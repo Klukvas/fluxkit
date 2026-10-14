@@ -11,3 +11,4 @@ coverage/
 *.log
 *.rdb
 *.tsbuildinfo
+third-party/

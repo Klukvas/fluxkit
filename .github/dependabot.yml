@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # TypeScript is pinned to 6.0.3 until typescript-eslint and dependency-cruiser support 7 (AGENTS.md, ADR 0003).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /infra
+    schedule:
+      interval: weekly

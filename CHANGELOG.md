@@ -12,3 +12,4 @@ One line per user-visible or schema change.
 - Add Meilisearch spike tests and search findings (`docs/adr/0005-search-notes.md`).
 - Add storefront (Next.js) and admin (Vite) skeletons on a shared token-based UI library with `uk`/`en` i18n, design tokens (`light`/`dark`) and design-guard tests.
 - Approve LGPL-3.0-or-later (unmodified sharp-libvips binaries) and CC-BY-4.0 (caniuse-lite) for specific cases.
+- Add GitHub Actions CI (verify, feature matrix, licenses/audit/notices, docs check, compose), Dependabot, and the scripts behind them.

@@ -25,3 +25,9 @@
 
 ## Other
 - `infra/docker-compose.yml` - local/CI services: PostgreSQL 17, Redis 8, Meilisearch v1.55.0 (healthchecks, ports on 127.0.0.1, required vars via `.env`). `infra/README.md` - how to start. `seeds/` - demo data (no client data).
+
+## CI and scripts
+- `.github/workflows/ci.yml` - CI jobs (verify, feature-matrix, policy, docs, compose). `.github/dependabot.yml` - weekly dependency updates.
+- `scripts/license-policy.json` + `scripts/check-licenses.mjs` - license policy and its check (production strict, dev extras, explicit exceptions).
+- `scripts/third-party-notices.mjs` - writes `third-party/THIRD_PARTY_NOTICES.md` for runtime dependencies (git-ignored, CI artifact).
+- `scripts/check-docs.mjs` - docs-with-code rules for PRs. `scripts/feature-matrix.sh` - feature on/off/deleted verification.

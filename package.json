@@ -16,7 +16,12 @@
     "format:check": "prettier --check .",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "test": "pnpm build && turbo run test",
-    "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export"
+    "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export",
+    "check:licenses": "node scripts/check-licenses.mjs",
+    "check:docs": "node scripts/check-docs.mjs --base origin/main",
+    "notices": "node scripts/third-party-notices.mjs",
+    "feature-matrix": "bash scripts/feature-matrix.sh",
+    "audit:prod": "pnpm audit --prod --audit-level=high"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

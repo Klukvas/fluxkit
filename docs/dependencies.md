@@ -104,3 +104,11 @@ Options for sharp: approve LGPL for unmodified, dynamically linked binaries; or 
 Decision (owner, 2026-10-14): both approved. `@img/sharp-libvips-*` (LGPL-3.0-or-later) only as unmodified, dynamically loaded prebuilt binaries brought by `next` -> `sharp`;
 `caniuse-lite` (CC-BY-4.0) as build-time browser data. Obligations to honor: keep license notices and attribution, never modify those packages, and include
 third-party notices with every client delivery (to be generated in CI, plan step 8). Any other LGPL/GPL-family or CC-BY package needs its own approval.
+
+## Decision 2026-10-14: Python-2.0 for `argparse` at runtime
+Found by `scripts/check-licenses.mjs` (plan step 8): `argparse` is a RUNTIME transitive dependency (`@nestjs/swagger` -> `js-yaml` -> `argparse`). Approved by the owner for this package only
+(permissive PSF-style license; notice goes into `THIRD_PARTY_NOTICES.md`). Machine-readable policy: `scripts/license-policy.json`.
+
+## Audit (2026-10-14)
+`pnpm audit`: 1 moderate finding, `esbuild <=0.24.2` (dev server request exposure) via `drizzle-kit` -> `@esbuild-kit/*` (dev tooling only, not shipped). CI fails only on high severity in production dependencies
+and reports the rest.
