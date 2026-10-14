@@ -1,2 +1,3 @@
-// Placeholder entry point. Real exports are added together with the code.
-export {};
+export const themeNames = ["light", "dark"] as const;
+export type ThemeName = (typeof themeNames)[number];
+export const defaultTheme: ThemeName = "light";

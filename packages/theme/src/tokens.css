@@ -1,0 +1,39 @@
+/*
+ * Design tokens: the ONE place to rebrand Fluxkit. Components never use raw colors, fonts or radii
+ * (AGENTS.md section 2.2); they use the semantic names mapped in tailwind.css.
+ * Replace the values below (or add a theme preset selector) when delivering a client design.
+ */
+:root,
+[data-theme="light"] {
+  --fk-color-background: #ffffff;
+  --fk-color-foreground: #0f172a;
+  --fk-color-muted: #f1f5f9;
+  --fk-color-muted-foreground: #475569;
+  --fk-color-border: #e2e8f0;
+  --fk-color-primary: #4f46e5;
+  --fk-color-primary-foreground: #ffffff;
+  --fk-color-danger: #dc2626;
+  --fk-radius-sm: 0.25rem;
+  --fk-radius-md: 0.5rem;
+  --fk-radius-lg: 1rem;
+  --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --fk-font-mono: ui-monospace, monospace;
+  --fk-shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.1);
+}
+
+[data-theme="dark"] {
+  --fk-color-background: #0b1020;
+  --fk-color-foreground: #e2e8f0;
+  --fk-color-muted: #172036;
+  --fk-color-muted-foreground: #94a3b8;
+  --fk-color-border: #26314d;
+  --fk-color-primary: #818cf8;
+  --fk-color-primary-foreground: #0b1020;
+  --fk-color-danger: #f87171;
+  --fk-radius-sm: 0.25rem;
+  --fk-radius-md: 0.5rem;
+  --fk-radius-lg: 1rem;
+  --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --fk-font-mono: ui-monospace, monospace;
+  --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+}

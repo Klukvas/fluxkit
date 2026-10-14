@@ -89,3 +89,14 @@ Install scripts: `@scarf/scarf` (analytics/telemetry, pulled in by `@nestjs/swag
 blocked (pnpm blocks dependency scripts by default and `pnpm-workspace.yaml` lists it explicitly). Never approve it. `@swc/core` and `msgpackr-extract` scripts are not needed either.
 
 Plan step 5 added the NestJS packages, Drizzle, pg, BullMQ, ioredis, zod, vitest, unplugin-swc, @swc/core and the types above; all are in the table.
+
+## Added in plan step 7 (frontends)
+next 16.4.1, react / react-dom 19.3.1, tailwindcss + @tailwindcss/postcss + @tailwindcss/vite 4.3.3, vite 8.3.4, @vitejs/plugin-react 6.1.2, @types/react(-dom) 19.3.0 (all MIT).
+Next telemetry is disabled through `NEXT_TELEMETRY_DISABLED=1` in the app scripts (AGENTS.md: no telemetry).
+
+### New license findings (decision needed, not approved yet)
+| License | Package | Where | Note |
+|---|---|---|---|
+| LGPL-3.0-or-later | `@img/sharp-libvips-linux-x64` (and musl) | RUNTIME: `next` -> `sharp` (optional) -> prebuilt libvips binaries used for image optimization | dynamically loaded, unmodified; LGPL is outside the strict list |
+| CC-BY-4.0 | `caniuse-lite` | build tooling (browserslist data used by Next/PostCSS) | data license, not code; attribution |
+Options for sharp: approve LGPL for unmodified, dynamically linked binaries; or avoid sharp (disable Next image optimization with `images.unoptimized` or use a custom loader) and drop it from the runtime.

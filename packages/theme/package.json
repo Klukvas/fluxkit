@@ -6,10 +6,25 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "6.0.3"
-  }
+    "@types/node": "26.6.5",
+    "typescript": "6.0.3",
+    "vitest": "5.0.4"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./tokens.css": "./src/tokens.css",
+    "./tailwind.css": "./src/tailwind.css"
+  },
+  "files": [
+    "dist",
+    "src"
+  ]
 }

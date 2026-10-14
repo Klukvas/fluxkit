@@ -1,0 +1,9 @@
+{
+  "site.title": "Fluxkit — storefront template",
+  "home.heading": "Catalog",
+  "home.subheading": "Your store's product catalog will appear here.",
+  "home.product.placeholder": "Placeholder product",
+  "home.product.price": "Price goes here",
+  "home.cta": "Add to cart",
+  "footer.powered": "Powered by FluxLab"
+}
