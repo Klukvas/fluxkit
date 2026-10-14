@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "openapi:export": "node dist/openapi-export.js",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "start": "node --env-file=../../.env dist/main.js"
   },
   "devDependencies": {
     "@nestjs/testing": "12.1.3",

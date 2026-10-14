@@ -1,6 +1,6 @@
 # Plan: monorepo scaffold and stack spike
 
-Status: proposed (waiting for approval)
+Status: steps 1 to 8 merged to `main` (PRs #1 to #5); step 9 (documentation) in PR #10. See Outcome at the end.
 Role: orchestrator plan; implementation by Developer agents, review by a different agent.
 
 ## Goal
@@ -120,3 +120,15 @@ Steps with disjoint owned paths may run in parallel by different agents. Reviewe
 1. Remote repository: push to GitHub is needed for CI. Which owner/name? (Org under FluxLab or personal account.)
 2. Node LTS pin: use the container's v22 line, or a different version?
 3. Is a throwaway example feature (`packages/features/_example`) acceptable in the template, or should it live only as a test fixture?
+
+## Outcome (added at completion)
+- Steps 1 to 8 done and merged; step 9 delivered in PR #10. Verified on GitHub Actions (for steps 1 to 8): lint, types, boundaries, 47 tests on real Postgres 17 / Redis 8 / Meilisearch v1.55.0, feature matrix on/off/deleted, license and audit policy, docs check, Compose stack healthy.
+- Deviations from the plan:
+  - Step 2: only `build` and `typecheck` scripts at first; other scripts were added in the step that makes them real (no stub scripts).
+  - Step 3: TypeScript pinned to 6.0.3 (typescript-eslint and dependency-cruiser do not support 7); added a guard that fails when dependency-cruiser checks nothing.
+  - Step 5: Drizzle has no down migrations (hand-written `.down.sql` convention); NestJS 12 is ESM-only (tsconfig base moved to NodeNext); feature tests live inside the feature package; independent review found 10 issues, all fixed (PR #2).
+  - Step 6: findings recorded in ADR 0005; two decisions still open (Ukrainian morphology, variant facet counts).
+  - Step 8: first CI run found a broken Meilisearch healthcheck in Compose and a misnamed audit script; both fixed.
+  - Docs agent role (step 9) was done by the orchestrating agent, not a separate Haiku agent.
+- Approved license exceptions are recorded in `AGENTS.md` section 16 and `scripts/license-policy.json`.
+- Not done (by design, outside this plan): domain logic, providers, e2e tests, production deployment, branch protection.

@@ -23,18 +23,19 @@ Every decision must keep these facts in mind:
 - Language: TypeScript everywhere (monorepo, shared types and validation schemas).
 - Backend: NestJS (modules map to core domains and feature modules). Public API: REST + OpenAPI.
 - DB: PostgreSQL + Drizzle ORM. Migrations via Drizzle, reversible.
-- Search/filters: Meilisearch (facets, counts, suggestions), fed from Postgres via events/queues.
+- Search/filters: Meilisearch (typo tolerance, filters, facets), fed from Postgres via events/queues. Spike findings and open decisions (Ukrainian morphology,
+  variant-level facet counts) are in `docs/adr/0005-search-notes.md`; one document per variant + `distinctAttribute: productId`.
 - Queues/cache: Redis + BullMQ.
 - Storefront: Next.js (App Router) + Tailwind, design tokens as CSS variables.
 - Admin: React SPA (Vite), shares the UI library and tokens with the storefront.
-- Deployment: Docker Compose (API, worker, Postgres, Redis, Meilisearch); one-command local setup.
+- Deployment: `infra/docker-compose.yml` runs Postgres, Redis and Meilisearch today (verified in CI). API/worker images and a production deployment are not built yet.
 - First market: Ukraine (UAH, `uk`/`en`, Ukrainian payment and shipping providers as plugins), then EU/US.
   Currencies, locales, payment and shipping providers are core abstractions, not hardcoded.
 
 ## Tooling (decided, see `docs/adr/0003-tooling.md`)
 
 - Package manager / monorepo: pnpm workspaces + Turborepo.
-- Tests: Vitest (unit, integration) + Playwright (e2e). Integration tests use a real Postgres (Docker/Testcontainers), not mocks.
+- Tests: Vitest (unit, integration); Playwright (e2e) is planned, not set up yet. Integration tests use real Postgres, Redis and Meilisearch (CI service containers), not mocks.
 - Lint/format: ESLint (strict TS rules) + Prettier; dependency-cruiser for module boundaries.
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
@@ -43,9 +44,9 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
   `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
-- Planned, added later: root `pnpm dev`, `pnpm test:e2e`.
-  Integration tests need real services and fail (not skip) without `DATABASE_URL`, `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; start Postgres/Redis (see `infra/README.md`) and export them.
-  Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
+- Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
+- Planned, added later: root `pnpm dev`, `pnpm test:e2e`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
+- Integration tests need real services and fail (not skip) without `DATABASE_URL` (database name must end in `_test`), `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; see the README quick start.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
 Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), **TypeScript pinned to 6.0.3** (see below), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
@@ -88,7 +89,8 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Catalog filters operate on variants and group results by product. Search runs through a search index, not ad-hoc SQL JOINs.
 - Money is stored in minor units (integers) with a currency code. Never floats.
 - Order items store a **snapshot** (title, SKU, price, image) at purchase time.
-- Inventory lives in its own table (`variant_id + warehouse_id + qty`) to keep multi-warehouse possible.
+- Prices live in a `price` table (variant, currency, minor-unit amount, optional customer group). Inventory lives in `inventory_level` per `variant_id + location_id`
+  (`on_hand`, `reserved`) with reservations and an append-only `stock_movement` journal, so multi-warehouse needs no migration. Details: `docs/adr/0004-core-data-model.md`.
 
 ## 3. Working rules for agents
 
@@ -125,7 +127,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 
 ## 4. Conventions
 
-- Language: code, comments, commits, and docs in English. UI strings via i18n (default locale + `ru`).
+- Language: code, comments, commits, and docs in English. UI strings via i18n (default locale `uk`, plus `en`).
 - Naming: descriptive and consistent with the domain (`variant`, `productType`, `attribute`, `option`). Avoid abbreviations.
 - Commits: small, focused, imperative mood. One concern per commit.
 - Branches: `feature/<name>`, `fix/<name>`, `chore/<name>`.
@@ -135,20 +137,22 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 
 ```
 /apps
-  /api               # NestJS: core domains + feature modules, REST/OpenAPI
-  /storefront        # Next.js customer site
-  /admin             # React SPA (Vite)
+  /api               # NestJS: health, feature loader, DB; core domains to come (REST/OpenAPI)
+  /storefront        # Next.js customer site (placeholder home page)
+  /admin             # React SPA (Vite) (placeholder screen)
 /packages
-  /core              # domain logic: catalog, pricing, inventory, cart, checkout, orders, customers
-  /features          # optional modules: wishlist, reviews, coupons, ...
-  /providers         # payment and shipping provider plugins (liqpay, nova-poshta, stripe, ...)
+  /core              # domain logic: catalog, pricing, inventory, cart, checkout, orders, customers (empty scaffold)
+  /features          # optional modules, one package each (only the sample `_example` so far)
+  /providers         # payment and shipping provider plugins (none yet)
   /ui                # token-based component library (shared by storefront and admin)
-  /theme             # design tokens + theme presets
-  /config            # feature flags, store settings schema
-  /api-client        # typed client generated from OpenAPI
-/docs                # api, files, adr, plans, contracts, migrations
-/seeds               # demo data, product type presets
-/infra               # docker compose, deployment
+  /theme             # design tokens + tests/guards
+  /config            # env parsing and feature flag parsing
+  /api-client        # typed client generated from OpenAPI (empty scaffold)
+/docs                # api, files, adr, plans, contracts, migrations, dependencies
+/seeds               # demo data, product type presets (none yet)
+/infra               # docker compose for Postgres, Redis, Meilisearch
+/scripts             # CI and policy scripts (licenses, docs check, feature matrix, notices)
+/.github             # CI workflow and Dependabot
 ```
 
 ## 6. Definition of done
@@ -308,4 +312,5 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
 - Dependabot (`.github/dependabot.yml`) updates npm, GitHub Actions and Docker images weekly; TypeScript major bumps are ignored until the linters support them.
-- Local equivalents: every script above is a `pnpm` script (`check:licenses`, `check:docs`, `audit`, `notices`, `feature-matrix`).
+- Local equivalents: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `test`, `feature-matrix`, `check:licenses`, `audit:prod`, `notices`, `check:docs`.
+  There is no script for the `compose` job; run `docker compose --env-file .env -f infra/docker-compose.yml up -d --wait` yourself.
