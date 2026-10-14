@@ -38,10 +38,12 @@ Every decision must keep these facts in mind:
 - Lint/format: ESLint (strict TS rules) + Prettier; dependency-cruiser for module boundaries.
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
-Standard root scripts (convention; the scaffold must provide them, always check `package.json` before using):
-`pnpm dev`, `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm check:boundaries`.
+Root scripts (always check `package.json` before using; do not invent commands):
+- Available now: `pnpm build`, `pnpm typecheck` (Turborepo runs them in every workspace package).
+- Planned, added in their plan steps: `pnpm lint` and `pnpm check:boundaries` (step 3), `pnpm test` (step 5), `pnpm dev` (steps 5 and 7), `pnpm test:e2e` (later).
+  Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 
-> TODO until the scaffold exists: exact versions, Node version, the real scripts. Do not invent commands that are not in `package.json`.
+Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
 
 ## 2. Core architecture principles
 
