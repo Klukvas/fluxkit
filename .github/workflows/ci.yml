@@ -136,7 +136,7 @@ jobs:
       - name: Audit all dependencies (report only)
         run: pnpm audit --audit-level=moderate || true
       - run: pnpm notices
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: third-party-notices
           path: third-party/THIRD_PARTY_NOTICES.md
