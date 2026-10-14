@@ -11,3 +11,4 @@ One line per user-visible or schema change.
 - Approve MPL-2.0, Python-2.0, BlueOak-1.0.0 and Apache-2.0 AND MIT for development tooling only.
 - Add Meilisearch spike tests and search findings (`docs/adr/0005-search-notes.md`).
 - Add storefront (Next.js) and admin (Vite) skeletons on a shared token-based UI library with `uk`/`en` i18n, design tokens (`light`/`dark`) and design-guard tests.
+- Approve LGPL-3.0-or-later (unmodified sharp-libvips binaries) and CC-BY-4.0 (caniuse-lite) for specific cases.
