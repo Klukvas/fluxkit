@@ -38,10 +38,16 @@ Every decision must keep these facts in mind:
 - Lint/format: ESLint (strict TS rules) + Prettier; dependency-cruiser for module boundaries.
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
-Standard root scripts (convention; the scaffold must provide them, always check `package.json` before using):
-`pnpm dev`, `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm check:boundaries`.
+Root scripts (always check `package.json` before using; do not invent commands):
+- Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`.
+- Planned, added in their plan steps: `pnpm test` (step 5), `pnpm dev` (steps 5 and 7), `pnpm test:e2e` (later).
+  Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
+- Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
-> TODO until the scaffold exists: exact versions, Node version, the real scripts. Do not invent commands that are not in `package.json`.
+Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), **TypeScript pinned to 6.0.3** (see below), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
+
+TypeScript 7 is NOT used yet: `typescript-eslint` and `dependency-cruiser` do not support it (the latter silently checks nothing). Do not bump TypeScript
+until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; changing the pin is a red-zone decision (section 14).
 
 ## 2. Core architecture principles
 
@@ -255,8 +261,11 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 
 ## 16. Dependencies
 
-- Allowed licenses only: MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0. GPL, AGPL, SSPL, and "source-available"
-  licenses are forbidden in the template; anything unusual needs explicit approval.
+- Allowed licenses for code dependencies (anything installed into our packages): MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0.
+  GPL, AGPL, SSPL, and "source-available" licenses are forbidden there; anything unusual needs explicit approval.
+- External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
+  Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
+  fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.
 - Commit the lockfile. Pin exact versions for production dependencies.
 - Dependency audit (vulnerabilities + license check) runs in CI and must pass.
 - Prefer fewer, well-maintained dependencies. Do not add a library for something small.
