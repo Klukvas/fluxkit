@@ -17,7 +17,7 @@ Every decision must keep these facts in mind:
 
 **Optimize for changeability, not for cleverness.** Prefer boring, explicit, well-named code.
 
-> TODO (fill in once chosen): stack, package manager, DB, search engine, payment providers.
+> TODO (open decision, discussed separately): stack, package manager, DB, search engine, payment providers.
 > Do not assume a stack that is not listed here. Check existing code and config first.
 
 ## 2. Core architecture principles
@@ -193,3 +193,65 @@ Rules:
 - Do not push to `main` directly. Do not force-push shared branches.
 - Do not commit generated files, build output, or secrets.
 - Review checklist: architecture rules (section 2), tests, docs, security (section 11), no masked failures (section 9).
+
+## 13. Testing strategy
+
+- **Money logic is TDD, no exceptions**: prices, discounts, coupons, taxes, shipping cost, stock changes, order totals,
+  refunds. Write failing tests first (include edge cases: rounding, zero/negative, currency, concurrency on stock),
+  then the code. The report must show the failing-then-passing evidence.
+- Everything else: tests are written together with the code, in the same PR. Order is not enforced.
+- Bug fixes: add a regression test that fails before the fix.
+- Test the real thing. Mock only external boundaries (payment provider, email, third-party APIs).
+
+## 14. Stop and ask (red zones)
+
+An agent MUST stop and get approval from the orchestrator/user before doing any of the following:
+
+- Adding a new dependency (state: why, license, size, alternatives considered).
+- Creating, changing, or removing a DB migration or schema.
+- Changing a public contract (see section 17): API shape, extension point, config schema, theme tokens, events.
+- Touching payments, auth/permissions, or order-total/pricing calculation outside the approved plan.
+- Deleting or moving files outside the task's owned paths.
+- Moving something between core and a feature module, or adding a new feature flag.
+- Running destructive commands (data reset, force-push, dropping tables).
+
+Everything else the agent decides itself and mentions in the report. Do not ask about trivia.
+
+## 15. Template cleanliness (master + forks)
+
+- The master repository is the product. It must contain NO client data: no client names, domains, emails,
+  logos, copy, keys, real products, or orders. Only placeholders and demo seeds.
+- Client work happens in a **separate fork or private repo per client**, never in master.
+- Generic improvements made for a client are ported back to master as a separate, cleaned PR.
+- Master receives updates from forks only through reviewed PRs; client forks pull upstream releases (SemVer, section 17).
+- Before any release of master, a human confirms there are no client traces (names, secrets, assets).
+
+## 16. Dependencies
+
+- Allowed licenses only: MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0. GPL, AGPL, SSPL, and "source-available"
+  licenses are forbidden in the template; anything unusual needs explicit approval.
+- Commit the lockfile. Pin exact versions for production dependencies.
+- Dependency audit (vulnerabilities + license check) runs in CI and must pass.
+- Prefer fewer, well-maintained dependencies. Do not add a library for something small.
+- Record each non-obvious dependency choice in `docs/adr/` or the module README.
+
+## 17. Contracts and versioning
+
+- The template follows **SemVer**. Public contracts are listed in `docs/contracts/` (one file per area):
+  API endpoints, UI slots, hooks and events, feature-flag/config schema, theme tokens, DB tables meant for extension.
+- Anything not listed there is internal and may change freely. Do not rely on internals from feature modules or client code.
+- Breaking a public contract = major version, a migration guide in `docs/migrations/`, and a `CHANGELOG.md` entry.
+  Deprecate first (one minor release) when possible.
+- Customization must go through public contracts (slots, hooks, config, tokens), not by editing core files.
+  If a client needs something that requires editing core, add a proper extension point instead.
+
+## 18. CI requirements
+
+CI must run on every PR and block merge on failure:
+
+- Lint, type check, unit/integration tests.
+- Build matrix for feature removal: (a) all features enabled, (b) all optional features disabled via flags,
+  (c) each feature folder deleted in turn. Core must build and its tests must pass in all of them.
+- Module boundary check: core must not import from `packages/features/*`.
+- Dependency audit and license allowlist check.
+- Docs check: changed endpoints/files/contracts require matching updates in `docs/`.

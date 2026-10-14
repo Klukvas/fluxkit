@@ -35,3 +35,13 @@ User goal
 - Escalate on blockers instead of guessing: Developer -> Orchestrator -> Architect -> user.
 - Keep tasks small enough that a Developer finishes in one session with a clear verification command.
 - Every handoff is a file or a written task, not an assumption.
+
+## Decisions log (workflow)
+
+- Tests: TDD for money logic, tests-with-code elsewhere.
+- Autonomy: stop-and-ask list (red zones), see AGENTS.md section 14.
+- Cleanliness: clean master repo, client work in forks.
+- Dependencies: license allowlist + CI audit + pinned versions.
+- Feature removal: verified by CI build matrix.
+- Contracts: SemVer + `docs/contracts/` registry.
+- Stack: undecided, to be discussed.
