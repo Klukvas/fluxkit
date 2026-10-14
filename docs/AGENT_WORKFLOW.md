@@ -49,3 +49,4 @@ User goal
 - Core: own core (ADR 0001). Stack: TypeScript, NestJS, REST+OpenAPI, Postgres+Drizzle, Meilisearch, Redis+BullMQ, Next.js+Tailwind storefront, React SPA admin, Docker Compose (ADR 0002).
 - Tooling: pnpm + Turborepo, Vitest + Playwright, ESLint + Prettier + dependency-cruiser, GitHub + Actions (ADR 0003).
 - Data model: JSONB attributes, price table, inventory_level+reservations+movements, cart->order snapshot with separate payment/fulfillment (ADR 0004).
+- Taxes: prices as entered + prices_include_tax setting, rates in tax_class. Pricing pipeline with adjusters in core, discounts/coupons as feature. customer_group in core, B2B pricing paid module (ADR 0004).

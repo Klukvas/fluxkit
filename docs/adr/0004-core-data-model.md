@@ -15,10 +15,10 @@ Status: accepted (decisions); entity list is a design draft to be refined when w
 ## Draft entities
 - Catalog: `product_type`, `attribute` (definition), `attribute_option` (dictionary values), `product_type_attribute` (assignment, level product|variant),
   `category`, `brand`, `product`, `product_option`, `product_option_value`, `variant`, `variant_option_value`, `media`.
-- Pricing: `price`, `price_rule`/customer group (later), `tax_class`, `currency`.
+- Pricing: `price` (with optional `customer_group_id`), `tax_class`, `tax_rate`/region rules, `currency`.
 - Inventory: `location`, `inventory_level`, `reservation`, `stock_movement`.
 - Sales: `cart`, `cart_item`, `order`, `order_item` (snapshot), `payment`, `payment_attempt`, `fulfillment`, `fulfillment_item`, `refund`/`return`.
-- Customers: `customer`, `address`, `customer_group`.
+- Customers: `customer`, `address`, `customer_group` (core from day one).
 - Platform: `store_settings`, `feature_flag` state, `event_outbox`, `audit_log`.
 
 ## Design notes (proposed by the architect role, confirm when implementing)
@@ -36,7 +36,15 @@ Status: accepted (decisions); entity list is a design draft to be refined when w
 - Price table and inventory levels add joins but make multi-currency, B2B pricing and multi-warehouse additive, not rewrites.
 - More entities than a minimal shop: justified by the Ukraine -> EU/US roadmap and cash-on-delivery support.
 
-## Open questions
-- Taxes: prices tax-inclusive or exclusive per market (UA vs EU/US)? Needs its own decision.
-- Discounts/coupons: core or feature module? (currently feature; core must expose a price-adjustment extension point).
-- Customer groups and B2B pricing: when to introduce.
+## Resolved open questions
+- **Taxes**: price stored as entered; a `prices_include_tax` setting (per store/currency) defines its meaning; rates live in `tax_class` and region
+  rules. UA (incl./excl. VAT), EU (VAT-inclusive) and US (tax-exclusive, tax at checkout) fit one model. Full US sales tax by address uses an external provider plugin.
+- **Discounts/coupons**: the core owns an ordered pricing pipeline (lines -> discounts -> taxes -> shipping -> total) with registered
+  price adjusters in fixed steps. Coupons/promotions/loyalty are feature modules that register adjusters; disabling them leaves the pipeline intact. Fully TDD.
+- **Customer groups / B2B**: `customer_group` and `price.customer_group_id` exist in the core from day one. B2B logic (wholesale prices,
+  invoices, company accounts) is a paid feature module added later without schema migration.
+
+## Still open
+- Exact pipeline steps and adjuster contract (to be published in `docs/contracts/`).
+- Rounding rules per currency and tax-rounding strategy (per line vs per order).
+- Returns/refund model details.
