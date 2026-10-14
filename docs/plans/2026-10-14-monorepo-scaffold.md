@@ -1,6 +1,6 @@
 # Plan: monorepo scaffold and stack spike
 
-Status: COMPLETED 2026-10-14 (see Outcome at the end). Merged in PRs #1 to #5 on `main`.
+Status: steps 1 to 8 merged to `main` (PRs #1 to #5); step 9 (documentation) in PR #10. See Outcome at the end.
 Role: orchestrator plan; implementation by Developer agents, review by a different agent.
 
 ## Goal
@@ -122,7 +122,7 @@ Steps with disjoint owned paths may run in parallel by different agents. Reviewe
 3. Is a throwaway example feature (`packages/features/_example`) acceptable in the template, or should it live only as a test fixture?
 
 ## Outcome (added at completion)
-- All nine steps done. Verified on GitHub Actions: lint, types, boundaries, 47 tests on real Postgres 17 / Redis 8 / Meilisearch v1.55.0, feature matrix on/off/deleted, license and audit policy, docs check, Compose stack healthy.
+- Steps 1 to 8 done and merged; step 9 delivered in PR #10. Verified on GitHub Actions (for steps 1 to 8): lint, types, boundaries, 47 tests on real Postgres 17 / Redis 8 / Meilisearch v1.55.0, feature matrix on/off/deleted, license and audit policy, docs check, Compose stack healthy.
 - Deviations from the plan:
   - Step 2: only `build` and `typecheck` scripts at first; other scripts were added in the step that makes them real (no stub scripts).
   - Step 3: TypeScript pinned to 6.0.3 (typescript-eslint and dependency-cruiser do not support 7); added a guard that fails when dependency-cruiser checks nothing.

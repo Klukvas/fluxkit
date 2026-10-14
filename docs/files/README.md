@@ -9,5 +9,5 @@ Update on every add, move, rename, or delete.
 ## Index
 - `workspace.md` - repo root, CI and scripts. `api.md` - apps/api. `storefront.md` - apps/storefront. `admin.md` - apps/admin.
 - `ui.md` - packages/ui. `theme.md` - packages/theme. `config.md` - packages/config. `features.md` - packages/features.
-- Empty scaffolds with only a README and a placeholder entry point (documented here until they get code): `packages/core` (domain logic),
-  `packages/api-client` (client generated from OpenAPI), `packages/providers` (payment and shipping plugins), `seeds/` (demo data).
+- Scaffolds without real code yet: `packages/core` and `packages/api-client` (placeholder `src/index.ts`), `packages/providers` and `seeds/` (only a README, no package).
+  They are documented here until they get code.

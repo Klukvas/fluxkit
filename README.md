@@ -30,6 +30,8 @@ Prerequisites: Node 22 (`.nvmrc`), pnpm 10.28 (`corepack enable`), Docker with C
 ```bash
 pnpm install
 cp .env.example .env     # edit values; never commit .env
+                         # keep the passwords inside DATABASE_URL and REDIS_URL equal to POSTGRES_PASSWORD and REDIS_PASSWORD
+                         # if ports 5432, 6379 or 7700 are taken, change POSTGRES_PORT, REDIS_PORT, MEILI_PORT and the URLs too
 
 # Postgres, Redis, Meilisearch
 docker compose --env-file .env -f infra/docker-compose.yml up -d --wait
@@ -39,17 +41,21 @@ docker compose --env-file .env -f infra/docker-compose.yml exec postgres created
 
 pnpm build
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
-pnpm --filter @fluxkit/storefront dev   # http://localhost:3000 (set another port if the API uses 3000)
-pnpm --filter @fluxkit/admin dev
+pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000)
+pnpm --filter @fluxkit/admin dev                # Vite prints the URL (default http://localhost:5173)
 ```
 
-Run the full test suite (integration tests need real services and fail, not skip, without these variables; use the passwords from your `.env`):
+Run the full test suite (integration tests need real services and fail, not skip, without these variables; use the values from your `.env`).
+Use a subshell so the test variables do not leak into your terminal: Node's `--env-file` never overrides variables that are already set, so a leaked
+`DATABASE_URL` would make `pnpm --filter @fluxkit/api start` silently use the test database.
 
 ```bash
-export DATABASE_URL=postgres://fluxkit:<POSTGRES_PASSWORD>@127.0.0.1:5432/fluxkit_test
-export REDIS_URL=redis://:<REDIS_PASSWORD>@127.0.0.1:6379
-export MEILI_URL=http://127.0.0.1:7700 MEILI_MASTER_KEY=<MEILI_MASTER_KEY>
-pnpm test
+(
+  export DATABASE_URL=postgres://fluxkit:<POSTGRES_PASSWORD>@127.0.0.1:5432/fluxkit_test
+  export REDIS_URL=redis://:<REDIS_PASSWORD>@127.0.0.1:6379
+  export MEILI_URL=http://127.0.0.1:7700 MEILI_MASTER_KEY=<MEILI_MASTER_KEY>
+  pnpm test
+)
 ```
 
 Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`.

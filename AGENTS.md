@@ -44,7 +44,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
   `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
-- Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`).
+- Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
 - Planned, added later: root `pnpm dev`, `pnpm test:e2e`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Integration tests need real services and fail (not skip) without `DATABASE_URL` (database name must end in `_test`), `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; see the README quick start.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
@@ -312,4 +312,5 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
 - Dependabot (`.github/dependabot.yml`) updates npm, GitHub Actions and Docker images weekly; TypeScript major bumps are ignored until the linters support them.
-- Local equivalents: every script above is a `pnpm` script (`check:licenses`, `check:docs`, `audit`, `notices`, `feature-matrix`).
+- Local equivalents: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `test`, `feature-matrix`, `check:licenses`, `audit:prod`, `notices`, `check:docs`.
+  There is no script for the `compose` job; run `docker compose --env-file .env -f infra/docker-compose.yml up -d --wait` yourself.
