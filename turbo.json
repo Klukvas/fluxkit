@@ -11,7 +11,7 @@
     "test": {
       "dependsOn": ["^build"],
       "cache": false,
-      "passThroughEnv": ["DATABASE_URL", "REDIS_URL"]
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "MEILI_URL", "MEILI_MASTER_KEY"]
     }
   }
 }

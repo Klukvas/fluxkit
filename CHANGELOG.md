@@ -9,3 +9,4 @@ One line per user-visible or schema change.
 - Add ESLint, Prettier and dependency-cruiser checks (`lint`, `format:check`, `check:boundaries`); pin TypeScript to 6.0.3.
 - Add NestJS API spike: `GET /health`, Drizzle migration with down script, OpenAPI export, feature flag loader with example feature, BullMQ spike; `pnpm test` and `pnpm openapi:export`.
 - Approve MPL-2.0, Python-2.0, BlueOak-1.0.0 and Apache-2.0 AND MIT for development tooling only.
+- Add Meilisearch spike tests and search findings (`docs/adr/0005-search-notes.md`).

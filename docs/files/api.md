@@ -11,5 +11,6 @@
 - `src/health/` - `GET /health`.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`).
 - `src/spikes/queue.spec.ts` - BullMQ spike against real Redis.
+- `src/spikes/search.spec.ts` - Meilisearch spike (Ukrainian text, variant filters, facets); findings in `docs/adr/0005-search-notes.md`.
 - `src/test/` - test helpers (`startApp`, `requireEnv`) and the fixture feature used by core tests.
 - `vitest.config.ts` - Vitest with SWC (needed for Nest decorator metadata).

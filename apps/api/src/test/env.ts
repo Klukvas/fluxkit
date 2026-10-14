@@ -1,5 +1,7 @@
 /** Integration tests need real services. A missing variable fails the test loudly instead of skipping it. */
-export function requireEnv(name: "DATABASE_URL" | "REDIS_URL"): string {
+export function requireEnv(
+  name: "DATABASE_URL" | "REDIS_URL" | "MEILI_URL" | "MEILI_MASTER_KEY",
+): string {
   const value = process.env[name];
   if (value === undefined || value === "") {
     throw new Error(
