@@ -1,0 +1,27 @@
+{
+  "_comment": "License policy enforced by scripts/check-licenses.mjs. Mirrors AGENTS.md section 16. Change only with owner approval.",
+  "strict": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "0BSD", "CC0-1.0"],
+  "devOnlyExtra": ["MPL-2.0", "Python-2.0", "BlueOak-1.0.0"],
+  "exceptions": [
+    {
+      "package": "@img/sharp-libvips-linux-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp)"
+    },
+    {
+      "package": "@img/sharp-libvips-linuxmusl-x64",
+      "license": "LGPL-3.0-or-later",
+      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp)"
+    },
+    {
+      "package": "caniuse-lite",
+      "license": "CC-BY-4.0",
+      "reason": "owner 2026-10-14: build-time browser data, keep attribution"
+    },
+    {
+      "package": "argparse",
+      "license": "Python-2.0",
+      "reason": "owner 2026-10-14: runtime transitive of @nestjs/swagger -> js-yaml, permissive"
+    }
+  ]
+}

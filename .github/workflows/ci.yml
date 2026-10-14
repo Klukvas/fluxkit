@@ -1,0 +1,170 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
+  # Throwaway credentials for ephemeral CI service containers only.
+  DATABASE_URL: postgres://fluxkit:ci-postgres@localhost:5432/fluxkit_test
+  REDIS_URL: redis://localhost:6379
+  MEILI_URL: http://localhost:7700
+  MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+
+jobs:
+  verify:
+    name: Lint, types, boundaries, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fluxkit
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: fluxkit_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fluxkit -d fluxkit_test" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+          MEILI_NO_ANALYTICS: "true"
+        ports: ["7700:7700"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for Meilisearch
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS "$MEILI_URL/health" && exit 0
+            sleep 1
+          done
+          echo "Meilisearch did not become healthy" >&2
+          exit 1
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm check:boundaries
+      - run: pnpm test
+
+  feature-matrix:
+    name: Feature matrix (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [on, off, deleted]
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fluxkit
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: fluxkit_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fluxkit -d fluxkit_test" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+          MEILI_NO_ANALYTICS: "true"
+        ports: ["7700:7700"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for Meilisearch
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS "$MEILI_URL/health" && exit 0
+            sleep 1
+          done
+          echo "Meilisearch did not become healthy" >&2
+          exit 1
+      - run: bash scripts/feature-matrix.sh ${{ matrix.mode }}
+
+  policy:
+    name: Licenses, audit, notices
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:licenses
+      - name: Audit production dependencies (fails on high severity)
+        run: pnpm audit
+      - name: Audit all dependencies (report only)
+        run: pnpm audit --audit-level=moderate || true
+      - run: pnpm notices
+      - uses: actions/upload-artifact@v4
+        with:
+          name: third-party-notices
+          path: third-party/THIRD_PARTY_NOTICES.md
+
+  docs:
+    name: Docs are updated with the code
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/check-docs.mjs --base origin/${{ github.base_ref }}
+
+  compose:
+    name: Docker Compose stack starts healthy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp .env.example .env
+      - run: docker compose --env-file .env -f infra/docker-compose.yml up -d --wait --wait-timeout 180
+      - run: docker compose --env-file .env -f infra/docker-compose.yml ps
+      - if: failure()
+        run: docker compose --env-file .env -f infra/docker-compose.yml logs
+      - if: always()
+        run: docker compose --env-file .env -f infra/docker-compose.yml down -v
