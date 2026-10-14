@@ -63,7 +63,7 @@ Standard root scripts (convention; the scaffold must provide them, always check 
 - All user-facing strings go through i18n. No hardcoded text in components.
 - Do not bake client-specific branding, copy, or images into the template. Use placeholders and demo data.
 
-### 2.3 Catalog data model (do not break this)
+### 2.3 Catalog data model (do not break this; details in `docs/adr/0004-core-data-model.md`)
 - **Product** = catalog entity (card, SEO, reviews, categories). **Variant/SKU** = purchasable unit (price, stock, SKU code).
 - Cart, order items, and stock reference `variant_id`, never `product_id`.
 - A simple product still has one default variant. No special-case branches for "no variants".
