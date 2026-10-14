@@ -1,0 +1,120 @@
+# AGENTS.md — Fluxkit
+
+_Fluxkit — white-label e-commerce template. Powered by [FluxLab](https://flux-lab.dev/en)._
+
+Shared rules for all AI coding agents (Claude Code, Codex, etc.).
+`CLAUDE.md` imports this file, so this is the single source of truth.
+
+## 1. What we are building
+
+A **white-label e-commerce template** that is sold to clients and then customized by our team.
+Every decision must keep these facts in mind:
+
+- We do NOT know the client's niche in advance (clothes, tools, food, digital goods...).
+- Design WILL be replaced per client (colors, fonts, layout, components).
+- Features WILL be added or removed per client (reviews, wishlist, coupons, multi-currency...).
+- The codebase must stay easy to hand over: clear structure, docs, demo data, one-command setup.
+
+**Optimize for changeability, not for cleverness.** Prefer boring, explicit, well-named code.
+
+> TODO (fill in once chosen): stack, package manager, DB, search engine, payment providers.
+> Do not assume a stack that is not listed here. Check existing code and config first.
+
+## 2. Core architecture principles
+
+### 2.1 Feature modules (add/remove without breaking the rest)
+- Each optional feature lives in its own module/folder (e.g. `features/wishlist`, `features/reviews`, `features/coupons`).
+- Core code must NEVER import from an optional feature directly. Features plug in through
+  extension points: registry, config flags, events, slots, or hooks.
+- Every optional feature must be toggleable by a single config flag (`features.wishlist.enabled`).
+  With the flag off: no UI, no routes, no API endpoints, no DB side effects at runtime.
+- Removing a feature = deleting its folder + its flag + its migration (documented in the feature's README). Check that this actually works when you add a feature.
+- Core = catalog, cart, checkout, orders, customers, admin basics. Everything else is a feature.
+
+### 2.2 Design is replaceable (theming)
+- No hardcoded colors, fonts, spacing, radii, shadows in components. Use **design tokens** only
+  (CSS variables / theme file). One place to rebrand.
+- Separate **UI components** (dumb, presentational, token-styled) from **data/logic** (hooks, services).
+  Redesign must be possible without touching business logic.
+- Layout composition (page sections, order of blocks) should be configurable, not buried in components.
+- All user-facing strings go through i18n. No hardcoded text in components.
+- Do not bake client-specific branding, copy, or images into the template. Use placeholders and demo data.
+
+### 2.3 Catalog data model (do not break this)
+- **Product** = catalog entity (card, SEO, reviews, categories). **Variant/SKU** = purchasable unit (price, stock, SKU code).
+- Cart, order items, and stock reference `variant_id`, never `product_id`.
+- A simple product still has one default variant. No special-case branches for "no variants".
+- **Options** (color, size) generate variants. **Attributes** (material, length) describe the product. Never mix them.
+- Product structure is **data-driven**: ProductType defines which options/attributes exist.
+  Never hardcode niche-specific fields like `size` or `color` on the product schema or in UI.
+- Attribute behavior is controlled by flags (`is_filterable`, `is_searchable`, `is_visible_on_storefront`,
+  `is_comparable`, `is_sortable`, `is_internal`). Categories can override filter lists and order.
+- `is_internal` data must never leave the public/storefront API. Enforce on the backend, not only in templates.
+- Catalog filters operate on variants and group results by product. Search runs through a search index, not ad-hoc SQL JOINs.
+- Money is stored in minor units (integers) with a currency code. Never floats.
+- Order items store a **snapshot** (title, SKU, price, image) at purchase time.
+- Inventory lives in its own table (`variant_id + warehouse_id + qty`) to keep multi-warehouse possible.
+
+## 3. Working rules for agents
+
+### Before coding
+- Read the relevant module and its README first. Follow existing conventions over personal preference.
+- If a request conflicts with section 2 (e.g. "just hardcode this color/field"), do the right thing within the architecture and tell the user why.
+- If the request is ambiguous in a way that changes architecture (core vs feature, data model), ask a short question before building.
+
+### While coding
+- Make the smallest change that solves the task. No drive-by refactors, no unrelated renames or reformatting.
+- No new dependencies without a clear reason; state the reason. Prefer what is already in the project.
+- No client-specific logic in core. If something is niche-specific, make it config, a feature module, or an attribute.
+- Keep public APIs and DB schema backward compatible where possible. Schema changes need a migration (up and down) and a note in the changelog.
+- Never commit secrets. Use `.env` + `.env.example`; every new env var must be added to `.env.example` and the docs.
+- Validate input at the boundary (API, forms, imports). Never trust client-sent prices, totals, or stock.
+  Prices and totals are always recalculated on the server.
+- Handle empty/loading/error states in UI (empty cart, no results, out of stock, payment failed).
+- Accessibility baseline: semantic HTML, labels, keyboard navigation, contrast via tokens.
+- Performance baseline: optimized images, lazy loading, no N+1 queries, paginate lists.
+
+### After coding
+- Run lint, type check, and tests for what you touched. Add or update tests for new behavior
+  (especially cart, pricing, stock, checkout, permissions).
+- Update docs when you change behavior: module README, `docs/`, `.env.example`, demo data/seeds.
+- Report honestly: what changed, what was verified, what was NOT verified or skipped.
+
+### Do not, without explicit approval
+- Delete or rewrite migrations that may already be applied.
+- Change payment, auth, or order-total calculation logic beyond the task.
+- Run destructive DB or git commands (reset, force-push, drop).
+- Add telemetry or third-party scripts.
+
+## 4. Conventions
+
+- Language: code, comments, commits, and docs in English. UI strings via i18n (default locale + `ru`).
+- Naming: descriptive and consistent with the domain (`variant`, `productType`, `attribute`, `option`). Avoid abbreviations.
+- Commits: small, focused, imperative mood. One concern per commit.
+- Branches: `feature/<name>`, `fix/<name>`, `chore/<name>`.
+- Comments explain *why*, not *what*. Do not comment obvious code.
+
+## 5. Suggested repo layout (adjust to the real stack)
+
+```
+/apps
+  /storefront        # customer-facing site
+  /admin             # admin panel (or built into the platform)
+/packages
+  /core              # catalog, cart, checkout, orders, customers
+  /features          # optional modules: wishlist, reviews, coupons, ...
+  /ui                # token-based component library
+  /theme             # design tokens + theme presets
+  /config            # feature flags, store settings schema
+/docs                # architecture, feature guides, how to rebrand, how to remove a feature
+/seeds               # demo data, product type presets
+```
+
+## 6. Definition of done
+
+- Works with the feature flag on and off (for feature modules).
+- No hardcoded design values or user-facing strings.
+- Respects Product/Variant and attribute rules above.
+- Lint, types, and tests pass; new behavior is covered.
+- Docs, `.env.example`, and seeds updated.
+- No client-specific code in the template.
