@@ -41,7 +41,7 @@ Every decision must keep these facts in mind:
 Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
-  `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
+  `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Planned, added later: root `pnpm dev`, `pnpm test:e2e`.
   Integration tests need real services and fail (not skip) without `DATABASE_URL`, `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; start Postgres/Redis (see `infra/README.md`) and export them.
@@ -302,7 +302,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
 - `verify`: lint, format check, type check, module boundary check, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
 - `feature-matrix` (`scripts/feature-matrix.sh`): `on` (API started with `FEATURES_ENABLED=example`, route exists), `off` (404), `deleted`
   (feature folder removed, lint/types/boundaries/tests still pass). Core must never depend on a feature.
-- `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit` (fails on high severity in production dependencies),
+- `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.

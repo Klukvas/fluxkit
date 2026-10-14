@@ -50,7 +50,7 @@ services:
     volumes:
       - meili-data:/meili_data
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:7700/health"]
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:7700/health"]
       interval: 5s
       timeout: 3s
       retries: 10
