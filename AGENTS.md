@@ -118,3 +118,78 @@ Every decision must keep these facts in mind:
 - Lint, types, and tests pass; new behavior is covered.
 - Docs, `.env.example`, and seeds updated.
 - No client-specific code in the template.
+
+## 7. Workflow (mandatory for every non-trivial task)
+
+1. **Plan first.** Before editing code, write a short plan: goal, files/modules to touch, data/API changes,
+   risks, how it will be verified. For small fixes one or two lines is enough. For anything touching the
+   data model, checkout/payments, auth, or feature boundaries, put the plan in `docs/plans/<date>-<slug>.md`
+   and get approval from the orchestrator/user before implementing.
+2. **Check for existing functionality.** Before writing anything new, search the repo (code, `docs/api`,
+   `docs/files`, feature modules) for something that already does it or can be extended. Reuse over reinvent.
+   State in the plan what you found.
+3. **Check scope.** Is it core or an optional feature? Does it need a flag? Does it break Product/Variant or
+   theming rules? If unsure, ask.
+4. **Implement** in small steps; keep the build green.
+5. **Verify** with real commands (lint, types, tests, run the thing). Paste actual results in the report.
+6. **Document** (section 8) in the same change.
+7. **Report**: what changed, what was verified, what was not, open risks.
+
+## 8. Documentation (kept short, kept current)
+
+Docs are part of the code. A change without updated docs is not done.
+
+- **API endpoints** → `docs/api/<module>.md`. One line per endpoint: `METHOD /path` — purpose, auth
+  (public/customer/admin), request shape, response shape, errors, feature flag if any. No essays.
+- **Files and modules** → `docs/files/<package-or-app>.md`. One line per significant file or folder:
+  `path` — what it is responsible for (and what it must NOT do). Update when you add, move, rename or delete files.
+- **Feature modules** → each has `README.md`: purpose, flag name, extension points used, DB tables/migrations,
+  how to remove it cleanly.
+- **Decisions** → `docs/adr/NNNN-title.md` for architectural decisions (context, decision, consequences). Never edit old ADRs; supersede them.
+- **Changelog** → `CHANGELOG.md`, one line per user-visible or schema change.
+- Style: bullet lists and tables, present tense, no marketing text. If a doc grows long, split it.
+- Docs describe what exists. Do not document planned behavior as if it is implemented.
+
+## 9. Honesty and failure handling
+
+- **Never mask failures.** Do not swallow errors, add empty `catch`, blanket try/catch, or fallback values that hide a bug.
+  Do not skip, disable, delete, or weaken tests/lint/type rules to get green. Do not mock the thing under test.
+  Do not hardcode expected outputs. Do not use `any`/`@ts-ignore`/`eslint-disable` to silence a real problem.
+- Fix the root cause. If you cannot, stop and say so with the exact error, what you tried, and your best hypothesis.
+- If something is stubbed, mocked, or fake, label it clearly in code and in the report (`TODO(fluxkit): ...`).
+- Never claim "done" or "tests pass" without having run them. Say "not verified" when it is not.
+- If you find an unrelated bug, report it; do not silently fix it inside an unrelated change.
+- Errors shown to users are friendly; errors in logs are complete. Fail loudly in dev, gracefully in prod, never silently.
+
+## 10. Roles and models
+
+Agents work in one of these roles. See `docs/AGENT_WORKFLOW.md` for model/effort assignments and handoffs.
+
+- **Architect**: data model, module boundaries, ADRs. Does not write feature code.
+- **Orchestrator**: turns a goal into a plan and tasks, delegates, integrates, checks Definition of Done.
+- **Developer**: implements one scoped task inside the plan. Owns specific files/paths; does not edit outside them.
+- **QA / Reviewer**: reviews diffs and writes/runs tests. The reviewer must be a different agent (ideally a different model) than the author.
+- **Docs/chores**: updates docs, changelog, seeds, formatting.
+
+Rules:
+- Developers stay within their task and owned paths. Out-of-scope needs go back to the orchestrator.
+- Parallel agents must not touch the same files. The orchestrator assigns path ownership.
+- Handoffs are written (plan file, task description, report), not assumed from chat memory.
+- A role that is blocked by a missing decision escalates upward (Developer → Orchestrator → Architect → user).
+
+## 11. Security and data safety
+
+- Never trust the client: recalculate prices, totals, discounts, stock on the server.
+- Authorization on every admin endpoint and on every customer resource (owner checks). Default deny.
+- Parameterized queries only. Escape/sanitize rendered user content (reviews, descriptions).
+- Do not log secrets, tokens, full card data, or unnecessary personal data.
+- Payment webhooks: verify signatures, be idempotent.
+- Uploads/imports: validate type, size, and structure; never execute uploaded content.
+- Add rate limits to auth, search, and checkout endpoints.
+
+## 12. Git and review
+
+- One concern per branch/PR. PR description: goal, plan link, what changed, how verified, risks, docs updated.
+- Do not push to `main` directly. Do not force-push shared branches.
+- Do not commit generated files, build output, or secrets.
+- Review checklist: architecture rules (section 2), tests, docs, security (section 11), no masked failures (section 9).
