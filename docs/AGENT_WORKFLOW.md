@@ -45,3 +45,4 @@ User goal
 - Feature removal: verified by CI build matrix.
 - Contracts: SemVer + `docs/contracts/` registry.
 - Stack: undecided, to be discussed.
+- Stack inputs gathered: team knows Python + JS/TS; first market is Ukraine (UAH, uk/en, Ukrainian payments/shipping), then EU and US; core engine (ready-made vs own) and admin approach still open, to be discussed in chat.
