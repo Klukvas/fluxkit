@@ -20,4 +20,4 @@
 - `package.json` (name `@fluxkit/<name>`, scripts `build` and `typecheck`), `tsconfig.json` (extends base, `src` to `dist`), `src/index.ts` (placeholder export), `README.md`.
 
 ## Other
-- `infra/` - Docker Compose and deployment (plan step 4). `seeds/` - demo data (no client data).
+- `infra/docker-compose.yml` - local/CI services: PostgreSQL 17, Redis 8, Meilisearch v1.55.0 (healthchecks, ports on 127.0.0.1, required vars via `.env`). `infra/README.md` - how to start. `seeds/` - demo data (no client data).
