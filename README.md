@@ -112,6 +112,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Core domain implementation in `packages/core` and `apps/api`: catalog (ProductType, attributes, variants), pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic).
+2. Core domain implementation in `packages/core` and `apps/api`. The catalog plan (`docs/plans/2026-10-14-catalog.md`) is written and awaits approval; then pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic).
 3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.

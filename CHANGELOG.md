@@ -14,3 +14,4 @@ One line per user-visible or schema change.
 - Approve LGPL-3.0-or-later (unmodified sharp-libvips binaries) and CC-BY-4.0 (caniuse-lite) for specific cases.
 - Add GitHub Actions CI (verify, feature matrix, licenses/audit/notices, docs check, compose), Dependabot, and the scripts behind them.
 - Rewrite README with a verified quick start; add `pnpm --filter @fluxkit/api start`; refresh docs indexes, AGENTS.md consistency fixes; mark the scaffold plan completed.
+- Add the catalog domain plan (`docs/plans/2026-10-14-catalog.md`).
