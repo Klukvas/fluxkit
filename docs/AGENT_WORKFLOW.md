@@ -50,3 +50,11 @@ User goal
 - Tooling: pnpm + Turborepo, Vitest + Playwright, ESLint + Prettier + dependency-cruiser, GitHub + Actions (ADR 0003).
 - Data model: JSONB attributes, price table, inventory_level+reservations+movements, cart->order snapshot with separate payment/fulfillment (ADR 0004).
 - Taxes: prices as entered + prices_include_tax setting, rates in tax_class. Pricing pipeline with adjusters in core, discounts/coupons as feature. customer_group in core, B2B pricing paid module (ADR 0004).
+- Licenses: Redis 8 (AGPLv3, external service), dev-tooling licenses (MPL-2.0, Python-2.0, BlueOak-1.0.0, Apache-2.0 AND MIT), LGPL sharp-libvips and CC-BY caniuse-lite for specific cases, Python-2.0 for runtime `argparse` (AGENTS.md section 16).
+- TypeScript pinned to 6.0.3 until typescript-eslint and dependency-cruiser support 7 (ADR 0003).
+- CI: GitHub Actions with feature matrix, license/audit/docs checks (AGENTS.md section 18); scaffold plan completed (see its Outcome section).
+
+## Practice that worked during the scaffold
+- Every PR with code got an independent review by a different agent (PR #2 review found a cached-test false pass, a half-reverting down migration and a destructive test; all confirmed and fixed).
+- Negative checks: each new guard (lint, boundaries, design guard, license policy, docs check, test env) was shown to fail on a deliberate violation before being trusted.
+- First CI run on GitHub is part of the work: it found problems that cannot be seen in the agent container (no Docker daemon).

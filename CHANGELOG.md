@@ -13,3 +13,4 @@ One line per user-visible or schema change.
 - Add storefront (Next.js) and admin (Vite) skeletons on a shared token-based UI library with `uk`/`en` i18n, design tokens (`light`/`dark`) and design-guard tests.
 - Approve LGPL-3.0-or-later (unmodified sharp-libvips binaries) and CC-BY-4.0 (caniuse-lite) for specific cases.
 - Add GitHub Actions CI (verify, feature matrix, licenses/audit/notices, docs check, compose), Dependabot, and the scripts behind them.
+- Rewrite README with a verified quick start; add `pnpm --filter @fluxkit/api start`; refresh docs indexes, AGENTS.md consistency fixes; mark the scaffold plan completed.
