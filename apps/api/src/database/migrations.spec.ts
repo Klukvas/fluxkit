@@ -1,18 +1,24 @@
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { requireEnv } from "../test/env.js";
+import { requireTestDatabaseUrl } from "../test/env.js";
 
-const migrationsFolder = new URL("../../drizzle", import.meta.url).pathname;
+const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
 
 describe("health_check migration", () => {
-  const pool = new pg.Pool({ connectionString: requireEnv("DATABASE_URL") });
+  // Destructive: drops the drizzle schema. requireTestDatabaseUrl refuses non-"_test" databases.
+  const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
 
   async function tableExists(): Promise<boolean> {
     const result = await pool.query("select to_regclass('public.health_check') as name");
     return result.rows[0].name !== null;
+  }
+
+  async function rollback(): Promise<void> {
+    await pool.query(await readFile(`${migrationsFolder}/0000_health_check.down.sql`, "utf8"));
   }
 
   beforeAll(async () => {
@@ -26,14 +32,20 @@ describe("health_check migration", () => {
     await pool.end();
   });
 
-  it("applies up, then rolls back with the hand-written down migration", async () => {
+  it("applies up, rolls back with the down migration, and can be applied again", async () => {
     expect(await tableExists()).toBe(false);
 
     await migrate(drizzle(pool), { migrationsFolder });
     expect(await tableExists()).toBe(true);
 
-    const down = await readFile(`${migrationsFolder}/0000_health_check.down.sql`, "utf8");
-    await pool.query(down);
+    await rollback();
+    expect(await tableExists()).toBe(false);
+
+    // The down script must also clear the migrator's bookkeeping, otherwise this second "up" would be a silent no-op.
+    await migrate(drizzle(pool), { migrationsFolder });
+    expect(await tableExists()).toBe(true);
+
+    await rollback();
     expect(await tableExists()).toBe(false);
   });
 });

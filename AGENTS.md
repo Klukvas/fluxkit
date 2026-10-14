@@ -100,7 +100,8 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - No new dependencies without a clear reason; state the reason. Prefer what is already in the project.
 - No client-specific logic in core. If something is niche-specific, make it config, a feature module, or an attribute.
 - Keep public APIs and DB schema backward compatible where possible. Schema changes need a migration (up and down) and a note in the changelog.
-  Drizzle does not generate down migrations: write `drizzle/NNNN_name.down.sql` by hand next to each generated migration and test up then down.
+  Drizzle does not generate down migrations: write `drizzle/NNNN_name.down.sql` by hand next to each generated migration (it must also delete that migration's row from `drizzle.__drizzle_migrations`,
+  keyed by `created_at` = the `when` of its `meta/_journal.json` entry) and test up, down, up again, down. Destructive DB tests only run against a database whose name ends in `_test`.
 - Never commit secrets. Use `.env` + `.env.example`; every new env var must be added to `.env.example` and the docs.
 - Validate input at the boundary (API, forms, imports). Never trust client-sent prices, totals, or stock.
   Prices and totals are always recalculated on the server.

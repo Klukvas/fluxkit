@@ -8,7 +8,14 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | Package | Latest seen | License | Verdict |
 |---|---|---|---|
 | @nestjs/core, @nestjs/common | 12.1.3 | MIT | OK |
-| @nestjs/swagger | 12.0.2 | MIT | OK |
+| @nestjs/swagger | 12.0.2 | MIT | OK (runtime; pulls swagger-ui-dist -> @scarf/scarf, see below) |
+| @nestjs/platform-express | 12.1.3 | MIT | OK |
+| @nestjs/testing | 12.1.3 | MIT | OK (dev) |
+| reflect-metadata | 0.2.2 | Apache-2.0 | OK |
+| rxjs | 7.8.2 | Apache-2.0 | OK |
+| @types/node | 26.6.5 | MIT | OK (dev) |
+| @types/pg | 8.23.1 | MIT | OK (dev) |
+| @types/express | 5.0.6 | MIT | OK (dev) |
 | drizzle-orm | 0.45.4 | Apache-2.0 | OK |
 | drizzle-kit | 0.31.11 | MIT | OK |
 | pg | 8.23.1 | MIT | OK (chosen Postgres driver) |
@@ -81,5 +88,4 @@ Outside the strict allowlist (decision needed, see PR):
 Install scripts: `@scarf/scarf` (analytics/telemetry, pulled in by `@nestjs/swagger` -> `swagger-ui-dist`, a RUNTIME dependency of the API) has its install script
 blocked (pnpm blocks dependency scripts by default and `pnpm-workspace.yaml` lists it explicitly). Never approve it. `@swc/core` and `msgpackr-extract` scripts are not needed either.
 
-## Added in plan step 5 (all in the table above): NestJS 12.1.3, Drizzle (orm 0.45.4, kit 0.31.11), pg 8.23.1, BullMQ 6.3.15, ioredis 6.0.0, zod 4.6.7,
-vitest 5.0.4, unplugin-swc 2.0.0, @swc/core 1.16.18, plus types (@types/node, pg, express), reflect-metadata, rxjs, @nestjs/testing, @nestjs/platform-express.
+Plan step 5 added the NestJS packages, Drizzle, pg, BullMQ, ioredis, zod, vitest, unplugin-swc, @swc/core and the types above; all are in the table.

@@ -59,4 +59,38 @@ describe("loadFeatures", () => {
       /must export "featureModule"/,
     );
   });
+
+  it("rejects a manifest whose main escapes the feature folder", async () => {
+    await writeFeature("evil", "evil", "export const featureModule = class {};\n");
+    await writeFile(
+      join(dir, "evil", "package.json"),
+      JSON.stringify({ type: "module", main: "../outside.js", fluxkit: { feature: "evil" } }),
+    );
+    await expect(loadFeatures({ enabled: ["evil"], featuresDir: dir })).rejects.toThrow(
+      /must stay inside/,
+    );
+  });
+
+  it("rejects two packages declaring the same feature name", async () => {
+    await writeFeature("one", "dup", "export const featureModule = class {};\n");
+    await writeFeature("two", "dup", "export const featureModule = class {};\n");
+    await expect(loadFeatures({ enabled: ["dup"], featuresDir: dir })).rejects.toThrow(
+      /declared twice/,
+    );
+  });
+
+  it("rejects an invalid manifest feature name, naming the file", async () => {
+    await writeFeature("Upper", "Upper", "export const featureModule = class {};\n");
+    await expect(loadFeatures({ enabled: ["upper"], featuresDir: dir })).rejects.toThrow(
+      /Invalid feature name "Upper" in .*package\.json/,
+    );
+  });
+
+  it("names the file when a package.json cannot be parsed", async () => {
+    await mkdir(join(dir, "broken"), { recursive: true });
+    await writeFile(join(dir, "broken", "package.json"), "{ not json");
+    await expect(loadFeatures({ enabled: ["anything"], featuresDir: dir })).rejects.toThrow(
+      /Cannot parse .*broken.*package\.json/,
+    );
+  });
 });

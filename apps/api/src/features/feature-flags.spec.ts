@@ -1,10 +1,11 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { startApp } from "../test/app.js";
 
-const fixturesDir = new URL("../test/fixtures/features", import.meta.url).pathname;
+const fixturesDir = fileURLToPath(new URL("../test/fixtures/features", import.meta.url));
 
 describe("feature flag matrix (core, using a test fixture feature)", () => {
   it("flag ON: the feature route exists", async () => {

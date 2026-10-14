@@ -8,3 +8,18 @@ export function requireEnv(name: "DATABASE_URL" | "REDIS_URL"): string {
   }
   return value;
 }
+
+/**
+ * For tests that drop or recreate schema objects. Refuses any database whose name does not end in "_test",
+ * so a developer's migrated dev database can never be wiped by accident.
+ */
+export function requireTestDatabaseUrl(): string {
+  const url = requireEnv("DATABASE_URL");
+  const databaseName = new URL(url).pathname.replace(/^\//, "");
+  if (!databaseName.endsWith("_test")) {
+    throw new Error(
+      `Refusing to run a destructive test against database "${databaseName}". Point DATABASE_URL at a database whose name ends in "_test".`,
+    );
+  }
+  return url;
+}

@@ -1,6 +1,6 @@
 # @fluxkit/feature-example
 
-Purpose: sample optional feature. It shows the structure every feature follows and is the fixture for the enable / disable / delete CI matrix.
+Purpose: sample optional feature. It shows the structure every feature follows and is the intended fixture for the enable / disable / delete CI matrix (planned, plan step 8; no workflow exists yet).
 Remove it from a real project by deleting this folder; nothing in core references it.
 
 - Flag: `FEATURES_ENABLED=example` (comma-separated list of enabled features).

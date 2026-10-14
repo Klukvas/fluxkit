@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { join, relative, resolve, sep } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import type { Type } from "@nestjs/common";
 
 export interface LoadedFeature {
@@ -15,8 +15,11 @@ interface FeatureManifest {
 }
 
 /** Default location of feature packages: <repo>/packages/features (also works from dist/). */
-export const DEFAULT_FEATURES_DIR = new URL("../../../../packages/features", import.meta.url)
-  .pathname;
+export const DEFAULT_FEATURES_DIR = fileURLToPath(
+  new URL("../../../../packages/features", import.meta.url),
+);
+
+const FEATURE_NAME = /^[a-z][a-z0-9-]*$/;
 
 async function readManifests(featuresDir: string): Promise<FeatureManifest[]> {
   let entries: string[];
@@ -43,11 +46,29 @@ async function readManifests(featuresDir: string): Promise<FeatureManifest[]> {
       }
       throw error;
     }
-    const pkg = JSON.parse(raw) as { main?: string; fluxkit?: { feature?: string } };
-    const name = pkg.fluxkit?.feature;
-    if (name !== undefined) {
-      manifests.push({ dir, name, main: pkg.main ?? "dist/index.js" });
+    const manifestPath = join(dir, "package.json");
+    let pkg: { main?: string; fluxkit?: { feature?: string } };
+    try {
+      pkg = JSON.parse(raw) as typeof pkg;
+    } catch (error) {
+      throw new Error(`Cannot parse ${manifestPath}: ${(error as Error).message}`, {
+        cause: error,
+      });
     }
+    const name = pkg.fluxkit?.feature;
+    if (name === undefined) {
+      continue;
+    }
+    if (!FEATURE_NAME.test(name)) {
+      throw new Error(
+        `Invalid feature name "${name}" in ${manifestPath}. Use lowercase letters, digits and dashes.`,
+      );
+    }
+    const duplicate = manifests.find((existing) => existing.name === name);
+    if (duplicate !== undefined) {
+      throw new Error(`Feature "${name}" is declared twice: ${duplicate.dir} and ${dir}.`);
+    }
+    manifests.push({ dir, name, main: pkg.main ?? "dist/index.js" });
   }
   return manifests;
 }
@@ -73,7 +94,18 @@ export async function loadFeatures(options: {
         `Feature "${name}" is enabled in FEATURES_ENABLED but no package with "fluxkit.feature": "${name}" was found in ${options.featuresDir}.`,
       );
     }
-    const entry = pathToFileURL(join(manifest.dir, manifest.main)).href;
+    const entryPath = resolve(manifest.dir, manifest.main);
+    const relativeEntry = relative(manifest.dir, entryPath);
+    if (
+      relativeEntry.startsWith(`..${sep}`) ||
+      relativeEntry === ".." ||
+      resolve(relativeEntry) === relativeEntry
+    ) {
+      throw new Error(
+        `Feature "${name}": "main" (${manifest.main}) must stay inside ${manifest.dir}.`,
+      );
+    }
+    const entry = pathToFileURL(entryPath).href;
     const imported = (await import(entry)) as { featureModule?: Type<unknown> };
     if (imported.featureModule === undefined) {
       throw new Error(`Feature "${name}" must export "featureModule" from ${manifest.main}.`);
