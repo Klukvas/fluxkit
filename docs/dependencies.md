@@ -28,7 +28,7 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | bullmq | 6.3.15 | MIT | OK |
 | ioredis | 6.0.0 | MIT | OK |
 | meilisearch (JS client) | 0.62.0 | MIT | OK |
-| typescript | 7.0.2 | Apache-2.0 | OK |
+| typescript | 6.0.3 (pinned; 7.0.2 is latest but unsupported by linters) | Apache-2.0 | OK |
 | zod | 4.6.7 | MIT | OK |
 | @swc/core | 1.16.18 | Apache-2.0 | OK |
 | unplugin-swc | 2.0.0 | MIT | OK |
@@ -60,8 +60,9 @@ Valkey (BSD-3) stays a known fallback if legal or client requirements change; no
   (GitHub Actions service containers). Meilisearch prototype (step 6) needs the binary downloaded; its availability through the network proxy is untested.
 - Node v22.22.0, pnpm 10.28.0, npm 10.9.4.
 
-## Known blocker: TypeScript 7 vs linters (found in plan step 3, 2026-10-14)
+## Resolved: TypeScript 7 vs linters (2026-10-14)
 - `typescript-eslint` 8.71.2 (also the canary) throws "does not support TS 7.0"; supported range is `>=4.8.4 <6.1.0`.
-- `dependency-cruiser` 18.6.0 supports TypeScript `<7.0.0` and, with TS 7, silently cruises 0 modules (false pass).
-- Verified in a scratch copy with `typescript@6.0.3`: typecheck/build pass, ESLint and dependency-cruiser rules all fire on deliberate violations.
-- Waiting for the owner's decision on the TypeScript pin. Lint config files are committed as WIP; no `lint` / `check:boundaries` scripts exist yet on purpose.
+- `dependency-cruiser` 18.6.0 supports TypeScript `<7.0.0`; with TS 7 it silently cruised 0 modules (false pass).
+- Decision (owner): pin TypeScript to **6.0.3** everywhere. Verified: typecheck, build, lint, boundary check pass, and every rule fails on deliberate violations.
+- `scripts/check-boundaries.mjs` additionally fails if zero modules are cruised, so this failure mode cannot pass silently again.
+- Revisit TS 7 when both tools support it.

@@ -39,11 +39,15 @@ Every decision must keep these facts in mind:
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
 Root scripts (always check `package.json` before using; do not invent commands):
-- Available now: `pnpm build`, `pnpm typecheck` (Turborepo runs them in every workspace package).
-- Planned, added in their plan steps: `pnpm lint` and `pnpm check:boundaries` (step 3), `pnpm test` (step 5), `pnpm dev` (steps 5 and 7), `pnpm test:e2e` (later).
+- Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`.
+- Planned, added in their plan steps: `pnpm test` (step 5), `pnpm dev` (steps 5 and 7), `pnpm test:e2e` (later).
   Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
+- Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
-Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
+Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), **TypeScript pinned to 6.0.3** (see below), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
+
+TypeScript 7 is NOT used yet: `typescript-eslint` and `dependency-cruiser` do not support it (the latter silently checks nothing). Do not bump TypeScript
+until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; changing the pin is a red-zone decision (section 14).
 
 ## 2. Core architecture principles
 

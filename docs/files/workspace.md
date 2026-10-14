@@ -1,12 +1,16 @@
 # Workspace files
 
 ## Root
-- `package.json` - private workspace root; scripts `build` and `typecheck`; pins pnpm and Node range; devDependencies turbo and typescript (exact versions).
+- `package.json` - private workspace root; scripts `build`, `typecheck`, `lint`, `format`, `format:check`, `check:boundaries`; pins pnpm and Node range; devDependencies pinned exactly (turbo, typescript 6.0.3, eslint, typescript-eslint, prettier, dependency-cruiser).
 - `pnpm-workspace.yaml` - workspace globs: `apps/*`, `packages/*`, `packages/features/*`, `packages/providers/*`.
 - `turbo.json` - Turborepo tasks `build` (cached, outputs `dist/**`) and `typecheck`; both depend on upstream `build`.
 - `tsconfig.base.json` - strict TypeScript settings shared by all packages (ES2022, Bundler resolution, `noUncheckedIndexedAccess`).
 - `.nvmrc` - Node major version (22). `.editorconfig` - editor defaults. `.env.example` - documented env vars (empty for now).
 - `pnpm-lock.yaml` - lockfile, always committed.
+- `eslint.config.mjs` - ESLint flat config: strict TS rules, bans `any`, `@ts-ignore`/`@ts-expect-error`, empty `catch`, unused disable directives.
+- `.prettierrc.json`, `.prettierignore` - Prettier for code and config (Markdown is ignored).
+- `.dependency-cruiser.cjs` - module boundary rules (core must not import features, features isolated, packages must not import apps, no deep imports, no cycles).
+- `scripts/check-boundaries.mjs` - runs dependency-cruiser; fails on violations or if zero modules were cruised.
 
 ## Apps (empty scaffolds)
 - `apps/api` (`@fluxkit/api`) - NestJS API. `apps/storefront` (`@fluxkit/storefront`) - Next.js site. `apps/admin` (`@fluxkit/admin`) - Vite React admin.

@@ -3,7 +3,8 @@ module.exports = {
   forbidden: [
     {
       name: "core-must-not-import-features",
-      comment: "Core must never import optional feature modules; features plug in via extension points.",
+      comment:
+        "Core must never import optional feature modules; features plug in via extension points.",
       severity: "error",
       from: { path: "^packages/core/" },
       to: { path: "^packages/features/" },
@@ -32,7 +33,10 @@ module.exports = {
       name: "no-deep-imports-into-packages",
       comment: "Import packages only through their public entry point (src/index.ts).",
       severity: "error",
-      from: { path: "^(apps|packages)/([^/]+)/", pathNot: "^packages/features/([^/]+)/|^packages/providers/([^/]+)/" },
+      from: {
+        path: "^(apps|packages)/([^/]+)/",
+        pathNot: "^packages/features/([^/]+)/|^packages/providers/([^/]+)/",
+      },
       to: { path: "^packages/(?!features/|providers/)([^/]+)/src/(?!index\\.ts$)", pathNot: "^$1" },
     },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
