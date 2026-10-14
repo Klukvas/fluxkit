@@ -31,9 +31,17 @@ Every decision must keep these facts in mind:
 - First market: Ukraine (UAH, `uk`/`en`, Ukrainian payment and shipping providers as plugins), then EU/US.
   Currencies, locales, payment and shipping providers are core abstractions, not hardcoded.
 
-> TODO: package manager, test runner, lint/format tooling, CI provider, exact versions, run/test commands.
-> Check existing config before assuming; do not invent commands.
-> Do not assume a stack that is not listed here. Check existing code and config first.
+## Tooling (decided, see `docs/adr/0003-tooling.md`)
+
+- Package manager / monorepo: pnpm workspaces + Turborepo.
+- Tests: Vitest (unit, integration) + Playwright (e2e). Integration tests use a real Postgres (Docker/Testcontainers), not mocks.
+- Lint/format: ESLint (strict TS rules) + Prettier; dependency-cruiser for module boundaries.
+- Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
+
+Standard root scripts (convention; the scaffold must provide them, always check `package.json` before using):
+`pnpm dev`, `pnpm build`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm test:e2e`, `pnpm check:boundaries`.
+
+> TODO until the scaffold exists: exact versions, Node version, the real scripts. Do not invent commands that are not in `package.json`.
 
 ## 2. Core architecture principles
 

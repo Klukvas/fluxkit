@@ -47,3 +47,4 @@ User goal
 - Stack: decided, see ADR 0002.
 - Stack inputs gathered: team knows Python + JS/TS; first market is Ukraine (UAH, uk/en, Ukrainian payments/shipping), then EU and US; core engine (ready-made vs own) and admin approach still open, to be discussed in chat.
 - Core: own core (ADR 0001). Stack: TypeScript, NestJS, REST+OpenAPI, Postgres+Drizzle, Meilisearch, Redis+BullMQ, Next.js+Tailwind storefront, React SPA admin, Docker Compose (ADR 0002).
+- Tooling: pnpm + Turborepo, Vitest + Playwright, ESLint + Prettier + dependency-cruiser, GitHub + Actions (ADR 0003).
