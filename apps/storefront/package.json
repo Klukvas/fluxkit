@@ -3,13 +3,25 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3"
+  },
+  "dependencies": {
+    "@fluxkit/theme": "workspace:*",
+    "@fluxkit/ui": "workspace:*",
+    "next": "16.4.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }

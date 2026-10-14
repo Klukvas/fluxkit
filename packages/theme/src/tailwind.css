@@ -1,0 +1,17 @@
+/* Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, rounded-md, ... */
+@theme inline {
+  --color-background: var(--fk-color-background);
+  --color-foreground: var(--fk-color-foreground);
+  --color-muted: var(--fk-color-muted);
+  --color-muted-foreground: var(--fk-color-muted-foreground);
+  --color-border: var(--fk-color-border);
+  --color-primary: var(--fk-color-primary);
+  --color-primary-foreground: var(--fk-color-primary-foreground);
+  --color-danger: var(--fk-color-danger);
+  --radius-sm: var(--fk-radius-sm);
+  --radius-md: var(--fk-radius-md);
+  --radius-lg: var(--fk-radius-lg);
+  --font-sans: var(--fk-font-sans);
+  --font-mono: var(--fk-font-mono);
+  --shadow-card: var(--fk-shadow-card);
+}

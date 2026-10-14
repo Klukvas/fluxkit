@@ -1,0 +1,9 @@
+{
+  "site.title": "Fluxkit — шаблон інтернет-магазину",
+  "home.heading": "Каталог",
+  "home.subheading": "Тут буде каталог товарів вашого магазину.",
+  "home.product.placeholder": "Товар-заглушка",
+  "home.product.price": "Ціна буде тут",
+  "home.cta": "Додати до кошика",
+  "footer.powered": "Працює на FluxLab"
+}

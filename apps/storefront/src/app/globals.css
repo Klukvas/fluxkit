@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@fluxkit/theme/tokens.css";
+@import "@fluxkit/theme/tailwind.css";
+/* Tailwind must also scan the shared UI library for class names. */
+@source "../../../../packages/ui/src";
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}

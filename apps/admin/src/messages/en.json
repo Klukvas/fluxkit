@@ -1,0 +1,8 @@
+{
+  "admin.title": "Fluxkit Admin",
+  "admin.welcome": "Products, orders and customers will live here.",
+  "admin.nav.products": "Products",
+  "admin.nav.orders": "Orders",
+  "admin.nav.customers": "Customers",
+  "admin.action.create": "Create"
+}

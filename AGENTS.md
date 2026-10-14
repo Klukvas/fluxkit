@@ -41,7 +41,8 @@ Every decision must keep these facts in mind:
 Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`).
-- Planned, added in their plan steps: `pnpm dev` (step 7), `pnpm test:e2e` (later).
+- App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
+- Planned, added later: root `pnpm dev`, `pnpm test:e2e`.
   Integration tests need real services and fail (not skip) without `DATABASE_URL`, `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; start Postgres/Redis (see `infra/README.md`) and export them.
   Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
@@ -271,6 +272,9 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
   GPL, AGPL, SSPL, and "source-available" licenses are forbidden there; anything unusual needs explicit approval.
 - Approved for **development tooling only** (devDependencies, never shipped to clients' runtime): MPL-2.0 (e.g. lightningcss, unmodified), Python-2.0 (argparse),
   BlueOak-1.0.0 (minimatch) and "Apache-2.0 AND MIT" combined expressions (@swc/core binaries). Approved by the owner on 2026-10-14. Runtime dependencies stay on the strict list.
+- Also approved by the owner on 2026-10-14, each for ONE specific case: **LGPL-3.0-or-later** for the unmodified, dynamically loaded prebuilt `@img/sharp-libvips-*` binaries
+  (Next.js image optimization; never copy or modify their code; keep the notices), and **CC-BY-4.0** for the `caniuse-lite` browser-data package (keep attribution).
+  Any other LGPL/GPL-family or CC-BY package still needs its own approval. Third-party notices must be shipped with a client delivery.
 - External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
   Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
   fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.
