@@ -17,7 +17,22 @@ Every decision must keep these facts in mind:
 
 **Optimize for changeability, not for cleverness.** Prefer boring, explicit, well-named code.
 
-> TODO (open decision, discussed separately): stack, package manager, DB, search engine, payment providers.
+## Stack (decided, see `docs/adr/0002-tech-stack.md`)
+
+- Own core (no Saleor/Medusa), see `docs/adr/0001-own-core.md`.
+- Language: TypeScript everywhere (monorepo, shared types and validation schemas).
+- Backend: NestJS (modules map to core domains and feature modules). Public API: REST + OpenAPI.
+- DB: PostgreSQL + Drizzle ORM. Migrations via Drizzle, reversible.
+- Search/filters: Meilisearch (facets, counts, suggestions), fed from Postgres via events/queues.
+- Queues/cache: Redis + BullMQ.
+- Storefront: Next.js (App Router) + Tailwind, design tokens as CSS variables.
+- Admin: React SPA (Vite), shares the UI library and tokens with the storefront.
+- Deployment: Docker Compose (API, worker, Postgres, Redis, Meilisearch); one-command local setup.
+- First market: Ukraine (UAH, `uk`/`en`, Ukrainian payment and shipping providers as plugins), then EU/US.
+  Currencies, locales, payment and shipping providers are core abstractions, not hardcoded.
+
+> TODO: package manager, test runner, lint/format tooling, CI provider, exact versions, run/test commands.
+> Check existing config before assuming; do not invent commands.
 > Do not assume a stack that is not listed here. Check existing code and config first.
 
 ## 2. Core architecture principles
@@ -94,20 +109,24 @@ Every decision must keep these facts in mind:
 - Branches: `feature/<name>`, `fix/<name>`, `chore/<name>`.
 - Comments explain *why*, not *what*. Do not comment obvious code.
 
-## 5. Suggested repo layout (adjust to the real stack)
+## 5. Repo layout
 
 ```
 /apps
-  /storefront        # customer-facing site
-  /admin             # admin panel (or built into the platform)
+  /api               # NestJS: core domains + feature modules, REST/OpenAPI
+  /storefront        # Next.js customer site
+  /admin             # React SPA (Vite)
 /packages
-  /core              # catalog, cart, checkout, orders, customers
+  /core              # domain logic: catalog, pricing, inventory, cart, checkout, orders, customers
   /features          # optional modules: wishlist, reviews, coupons, ...
-  /ui                # token-based component library
+  /providers         # payment and shipping provider plugins (liqpay, nova-poshta, stripe, ...)
+  /ui                # token-based component library (shared by storefront and admin)
   /theme             # design tokens + theme presets
   /config            # feature flags, store settings schema
-/docs                # architecture, feature guides, how to rebrand, how to remove a feature
+  /api-client        # typed client generated from OpenAPI
+/docs                # api, files, adr, plans, contracts, migrations
 /seeds               # demo data, product type presets
+/infra               # docker compose, deployment
 ```
 
 ## 6. Definition of done
