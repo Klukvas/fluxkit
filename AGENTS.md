@@ -269,6 +269,8 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 
 - Allowed licenses for code dependencies (anything installed into our packages): MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0.
   GPL, AGPL, SSPL, and "source-available" licenses are forbidden there; anything unusual needs explicit approval.
+- Approved for **development tooling only** (devDependencies, never shipped to clients' runtime): MPL-2.0 (e.g. lightningcss, unmodified), Python-2.0 (argparse),
+  BlueOak-1.0.0 (minimatch) and "Apache-2.0 AND MIT" combined expressions (@swc/core binaries). Approved by the owner on 2026-10-14. Runtime dependencies stay on the strict list.
 - External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
   Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
   fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.

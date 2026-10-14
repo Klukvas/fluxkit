@@ -77,7 +77,7 @@ Valkey (BSD-3) stays a known fallback if legal or client requirements change; no
 ## Transitive licenses (plan step 5, `pnpm licenses list`, 2026-10-14)
 Counts across the install tree: MIT 269, Apache-2.0 25, ISC 15, BSD-2-Clause 6, BSD-3-Clause 5, 0BSD 1, plus the exceptions below.
 
-Outside the strict allowlist (decision needed, see PR):
+Outside the strict allowlist. DECISION (owner, 2026-10-14): approved for development tooling only (devDependencies); runtime dependencies keep the strict list:
 | License | Packages | Where | Note |
 |---|---|---|---|
 | Apache-2.0 AND MIT | @swc/core-linux-x64-gnu, -musl | devDependency (tests) | both parts are allowed; combined expression only |
