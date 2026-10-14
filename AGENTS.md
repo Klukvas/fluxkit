@@ -42,7 +42,7 @@ Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`).
 - Planned, added in their plan steps: `pnpm dev` (step 7), `pnpm test:e2e` (later).
-  Integration tests need real services and fail (not skip) without `DATABASE_URL` and `REDIS_URL`; start Postgres/Redis (see `infra/README.md`) and export them.
+  Integration tests need real services and fail (not skip) without `DATABASE_URL`, `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; start Postgres/Redis (see `infra/README.md`) and export them.
   Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
