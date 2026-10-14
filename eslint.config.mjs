@@ -29,6 +29,8 @@ export default tseslint.config(
       ],
       "no-empty": ["error", { allowEmptyCatch: false }],
       "@typescript-eslint/no-non-null-assertion": "error",
+      // Nest modules are decorated classes that carry metadata only.
+      "@typescript-eslint/no-extraneous-class": ["error", { allowWithDecorator: true }],
     },
   },
 );

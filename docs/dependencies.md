@@ -66,3 +66,20 @@ Valkey (BSD-3) stays a known fallback if legal or client requirements change; no
 - Decision (owner): pin TypeScript to **6.0.3** everywhere. Verified: typecheck, build, lint, boundary check pass, and every rule fails on deliberate violations.
 - `scripts/check-boundaries.mjs` additionally fails if zero modules are cruised, so this failure mode cannot pass silently again.
 - Revisit TS 7 when both tools support it.
+
+## Transitive licenses (plan step 5, `pnpm licenses list`, 2026-10-14)
+Counts across the install tree: MIT 269, Apache-2.0 25, ISC 15, BSD-2-Clause 6, BSD-3-Clause 5, 0BSD 1, plus the exceptions below.
+
+Outside the strict allowlist (decision needed, see PR):
+| License | Packages | Where | Note |
+|---|---|---|---|
+| Apache-2.0 AND MIT | @swc/core-linux-x64-gnu, -musl | devDependency (tests) | both parts are allowed; combined expression only |
+| MPL-2.0 | lightningcss (+ platform binaries) | devDependency (vite via vitest) | file-level copyleft, unmodified, build/test tooling only, not shipped |
+| Python-2.0 | argparse | devDependency (eslint) | permissive, PSF-style |
+| BlueOak-1.0.0 | minimatch | devDependency (eslint tooling) | permissive |
+
+Install scripts: `@scarf/scarf` (analytics/telemetry, pulled in by `@nestjs/swagger` -> `swagger-ui-dist`, a RUNTIME dependency of the API) has its install script
+blocked (pnpm blocks dependency scripts by default and `pnpm-workspace.yaml` lists it explicitly). Never approve it. `@swc/core` and `msgpackr-extract` scripts are not needed either.
+
+## Added in plan step 5 (all in the table above): NestJS 12.1.3, Drizzle (orm 0.45.4, kit 0.31.11), pg 8.23.1, BullMQ 6.3.15, ioredis 6.0.0, zod 4.6.7,
+vitest 5.0.4, unplugin-swc 2.0.0, @swc/core 1.16.18, plus types (@types/node, pg, express), reflect-metadata, rxjs, @nestjs/testing, @nestjs/platform-express.

@@ -39,8 +39,10 @@ Every decision must keep these facts in mind:
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
 Root scripts (always check `package.json` before using; do not invent commands):
-- Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`.
-- Planned, added in their plan steps: `pnpm test` (step 5), `pnpm dev` (steps 5 and 7), `pnpm test:e2e` (later).
+- Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
+  `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`).
+- Planned, added in their plan steps: `pnpm dev` (step 7), `pnpm test:e2e` (later).
+  Integration tests need real services and fail (not skip) without `DATABASE_URL` and `REDIS_URL`; start Postgres/Redis (see `infra/README.md`) and export them.
   Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
@@ -58,6 +60,8 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Every optional feature must be toggleable by a single config flag (`features.wishlist.enabled`).
   With the flag off: no UI, no routes, no API endpoints, no DB side effects at runtime.
 - Removing a feature = deleting its folder + its flag + its migration (documented in the feature's README). Check that this actually works when you add a feature.
+- Mechanism (see `docs/contracts/config.md`): a feature package declares `"fluxkit": {"feature": "<name>"}` and exports `featureModule`; `apps/api` discovers and
+  dynamically imports only enabled ones from `FEATURES_ENABLED`. Feature tests live inside the feature package so they disappear with it; core tests use a fixture feature.
 - Core = catalog, cart, checkout, orders, customers, admin basics. Everything else is a feature.
 
 ### 2.2 Design is replaceable (theming)
@@ -96,6 +100,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - No new dependencies without a clear reason; state the reason. Prefer what is already in the project.
 - No client-specific logic in core. If something is niche-specific, make it config, a feature module, or an attribute.
 - Keep public APIs and DB schema backward compatible where possible. Schema changes need a migration (up and down) and a note in the changelog.
+  Drizzle does not generate down migrations: write `drizzle/NNNN_name.down.sql` by hand next to each generated migration and test up then down.
 - Never commit secrets. Use `.env` + `.env.example`; every new env var must be added to `.env.example` and the docs.
 - Validate input at the boundary (API, forms, imports). Never trust client-sent prices, totals, or stock.
   Prices and totals are always recalculated on the server.
