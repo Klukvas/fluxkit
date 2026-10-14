@@ -8,7 +8,14 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | Package | Latest seen | License | Verdict |
 |---|---|---|---|
 | @nestjs/core, @nestjs/common | 12.1.3 | MIT | OK |
-| @nestjs/swagger | 12.0.2 | MIT | OK |
+| @nestjs/swagger | 12.0.2 | MIT | OK (runtime; pulls swagger-ui-dist -> @scarf/scarf, see below) |
+| @nestjs/platform-express | 12.1.3 | MIT | OK |
+| @nestjs/testing | 12.1.3 | MIT | OK (dev) |
+| reflect-metadata | 0.2.2 | Apache-2.0 | OK |
+| rxjs | 7.8.2 | Apache-2.0 | OK |
+| @types/node | 26.6.5 | MIT | OK (dev) |
+| @types/pg | 8.23.1 | MIT | OK (dev) |
+| @types/express | 5.0.6 | MIT | OK (dev) |
 | drizzle-orm | 0.45.4 | Apache-2.0 | OK |
 | drizzle-kit | 0.31.11 | MIT | OK |
 | pg | 8.23.1 | MIT | OK (chosen Postgres driver) |
@@ -66,3 +73,19 @@ Valkey (BSD-3) stays a known fallback if legal or client requirements change; no
 - Decision (owner): pin TypeScript to **6.0.3** everywhere. Verified: typecheck, build, lint, boundary check pass, and every rule fails on deliberate violations.
 - `scripts/check-boundaries.mjs` additionally fails if zero modules are cruised, so this failure mode cannot pass silently again.
 - Revisit TS 7 when both tools support it.
+
+## Transitive licenses (plan step 5, `pnpm licenses list`, 2026-10-14)
+Counts across the install tree: MIT 269, Apache-2.0 25, ISC 15, BSD-2-Clause 6, BSD-3-Clause 5, 0BSD 1, plus the exceptions below.
+
+Outside the strict allowlist. DECISION (owner, 2026-10-14): approved for development tooling only (devDependencies); runtime dependencies keep the strict list:
+| License | Packages | Where | Note |
+|---|---|---|---|
+| Apache-2.0 AND MIT | @swc/core-linux-x64-gnu, -musl | devDependency (tests) | both parts are allowed; combined expression only |
+| MPL-2.0 | lightningcss (+ platform binaries) | devDependency (vite via vitest) | file-level copyleft, unmodified, build/test tooling only, not shipped |
+| Python-2.0 | argparse | devDependency (eslint) | permissive, PSF-style |
+| BlueOak-1.0.0 | minimatch | devDependency (eslint tooling) | permissive |
+
+Install scripts: `@scarf/scarf` (analytics/telemetry, pulled in by `@nestjs/swagger` -> `swagger-ui-dist`, a RUNTIME dependency of the API) has its install script
+blocked (pnpm blocks dependency scripts by default and `pnpm-workspace.yaml` lists it explicitly). Never approve it. `@swc/core` and `msgpackr-extract` scripts are not needed either.
+
+Plan step 5 added the NestJS packages, Drizzle, pg, BullMQ, ioredis, zod, vitest, unplugin-swc, @swc/core and the types above; all are in the table.

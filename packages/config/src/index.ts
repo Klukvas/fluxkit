@@ -1,2 +1,2 @@
-// Placeholder entry point. Real exports are added together with the code.
-export {};
+export { loadEnv, type AppEnv } from "./env.js";
+export { parseEnabledFeatures } from "./features.js";

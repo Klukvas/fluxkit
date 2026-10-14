@@ -14,7 +14,9 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check:boundaries": "node scripts/check-boundaries.mjs"
+    "check:boundaries": "node scripts/check-boundaries.mjs",
+    "test": "pnpm build && turbo run test",
+    "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

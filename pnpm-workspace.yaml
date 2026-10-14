@@ -3,3 +3,12 @@ packages:
   - "packages/*"
   - "packages/features/*"
   - "packages/providers/*"
+
+# Dependency install scripts are blocked by default. These two are explicitly ignored:
+# @scarf/scarf is a telemetry package pulled in by swagger-ui-dist (AGENTS.md: no telemetry);
+# msgpackr-extract is an optional native accelerator (BullMQ falls back to pure JS);
+# @swc/core ships its binary via platform packages, its install script is only a fallback download.
+ignoredBuiltDependencies:
+  - "@scarf/scarf"
+  - msgpackr-extract
+  - "@swc/core"

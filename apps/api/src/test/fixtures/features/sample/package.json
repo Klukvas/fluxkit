@@ -1,0 +1,9 @@
+{
+  "name": "fluxkit-test-fixture-sample",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "fluxkit": {
+    "feature": "sample"
+  }
+}
