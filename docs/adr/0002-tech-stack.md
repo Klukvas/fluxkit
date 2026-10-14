@@ -15,6 +15,6 @@ Status: accepted (versions and tooling to be fixed when scaffolding)
 | Deploy | Docker Compose | One-command setup for clients and CI |
 
 ## To verify before locking
-- Licenses of every chosen component against the allowlist (AGENTS.md section 16), notably Meilisearch edition and NestJS/Drizzle (not checked yet).
+- Licenses: checked in `docs/dependencies.md`. Redis 8+ is used under AGPLv3 as an unmodified external service (legal OK, see AGENTS.md section 16). Transitive dependency licenses are enforced by CI.
 - Package manager, test runner, lint tooling, CI provider.
 - Meilisearch Ukrainian-language behavior (morphology) on real data.

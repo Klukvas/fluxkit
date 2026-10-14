@@ -255,8 +255,11 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 
 ## 16. Dependencies
 
-- Allowed licenses only: MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0. GPL, AGPL, SSPL, and "source-available"
-  licenses are forbidden in the template; anything unusual needs explicit approval.
+- Allowed licenses for code dependencies (anything installed into our packages): MIT, Apache-2.0, BSD-2/3, ISC, 0BSD, CC0.
+  GPL, AGPL, SSPL, and "source-available" licenses are forbidden there; anything unusual needs explicit approval.
+- External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
+  Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
+  fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.
 - Commit the lockfile. Pin exact versions for production dependencies.
 - Dependency audit (vulnerabilities + license check) runs in CI and must pass.
 - Prefer fewer, well-maintained dependencies. Do not add a library for something small.

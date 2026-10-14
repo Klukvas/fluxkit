@@ -43,13 +43,15 @@ Transitive dependencies are NOT checked here. CI must run a license check over t
 | PostgreSQL | PostgreSQL License (permissive, BSD/MIT-like) | OK |
 | Meilisearch Community Edition | MIT ([repo](https://github.com/meilisearch/meilisearch)) | OK. Enterprise Edition features (e.g. sharding) are BUSL/commercial: do not enable or use them in the template |
 | Redis 7.0.x and earlier (up to 7.2) | BSD-3 | Allowed but old |
-| Redis 7.4+ | RSALv2 / SSPLv1 | NOT on allowlist |
-| Redis 8+ | tri-licensed: RSALv2 / SSPLv1 / AGPLv3 ([news](https://www.phoronix.com/news/Redis-8.0-Goes-AGPLv3)) | NOT on allowlist (AGPL) |
-| Valkey | BSD-3-Clause ([COPYING](https://raw.githubusercontent.com/valkey-io/valkey/unstable/COPYING)) | OK, protocol-compatible with Redis, works with ioredis and BullMQ |
+| Redis 7.4 - 7.x | RSALv2 / SSPLv1 | Not used (skip straight to 8+ under AGPLv3) |
+| Redis 8+ | tri-licensed: RSALv2 / SSPLv1 / AGPLv3 ([news](https://www.phoronix.com/news/Redis-8.0-Goes-AGPLv3)) | APPROVED exception: use under AGPLv3, unmodified, as a separate service (legal OK from owner's lawyer) |
+| Valkey | BSD-3-Clause ([COPYING](https://raw.githubusercontent.com/valkey-io/valkey/unstable/COPYING)) | OK; fallback option, protocol-compatible with Redis |
 
-## Decision needed (red zone)
-Redis current releases fail the allowlist. Proposal: use **Valkey** in `infra/docker-compose.yml` instead of Redis. Client code (ioredis, BullMQ) is unchanged.
-Not yet verified: BullMQ compatibility with Valkey in practice (to be covered by an integration test in step 5).
+## Decision (resolved 2026-10-14)
+Use the **latest Redis (8+) under the AGPLv3 option**. The owner confirmed legal approval from their lawyer.
+Conditions: Redis is run unmodified as a separate service (Docker image), never forked or patched; our code talks to it over the network
+via ioredis/BullMQ. AGENTS.md section 16 now distinguishes code dependencies (strict allowlist) from external services (explicit decision here).
+Valkey (BSD-3) stays a known fallback if legal or client requirements change; no code change is needed to switch.
 
 ## Environment findings (this agent container)
 - Docker CLI 29.8.2 is installed but the daemon is NOT running (`/var/run/docker.sock` missing). Docker Compose and Testcontainers cannot run here.
