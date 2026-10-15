@@ -12,3 +12,4 @@ coverage/
 *.rdb
 *.tsbuildinfo
 third-party/
+.claude/worktrees/

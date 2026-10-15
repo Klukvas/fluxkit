@@ -32,3 +32,47 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ DATABASE_URL: "x", PORT: "70000" })).toThrow(/PORT/);
   });
 });
+
+describe("loadEnv locales", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to uk with locales uk and en", () => {
+    const env = loadEnv(base);
+    expect(env.defaultLocale).toBe("uk");
+    expect(env.locales).toEqual(["uk", "en"]);
+  });
+
+  it("parses a custom list, trimming spaces", () => {
+    const env = loadEnv({ ...base, DEFAULT_LOCALE: "en", LOCALES: "en, uk ,pl" });
+    expect(env.defaultLocale).toBe("en");
+    expect(env.locales).toEqual(["en", "uk", "pl"]);
+  });
+
+  it("accepts region segments", () => {
+    const env = loadEnv({ ...base, DEFAULT_LOCALE: "en-us", LOCALES: "en-us,uk" });
+    expect(env.locales).toEqual(["en-us", "uk"]);
+  });
+
+  it("rejects a default locale missing from the list", () => {
+    expect(() => loadEnv({ ...base, DEFAULT_LOCALE: "de" })).toThrow(/DEFAULT_LOCALE/);
+  });
+
+  it("rejects duplicates", () => {
+    expect(() => loadEnv({ ...base, LOCALES: "uk,en,uk" })).toThrow(/duplicate/i);
+  });
+
+  it.each(["UK,en", "u,en", "uk,e n", "uk,,en", "uk,en_US", "uk,-en", "uk,en-", "abcdefghi,uk"])(
+    "rejects invalid locale list %j",
+    (locales) => {
+      expect(() => loadEnv({ ...base, LOCALES: locales })).toThrow(/LOCALES/);
+    },
+  );
+
+  it("rejects an invalid default locale code", () => {
+    expect(() => loadEnv({ ...base, DEFAULT_LOCALE: "UK" })).toThrow(/DEFAULT_LOCALE/);
+  });
+
+  it("rejects an empty LOCALES value", () => {
+    expect(() => loadEnv({ ...base, LOCALES: "" })).toThrow(/LOCALES/);
+  });
+});
