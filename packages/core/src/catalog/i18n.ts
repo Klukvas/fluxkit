@@ -18,8 +18,7 @@ export interface I18nTextError {
 }
 
 export type I18nTextResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly errors: readonly I18nTextError[] };
+  { readonly ok: true } | { readonly ok: false; readonly errors: readonly I18nTextError[] };
 
 export interface I18nTextOptions {
   readonly defaultLocale: string;

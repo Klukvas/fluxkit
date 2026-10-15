@@ -115,8 +115,7 @@ export interface CategoryMoveError {
 }
 
 export type CategoryMoveResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly errors: readonly CategoryMoveError[] };
+  { readonly ok: true } | { readonly ok: false; readonly errors: readonly CategoryMoveError[] };
 
 function checkDepth(
   parentDepth: number | null,
@@ -176,11 +175,7 @@ export function validateNewNode(
 }
 
 export type CategoryTreeViolationReason =
-  | "duplicate_id"
-  | "parent_not_found"
-  | "self_parent"
-  | "cycle"
-  | "max_depth_exceeded";
+  "duplicate_id" | "parent_not_found" | "self_parent" | "cycle" | "max_depth_exceeded";
 
 export interface CategoryTreeViolation {
   readonly reason: CategoryTreeViolationReason;

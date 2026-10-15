@@ -166,7 +166,11 @@ export function publishPreconditions(
 
 function attributeViolation(
   level: AttributeLevel,
-  error: { readonly attributeCode: string | null; readonly reason: string; readonly locale?: string },
+  error: {
+    readonly attributeCode: string | null;
+    readonly reason: string;
+    readonly locale?: string;
+  },
 ): PublishViolation {
   return {
     code: "attribute_invalid",

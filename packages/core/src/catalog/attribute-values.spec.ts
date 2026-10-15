@@ -90,7 +90,12 @@ describe("keys", () => {
       ok: true,
     });
     expect(
-      validateAttributeValues(type, "product", { material: "cotton" }, { mode: "draft", ...locales }),
+      validateAttributeValues(
+        type,
+        "product",
+        { material: "cotton" },
+        { mode: "draft", ...locales },
+      ),
     ).toEqual({ ok: true });
   });
 
@@ -105,14 +110,24 @@ describe("keys", () => {
       validateAttributeValues(type, "product", { weight_g: 5 }, { mode: "draft", ...locales }),
     ).toEqual({ ok: false, errors: [{ attributeCode: "weight_g", reason: "unknown_attribute" }] });
     expect(
-      validateAttributeValues(type, "variant", { material: "cotton" }, { mode: "draft", ...locales }),
+      validateAttributeValues(
+        type,
+        "variant",
+        { material: "cotton" },
+        { mode: "draft", ...locales },
+      ),
     ).toEqual({ ok: false, errors: [{ attributeCode: "material", reason: "unknown_attribute" }] });
   });
 
   it("rejects null and undefined values: not set means the key is absent", () => {
     for (const value of [null, undefined]) {
       expect(
-        validateAttributeValues(type, "product", { material: value }, { mode: "draft", ...locales }),
+        validateAttributeValues(
+          type,
+          "product",
+          { material: value },
+          { mode: "draft", ...locales },
+        ),
       ).toEqual({ ok: false, errors: [{ attributeCode: "material", reason: "null_value" }] });
     }
   });
@@ -125,7 +140,9 @@ describe("keys", () => {
 
   it("rejects a values container that is not a plain object", () => {
     for (const values of [null, undefined, [], "x", 5]) {
-      expect(validateAttributeValues(type, "product", values, { mode: "draft", ...locales })).toEqual({
+      expect(
+        validateAttributeValues(type, "product", values, { mode: "draft", ...locales }),
+      ).toEqual({
         ok: false,
         errors: [{ attributeCode: null, reason: "values_not_an_object" }],
       });
@@ -250,15 +267,23 @@ describe("text (localized)", () => {
   });
 
   it("rejects locales that are not configured", () => {
-    expectError(care, { uk: "Прати", de: "Waschen" }, { reason: "locale_not_allowed", locale: "de" });
+    expectError(
+      care,
+      { uk: "Прати", de: "Waschen" },
+      { reason: "locale_not_allowed", locale: "de" },
+    );
   });
 
   it("applies max_length per locale", () => {
-    expectError(care, { uk: "Прати", en: "x".repeat(11) }, {
-      reason: "too_long",
-      locale: "en",
-      limit: 10,
-    });
+    expectError(
+      care,
+      { uk: "Прати", en: "x".repeat(11) },
+      {
+        reason: "too_long",
+        locale: "en",
+        limit: 10,
+      },
+    );
   });
 
   it("applies min_length per locale", () => {
@@ -428,7 +453,13 @@ describe("date", () => {
   });
 
   it("rejects other formats and non-strings", () => {
-    for (const value of ["2026-1-1", "2026/01/01", "01.01.2026", "2026-01-01T00:00:00Z", " 2026-01-01"]) {
+    for (const value of [
+      "2026-1-1",
+      "2026/01/01",
+      "01.01.2026",
+      "2026-01-01T00:00:00Z",
+      " 2026-01-01",
+    ]) {
       expectError(released, value, { reason: "invalid_date" });
     }
     for (const value of [20260101, new Date(0), true]) {
@@ -528,9 +559,10 @@ describe("parseAttributeValidation", () => {
       ok: false,
       issues: [{ key: "min_items", reason: "min_greater_than_max" }],
     });
-    expect(
-      parseAttributeValidation("date", { min: "2026-12-31", max: "2026-01-01" }),
-    ).toEqual({ ok: false, issues: [{ key: "min", reason: "min_greater_than_max" }] });
+    expect(parseAttributeValidation("date", { min: "2026-12-31", max: "2026-01-01" })).toEqual({
+      ok: false,
+      issues: [{ key: "min", reason: "min_greater_than_max" }],
+    });
   });
 
   it("rejects a validation that is not an object", () => {
@@ -575,7 +607,11 @@ describe("aggregation and purity", () => {
   it("does not throw and does not mutate frozen input; repeated calls are equal", () => {
     const frozenType = deepFreeze(type);
     const values = deepFreeze({ pieces: 2, model: "m", season: ["spring"], brand_line: "x" });
-    const options = deepFreeze({ mode: "publish" as const, ...locales, locales: [...locales.locales] });
+    const options = deepFreeze({
+      mode: "publish" as const,
+      ...locales,
+      locales: [...locales.locales],
+    });
     const first = validateAttributeValues(frozenType, "product", values, options);
     const second = validateAttributeValues(frozenType, "product", values, options);
     expect(first).toEqual({ ok: true });
@@ -586,6 +622,8 @@ describe("aggregation and purity", () => {
   it("validates frozen invalid input without throwing", () => {
     const values = deepFreeze({ pieces: "x", model: null, nested: { a: [1] } });
     const options = { mode: "draft" as const, ...locales };
-    expect(() => validateAttributeValues(deepFreeze(type), "product", values, options)).not.toThrow();
+    expect(() =>
+      validateAttributeValues(deepFreeze(type), "product", values, options),
+    ).not.toThrow();
   });
 });

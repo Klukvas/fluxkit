@@ -232,7 +232,9 @@ describe("validateTree", () => {
   });
 
   it("reports every node that sits on a cycle", () => {
-    expect(validateTree([node("a", "c"), node("b", "a"), node("c", "b"), node("r", null)], 5)).toEqual({
+    expect(
+      validateTree([node("a", "c"), node("b", "a"), node("c", "b"), node("r", null)], 5),
+    ).toEqual({
       ok: false,
       violations: [
         { reason: "cycle", nodeId: "a" },

@@ -145,7 +145,9 @@ describe("deleting an attribute, an option or a product type", () => {
 
   it("blocks a product type that has products", () => {
     expect(decideDeleteProductType({ hasProducts: false })).toEqual(allowed);
-    expect(decideDeleteProductType({ hasProducts: true })).toEqual(forbidden("product_type_in_use"));
+    expect(decideDeleteProductType({ hasProducts: true })).toEqual(
+      forbidden("product_type_in_use"),
+    );
   });
 });
 
@@ -190,7 +192,10 @@ describe("removing a product option value", () => {
 
 describe("purity", () => {
   it("does not mutate frozen input and returns equal results on repeat calls", () => {
-    const input = deepFreeze({ currentUnit: "mm" as string | null, nextUnit: "cm" as string | null });
+    const input = deepFreeze({
+      currentUnit: "mm" as string | null,
+      nextUnit: "cm" as string | null,
+    });
     const facts = deepFreeze({ valuesExist: true });
     const first = decideUnitChange(input, facts);
     expect(decideUnitChange(input, facts)).toEqual(first);

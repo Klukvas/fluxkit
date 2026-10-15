@@ -209,7 +209,9 @@ export interface VariantInvariantViolation {
 export function checkExactlyOneDefault(
   variants: readonly Pick<VariantInvariantInput, "isDefault">[],
 ): VariantInvariantViolation[] {
-  const defaults = variants.flatMap((variant, variantIndex) => (variant.isDefault ? [variantIndex] : []));
+  const defaults = variants.flatMap((variant, variantIndex) =>
+    variant.isDefault ? [variantIndex] : [],
+  );
   if (defaults.length === 0) {
     return [{ code: "no_default_variant" }];
   }

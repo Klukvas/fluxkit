@@ -28,9 +28,7 @@ export type ParsedAttributeValidation =
   | { readonly inputType: "date"; readonly min?: string; readonly max?: string };
 
 export type AttributeValidationIssueReason =
-  | "unknown_key"
-  | "invalid_value"
-  | "min_greater_than_max";
+  "unknown_key" | "invalid_value" | "min_greater_than_max";
 
 export interface AttributeValidationIssue {
   /** The offending `validation` key; empty when the whole value is not an object. */
@@ -159,7 +157,9 @@ export function parseAttributeValidation(
       const min = optionalString(data["min"]);
       const max = optionalString(data["max"]);
       const issues = rangeIssue(min, max, "min");
-      return issues.length > 0 ? { ok: false, issues } : { ok: true, value: { inputType, min, max } };
+      return issues.length > 0
+        ? { ok: false, issues }
+        : { ok: true, value: { inputType, min, max } };
     }
     case "boolean":
     case "select":
@@ -218,8 +218,7 @@ export interface AttributeValueError {
 }
 
 export type AttributeValuesResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly errors: readonly AttributeValueError[] };
+  { readonly ok: true } | { readonly ok: false; readonly errors: readonly AttributeValueError[] };
 
 export interface ValidateAttributeValuesOptions extends LocaleConfig {
   /** Draft writes may omit required attributes; publish (and writes to active products) may not. */

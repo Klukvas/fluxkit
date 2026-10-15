@@ -35,7 +35,11 @@ describe("computeOptionSignature", () => {
   });
 
   it("sorts by option code, so reordering options changes nothing", () => {
-    const sorted = computeOptionSignature([pair("color", "black"), pair("size", "42"), pair("width", "wide")]);
+    const sorted = computeOptionSignature([
+      pair("color", "black"),
+      pair("size", "42"),
+      pair("width", "wide"),
+    ]);
     expect(sorted).toBe("color=black;size=42;width=wide");
     expect(
       computeOptionSignature([pair("width", "wide"), pair("color", "black"), pair("size", "42")]),
@@ -79,7 +83,11 @@ describe("generateVariants", () => {
       ok: true,
       variants: [
         { optionValues: [pair("color", "red")], optionSignature: "color=red", isDefault: true },
-        { optionValues: [pair("color", "black")], optionSignature: "color=black", isDefault: false },
+        {
+          optionValues: [pair("color", "black")],
+          optionSignature: "color=black",
+          isDefault: false,
+        },
       ],
     });
   });
@@ -137,7 +145,10 @@ describe("generateVariants", () => {
   });
 
   it("adding one value generates only the new combinations", () => {
-    const widened: GenerateVariantsOption = { code: "color", valueCodes: ["red", "black", "white"] };
+    const widened: GenerateVariantsOption = {
+      code: "color",
+      valueCodes: ["red", "black", "white"],
+    };
     const existing = new Set([
       "color=red;size=s",
       "color=red;size=m",
@@ -269,9 +280,7 @@ describe("generateVariants", () => {
     it("refuses 251 variants", () => {
       expect(
         generateVariants({
-          options: [
-            { code: "a", valueCodes: range("v", 251) },
-          ],
+          options: [{ code: "a", valueCodes: range("v", 251) }],
           existingSignatures: new Set(),
           limits: { maxValuesPerProductOption: 1000 },
         }),
@@ -431,9 +440,9 @@ describe("variant invariants", () => {
     });
 
     it("reports a stale or wrong signature", () => {
-      expect(
-        checkSignatureConsistency([red, { ...black, optionSignature: "color=red" }]),
-      ).toEqual([{ code: "signature_mismatch", variantIndex: 1, signature: "color=red" }]);
+      expect(checkSignatureConsistency([red, { ...black, optionSignature: "color=red" }])).toEqual([
+        { code: "signature_mismatch", variantIndex: 1, signature: "color=red" },
+      ]);
     });
   });
 

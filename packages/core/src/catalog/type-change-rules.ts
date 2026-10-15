@@ -27,8 +27,7 @@ export type TypeChangeReason =
   | "product_option_value_in_use";
 
 export type TypeChangeDecision =
-  | { readonly allowed: true }
-  | { readonly allowed: false; readonly reason: TypeChangeReason };
+  { readonly allowed: true } | { readonly allowed: false; readonly reason: TypeChangeReason };
 
 const ALLOWED: TypeChangeDecision = Object.freeze({ allowed: true });
 
@@ -112,7 +111,9 @@ export function decideDeleteOption(facts: {
   return forbidIf(facts.usedByProducts, "option_in_use_by_products");
 }
 
-export function decideDeleteProductType(facts: { readonly hasProducts: boolean }): TypeChangeDecision {
+export function decideDeleteProductType(facts: {
+  readonly hasProducts: boolean;
+}): TypeChangeDecision {
   return forbidIf(facts.hasProducts, "product_type_in_use");
 }
 

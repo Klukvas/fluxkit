@@ -49,9 +49,9 @@ describe("proposeSku", () => {
   const none: ReadonlySet<string> = new Set();
 
   it("joins the slug and the value codes in uppercase", () => {
-    expect(proposeSku({ slug: "futbolka-basic", valueCodes: ["red", "s"], takenSkus: none })).toEqual(
-      { ok: true, sku: "FUTBOLKA-BASIC-RED-S" },
-    );
+    expect(
+      proposeSku({ slug: "futbolka-basic", valueCodes: ["red", "s"], takenSkus: none }),
+    ).toEqual({ ok: true, sku: "FUTBOLKA-BASIC-RED-S" });
   });
 
   it("uses only the slug for a product without options", () => {
@@ -74,9 +74,9 @@ describe("proposeSku", () => {
       ok: true,
       sku: "FUTBOLKA-RED-2",
     });
-    expect(
-      proposeSku({ ...base, takenSkus: new Set(["FUTBOLKA-RED", "FUTBOLKA-RED-2"]) }),
-    ).toEqual({ ok: true, sku: "FUTBOLKA-RED-3" });
+    expect(proposeSku({ ...base, takenSkus: new Set(["FUTBOLKA-RED", "FUTBOLKA-RED-2"]) })).toEqual(
+      { ok: true, sku: "FUTBOLKA-RED-3" },
+    );
   });
 
   it("truncates to 64 characters", () => {
@@ -122,7 +122,11 @@ describe("proposeSkus (one batch)", () => {
   it("proposes distinct SKUs for a whole generate call", () => {
     const result = proposeSkus({
       slug: "futbolka",
-      variants: [["red", "s"], ["red", "m"], ["black", "s"]],
+      variants: [
+        ["red", "s"],
+        ["red", "m"],
+        ["black", "s"],
+      ],
       takenSkus: new Set(["FUTBOLKA-RED-M"]),
     });
     expect(result).toEqual([

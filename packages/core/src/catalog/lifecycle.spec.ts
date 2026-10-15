@@ -44,7 +44,9 @@ const clothing: ProductTypeDefinition = {
   allowedOptionCodes: ["color", "size"],
   attributes: [
     {
-      attribute: attribute("material", "select", { options: [{ code: "cotton" }, { code: "linen" }] }),
+      attribute: attribute("material", "select", {
+        options: [{ code: "cotton" }, { code: "linen" }],
+      }),
       level: "product",
       isRequired: true,
     },
@@ -59,7 +61,10 @@ const clothing: ProductTypeDefinition = {
       isRequired: true,
     },
     {
-      attribute: attribute("supplier_code", "text", { isInternal: true, isVisibleOnStorefront: false }),
+      attribute: attribute("supplier_code", "text", {
+        isInternal: true,
+        isVisibleOnStorefront: false,
+      }),
       level: "variant",
       isRequired: false,
     },
@@ -247,7 +252,9 @@ describe("publishPreconditions", () => {
     it("requires unique option signatures and consistent signatures", () => {
       expect(
         check(product({ variants: [variant(), { ...variant(), sku: "OTHER", isDefault: false }] })),
-      ).toEqual([{ code: "duplicate_option_signature", variantIndex: 1, signature: "color=red;size=s" }]);
+      ).toEqual([
+        { code: "duplicate_option_signature", variantIndex: 1, signature: "color=red;size=s" },
+      ]);
       expect(check(product({ variants: [variant({ optionSignature: "color=red" })] }))).toEqual([
         { code: "signature_mismatch", variantIndex: 0, signature: "color=red" },
       ]);
@@ -258,9 +265,9 @@ describe("publishPreconditions", () => {
       expect(result).toEqual([
         { code: "variant_sku_invalid", variantIndex: 1, reason: "invalid_format" },
       ]);
-      expect(codes(check(product({ variants: [variant({ sku: "lower" }), blackVariant] })))).toEqual([
-        "variant_sku_invalid",
-      ]);
+      expect(
+        codes(check(product({ variants: [variant({ sku: "lower" }), blackVariant] }))),
+      ).toEqual(["variant_sku_invalid"]);
       expect(codes(check(product({ variants: [variant({ sku: "" }), blackVariant] })))).toEqual([
         "variant_sku_invalid",
       ]);
@@ -279,7 +286,12 @@ describe("publishPreconditions", () => {
   describe("attributes", () => {
     it("requires product-level required attributes", () => {
       expect(check(product({ attributes: {} }))).toEqual([
-        { code: "attribute_invalid", level: "product", attributeCode: "material", reason: "required" },
+        {
+          code: "attribute_invalid",
+          level: "product",
+          attributeCode: "material",
+          reason: "required",
+        },
       ]);
     });
 

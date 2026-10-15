@@ -86,7 +86,12 @@ export function transliterateUkrainian(text: string): string {
       output = "gh";
     } else {
       const positional = POSITIONAL[lower];
-      output = positional !== undefined ? (atWordStart ? positional.initial : positional.inner) : SIMPLE[lower];
+      output =
+        positional !== undefined
+          ? atWordStart
+            ? positional.initial
+            : positional.inner
+          : SIMPLE[lower];
     }
     result += output === undefined ? char : isUpper ? capitalize(output) : output;
     previous = char;
