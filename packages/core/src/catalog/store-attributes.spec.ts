@@ -46,9 +46,9 @@ describe("selectPublicAttributes allowlist", () => {
   });
 
   it("drops keys that have no definition", () => {
-    expect(selectPublicAttributes(definitions, { visible: "a", unknown_key: "x" }, context)).toEqual(
-      { visible: "a" },
-    );
+    expect(
+      selectPublicAttributes(definitions, { visible: "a", unknown_key: "x" }, context),
+    ).toEqual({ visible: "a" });
   });
 
   it("omits attributes that have no value", () => {
@@ -107,18 +107,24 @@ describe("selectPublicAttributes value resolution", () => {
   });
 
   it("returns plain text as is", () => {
-    expect(selectPublicAttributes([attribute("model", "text")], { model: "X-1" }, context)).toEqual({
-      model: "X-1",
-    });
+    expect(selectPublicAttributes([attribute("model", "text")], { model: "X-1" }, context)).toEqual(
+      {
+        model: "X-1",
+      },
+    );
   });
 
   it("returns number with its unit", () => {
     expect(
-      selectPublicAttributes([attribute("weight_g", "number", { unit: "g" })], { weight_g: 180 }, context),
+      selectPublicAttributes(
+        [attribute("weight_g", "number", { unit: "g" })],
+        { weight_g: 180 },
+        context,
+      ),
     ).toEqual({ weight_g: { value: 180, unit: "g" } });
-    expect(
-      selectPublicAttributes([attribute("count", "number")], { count: 0 }, context),
-    ).toEqual({ count: { value: 0, unit: null } });
+    expect(selectPublicAttributes([attribute("count", "number")], { count: 0 }, context)).toEqual({
+      count: { value: 0, unit: null },
+    });
   });
 
   it("returns boolean (including false) and date as is", () => {
@@ -168,9 +174,7 @@ describe("selectPublicAttributes value resolution", () => {
   });
 
   it("orders multiselect values by option position, not by stored order", () => {
-    expect(
-      selectPublicAttributes([season], { season: ["summer", "spring"] }, context),
-    ).toEqual({
+    expect(selectPublicAttributes([season], { season: ["summer", "spring"] }, context)).toEqual({
       season: [
         { code: "spring", label: "Spring" },
         { code: "summer", label: "Summer" },
@@ -179,9 +183,7 @@ describe("selectPublicAttributes value resolution", () => {
   });
 
   it("puts options without a position last, keeping their stored order", () => {
-    expect(
-      selectPublicAttributes([season], { season: ["autumn", "winter"] }, context),
-    ).toEqual({
+    expect(selectPublicAttributes([season], { season: ["autumn", "winter"] }, context)).toEqual({
       season: [
         { code: "winter", label: "Winter" },
         { code: "autumn", label: "Autumn" },
