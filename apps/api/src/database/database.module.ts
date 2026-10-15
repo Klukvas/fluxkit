@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
 import pg from "pg";
-import * as schema from "./schema.js";
+import * as schema from "./schema/index.js";
 
 export const PG_POOL = Symbol("PG_POOL");
 export const DRIZZLE = Symbol("DRIZZLE");
