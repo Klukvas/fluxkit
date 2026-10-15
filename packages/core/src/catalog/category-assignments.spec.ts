@@ -8,7 +8,10 @@ import { deepFreeze } from "./test-support.js";
 
 describe("normalizeCategoryAssignments", () => {
   it("accepts an empty list and has no primary", () => {
-    expect(normalizeCategoryAssignments({ assignments: [] })).toEqual({ ok: true, assignments: [] });
+    expect(normalizeCategoryAssignments({ assignments: [] })).toEqual({
+      ok: true,
+      assignments: [],
+    });
   });
 
   it("makes the assignment with the lowest position primary when none is given", () => {
@@ -173,6 +176,8 @@ describe("promotePrimaryAfterRemoval", () => {
 
   it("is pure: frozen input is not mutated and two calls agree", () => {
     const frozen = deepFreeze(assignments.map((assignment) => ({ ...assignment })));
-    expect(promotePrimaryAfterRemoval(frozen, "a")).toEqual(promotePrimaryAfterRemoval(frozen, "a"));
+    expect(promotePrimaryAfterRemoval(frozen, "a")).toEqual(
+      promotePrimaryAfterRemoval(frozen, "a"),
+    );
   });
 });
