@@ -6,7 +6,7 @@ No feature flag: the catalog is core.
 
 ## Conventions
 
-- **Admin auth**: every `/admin/*` route runs `AdminGuard`. The only production authenticator is `DenyAllAdminAuthenticator`, so every admin request answers `401 unauthorized` until the auth and roles plan lands. Tests inject an allow-all authenticator.
+- **Admin auth**: every `/admin/*` route runs `AdminGuard`: `@AdminController` applies it, and a global guard covers any path under `/admin` even when a controller forgot the decorator (`docs/contracts/api.md`). The only production authenticator is `DenyAllAdminAuthenticator`, so every admin request answers `401 unauthorized` until the auth and roles plan lands. Tests inject an allow-all authenticator.
 - **Store auth**: none. `/store/*` is public and read-only (GET only).
 - **Format**: JSON; field names camelCase; ids are UUIDs (opaque); timestamps are ISO 8601 UTC. Admin responses carry `createdAt` and `updatedAt`; store responses carry only `publishedAt`.
 - **Texts**: i18n texts are maps `{"uk": "...", "en": "..."}`. Locales come from `LOCALES` (default `uk,en`); `DEFAULT_LOCALE` (default `uk`) is required for required texts. A text map in a PATCH replaces the whole map.
