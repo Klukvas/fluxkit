@@ -142,7 +142,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
   /storefront        # Next.js customer site (placeholder home page)
   /admin             # React SPA (Vite) (placeholder screen)
 /packages
-  /core              # domain logic: catalog, pricing, inventory, cart, checkout, orders, customers (empty scaffold)
+  /core              # domain logic: catalog rules implemented (docs/files/core.md); pricing, inventory, cart, checkout, orders, customers not yet
   /features          # optional modules, one package each (only the sample `_example` so far)
   /providers         # payment and shipping provider plugins (none yet)
   /ui                # token-based component library (shared by storefront and admin)

@@ -7,17 +7,18 @@ Sold as a template plus a team that adapts design and features for each client.
 
 ## Principles
 
-- **Niche-agnostic catalog**: Product + Variant (SKU), data-driven attributes via ProductType (not built yet, designed in ADR 0004).
+- **Niche-agnostic catalog**: Product + Variant (SKU), data-driven attributes via ProductType (admin write API and public store read API built; ADR 0004 and ADR 0006).
 - **Replaceable design**: design tokens (`packages/theme`) and a token-based UI library (`packages/ui`); redesign = change tokens, not components.
 - **Modular features**: every optional feature is its own package behind one flag; core never imports features (enforced in CI).
 - **Honest checks**: no stubbed scripts, no skipped integration tests, no cached test passes.
 
 ## Status
 
-Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`): monorepo, tooling, CI, API spike, search spike, storefront and admin skeletons.
-**There is no business logic yet**: no catalog, cart, checkout, orders or customers. What exists and works:
+Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): steps 1 to 7 done, step 8 (independent review) pending.
+**Not built yet**: authentication (every `/admin` route answers 401 until the auth plan), prices, inventory, search indexing, cart, checkout, orders and customers. What exists and works:
 
-- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migration spike, BullMQ and Meilisearch spikes.
+- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`), BullMQ and Meilisearch spikes.
+- Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; default deny) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
 - Storefront (`/uk`, `/en`) and admin: placeholder pages built from the shared UI and tokens (light and dark themes).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
 
@@ -81,7 +82,7 @@ Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.
 apps/api            NestJS API (REST + OpenAPI)
 apps/storefront     Next.js storefront (App Router, Tailwind, tokens, uk/en)
 apps/admin          React + Vite admin
-packages/core       domain logic (empty scaffold)
+packages/core       catalog domain rules, pure TypeScript (pricing and the rest not yet)
 packages/features   optional feature modules (sample: _example)
 packages/providers  payment and shipping provider plugins (none yet)
 packages/ui         token-based components and i18n helpers
@@ -98,7 +99,7 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes.
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
@@ -116,6 +117,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Core domain implementation in `packages/core` and `apps/api`. The catalog plan (`docs/plans/2026-10-14-catalog.md`) is written and awaits approval; then pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic).
+2. Catalog plan step 8 (independent review), then the auth and roles plan (admin endpoints stay 401 until then), then pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting (needs a dependency), a `db:migrate` script.
 3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.
