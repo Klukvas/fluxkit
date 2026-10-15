@@ -40,6 +40,8 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "admin_session",
+      "admin_user",
       "media",
       "variant_option_value",
       "variant",
@@ -1397,7 +1399,7 @@ describe("catalog schema (real Postgres)", () => {
         from pg_constraint c
         join pg_class t on t.oid = c.conrelid
         join pg_namespace n on n.oid = c.connamespace
-        where n.nspname = 'public' and c.contype <> 'n' and t.relname <> 'health_check'
+        where n.nspname = 'public' and c.contype <> 'n' and t.relname not in ('health_check', 'admin_user', 'admin_session')
       `);
       const unnamed = result.rows.filter(
         (row) => !declared.has(row.name) && row.name !== `${row.table}_pkey`,
@@ -1413,7 +1415,7 @@ describe("catalog schema (real Postgres)", () => {
         join pg_class i on i.oid = x.indexrelid
         join pg_class t on t.oid = x.indrelid
         join pg_namespace n on n.oid = t.relnamespace
-        where n.nspname = 'public' and t.relname <> 'health_check'
+        where n.nspname = 'public' and t.relname not in ('health_check', 'admin_user', 'admin_session')
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.
       const undeclared = result.rows.filter(

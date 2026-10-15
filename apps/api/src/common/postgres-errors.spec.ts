@@ -34,6 +34,18 @@ describe("mapPostgresError", () => {
     expect(problem?.getStatus()).toBe(409);
   });
 
+  it("learns the admin auth constraints from the schema: duplicate email is a 409 conflict on field email", () => {
+    const problem = mapPostgresError(wrapped(pgError("23505", "admin_user_email_key")));
+    expect(problem).toMatchObject({
+      code: "conflict",
+      extensions: { field: "email", constraint: "admin_user_email_key" },
+    });
+    expect(problem?.getStatus()).toBe(409);
+    expect(mapPostgresError(pgError("23505", "admin_session_token_hash_key"))).toMatchObject({
+      extensions: { field: "tokenHash", constraint: "admin_session_token_hash_key" },
+    });
+  });
+
   it("converts snake_case columns to camelCase field names", () => {
     expect(mapPostgresError(pgError("23505", "attribute_code_key"))).toMatchObject({
       extensions: { field: "code" },
