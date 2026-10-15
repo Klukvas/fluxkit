@@ -1,4 +1,4 @@
-import { CATALOG_LIMITS } from "./limits.js";
+import { CATALOG_LIMITS, isValidCode } from "./limits.js";
 import type { OptionValuePair, VariantSnapshot } from "./types.js";
 
 /**
@@ -7,6 +7,14 @@ import type { OptionValuePair, VariantSnapshot } from "./types.js";
  * not by position, keeps it stable when the admin reorders options.
  */
 export function computeOptionSignature(pairs: readonly OptionValuePair[]): string {
+  for (const pair of pairs) {
+    if (!isValidCode(pair.optionCode) || !isValidCode(pair.valueCode)) {
+      // A code containing ";" or "=" could make two different combinations share a signature.
+      throw new RangeError(
+        `Invalid option or value code in signature: "${pair.optionCode}=${pair.valueCode}"`,
+      );
+    }
+  }
   return [...pairs]
     .sort((left, right) => compareCodes(left.optionCode, right.optionCode))
     .map((pair) => `${pair.optionCode}=${pair.valueCode}`)
@@ -54,6 +62,7 @@ export type GenerateVariantsErrorReason =
   | "too_many_values"
   | "duplicate_option"
   | "duplicate_value"
+  | "invalid_code"
   | "too_many_new_variants"
   | "too_many_variants_total";
 
@@ -69,6 +78,16 @@ export type GenerateVariantsResult =
   | { readonly ok: true; readonly variants: readonly GeneratedVariant[] }
   | { readonly ok: false; readonly errors: readonly GenerateVariantsError[] };
 
+/** Drops keys whose value is undefined so that they cannot override a default limit. */
+function definedOnly<T extends object>(value: T | undefined): Partial<T> {
+  if (value === undefined) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined),
+  ) as Partial<T>;
+}
+
 /**
  * Builds the variants a product is missing: the cartesian product of the chosen option values minus
  * the combinations that already exist. Either returns all of them or refuses with typed errors;
@@ -80,7 +99,7 @@ export function generateVariants(input: GenerateVariantsInput): GenerateVariants
     maxValuesPerProductOption: CATALOG_LIMITS.maxValuesPerProductOption,
     maxVariantsPerProduct: CATALOG_LIMITS.maxVariantsPerProduct,
     maxNewVariantsPerGenerate: CATALOG_LIMITS.maxNewVariantsPerGenerate,
-    ...input.limits,
+    ...definedOnly(input.limits),
   };
   const { options, existingSignatures } = input;
 
@@ -91,6 +110,16 @@ export function generateVariants(input: GenerateVariantsInput): GenerateVariants
       limit: limits.maxOptionsPerProduct,
       actual: options.length,
     });
+  }
+  for (const option of options) {
+    if (!isValidCode(option.code)) {
+      structuralErrors.push({ reason: "invalid_code", optionCode: option.code });
+    }
+    for (const valueCode of option.valueCodes) {
+      if (!isValidCode(valueCode)) {
+        structuralErrors.push({ reason: "invalid_code", optionCode: option.code, valueCode });
+      }
+    }
   }
   const seenOptions = new Set<string>();
   for (const option of options) {

@@ -11,7 +11,10 @@ import { computeOptionSignature, generateVariants } from "./variants.js";
 
 const locales = { defaultLocale: "uk", locales: ["uk", "en"] } as const;
 
-function textAttribute(code: string, isRequired = false): ProductTypeDefinition["attributes"][number] {
+function textAttribute(
+  code: string,
+  isRequired = false,
+): ProductTypeDefinition["attributes"][number] {
   const definition: AttributeDefinition = {
     code,
     inputType: "text",
@@ -70,13 +73,23 @@ describe("strings that Postgres jsonb would reject are refused with a field erro
 
   it("rejects NUL characters and lone surrogates in attribute text", () => {
     for (const bad of ["a\u0000b", "\ud800", "x\udc00y"]) {
-      const result = validateAttributeValues(type, "product", { txt: bad }, { ...locales, mode: "draft" });
+      const result = validateAttributeValues(
+        type,
+        "product",
+        { txt: bad },
+        { ...locales, mode: "draft" },
+      );
       expect(result.ok, JSON.stringify(bad)).toBe(false);
     }
   });
 
   it("accepts ordinary text including emoji (valid surrogate pairs)", () => {
-    const result = validateAttributeValues(type, "product", { txt: "ok 😀" }, { ...locales, mode: "draft" });
+    const result = validateAttributeValues(
+      type,
+      "product",
+      { txt: "ok 😀" },
+      { ...locales, mode: "draft" },
+    );
     expect(result.ok).toBe(true);
   });
 
@@ -103,7 +116,9 @@ describe("slugify keeps word-start romanization after opening quotes", () => {
 
 describe("option codes are validated so that signatures stay unambiguous", () => {
   it("computeOptionSignature refuses codes that do not match the code pattern", () => {
-    expect(() => computeOptionSignature([{ optionCode: "a", valueCode: "x;b=y" }])).toThrow(/code/i);
+    expect(() => computeOptionSignature([{ optionCode: "a", valueCode: "x;b=y" }])).toThrow(
+      /code/i,
+    );
     expect(() => computeOptionSignature([{ optionCode: "A b", valueCode: "x" }])).toThrow(/code/i);
   });
 
@@ -149,5 +164,25 @@ describe("limit overrides set to undefined do not switch a limit off", () => {
       limits: { maxOptionsPerProduct: undefined },
     });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("value codes may start with a digit (numeric sizes), option codes may not", () => {
+  it("accepts numeric option value codes such as shoe size 42", () => {
+    expect(computeOptionSignature([{ optionCode: "size", valueCode: "42" }])).toBe("size=42");
+    const result = generateVariants({
+      options: [{ code: "size", valueCodes: ["40", "41", "42"] }],
+      existingSignatures: new Set(),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("still rejects option codes that start with a digit", () => {
+    expect(() => computeOptionSignature([{ optionCode: "2size", valueCode: "m" }])).toThrow(/code/i);
+  });
+
+  it("still rejects value codes with separators", () => {
+    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "4;2" }])).toThrow(/code/i);
+    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "a=b" }])).toThrow(/code/i);
   });
 });

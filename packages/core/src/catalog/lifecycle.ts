@@ -134,7 +134,7 @@ export function publishPreconditions(
     seenSkus.add(variant.sku);
   });
 
-  const options = { mode: "publish" as const, ...config };
+  const options = { ...config, mode: "publish" as const };
   const productAttributes = validateAttributeValues(
     productType,
     "product",

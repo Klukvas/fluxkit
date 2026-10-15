@@ -1,3 +1,4 @@
+import { hasJsonbUnsafeCharacters } from "./text-safety.js";
 import type { I18nText } from "./types.js";
 
 export type I18nTextErrorReason =
@@ -8,7 +9,8 @@ export type I18nTextErrorReason =
   | "not_a_string"
   | "empty"
   | "too_short"
-  | "too_long";
+  | "too_long"
+  | "invalid_characters";
 
 export interface I18nTextError {
   readonly reason: I18nTextErrorReason;
@@ -70,6 +72,10 @@ export function validateI18nText(value: unknown, options: I18nTextOptions): I18n
       errors.push({ reason: "empty", locale });
       continue;
     }
+    if (hasJsonbUnsafeCharacters(text)) {
+      errors.push({ reason: "invalid_characters", locale });
+      continue;
+    }
     const length = codePointLength(text);
     if (options.minLength !== undefined && length < options.minLength) {
       errors.push({ reason: "too_short", locale, limit: options.minLength });
@@ -93,5 +99,7 @@ export function resolveText(
   if (text === null || text === undefined) {
     return undefined;
   }
-  return text[locale] ?? text[defaultLocale];
+  const own = (key: string): string | undefined =>
+    Object.hasOwn(text, key) ? text[key] : undefined;
+  return own(locale) ?? own(defaultLocale);
 }

@@ -3,9 +3,10 @@ import { TEXT_LIMITS } from "./limits.js";
 export const SKU_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,63}$/;
 const SKU_ALPHABET = /^[A-Z0-9][A-Z0-9._-]*$/;
 
-/** Trim and uppercase, the normalization the service applies before validating (ADR 0006 section 7). */
+/** Trim and uppercase ASCII letters, the normalization the service applies before validating (ADR 0006 section 7). */
 export function normalizeSku(raw: string): string {
-  return raw.trim().toUpperCase();
+  // ASCII only: Unicode case mapping would silently turn "ß", "ſ", "ı" or "ﬁ" into ASCII letters.
+  return raw.trim().replace(/[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 export function isValidSku(sku: string): boolean {

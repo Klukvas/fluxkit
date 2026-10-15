@@ -75,10 +75,15 @@ function capitalize(text: string): string {
 export function transliterateUkrainian(text: string): string {
   let result = "";
   let previous = "";
+  // The last letter seen, skipping apostrophes that sit between letters (Знам'янка), so that a quote
+  // after a space or at the start (opening quote) does not hide a word start.
+  let previousLetterBeforeApostrophe = false;
   for (const char of text.normalize("NFC")) {
     const lower = char.toLowerCase();
     const isUpper = char !== lower;
-    const atWordStart = previous === "" || !(/\p{L}/u.test(previous) || APOSTROPHES.has(previous));
+    const atWordStart =
+      previous === "" ||
+      !(/\p{L}/u.test(previous) || (APOSTROPHES.has(previous) && previousLetterBeforeApostrophe));
     let output: string | undefined;
     if (APOSTROPHES.has(char) || lower === "ь") {
       output = "";
@@ -94,6 +99,9 @@ export function transliterateUkrainian(text: string): string {
           : SIMPLE[lower];
     }
     result += output === undefined ? char : isUpper ? capitalize(output) : output;
+    if (!APOSTROPHES.has(char)) {
+      previousLetterBeforeApostrophe = /\p{L}/u.test(char);
+    }
     previous = char;
   }
   return result;

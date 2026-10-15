@@ -41,3 +41,7 @@ export const ATTRIBUTE_VALIDATION_DEFAULTS = Object.freeze({
 
 /** Shape of option, option value, attribute and product type codes (also a DB CHECK). */
 export const CODE_PATTERN = /^[a-z][a-z0-9_]{0,63}$/;
+
+export function isValidCode(code: string): boolean {
+  return CODE_PATTERN.test(code);
+}

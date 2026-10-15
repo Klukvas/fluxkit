@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { codePointLength, validateI18nText } from "./i18n.js";
+import { hasJsonbUnsafeCharacters } from "./text-safety.js";
 import { ATTRIBUTE_VALIDATION_DEFAULTS, TEXT_LIMITS } from "./limits.js";
 import type {
   AttributeDefinition,
@@ -194,6 +195,7 @@ export type AttributeValueErrorReason =
   | "empty"
   | "too_short"
   | "too_long"
+  | "invalid_characters"
   | "locale_not_allowed"
   | "default_locale_missing"
   | "not_integer"
@@ -290,6 +292,9 @@ function validateText(
   }
   if (value.trim().length === 0) {
     return [{ reason: "empty" }];
+  }
+  if (hasJsonbUnsafeCharacters(value)) {
+    return [{ reason: "invalid_characters" }];
   }
   const length = codePointLength(value);
   if (length < rules.minLength) {
