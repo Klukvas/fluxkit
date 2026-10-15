@@ -14,6 +14,8 @@ export default defineConfig({
   ],
   test: {
     environment: "node",
+    // HTTP specs commit data to one shared database and migrations.spec drops it: one spec file at a time.
+    fileParallelism: false,
     include: ["src/**/*.spec.ts"],
     testTimeout: 20000,
     hookTimeout: 20000,
