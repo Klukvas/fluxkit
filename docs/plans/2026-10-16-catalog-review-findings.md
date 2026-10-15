@@ -1,6 +1,6 @@
 # Catalog independent review: findings (plan step 8)
 
-Status: review done 2026-10-16 on `main` at 4c99c67 / 56e5d20. Fixes are not made yet; each finding below is a candidate for the hardening PRs.
+Status: review done 2026-10-16 on `main` at 4c99c67 / 56e5d20. Fixed in PRs #27 (store: S3a, S4, C3), #28 (S1, S2, S3b, S8) and #29 (C1, C2, C4, S5, S6, S7) on 2026-10-16. Still open: C5 (concurrency windows around attribute facts), the information items, and the surviving mutations listed below. ADR 0007 and ADR 0008 record the two rule decisions.
 Reviewers: Opus (security and data exposure), Fable (correctness, schema, tests). Authors were Sonnet and Haiku agents; the reviewers did not see the orchestrator's conclusions.
 "Confirmed" = the orchestrator reproduced it or re-derived it from the code. "Reported" = reproduced by the reviewer only.
 

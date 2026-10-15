@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (step 8 review).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (review fixes merged).
 
 ## Where we are
 
@@ -17,13 +17,14 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 | Step 5, public store read API (`2026-10-16-catalog-store-api-design.md`) | Implemented in `apps/api/src/catalog/store/` (`GET /store/categories`, `GET /store/products`, `GET /store/products/:slug`; no auth; HTTP integration tests incl. leak and query-count tests); merged (PR #23). |
 | Step 6, ProductType presets and demo data | Implemented: pure data in `seeds/` (`@fluxkit/seeds`: Clothing, Hand tool, Digital product presets; 9 categories, 1 brand, 8 published products in `uk`/`en`) and the idempotent runner `apps/api/src/seed/` (`pnpm seed`; creates through the admin services, never updates or deletes, refuses `NODE_ENV=production` without `--allow-production`); integration test reads the result through the store API; merged (PR #24). |
 | Step 7 OpenAPI and docs | Done and merged (PR #25): `docs/api/catalog.md` (every `/admin` and `/store` route), `docs/contracts/api.md`, `docs/files/core.md`, `docs/files/api.md`, ADR index, README status, plan outcome. |
-| Step 8 independent review | Done 2026-10-16 by two reviewers (Opus: security; Fable: correctness and tests). No leak of internal data found; 5 medium and several low findings, none fixed yet. Findings and status: `docs/plans/2026-10-16-catalog-review-findings.md`. |
+| Step 8 independent review | Done 2026-10-16 by two reviewers (Opus: security; Fable: correctness and tests). No leak of internal data found. The medium and low findings are fixed (PRs #27, #28, #29; ADR 0007 and 0008). Still open: see `docs/plans/2026-10-16-catalog-review-findings.md` (C5, information items, surviving mutations). The catalog plan is complete. |
 
 ## Next steps (in order)
 
-1. Fix the review findings in small PRs, each with a regression test that fails before the fix (list and status: `docs/plans/2026-10-16-catalog-review-findings.md`): (a) global default deny for `/admin` plus a router-walking test and a sanctioned admin decorator for feature modules (public contract, owner's decision); (b) 500s on NUL and oversized bodies, and error logging without SQL and parameters; (c) slug collisions for 160-character titles; (d) required variant attributes when a value is added to an active product; (e) the low findings.
-2. Known gaps of the store API: no rate limiting yet (needs a dependency, red zone; before launch); the public attribute definition gets its display name in the serializer, not in core.
-3. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
+1. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design; the global guard already denies every `/admin` path). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
+2. Before any launch: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production.
+3. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
+4. Next domain plan: pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
 
 ## Open decisions (owner)
 
@@ -31,6 +32,7 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 - Branch protection on `main` (GitHub settings, owner side). Pinning GitHub Actions by SHA.
 - Permanent negative test for the dependency-cruiser `core-must-not-import-infrastructure` rule.
 - ADR 0006 (accepted) and the code differ on two points: the default page size (code: admin 50, store 24; ADR section 9: 24) and category filters (`?categoryId` on admin products matches direct assignments only; ADR section 8 says listings include descendants). Fix the code, or supersede the ADR; do not edit it.
+- Owner sign-off still wanted on the core rule inside ADR 0008: required variant-level attributes are asked only of active variants at publish.
 
 ## Working agreements (the owner's process)
 
