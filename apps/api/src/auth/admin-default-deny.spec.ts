@@ -1,12 +1,9 @@
 import { Controller, Delete, Get, Module, Post } from "@nestjs/common";
-import { NestFactory } from "@nestjs/core";
-import type { NestExpressApplication } from "@nestjs/platform-express";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { AppModule } from "../app.module.js";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
-import { requireEnv } from "../test/env.js";
 import { http } from "../test/http.js";
+import { adminRoutes, SOME_ID } from "../test/routes.js";
 import type { AdminAuthenticator } from "./admin-authenticator.js";
 
 /** A controller written by someone who forgot `@AdminController`: the global guard must still protect it. */
@@ -31,63 +28,39 @@ class ForgottenGuardController {
 @Module({ controllers: [ForgottenGuardController] })
 class ProbeFeatureModule {}
 
-const SOME_ID = "6f1c1d2e-8b43-4f4e-9c55-0a1b2c3d4e5f";
-
-interface ExpressLayer {
-  route?: { path: string; methods: Record<string, boolean> };
-}
-
-/** Every `METHOD path` registered on the real Express router, with params filled in. */
-function registeredRoutes(app: NestExpressApplication): { method: string; path: string }[] {
-  const router = (app.getHttpAdapter().getInstance() as { router: { stack: ExpressLayer[] } })
-    .router;
-  const routes: { method: string; path: string }[] = [];
-  for (const layer of router.stack) {
-    if (layer.route === undefined) continue;
-    for (const method of Object.keys(layer.route.methods)) {
-      routes.push({
-        method: method.toUpperCase(),
-        path: layer.route.path.replace(/:[A-Za-z]+/g, SOME_ID),
-      });
-    }
-  }
-  return routes;
-}
+const probeFeature = [{ name: "probe", module: ProbeFeatureModule }];
 
 describe("admin default deny (global guard)", () => {
   let running: RunningApp;
-  let probe: NestExpressApplication;
-  let probeUrl: string;
+  let probe: RunningApp;
+  let signedInViewer: RunningApp;
+  let signedInOwner: RunningApp;
   let probeCalls = 0;
 
   beforeAll(async () => {
     running = await startApp({ adminAuthenticator: "production-default" });
     const countingDeny: AdminAuthenticator = {
-      allows: () => {
+      authenticate: () => {
         probeCalls += 1;
-        return false;
+        return undefined;
       },
     };
-    probe = await NestFactory.create<NestExpressApplication>(
-      AppModule.register({
-        databaseUrl: requireEnv("DATABASE_URL"),
-        features: [{ name: "probe", module: ProbeFeatureModule }],
-        locale: { defaultLocale: "uk", locales: ["uk", "en"] },
-        adminAuthenticator: countingDeny,
-      }),
-      { logger: false },
-    );
-    await probe.listen(0, "127.0.0.1");
-    probeUrl = `http://127.0.0.1:${(probe.getHttpServer().address() as { port: number }).port}`;
+    probe = await startApp({ extraFeatures: probeFeature, adminAuthenticator: countingDeny });
+    signedInViewer = await startApp({
+      extraFeatures: probeFeature,
+      adminPrincipal: { role: "viewer" },
+    });
+    signedInOwner = await startApp({ extraFeatures: probeFeature });
   });
 
   afterAll(async () => {
-    await running.app.close();
-    await probe.close();
+    for (const started of [running, probe, signedInViewer, signedInOwner]) {
+      await started.app.close();
+    }
   });
 
-  it("answers 401 on EVERY registered /admin route of the real router", async () => {
-    const admin = registeredRoutes(running.app).filter(({ path }) => path.startsWith("/admin"));
+  it("answers 401 on EVERY registered /admin route of the real router (real authenticator, no cookie)", async () => {
+    const admin = adminRoutes(running.app);
     expect(admin.length).toBeGreaterThan(50);
     for (const { method, path } of admin) {
       const result = await http<ProblemBody>(
@@ -101,7 +74,20 @@ describe("admin default deny (global guard)", () => {
     }
   });
 
-  it("denies a plain @Controller('admin/probe') that forgot @AdminController", async () => {
+  it("stays 401 with a malformed, unknown or foreign cookie and with Authorization or API-key headers", async () => {
+    const attempts: Record<string, string>[] = [
+      { cookie: "fluxkit_admin_session=garbage" },
+      { cookie: `fluxkit_admin_session=${"A".repeat(43)}` },
+      { cookie: "other=1" },
+      { authorization: "Bearer anything", "x-api-key": "anything" },
+    ];
+    for (const headers of attempts) {
+      const result = await http<ProblemBody>(running.baseUrl, "GET", "/admin/brands", { headers });
+      expect(result.status, JSON.stringify(headers)).toBe(401);
+    }
+  });
+
+  it("denies a plain @Controller('admin/probe') that forgot @AdminController: 401 when anonymous", async () => {
     for (const [method, path] of [
       ["GET", "/admin/probe"],
       ["POST", "/admin/probe/nested/deep"],
@@ -109,25 +95,46 @@ describe("admin default deny (global guard)", () => {
       ["GET", "/ADMIN/probe"],
       ["GET", "/admin/probe/"],
     ] as const) {
-      const result = await http<ProblemBody>(probeUrl, method, path, {});
+      const result = await http<ProblemBody>(probe.baseUrl, method, path, {});
       expect(result.status, `${method} ${path}`).toBe(401);
       expect(JSON.stringify(result.body)).not.toContain("leaked");
     }
   });
 
+  it.each([
+    ["viewer", () => signedInViewer],
+    ["owner", () => signedInOwner],
+  ])(
+    "denies the same probe routes with 403 forbidden when signed in as %s (no permission metadata)",
+    async (_role, app) => {
+      for (const [method, path] of [
+        ["GET", "/admin/probe"],
+        ["POST", "/admin/probe/nested/deep"],
+        ["DELETE", `/admin/probe/${SOME_ID}`],
+        ["GET", "/ADMIN/probe"],
+        ["GET", "/admin/probe/"],
+      ] as const) {
+        const result = await http<ProblemBody>(app().baseUrl, method, path, {});
+        expect(result.status, `${method} ${path}`).toBe(403);
+        expect(result.body, `${method} ${path}`).toMatchObject({ code: "forbidden" });
+        expect(JSON.stringify(result.body)).not.toContain("leaked");
+      }
+    },
+  );
+
   it("asks the authenticator once per request, also for @AdminController routes", async () => {
     probeCalls = 0;
-    expect((await http(probeUrl, "GET", "/admin/brands")).status).toBe(401);
+    expect((await http(probe.baseUrl, "GET", "/admin/brands")).status).toBe(401);
     expect(probeCalls).toBe(1);
     probeCalls = 0;
-    expect((await http(probeUrl, "GET", "/admin/probe")).status).toBe(401);
+    expect((await http(probe.baseUrl, "GET", "/admin/probe")).status).toBe(401);
     expect(probeCalls).toBe(1);
   });
 
   it("does not guard routes outside /admin", async () => {
     probeCalls = 0;
-    expect((await http(probeUrl, "GET", "/health")).status).not.toBe(401);
-    expect((await http(probeUrl, "GET", "/administrator")).status).toBe(404);
+    expect((await http(probe.baseUrl, "GET", "/health")).status).not.toBe(401);
+    expect((await http(probe.baseUrl, "GET", "/administrator")).status).toBe(404);
     expect(probeCalls).toBe(0);
   });
 });

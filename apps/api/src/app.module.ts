@@ -1,6 +1,9 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
+import { DEFAULT_ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth/auth-config.js";
 import { AuthModule } from "./auth/auth.module.js";
+import type { Clock } from "./auth/clock.js";
+import type { ScryptParams } from "./auth/password-hasher.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { CommonModule } from "./common/common.module.js";
 import type { LocaleConfig } from "./common/locale.js";
@@ -12,8 +15,14 @@ export interface AppModuleOptions {
   databaseUrl: string;
   features: LoadedFeature[];
   locale: LocaleConfig;
-  /** Tests only: replaces the default authenticator, which denies every admin request. */
+  /** Defaults to the secure defaults of `docs/contracts/config.md` (the seed command builds the module without them). */
+  adminAuth?: AdminAuthConfig;
+  /** Tests only: replaces the session-based authenticator. */
   adminAuthenticator?: AdminAuthenticator;
+  /** Tests only: a controlled clock for session expiry. */
+  clock?: Clock;
+  /** Tests only: cheap scrypt parameters. */
+  scrypt?: ScryptParams;
 }
 
 @Module({})
@@ -24,7 +33,12 @@ export class AppModule {
       imports: [
         CommonModule.register(options.locale),
         DatabaseModule.forRoot(options.databaseUrl),
-        AuthModule.register(options.adminAuthenticator),
+        AuthModule.register({
+          config: options.adminAuth ?? DEFAULT_ADMIN_AUTH_CONFIG,
+          authenticator: options.adminAuthenticator,
+          clock: options.clock,
+          scrypt: options.scrypt,
+        }),
         HealthModule,
         CatalogModule,
         ...options.features.map((feature) => feature.module),

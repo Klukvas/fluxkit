@@ -1,25 +1,23 @@
-import { Injectable } from "@nestjs/common";
+import type { AdminPermission, AdminRole } from "@fluxkit/core";
 import type { Request } from "express";
 
 export const ADMIN_AUTHENTICATOR = Symbol("ADMIN_AUTHENTICATOR");
 
-/**
- * Decides whether a request may use the admin API. Contract of the future auth plan: it replaces the provider
- * bound to `ADMIN_AUTHENTICATOR`; `AdminGuard` and the controllers stay as they are.
- * An implementation that throws is treated as "not allowed" for the caller (HTTP 500, logged), never as "allowed".
- */
-export interface AdminAuthenticator {
-  allows(request: Request): boolean | Promise<boolean>;
+/** Who is calling, as decided by the authenticator for this request. Controllers read it with `@CurrentAdmin()`. */
+export interface AdminPrincipal {
+  userId: string;
+  email: string;
+  role: AdminRole;
+  permissions: readonly AdminPermission[];
+  sessionId: string;
 }
 
 /**
- * The default authenticator denies everything. The real implementation (sessions or tokens, roles) arrives with
- * the auth plan. There is deliberately no interim backdoor: no environment-variable switch, no API key, no
- * "development mode". Tests inject their own authenticator through `createApp` (see `test/app.ts`).
+ * Identifies the caller of an admin request. `undefined` means "not signed in" (the guard answers 401); a principal
+ * is checked against the route's permission by `AdminGuard` (403 when missing). An implementation that throws is
+ * treated as "not allowed" for the caller (HTTP 500, logged), never as "allowed".
+ * Tests inject their own through `createApp` (see `test/app.ts`); there is no environment switch or backdoor.
  */
-@Injectable()
-export class DenyAllAdminAuthenticator implements AdminAuthenticator {
-  allows(): boolean {
-    return false;
-  }
+export interface AdminAuthenticator {
+  authenticate(request: Request): AdminPrincipal | undefined | Promise<AdminPrincipal | undefined>;
 }

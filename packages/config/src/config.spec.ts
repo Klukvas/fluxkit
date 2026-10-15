@@ -76,3 +76,53 @@ describe("loadEnv locales", () => {
     expect(() => loadEnv({ ...base, LOCALES: "" })).toThrow(/LOCALES/);
   });
 });
+
+describe("loadEnv admin auth", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to a secure cookie, 720 idle minutes and 168 maximum hours", () => {
+    const env = loadEnv(base);
+    expect(env.adminCookieSecure).toBe(true);
+    expect(env.adminSessionIdleMinutes).toBe(720);
+    expect(env.adminSessionMaxHours).toBe(168);
+  });
+
+  it("parses explicit values", () => {
+    const env = loadEnv({
+      ...base,
+      ADMIN_COOKIE_SECURE: "false",
+      ADMIN_SESSION_IDLE_MINUTES: "30",
+      ADMIN_SESSION_MAX_HOURS: "8",
+    });
+    expect(env).toMatchObject({
+      adminCookieSecure: false,
+      adminSessionIdleMinutes: 30,
+      adminSessionMaxHours: 8,
+    });
+  });
+
+  it.each(["TRUE", "False", "1", "0", "yes", "", " true"])(
+    "rejects ADMIN_COOKIE_SECURE=%j loudly instead of guessing",
+    (value) => {
+      expect(() => loadEnv({ ...base, ADMIN_COOKIE_SECURE: value })).toThrow(/ADMIN_COOKIE_SECURE/);
+    },
+  );
+
+  it.each(["0", "-5", "1.5", "abc", "", "1e3", "0x10", " 12", "99999999"])(
+    "rejects ADMIN_SESSION_IDLE_MINUTES=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, ADMIN_SESSION_IDLE_MINUTES: value })).toThrow(
+        /ADMIN_SESSION_IDLE_MINUTES/,
+      );
+    },
+  );
+
+  it.each(["0", "-5", "1.5", "abc", "", "1e3", "0x10", " 12", "99999999"])(
+    "rejects ADMIN_SESSION_MAX_HOURS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, ADMIN_SESSION_MAX_HOURS: value })).toThrow(
+        /ADMIN_SESSION_MAX_HOURS/,
+      );
+    },
+  );
+});

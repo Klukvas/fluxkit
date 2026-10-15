@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Logger,
   NotFoundException,
   PayloadTooLargeException,
@@ -14,6 +15,7 @@ import {
   PROBLEM_CODES,
   PROBLEM_STATUS,
   conflict,
+  forbidden,
   inUse,
   invalidTransition,
   notFound,
@@ -66,6 +68,7 @@ describe("ProblemDetailsFilter", () => {
     const samples = {
       validation_failed: validationFailed([{ path: "name.uk", code: "required" }]),
       unauthorized: unauthorized(),
+      forbidden: forbidden(),
       not_found: notFound("Brand"),
       conflict: conflict("Taken.", { field: "slug", constraint: "brand_slug_key" }),
       in_use: inUse("Used.", { constraint: "product_brand_id_fkey" }),
@@ -87,6 +90,7 @@ describe("ProblemDetailsFilter", () => {
     expect([...PROBLEM_CODES].sort()).toEqual(
       [
         "conflict",
+        "forbidden",
         "in_use",
         "internal_error",
         "invalid_transition",
@@ -96,6 +100,24 @@ describe("ProblemDetailsFilter", () => {
         "validation_failed",
       ].sort(),
     );
+  });
+
+  it("answers forbidden with 403 and keeps the caller's detail", () => {
+    const result = run(forbidden("Your role may not do this."));
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({
+      status: 403,
+      code: "forbidden",
+      title: "Forbidden",
+      detail: "Your role may not do this.",
+    });
+  });
+
+  it("maps a framework 403 to forbidden without leaking its message", () => {
+    const result = run(new ForbiddenException("secret guard internals"));
+    expect(result.status).toBe(403);
+    expect(result.body).toMatchObject({ code: "forbidden" });
+    expect(JSON.stringify(result.body)).not.toContain("secret guard internals");
   });
 
   it("includes errors[] and the extension members when given", () => {

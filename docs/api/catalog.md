@@ -6,7 +6,10 @@ No feature flag: the catalog is core.
 
 ## Conventions
 
-- **Admin auth**: every `/admin/*` route runs `AdminGuard`: `@AdminController` applies it, and a global guard covers any path under `/admin` even when a controller forgot the decorator (`docs/contracts/api.md`). The only production authenticator is `DenyAllAdminAuthenticator`, so every admin request answers `401 unauthorized` until the auth and roles plan lands. Tests inject an allow-all authenticator.
+- **Admin auth**: every `/admin/*` route runs `AdminGuard` (applied by `@AdminController`, and by a global guard for any path under `/admin` even when a controller forgot the decorator, see `docs/contracts/api.md`). Order of checks: CSRF header (state-changing methods), then authentication (`401 unauthorized`), then permission (`403 forbidden`).
+  - **Session cookie**: the caller is identified by the cookie `fluxkit_admin_session` (`HttpOnly`, `SameSite=Strict`, `Path=/admin`, `Secure` unless `ADMIN_COOKIE_SECURE=false`, `Max-Age` = `ADMIN_SESSION_MAX_HOURS`). Only the cookie is read: an `Authorization` header, an API key or a query parameter is ignored. A missing, malformed, unknown or expired cookie, or a deactivated user, answers `401`. Role and activity are read from the database on every request, so a role change or deactivation applies at once. The login and logout endpoints that issue and clear the cookie are the next step of the auth plan and do not exist yet: until then no real caller can sign in, and tests create sessions through the session service.
+  - **CSRF**: every `POST`, `PUT`, `PATCH` and `DELETE` under `/admin` must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`, also for callers that are not signed in. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers.
+  - **Permissions**: roles `owner` (all), `manager` (`catalog.read`, `catalog.write`, `catalog.publish`), `viewer` (`catalog.read`). Every route resolves to one permission: `GET` and `HEAD` need `catalog.read`; every other method needs `catalog.write` (create, update, delete, replace sets, variants, media, dictionaries, categories); the product lifecycle routes `POST /admin/products/{id}/publish`, `/unpublish`, `/archive` and `/restore` need `catalog.publish`. A signed-in caller without the permission gets `403 forbidden`. A route under `/admin` with no permission declaration at all is denied with `403` (`401` when not signed in). `users.manage` is not used by any route yet.
 - **Store auth**: none. `/store/*` is public and read-only (GET only).
 - **Format**: JSON; field names camelCase; ids are UUIDs (opaque); timestamps are ISO 8601 UTC. Admin responses carry `createdAt` and `updatedAt`; store responses carry only `publishedAt`.
 - **Texts**: i18n texts are maps `{"uk": "...", "en": "..."}`. Locales come from `LOCALES` (default `uk,en`); `DEFAULT_LOCALE` (default `uk`) is required for required texts. A text map in a PATCH replaces the whole map.
@@ -15,7 +18,8 @@ No feature flag: the catalog is core.
 | code | status | when |
 |---|---|---|
 | `validation_failed` | 400 | malformed body or query, unknown field (`unknown_field`), value rejected by a core rule (`errors[]` carries the core reason as `code`), missing reference (`invalid_reference`), publish preconditions not met |
-| `unauthorized` | 401 | every admin request until auth exists |
+| `unauthorized` | 401 | no valid session: missing, malformed, unknown or expired cookie, or a deactivated user |
+| `forbidden` | 403 | signed in but the role lacks the route's permission (the detail names it), or a state-changing admin request lacks `X-Fluxkit-CSRF: 1` or, with a body, `Content-Type: application/json` |
 | `not_found` | 404 | unknown id or slug, or an unknown route |
 | `conflict` | 409 | unique value taken (`field` when the constraint is one column; `constraint` name); also after SKU or slug allocation retries are exhausted |
 | `in_use` | 409 | a referenced row still exists (database RESTRICT), or a category with children or products is deleted |
