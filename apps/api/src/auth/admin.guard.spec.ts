@@ -6,9 +6,11 @@ import { ProblemException } from "../common/problem.js";
 import type { AdminAuthenticator, AdminPrincipal } from "./admin-authenticator.js";
 import { AdminGuard } from "./admin.guard.js";
 import {
+  AuthenticatedAdminRoute,
   UseDefaultPermissionByMethod,
   PublicAdminRoute,
   RequirePermission,
+  resolveRouteAccess,
 } from "./route-access.js";
 import { getCurrentAdmin } from "./current-admin.js";
 
@@ -30,6 +32,8 @@ class DefaultsController {
   publish(): void {}
   @PublicAdminRoute()
   login(): void {}
+  @AuthenticatedAdminRoute()
+  logout(): void {}
 }
 
 class PlainController {
@@ -48,6 +52,22 @@ class BrokenController {
   @PublicAdminRoute()
   @RequirePermission("catalog.read")
   both(): void {}
+
+  @AuthenticatedAdminRoute()
+  @RequirePermission("users.manage")
+  signedInAndPermissioned(): void {}
+
+  @AuthenticatedAdminRoute()
+  @PublicAdminRoute()
+  signedInAndPublic(): void {}
+}
+
+/** A route-level marker wins over the controller's permission, like @RequirePermission does. */
+@RequirePermission("users.manage")
+class UsersWithSelfServiceController {
+  list(): void {}
+  @AuthenticatedAdminRoute()
+  mine(): void {}
 }
 
 function contextFor(
@@ -214,5 +234,64 @@ describe("AdminGuard", () => {
     const failing = guardFor(() => Promise.reject(new Error("token store down")));
     const { context } = contextFor(DefaultsController, "list", "GET");
     await expect(failing.canActivate(context)).rejects.toThrow("token store down");
+  });
+
+  describe("@AuthenticatedAdminRoute (any signed-in admin, no particular permission)", () => {
+    it("resolves to the authenticated kind, ahead of the controller default", () => {
+      const access = resolveRouteAccess(
+        new Reflector(),
+        DefaultsController.prototype.logout,
+        DefaultsController,
+        "POST",
+      );
+      expect(access).toEqual({ kind: "authenticated" });
+    });
+
+    it("answers 401 to an anonymous caller", async () => {
+      const { context } = contextFor(DefaultsController, "logout", "POST");
+      await expect(guardFor(() => undefined).canActivate(context)).rejects.toMatchObject({
+        code: "unauthorized",
+      });
+    });
+
+    it.each(["owner", "manager", "viewer"] as const)(
+      "lets a signed-in %s through a POST, which the write default would deny a viewer",
+      async (role) => {
+        const { context, request } = contextFor(DefaultsController, "logout", "POST");
+        expect(await guardFor(() => principal(role)).canActivate(context)).toBe(true);
+        expect(getCurrentAdmin(request)).toMatchObject({ role });
+      },
+    );
+
+    it("still checks the CSRF header before authentication", async () => {
+      let calls = 0;
+      const guard = guardFor(() => {
+        calls += 1;
+        return principal("owner");
+      });
+      const { context } = contextFor(DefaultsController, "logout", "POST", {});
+      await expect(guard.canActivate(context)).rejects.toMatchObject({ code: "forbidden" });
+      expect(calls).toBe(0);
+    });
+
+    it("lets a route opt out of its controller's permission", async () => {
+      const viewer = guardFor(() => principal("viewer"));
+      await expect(
+        viewer.canActivate(contextFor(UsersWithSelfServiceController, "list", "GET").context),
+      ).rejects.toMatchObject({ code: "forbidden" });
+      expect(
+        await viewer.canActivate(contextFor(UsersWithSelfServiceController, "mine", "GET").context),
+      ).toBe(true);
+    });
+
+    it("refuses to combine the marker with a permission or with public, instead of picking one", async () => {
+      for (const handler of ["signedInAndPermissioned", "signedInAndPublic"]) {
+        const { context } = contextFor(BrokenController, handler, "GET");
+        await expect(
+          guardFor(() => principal("owner")).canActivate(context),
+          handler,
+        ).rejects.toThrow(/cannot be both/);
+      }
+    });
   });
 });

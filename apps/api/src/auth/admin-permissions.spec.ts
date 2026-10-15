@@ -39,7 +39,23 @@ const PUBLISH_ROUTES = new Set([
   "POST /admin/products/:id/restore",
 ]);
 
+/** The sign-in flow: login is public, the other three serve any signed-in admin whatever the role. */
+const PUBLIC_ROUTES = ["POST /admin/auth/login"];
+const AUTHENTICATED_ROUTES = [
+  "GET /admin/auth/me",
+  "POST /admin/auth/change-password",
+  "POST /admin/auth/logout",
+];
+const USERS_ROUTES = [
+  "GET /admin/users",
+  "POST /admin/users",
+  "GET /admin/users/:id",
+  "PATCH /admin/users/:id",
+  "POST /admin/users/:id/reset-password",
+];
+
 function expectedPermission(method: string, pattern: string): AdminPermission {
+  if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
   if (PUBLISH_ROUTES.has(`${method} ${pattern}`)) return "catalog.publish";
   return method === "GET" || method === "HEAD" ? "catalog.read" : "catalog.write";
 }
@@ -126,24 +142,44 @@ describe("admin route permissions", () => {
       );
       expect(undeclared.map(({ method, pattern }) => `${method} ${pattern}`)).toEqual([]);
       for (const route of declaredAdminRoutes(manager.app)) {
-        expect(["permission", "public"], `${route.method} ${route.pattern}`).toContain(
-          route.access.kind,
-        );
+        expect(
+          ["permission", "public", "authenticated"],
+          `${route.method} ${route.pattern}`,
+        ).toContain(route.access.kind);
       }
     });
 
-    it("has no public admin route yet (the login route of the next step is the only one that may appear)", () => {
-      const publicRoutes = declaredAdminRoutes(manager.app)
-        .filter(({ access }) => access.kind === "public")
-        .map(({ method, pattern }) => `${method} ${pattern}`);
-      expect(publicRoutes).toEqual([]);
+    it("has exactly one public admin route (login) and exactly three any-signed-in-admin routes", () => {
+      const named = (kind: "public" | "authenticated") =>
+        declaredAdminRoutes(manager.app)
+          .filter(({ access }) => access.kind === kind)
+          .map(({ method, pattern }) => `${method} ${pattern}`)
+          .sort();
+      expect(named("public")).toEqual([...PUBLIC_ROUTES].sort());
+      expect(named("authenticated")).toEqual([...AUTHENTICATED_ROUTES].sort());
     });
 
-    it("resolves each route to the documented permission: publish for the four lifecycle routes, read for GET, write otherwise", () => {
+    it("gives the users routes users.manage, once, on the controller", () => {
+      const users = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/users"),
+      );
+      expect(users.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...USERS_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of users) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: "users.manage",
+          source: "controller",
+        });
+      }
+    });
+
+    it("resolves each route to the documented permission: users.manage for users, publish for the four lifecycle routes, read for GET, write otherwise", () => {
       const routes = declaredAdminRoutes(manager.app);
       for (const { method, pattern, access } of routes) {
-        // Public routes (login, from the next step) have no permission to resolve.
-        if (access.kind === "public") continue;
+        // Public and any-signed-in routes (the sign-in flow) have no permission to resolve.
+        if (access.kind === "public" || access.kind === "authenticated") continue;
         expect(access, `${method} ${pattern}`).toMatchObject({
           kind: "permission",
           permission: expectedPermission(method, pattern),
@@ -158,43 +194,71 @@ describe("admin route permissions", () => {
       }
     });
 
-    it("every permission the routes need is held by the manager role except none, and users.manage by no route yet", () => {
+    it("every permission the routes need exists, the owner holds all of them and users.manage is the owner's alone", () => {
       const needed = new Set(
         declaredAdminRoutes(manager.app).flatMap(({ access }) =>
           access.kind === "permission" ? [access.permission] : [],
         ),
       );
-      expect([...needed].sort()).toEqual(["catalog.publish", "catalog.read", "catalog.write"]);
+      expect([...needed].sort()).toEqual([
+        "catalog.publish",
+        "catalog.read",
+        "catalog.write",
+        "users.manage",
+      ]);
       for (const permission of needed) {
-        expect(permissionsOf("manager")).toContain(permission);
+        expect(permissionsOf("owner")).toContain(permission);
       }
+      expect(permissionsOf("manager")).not.toContain("users.manage");
+      expect(permissionsOf("viewer")).not.toContain("users.manage");
     });
   });
 
   describe("a viewer over HTTP, on every registered route", () => {
-    it("is forbidden on every non-GET route and allowed through on every GET route", async () => {
-      const routes = adminRoutes(viewer.app);
-      let writes = 0;
-      let reads = 0;
-      for (const { method, path } of routes) {
+    it("holds exactly the permissions the walk says: forbidden where it lacks one, never 401 or 403 where it does not need one", async () => {
+      const declared = new Map(
+        declaredAdminRoutes(viewer.app).map((route) => [`${route.method} ${route.pattern}`, route]),
+      );
+      let forbiddenCount = 0;
+      let allowedCount = 0;
+      for (const { method, pattern, path } of adminRoutes(viewer.app)) {
+        const access = declared.get(`${method} ${pattern}`)?.access;
         const result = await http<ProblemBody>(
           viewer.baseUrl,
           method as "GET",
           path,
           method === "GET" ? {} : { body: {} },
         );
-        if (method === "GET") {
-          reads += 1;
-          expect(result.status, `${method} ${path}`).not.toBe(403);
-          expect(result.status, `${method} ${path}`).not.toBe(401);
-        } else {
-          writes += 1;
+        const lacksPermission =
+          access?.kind === "permission" && !permissionsOf("viewer").includes(access.permission);
+        if (lacksPermission) {
+          forbiddenCount += 1;
           expect(result.status, `${method} ${path}`).toBe(403);
           expect(result.body, `${method} ${path}`).toMatchObject({ code: "forbidden" });
+        } else {
+          allowedCount += 1;
+          expect(result.status, `${method} ${path}`).not.toBe(403);
+          // The test principal is not a row in admin_user, so only /me and change-password may say 401 here.
+          if (access?.kind !== "authenticated") {
+            expect(result.status, `${method} ${path}`).not.toBe(401);
+          }
         }
       }
-      expect(reads).toBeGreaterThan(10);
-      expect(writes).toBeGreaterThan(30);
+      expect(allowedCount).toBeGreaterThan(10);
+      expect(forbiddenCount).toBeGreaterThan(30);
+    });
+
+    it("is forbidden on every users route", async () => {
+      for (const route of USERS_ROUTES) {
+        const [method, pattern] = route.split(" ") as ["GET", string];
+        const result = await http<ProblemBody>(
+          viewer.baseUrl,
+          method,
+          pattern.replace(":id", SOME_ID),
+          method === "GET" ? {} : { body: {} },
+        );
+        expect(result.status, route).toBe(403);
+      }
     });
   });
 
@@ -236,6 +300,27 @@ describe("admin route permissions", () => {
         allowedStatus: 404,
       },
       {
+        name: "GET /admin/users",
+        permission: "users.manage",
+        call: (url) => http(url, "GET", "/admin/users"),
+        allowedStatus: 200,
+      },
+      {
+        name: "PATCH /admin/users/:id",
+        permission: "users.manage",
+        call: (url) => http(url, "PATCH", `/admin/users/${SOME_ID}`, { body: { role: "viewer" } }),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/users/:id/reset-password",
+        permission: "users.manage",
+        call: (url) =>
+          http(url, "POST", `/admin/users/${SOME_ID}/reset-password`, {
+            body: { newPassword: "a long enough passphrase" },
+          }),
+        allowedStatus: 404,
+      },
+      {
         name: "POST /admin/products/:id/publish (lifecycle override)",
         permission: "catalog.publish",
         call: (url) => http(url, "POST", `/admin/products/${SOME_ID}/publish`),
@@ -263,6 +348,13 @@ describe("admin route permissions", () => {
           expect(result.status, `${role}: ${name}`).toBe(403);
           expect(result.body, `${role}: ${name}`).toMatchObject({ code: "forbidden" });
         }
+      }
+    });
+
+    it("@AuthenticatedAdminRoute: logout is open to every signed-in role, even to a viewer on a POST", async () => {
+      for (const [role, running] of Object.entries(apps())) {
+        const result = await http(running.baseUrl, "POST", "/admin/auth/logout");
+        expect(result.status, role).toBe(204);
       }
     });
 

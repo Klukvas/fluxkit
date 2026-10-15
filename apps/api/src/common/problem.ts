@@ -10,6 +10,7 @@ export const PROBLEM_CODES = [
   "in_use",
   "invalid_transition",
   "rule_violation",
+  "too_many_requests",
   "internal_error",
 ] as const;
 
@@ -24,6 +25,7 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   in_use: 409,
   invalid_transition: 409,
   rule_violation: 409,
+  too_many_requests: 429,
   internal_error: 500,
 };
 
@@ -36,6 +38,7 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   in_use: "Resource is in use",
   invalid_transition: "Invalid state transition",
   rule_violation: "Business rule violated",
+  too_many_requests: "Too many requests",
   internal_error: "Internal server error",
 };
 
@@ -56,6 +59,8 @@ export interface ProblemInit {
   extensions?: ProblemExtensions;
   /** Only for client errors that have no dedicated code (e.g. 413); defaults to the status of `code`. */
   status?: number;
+  /** Extra response headers (`Retry-After` of a 429). Never put secrets or internals here. */
+  headers?: Readonly<Record<string, string>>;
 }
 
 /**
@@ -67,6 +72,7 @@ export class ProblemException extends HttpException {
   readonly detail: string;
   readonly errors: readonly FieldError[] | undefined;
   readonly extensions: ProblemExtensions;
+  readonly headers: Readonly<Record<string, string>>;
 
   constructor(init: ProblemInit) {
     super(init.detail, init.status ?? PROBLEM_STATUS[init.code]);
@@ -74,6 +80,7 @@ export class ProblemException extends HttpException {
     this.detail = init.detail;
     this.errors = init.errors;
     this.extensions = init.extensions ?? {};
+    this.headers = init.headers ?? {};
   }
 }
 
@@ -91,6 +98,15 @@ export function unauthorized(detail = "Authentication is required."): ProblemExc
 /** Signed in (or a public route) but not allowed: the role lacks the permission, or the CSRF header is missing. */
 export function forbidden(detail = "You do not have permission to do this."): ProblemException {
   return new ProblemException({ code: "forbidden", detail });
+}
+
+/** `retryAfterSeconds` is sent as `Retry-After` (rounded up to a whole second, at least 1). */
+export function tooManyRequests(detail: string, retryAfterSeconds: number): ProblemException {
+  return new ProblemException({
+    code: "too_many_requests",
+    detail,
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  });
 }
 
 export function notFound(resource: string): ProblemException {

@@ -36,7 +36,7 @@ function isPrincipal(value: unknown): value is AdminPrincipal {
  * 2. `@PublicAdminRoute` routes end here,
  * 3. authentication: no principal -> 401,
  * 4. permission: a route needs its `@RequirePermission` (or the `@AdminController` default); a route without any
- *    declaration, or with a permission the role lacks -> 403.
+ *    declaration, or with a permission the role lacks -> 403. `@AuthenticatedAdminRoute` routes need no permission.
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
@@ -74,7 +74,7 @@ export class AdminGuard implements CanActivate {
     if (access.kind === "undeclared") {
       throw forbidden("This admin route does not declare the permission it requires.");
     }
-    if (!principal.permissions.includes(access.permission)) {
+    if (access.kind === "permission" && !principal.permissions.includes(access.permission)) {
       throw forbidden(`Your role does not have the permission ${access.permission}.`);
     }
     setCurrentAdmin(request, principal);

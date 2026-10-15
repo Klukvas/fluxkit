@@ -32,6 +32,7 @@ const CODE_BY_HTTP_STATUS: Readonly<Record<number, ProblemCode>> = {
   403: "forbidden",
   404: "not_found",
   409: "conflict",
+  429: "too_many_requests",
 };
 
 const GENERIC_DETAIL: Readonly<Record<number, string>> = {
@@ -85,6 +86,11 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       return;
     }
     const body = this.toBody(translatePostgresError(exception), request);
+    if (exception instanceof ProblemException) {
+      for (const [name, value] of Object.entries(exception.headers)) {
+        response.setHeader(name, value);
+      }
+    }
     response.status(body.status).type(PROBLEM_CONTENT_TYPE).json(body);
   }
 

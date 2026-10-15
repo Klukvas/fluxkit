@@ -20,6 +20,7 @@ import {
   invalidTransition,
   notFound,
   ruleViolation,
+  tooManyRequests,
   unauthorized,
   validationFailed,
 } from "./problem.js";
@@ -28,14 +29,19 @@ interface Captured {
   status: number;
   contentType: string;
   body: unknown;
+  headers: Record<string, string>;
 }
 
 function run(
   exception: unknown,
   request: { method: string; path: string } = { method: "POST", path: "/admin/brands" },
 ): Captured {
-  const captured: Captured = { status: 0, contentType: "", body: undefined };
+  const captured: Captured = { status: 0, contentType: "", body: undefined, headers: {} };
   const response = {
+    setHeader(name: string, value: string) {
+      captured.headers[name] = value;
+      return response;
+    },
     status(status: number) {
       captured.status = status;
       return response;
@@ -74,6 +80,7 @@ describe("ProblemDetailsFilter", () => {
       in_use: inUse("Used.", { constraint: "product_brand_id_fkey" }),
       invalid_transition: invalidTransition("Cannot publish.", "no_default_variant"),
       rule_violation: ruleViolation("Not allowed.", "product_type_change_forbidden"),
+      too_many_requests: tooManyRequests("Slow down.", 30),
     } as const;
     for (const [code, exception] of Object.entries(samples)) {
       const result = run(exception);
@@ -96,10 +103,29 @@ describe("ProblemDetailsFilter", () => {
         "invalid_transition",
         "not_found",
         "rule_violation",
+        "too_many_requests",
         "unauthorized",
         "validation_failed",
       ].sort(),
     );
+  });
+
+  it("answers too_many_requests with 429 and a Retry-After header in whole seconds", () => {
+    const result = run(tooManyRequests("Too many login attempts.", 42));
+    expect(result.status).toBe(429);
+    expect(result.contentType).toBe("application/problem+json");
+    expect(result.headers).toEqual({ "Retry-After": "42" });
+    expect(result.body).toEqual({
+      type: "about:blank",
+      title: "Too many requests",
+      status: 429,
+      code: "too_many_requests",
+      detail: "Too many login attempts.",
+    });
+  });
+
+  it("sends no extra headers for other problems", () => {
+    expect(run(forbidden()).headers).toEqual({});
   });
 
   it("answers forbidden with 403 and keeps the caller's detail", () => {

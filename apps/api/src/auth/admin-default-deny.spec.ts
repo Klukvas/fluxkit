@@ -62,7 +62,11 @@ describe("admin default deny (global guard)", () => {
   it("answers 401 on EVERY registered /admin route of the real router (real authenticator, no cookie)", async () => {
     const admin = adminRoutes(running.app);
     expect(admin.length).toBeGreaterThan(50);
+    let guarded = 0;
     for (const { method, path } of admin) {
+      // The only route that is public on purpose; it is asserted separately below.
+      if (method === "POST" && path === "/admin/auth/login") continue;
+      guarded += 1;
       const result = await http<ProblemBody>(
         running.baseUrl,
         method as "GET",
@@ -72,6 +76,15 @@ describe("admin default deny (global guard)", () => {
       expect(result.status, `${method} ${path}`).toBe(401);
       expect(result.body, `${method} ${path}`).toMatchObject({ code: "unauthorized" });
     }
+    expect(guarded).toBe(admin.length - 1);
+  });
+
+  it("lets only POST /admin/auth/login reach its handler without a session (a 400 for an empty body, not a 401)", async () => {
+    const result = await http<ProblemBody>(running.baseUrl, "POST", "/admin/auth/login", {
+      body: {},
+    });
+    expect(result.status).toBe(400);
+    expect(result.body).toMatchObject({ code: "validation_failed" });
   });
 
   it("stays 401 with a malformed, unknown or foreign cookie and with Authorization or API-key headers", async () => {
