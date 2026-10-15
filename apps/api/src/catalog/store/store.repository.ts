@@ -123,7 +123,11 @@ export class StoreRepository {
     return and(...conditions);
   }
 
-  /** Newest first; the id breaks ties so pages are stable. */
+  /**
+   * Newest first; the id breaks ties so pages are stable. The explicit `nulls last` matches the index
+   * `product_status_published_at_id_idx`, so Postgres reads it in order instead of sorting (active products
+   * never have a NULL `published_at`, so the visible order is the same).
+   */
   async listProducts(
     filter: ProductListFilter,
     page: { limit: number; offset: number },
@@ -142,7 +146,7 @@ export class StoreRepository {
         .from(product)
         .leftJoin(brand, eq(brand.id, product.brandId))
         .where(where)
-        .orderBy(desc(product.publishedAt), desc(product.id))
+        .orderBy(sql`${product.publishedAt} desc nulls last`, sql`${product.id} desc nulls last`)
         .limit(page.limit)
         .offset(page.offset),
       this.db.$count(product, where),
@@ -279,6 +283,7 @@ export class StoreRepository {
         variantId: variantOptionValue.variantId,
         optionId: variantOptionValue.optionId,
         optionCode: option.code,
+        optionValueId: variantOptionValue.optionValueId,
         valueCode: optionValue.code,
       })
       .from(variantOptionValue)

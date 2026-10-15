@@ -4,7 +4,8 @@ import {
   DenyAllAdminAuthenticator,
   type AdminAuthenticator,
 } from "./admin-authenticator.js";
-import { AdminGuard } from "./admin.guard.js";
+import { APP_GUARD } from "@nestjs/core";
+import { AdminGuard, AdminPathGuard } from "./admin.guard.js";
 
 /** Global so that any admin controller can use `AdminGuard` without importing this module. */
 @Global()
@@ -19,6 +20,8 @@ export class AuthModule {
           ? { provide: ADMIN_AUTHENTICATOR, useClass: DenyAllAdminAuthenticator }
           : { provide: ADMIN_AUTHENTICATOR, useValue: authenticator },
         AdminGuard,
+        // Default deny for everything under /admin, whether or not the controller uses @AdminController.
+        { provide: APP_GUARD, useClass: AdminPathGuard },
       ],
       exports: [ADMIN_AUTHENTICATOR, AdminGuard],
     };

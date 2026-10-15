@@ -1,4 +1,4 @@
-import { CATALOG_LIMITS, type PublicAttributeValue } from "@fluxkit/core";
+import { CATALOG_LIMITS, SLUG_PATTERN, type PublicAttributeValue } from "@fluxkit/core";
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
@@ -28,11 +28,25 @@ const paginationQuery = {
     .default(0),
 };
 
-const slugQuery = z.string().min(1).max(160);
+/** A filter slug must look like a stored slug: text with NUL or other odd characters never reaches Postgres. */
+const slugQuery = z
+  .string()
+  .min(1)
+  .max(160)
+  .regex(SLUG_PATTERN, "must be a slug: lowercase letters, digits and single hyphens");
 
-/** Validates the `:slug` path parameter (a bad one is a 400, an unknown one a 404). */
-export function slugParam(): ZodValidationPipe<typeof slugQuery> {
-  return new ZodValidationPipe(slugQuery, "slug");
+const slugPathLength = z.string().min(1).max(160);
+
+/**
+ * Validates the `:slug` path parameter: a too long one is a 400. A malformed one cannot exist as a product, so the
+ * service answers 404 for it without a query (`isStoreSlug`).
+ */
+export function slugParam(): ZodValidationPipe<typeof slugPathLength> {
+  return new ZodValidationPipe(slugPathLength, "slug");
+}
+
+export function isStoreSlug(value: string): boolean {
+  return SLUG_PATTERN.test(value);
 }
 
 export const storeCategoriesQuerySchema = z.strictObject({ locale: localeQuery });

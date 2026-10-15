@@ -27,6 +27,7 @@ import type {
   StoreProductListItem,
   StoreProductsQuery,
 } from "./store.schemas.js";
+import { isStoreSlug } from "./store.schemas.js";
 
 /** A product row of an active product always has `published_at` (CHECK `product_published_at_check`). */
 function publishedAtOf(row: { publishedAt: Date | null; slug: string }): string {
@@ -126,6 +127,10 @@ export class StoreService {
 
   async getProduct(slug: string, requestedLocale: string | undefined): Promise<StoreProductDetail> {
     const locale = this.resolveLocale(requestedLocale);
+    if (!isStoreSlug(slug)) {
+      // Not a possible slug (and NUL would be rejected by Postgres as a 500): no such product, no query.
+      throw notFound("Product");
+    }
     const row = await this.store.findActiveProductBySlug(slug);
     if (row === undefined) {
       throw notFound("Product");
@@ -192,6 +197,27 @@ export class StoreService {
     const optionPosition = new Map(
       loaded.options.map((entry, index) => [entry.id, index] as const),
     );
+    // ADR 0007: only values some ACTIVE variant uses are offered, so no choice leads to nothing to buy.
+    const sellableValueIds = new Set(
+      loaded.variantOptionValues.map((value) => value.optionValueId),
+    );
+    const options = loaded.options
+      .map((entry) => ({
+        id: entry.id,
+        code: entry.code,
+        name: requiredText(entry.name, locale, `Option "${entry.code}" name`),
+        values: loaded.optionValues
+          .filter((value) => value.optionId === entry.id && sellableValueIds.has(value.id))
+          .map((value) => ({
+            id: value.id,
+            code: value.code,
+            name: requiredText(value.label, locale, `Option value "${value.code}" label`),
+          })),
+      }))
+      .filter((entry) => entry.values.length > 0);
+    const offeredValueIds = new Set(
+      options.flatMap((entry) => entry.values.map((value) => value.id)),
+    );
     return {
       id: row.id,
       slug: row.slug,
@@ -202,18 +228,7 @@ export class StoreService {
       categories,
       attributes: serializeAttributes(loaded.assignments, "product", row.attributes, locale),
       attributeDefinitions: serializeAttributeDefinitions(loaded.assignments, locale),
-      options: loaded.options.map((entry) => ({
-        id: entry.id,
-        code: entry.code,
-        name: requiredText(entry.name, locale, `Option "${entry.code}" name`),
-        values: loaded.optionValues
-          .filter((value) => value.optionId === entry.id)
-          .map((value) => ({
-            id: value.id,
-            code: value.code,
-            name: requiredText(value.label, locale, `Option value "${value.code}" label`),
-          })),
-      })),
+      options,
       variants: loaded.variants.map((entry) => ({
         id: entry.id,
         sku: entry.sku,
@@ -226,11 +241,13 @@ export class StoreService {
           .map(({ optionCode, valueCode }) => ({ optionCode, valueCode })),
         attributes: serializeAttributes(loaded.assignments, "variant", entry.attributes, locale),
       })),
-      media: loaded.media.map((entry) => ({
-        url: entry.url,
-        alt: optionalText(entry.alt, locale),
-        optionValueId: entry.optionValueId,
-      })),
+      media: loaded.media
+        .filter((entry) => entry.optionValueId === null || offeredValueIds.has(entry.optionValueId))
+        .map((entry) => ({
+          url: entry.url,
+          alt: optionalText(entry.alt, locale),
+          optionValueId: entry.optionValueId,
+        })),
     };
   }
 }

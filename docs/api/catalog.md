@@ -6,7 +6,7 @@ No feature flag: the catalog is core.
 
 ## Conventions
 
-- **Admin auth**: every `/admin/*` route runs `AdminGuard`. The only production authenticator is `DenyAllAdminAuthenticator`, so every admin request answers `401 unauthorized` until the auth and roles plan lands. Tests inject an allow-all authenticator.
+- **Admin auth**: every `/admin/*` route runs `AdminGuard`: `@AdminController` applies it, and a global guard covers any path under `/admin` even when a controller forgot the decorator (`docs/contracts/api.md`). The only production authenticator is `DenyAllAdminAuthenticator`, so every admin request answers `401 unauthorized` until the auth and roles plan lands. Tests inject an allow-all authenticator.
 - **Store auth**: none. `/store/*` is public and read-only (GET only).
 - **Format**: JSON; field names camelCase; ids are UUIDs (opaque); timestamps are ISO 8601 UTC. Admin responses carry `createdAt` and `updatedAt`; store responses carry only `publishedAt`.
 - **Texts**: i18n texts are maps `{"uk": "...", "en": "..."}`. Locales come from `LOCALES` (default `uk,en`); `DEFAULT_LOCALE` (default `uk`) is required for required texts. A text map in a PATCH replaces the whole map.
@@ -166,7 +166,7 @@ Public read-only routes. Rules and locale handling: see Conventions.
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
 | `GET /store/categories` | public | Public category tree: active categories whose ancestors are all active, ordered by position, slug | `locale` | 200 `{items: [node]}`; a node is `{id, slug, name, description, children}`, at most 5 levels | 400 (`locale`) | - |
-| `GET /store/products` | public | List active products, newest first (`publishedAt` descending, then `id`); filter by category (with descendants) and brand | `locale`, `category` (slug), `brand` (slug), `limit`, `offset` | 200 page of items `{id, slug, title, brand: {slug, name} or null, image: {url, alt} or null, publishedAt}` | 400 (`locale`, pagination, unknown query key) | - |
-| `GET /store/products/{slug}` | public | Get an active product by slug with its options, variants, media and public attributes | path `slug`, `locale` | 200 `{id, slug, title, description, brand, publishedAt, categories, attributes, attributeDefinitions, options, variants, media}`; `options` list only the values the product chose; `variants` only active ones | 400 (`locale`, slug longer than 160), 404 (draft, archived or unknown) | - |
+| `GET /store/products` | public | List active products, newest first (`publishedAt` descending, then `id`); filter by category (with descendants) and brand | `locale`, `category` (slug), `brand` (slug), `limit`, `offset` | 200 page of items `{id, slug, title, brand: {slug, name} or null, image: {url, alt} or null, publishedAt}`; a well-formed unknown `category` or `brand` gives an empty list | 400 (`locale`, pagination, unknown query key, `category` or `brand` that is not a slug: `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 160) | - |
+| `GET /store/products/{slug}` | public | Get an active product by slug with its options, variants, media and public attributes | path `slug`, `locale` | 200 `{id, slug, title, description, brand, publishedAt, categories, attributes, attributeDefinitions, options, variants, media}`; `options` list only the values the product chose that an active variant uses (an option with none left is omitted); `variants` only active ones; `media` with an `optionValueId` only for the listed values (ADR 0007) | 400 (`locale`, slug longer than 160), 404 (draft, archived, unknown or malformed slug) | - |
 
 Store product `image` is the first media item of the product without an option value, else the first media item. Store `media` items carry `optionValueId` (or null).

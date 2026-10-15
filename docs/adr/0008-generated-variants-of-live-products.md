@@ -1,6 +1,6 @@
 # ADR 0008: Generated variants of live products
 
-Status: accepted (2026-10-15, owner decision). Extends ADR 0006 sections 4 and 6; ADR 0006 is not edited.
+Status: accepted (2026-10-16, owner decision). Extends ADR 0006 sections 4 and 6; ADR 0006 is not edited.
 
 ## Context
 
