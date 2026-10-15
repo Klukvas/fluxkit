@@ -472,6 +472,79 @@ describe("store API (public, real app, real Postgres)", () => {
     ids["p6"] = await createProduct("p6", { brand: "brandA", publishedDaysAgo: 3 });
     await assignCategory("p6", "zeta", true);
 
+    // P8 (ADR 0007): colour red (default variant) and blue (both blue variants inactive), sizes s and m.
+    ids["p8"] = await createProduct("p8-hidden-value", { publishedDaysAgo: 10 });
+    await chooseOption("p8", "optColor", 0, ["valRed", "valBlue"]);
+    await chooseOption("p8", "optSize", 1, ["valS", "valM"]);
+    await createVariant("p8", "H-RED-S", {
+      signature: `color_${runId}=red;size_${runId}=s`,
+      isDefault: true,
+      position: 0,
+      optionValues: [
+        ["optColor", "valRed"],
+        ["optSize", "valS"],
+      ],
+    });
+    await createVariant("p8", "H-RED-M", {
+      signature: `color_${runId}=red;size_${runId}=m`,
+      position: 1,
+      optionValues: [
+        ["optColor", "valRed"],
+        ["optSize", "valM"],
+      ],
+    });
+    await createVariant("p8", "H-BLUE-S", {
+      signature: `color_${runId}=blue;size_${runId}=s`,
+      isActive: false,
+      position: 2,
+      optionValues: [
+        ["optColor", "valBlue"],
+        ["optSize", "valS"],
+      ],
+    });
+    await createVariant("p8", "H-BLUE-M", {
+      signature: `color_${runId}=blue;size_${runId}=m`,
+      isActive: false,
+      position: 3,
+      optionValues: [
+        ["optColor", "valBlue"],
+        ["optSize", "valM"],
+      ],
+    });
+    await addMedia("p8", "https://img.test/p8-red.jpg", 0, {
+      optionKey: "optColor",
+      valueKey: "valRed",
+    });
+    await addMedia("p8", "https://img.test/p8-blue.jpg", 1, {
+      optionKey: "optColor",
+      valueKey: "valBlue",
+    });
+    await addMedia("p8", "https://img.test/p8-gallery.jpg", 2);
+
+    // P9 (ADR 0007): the colour option exists only on an inactive variant, so the whole option disappears.
+    ids["p9"] = await createProduct("p9-hidden-option", { publishedDaysAgo: 11 });
+    await chooseOption("p9", "optColor", 0, ["valRed"]);
+    await chooseOption("p9", "optSize", 1, ["valS"]);
+    await createVariant("p9", "O-S", {
+      signature: `size_${runId}=s`,
+      isDefault: true,
+      position: 0,
+      optionValues: [["optSize", "valS"]],
+    });
+    await createVariant("p9", "O-RED-S", {
+      signature: `color_${runId}=red;size_${runId}=s`,
+      isActive: false,
+      position: 1,
+      optionValues: [
+        ["optColor", "valRed"],
+        ["optSize", "valS"],
+      ],
+    });
+    await addMedia("p9", "https://img.test/p9-red.jpg", 0, {
+      optionKey: "optColor",
+      valueKey: "valRed",
+    });
+
     // P7: every image has an option pair, so the list image is the first image.
     ids["p7"] = await createProduct("p7-colour", { brand: "brandB", publishedDaysAgo: 9 });
     await chooseOption("p7", "optColor", 0, ["valRed"]);
@@ -709,6 +782,102 @@ describe("store API (public, real app, real Postgres)", () => {
       expect(problem(result).code).toBe("validation_failed");
     });
 
+    it.each([["brand"], ["category"]])(
+      "answers 400 validation_failed for NUL and malformed text in ?%s without touching the database",
+      async (name) => {
+        const poolOfApp = running.app.get<pg.Pool>(PG_POOL, { strict: false });
+        for (const raw of ["%00", "x%00y", "Upper", "a%20b", "-a", "a--b", "%FF"]) {
+          const spy = vi.spyOn(poolOfApp, "query");
+          try {
+            const result = await get(`/store/products?${name}=${raw}`);
+            expect(result.status, `${name}=${raw}`).toBe(400);
+            expect(problem(result).code).toBe("validation_failed");
+            expect(problem(result).errors?.[0]?.path).toBe(name);
+            expect(spy, `${name}=${raw}`).not.toHaveBeenCalled();
+          } finally {
+            spy.mockRestore();
+          }
+        }
+      },
+    );
+
+    it("keeps well-formed unknown slugs an empty list", async () => {
+      for (const name of ["brand", "category"]) {
+        const page = await getOk<Page<StoreProductListItem>>(
+          `/store/products?${name}=${slug("unknown-thing")}`,
+        );
+        expect(page.items, name).toEqual([]);
+      }
+    });
+
+    it("orders by published_at then id, newest first, id breaking ties", async () => {
+      ids["brandC"] = await insert(
+        "insert into brand (slug, name) values ($1, $2::jsonb) returning id",
+        [slug("brand-c"), JSON.stringify({ uk: "Бренд Ц" })],
+      );
+      const insertTied = (key: string, publishedAt: Date): Promise<string> =>
+        insert(
+          `insert into product (product_type_id, brand_id, slug, title, status, published_at)
+           values ($1, $2, $3, $4::jsonb, 'active', $5) returning id`,
+          [ids["type"], ids["brandC"], slug(key), JSON.stringify({ uk: key }), publishedAt],
+        );
+      const sameMoment = new Date(now - 20 * DAY_MS);
+      const tied = [
+        await insertTied("t1", sameMoment),
+        await insertTied("t2", sameMoment),
+        await insertTied("t3", sameMoment),
+      ];
+      await insertTied("newer", new Date(now - 19 * DAY_MS));
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-c")}`,
+      );
+      expect(page.items.map((item) => item.slug)[0]).toBe(slug("newer"));
+      expect(page.items.slice(1).map((item) => item.id)).toEqual([...tied].sort().reverse());
+    });
+
+    it("sorts through the status/published_at index (no Sort node in the plan)", async () => {
+      const poolOfApp = running.app.get<pg.Pool>(PG_POOL, { strict: false });
+      const spy = vi.spyOn(poolOfApp, "query");
+      let statement: { text: string; values: unknown[] } | undefined;
+      try {
+        await getOk<Page<StoreProductListItem>>("/store/products?limit=5");
+        for (const call of spy.mock.calls) {
+          const first = call[0] as unknown;
+          if (typeof first === "object" && first !== null && "text" in first) {
+            const candidate = first as { text: string; values?: unknown[] };
+            if (/order by/i.test(candidate.text) && /limit/i.test(candidate.text)) {
+              statement = {
+                text: candidate.text,
+                values: (call[1] as unknown[] | undefined) ?? candidate.values ?? [],
+              };
+            }
+          }
+        }
+      } finally {
+        spy.mockRestore();
+      }
+      if (statement === undefined) {
+        throw new Error("the list statement was not captured");
+      }
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        // Make the planner's choice depend on the index order, not on the size of the fixture.
+        await client.query("set local enable_seqscan = off");
+        await client.query("set local enable_bitmapscan = off");
+        const plan = await client.query<{ "QUERY PLAN": string }>(
+          `explain ${statement.text}`,
+          statement.values,
+        );
+        const text = plan.rows.map((row) => row["QUERY PLAN"]).join("\n");
+        expect(text).toContain("product_status_published_at_id_idx");
+        expect(text).not.toMatch(/\bSort\b/);
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+    });
+
     it("accepts the documented bounds", async () => {
       expect((await get("/store/products?limit=100&offset=10000")).status).toBe(200);
       expect((await get("/store/products?limit=1&offset=0")).status).toBe(200);
@@ -778,11 +947,10 @@ describe("store API (public, real app, real Postgres)", () => {
             id: ids["optSize"],
             code: `size_${runId}`,
             name: "Розмір",
-            // Only the values the product chose, in the product's order (l is chosen but only used by an inactive variant).
+            // Only values of active variants, in the product's order (l is chosen but only used by an inactive variant: ADR 0007).
             values: [
               { id: ids["valS"], code: "s", name: "S" },
               { id: ids["valM"], code: "m", name: "M" },
-              { id: ids["valL"], code: "l", name: "L" },
             ],
           },
         ],
@@ -887,6 +1055,68 @@ describe("store API (public, real app, real Postgres)", () => {
       expect((await get(`/store/products/${slug("p1")}?locale=zz`)).status).toBe(400);
       expect((await get(`/store/products/${slug("p1")}?limit=5`)).status).toBe(400);
     });
+
+    it("hides option values and images that only deactivated variants use (ADR 0007)", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p8-hidden-value")}`);
+      expect(product.options).toEqual([
+        {
+          id: ids["optColor"],
+          code: `color_${runId}`,
+          name: "Колір",
+          values: [{ id: ids["valRed"], code: "red", name: "Червоний" }],
+        },
+        {
+          id: ids["optSize"],
+          code: `size_${runId}`,
+          name: "Розмір",
+          values: [
+            { id: ids["valS"], code: "s", name: "S" },
+            { id: ids["valM"], code: "m", name: "M" },
+          ],
+        },
+      ]);
+      expect(product.variants.map((entry) => entry.sku)).toEqual([
+        `${upper}-H-RED-S`,
+        `${upper}-H-RED-M`,
+      ]);
+      expect(product.media).toEqual([
+        { url: "https://img.test/p8-red.jpg", alt: null, optionValueId: ids["valRed"] },
+        { url: "https://img.test/p8-gallery.jpg", alt: null, optionValueId: null },
+      ]);
+    });
+
+    it("omits an option none of whose values is used by an active variant (ADR 0007)", async () => {
+      const product = await getOk<StoreProductDetail>(
+        `/store/products/${slug("p9-hidden-option")}`,
+      );
+      expect(product.options.map((entry) => entry.code)).toEqual([`size_${runId}`]);
+      expect(product.media).toEqual([]);
+      expect(product.variants.map((entry) => entry.sku)).toEqual([`${upper}-O-S`]);
+    });
+
+    it("keeps a value used by the default variant even when its other variants are inactive (ADR 0007)", async () => {
+      // In p8, size s is used by the active default variant and by an inactive one.
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p8-hidden-value")}`);
+      expect(product.options[1]?.values.map((value) => value.code)).toContain("s");
+      const p9 = await getOk<StoreProductDetail>(`/store/products/${slug("p9-hidden-option")}`);
+      expect(p9.options[0]?.values.map((value) => value.code)).toEqual(["s"]);
+    });
+
+    it.each([["%00"], ["nul%00"], ["p1%00x"], ["Upper"], ["a%20b"], ["a%2Fb"], ["-"]])(
+      "answers 404 for the malformed slug %s without touching the database",
+      async (raw) => {
+        const poolOfApp = running.app.get<pg.Pool>(PG_POOL, { strict: false });
+        const spy = vi.spyOn(poolOfApp, "query");
+        try {
+          const result = await get(`/store/products/${raw}`);
+          expect(result.status).toBe(404);
+          expect(problem(result).code).toBe("not_found");
+          expect(spy).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      },
+    );
 
     it("never shows an inactive variant", async () => {
       const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
