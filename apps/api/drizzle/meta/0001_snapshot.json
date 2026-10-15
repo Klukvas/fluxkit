@@ -1,5 +1,5 @@
 {
-  "id": "98248b02-f100-4fd9-a482-d83dc4d56337",
+  "id": "af2cefa6-e214-45fc-84e8-604f4758d794",
   "prevId": "3f2adef8-f38c-4cd7-9826-e7e8e5d085e0",
   "version": "7",
   "dialect": "postgresql",
@@ -304,7 +304,7 @@
       "checkConstraints": {
         "attribute_option_code_check": {
           "name": "attribute_option_code_check",
-          "value": "\"attribute_option\".\"code\" ~ '^[a-z][a-z0-9_]{0,63}$'"
+          "value": "\"attribute_option\".\"code\" ~ '^[a-z0-9][a-z0-9_]{0,63}$'"
         },
         "attribute_option_label_check": {
           "name": "attribute_option_label_check",
@@ -801,7 +801,7 @@
       "checkConstraints": {
         "option_value_code_check": {
           "name": "option_value_code_check",
-          "value": "\"option_value\".\"code\" ~ '^[a-z][a-z0-9_]{0,63}$'"
+          "value": "\"option_value\".\"code\" ~ '^[a-z0-9][a-z0-9_]{0,63}$'"
         },
         "option_value_label_check": {
           "name": "option_value_label_check",

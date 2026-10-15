@@ -37,7 +37,7 @@ CREATE TABLE "attribute_option" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "attribute_option_attribute_id_code_key" UNIQUE("attribute_id","code"),
-	CONSTRAINT "attribute_option_code_check" CHECK ("attribute_option"."code" ~ '^[a-z][a-z0-9_]{0,63}$'),
+	CONSTRAINT "attribute_option_code_check" CHECK ("attribute_option"."code" ~ '^[a-z0-9][a-z0-9_]{0,63}$'),
 	CONSTRAINT "attribute_option_label_check" CHECK (jsonb_typeof("attribute_option"."label") = 'object' AND "attribute_option"."label" <> '{}'::jsonb)
 );
 --> statement-breakpoint
@@ -107,7 +107,7 @@ CREATE TABLE "option_value" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "option_value_option_id_code_key" UNIQUE("option_id","code"),
 	CONSTRAINT "option_value_id_option_id_key" UNIQUE("id","option_id"),
-	CONSTRAINT "option_value_code_check" CHECK ("option_value"."code" ~ '^[a-z][a-z0-9_]{0,63}$'),
+	CONSTRAINT "option_value_code_check" CHECK ("option_value"."code" ~ '^[a-z0-9][a-z0-9_]{0,63}$'),
 	CONSTRAINT "option_value_label_check" CHECK (jsonb_typeof("option_value"."label") = 'object' AND "option_value"."label" <> '{}'::jsonb)
 );
 --> statement-breakpoint

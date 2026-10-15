@@ -602,7 +602,12 @@ describe("catalog schema (real Postgres)", () => {
           : table === "attribute_option"
             ? await createAttribute("parent_attribute")
             : null;
-      for (const code of invalidCodes) {
+      // Value codes (option values, attribute options) may start with a digit, e.g. shoe size "42".
+      const isValueTable = table === "option_value" || table === "attribute_option";
+      const codes = isValueTable
+        ? invalidCodes.filter((code) => code !== "1starts_with_digit")
+        : invalidCodes;
+      for (const code of codes) {
         await expectViolation(
           () => {
             if (table === "attribute") return createAttribute(code);
@@ -619,6 +624,23 @@ describe("catalog schema (real Postgres)", () => {
           constraint,
         );
       }
+    });
+
+    it("accepts numeric value codes for option values and attribute options, but not for other codes", async () => {
+      const optionId = await createOption("shoe_size");
+      await createOptionValue(optionId, "42");
+      await createOptionValue(optionId, "2xl");
+      const attributeId = await createAttribute("size_label");
+      for (const code of ["42", "2xl"]) {
+        await insert("attribute_option", { attribute_id: attributeId, code, label: i18n("label") });
+      }
+      await expectViolation(() => createOption("42"), CHECK_VIOLATION, "option_code_check");
+      await expectViolation(() => createAttribute("42"), CHECK_VIOLATION, "attribute_code_check");
+      await expectViolation(
+        () => createProductType("42"),
+        CHECK_VIOLATION,
+        "product_type_code_check",
+      );
     });
 
     it("accepts codes at the boundaries (1 and 64 characters)", async () => {

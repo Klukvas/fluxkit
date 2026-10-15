@@ -18,4 +18,4 @@ DROP TABLE IF EXISTS "option_value";
 DROP TABLE IF EXISTS "option";
 DROP TABLE IF EXISTS "attribute_option";
 DROP TABLE IF EXISTS "attribute";
-DELETE FROM "drizzle"."__drizzle_migrations" WHERE "created_at" = 1792023871912;
+DELETE FROM "drizzle"."__drizzle_migrations" WHERE "created_at" = 1792025565416;

@@ -29,6 +29,8 @@ export type I18nText = Record<string, string>;
 export type AttributeValues = Record<string, unknown>;
 
 const CODE_PATTERN = "^[a-z][a-z0-9_]{0,63}$";
+// Codes of option values and attribute options may also start with a digit (shoe size "42", "2xl").
+const VALUE_CODE_PATTERN = "^[a-z0-9][a-z0-9_]{0,63}$";
 const SLUG_PATTERN = "^[a-z0-9]+(-[a-z0-9]+)*$";
 const SKU_PATTERN = "^[A-Z0-9][A-Z0-9._-]{0,63}$";
 
@@ -43,6 +45,8 @@ const position = () => integer("position").notNull().default(0);
 
 const codeCheck = (name: string, column: AnyPgColumn) =>
   check(name, sql`${column} ~ ${sql.raw(`'${CODE_PATTERN}'`)}`);
+const valueCodeCheck = (name: string, column: AnyPgColumn) =>
+  check(name, sql`${column} ~ ${sql.raw(`'${VALUE_CODE_PATTERN}'`)}`);
 const slugCheck = (name: string, column: AnyPgColumn) =>
   check(name, sql`${column} ~ ${sql.raw(`'${SLUG_PATTERN}'`)} AND char_length(${column}) <= 160`);
 /** Required i18n text: shape and non-empty only. The default locale is checked by the service (ADR 0006 section 1). */
@@ -116,7 +120,7 @@ export const attributeOption = pgTable(
       foreignColumns: [attribute.id],
     }).onDelete("cascade"),
     unique("attribute_option_attribute_id_code_key").on(t.attributeId, t.code),
-    codeCheck("attribute_option_code_check", t.code),
+    valueCodeCheck("attribute_option_code_check", t.code),
     requiredTextCheck("attribute_option_label_check", t.label),
     index("attribute_option_attribute_id_position_idx").on(t.attributeId, t.position),
   ],
@@ -158,7 +162,7 @@ export const optionValue = pgTable(
     unique("option_value_option_id_code_key").on(t.optionId, t.code),
     // Target of the composite foreign keys that guarantee "this value belongs to that option".
     unique("option_value_id_option_id_key").on(t.id, t.optionId),
-    codeCheck("option_value_code_check", t.code),
+    valueCodeCheck("option_value_code_check", t.code),
     requiredTextCheck("option_value_label_check", t.label),
     index("option_value_option_id_position_idx").on(t.optionId, t.position),
   ],
