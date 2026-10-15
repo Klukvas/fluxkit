@@ -6,7 +6,7 @@ import { summarizeError } from "../common/error-summary.js";
 import { withTransaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { AdminUserRepository } from "./admin-user.repository.js";
-import { PASSWORD_ARGUMENT_REFUSAL, looksLikePasswordArgument } from "./create-admin-command.js";
+import { looksLikePasswordArgument } from "./create-admin-command.js";
 
 /** The person running the command can fix this (bad input, unknown user): the message is the whole output. */
 export class UnlockAdminUsageError extends Error {
@@ -31,6 +31,11 @@ export interface UnlockAdminResult {
 }
 
 const USAGE = "Usage: pnpm admin:unlock --email <address>";
+
+const PASSWORD_ARGUMENT_REFUSAL =
+  "This command needs no password, and passwords are never accepted as command-line arguments: " +
+  "arguments leak through the process list and shell history. " +
+  USAGE;
 
 /** Parses and validates the arguments. Throws `UnlockAdminUsageError`; touches nothing else. */
 export function parseUnlockAdminArgs(argv: readonly string[]): { email: string } {

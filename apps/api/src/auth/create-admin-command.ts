@@ -41,7 +41,7 @@ export interface CreateAdminResult {
   role: AdminRole;
 }
 
-export const PASSWORD_ARGUMENT_REFUSAL =
+const PASSWORD_ARGUMENT_REFUSAL =
   "Passwords are not accepted as command-line arguments: arguments leak through the process list and shell history. " +
   "Set the ADMIN_PASSWORD environment variable for this command, or run it in a terminal and type the password at the prompt.";
 
