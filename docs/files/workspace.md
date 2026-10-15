@@ -15,8 +15,8 @@
 ## Apps (empty scaffolds)
 - `apps/api` (`@fluxkit/api`) - NestJS API. `apps/storefront` (`@fluxkit/storefront`) - Next.js site. `apps/admin` (`@fluxkit/admin`) - Vite React admin.
 
-## Packages (empty scaffolds)
-- `packages/core` - domain logic. `packages/ui` - token-based components. `packages/theme` - design tokens and presets.
+## Packages
+- `packages/core` - catalog domain rules (not a scaffold any more; see `core.md`). `packages/ui` - token-based components. `packages/theme` - design tokens and presets.
 - `packages/config` - feature flags and settings schema. `packages/api-client` - client generated from OpenAPI.
 - `packages/features/` - one package per optional feature (none yet). `packages/providers/` - one package per payment/shipping provider (none yet).
 
