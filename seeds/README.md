@@ -41,6 +41,7 @@ It prints how many entities were created and how many already existed. Any error
   `pnpm --filter @fluxkit/api seed --allow-production` after a build. Demo data does not belong in a client's production database.
   Note: the database name `fluxkit` from `.env.example` does not match the suffix rule, so either name your database `fluxkit_dev` (or similar) or pass the flag.
 - Optional feature modules are not loaded while seeding.
+- Seeding creates no users. The first admin owner comes from `pnpm admin:create` (README, Admin sign-in).
 
 ## Add or change a preset
 

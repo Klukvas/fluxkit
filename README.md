@@ -14,11 +14,12 @@ Sold as a template plus a team that adapts design and features for each client.
 
 ## Status
 
-Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): steps 1 to 7 done, step 8 (independent review) pending.
-**Not built yet**: authentication (every `/admin` route answers 401 until the auth plan), prices, inventory, search indexing, cart, checkout, orders and customers. What exists and works:
+Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): steps 1 to 4 done, step 5 (independent review) pending.
+**Not built yet**: customer accounts and storefront login, prices, inventory, search indexing, cart, checkout and orders. What exists and works:
 
-- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`), BullMQ and Meilisearch spikes.
-- Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; default deny) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
+- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`), BullMQ and Meilisearch spikes.
+- Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
+- Admin authentication: cookie sessions, roles `owner`, `manager`, `viewer`, owner-only user management, first owner through `pnpm admin:create` (see Admin sign-in below). Endpoints: `docs/api/auth.md`; contract: `docs/contracts/api.md`.
 - Storefront (`/uk`, `/en`) and admin: placeholder pages built from the shared UI and tokens (light and dark themes).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
 
@@ -42,6 +43,7 @@ docker compose --env-file .env -f infra/docker-compose.yml exec postgres created
 
 pnpm build
 pnpm seed                               # optional: demo catalog (needs a migrated database, see seeds/README.md)
+pnpm admin:create --email you@example.com   # first owner (needs a migrated database); asks for the password, see Admin sign-in
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
 pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000)
 pnpm --filter @fluxkit/admin dev                # Vite prints the URL (default http://localhost:5173)
@@ -60,6 +62,29 @@ Use a subshell so the test variables do not leak into your terminal: Node's `--e
 )
 ```
 
+## Admin sign-in
+
+Every `/admin` route needs a signed-in user. There is no sign-up and no default account: the first owner is created with the command line, then signs in with `POST /admin/auth/login` (`docs/api/auth.md`).
+
+```bash
+pnpm admin:create --email you@example.com                  # in a terminal: asks for the password twice, nothing is echoed
+ADMIN_PASSWORD='a long password' pnpm admin:create --email you@example.com --role manager   # scripts: from the environment
+```
+
+- Options: `--email` (required) and `--role` (`owner`, `manager` or `viewer`; default `owner`). Arguments after the script name reach the command as they are; do not add `--` (it is rejected as an unknown argument).
+- The password comes from `ADMIN_PASSWORD` or the prompt, 12 to 128 characters. A `--password` argument is refused on purpose: command-line arguments leak through the process list and shell history. Without `ADMIN_PASSWORD` and without a terminal the command fails.
+- The command only creates. An email that already exists is refused and left untouched; it never changes a password or a role. It prints `Created owner you@example.com (id ...)` and never the password. The database must be migrated first (same as `pnpm seed`) and `DATABASE_URL` comes from `.env`.
+- For plain-HTTP local development set `ADMIN_COOKIE_SECURE=false`; the default is a `Secure` cookie, which is meant for HTTPS. Every state-changing request must carry the header `X-Fluxkit-CSRF: 1`.
+
+| Role | Can do |
+|---|---|
+| `owner` | everything, including managing users |
+| `manager` | read, write and publish the catalog |
+| `viewer` | read the catalog |
+
+More users: an owner calls `POST /admin/users` with `{email, role, password}` (and `PATCH /admin/users/{id}` to change a role or deactivate, `POST /admin/users/{id}/reset-password` to set a new password). There is no self-service password reset by email yet.
+If every owner is locked out or has lost the password, create a new owner with `pnpm admin:create`; the command works against the database directly and needs no existing session.
+
 Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`.
 
 ## Scripts (root)
@@ -71,6 +96,7 @@ Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.
 | `pnpm check:boundaries` | module boundary rules (core must not import features, etc.); fails if nothing was checked |
 | `pnpm test` | builds, then runs Vitest in every package (needs the services above) |
 | `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
+| `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
 | `pnpm check:docs` | docs-with-code rules against `origin/main` |
@@ -99,7 +125,7 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema (index with status in `docs/adr/README.md`).
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 admin authentication and roles (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
@@ -117,6 +143,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Catalog plan step 8 (independent review), then the auth and roles plan (admin endpoints stay 401 until then), then pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting (needs a dependency), a `db:migrate` script.
+2. Independent review of the auth plan (step 5), then the next domain plan: pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), a `db:migrate` script, auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
 3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.

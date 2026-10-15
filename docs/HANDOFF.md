@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (auth plan proposed).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (auth plan step 4 in PR).
 
 ## Where we are
 
@@ -18,13 +18,15 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 | Step 6, ProductType presets and demo data | Implemented: pure data in `seeds/` (`@fluxkit/seeds`: Clothing, Hand tool, Digital product presets; 9 categories, 1 brand, 8 published products in `uk`/`en`) and the idempotent runner `apps/api/src/seed/` (`pnpm seed`; creates through the admin services, never updates or deletes, refuses `NODE_ENV=production` without `--allow-production`); integration test reads the result through the store API; merged (PR #24). |
 | Step 7 OpenAPI and docs | Done and merged (PR #25): `docs/api/catalog.md` (every `/admin` and `/store` route), `docs/contracts/api.md`, `docs/files/core.md`, `docs/files/api.md`, ADR index, README status, plan outcome. |
 | Step 8 independent review | Done 2026-10-16 by two reviewers (Opus: security; Fable: correctness and tests). No leak of internal data found. The medium and low findings are fixed (PRs #27, #28, #29; ADR 0007 and 0008). Still open: see `docs/plans/2026-10-16-catalog-review-findings.md` (C5, information items, surviving mutations). The catalog plan is complete. |
+| Auth and roles plan `2026-10-16-auth-and-roles.md` | Approved by the owner. Steps 1 (ADR 0009, core rules), 2 (migration `0002_admin_auth`), 3a (infrastructure) and 3b (login, logout, me, change-password, owner-only `/admin/users`) merged; admin routes are now protected by cookie sessions, roles and the CSRF header. Step 4 (`pnpm admin:create`, auth docs, README) in PR, pending. Step 5 (independent review by a different model) is next. Contract: `docs/contracts/api.md`. |
 
 ## Next steps (in order)
 
-1. Auth and roles: plan `docs/plans/2026-10-16-auth-and-roles.md` written, waiting for the owner's approval (merge of the plan PR); decisions taken: sessions in Postgres with an HttpOnly cookie, fixed roles in code (owner, manager, viewer), first owner through `pnpm admin:create`. Then implement in the plan's steps. Background: auth and roles (admin endpoints return 401 for everyone until it lands, by design; the global guard already denies every `/admin` path). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
-2. Before any launch: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production.
-3. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
-4. Next domain plan: pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
+1. Auth and roles: after the step 4 PR is merged, run step 5, the independent review (a different model than the authors; focus listed in the plan). Fix its findings before closing the plan. First owner: `pnpm admin:create --email <address>` (README, Admin sign-in). Follow-ups are in the plan's Outcome section (audit log, two-factor, password reset by email, Redis-backed throttle, `trust proxy`, customer accounts).
+2. Small follow-up: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; `pnpm seed` and `pnpm admin:create` need a migrated database).
+3. Launch blockers: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; `trust proxy` for the login IP limit behind a proxy.
+4. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
+5. After the review: pick the next domain plan: pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
 
 ## Open decisions (owner)
 
