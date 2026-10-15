@@ -94,9 +94,9 @@ describe("proposeSku", () => {
   });
 
   it("does not leave a separator at the cut", () => {
-    const slug = `${"a".repeat(62)}-bbb`;
+    const slug = `${"a".repeat(63)}-bbb`;
     const result = proposeSku({ slug, valueCodes: [], takenSkus: none });
-    expect(result).toEqual({ ok: true, sku: "A".repeat(62) });
+    expect(result).toEqual({ ok: true, sku: "A".repeat(63) });
   });
 
   it("fails loudly when there is nothing to build a SKU from", () => {
