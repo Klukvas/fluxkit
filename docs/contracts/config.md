@@ -10,6 +10,8 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 | `PORT` | no | 3000 | HTTP port |
 | `FEATURES_ENABLED` | no | empty | Comma-separated optional feature names; unset means none |
 | `FEATURES_DIR` | no | `<repo>/packages/features` | Where feature packages are discovered |
+| `DEFAULT_LOCALE` | no | `uk` | Locale every translated text must contain; must be in `LOCALES` |
+| `LOCALES` | no | `uk,en` | Comma-separated locales accepted in translated texts; lowercase codes (2 to 8 letters, optional `-` segments), no duplicates |
 
 Invalid values fail startup with a readable `Invalid environment: ...` error.
 
