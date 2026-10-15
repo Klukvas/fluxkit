@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-15 (4b).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-15 (4c).
 
 ## Where we are
 
@@ -13,13 +13,13 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 |---|---|
 | Monorepo scaffold, CI, licenses, docs | Done and merged (plan `2026-10-14-monorepo-scaffold.md`). |
 | Catalog plan `2026-10-14-catalog.md` | Step 1 (ADR 0006), step 2 (core rules in `packages/core/src/catalog`), step 3 (schema + migration `0001_catalog`) merged. |
-| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). **4b dictionaries (attributes, options, product types): in PR, pending.** |
-| Not started | 4c categories, 4d products and variants; step 5 store API, 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
+| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). **4c categories (+move with the tree advisory lock): in PR, pending.** |
+| Not started | 4d products and variants; step 5 store API, 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
 
 ## Next steps (in order)
 
-1. Review and merge the 4b PR (owner's word). It adds `/admin/attributes`, `/admin/options`, `/admin/product-types` in `apps/api/src/catalog/admin/`; the shared helpers are `catalog/shared/` (`rules.ts` turns core change decisions into 409 `rule_violation`, `attribute-usage.ts` reads the "values exist" facts, `code-schemas.ts`).
-2. 4c categories (+move with advisory lock), 4d products and variants (+publish lifecycle, options, categories, media, generate). Pattern: copy `admin/product-types/` (repositories take the executor as the first argument so rules run inside `withTransaction`).
+1. Review and merge the 4c PR (owner's word). It adds `/admin/categories` and `POST /admin/categories/:id/move` in `apps/api/src/catalog/admin/categories/`. Writes that change the tree shape (create, move, delete) take `pg_advisory_xact_lock(CATEGORY_TREE_LOCK_KEY)` and run the core `validateNewNode`/`validateMove` on the tree read after the lock. `position` is an index among siblings; positions are kept gap-free (0..n-1). `PATCH` does not accept `parentId` or `position` (only `move` changes the tree).
+2. 4d products and variants (+publish lifecycle, options, categories, media, generate). Pattern: copy `admin/product-types/` (repositories take the executor as the first argument so rules run inside `withTransaction`).
 3. Steps 5 to 8 of the catalog plan.
 4. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design).
 
