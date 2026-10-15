@@ -71,13 +71,16 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `schema/index.ts` - schema barrel used by Drizzle and by the error mapper.
 - `schema/health.ts` - `health_check` table (health probe).
 - `schema/catalog.ts` - the 16 catalog tables (ADR 0006 section 2) with constraints and indexes.
+- `schema/admin-auth.ts` - `admin_user` and `admin_session` tables (admin login; sessions store only a SHA-256 token hash, no IP address or user agent).
 - `catalog-schema.spec.ts` - constraint tests on real Postgres (inside rolled-back transactions).
+- `admin-auth-schema.spec.ts` - constraint, cascade and name tests for the admin auth tables.
 - `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database; refuses other database names.
 
 ## Migrations (`drizzle/`)
 
 - `0000_health_check.sql` and `0000_health_check.down.sql` - the scaffold's health table.
 - `0001_catalog.sql` and `0001_catalog.down.sql` - the 16 catalog tables; the down script drops them in reverse order and removes the migration's bookkeeping row.
+- `0002_admin_auth.sql` and `0002_admin_auth.down.sql` - `admin_user` and `admin_session`; the down script drops them (sessions first) and removes the bookkeeping row.
 - `meta/_journal.json`, `meta/*_snapshot.json` - drizzle-kit bookkeeping; generated, never edited by hand.
 - `drizzle.config.ts` (in `apps/api/`) - drizzle-kit config; schema from `src/database/schema/index.ts`. `pnpm --filter @fluxkit/api db:generate` creates a migration; `db:drift` checks that the schema and migrations agree.
 
