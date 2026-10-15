@@ -7,6 +7,7 @@ import {
   shouldTouchSession,
   type AdminRole,
 } from "@fluxkit/core";
+import type { DbExecutor } from "../common/transaction.js";
 import { ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth-config.js";
 import { CLOCK, type Clock } from "./clock.js";
 import { SessionRepository } from "./session.repository.js";
@@ -115,8 +116,20 @@ export class SessionService {
     return (await this.sessions.deleteByTokenHash(hashToken(rawToken))) > 0;
   }
 
-  /** Returns how many sessions were deleted. `exceptSessionId` keeps the caller's own session (password change). */
-  revokeAllForUser(userId: string, exceptSessionId?: string): Promise<number> {
-    return this.sessions.deleteForUser(userId, exceptSessionId);
+  /** Deletes one session by id (logout of the signed-in caller, whose principal carries the id). */
+  async revokeSession(sessionId: string): Promise<void> {
+    await this.sessions.deleteById(sessionId);
+  }
+
+  /**
+   * Returns how many sessions were deleted. `exceptSessionId` keeps the caller's own session (password change).
+   * Pass the open `executor` when the revocation must commit or roll back together with the change that caused it.
+   */
+  revokeAllForUser(
+    userId: string,
+    exceptSessionId?: string,
+    executor?: DbExecutor,
+  ): Promise<number> {
+    return this.sessions.deleteForUser(userId, exceptSessionId, executor);
   }
 }

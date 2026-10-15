@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, eq, ne } from "drizzle-orm";
+import type { DbExecutor } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { adminSession, adminUser } from "../database/schema/index.js";
 
@@ -80,8 +81,12 @@ export class SessionRepository {
     return deleted.length;
   }
 
-  async deleteForUser(userId: string, exceptSessionId?: string): Promise<number> {
-    const deleted = await this.db
+  async deleteForUser(
+    userId: string,
+    exceptSessionId?: string,
+    executor: DbExecutor = this.db,
+  ): Promise<number> {
+    const deleted = await executor
       .delete(adminSession)
       .where(
         exceptSessionId === undefined

@@ -25,6 +25,7 @@ No feature flag: the catalog is core.
 | `in_use` | 409 | a referenced row still exists (database RESTRICT), or a category with children or products is deleted |
 | `invalid_transition` | 409 | product lifecycle action not allowed from the current status; `rule` is `<from>_to_<target>` |
 | `rule_violation` | 409 | a core rule refuses the change; `rule` is the core reason code (for example `options_frozen`, `product_type_in_use`, `last_variant`) |
+| `too_many_requests` | 429 | too many login attempts from one client address (`POST /admin/auth/login`); `Retry-After` carries the seconds to wait |
 | `internal_error` | 500 | unexpected failure; the detail is generic |
 
 - Field error `code` values come from the request schema (`required`, `invalid_type`, `unknown_field`, `too_small`, `too_big`, `invalid_format`, `invalid_value`) or from core (for example `title_invalid`, `default_locale_missing`, `slug_missing`, `default_variant_inactive`).
