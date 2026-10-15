@@ -10,6 +10,18 @@ module.exports = {
       to: { path: "^packages/features/" },
     },
     {
+      name: "core-must-not-import-infrastructure",
+      comment:
+        "Core domain logic stays pure: no framework, ORM, database, cache, queue or search client. " +
+        "The pattern matches both a resolved node_modules path and an unresolved bare import " +
+        "(core does not install these packages, so dependency-cruiser reports them by name).",
+      severity: "error",
+      from: { path: "^packages/core/" },
+      to: {
+        path: "(^|/node_modules/)(@nestjs/[^/]+|drizzle-orm|drizzle-kit|pg|ioredis|bullmq|meilisearch)(/|$)",
+      },
+    },
+    {
       name: "features-must-not-import-each-other",
       comment: "Features are independent so that any one can be removed.",
       severity: "error",
