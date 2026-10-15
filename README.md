@@ -94,6 +94,7 @@ docs/               architecture decisions, contracts, API and file maps, plans
 ## Documentation map
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
+- `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
 - `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes.
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.

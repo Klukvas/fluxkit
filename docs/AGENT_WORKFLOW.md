@@ -35,6 +35,7 @@ User goal
 - Escalate on blockers instead of guessing: Developer -> Orchestrator -> Architect -> user.
 - Keep tasks small enough that a Developer finishes in one session with a clear verification command.
 - Every handoff is a file or a written task, not an assumption.
+- `docs/HANDOFF.md` is the shared state for every agent and model. Read it first; update it whenever project state changes.
 
 ## Decisions log (workflow)
 
