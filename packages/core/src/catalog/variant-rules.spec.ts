@@ -3,9 +3,11 @@ import { canCreateVariantManually, canDeleteVariant } from "./variant-rules.js";
 
 describe("canDeleteVariant", () => {
   it("allows deleting a non-default variant of a draft product that has other variants", () => {
-    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 2 })).toEqual({
-      allowed: true,
-    });
+    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 2 })).toEqual(
+      {
+        allowed: true,
+      },
+    );
   });
 
   it.each(["active", "archived"] as const)("refuses for a %s product", (productStatus) => {
@@ -16,10 +18,12 @@ describe("canDeleteVariant", () => {
   });
 
   it("refuses to delete the last variant", () => {
-    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 1 })).toEqual({
-      allowed: false,
-      reason: "last_variant",
-    });
+    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 1 })).toEqual(
+      {
+        allowed: false,
+        reason: "last_variant",
+      },
+    );
   });
 
   it("refuses to delete the default variant", () => {
@@ -30,17 +34,21 @@ describe("canDeleteVariant", () => {
   });
 
   it("treats a count of zero like a last variant", () => {
-    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 0 })).toEqual({
-      allowed: false,
-      reason: "last_variant",
-    });
+    expect(canDeleteVariant({ productStatus: "draft", isDefault: false, variantCount: 0 })).toEqual(
+      {
+        allowed: false,
+        reason: "last_variant",
+      },
+    );
   });
 
   it("reports the product status first when several rules are broken", () => {
-    expect(canDeleteVariant({ productStatus: "active", isDefault: true, variantCount: 1 })).toEqual({
-      allowed: false,
-      reason: "product_not_draft",
-    });
+    expect(canDeleteVariant({ productStatus: "active", isDefault: true, variantCount: 1 })).toEqual(
+      {
+        allowed: false,
+        reason: "product_not_draft",
+      },
+    );
   });
 
   it("reports the last variant before the default variant", () => {
