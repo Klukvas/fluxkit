@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (step 7).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (step 8 review).
 
 ## Where we are
 
@@ -16,13 +16,13 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 | Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). 4c categories (+move with the tree advisory lock) merged (PR #20). 4d-1 products (CRUD, lifecycle, categories, media) merged. 4d-2 product options and variants merged (PR #22); the step 4 admin write API is complete. |
 | Step 5, public store read API (`2026-10-16-catalog-store-api-design.md`) | Implemented in `apps/api/src/catalog/store/` (`GET /store/categories`, `GET /store/products`, `GET /store/products/:slug`; no auth; HTTP integration tests incl. leak and query-count tests); merged (PR #23). |
 | Step 6, ProductType presets and demo data | Implemented: pure data in `seeds/` (`@fluxkit/seeds`: Clothing, Hand tool, Digital product presets; 9 categories, 1 brand, 8 published products in `uk`/`en`) and the idempotent runner `apps/api/src/seed/` (`pnpm seed`; creates through the admin services, never updates or deletes, refuses `NODE_ENV=production` without `--allow-production`); integration test reads the result through the store API; merged (PR #24). |
-| Step 7 OpenAPI and docs | In PR `chore/catalog-step-7` (no PR number yet). `openapi.json` is unchanged (a fresh export equals the committed file); written docs: `docs/api/catalog.md`, `docs/contracts/api.md`, `docs/files/core.md`, `docs/files/api.md`, ADR index, README status, plan outcome. |
-| Step 8 independent review | Not started. Done by a different agent than the authors. |
+| Step 7 OpenAPI and docs | Done and merged (PR #25): `docs/api/catalog.md` (every `/admin` and `/store` route), `docs/contracts/api.md`, `docs/files/core.md`, `docs/files/api.md`, ADR index, README status, plan outcome. |
+| Step 8 independent review | Done 2026-10-16 by two reviewers (Opus: security; Fable: correctness and tests). No leak of internal data found; 5 medium and several low findings, none fixed yet. Findings and status: `docs/plans/2026-10-16-catalog-review-findings.md`. |
 
 ## Next steps (in order)
 
-1. Review and merge the step 7 PR `chore/catalog-step-7` (owner's word). Its docs are the catalog reference: `docs/api/catalog.md` (every `/admin` and `/store` route) and `docs/contracts/api.md`. Known gaps of the store API (`apps/api/src/catalog/store/`): no rate limiting yet (needs a dependency, red zone; follow-up before launch); core's public attribute definition has no display name (the serializer adds it by code from the rows core kept; a core change could carry it).
-2. Step 8 of the catalog plan: independent review of the whole catalog by an agent other than the authors, against AGENTS.md sections 2 (core purity, no internal attribute leaks), 11 (default deny, owner checks), 13 (tests that cannot pass while the code is broken) and 18 (docs).
+1. Fix the review findings in small PRs, each with a regression test that fails before the fix (list and status: `docs/plans/2026-10-16-catalog-review-findings.md`): (a) global default deny for `/admin` plus a router-walking test and a sanctioned admin decorator for feature modules (public contract, owner's decision); (b) 500s on NUL and oversized bodies, and error logging without SQL and parameters; (c) slug collisions for 160-character titles; (d) required variant attributes when a value is added to an active product; (e) the low findings.
+2. Known gaps of the store API: no rate limiting yet (needs a dependency, red zone; before launch); the public attribute definition gets its display name in the serializer, not in core.
 3. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
 
 ## Open decisions (owner)
