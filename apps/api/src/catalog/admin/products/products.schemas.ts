@@ -4,6 +4,7 @@ import { timestampSchema, uuidSchema } from "../../../common/openapi-formats.js"
 import { paginationQuerySchema } from "../../../common/pagination.js";
 import { positionSchema } from "../../shared/code-schemas.js";
 import { i18nTextSchema } from "../../shared/i18n-validation.js";
+import { isDatabaseSafeText, UNSAFE_TEXT_MESSAGE } from "../../shared/text.js";
 
 // Schemas check structure and static limits. Locale rules run in the service with the core i18n functions;
 // attribute values are validated against the product type with the core attribute rules (draft or publish mode).
@@ -35,8 +36,7 @@ const idSchema = z.guid().meta({ format: "uuid" });
 const mediaUrlSchema = z
   .url({ protocol: /^https?$/, error: "Must be an http or https URL." })
   .max(TEXT_LIMITS.url)
-  // A NUL character passes URL parsing but Postgres rejects it in text columns (would be an HTTP 500).
-  .refine((url) => !url.includes("\u0000"), { error: "Must not contain NUL characters." })
+  .refine(isDatabaseSafeText, { error: UNSAFE_TEXT_MESSAGE })
   .meta({ pattern: "^https?://" });
 
 const attributeValuesSchema = z.record(z.string(), z.unknown()).meta({

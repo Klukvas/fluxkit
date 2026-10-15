@@ -9,7 +9,7 @@ import {
   normalizeCategoryAssignments,
   proposeSku,
   publishPreconditions,
-  slugify,
+  slugLookupPrefix,
   TEXT_LIMITS,
   validateAttributeValues,
   type ProductStatus,
@@ -30,6 +30,7 @@ import {
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
+import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
 import { assertAllowed } from "../../shared/rules.js";
 import { emptyToNull } from "../../shared/text.js";
 import {
@@ -86,27 +87,30 @@ export class ProductsService {
   /** Creates a draft and its single default variant in one transaction. */
   async create(body: CreateProductBody): Promise<ProductDetailResponse> {
     this.assertValidTexts(body);
-    for (let attempt = 1; attempt <= MAX_CREATE_ATTEMPTS; attempt += 1) {
-      try {
+    try {
+      return await retryLostRaces(
+        {
+          maxAttempts: MAX_CREATE_ATTEMPTS,
+          // A slug the client sent is never retried: the same slug would collide again.
+          isLostRace: (error) =>
+            isUniqueViolation(error, VARIANT_SKU_CONSTRAINT) ||
+            (body.slug === undefined && isUniqueViolation(error, PRODUCT_SLUG_CONSTRAINT)),
+          exhausted: () =>
+            conflict("Could not allocate a unique slug and SKU; try again or provide a slug.", {
+              field: "slug",
+              constraint: PRODUCT_SLUG_CONSTRAINT,
+            }),
+        },
         // Slug and SKU candidates are computed inside the transaction; a unique violation aborts it, so the retry
         // starts a new transaction and reads the taken values again.
-        return await withTransaction(this.database, (tx) => this.createIn(tx, body));
-      } catch (error) {
-        const lostRace =
-          isUniqueViolation(error, VARIANT_SKU_CONSTRAINT) ||
-          (body.slug === undefined && isUniqueViolation(error, PRODUCT_SLUG_CONSTRAINT));
-        if (!lostRace) {
-          throw translatePostgresError(error, {
-            detail: "Another product already uses this slug.",
-            foreignKey: "invalid_reference",
-          });
-        }
-      }
+        (log) => withTransaction(this.database, (tx) => this.createIn(tx, body, log)),
+      );
+    } catch (error) {
+      throw translatePostgresError(error, {
+        detail: "Another product already uses this slug.",
+        foreignKey: "invalid_reference",
+      });
     }
-    throw conflict("Could not allocate a unique slug and SKU; try again or provide a slug.", {
-      field: "slug",
-      constraint: PRODUCT_SLUG_CONSTRAINT,
-    });
   }
 
   async get(id: string): Promise<ProductDetailResponse> {
@@ -317,7 +321,11 @@ export class ProductsService {
     }
   }
 
-  private async createIn(tx: DbExecutor, body: CreateProductBody): Promise<ProductDetailResponse> {
+  private async createIn(
+    tx: DbExecutor,
+    body: CreateProductBody,
+    log: ProposalLog,
+  ): Promise<ProductDetailResponse> {
     const definition = await this.loadDefinition(tx, body.productTypeId, "productTypeId");
     if (body.brandId !== undefined && body.brandId !== null) {
       await this.assertBrandExists(tx, body.brandId);
@@ -327,6 +335,7 @@ export class ProductsService {
 
     const slug = body.slug ?? (await this.generateSlug(tx, body.title));
     const sku = await this.proposeDefaultSku(tx, slug);
+    log.record(slug, sku);
     const created = await this.products.insertProduct(tx, {
       productTypeId: body.productTypeId,
       brandId: body.brandId ?? null,
@@ -350,7 +359,7 @@ export class ProductsService {
 
   private async generateSlug(tx: DbExecutor, title: Record<string, string>): Promise<string> {
     const source = title[this.locale.defaultLocale] ?? "";
-    const prefix = slugify(source);
+    const prefix = slugLookupPrefix(source);
     const generated = generateUniqueSlug(
       source,
       prefix === "" ? new Set() : await this.products.findSlugsStartingWith(tx, prefix),

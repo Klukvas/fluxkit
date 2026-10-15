@@ -1,5 +1,5 @@
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ProblemBody } from "../../../common/problem.filter.js";
 import { startApp, type RunningApp } from "../../../test/app.js";
 import {
@@ -13,6 +13,7 @@ import {
 } from "../../../test/catalog-fixtures.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { ProductsRepository } from "../products/products.repository.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
 
 const MISSING_ID = "00000000-0000-4000-8000-000000000000";
@@ -535,6 +536,138 @@ describe("admin product options API (real app, real Postgres)", () => {
       expect(product.variants.filter((variant) => oldIds.includes(variant.id))).toHaveLength(4);
       await expectVariantInvariants(pool, active.id);
       expect((await getProduct(active.id)).variants).toEqual(product.variants);
+    });
+
+    describe("a type with a required variant attribute (ADR 0008)", () => {
+      const variantPath = (productId: string, variantId: string | undefined) =>
+        `/admin/products/${productId}/variants/${variantId}`;
+
+      /** A strict product with one variant that has its required attribute, moved to `status`. */
+      async function strictProductIn(
+        status: "draft" | "active" | "archived",
+      ): Promise<ProductDetailResponse> {
+        const product = await createProduct(fx.strictTypeId);
+        const withOptions = await okPut(product.id, sel(fx.color, ["red"]));
+        const filled = await call("PATCH", variantPath(product.id, withOptions.variants[0]?.id), {
+          attributes: { [fx.batchAttributeCode]: "B-1" },
+        });
+        expect(filled.status, JSON.stringify(filled.body)).toBe(200);
+        if (status !== "draft") {
+          expect((await call("POST", `/admin/products/${product.id}/publish`)).status).toBe(200);
+        }
+        if (status === "archived") {
+          expect((await call("POST", `/admin/products/${product.id}/archive`)).status).toBe(200);
+        }
+        return getProduct(product.id);
+      }
+
+      it("creates the variant of a new value inactive on an active product, and it can be published and activated later", async () => {
+        const active = await strictProductIn("active");
+        const result = await addValue(active.id, fx.color, fx.color.values.blue);
+        expect(result.status, JSON.stringify(result.body)).toBe(201);
+        const created = result.body.variants.find(
+          (variant) => variant.id !== active.variants[0]?.id,
+        );
+        expect(created).toMatchObject({ isActive: false, isDefault: false, attributes: {} });
+        expect(result.body.variants.filter((variant) => variant.isActive)).toHaveLength(1);
+
+        // The store does not list the inactive variant.
+        const store = await call<{ variants: { sku: string }[] }>(
+          "GET",
+          `/store/products/${active.slug}`,
+        );
+        expect(store.status).toBe(200);
+        expect(store.body.variants.map((variant) => variant.sku)).toEqual([
+          active.variants[0]?.sku,
+        ]);
+
+        // Unpublish and publish again: an inactive variant does not need its required attributes.
+        expect((await call("POST", `/admin/products/${active.id}/unpublish`)).status).toBe(200);
+        const republished = await call("POST", `/admin/products/${active.id}/publish`);
+        expect(republished.status, JSON.stringify(republished.body)).toBe(200);
+
+        // Activating without the required attribute is refused, with it succeeds.
+        const refused = await call("PATCH", variantPath(active.id, created?.id), {
+          isActive: true,
+        });
+        expect(refused.status).toBe(400);
+        expect(problem(refused).errors).toEqual([
+          { path: `attributes.${fx.batchAttributeCode}`, code: "required" },
+        ]);
+        const filled = await call<{ isActive: boolean }>(
+          "PATCH",
+          variantPath(active.id, created?.id),
+          { isActive: true, attributes: { [fx.batchAttributeCode]: "B-2" } },
+        );
+        expect(filled.status, JSON.stringify(filled.body)).toBe(200);
+        expect(filled.body.isActive).toBe(true);
+        const storeAfter = await call<{ variants: unknown[] }>(
+          "GET",
+          `/store/products/${active.slug}`,
+        );
+        expect(storeAfter.body.variants).toHaveLength(2);
+      });
+
+      it("creates the variant inactive on an archived product too", async () => {
+        const archived = await strictProductIn("archived");
+        const result = await addValue(archived.id, fx.color, fx.color.values.blue);
+        expect(result.status).toBe(201);
+        expect(result.body.variants.map((variant) => variant.isActive).sort()).toEqual([
+          false,
+          true,
+        ]);
+        expect((await call("POST", `/admin/products/${archived.id}/restore`)).status).toBe(200);
+        expect((await call("POST", `/admin/products/${archived.id}/publish`)).status).toBe(200);
+      });
+
+      it("keeps creating active variants on a draft", async () => {
+        const draft = await strictProductIn("draft");
+        const result = await addValue(draft.id, fx.color, fx.color.values.blue);
+        expect(result.status).toBe(201);
+        expect(result.body.variants.every((variant) => variant.isActive)).toBe(true);
+      });
+    });
+
+    describe("a proposed SKU that loses a race", () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      /** Takes the SKU that the next generated variant would get, as a concurrent request could. */
+      async function takeSkuOfNextVariant(product: ProductDetailResponse, valueCode: string) {
+        const sku = `${product.slug}-${valueCode}`.toUpperCase();
+        const other = await createProduct();
+        await pool.query("update variant set sku = $1 where product_id = $2", [sku, other.id]);
+        return sku;
+      }
+
+      it("is proposed again and the request succeeds", async () => {
+        const active = await productIn("active");
+        const sku = await takeSkuOfNextVariant(active, "green-s");
+        const repository = running.app.get(ProductsRepository);
+        // The first lookup does not see the taken SKUs (the race); later lookups are real.
+        const lookup = vi
+          .spyOn(repository, "findSkusStartingWith")
+          .mockResolvedValueOnce(new Set());
+        const result = await addValue(active.id, fx.color, fx.color.values.green);
+        expect(result.status, JSON.stringify(result.body)).toBe(201);
+        expect(lookup.mock.calls.length).toBeGreaterThanOrEqual(2);
+        const skus = result.body.variants.map((variant) => variant.sku);
+        expect(new Set(skus).size).toBe(skus.length);
+        expect(skus).not.toContain(sku);
+      });
+
+      it("stops with 409 when every attempt would propose the same colliding SKU", async () => {
+        const active = await productIn("active");
+        await takeSkuOfNextVariant(active, "green-s");
+        const lookup = vi
+          .spyOn(running.app.get(ProductsRepository), "findSkusStartingWith")
+          .mockResolvedValue(new Set());
+        const result = await addValue(active.id, fx.color, fx.color.values.green);
+        expect(result.status).toBe(409);
+        expect(problem(result)).toMatchObject({ field: "sku", constraint: "variant_sku_key" });
+        expect(lookup).toHaveBeenCalledTimes(2);
+      });
     });
 
     it("works on an archived product", async () => {

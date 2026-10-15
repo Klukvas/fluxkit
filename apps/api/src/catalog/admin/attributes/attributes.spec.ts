@@ -253,6 +253,17 @@ describe("admin attributes API (real app, real Postgres)", () => {
     });
 
     it.each([
+      ["NUL", "m\u0000m"],
+      ["a lone surrogate", "m\ud800"],
+    ])("answers 400, not 500, for %s in the unit", async (_name, unit) => {
+      const result = await http(running.baseUrl, "POST", "/admin/attributes", {
+        body: { code: uniqueCode(), name: name(), inputType: "number", unit },
+      });
+      expect(result.status, JSON.stringify(result.body)).toBe(400);
+      expect(result.body).toMatchObject({ errors: [expect.objectContaining({ path: "unit" })] });
+    });
+
+    it.each([
       [{ inputType: "text", unit: "mm" }, "unit", "unit_requires_number"],
       [{ inputType: "number", unit: "  " }, "unit", "unit_empty"],
       [{ inputType: "number", unit: "x".repeat(17) }, "unit", "unit_too_long"],

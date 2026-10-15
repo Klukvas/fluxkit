@@ -135,6 +135,8 @@ export function publishPreconditions(
   });
 
   const options = { ...config, mode: "publish" as const };
+  // An inactive variant is not sold, so it may still lack required attributes (ADR 0008); what it has must be valid.
+  const inactiveOptions = { ...config, mode: "draft" as const };
   const productAttributes = validateAttributeValues(
     productType,
     "product",
@@ -147,7 +149,12 @@ export function publishPreconditions(
     }
   }
   product.variants.forEach((variant, variantIndex) => {
-    const result = validateAttributeValues(productType, "variant", variant.attributes, options);
+    const result = validateAttributeValues(
+      productType,
+      "variant",
+      variant.attributes,
+      variant.isActive ? options : inactiveOptions,
+    );
     if (!result.ok) {
       for (const error of result.errors) {
         violations.push({ ...attributeViolation("variant", error), variantIndex });

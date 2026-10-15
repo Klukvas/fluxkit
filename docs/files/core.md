@@ -11,12 +11,12 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 
 - `src/catalog/types.ts` - plain data shapes (`I18nText`, `AttributeDefinition`, `ProductTypeDefinition`, `OptionDefinition`, `VariantSnapshot`, `ProductSnapshot`, `CategoryNode`, `LocaleConfig`). Must not carry ORM or framework types; the API maps rows to these and back.
 - `src/catalog/limits.ts` - `CATALOG_LIMITS` (options per product 3, values per option 30, variants 250, depth 5, page size 100, offset 10 000, ...), `TEXT_LIMITS`, `ATTRIBUTE_VALIDATION_DEFAULTS`, code patterns and `isValidCode` / `isValidValueCode`. Must not read configuration; limits are constants.
-- `src/catalog/text-safety.ts` - `hasJsonbUnsafeCharacters`: NUL and unpaired surrogates, which Postgres rejects. Turns a 500 into a field error.
+- `src/catalog/text-safety.ts` - `hasJsonbUnsafeCharacters` (exported): NUL and unpaired surrogates, which Postgres rejects or the driver silently replaces. Turns a 500 into a field error; the admin schemas use it for every free-text column (barcode, URLs, unit).
 
 ## Text, slugs, SKUs
 
 - `src/catalog/i18n.ts` - `validateI18nText` (shape, default locale required, allowed locales, length), `resolveText` (requested locale, else default; per field), `codePointLength`.
-- `src/catalog/slug.ts` - `validateSlug`, `isValidSlug`, `transliterateUkrainian` (KMU resolution 55/2010), `slugify`, `generateUniqueSlug` (slugifies the title and adds `-2`, `-3` against the set of taken slugs the caller passes in). Must not query the database for collisions itself.
+- `src/catalog/slug.ts` - `validateSlug`, `isValidSlug`, `transliterateUkrainian` (KMU resolution 55/2010), `slugify`, `slugLookupPrefix` (the prefix a caller queries taken slugs with; not the plain slug, because the candidates of a 160 character slug are `base158-2`, ...), `generateUniqueSlug` (slugifies the title and adds `-2`, `-3` against the set of taken slugs the caller passes in; it must contain every taken slug that starts with `slugLookupPrefix(title)`). Must not query the database for collisions itself.
 - `src/catalog/sku.ts` - `normalizeSku` (trim, uppercase), `validateSku`, `proposeSku` / `proposeSkus` (`<SLUG>-<VALUE_CODE>...` uppercased, skipping SKUs in the taken set the caller passes in).
 
 ## Attributes and values

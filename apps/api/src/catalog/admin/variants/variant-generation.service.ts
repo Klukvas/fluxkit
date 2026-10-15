@@ -6,8 +6,10 @@ import {
   type GenerateVariantsOption,
 } from "@fluxkit/core";
 import { isUniqueViolation } from "../../../common/postgres-errors.js";
+import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
 import { conflict, validationFailed, type FieldError } from "../../../common/problem.js";
 import type { DbExecutor } from "../../../common/transaction.js";
+import { toProductTypeDefinition } from "../products/products.mapper.js";
 import { ProductsRepository, type ProductRow } from "../products/products.repository.js";
 import { VariantsRepository } from "./variants.repository.js";
 
@@ -27,22 +29,23 @@ export interface GenerationOutcome {
 
 /**
  * Runs `work` (one whole transaction) again when a SKU that the service proposed was taken by a concurrent write.
- * Only use it for work whose SKUs are all proposed: a SKU the client sent must answer 409, not be retried.
+ * `work` records the SKUs it proposed in the log; a round that proposes the same SKUs as the one before fails with
+ * 409 instead of repeating identical work. Only use it for work whose SKUs are all proposed: a SKU the client sent
+ * must answer 409, not be retried.
  */
-export async function retryOnProposedSkuCollision<T>(work: () => Promise<T>): Promise<T> {
-  for (let attempt = 1; attempt <= MAX_SKU_ATTEMPTS; attempt += 1) {
-    try {
-      return await work();
-    } catch (error) {
-      if (!isUniqueViolation(error, VARIANT_SKU_CONSTRAINT)) {
-        throw error;
-      }
-    }
-  }
-  throw conflict("Could not allocate unique SKUs; try again or provide them.", {
-    field: "sku",
-    constraint: VARIANT_SKU_CONSTRAINT,
-  });
+export function retryOnProposedSkuCollision<T>(work: (log: ProposalLog) => Promise<T>): Promise<T> {
+  return retryLostRaces(
+    {
+      maxAttempts: MAX_SKU_ATTEMPTS,
+      isLostRace: (error) => isUniqueViolation(error, VARIANT_SKU_CONSTRAINT),
+      exhausted: () =>
+        conflict("Could not allocate unique SKUs; try again or provide them.", {
+          field: "sku",
+          constraint: VARIANT_SKU_CONSTRAINT,
+        }),
+    },
+    work,
+  );
 }
 
 function toFieldError(error: GenerateVariantsError): FieldError {
@@ -75,7 +78,11 @@ export class VariantGenerationService {
    * `generateVariants`, which also enforces the limits). The first variant of a product that has none becomes the
    * default one. Idempotent: a second call creates nothing.
    */
-  async generateMissing(tx: DbExecutor, product: ProductRow): Promise<GenerationOutcome> {
+  async generateMissing(
+    tx: DbExecutor,
+    product: ProductRow,
+    log: ProposalLog,
+  ): Promise<GenerationOutcome> {
     const options = await this.products.listProductOptions(tx, product.id);
     const chosenValues = await this.products.listProductOptionValues(tx, product.id);
     const existing = await this.products.listVariants(tx, product.id);
@@ -130,7 +137,9 @@ export class VariantGenerationService {
     if (skuProblems.length > 0) {
       throw validationFailed(skuProblems);
     }
+    log.record(...skuValues);
 
+    const isActive = await this.generatedVariantsAreActive(tx, product);
     const firstPosition =
       existing.reduce((highest, variant) => Math.max(highest, variant.position), -1) + 1;
     const inserted = await this.variants.insertVariants(
@@ -145,7 +154,7 @@ export class VariantGenerationService {
           sku,
           optionSignature: variant.optionSignature,
           isDefault: variant.isDefault,
-          isActive: true,
+          isActive,
           attributes: {},
           position: firstPosition + index,
         };
@@ -170,5 +179,23 @@ export class VariantGenerationService {
       ),
     );
     return { created: generated.length, skipped: combinations - generated.length };
+  }
+
+  /**
+   * ADR 0008: a generated variant has no attributes. On a live (active or archived) product whose type requires a
+   * variant attribute it would break the required-attribute rule if it were sold, so it starts inactive and is
+   * activated once the attributes are filled. Draft products stay lenient.
+   */
+  private async generatedVariantsAreActive(tx: DbExecutor, product: ProductRow): Promise<boolean> {
+    if (product.status === "draft") {
+      return true;
+    }
+    const rows = await this.products.findProductTypeRows(tx, product.productTypeId);
+    if (rows === undefined) {
+      throw new Error(`Product type ${product.productTypeId} of an existing product is missing.`);
+    }
+    return !toProductTypeDefinition(rows).attributes.some(
+      (assignment) => assignment.level === "variant" && assignment.isRequired,
+    );
   }
 }

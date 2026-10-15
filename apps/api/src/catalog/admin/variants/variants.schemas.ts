@@ -2,6 +2,7 @@ import { CATALOG_LIMITS, TEXT_LIMITS } from "@fluxkit/core";
 import { z } from "zod";
 import { paginationQuerySchema } from "../../../common/pagination.js";
 import { productVariantResponseSchema } from "../products/products.schemas.js";
+import { isDatabaseSafeText, UNSAFE_TEXT_MESSAGE } from "../../shared/text.js";
 
 // Schemas check structure and static limits. The SKU format, attribute values and option coverage are checked in
 // the service with the core rules (they depend on the product and its product type).
@@ -14,9 +15,15 @@ const skuSchema = z.string().max(256).meta({
     "Trimmed and uppercased by the service, then checked against ^[A-Z0-9][A-Z0-9._-]{0,63}$. Globally unique.",
 });
 
-const barcodeSchema = z.string().trim().max(TEXT_LIMITS.barcode).meta({
-  description: "Free text, at most 64 characters, no uniqueness check. An empty string clears it.",
-});
+const barcodeSchema = z
+  .string()
+  .trim()
+  .max(TEXT_LIMITS.barcode)
+  .refine(isDatabaseSafeText, { error: UNSAFE_TEXT_MESSAGE })
+  .meta({
+    description:
+      "Free text, at most 64 characters, no uniqueness check. An empty string clears it.",
+  });
 
 const attributeValuesSchema = z.record(z.string(), z.unknown()).meta({
   description:

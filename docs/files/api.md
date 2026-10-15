@@ -36,7 +36,8 @@
 - `shared/code-schemas.ts` - zod schemas for codes (`code`, value code) and the limits they use.
 - `shared/i18n-validation.ts` - zod schema for i18n texts that calls core `validateI18nText` with the configured locales.
 - `shared/rules.ts` - `assertAllowed`: turns a rejected core decision into `409 rule_violation` with the core reason as `rule`.
-- `shared/text.ts` - `emptyToNull` for text maps.
+- `shared/text.ts` - `emptyToNull` for text maps; `isDatabaseSafeText` (zod refinement over core `hasJsonbUnsafeCharacters`: NUL and unpaired surrogates) for free-text columns.
+- `shared/retry.ts` - `retryLostRaces` and `ProposalLog`: run a whole transaction again when a slug or SKU the service proposed lost a race; stops with 409 when a round proposes what the previous round did. Never use it for a value the client sent.
 
 ### Admin (`src/catalog/admin/`)
 

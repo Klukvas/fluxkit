@@ -3,6 +3,7 @@ import {
   generateUniqueSlug,
   isValidSlug,
   slugify,
+  slugLookupPrefix,
   transliterateUkrainian,
   validateSlug,
 } from "./slug.js";
@@ -217,5 +218,39 @@ describe("generateUniqueSlug", () => {
     const taken = new Set(["futbolka"]);
     generateUniqueSlug("Футболка", taken);
     expect([...taken]).toEqual(["futbolka"]);
+  });
+});
+
+describe("slugLookupPrefix", () => {
+  it("is empty when the title has no usable characters", () => {
+    expect(slugLookupPrefix("!!!")).toBe("");
+  });
+
+  it("is the whole slug for a short title", () => {
+    expect(slugLookupPrefix("Футболка")).toBe("futbolka");
+  });
+
+  it("matches every slug generateUniqueSlug can produce, also for a 160 character slug", () => {
+    // A caller reads the taken slugs with a `startsWith(prefix)` query, like the repositories do.
+    const store = new Set<string>();
+    const created: string[] = [];
+    for (const title of ["a".repeat(200), "ab ".repeat(100), `${"a".repeat(157)} b c`]) {
+      store.clear();
+      created.length = 0;
+      for (let round = 0; round < 12; round += 1) {
+        const prefix = slugLookupPrefix(title);
+        const taken = new Set([...store].filter((slug) => slug.startsWith(prefix)));
+        const result = generateUniqueSlug(title, taken);
+        expect(result.ok).toBe(true);
+        if (!result.ok) {
+          return;
+        }
+        expect(store.has(result.slug)).toBe(false);
+        expect(isValidSlug(result.slug)).toBe(true);
+        store.add(result.slug);
+        created.push(result.slug);
+      }
+      expect(new Set(created).size).toBe(12);
+    }
   });
 });

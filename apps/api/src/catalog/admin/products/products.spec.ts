@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Page } from "../../../common/pagination.js";
 import type { ProblemBody } from "../../../common/problem.filter.js";
 import { startApp, type RunningApp } from "../../../test/app.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { ProductsRepository } from "./products.repository.js";
 import type { ProductDetailResponse, ProductResponse } from "./products.schemas.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -231,6 +232,105 @@ describe("admin products API (real app, real Postgres)", () => {
   });
 
   describe("POST /admin/products", () => {
+    describe("retries of a slug or SKU the service proposed", () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      function spyOnInserts() {
+        return vi.spyOn(running.app.get(ProductsRepository), "insertProduct");
+      }
+
+      it("answers 409 at once, without a retry, for an explicit slug that is taken", async () => {
+        const existing = await createProduct({ slug: `fast-${runId}` });
+        const inserts = spyOnInserts();
+        const result = await call("POST", "/admin/products", {
+          productTypeId: teeTypeId,
+          title: uniqueTitle(),
+          slug: existing.slug,
+        });
+        expect(result.status).toBe(409);
+        expect(problem(result)).toMatchObject({ field: "slug", constraint: "product_slug_key" });
+        expect(inserts).toHaveBeenCalledTimes(1);
+      });
+
+      it("proposes another SKU after losing a race for one, and succeeds", async () => {
+        const other = await createProduct({ slug: `sku-other-${runId}` });
+        // Another request takes the SKU that the next product would get, between the lookup and the insert.
+        await pool.query("update variant set sku = $1 where product_id = $2", [
+          `SKU-NEW-${runId}`.toUpperCase(),
+          other.id,
+        ]);
+        const repository = running.app.get(ProductsRepository);
+        const inserts = spyOnInserts();
+        // The first lookup does not see the taken SKU (the race); later lookups are real.
+        vi.spyOn(repository, "findSkusStartingWith").mockResolvedValueOnce(new Set());
+        const result = await call<ProductDetailResponse>("POST", "/admin/products", {
+          productTypeId: teeTypeId,
+          title: uniqueTitle(),
+          slug: `sku-new-${runId}`,
+        });
+        expect(result.status, JSON.stringify(result.body)).toBe(201);
+        created.products.push(result.body.id);
+        expect(inserts).toHaveBeenCalledTimes(2);
+        expect(result.body.variants[0]?.sku).not.toBe(`SKU-NEW-${runId}`.toUpperCase());
+      });
+
+      it("stops with 409 when a retry would propose the same SKU again", async () => {
+        const other = await createProduct({ slug: `same-other-${runId}` });
+        await pool.query("update variant set sku = $1 where product_id = $2", [
+          `SAME-NEW-${runId}`.toUpperCase(),
+          other.id,
+        ]);
+        const inserts = spyOnInserts();
+        // The lookup never sees the taken SKU, so every attempt proposes the colliding one.
+        vi.spyOn(running.app.get(ProductsRepository), "findSkusStartingWith").mockResolvedValue(
+          new Set(),
+        );
+        const result = await call("POST", "/admin/products", {
+          productTypeId: teeTypeId,
+          title: uniqueTitle(),
+          slug: `same-new-${runId}`,
+        });
+        expect(result.status).toBe(409);
+        expect(inserts).toHaveBeenCalledTimes(2);
+      });
+
+      it("stops with 409 when a retry would generate the same slug again", async () => {
+        const title = { uk: `Repeat ${runId}` };
+        await createProduct({ title });
+        const inserts = spyOnInserts();
+        vi.spyOn(running.app.get(ProductsRepository), "findSlugsStartingWith").mockResolvedValue(
+          new Set(),
+        );
+        const result = await call("POST", "/admin/products", {
+          productTypeId: teeTypeId,
+          title,
+        });
+        expect(result.status).toBe(409);
+        expect(problem(result)).toMatchObject({ field: "slug" });
+        expect(inserts).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    it("generates distinct slugs of at most 160 characters for the same 200 character title", async () => {
+      const title = { uk: `${runId}${"a".repeat(192)}` };
+      const slugs: string[] = [];
+      for (let round = 0; round < 4; round += 1) {
+        slugs.push((await createProduct({ title })).slug);
+      }
+      const base = `${runId}${"a".repeat(152)}`;
+      expect(slugs).toEqual([
+        base,
+        `${base.slice(0, 158)}-2`,
+        `${base.slice(0, 158)}-3`,
+        `${base.slice(0, 158)}-4`,
+      ]);
+      for (const slug of slugs) {
+        expect(slug.length).toBeLessThanOrEqual(160);
+      }
+    });
+
     it("creates a draft with its default variant, generates the slug and sets Location", async () => {
       const title = uniqueTitle();
       const result = await call<ProductDetailResponse>("POST", "/admin/products", {
@@ -650,6 +750,22 @@ describe("admin products API (real app, real Postgres)", () => {
         status: "draft",
       });
       expect(result.body.variants).toHaveLength(1);
+    });
+
+    it("answers 400, not 500, for a deeply nested attribute value", async () => {
+      const product = await createProduct();
+      const deep = `${"[".repeat(50_000)}"x"${"]".repeat(50_000)}`;
+      const result = await http(running.baseUrl, "PATCH", `/admin/products/${product.id}`, {
+        rawBody: `{"attributes":{"${codes.note}":${deep}}}`,
+      });
+      expect(result.status).toBe(400);
+      expect(problem(result).errors).toEqual([
+        { path: `attributes.${codes.note}`, code: "invalid_type" },
+      ]);
+      const created = await http(running.baseUrl, "POST", "/admin/products", {
+        rawBody: `{"productTypeId":"${teeTypeId}","title":{"uk":"Deep ${runId}"},"attributes":{"${codes.note}":${deep}}}`,
+      });
+      expect(created.status).toBe(400);
     });
 
     it("clears the description and the brand with null, and sets a brand", async () => {
@@ -1141,6 +1257,26 @@ describe("admin products API (real app, real Postgres)", () => {
     async function put(productId: string, body: unknown) {
       return call<ProductDetailResponse>("PUT", `/admin/products/${productId}/media`, body);
     }
+
+    it.each([
+      ["NUL", "\u0000"],
+      ["a lone surrogate", "\ud800"],
+    ])("answers 400, not 500, for %s in a url or an alt text", async (_name, bad) => {
+      const product = await createProduct();
+      const url = await put(product.id, {
+        media: [{ url: `https://cdn.example.test/a${bad}.png` }],
+      });
+      expect(url.status, JSON.stringify(url.body)).toBe(400);
+      expect(problem(url).errors).toContainEqual(expect.objectContaining({ path: "media.0.url" }));
+      const alt = await put(product.id, {
+        media: [{ url: "https://cdn.example.test/a.png", alt: { uk: `Фото${bad}` } }],
+      });
+      expect(alt.status, JSON.stringify(alt.body)).toBe(400);
+      expect(problem(alt).errors).toContainEqual(
+        expect.objectContaining({ path: "media.0.alt.uk" }),
+      );
+      expect((await getProduct(product.id)).media).toEqual([]);
+    });
 
     it("replaces the list, defaults positions to the index and returns the items in order", async () => {
       const product = await createProduct();
