@@ -30,6 +30,14 @@ describe("public entry point", () => {
       "publishPreconditions",
       "decideCodeChange",
       "decideProductOptionChange",
+      "hasPermission",
+      "permissionsOf",
+      "validatePassword",
+      "validateEmail",
+      "normalizeEmail",
+      "registerFailedLogin",
+      "evaluateSession",
+      "decideUserChange",
     ] as const;
     for (const name of functions) {
       expect(typeof core[name], name).toBe("function");
