@@ -72,8 +72,12 @@ describe("planProductOptionChange in draft", () => {
 
   it("allows removing and adding values of an existing option", () => {
     const result = plan("draft", [color("red", "blue")], [color("blue", "green")]);
-    expect(result.ok && result.plan.addedValues).toEqual([{ optionId: "color", valueIds: ["green"] }]);
-    expect(result.ok && result.plan.removedValues).toEqual([{ optionId: "color", valueIds: ["red"] }]);
+    expect(result.ok && result.plan.addedValues).toEqual([
+      { optionId: "color", valueIds: ["green"] },
+    ]);
+    expect(result.ok && result.plan.removedValues).toEqual([
+      { optionId: "color", valueIds: ["red"] },
+    ]);
     expect(result.ok && result.plan.addedOptionIds).toEqual([]);
   });
 
@@ -137,7 +141,9 @@ describe("planProductOptionChange validation", () => {
   it("refuses an option that the product type does not allow, in every status", () => {
     for (const status of ["draft", "active", "archived"] as const) {
       expect(
-        errorsOf(plan(status, [color("red")], [color("red"), { optionId: "weight", valueIds: ["x"] }])),
+        errorsOf(
+          plan(status, [color("red")], [color("red"), { optionId: "weight", valueIds: ["x"] }]),
+        ),
       ).toContainEqual({ reason: "option_not_allowed", optionId: "weight" });
     }
   });
@@ -147,7 +153,16 @@ describe("planProductOptionChange validation", () => {
   });
 
   it("refuses more than 3 options", () => {
-    const result = plan("draft", [], [color("a"), size("a"), { optionId: "fit", valueIds: ["a"] }, { optionId: "material", valueIds: ["a"] }]);
+    const result = plan(
+      "draft",
+      [],
+      [
+        color("a"),
+        size("a"),
+        { optionId: "fit", valueIds: ["a"] },
+        { optionId: "material", valueIds: ["a"] },
+      ],
+    );
     expect(errorsOf(result)).toContainEqual({ reason: "too_many_options", limit: 3, actual: 4 });
   });
 
