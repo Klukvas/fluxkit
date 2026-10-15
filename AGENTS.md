@@ -95,6 +95,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 ## 3. Working rules for agents
 
 ### Before coding
+- Read `docs/HANDOFF.md` first: current state, next steps, open decisions and the owner's working agreements.
 - Read the relevant module and its README first. Follow existing conventions over personal preference.
 - If a request conflicts with section 2 (e.g. "just hardcode this color/field"), do the right thing within the architecture and tell the user why.
 - If the request is ambiguous in a way that changes architecture (core vs feature, data model), ask a short question before building.
@@ -161,7 +162,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - No hardcoded design values or user-facing strings.
 - Respects Product/Variant and attribute rules above.
 - Lint, types, and tests pass; new behavior is covered.
-- Docs, `.env.example`, and seeds updated.
+- Docs, `.env.example`, and seeds updated; `docs/HANDOFF.md` updated when project state changed.
 - No client-specific code in the template.
 
 ## 7. Workflow (mandatory for every non-trivial task)
@@ -177,7 +178,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
    theming rules? If unsure, ask.
 4. **Implement** in small steps; keep the build green.
 5. **Verify** with real commands (lint, types, tests, run the thing). Paste actual results in the report.
-6. **Document** (section 8) in the same change.
+6. **Document** (section 8) in the same change, including `docs/HANDOFF.md` when project state changes.
 7. **Report**: what changed, what was verified, what was not, open risks.
 
 ## 8. Documentation (kept short, kept current)
@@ -192,6 +193,8 @@ Docs are part of the code. A change without updated docs is not done.
   how to remove it cleanly.
 - **Decisions** → `docs/adr/NNNN-title.md` for architectural decisions (context, decision, consequences). Never edit old ADRs; supersede them.
 - **Changelog** → `CHANGELOG.md`, one line per user-visible or schema change.
+- **Handoff** → `docs/HANDOFF.md`: current state, next steps, open decisions, working agreements. New agents read it first. Every PR that changes project state
+  (a PR merged or opened for a plan step, a step finished, a decision taken, a working agreement changed) updates it and its "Last updated" date. Keep it short.
 - Style: bullet lists and tables, present tense, no marketing text. If a doc grows long, split it.
 - Docs describe what exists. Do not document planned behavior as if it is implemented.
 
