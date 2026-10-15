@@ -152,6 +152,18 @@ describe("validateMove", () => {
     });
   });
 
+  it("refuses to decide on a corrupted tree instead of passing silently", () => {
+    const corrupted = [node("p", "q"), node("q", "p"), node("n", null), node("m", "ghost")];
+    expect(validateMove(corrupted, "n", "m", 5)).toEqual({
+      ok: false,
+      errors: [{ reason: "tree_corrupted" }],
+    });
+    expect(validateMove(corrupted, "p", null, 5)).toEqual({
+      ok: false,
+      errors: [{ reason: "tree_corrupted" }],
+    });
+  });
+
   it("walks through the ADR scenario (e)", () => {
     const tree = [
       node("odyag", null),
