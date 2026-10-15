@@ -41,13 +41,13 @@ export interface CreateAdminResult {
   role: AdminRole;
 }
 
-const PASSWORD_ARGUMENT_REFUSAL =
+export const PASSWORD_ARGUMENT_REFUSAL =
   "Passwords are not accepted as command-line arguments: arguments leak through the process list and shell history. " +
   "Set the ADMIN_PASSWORD environment variable for this command, or run it in a terminal and type the password at the prompt.";
 
 const USAGE = "Usage: pnpm admin:create --email <address> [--role <owner|manager|viewer>]";
 
-function looksLikePasswordArgument(argument: string): boolean {
+export function looksLikePasswordArgument(argument: string): boolean {
   if (!argument.startsWith("-")) {
     return false;
   }
@@ -213,6 +213,7 @@ export async function runCreateAdminCommand(
         features: [],
         locale: { defaultLocale: config.defaultLocale, locales: config.locales },
         scrypt: options.scrypt,
+        cleanExpiredSessionsOnBootstrap: false,
       }),
       { logger: ["error", "warn"] },
     );

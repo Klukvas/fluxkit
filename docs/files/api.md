@@ -12,12 +12,14 @@
 - `common.module.ts` - global module: the problem filter for every route and the locale configuration (`LOCALE_CONFIG`).
 - `locale.ts` - `LOCALE_CONFIG` token and `LocaleConfig` (`defaultLocale`, `locales`), fed from `DEFAULT_LOCALE` and `LOCALES`.
 - `problem.ts` - error codes (`PROBLEM_CODES`), status and title maps, `ProblemException` and factories (`validationFailed`, `notFound`, `conflict`, `inUse`, `invalidTransition`, `ruleViolation`, `unauthorized`, `forbidden`, `tooManyRequests` with its `Retry-After` header). Must not carry SQL or internals.
-- `problem.filter.ts` - the one `application/problem+json` writer: known problems pass through, framework 4xx get generic details, unknown errors are logged (method and path only) and answered as `internal_error`.
+- `problem.filter.ts` - the one `application/problem+json` writer: known problems pass through, framework 4xx get generic details, unknown errors are logged (method and path only) and answered as `internal_error`. A query error (`DrizzleQueryError`, a `Failed query:` message, or `query`/`params` properties) is logged as class names plus the innermost cause's name and code, never its message. Sets `Cache-Control: no-store` on `/admin` errors that happen before any middleware (body-parser 413).
 - `postgres-errors.ts` - maps SQLSTATE and constraint names to problems (`23505` to `conflict` with `field`, `23503` to `in_use` or `invalid_reference`, `23514` to `validation_failed`). Never maps by message text.
 - `zod-validation.pipe.ts` - validates `@Body`, `@Query`, `@Param` with zod and turns issues into `errors[]` (`required`, `unknown_field`, ...); `uuidParam` for id parameters.
 - `pagination.ts` - admin `?limit` (default 50, max 100) and `?offset` (max 10 000) schema, `Page<T>`, `toPage`, `pageSchema` for OpenAPI.
 - `openapi.ts` - OpenAPI helpers: `ApiZodBody`, `ApiZodResponse` (schema from the same zod schema as the validation), `ApiPaginationQuery`, `ApiProblemResponses` and the problem document models.
 - `openapi-formats.ts` - response-only schemas (`uuidSchema`, `timestampSchema`) with OpenAPI formats.
+- `admin-path.ts` - `isAdminPath` (the `/admin` test, case-insensitive like Express routing) and `markAdminResponseUncacheable` (`Cache-Control: no-store`); used by the guard, the auth middleware and the problem filter.
+- `error-summary.ts` - `summarizeError`, `innermostCause`, `errorCode`: what is safe to log about a failure (class names and a code, never the message, which can hold SQL and parameters).
 - `transaction.ts` - `withTransaction` and the `DbExecutor` / `Transaction` types used by repositories and services.
 - `*.spec.ts` - unit tests for the filter, pipe, pagination, Postgres error mapping and transaction helper.
 
@@ -25,8 +27,9 @@
 
 - `admin-authenticator.ts` - `AdminAuthenticator` contract (`authenticate(request)` returns an `AdminPrincipal` or `undefined`) and the `AdminPrincipal` type. No environment switch, no API key.
 - `session-admin-authenticator.ts` - the production authenticator: session cookie -> `SessionService.resolve` -> principal with the role's permissions. Rethrows internal failures (500), never turns them into access.
-- `session.service.ts` - sessions: `create` (32-byte random token, only its SHA-256 stored), `resolve` (core `evaluateSession`, active user, role read from the database every call, `last_seen_at` touched at most once a minute, expired sessions deleted), `revoke`, `revokeSession` (by id, logout), `revokeAllForUser` (optionally inside the caller's transaction). Never logs tokens.
-- `session.repository.ts` - Drizzle queries on `admin_session` joined to `admin_user`. Tables only, no rules.
+- `session.service.ts` - sessions: `create` (32-byte random token, only its SHA-256 stored), `resolve` (core `evaluateSession`, active user, role read from the database every call, `last_seen_at` touched at most once a minute, expired sessions deleted), `revoke`, `revokeSession` (by id, logout), `revokeAllForUser` (optionally inside the caller's transaction), `create` also inside the caller's transaction (login), `deleteExpired` (all users) and `deleteExpiredForUser`. Never logs tokens.
+- `session.repository.ts` - Drizzle queries on `admin_session` joined to `admin_user`; `insert` and `deleteExpired` accept the caller's transaction. Tables only, no rules.
+- `session-cleanup.ts` - `ExpiredSessionCleanup`: deletes all expired sessions once at application bootstrap (no timers); a failure is logged as a warning (class, cause, code) and never blocks startup. Switched off for command-line contexts (`cleanExpiredSessionsOnBootstrap: false`).
 - `session-cookie.ts` - cookie name, safe `Cookie` header parsing (first valid occurrence), `setSessionCookie` / `clearSessionCookie` with the fixed flags. Must not hold session rules.
 - `password-hasher.ts` - `PasswordHasher`: `node:crypto` scrypt (asynchronous), self-describing `scrypt$N$r$p$salt$hash`, `verify` (timing-safe, false on malformed input), `needsRehash`, `verifyDummy`.
 - `clock.ts` - `Clock` and `SystemClock`, injected so tests control time.
@@ -35,9 +38,10 @@
 - `csrf.ts` - `assertCsrfSafe`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods.
 - `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `@AuthenticatedAdminRoute` (any signed-in admin, no permission: logout, me, change-password), `UseDefaultPermissionByMethod` and `resolveRouteAccess` (route, then controller, then the default by HTTP method). Must not hold role tables: those are in `@fluxkit/core`.
 - `auth.controller.ts` - `/admin/auth/*`: login (public; sets the cookie), logout, me, change-password. Thin: validates, calls the service, sets or clears the cookie. No rules.
-- `auth.service.ts` - login (one scrypt per failure, identical 401, core lockout under a row lock, rehash, new session), me, change-password; logs reason codes only. Must not log emails, passwords, hashes or tokens.
+- `auth.service.ts` - login (one scrypt per failure, identical 401, core lockout under a row lock, rehash, expired-session cleanup and the new session inside the same locked transaction), me, change-password; logs reason codes only. Must not log emails, passwords, hashes or tokens.
 - `auth.schemas.ts` - zod schemas of the auth bodies and responses (structural limits only; policy runs in core).
-- `login-throttle.ts` - per client IP fixed-window login limit, in memory, bounded, clock injected. Single process only (documented in the file).
+- `login-throttle.ts` - per client address fixed-window login limit, in memory, bounded, clock injected; `throttleKeyOf` keys IPv6 by its /64 prefix and maps IPv4-mapped addresses to IPv4. Single process only (documented in the file).
+- `admin-no-store.middleware.ts` - sets `Cache-Control: no-store` on every `/admin` response; registered by `AuthModule.configure`.
 - `admin-user.repository.ts` - Drizzle queries on `admin_user` (find, list, insert, update, row lock, active owners) and the key of the advisory lock that serializes owner changes. Queries only, no rules.
 - `admin-user.mapper.ts` - row to the user shape of the auth responses (an allow list: the hash cannot leak).
 - `password-policy-errors.ts` - core `validatePassword` result as `errors[]` for a request path.
@@ -47,9 +51,12 @@
 - `auth.module.ts` - global `AuthModule.register(options)`: config, clock, hasher, session service, login throttle, auth and users controllers and services, the authenticator (session-based unless a test replaces it) and the guards.
 - `create-admin.ts` - entry of `pnpm admin:create` (built output run by Node, like `seed.ts`): wires the real terminal prompt, prints `Created <role> <email> (id ...)` or the error, exit code 1 on failure. No logic.
 - `create-admin-command.ts` - the command: argument parsing (`--email`, `--role`; any password-like argument is refused), password from `ADMIN_PASSWORD` or the prompt, core email and password rules, standalone Nest context, insert through `AdminUserRepository`. Creates only: an existing email is refused. Must NOT print or log the password or the hash (unexpected errors are redacted).
+- `unlock-admin.ts` - entry of `pnpm admin:unlock` (built output run by Node): prints `Unlocked <email>` or `<email> was not locked`, or the error with exit code 1. No logic.
+- `unlock-admin-command.ts` - the command: strict argument parsing (`--email` only; any password-like argument is refused), email normalized like login, standalone Nest context, one transaction under the row lock that sets `failed_login_count = 0` and `locked_until = null`. Must NOT touch the password, role, active flag or sessions, and must NOT print secrets (unexpected errors print class names and a code only).
+- `unlock-admin-command.spec.ts`, `unlock-admin-entry.spec.ts` - arguments, real-Postgres unlock after real failed logins, untouched columns, secrecy, and the built entry as a real process.
 - `create-admin-prompt.ts` - no-echo prompt on node `readline` (typed characters go to a sink stream); asks twice, rejects when the input ends.
 - `create-admin-command.spec.ts`, `create-admin-prompt.spec.ts`, `create-admin-entry.spec.ts` - arguments, password sources, real-Postgres creation and refusals, secrecy, and the built entry run as a real process (needs `pnpm build`, which `pnpm test` does).
-- `*.spec.ts` - hasher, cookie, CSRF, session service (real Postgres), guard unit tests, `login-throttle.spec.ts`, `auth-login.spec.ts` (identical failures, lockout, IP limit, logging), `auth-session-endpoints.spec.ts` (logout, me, change-password), `auth-secrecy.spec.ts` (no hash in any response or log); `admin-default-deny.spec.ts` (401 on every route, probe controllers), `admin-permissions.spec.ts` (route walk, role matrix), `admin-csrf.spec.ts` (CSRF and no-CORS), `session-authentication.spec.ts` (cookie end to end), `auth-consistency.spec.ts` (`ROLES` vs the database CHECK, config defaults vs core).
+- `*.spec.ts` - hasher, cookie, CSRF, session service (real Postgres), guard unit tests, `login-throttle.spec.ts`, `auth-login.spec.ts` (identical failures, lockout, IP limit, logging), `auth-session-endpoints.spec.ts` (logout, me, change-password), `auth-secrecy.spec.ts` (no hash in any response or log); `admin-default-deny.spec.ts` (401 on every route, probe controllers), `admin-permissions.spec.ts` (route walk, role matrix), `admin-csrf.spec.ts` (CSRF and no-CORS), `session-authentication.spec.ts` (cookie end to end), `auth-consistency.spec.ts` (`ROLES` vs the database CHECK, config defaults vs core), `auth-login-race.spec.ts` (login racing a password reset), `session-cleanup.spec.ts` (bootstrap cleanup), `admin-no-store.spec.ts` (`Cache-Control`).
 
 ## Catalog (`src/catalog/`)
 
@@ -89,7 +96,8 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 
 ## Database (`src/database/`)
 
-- `database.module.ts` - global Postgres pool and Drizzle provider; closes the pool on shutdown.
+- `database.module.ts` - global Postgres pool and Drizzle provider; closes the pool on shutdown. Error listeners on the pool (idle clients) AND on every client as it connects (checked-out clients), so a dropped connection inside a transaction rejects that query instead of ending the process; logs the error name and code only.
+- `database.module.spec.ts` - kills the backend of a running transaction (`pg_terminate_backend`): the test process survives, the request answers 500 problem+json and the API keeps serving.
 - `schema/index.ts` - schema barrel used by Drizzle and by the error mapper.
 - `schema/health.ts` - `health_check` table (health probe).
 - `schema/catalog.ts` - the 16 catalog tables (ADR 0006 section 2) with constraints and indexes.

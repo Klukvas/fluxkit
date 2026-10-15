@@ -50,16 +50,18 @@ export class SessionService {
     @Inject(ADMIN_AUTH_CONFIG) private readonly config: AdminAuthConfig,
   ) {}
 
-  async create(userId: string, now: Date = this.clock.now()): Promise<CreatedSession> {
+  /** Pass the open `executor` to insert the session in the caller's transaction (login, under the user row lock). */
+  async create(
+    userId: string,
+    now: Date = this.clock.now(),
+    executor?: DbExecutor,
+  ): Promise<CreatedSession> {
     const token = randomBytes(TOKEN_BYTES).toString("base64url");
     const expiresAt = sessionExpiry(now, this.config);
-    const sessionId = await this.sessions.insert({
-      userId,
-      tokenHash: hashToken(token),
-      createdAt: now,
-      lastSeenAt: now,
-      expiresAt,
-    });
+    const sessionId = await this.sessions.insert(
+      { userId, tokenHash: hashToken(token), createdAt: now, lastSeenAt: now, expiresAt },
+      executor,
+    );
     return { token, sessionId, expiresAt };
   }
 
@@ -131,5 +133,19 @@ export class SessionService {
     executor?: DbExecutor,
   ): Promise<number> {
     return this.sessions.deleteForUser(userId, exceptSessionId, executor);
+  }
+
+  /** Deletes the expired sessions (lifetime or idle time reached) of every user. Returns how many. */
+  deleteExpired(now: Date = this.clock.now()): Promise<number> {
+    return this.sessions.deleteExpired(now, this.config.idleMinutes);
+  }
+
+  /** Same for one user; login calls it inside its transaction so the table cannot grow without bound. */
+  deleteExpiredForUser(
+    userId: string,
+    now: Date = this.clock.now(),
+    executor?: DbExecutor,
+  ): Promise<number> {
+    return this.sessions.deleteExpired(now, this.config.idleMinutes, userId, executor);
   }
 }

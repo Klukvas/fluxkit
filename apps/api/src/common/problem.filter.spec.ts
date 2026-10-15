@@ -114,7 +114,7 @@ describe("ProblemDetailsFilter", () => {
     const result = run(tooManyRequests("Too many login attempts.", 42));
     expect(result.status).toBe(429);
     expect(result.contentType).toBe("application/problem+json");
-    expect(result.headers).toEqual({ "Retry-After": "42" });
+    expect(result.headers).toEqual({ "Retry-After": "42", "Cache-Control": "no-store" });
     expect(result.body).toEqual({
       type: "about:blank",
       title: "Too many requests",
@@ -124,8 +124,25 @@ describe("ProblemDetailsFilter", () => {
     });
   });
 
-  it("sends no extra headers for other problems", () => {
-    expect(run(forbidden()).headers).toEqual({});
+  it("sends no extra headers for other problems except no-store on /admin", () => {
+    expect(run(forbidden(), { method: "GET", path: "/store/products" }).headers).toEqual({});
+    expect(run(forbidden()).headers).toEqual({ "Cache-Control": "no-store" });
+  });
+
+  it("marks admin errors no-store whatever their kind, case-insensitively, and nothing else", () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const cases: [string, unknown][] = [
+      ["/admin/x", unauthorized()],
+      ["/ADMIN/x", new NotFoundException()],
+      ["/admin", new Error("boom")],
+      ["/admin/", new BadRequestException()],
+    ];
+    for (const [path, error] of cases) {
+      expect(run(error, { method: "GET", path }).headers["Cache-Control"], path).toBe("no-store");
+    }
+    for (const path of ["/store/x", "/health", "/administrator", "/"]) {
+      expect(run(new Error("boom"), { method: "GET", path }).headers, path).toEqual({});
+    }
   });
 
   it("answers forbidden with 403 and keeps the caller's detail", () => {
@@ -256,6 +273,63 @@ describe("ProblemDetailsFilter logging", () => {
     expect(text).not.toMatch(
       /SQL_TEXT_MARKER|PARAM_VALUE_MARKER|SECRET_TOKEN|insert into|Failed query/,
     );
+  });
+
+  describe("a query error whose cause is not a pg.DatabaseError (network loss, pool timeout)", () => {
+    const HASH = "scrypt$32768$8$1$c2FsdA$aGFzaA";
+    const SQL_TEXT = 'select "id", "password_hash" from "admin_user" where "email" = $1';
+
+    function loggedFor(error: unknown): string {
+      const logged = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+      expect(run(error, { method: "POST", path: "/admin/auth/login" }).status).toBe(500);
+      expect(logged).toHaveBeenCalledTimes(1);
+      return [...logged.mock.calls.flat().map(String)].join("\n");
+    }
+
+    function expectRedacted(text: string): void {
+      expect(text).not.toContain("victim@example.com");
+      expect(text).not.toContain(HASH);
+      expect(text).not.toContain("Failed query");
+      expect(text).not.toContain("admin_user");
+      expect(text).not.toMatch(/select |params/i);
+      expect(text).toContain("POST /admin/auth/login");
+    }
+
+    it("logs neither SQL, email nor hash for a DrizzleQueryError over a plain Error", () => {
+      const cause = new Error("Connection terminated unexpectedly");
+      const text = loggedFor(new DrizzleQueryError(SQL_TEXT, ["victim@example.com", HASH], cause));
+      expectRedacted(text);
+      expect(text).toContain("DrizzleQueryError");
+      expect(text).toContain("Error");
+    });
+
+    it("logs the innermost cause name and code", () => {
+      const network = Object.assign(new Error("read ECONNRESET victim@example.com"), {
+        code: "ECONNRESET",
+      });
+      const text = loggedFor(
+        new DrizzleQueryError(SQL_TEXT, ["victim@example.com", HASH], network),
+      );
+      expectRedacted(text);
+      expect(text).toContain("ECONNRESET");
+    });
+
+    it("recognizes a wrapper by its message even when it is not a DrizzleQueryError", () => {
+      const text = loggedFor(
+        new Error(`Failed query: ${SQL_TEXT}\nparams: victim@example.com,${HASH}`),
+      );
+      expectRedacted(text);
+    });
+
+    it("recognizes an error that carries query and params properties", () => {
+      const text = loggedFor(
+        Object.assign(new Error("something went wrong for victim@example.com"), {
+          query: SQL_TEXT,
+          params: ["victim@example.com", HASH],
+        }),
+      );
+      expectRedacted(text);
+    });
   });
 
   it("escapes control characters in the request line and in logged messages", () => {

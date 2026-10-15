@@ -13,3 +13,4 @@
 | [0007](0007-store-hides-unsellable-option-values.md) | The store hides option values and images that no active variant can sell | accepted (2026-10-16); adds a rule to ADR 0006 section 10 |
 | [0008](0008-generated-variants-of-live-products.md) | Generated variants of live products | accepted (2026-10-16); extends ADR 0006 sections 4 and 6 |
 | [0009](0009-admin-auth.md) | Admin authentication and roles | accepted (2026-10-16, owner decisions) |
+| [0010](0010-admin-lockout-and-recovery.md) | Admin lockout, recovery and the limits of the session design | accepted (2026-10-16, owner decision); extends ADR 0009 |

@@ -18,6 +18,7 @@
     "test": "pnpm build && turbo run test",
     "seed": "pnpm build && pnpm --filter @fluxkit/api seed",
     "admin:create": "pnpm build && pnpm --filter @fluxkit/api admin:create",
+    "admin:unlock": "pnpm build && pnpm --filter @fluxkit/api admin:unlock",
     "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export",
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:docs": "node scripts/check-docs.mjs --base origin/main",

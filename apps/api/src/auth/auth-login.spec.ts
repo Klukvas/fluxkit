@@ -17,6 +17,7 @@ import { http, type HttpResult } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { PasswordHasher } from "./password-hasher.js";
 import { SESSION_COOKIE_NAME } from "./session-cookie.js";
+import { SessionService } from "./session.service.js";
 
 const START = "2030-06-01T08:00:00.000Z";
 const PASSWORD = "correct horse battery staple";
@@ -112,6 +113,33 @@ describe("POST /admin/auth/login", () => {
       expect(
         (await http(running.baseUrl, "GET", "/admin/brands", { headers: { cookie } })).status,
       ).toBe(200);
+    });
+
+    it("deletes the expired sessions of the signing-in user only, in the login transaction", async () => {
+      const user = await newUser();
+      const other = await newUser();
+      const sessions = running.app.get(SessionService);
+      const longAgo = new Date(clock.now().getTime() - 30 * 24 * 60 * 60_000);
+      const recent = new Date(clock.now().getTime() - 5 * 60_000);
+      const staleOwn = await sessions.create(user.id, longAgo);
+      const liveOwn = await sessions.create(user.id, recent);
+      const staleOther = await sessions.create(other.id, longAgo);
+      const liveOther = await sessions.create(other.id, recent);
+
+      const result = await login(running.baseUrl, user.email, PASSWORD);
+      expect(result.status).toBe(200);
+
+      const remaining = async (userId: string): Promise<string[]> =>
+        (await db.select().from(adminSession).where(eq(adminSession.userId, userId))).map(
+          (row) => row.id,
+        );
+      const own = await remaining(user.id);
+      expect(own).toContain(liveOwn.sessionId);
+      expect(own).not.toContain(staleOwn.sessionId);
+      expect(own).toHaveLength(2);
+      expect((await remaining(other.id)).sort()).toEqual(
+        [staleOther.sessionId, liveOther.sessionId].sort(),
+      );
     });
 
     it("normalizes the email like the stored form (case and surrounding spaces)", async () => {

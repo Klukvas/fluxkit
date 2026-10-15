@@ -1,6 +1,9 @@
 import { ArgumentsHost, Catch, HttpException, Logger, type ExceptionFilter } from "@nestjs/common";
+import { DrizzleQueryError } from "drizzle-orm";
 import type { Request, Response } from "express";
 import pg from "pg";
+import { markAdminResponseUncacheable } from "./admin-path.js";
+import { errorCode, innermostCause } from "./error-summary.js";
 import { translatePostgresError } from "./postgres-errors.js";
 import {
   PROBLEM_STATUS,
@@ -75,6 +78,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     const http = host.switchToHttp();
     const response = http.getResponse<Response>();
     const request = http.getRequest<Request>();
+    markAdminResponseUncacheable(request, response);
     if (
       exception instanceof HttpException &&
       !(exception instanceof ProblemException) &&
@@ -150,6 +154,34 @@ function findDatabaseError(error: unknown): pg.DatabaseError | undefined {
   return undefined;
 }
 
+const MAX_CAUSE_DEPTH = 10;
+
+/**
+ * Drizzle's `DrizzleQueryError` message is `Failed query: <sql> params: <values>`, so it can hold emails and password
+ * hashes whatever the cause is (network loss, pool timeout, a driver error that is not a `pg.DatabaseError`).
+ * Recognized by class, by that message prefix and by the `query`/`params` properties it carries.
+ */
+function isQueryError(error: unknown): boolean {
+  if (error instanceof DrizzleQueryError) {
+    return true;
+  }
+  if (!(error instanceof Error)) {
+    return false;
+  }
+  return error.message.startsWith("Failed query:") || ("query" in error && "params" in error);
+}
+
+function chainHasQueryError(error: unknown): boolean {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSE_DEPTH && current instanceof Error; depth += 1) {
+    if (isQueryError(current)) {
+      return true;
+    }
+    current = current.cause;
+  }
+  return false;
+}
+
 /** Replaces C0/C1 control characters and line separators so user-influenced text cannot forge log lines. */
 function escapeControlCharacters(text: string): string {
   return Array.from(text, (character) =>
@@ -185,6 +217,17 @@ function describeError(error: unknown): string {
         const value = databaseError[field];
         return value === undefined ? [] : [`${field}=${value}`];
       }),
+    ];
+    return escapeControlCharacters(parts.join(" "));
+  }
+  if (error instanceof Error && chainHasQueryError(error)) {
+    // No message at all: it embeds the SQL and its bound parameters. Class names and a code are enough to diagnose.
+    const innermost = innermostCause(error);
+    const code = errorCode(innermost);
+    const parts = [
+      `${error.constructor.name} (query error)`,
+      `cause=${innermost.name}`,
+      ...(code === undefined ? [] : [`code=${code}`]),
     ];
     return escapeControlCharacters(parts.join(" "));
   }
