@@ -7,17 +7,48 @@ import { CatalogSeeder, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-se
 
 export const ALLOW_PRODUCTION_FLAG = "--allow-production";
 
+/** Database names the seed accepts without the flag: throwaway databases only. */
+const SEEDABLE_DATABASE_SUFFIXES = ["_test", "_dev", "_demo", "_local"] as const;
+
+function databaseNameOf(databaseUrl: string): string | undefined {
+  try {
+    return decodeURIComponent(new URL(databaseUrl).pathname.replace(/^\//, ""));
+  } catch {
+    // An unparseable URL has no known name: the guard then refuses, and loadEnv reports the URL itself otherwise.
+    return undefined;
+  }
+}
+
 /**
- * The seed creates demo products, so it must not run against a production database by accident. It looks at the
- * same `NODE_ENV` the API uses; an explicit flag is the only way around it.
+ * The seed creates demo products, so it must not run against a production database by accident. Two checks,
+ * and `--allow-production` is the single override for both:
+ * - `NODE_ENV` (the variable the API uses) must not be `production` (compared trimmed and case-insensitively);
+ * - when `DATABASE_URL` is set, the database name must end in `_test`, `_dev`, `_demo` or `_local`.
+ *   A missing `DATABASE_URL` is not judged here: `loadEnv` fails loudly on it afterwards.
  */
 export function assertSeedAllowed(
   env: Readonly<Record<string, string | undefined>>,
   argv: readonly string[],
 ): void {
-  if (env["NODE_ENV"] === "production" && !argv.includes(ALLOW_PRODUCTION_FLAG)) {
+  if (argv.includes(ALLOW_PRODUCTION_FLAG)) {
+    return;
+  }
+  if ((env["NODE_ENV"] ?? "").trim().toLowerCase() === "production") {
     throw new Error(
       `Refusing to seed demo data: NODE_ENV is "production". Pass ${ALLOW_PRODUCTION_FLAG} only if you really want demo data in this database.`,
+    );
+  }
+  const databaseUrl = env["DATABASE_URL"];
+  if (databaseUrl === undefined || databaseUrl === "") {
+    return;
+  }
+  const name = databaseNameOf(databaseUrl);
+  if (
+    name === undefined ||
+    !SEEDABLE_DATABASE_SUFFIXES.some((suffix) => name.toLowerCase().endsWith(suffix))
+  ) {
+    throw new Error(
+      `Refusing to seed demo data: the database name ${name === undefined ? "could not be read from DATABASE_URL" : `"${name}"`} does not end in ${SEEDABLE_DATABASE_SUFFIXES.join(", ")}. Pass ${ALLOW_PRODUCTION_FLAG} only if you really want demo data in this database.`,
     );
   }
 }

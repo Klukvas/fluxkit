@@ -36,8 +36,10 @@ It prints how many entities were created and how many already existed. Any error
 - **Idempotent.** Each entity is looked up by its stable code or slug and created only when missing. A second run changes nothing (no new rows in any table) and does not fail.
 - **No overwrite, no delete.** An entity that exists is left exactly as it is, with all its children (a product is never touched again, an attribute keeps its options, even when you edited them).
   The seed never updates or removes anything. Consequence: a run that crashed halfway can leave a half-built product; delete it in the admin and run the seed again.
-- **Production guard.** With `NODE_ENV=production` the runner refuses to start (non-zero exit, before it touches the database). `--allow-production` overrides it:
+- **Production guard.** The runner refuses to start (non-zero exit, before it touches the database) when `NODE_ENV` is `production` (trimmed, any letter case), or when the name of the
+  database in `DATABASE_URL` does not end in `_test`, `_dev`, `_demo` or `_local`. `--allow-production` is the single override for both:
   `pnpm --filter @fluxkit/api seed --allow-production` after a build. Demo data does not belong in a client's production database.
+  Note: the database name `fluxkit` from `.env.example` does not match the suffix rule, so either name your database `fluxkit_dev` (or similar) or pass the flag.
 - Optional feature modules are not loaded while seeding.
 
 ## Add or change a preset
