@@ -358,6 +358,47 @@ describe("catalog seed (real app, real Postgres)", () => {
       expect(() => assertSeedAllowed({}, [])).not.toThrow();
     });
 
+    it.each(["Production", "PRODUCTION", " production ", "\tProduction\n"])(
+      "compares NODE_ENV case-insensitively and trimmed (%j)",
+      (nodeEnv) => {
+        expect(() => assertSeedAllowed({ NODE_ENV: nodeEnv }, [])).toThrow(/Refusing to seed/);
+        expect(() =>
+          assertSeedAllowed({ NODE_ENV: nodeEnv }, [ALLOW_PRODUCTION_FLAG]),
+        ).not.toThrow();
+      },
+    );
+
+    it.each([
+      "postgres://u:p@127.0.0.1:5432/shop_prod",
+      "postgres://u:p@127.0.0.1:5432/fluxkit",
+      "postgres://u:p@127.0.0.1:5432/shop_test_backup",
+      "postgres://u:p@127.0.0.1:5432/",
+      "not a url",
+    ])("refuses database %s unless the explicit flag is given", (databaseUrl) => {
+      expect(() => assertSeedAllowed({ DATABASE_URL: databaseUrl }, [])).toThrow(
+        /Refusing to seed/,
+      );
+      expect(() =>
+        assertSeedAllowed({ DATABASE_URL: databaseUrl }, [ALLOW_PRODUCTION_FLAG]),
+      ).not.toThrow();
+    });
+
+    it.each(["shop_test", "shop_dev", "shop_demo", "shop_local", "SHOP_DEMO"])(
+      "accepts a database named %s in a non-production environment",
+      (name) => {
+        const databaseUrl = `postgres://u:p@127.0.0.1:5432/${name}?sslmode=disable`;
+        expect(() => assertSeedAllowed({ DATABASE_URL: databaseUrl }, [])).not.toThrow();
+      },
+    );
+
+    it("does not let a safe database name override NODE_ENV=production", () => {
+      const env = {
+        NODE_ENV: "production",
+        DATABASE_URL: "postgres://u:p@127.0.0.1:5432/shop_dev",
+      };
+      expect(() => assertSeedAllowed(env, [])).toThrow(/Refusing to seed/);
+    });
+
     it("stops the command before it touches the database", async () => {
       const before = await tableCounts();
       await expect(runSeedCommand([], { ...env, NODE_ENV: "production" })).rejects.toThrow(

@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, HttpException, Logger, type ExceptionFilter } from "@nestjs/common";
 import type { Request, Response } from "express";
+import pg from "pg";
 import { translatePostgresError } from "./postgres-errors.js";
 import {
   PROBLEM_STATUS,
@@ -101,10 +102,25 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       const code = CODE_BY_HTTP_STATUS[status] ?? "validation_failed";
       return buildProblemBody(code, status, GENERIC_DETAIL[status] ?? DEFAULT_CLIENT_DETAIL);
     }
-    // Only method and path are logged: query strings and bodies may contain personal data or secrets.
+    const requestLine = `${escapeControlCharacters(String(request.method))} ${escapeControlCharacters(String(request.path))}`;
+    const clientError = clientErrorOf(exception);
+    if (clientError !== undefined) {
+      // Body-parser errors (too large, malformed JSON, unsupported charset): the caller's mistake, not ours.
+      // Never log the message or body: it may echo what the client sent.
+      this.logger.warn(
+        `Rejected request ${requestLine}: ${clientError.status} ${clientError.type ?? "client_error"}`,
+      );
+      return buildProblemBody(
+        CODE_BY_HTTP_STATUS[clientError.status] ?? "validation_failed",
+        clientError.status,
+        GENERIC_DETAIL[clientError.status] ?? DEFAULT_CLIENT_DETAIL,
+      );
+    }
+    // Only method and path are logged (control characters escaped): query strings and bodies may contain personal
+    // data or secrets, and the text of a database error embeds the SQL and its bound parameters.
     this.logger.error(
-      `Unhandled error on ${request.method} ${request.path}: ${describeError(exception)}`,
-      exception instanceof Error ? exception.stack : undefined,
+      `Unhandled error on ${requestLine}: ${describeError(exception)}`,
+      stackFramesOf(exception),
     );
     return buildProblemBody(
       "internal_error",
@@ -114,10 +130,90 @@ export class ProblemDetailsFilter implements ExceptionFilter {
   }
 }
 
+/** Drizzle wraps the driver error in a `DrizzleQueryError` (cause chain); the wrapper's message holds SQL and params. */
+function findDatabaseError(error: unknown): pg.DatabaseError | undefined {
+  let current: unknown = error;
+  for (let depth = 0; depth < 5 && current instanceof Error; depth += 1) {
+    if (current instanceof pg.DatabaseError) {
+      return current;
+    }
+    current = current.cause;
+  }
+  return undefined;
+}
+
+/** Replaces C0/C1 control characters and line separators so user-influenced text cannot forge log lines. */
+function escapeControlCharacters(text: string): string {
+  return Array.from(text, (character) =>
+    isControlCharacter(character.charCodeAt(0))
+      ? `\\u${character.charCodeAt(0).toString(16).padStart(4, "0")}`
+      : character,
+  ).join("");
+}
+
+function isControlCharacter(code: number): boolean {
+  return code <= 0x1f || (code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029;
+}
+
+/** Only our own call frames: the first stack line repeats the message, which may carry SQL or user input. */
+function stackFramesOf(error: unknown): string | undefined {
+  if (!(error instanceof Error) || error.stack === undefined) {
+    return undefined;
+  }
+  return error.stack
+    .split("\n")
+    .filter((line) => /^\s+at /.test(line))
+    .join("\n");
+}
+
 function describeError(error: unknown): string {
+  const databaseError = findDatabaseError(error);
+  if (databaseError !== undefined) {
+    // Name, SQLSTATE and the object names are enough to diagnose; the message embeds query text and parameters.
+    const parts = [
+      `${error instanceof Error ? error.constructor.name : "DatabaseError"} (database error)`,
+      `sqlstate=${databaseError.code ?? "unknown"}`,
+      ...(["constraint", "table", "column"] as const).flatMap((field) => {
+        const value = databaseError[field];
+        return value === undefined ? [] : [`${field}=${value}`];
+      }),
+    ];
+    return escapeControlCharacters(parts.join(" "));
+  }
   if (error instanceof Error) {
     const cause = error.cause instanceof Error ? ` (cause: ${error.cause.message})` : "";
-    return `${error.name}: ${error.message}${cause}`;
+    return escapeControlCharacters(`${error.name}: ${error.message}${cause}`);
   }
-  return String(error);
+  return escapeControlCharacters(String(error));
+}
+
+interface ClientError {
+  status: number;
+  type: string | undefined;
+}
+
+/** Errors that carry their own 4xx status without being Nest exceptions: `body-parser` (via `http-errors`). */
+function clientErrorOf(error: unknown): ClientError | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+  const { status, statusCode, type } = error as {
+    status?: unknown;
+    statusCode?: unknown;
+    type?: unknown;
+  };
+  for (const candidate of [status, statusCode]) {
+    if (
+      typeof candidate === "number" &&
+      Number.isInteger(candidate) &&
+      candidate >= 400 &&
+      candidate < 500
+    ) {
+      return {
+        status: candidate,
+        type: typeof type === "string" ? escapeControlCharacters(type) : undefined,
+      };
+    }
+  }
+  return undefined;
 }

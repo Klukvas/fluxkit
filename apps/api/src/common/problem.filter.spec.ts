@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
   type ArgumentsHost,
 } from "@nestjs/common";
+import { DrizzleQueryError } from "drizzle-orm";
 import pg from "pg";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProblemDetailsFilter, type ProblemBody } from "./problem.filter.js";
@@ -27,7 +28,10 @@ interface Captured {
   body: unknown;
 }
 
-function run(exception: unknown): Captured {
+function run(
+  exception: unknown,
+  request: { method: string; path: string } = { method: "POST", path: "/admin/brands" },
+): Captured {
   const captured: Captured = { status: 0, contentType: "", body: undefined };
   const response = {
     status(status: number) {
@@ -46,7 +50,7 @@ function run(exception: unknown): Captured {
   const host = {
     switchToHttp: () => ({
       getResponse: () => response,
-      getRequest: () => ({ method: "POST", path: "/admin/brands" }),
+      getRequest: () => request,
     }),
   } as unknown as ArgumentsHost;
   new ProblemDetailsFilter().catch(exception, host);
@@ -136,7 +140,9 @@ describe("ProblemDetailsFilter", () => {
     const [message, stack] = logged.mock.calls[0] ?? [];
     expect(String(message)).toContain("ECONNREFUSED");
     expect(String(message)).toContain("POST /admin/brands");
-    expect(String(stack)).toContain("Error: connect ECONNREFUSED");
+    // Only our own frames: the stack header repeats the message and is left out.
+    expect(String(stack)).toMatch(/^\s+at /);
+    expect(String(stack)).not.toContain("ECONNREFUSED");
   });
 
   it("treats non-Error throwables as internal errors too", () => {
@@ -168,5 +174,92 @@ describe("ProblemDetailsFilter", () => {
     );
     expect(result.status).toBe(503);
     expect(result.body).toEqual({ status: "error", database: "unreachable" });
+  });
+});
+
+describe("ProblemDetailsFilter logging", () => {
+  function databaseError(): DrizzleQueryError {
+    const cause = new pg.DatabaseError('syntax error at or near "SECRET_TOKEN"', 0, "error");
+    cause.code = "42601";
+    cause.table = "brand";
+    cause.column = "name";
+    cause.constraint = "brand_name_check";
+    return new DrizzleQueryError(
+      "insert into brand (name) values ($1) /* SQL_TEXT_MARKER */",
+      ["PARAM_VALUE_MARKER"],
+      cause,
+    );
+  }
+
+  function everythingLogged(spy: { mock: { calls: unknown[][] } }): string {
+    return spy.mock.calls.flat().map(String).join("\n");
+  }
+
+  it("logs a database error without SQL text, bound parameters or the driver message", () => {
+    const logged = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    const result = run(databaseError());
+    expect(result.status).toBe(500);
+    expect(logged).toHaveBeenCalledTimes(1);
+    const text = everythingLogged(logged);
+    expect(text).toContain("DrizzleQueryError");
+    expect(text).toContain("42601");
+    expect(text).toContain("brand_name_check");
+    expect(text).toContain("POST /admin/brands");
+    expect(text).not.toMatch(
+      /SQL_TEXT_MARKER|PARAM_VALUE_MARKER|SECRET_TOKEN|insert into|Failed query/,
+    );
+  });
+
+  it("escapes control characters in the request line and in logged messages", () => {
+    const logged = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    run(new Error("line one\nFORGED LOG LINE\u0000"), {
+      method: "GET\r",
+      path: "/store/products/a\nFORGED\u0000\u007f",
+    });
+    run(databaseError(), { method: "GET", path: "/x\nFORGED\u0000" });
+    expect(logged).toHaveBeenCalledTimes(2);
+    for (const [message, stack] of logged.mock.calls) {
+      expect(
+        Array.from(String(message)).some(
+          (c) => c.charCodeAt(0) <= 0x1f || c.charCodeAt(0) === 0x7f,
+        ),
+      ).toBe(false);
+      const lines = String(stack ?? "").split("\n");
+      expect(lines.every((line) => line === "" || /^\s+at /.test(line))).toBe(true);
+    }
+    expect(everythingLogged(logged)).toContain("FORGED");
+  });
+
+  it.each([
+    ["entity.too.large", 413],
+    ["entity.parse.failed", 400],
+    ["charset.unsupported", 415],
+  ])(
+    "maps body-parser error %s to a %i problem and logs a warning, not an error",
+    (type, status) => {
+      const error = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+      const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+      const parserError = Object.assign(new SyntaxError("Unexpected token in SECRET_BODY"), {
+        type,
+        status,
+        statusCode: status,
+        expose: true,
+        body: "SECRET_BODY",
+      });
+      const result = run(parserError);
+      expect(result.status).toBe(status);
+      expect(result.contentType).toBe("application/problem+json");
+      expect(result.body).toMatchObject({ status, code: "validation_failed" });
+      expect(JSON.stringify(result.body)).not.toContain("SECRET_BODY");
+      expect(error).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(everythingLogged(warn)).not.toContain("SECRET_BODY");
+      expect(everythingLogged(warn)).toContain(type);
+    },
+  );
+
+  it("keeps a status-carrying 5xx error an internal error", () => {
+    vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    expect(run(Object.assign(new Error("upstream"), { status: 502 })).status).toBe(500);
   });
 });
