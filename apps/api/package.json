@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:drift": "bash ../../scripts/check-schema-drift.sh",
     "start": "node --env-file=../../.env dist/main.js",
-    "seed": "node --env-file=../../.env dist/seed/seed.js"
+    "seed": "node --env-file=../../.env dist/seed/seed.js",
+    "admin:create": "node --env-file=../../.env dist/auth/create-admin.js"
   },
   "devDependencies": {
     "@nestjs/testing": "12.1.3",

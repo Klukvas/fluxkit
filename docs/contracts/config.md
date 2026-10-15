@@ -18,6 +18,8 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 
 Invalid values fail startup with a readable `Invalid environment: ...` error.
 
+`pnpm admin:create` reads the same file and `DATABASE_URL` (and the locale variables) through `loadEnv`, plus one variable that only that command reads: `ADMIN_PASSWORD`, the password of the user to create (12 to 128 characters). It is not a setting of the API and is deliberately absent from `.env.example`: pass it for one command (`ADMIN_PASSWORD=... pnpm admin:create --email ...`) or type the password at the prompt instead; do not store it in `.env`. Details: `README.md` (Admin sign-in).
+
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.
 - `main` (default `dist/index.js`) must export `featureModule`, a Nest module. It is imported dynamically and mounted only if `<name>` is in `FEATURES_ENABLED`.

@@ -1,6 +1,6 @@
 # Plan: admin authentication and roles
 
-Status: proposed 2026-10-16; the three main decisions are taken by the owner (see "Decisions"); waiting for plan approval (red zones: auth, schema and migration, public contract).
+Status: steps 1 to 4 done (step 4 in PR, pending merge); step 5 (independent review) pending. Proposed 2026-10-16; the three main decisions were taken by the owner (see "Decisions") and the plan was approved (red zones: auth, schema and migration, public contract).
 Roles: Architect step is covered by this plan and a short ADR 0009 written in step 1; Developers (Sonnet); independent Reviewer (Opus, a different model than the authors); Docs inside each step.
 Follows: `docs/plans/2026-10-14-catalog.md` (completed). Replaces the temporary default-deny authenticator promised there ("a separate small auth and roles plan follows right after").
 
@@ -118,3 +118,22 @@ Migration `0002_admin_auth` (two new tables, nothing existing changes). New endp
 - **scrypt bounds on stored strings**: `verify` treats `N` above 2^17, `r` or `p` above 16, a non power of two `N`, or a salt/hash that is not 16/64 bytes of strict base64 as malformed (returns false, never throws), so a corrupt row cannot make the API allocate gigabytes. Passwords are used as exact UTF-8 text without Unicode normalization.
 - `docs/contracts/api.md` (listing the contract items) is left for step 4 as planned; `docs/api/catalog.md` already documents what exists.
 
+## Outcome (steps 1 to 4)
+
+Done: ADR 0009 and the pure core rules (step 1), schema and migration `0002_admin_auth` (step 2), the API in two parts (steps 3a and 3b), and the CLI plus documentation (step 4). Step 5, the independent review by a different model, is pending; its findings are fixed before this plan is closed.
+
+Deviations from the plan as written:
+- **Step 3 was split** into 3a (infrastructure: hasher, sessions, authenticator, guards, decorators, cookie, CSRF, `forbidden`, throttle class) and 3b (the auth and users endpoints), for reviewable PRs.
+- **Default permission by HTTP method inside `@AdminController`**: instead of annotating every route by hand, `GET`/`HEAD` default to `catalog.read` and every other method to `catalog.write`; the four product lifecycle routes are annotated `catalog.publish`. A plain `@Controller("admin/...")` has no default and is denied. A test resolves the permission of every route.
+- **Throttle limits** are fixed in code (account: 5 failures, 15 minutes; IP: 20 attempts per 10 minutes) and are not configuration; they are not part of the contract.
+- **Config bounds** on the two session variables (one year at most, plain whole numbers) and exact `true`/`false` for `ADMIN_COOKIE_SECURE`, added to stop typos from meaning "never expires".
+- **CLI**: `ADMIN_PASSWORD` is read only by the command and is not in `.env.example` (see `docs/contracts/config.md`); `--password` and any password-like argument are refused; a literal `--` after the script name is rejected as an unknown argument.
+
+Follow-ups (each needs its own plan or task):
+- Audit log of sign-ins and user changes (no table exists; logs carry only reason codes).
+- Two-factor authentication; password reset by email (needs email delivery).
+- Redis-backed login throttle (the IP window is per process today).
+- Express `trust proxy` configuration, so `request.ip` is the client behind a reverse proxy.
+- Customer accounts and storefront login (a separate plan).
+- A `db:migrate` script (`pnpm seed` and `pnpm admin:create` need a migrated database and there is no one-command way to migrate).
+- Decide whether Swagger UI and `/docs-json` stay public in production (they describe the admin routes).

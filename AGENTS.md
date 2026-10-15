@@ -42,7 +42,7 @@ Every decision must keep these facts in mind:
 Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
-  `pnpm seed` (demo catalog into the migrated `DATABASE_URL` database, idempotent, refuses `NODE_ENV=production`; see `seeds/README.md`), `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
+  `pnpm seed` (demo catalog into the migrated `DATABASE_URL` database, idempotent, refuses `NODE_ENV=production`; see `seeds/README.md`), `pnpm admin:create` (creates one admin user, first owner; see `README.md`), `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
 - Planned, added later: root `pnpm dev`, `pnpm test:e2e`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
