@@ -16,3 +16,4 @@ One line per user-visible or schema change.
 - Rewrite README with a verified quick start; add `pnpm --filter @fluxkit/api start`; refresh docs indexes, AGENTS.md consistency fixes; mark the scaffold plan completed.
 - Add the catalog domain plan (`docs/plans/2026-10-14-catalog.md`).
 - Add ADR 0006 (catalog schema), verified against real Postgres.
+- ADR 0006 accepted: owner decisions on default locale, slug redirects, frozen options, requires_shipping, barcode.

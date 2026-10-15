@@ -1,12 +1,12 @@
 # 0006. Catalog schema
 
-Status: proposed, reviewed and partly verified by the orchestrator (plan `docs/plans/2026-10-14-catalog.md`, step 1). Refines the catalog part of ADR 0004; does not change ADR 0004's decisions.
+Status: accepted 2026-10-15 (owner answered the open questions; reviewed and partly verified by the orchestrator; plan `docs/plans/2026-10-14-catalog.md`, step 1). Refines the catalog part of ADR 0004; does not change ADR 0004's decisions.
 
 ## Context
 
 - Scope: the first core domain (ProductType, attributes, options, products, variants, categories, brands, media) for Postgres 17 + Drizzle ORM 0.45.
 - Already decided and not reopened here: JSONB attribute values validated by the backend against ProductType definitions, storing option **codes** (ADR 0004);
-  one search document per variant (ADR 0005, indexing out of scope); texts as JSONB maps `{"uk": "...", "en": "..."}` with `uk` required and fallback to `uk`;
+  one search document per variant (ADR 0005, indexing out of scope); texts as JSONB maps `{"<locale>": "..."}` (today `uk` and `en`) where the configured default locale (`DEFAULT_LOCALE`, default `uk`) is required and is the fallback;
   one latin slug per product, category and brand; media = `url`, `alt`, position; admin endpoints default-deny; options and attributes are separate concepts (AGENTS.md 2.3);
   a simple product has exactly one default variant; attribute flags `is_filterable`, `is_searchable`, `is_visible_on_storefront`, `is_comparable`, `is_sortable`, `is_internal`.
 - Out of scope: prices, inventory, cart/orders, search indexing, media upload, auth, category filter overrides (`category_filter` from ADR 0004 is deferred).
@@ -25,7 +25,7 @@ Status: proposed, reviewed and partly verified by the orchestrator (plan `docs/p
 | Enumerations | `text` + `CHECK (col IN (...))`, not Postgres `enum` types | Altering a `CHECK` is trivial in up and down scripts; altering a Postgres enum is not reversible without a type rebuild. |
 | Naming | Tables singular snake_case (`product`, `product_option_value`); join tables `<a>_<b>`; PK `id`; FK `<entity>_id`; booleans `is_*`; ordering `position integer not null default 0`; constraint names `<table>_<cols>_key` (unique), `<table>_<cols>_idx`, `<table>_<col>_check`, `<table>_<col>_fkey`. **Composite foreign keys must be named explicitly (`foreignKey({ name: ... })`) and every constraint name must be at most 63 characters** | Matches `health_check` and Drizzle defaults. Verified: drizzle-kit's auto-generated names for composite FKs reach 118 characters, above Postgres' 63-character limit (it would silently truncate them). A test asserts that no catalog constraint name is longer than 63 characters. |
 | Codes | `code text` matching `^[a-z][a-z0-9_]{0,63}$` (enforced by `CHECK`), unique in their scope, immutable after creation | Codes are keys in JSONB and in API payloads (section 10), so they are never renamed. |
-| i18n text columns | `jsonb` map `{"<locale>": "<string>"}`. DB `CHECK (jsonb_typeof(col) = 'object' AND col->>'uk' IS NOT NULL AND col->>'uk' <> '')` on required texts; optional texts are nullable with the same shape check when present. Allowed locale keys and max lengths are validated by the service (locales come from config). | The `uk` requirement follows the owner's decision (plan, decision 2). Open question 1 asks whether the DB should only check the shape and leave the default locale to configuration. |
+| i18n text columns | `jsonb` map `{"<locale>": "<string>"}`. DB `CHECK (jsonb_typeof(col) = 'object' AND col <> '{}'::jsonb)` on required texts (shape and non-empty only); optional texts are nullable with `jsonb_typeof(col) = 'object'` when present. The service enforces that the **configured default locale** (`DEFAULT_LOCALE`, default `uk`) is present and non-empty, validates allowed locale keys and max lengths (locales come from config). | Owner decision 1: the DB stays market-agnostic, so a fork for EU or US changes configuration, not a migration. |
 | Ordering ties | Every list query orders by `position`, then a stable key (`code`, `slug` or `id`) | Deterministic pagination. |
 
 ### 2. Tables
@@ -114,11 +114,11 @@ export const variantOptionValue = pgTable(
 );
 ```
 
-Required-text check as emitted SQL (one per required `i18n` column; see open question 1 about `uk`):
+Required-text check as emitted SQL (one per required `i18n` column; shape and non-empty only, the default locale is a service rule):
 
 ```sql
 ALTER TABLE "product" ADD CONSTRAINT "product_title_check"
-  CHECK (jsonb_typeof("title") = 'object' AND "title"->>'uk' IS NOT NULL AND "title"->>'uk' <> '');
+  CHECK (jsonb_typeof("title") = 'object' AND "title" <> '{}'::jsonb);
 ```
 
 Public list query (shape only; parameters bound by Drizzle): active products in a category subtree, optional brand, newest first.
@@ -178,7 +178,7 @@ The plan's proposal is confirmed with two additions (`option_signature`, composi
 
 | `input_type` | Value shape in JSONB | `validation` keys | Notes |
 |---|---|---|---|
-| `text` | `is_localized = true`: i18n map `{"uk": "...", "en": "..."}` (`uk` required, max length applies per locale). `is_localized = false`: plain string | `min_length`, `max_length` (default 1..1000) | No regex patterns in v1 (ReDoS risk, hard to explain in the admin). Non-localized text is for model numbers, supplier codes, URLs. |
+| `text` | `is_localized = true`: i18n map `{"uk": "...", "en": "..."}` (the default locale is required, max length applies per locale). `is_localized = false`: plain string | `min_length`, `max_length` (default 1..1000) | No regex patterns in v1 (ReDoS risk, hard to explain in the admin). Non-localized text is for model numbers, supplier codes, URLs. |
 | `number` | JSON number (jsonb stores it as exact `numeric`); `unit` comes from the definition, never from the value | `min`, `max`, `integer` (boolean, default false), `max_decimals` (default 3) | Not `NaN`/`Infinity` (JSON has none). |
 | `boolean` | `true` / `false` | none | |
 | `select` | one `attribute_option.code` string | none (allowed codes = the attribute's options) | |
@@ -227,7 +227,7 @@ Example, variant-level (clothing): `{ "weight_g": 180, "supplier_code": "SUP-778
 Transitions (anything else is `409`): `draft -> active` (publish), `active -> draft` (unpublish), `draft -> archived`, `active -> archived`, `archived -> draft` (restore; re-publishing then runs the preconditions again). Hard delete is allowed only for products with `published_at IS NULL` (never published); it cascades to variants, option rows, categories and media.
 
 Publish preconditions (all checked in one transaction, all violations returned at once):
-1. `title->>'uk'` non-empty and `slug` present (also DB-enforced, listed for completeness).
+1. `title` has a non-empty value for the configured default locale (service rule), and `slug` is present (DB-enforced).
 2. Exactly one `is_default` variant and it is `is_active`; at least one active variant.
 3. Every variant has a value for every product option (coverage) and a valid `sku`.
 4. All `is_required` product-level attributes are present and valid; every variant has its required variant-level attributes.
@@ -275,10 +275,10 @@ Not required: a category, a brand, media. The pricing plan adds "has a price" la
 | Categories | `is_active = true` and whose ancestors are active | All |
 | Attribute definitions | Only `is_visible_on_storefront = true AND is_internal = false`; flags exposed: `is_filterable`, `is_comparable`, `is_sortable` | All, incl. `is_internal`, `validation` |
 | Attribute values | **Allowlist**: one central serializer in `apps/api/src/catalog/store` emits only attributes whose definition passes the filter above; everything else (unknown keys, internal, hidden) is dropped. Tested: removing the filter fails the leak test. | Raw JSONB maps |
-| Texts | Resolved to one string: `value[locale] ?? value['uk']` | Full maps |
+| Texts | Resolved to one string: `value[locale] ?? value[defaultLocale]` | Full maps |
 | Timestamps | `published_at` only | All |
 
-Locale resolution: `?locale=` must be in the configured locale list (currently `uk`, `en`); missing = default `uk`; unknown = `400`. Fallback is per field, never per entity. Attribute values are resolved too: `select`/`multiselect` return `{code, label}`, `number` returns `{value, unit}`, localized text returns the resolved string.
+Locale resolution: `?locale=` must be in the configured locale list (currently `uk`, `en`); missing = the configured default locale; unknown = `400`. Fallback is per field, never per entity. Attribute values are resolved too: `select`/`multiselect` return `{code, label}`, `number` returns `{value, unit}`, localized text returns the resolved string.
 
 Public contract under SemVer (`docs/contracts/api.md`, written in step 7): the endpoint shapes above and the **stability rules** for identifiers: `id`s are opaque and stable; `code`s (attribute, attribute option, option, option value, product type) and `slug`s are never renamed by the system (slugs only by the admin). Clients' storefront templates may branch on codes (`if attribute.code === 'size_chart'`), which is why section 5 forbids renames. `option_signature`, `position` values and internal attributes are not contract.
 
@@ -289,7 +289,7 @@ Public contract under SemVer (`docs/contracts/api.md`, written in step 7): the e
 - Down script: `DROP TABLE IF EXISTS` in exact reverse order (no `CASCADE`, so an unexpected dependent object fails loudly), then `DELETE FROM "drizzle"."__drizzle_migrations" WHERE "created_at" = <when of the 0001 entry in meta/_journal.json>`, following `0000_health_check.down.sql`.
 - Tests on real Postgres (`*_test` database only, extending `apps/api/src/database/migrations.spec.ts`):
   - up, down, up, down; after each down no catalog table exists and `health_check` still exists.
-  - Constraint tests, one `it` each, every expected error asserted by SQLSTATE: duplicate `sku`; duplicate product/category/brand `slug`; invalid slug, code and SKU formats; `title` without `uk`; invalid `status`, `level`, `input_type`; `is_internal` combined with `is_visible_on_storefront`; variant without product; two default variants; duplicate `option_signature`; two primary categories; `variant_option_value` with a value the product did not choose; `variant_option_value` whose variant belongs to another product; `media` with only one of `option_id`/`option_value_id`; `RESTRICT` on deleting a used `option_value`, `attribute`, `brand`, `category` with children; `CASCADE` from product to variants and media.
+  - Constraint tests, one `it` each, every expected error asserted by SQLSTATE: duplicate `sku`; duplicate product/category/brand `slug`; invalid slug, code and SKU formats; `title` that is not an object or is empty (the default-locale rule is tested in the service); invalid `status`, `level`, `input_type`; `is_internal` combined with `is_visible_on_storefront`; variant without product; two default variants; duplicate `option_signature`; two primary categories; `variant_option_value` with a value the product did not choose; `variant_option_value` whose variant belongs to another product; `media` with only one of `option_id`/`option_value_id`; `RESTRICT` on deleting a used `option_value`, `attribute`, `brand`, `category` with children; `CASCADE` from product to variants and media.
   - Drizzle schema vs migration drift: `drizzle-kit generate` produces no new file after step 3 (checked in CI like `openapi.json`).
 
 ### 12. Verified against scenarios
@@ -333,7 +333,7 @@ Rows are abbreviated; `i18n` values shown as `uk|en`. These are walk-throughs of
 The architect marked the generated-SQL behavior as unverified, so the key tables were checked in a throwaway spike (not committed; schema built from this ADR's snippets, SQL generated with drizzle-kit, applied to Postgres 16 in a scratch database, then dropped):
 - drizzle-kit 0.31.11 emits the composite FKs, the composite PKs, the CHECK constraints and the partial unique index (`variant_product_id_default_key ... WHERE "variant"."is_default"`) as designed.
 - Finding (fixed in section 1): auto-generated names of 5 composite FKs were 67 to 118 characters long. After adding explicit `name` values every constraint name is at most 63 characters.
-- 18 constraint scenarios behaved as the ADR says (each failing case failed with the expected constraint): a value the product did not choose; a variant pointed at another product; a value claimed for the wrong option; two values for one option on one variant; duplicate option signature; a second variant on an option-less product; a second default variant; duplicate and malformed SKU; title without `uk`; bad slug; `active` without `published_at`; deleting a used option value (RESTRICT); media with only one of the pair; media for a value the product did not choose; cascade from product to variants, value rows and media.
+- 18 constraint scenarios behaved as the ADR says (each failing case failed with the expected constraint): a value the product did not choose; a variant pointed at another product; a value claimed for the wrong option; two values for one option on one variant; duplicate option signature; a second variant on an option-less product; a second default variant; duplicate and malformed SKU; title that fails the `uk` CHECK used in the spike (the accepted rule is shape-only, see section 1); bad slug; `active` without `published_at`; deleting a used option value (RESTRICT); media with only one of the pair; media for a value the product did not choose; cascade from product to variants, value rows and media.
 - Confirmed limits of the DB (as documented in section 3): the DB does not check option coverage (a product with option `color` accepts a variant without any value row) and trusts `option_signature` (a variant can claim `color=red` with no value row). Both are service-layer rules guarded by the consistency test, not DB guarantees.
 - Not verified: behavior on Postgres 17 (CI image) and concurrency under load; the migration and tests in step 3 cover Postgres 17 in CI.
 
@@ -349,10 +349,10 @@ The architect marked the generated-SQL behavior as unverified, so the key tables
 - Recursive CTEs on every category listing are fine at hundreds of categories; at tens of thousands a materialized path would be an additive optimization (new column, no contract change).
 - `requires_shipping` on `product_type` may need to move when the shipping plan arrives; it is a single additive change.
 
-### Open questions for the owner (recommendation in brackets)
+### Owner decisions (2026-10-15)
 
-1. The DB `CHECK` for required texts hardcodes `uk`. For a white-label template sold into EU/US, should the DB check only the shape (`jsonb_typeof = 'object'`) and the service enforce the configured default locale (`uk` today)? [Recommend: config-driven in the service, DB checks shape only; keeps the template market-agnostic for EU/US forks. Until answered, the tables above keep the `uk` CHECK, matching the owner's earlier decision 2; changing it later is a one-line CHECK change in the migration.]
-2. Slug edits on live products: accept "no redirect" in v1, or add a small `slug_redirect(entity_type, old_slug, entity_id)` table now? [Recommend: v1 without; add the table in the storefront SEO plan before the first client launch.]
-3. Options frozen after publish (section 5): acceptable for v1? [Recommend: yes; the unpublish -> restructure -> publish path is explicit and safe.]
-4. `requires_shipping` on `product_type` (v1) versus on `variant`? [Recommend: product type for v1; the shipping plan revisits.]
-5. Barcode: free text (v1) or GTIN-only with check-digit validation and a uniqueness constraint? [Recommend: free text now; GTIN validation as a configurable rule when inventory or marketplace feeds need it.]
+1. **Default locale in the DB**: the DB checks only shape and non-empty; the default locale comes from configuration (`DEFAULT_LOCALE`, default `uk`, and `LOCALES`, default `uk,en`, added to `packages/config`) and is enforced by the service. Reflected in sections 1, 4, 6, 10.
+2. **Slug edits on live products**: no redirects in v1; a `slug_redirect` table belongs to the storefront SEO plan and must land before the first client launch.
+3. **Options after publish**: frozen; unpublish, restructure, publish again. Adding option values stays allowed.
+4. **`requires_shipping`**: on `product_type` for v1; the shipping plan may move it.
+5. **Barcode**: free text for v1 (the recommendation was taken as the default; not separately confirmed by the owner). GTIN validation becomes a configurable rule when inventory or marketplace feeds need it.
