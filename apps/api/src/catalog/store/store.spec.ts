@@ -1,0 +1,1060 @@
+import { randomUUID } from "node:crypto";
+import pg from "pg";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import type { Page } from "../../common/pagination.js";
+import type { ProblemBody } from "../../common/problem.filter.js";
+import { PG_POOL } from "../../database/database.module.js";
+import { startApp, type RunningApp } from "../../test/app.js";
+import { requireTestDatabaseUrl } from "../../test/env.js";
+import { http } from "../../test/http.js";
+import { ensureMigrated } from "../../test/migrate.js";
+import type {
+  StoreCategoryNode,
+  StoreProductDetail,
+  StoreProductListItem,
+} from "./store.schemas.js";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+// Values that must never reach a response. They are stored in JSONB on purpose.
+const SECRET_INTERNAL = "SECRET-INTERNAL-VALUE";
+const SECRET_HIDDEN = "SECRET-HIDDEN-VALUE";
+const SECRET_UNKNOWN = "SECRET-UNKNOWN-KEY-VALUE";
+const SECRET_UNASSIGNED = "SECRET-UNASSIGNED-VALUE";
+const SECRET_WRONG_LEVEL = "SECRET-WRONG-LEVEL-VALUE";
+const SECRET_VARIANT_INTERNAL = "SECRET-VARIANT-INTERNAL-VALUE";
+const SECRET_VARIANT_HIDDEN = "SECRET-VARIANT-HIDDEN-VALUE";
+const ALL_SECRETS = [
+  SECRET_INTERNAL,
+  SECRET_HIDDEN,
+  SECRET_UNKNOWN,
+  SECRET_UNASSIGNED,
+  SECRET_WRONG_LEVEL,
+  SECRET_VARIANT_INTERNAL,
+  SECRET_VARIANT_HIDDEN,
+];
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+describe("store API (public, real app, real Postgres)", () => {
+  const runId = randomUUID().slice(0, 8);
+  const upper = runId.toUpperCase();
+  const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
+  const now = Date.now();
+  const ids: Record<string, string> = {};
+  let running: RunningApp;
+
+  const slug = (name: string): string => `${name}-${runId}`;
+
+  async function insert(statement: string, params: unknown[]): Promise<string> {
+    const result = await pool.query<{ id: string }>(statement, params);
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error("fixture insert returned no row");
+    }
+    return row.id;
+  }
+
+  function createAttribute(
+    key: string,
+    values: {
+      inputType: string;
+      isLocalized?: boolean;
+      unit?: string;
+      isFilterable?: boolean;
+      isInternal?: boolean;
+      isVisible?: boolean;
+    },
+  ): Promise<string> {
+    return insert(
+      `insert into attribute (code, name, input_type, is_localized, unit, is_filterable, is_internal, is_visible_on_storefront)
+       values ($1, $2::jsonb, $3, $4, $5, $6, $7, $8) returning id`,
+      [
+        `${key}_${runId}`,
+        JSON.stringify({ uk: `Назва ${key}`, en: `Name ${key}` }),
+        values.inputType,
+        values.isLocalized ?? false,
+        values.unit ?? null,
+        values.isFilterable ?? false,
+        values.isInternal ?? false,
+        values.isVisible ?? true,
+      ],
+    );
+  }
+
+  const attributeCode = (key: string): string => `${key}_${runId}`;
+
+  function createCategory(
+    key: string,
+    parent: string | null,
+    options: { position?: number; isActive?: boolean; description?: object } = {},
+  ): Promise<string> {
+    return insert(
+      `insert into category (parent_id, slug, name, description, position, is_active)
+       values ($1, $2, $3::jsonb, $4::jsonb, $5, $6) returning id`,
+      [
+        parent === null ? null : ids[parent],
+        slug(key),
+        JSON.stringify({ uk: `Категорія ${key}`, en: `Category ${key}` }),
+        options.description === undefined ? null : JSON.stringify(options.description),
+        options.position ?? 0,
+        options.isActive ?? true,
+      ],
+    );
+  }
+
+  function createProduct(
+    key: string,
+    values: {
+      status?: string;
+      brand?: string;
+      title?: object;
+      description?: object;
+      attributes?: object;
+      publishedDaysAgo?: number;
+    } = {},
+  ): Promise<string> {
+    return insert(
+      `insert into product (product_type_id, brand_id, slug, title, description, status, attributes, published_at)
+       values ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7::jsonb, $8) returning id`,
+      [
+        ids["type"],
+        values.brand === undefined ? null : ids[values.brand],
+        slug(key),
+        JSON.stringify(values.title ?? { uk: `Товар ${key}`, en: `Product ${key}` }),
+        values.description === undefined ? null : JSON.stringify(values.description),
+        values.status ?? "active",
+        JSON.stringify(values.attributes ?? {}),
+        new Date(now - (values.publishedDaysAgo ?? 0) * DAY_MS),
+      ],
+    );
+  }
+
+  async function assignCategory(
+    productKey: string,
+    categoryKey: string,
+    isPrimary: boolean,
+    position = 0,
+  ): Promise<void> {
+    await pool.query(
+      "insert into product_category (product_id, category_id, is_primary, position) values ($1, $2, $3, $4)",
+      [ids[productKey], ids[categoryKey], isPrimary, position],
+    );
+  }
+
+  async function createVariant(
+    productKey: string,
+    sku: string,
+    values: {
+      signature: string;
+      isDefault?: boolean;
+      isActive?: boolean;
+      position: number;
+      attributes?: object;
+      optionValues?: [string, string][];
+    },
+  ): Promise<string> {
+    const variantId = await insert(
+      `insert into variant (product_id, sku, option_signature, is_default, is_active, attributes, position)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7) returning id`,
+      [
+        ids[productKey],
+        `${upper}-${sku}`,
+        values.signature,
+        values.isDefault ?? false,
+        values.isActive ?? true,
+        JSON.stringify(values.attributes ?? {}),
+        values.position,
+      ],
+    );
+    for (const [optionKey, valueKey] of values.optionValues ?? []) {
+      await pool.query(
+        `insert into variant_option_value (variant_id, product_id, option_id, option_value_id)
+         values ($1, $2, $3, $4)`,
+        [variantId, ids[productKey], ids[optionKey], ids[valueKey]],
+      );
+    }
+    return variantId;
+  }
+
+  async function chooseOption(
+    productKey: string,
+    optionKey: string,
+    position: number,
+    valueKeys: string[],
+  ): Promise<void> {
+    await pool.query(
+      "insert into product_option (product_id, option_id, position) values ($1, $2, $3)",
+      [ids[productKey], ids[optionKey], position],
+    );
+    let valuePosition = 0;
+    for (const valueKey of valueKeys) {
+      await pool.query(
+        `insert into product_option_value (product_id, option_id, option_value_id, position)
+         values ($1, $2, $3, $4)`,
+        [ids[productKey], ids[optionKey], ids[valueKey], valuePosition],
+      );
+      valuePosition += 1;
+    }
+  }
+
+  async function addMedia(
+    productKey: string,
+    url: string,
+    position: number,
+    values: { alt?: object; optionKey?: string; valueKey?: string } = {},
+  ): Promise<void> {
+    await pool.query(
+      `insert into media (product_id, option_id, option_value_id, url, alt, position)
+       values ($1, $2, $3, $4, $5::jsonb, $6)`,
+      [
+        ids[productKey],
+        values.optionKey === undefined ? null : ids[values.optionKey],
+        values.valueKey === undefined ? null : ids[values.valueKey],
+        url,
+        values.alt === undefined ? null : JSON.stringify(values.alt),
+        position,
+      ],
+    );
+  }
+
+  async function get<T>(path: string) {
+    return http<T>(running.baseUrl, "GET", path);
+  }
+
+  async function getOk<T>(path: string): Promise<T> {
+    const result = await get<T>(path);
+    expect(result.status, JSON.stringify(result.body)).toBe(200);
+    return result.body;
+  }
+
+  function problem(result: { body: unknown }): ProblemBody {
+    return result.body as ProblemBody;
+  }
+
+  function findNode(nodes: StoreCategoryNode[], wanted: string): StoreCategoryNode | undefined {
+    for (const node of nodes) {
+      const found = node.slug === wanted ? node : findNode(node.children, wanted);
+      if (found !== undefined) {
+        return found;
+      }
+    }
+    return undefined;
+  }
+
+  const slugsOf = (page: Page<StoreProductListItem>): string[] =>
+    page.items.map((item) => item.slug);
+
+  beforeAll(async () => {
+    await ensureMigrated();
+    // The real default authenticator denies every admin request: the store must work without any auth.
+    running = await startApp({ adminAuthenticator: "production-default" });
+
+    // Dictionaries.
+    ids["attrMaterial"] = await createAttribute("material", { inputType: "select" });
+    await pool.query(
+      `insert into attribute_option (attribute_id, code, label, position) values
+         ($1, 'cotton', $2::jsonb, 0), ($1, 'linen', $3::jsonb, 1)`,
+      [
+        ids["attrMaterial"],
+        JSON.stringify({ uk: "Бавовна", en: "Cotton" }),
+        JSON.stringify({ uk: "Льон" }),
+      ],
+    );
+    ids["attrCare"] = await createAttribute("care", { inputType: "text", isLocalized: true });
+    ids["attrInternalNote"] = await createAttribute("internalnote", {
+      inputType: "text",
+      isInternal: true,
+      isVisible: false,
+    });
+    ids["attrHiddenNote"] = await createAttribute("hiddennote", {
+      inputType: "text",
+      isVisible: false,
+    });
+    ids["attrUnassigned"] = await createAttribute("unassigned", {
+      inputType: "text",
+      isInternal: true,
+      isVisible: false,
+    });
+    ids["attrWeight"] = await createAttribute("weight", {
+      inputType: "number",
+      unit: "g",
+      isFilterable: true,
+    });
+    ids["attrVariantInternal"] = await createAttribute("varinternal", {
+      inputType: "text",
+      isInternal: true,
+      isVisible: false,
+    });
+    ids["attrVariantHidden"] = await createAttribute("varhidden", {
+      inputType: "text",
+      isVisible: false,
+    });
+
+    ids["type"] = await insert(
+      "insert into product_type (code, name) values ($1, $2::jsonb) returning id",
+      [`type_${runId}`, JSON.stringify({ uk: "Тип", en: "Type" })],
+    );
+    const assignments: [string, string, number][] = [
+      ["attrMaterial", "product", 0],
+      ["attrCare", "product", 1],
+      ["attrInternalNote", "product", 2],
+      ["attrHiddenNote", "product", 3],
+      ["attrWeight", "variant", 4],
+      ["attrVariantInternal", "variant", 5],
+      ["attrVariantHidden", "variant", 6],
+    ];
+    for (const [key, level, position] of assignments) {
+      await pool.query(
+        `insert into product_type_attribute (product_type_id, attribute_id, level, position)
+         values ($1, $2, $3, $4)`,
+        [ids["type"], ids[key], level, position],
+      );
+    }
+
+    ids["optColor"] = await insert(
+      "insert into option (code, name) values ($1, $2::jsonb) returning id",
+      [`color_${runId}`, JSON.stringify({ uk: "Колір", en: "Color" })],
+    );
+    ids["optSize"] = await insert(
+      "insert into option (code, name) values ($1, $2::jsonb) returning id",
+      [`size_${runId}`, JSON.stringify({ uk: "Розмір" })],
+    );
+    const optionValues: [string, string, string, object][] = [
+      ["valRed", "optColor", "red", { uk: "Червоний", en: "Red" }],
+      ["valBlue", "optColor", "blue", { uk: "Синій", en: "Blue" }],
+      ["valS", "optSize", "s", { uk: "S" }],
+      ["valM", "optSize", "m", { uk: "M" }],
+      ["valL", "optSize", "l", { uk: "L" }],
+    ];
+    let valuePosition = 0;
+    for (const [key, optionKey, code, label] of optionValues) {
+      ids[key] = await insert(
+        `insert into option_value (option_id, code, label, position)
+         values ($1, $2, $3::jsonb, $4) returning id`,
+        [ids[optionKey], code, JSON.stringify(label), valuePosition],
+      );
+      valuePosition += 1;
+    }
+
+    ids["brandA"] = await insert(
+      "insert into brand (slug, name) values ($1, $2::jsonb) returning id",
+      [slug("brand-a"), JSON.stringify({ uk: "Бренд А", en: "Brand A" })],
+    );
+    ids["brandB"] = await insert(
+      "insert into brand (slug, name) values ($1, $2::jsonb) returning id",
+      [slug("brand-b"), JSON.stringify({ uk: "Бренд Б" })],
+    );
+
+    // Categories: root > alpha > grand; root > eta, zeta (same position, slug decides); root > inactive > underInactive;
+    // inactiveRoot > underInactiveRoot.
+    ids["root"] = await createCategory("root", null, { position: 9000 });
+    ids["alpha"] = await createCategory("alpha", "root", {
+      position: 0,
+      description: { uk: "Опис альфа" },
+    });
+    ids["grand"] = await createCategory("grand", "alpha");
+    ids["zeta"] = await createCategory("zeta", "root", { position: 1 });
+    ids["eta"] = await createCategory("eta", "root", { position: 1 });
+    ids["inactive"] = await createCategory("inactive", "root", { position: 2, isActive: false });
+    ids["underInactive"] = await createCategory("under-inactive", "inactive");
+    ids["inactiveRoot"] = await createCategory("inactive-root", null, {
+      position: 9001,
+      isActive: false,
+    });
+    ids["underInactiveRoot"] = await createCategory("under-inactive-root", "inactiveRoot");
+
+    // P1: options color x size, one inactive variant, hostile JSONB, media, several categories.
+    ids["p1"] = await createProduct("p1", {
+      brand: "brandA",
+      description: { uk: "Опис товару" },
+      publishedDaysAgo: 1,
+      attributes: {
+        [attributeCode("material")]: "cotton",
+        [attributeCode("care")]: { uk: "Прати при 30", en: "Wash at 30" },
+        [attributeCode("internalnote")]: SECRET_INTERNAL,
+        [attributeCode("hiddennote")]: SECRET_HIDDEN,
+        [attributeCode("unassigned")]: SECRET_UNASSIGNED,
+        [attributeCode("weight")]: 5,
+        [attributeCode("varinternal")]: SECRET_WRONG_LEVEL,
+        mystery_key: SECRET_UNKNOWN,
+      },
+    });
+    await chooseOption("p1", "optColor", 0, ["valRed", "valBlue"]);
+    await chooseOption("p1", "optSize", 1, ["valS", "valM", "valL"]);
+    const variantAttributes = (weight: number): object => ({
+      [attributeCode("weight")]: weight,
+      [attributeCode("varinternal")]: SECRET_VARIANT_INTERNAL,
+      [attributeCode("varhidden")]: SECRET_VARIANT_HIDDEN,
+      [attributeCode("material")]: "cotton",
+      variant_mystery: SECRET_UNKNOWN,
+    });
+    await createVariant("p1", "RED-M", {
+      signature: `color_${runId}=red;size_${runId}=m`,
+      position: 1,
+      attributes: variantAttributes(181),
+      optionValues: [
+        ["optColor", "valRed"],
+        ["optSize", "valM"],
+      ],
+    });
+    await createVariant("p1", "RED-S", {
+      signature: `color_${runId}=red;size_${runId}=s`,
+      isDefault: true,
+      position: 0,
+      attributes: variantAttributes(180),
+      optionValues: [
+        ["optColor", "valRed"],
+        ["optSize", "valS"],
+      ],
+    });
+    await createVariant("p1", "BLUE-S", {
+      signature: `color_${runId}=blue;size_${runId}=s`,
+      position: 2,
+      attributes: variantAttributes(182),
+      optionValues: [
+        ["optColor", "valBlue"],
+        ["optSize", "valS"],
+      ],
+    });
+    await createVariant("p1", "BLUE-L-INACTIVE", {
+      signature: `color_${runId}=blue;size_${runId}=l`,
+      isActive: false,
+      position: 3,
+      attributes: variantAttributes(183),
+      optionValues: [
+        ["optColor", "valBlue"],
+        ["optSize", "valL"],
+      ],
+    });
+    await addMedia("p1", "https://img.test/p1-red.jpg", 0, {
+      optionKey: "optColor",
+      valueKey: "valRed",
+    });
+    await addMedia("p1", "https://img.test/p1-gallery-1.jpg", 1, { alt: { uk: "Галерея" } });
+    await addMedia("p1", "https://img.test/p1-gallery-2.jpg", 2);
+    await assignCategory("p1", "grand", true);
+    await assignCategory("p1", "inactive", false, 1);
+    await assignCategory("p1", "underInactive", false, 2);
+
+    // P2: simple product (one default variant, no options), title only in the default locale, no media.
+    ids["p2"] = await createProduct("p2", {
+      brand: "brandA",
+      title: { uk: "Простий товар" },
+      publishedDaysAgo: 2,
+    });
+    await createVariant("p2", "SIMPLE", { signature: "", isDefault: true, position: 0 });
+    await assignCategory("p2", "eta", true);
+
+    ids["p3Draft"] = await createProduct("p3-draft", {
+      status: "draft",
+      brand: "brandA",
+      publishedDaysAgo: 0,
+    });
+    ids["p4Archived"] = await createProduct("p4-archived", {
+      status: "archived",
+      brand: "brandA",
+      publishedDaysAgo: 0,
+    });
+    for (const key of ["p3Draft", "p4Archived"]) {
+      await createVariant(key, `DRAFT-${key.toUpperCase()}`, {
+        signature: "",
+        isDefault: true,
+        position: 0,
+      });
+      await assignCategory(key, "alpha", true);
+    }
+
+    // P5: only in a category under an inactive parent; brand B.
+    ids["p5"] = await createProduct("p5", { brand: "brandB", publishedDaysAgo: 4 });
+    await assignCategory("p5", "underInactive", true);
+
+    ids["p6"] = await createProduct("p6", { brand: "brandA", publishedDaysAgo: 3 });
+    await assignCategory("p6", "zeta", true);
+
+    // P7: every image has an option pair, so the list image is the first image.
+    ids["p7"] = await createProduct("p7-colour", { brand: "brandB", publishedDaysAgo: 9 });
+    await chooseOption("p7", "optColor", 0, ["valRed"]);
+    await addMedia("p7", "https://img.test/p7-red.jpg", 0, {
+      optionKey: "optColor",
+      valueKey: "valRed",
+    });
+  });
+
+  afterAll(async () => {
+    await running.app.close();
+    // Products first (cascade to variants, option rows, media, category links), then what they referenced.
+    await pool.query("delete from product where product_type_id = $1", [ids["type"]]);
+    await pool.query("delete from product_type where id = $1", [ids["type"]]);
+    await pool.query("delete from attribute where code like $1", [`%\\_${runId}`]);
+    await pool.query("delete from option where code like $1", [`%\\_${runId}`]);
+    await pool.query("delete from brand where slug like $1", [`%-${runId}`]);
+    for (const key of [
+      "underInactiveRoot",
+      "inactiveRoot",
+      "underInactive",
+      "inactive",
+      "grand",
+      "zeta",
+      "eta",
+      "alpha",
+      "root",
+    ]) {
+      await pool.query("delete from category where id = $1", [ids[key]]);
+    }
+    await pool.end();
+  });
+
+  describe("no authentication", () => {
+    it("serves /store without credentials while /admin is denied by the production default", async () => {
+      expect((await get("/store/categories")).status).toBe(200);
+      expect((await get("/store/products")).status).toBe(200);
+      expect((await get(`/store/products/${slug("p1")}`)).status).toBe(200);
+      expect((await get("/admin/brands")).status).toBe(401);
+    });
+
+    it("is read-only: there are no write routes", async () => {
+      for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
+        const result = await http(running.baseUrl, method, "/store/products", { body: {} });
+        expect(result.status, method).toBe(404);
+      }
+    });
+  });
+
+  describe("GET /store/categories", () => {
+    it("returns the active tree, ordered by position then slug, without inactive categories or their subtrees", async () => {
+      const { items } = await getOk<{ items: StoreCategoryNode[] }>("/store/categories?locale=uk");
+      const root = findNode(items, slug("root"));
+      expect(root).toEqual({
+        id: ids["root"],
+        slug: slug("root"),
+        name: "Категорія root",
+        description: null,
+        children: [
+          {
+            id: ids["alpha"],
+            slug: slug("alpha"),
+            name: "Категорія alpha",
+            description: "Опис альфа",
+            children: [
+              {
+                id: ids["grand"],
+                slug: slug("grand"),
+                name: "Категорія grand",
+                description: null,
+                children: [],
+              },
+            ],
+          },
+          expect.objectContaining({ slug: slug("eta") }),
+          expect.objectContaining({ slug: slug("zeta") }),
+        ],
+      });
+      // Inactive categories and everything below them are gone, wherever they sit.
+      for (const hidden of ["inactive", "under-inactive", "inactive-root", "under-inactive-root"]) {
+        expect(findNode(items, slug(hidden)), hidden).toBeUndefined();
+      }
+    });
+
+    it("resolves texts per field: requested locale, falling back to the default locale", async () => {
+      const { items } = await getOk<{ items: StoreCategoryNode[] }>("/store/categories?locale=en");
+      const alpha = findNode(items, slug("alpha"));
+      expect(alpha?.name).toBe("Category alpha");
+      // The description exists only in uk: the en request falls back for this field only.
+      expect(alpha?.description).toBe("Опис альфа");
+    });
+
+    it("answers 400 for an unknown locale", async () => {
+      const result = await get("/store/categories?locale=de");
+      expect(result.status).toBe(400);
+      expect(result.headers.get("content-type")).toContain("application/problem+json");
+      expect(problem(result).code).toBe("validation_failed");
+      expect(problem(result).errors?.[0]?.path).toBe("locale");
+    });
+  });
+
+  describe("GET /store/products", () => {
+    it("lists only active products, newest first, with brand, image and publishedAt", async () => {
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-a")}&locale=uk`,
+      );
+      expect(slugsOf(page)).toEqual([slug("p1"), slug("p2"), slug("p6")]);
+      expect(page).toMatchObject({ total: 3, limit: 24, offset: 0 });
+      const [first, second] = page.items;
+      expect(first).toEqual({
+        id: ids["p1"],
+        slug: slug("p1"),
+        title: "Товар p1",
+        brand: { slug: slug("brand-a"), name: "Бренд А" },
+        // The first gallery image wins over the colour image that has a lower position.
+        image: { url: "https://img.test/p1-gallery-1.jpg", alt: "Галерея" },
+        publishedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+      });
+      expect(second?.image).toBeNull();
+      expect(Object.keys(first ?? {}).sort()).toEqual(
+        ["brand", "id", "image", "publishedAt", "slug", "title"].sort(),
+      );
+    });
+
+    it("falls back to the first image when every image has an option pair", async () => {
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-b")}`,
+      );
+      expect(page.items.find((item) => item.id === ids["p7"])?.image).toEqual({
+        url: "https://img.test/p7-red.jpg",
+        alt: null,
+      });
+    });
+
+    it("resolves texts per field in en: own value, else the default locale", async () => {
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-a")}&locale=en`,
+      );
+      const byslug = new Map(page.items.map((item) => [item.slug, item]));
+      expect(byslug.get(slug("p1"))?.title).toBe("Product p1");
+      expect(byslug.get(slug("p1"))?.brand?.name).toBe("Brand A");
+      // p2 has a uk title only.
+      expect(byslug.get(slug("p2"))?.title).toBe("Простий товар");
+    });
+
+    it("never lists draft or archived products", async () => {
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?category=${slug("alpha")}`,
+      );
+      expect(slugsOf(page)).toEqual([slug("p1")]);
+      const byBrand = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-a")}&limit=100`,
+      );
+      expect(slugsOf(byBrand)).not.toContain(slug("p3-draft"));
+      expect(slugsOf(byBrand)).not.toContain(slug("p4-archived"));
+    });
+
+    it("filters by category including all active descendants", async () => {
+      const byRoot = await getOk<Page<StoreProductListItem>>(
+        `/store/products?category=${slug("root")}`,
+      );
+      // p1 sits in grand (below alpha), p2 in eta, p6 in zeta; p5 only in a category under an inactive parent.
+      expect(slugsOf(byRoot)).toEqual([slug("p1"), slug("p2"), slug("p6")]);
+      expect(byRoot.total).toBe(3);
+
+      const byGrand = await getOk<Page<StoreProductListItem>>(
+        `/store/products?category=${slug("grand")}`,
+      );
+      expect(slugsOf(byGrand)).toEqual([slug("p1")]);
+      const byEta = await getOk<Page<StoreProductListItem>>(
+        `/store/products?category=${slug("eta")}`,
+      );
+      expect(slugsOf(byEta)).toEqual([slug("p2")]);
+    });
+
+    it("gives an empty list, not an error, for an unknown, inactive or hidden category", async () => {
+      for (const category of [
+        slug("does-not-exist"),
+        slug("inactive"),
+        // Active itself, but its parent is inactive.
+        slug("under-inactive"),
+        slug("under-inactive-root"),
+      ]) {
+        const page = await getOk<Page<StoreProductListItem>>(
+          `/store/products?category=${category}`,
+        );
+        expect(page, category).toEqual({ items: [], total: 0, limit: 24, offset: 0 });
+      }
+    });
+
+    it("filters by brand and gives an empty list for an unknown brand", async () => {
+      const page = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-b")}`,
+      );
+      expect(slugsOf(page)).toEqual([slug("p5"), slug("p7-colour")]);
+      const unknown = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("no-such-brand")}`,
+      );
+      expect(unknown.total).toBe(0);
+      const both = await getOk<Page<StoreProductListItem>>(
+        `/store/products?brand=${slug("brand-b")}&category=${slug("root")}`,
+      );
+      expect(both.items).toEqual([]);
+    });
+
+    it("paginates with limit and offset in a stable order", async () => {
+      const filter = `brand=${slug("brand-a")}`;
+      const pageOne = await getOk<Page<StoreProductListItem>>(
+        `/store/products?${filter}&limit=2&offset=0`,
+      );
+      const pageTwo = await getOk<Page<StoreProductListItem>>(
+        `/store/products?${filter}&limit=2&offset=2`,
+      );
+      expect(slugsOf(pageOne)).toEqual([slug("p1"), slug("p2")]);
+      expect(slugsOf(pageTwo)).toEqual([slug("p6")]);
+      expect(pageOne).toMatchObject({ total: 3, limit: 2, offset: 0 });
+      expect(pageTwo).toMatchObject({ total: 3, limit: 2, offset: 2 });
+      const beyond = await getOk<Page<StoreProductListItem>>(`/store/products?${filter}&offset=50`);
+      expect(beyond).toMatchObject({ items: [], total: 3 });
+    });
+
+    it.each([
+      ["limit=0"],
+      ["limit=101"],
+      ["limit=-1"],
+      ["limit=abc"],
+      ["offset=10001"],
+      ["offset=-1"],
+      ["offset=1.5"],
+      ["unknown=1"],
+    ])("answers 400 validation_failed for ?%s", async (query) => {
+      const result = await get(`/store/products?${query}`);
+      expect(result.status).toBe(400);
+      expect(result.headers.get("content-type")).toContain("application/problem+json");
+      expect(problem(result).code).toBe("validation_failed");
+    });
+
+    it("accepts the documented bounds", async () => {
+      expect((await get("/store/products?limit=100&offset=10000")).status).toBe(200);
+      expect((await get("/store/products?limit=1&offset=0")).status).toBe(200);
+    });
+
+    it("answers 400 for an unknown locale", async () => {
+      const result = await get("/store/products?locale=xx");
+      expect(result.status).toBe(400);
+      expect(problem(result).errors?.[0]?.path).toBe("locale");
+    });
+  });
+
+  describe("GET /store/products/:slug", () => {
+    it("returns the full product in uk", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}?locale=uk`);
+      expect(product).toEqual({
+        id: ids["p1"],
+        slug: slug("p1"),
+        title: "Товар p1",
+        description: "Опис товару",
+        brand: { slug: slug("brand-a"), name: "Бренд А" },
+        publishedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+        // Primary first; the inactive category and the one under it are not shown.
+        categories: [{ id: ids["grand"], slug: slug("grand"), name: "Категорія grand" }],
+        attributes: {
+          [attributeCode("material")]: { code: "cotton", label: "Бавовна" },
+          [attributeCode("care")]: "Прати при 30",
+        },
+        attributeDefinitions: [
+          {
+            code: attributeCode("material"),
+            name: "Назва material",
+            inputType: "select",
+            isLocalized: false,
+            unit: null,
+            isFilterable: false,
+            isComparable: false,
+            isSortable: false,
+            options: [
+              { code: "cotton", label: "Бавовна" },
+              { code: "linen", label: "Льон" },
+            ],
+          },
+          {
+            code: attributeCode("care"),
+            name: "Назва care",
+            inputType: "text",
+            isLocalized: true,
+            unit: null,
+            isFilterable: false,
+            isComparable: false,
+            isSortable: false,
+            options: [],
+          },
+        ],
+        options: [
+          {
+            id: ids["optColor"],
+            code: `color_${runId}`,
+            name: "Колір",
+            values: [
+              { id: ids["valRed"], code: "red", name: "Червоний" },
+              { id: ids["valBlue"], code: "blue", name: "Синій" },
+            ],
+          },
+          {
+            id: ids["optSize"],
+            code: `size_${runId}`,
+            name: "Розмір",
+            // Only the values the product chose, in the product's order (l is chosen but only used by an inactive variant).
+            values: [
+              { id: ids["valS"], code: "s", name: "S" },
+              { id: ids["valM"], code: "m", name: "M" },
+              { id: ids["valL"], code: "l", name: "L" },
+            ],
+          },
+        ],
+        variants: [
+          {
+            id: expect.stringMatching(UUID),
+            sku: `${upper}-RED-S`,
+            optionValues: [
+              { optionCode: `color_${runId}`, valueCode: "red" },
+              { optionCode: `size_${runId}`, valueCode: "s" },
+            ],
+            attributes: { [attributeCode("weight")]: { value: 180, unit: "g" } },
+          },
+          {
+            id: expect.stringMatching(UUID),
+            sku: `${upper}-RED-M`,
+            optionValues: [
+              { optionCode: `color_${runId}`, valueCode: "red" },
+              { optionCode: `size_${runId}`, valueCode: "m" },
+            ],
+            attributes: { [attributeCode("weight")]: { value: 181, unit: "g" } },
+          },
+          {
+            id: expect.stringMatching(UUID),
+            sku: `${upper}-BLUE-S`,
+            optionValues: [
+              { optionCode: `color_${runId}`, valueCode: "blue" },
+              { optionCode: `size_${runId}`, valueCode: "s" },
+            ],
+            attributes: { [attributeCode("weight")]: { value: 182, unit: "g" } },
+          },
+        ],
+        media: [
+          { url: "https://img.test/p1-red.jpg", alt: null, optionValueId: ids["valRed"] },
+          { url: "https://img.test/p1-gallery-1.jpg", alt: "Галерея", optionValueId: null },
+          { url: "https://img.test/p1-gallery-2.jpg", alt: null, optionValueId: null },
+        ],
+      });
+    });
+
+    it("resolves texts per field in en and falls back to uk only where en is missing", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}?locale=en`);
+      expect(product.title).toBe("Product p1");
+      // Only uk exists for the description, the option "Розмір" and the size labels.
+      expect(product.description).toBe("Опис товару");
+      expect(product.brand?.name).toBe("Brand A");
+      expect(product.attributes[attributeCode("material")]).toEqual({
+        code: "cotton",
+        label: "Cotton",
+      });
+      expect(product.attributes[attributeCode("care")]).toBe("Wash at 30");
+      expect(product.attributeDefinitions[0]?.name).toBe("Name material");
+      expect(product.attributeDefinitions[0]?.options).toEqual([
+        { code: "cotton", label: "Cotton" },
+        { code: "linen", label: "Льон" },
+      ]);
+      expect(product.options.map((option) => option.name)).toEqual(["Color", "Розмір"]);
+      expect(product.options[0]?.values.map((value) => value.name)).toEqual(["Red", "Blue"]);
+      expect(product.categories[0]?.name).toBe("Category grand");
+    });
+
+    it("uses the default locale when ?locale is missing", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+      expect(product.title).toBe("Товар p1");
+    });
+
+    it("returns a simple product with one variant and no options", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p2")}`);
+      expect(product).toMatchObject({
+        title: "Простий товар",
+        description: null,
+        options: [],
+        media: [],
+        attributes: {},
+        categories: [{ slug: slug("eta") }],
+      });
+      expect(product.variants).toEqual([
+        {
+          id: expect.stringMatching(UUID),
+          sku: `${upper}-SIMPLE`,
+          optionValues: [],
+          attributes: {},
+        },
+      ]);
+    });
+
+    it("answers 404 not_found for draft, archived and unknown slugs", async () => {
+      for (const missing of [slug("p3-draft"), slug("p4-archived"), slug("nope")]) {
+        const result = await get(`/store/products/${missing}`);
+        expect(result.status, missing).toBe(404);
+        expect(result.headers.get("content-type")).toContain("application/problem+json");
+        expect(problem(result).code).toBe("not_found");
+      }
+    });
+
+    it("hides a category under an inactive parent from the product", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p5")}`);
+      expect(product.categories).toEqual([]);
+    });
+
+    it("answers 400 for an unknown locale and for unknown query parameters", async () => {
+      expect((await get(`/store/products/${slug("p1")}?locale=zz`)).status).toBe(400);
+      expect((await get(`/store/products/${slug("p1")}?limit=5`)).status).toBe(400);
+    });
+
+    it("never shows an inactive variant", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+      expect(product.variants.map((variant) => variant.sku)).not.toContain(
+        `${upper}-BLUE-L-INACTIVE`,
+      );
+      expect(product.variants).toHaveLength(3);
+    });
+  });
+
+  describe("attribute leak tests (ADR 0006 section 10)", () => {
+    it("never returns internal or storefront-hidden attributes, in values or definitions, even when stored", async () => {
+      for (const locale of ["uk", "en"]) {
+        const product = await getOk<StoreProductDetail>(
+          `/store/products/${slug("p1")}?locale=${locale}`,
+        );
+        // Product level: exactly the two public attributes.
+        expect(Object.keys(product.attributes).sort()).toEqual(
+          [attributeCode("care"), attributeCode("material")].sort(),
+        );
+        expect(product.attributeDefinitions.map((definition) => definition.code)).toEqual([
+          attributeCode("material"),
+          attributeCode("care"),
+        ]);
+        // Variant level: only the weight; internal, hidden, wrong-level and unknown keys are dropped.
+        for (const variant of product.variants) {
+          expect(Object.keys(variant.attributes)).toEqual([attributeCode("weight")]);
+        }
+      }
+    });
+
+    it("keeps every stored secret out of the whole response body", async () => {
+      const bodies = [
+        await get(`/store/products/${slug("p1")}?locale=uk`),
+        await get(`/store/products/${slug("p1")}?locale=en`),
+        await get(`/store/products?brand=${slug("brand-a")}`),
+        await get("/store/categories"),
+      ].map((result) => JSON.stringify(result.body));
+      for (const body of bodies) {
+        for (const secret of ALL_SECRETS) {
+          expect(body).not.toContain(secret);
+        }
+        expect(body).not.toContain(attributeCode("internalnote"));
+        expect(body).not.toContain(attributeCode("hiddennote"));
+        expect(body).not.toContain(attributeCode("unassigned"));
+        expect(body).not.toContain(attributeCode("varinternal"));
+        expect(body).not.toContain(attributeCode("varhidden"));
+        expect(body).not.toContain("mystery");
+      }
+    });
+
+    it("does not expose internal flags, validation or non-contract fields", async () => {
+      const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+      const text = JSON.stringify(product);
+      for (const forbidden of [
+        "isInternal",
+        "isSearchable",
+        "isVisibleOnStorefront",
+        "validation",
+        "optionSignature",
+        "option_signature",
+        "isDefault",
+        "barcode",
+        "position",
+        "status",
+        "createdAt",
+        "updatedAt",
+      ]) {
+        expect(text, forbidden).not.toContain(`"${forbidden}"`);
+      }
+      expect(Object.keys(product).sort()).toEqual(
+        [
+          "attributeDefinitions",
+          "attributes",
+          "brand",
+          "categories",
+          "description",
+          "id",
+          "media",
+          "options",
+          "publishedAt",
+          "slug",
+          "title",
+          "variants",
+        ].sort(),
+      );
+    });
+
+    it("does not show an attribute that was public but became hidden or internal", async () => {
+      // Flip the flags on the live row: the response must follow the definition, not the stored value.
+      await pool.query("update attribute set is_visible_on_storefront = false where code = $1", [
+        attributeCode("care"),
+      ]);
+      try {
+        const product = await getOk<StoreProductDetail>(`/store/products/${slug("p1")}`);
+        expect(product.attributes).not.toHaveProperty(attributeCode("care"));
+        expect(product.attributeDefinitions.map((definition) => definition.code)).toEqual([
+          attributeCode("material"),
+        ]);
+      } finally {
+        await pool.query("update attribute set is_visible_on_storefront = true where code = $1", [
+          attributeCode("care"),
+        ]);
+      }
+    });
+  });
+
+  describe("query count (no N+1)", () => {
+    async function countStatements(path: string): Promise<number> {
+      const poolOfApp = running.app.get<pg.Pool>(PG_POOL, { strict: false });
+      const spy = vi.spyOn(poolOfApp, "query");
+      try {
+        const result = await get(path);
+        expect(result.status, path).toBe(200);
+        return spy.mock.calls.length;
+      } finally {
+        spy.mockRestore();
+      }
+    }
+
+    it("issues the same number of statements for a small and a large product", async () => {
+      const small = await countStatements(`/store/products/${slug("p2")}`);
+      // A product with 12 variants, 12 images and 2 options.
+      ids["pBig"] = await createProduct("p-big", { publishedDaysAgo: 8 });
+      await chooseOption("pBig", "optColor", 0, ["valRed", "valBlue"]);
+      await chooseOption("pBig", "optSize", 1, ["valS", "valM", "valL"]);
+      let position = 0;
+      for (const colour of ["Red", "Blue"]) {
+        for (const size of ["S", "M", "L"]) {
+          await createVariant("pBig", `BIG-${colour}-${size}`.toUpperCase(), {
+            signature: `color_${runId}=${colour.toLowerCase()};size_${runId}=${size.toLowerCase()}`,
+            isDefault: position === 0,
+            position,
+            attributes: { [attributeCode("weight")]: 100 + position },
+            optionValues: [
+              ["optColor", `val${colour}`],
+              ["optSize", `val${size}`],
+            ],
+          });
+          position += 1;
+        }
+      }
+      for (let index = 0; index < 12; index += 1) {
+        await addMedia("pBig", `https://img.test/big-${index}.jpg`, index);
+      }
+      await assignCategory("pBig", "eta", true);
+      await assignCategory("pBig", "zeta", false);
+      const large = await countStatements(`/store/products/${slug("p-big")}`);
+      expect(small).toBeGreaterThan(0);
+      expect(large).toBe(small);
+      // A fixed budget: nothing may be issued per variant, option, image or category.
+      expect(large).toBeLessThanOrEqual(10);
+    });
+
+    it("issues the same number of statements for a page of one and a page of many products", async () => {
+      const one = await countStatements(`/store/products?brand=${slug("brand-a")}&limit=1`);
+      const many = await countStatements(`/store/products?brand=${slug("brand-a")}&limit=100`);
+      expect(one).toBeGreaterThan(0);
+      expect(many).toBe(one);
+      const withCategory = await countStatements(`/store/products?category=${slug("root")}`);
+      const withCategoryOne = await countStatements(
+        `/store/products?category=${slug("root")}&limit=1`,
+      );
+      expect(withCategory).toBe(withCategoryOne);
+    });
+
+    it("reads the category tree with one statement", async () => {
+      expect(await countStatements("/store/categories")).toBe(1);
+    });
+  });
+});

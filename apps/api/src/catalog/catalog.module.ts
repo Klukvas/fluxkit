@@ -7,8 +7,9 @@ import { ProductOptionsModule } from "./admin/product-options/product-options.mo
 import { ProductTypesModule } from "./admin/product-types/product-types.module.js";
 import { ProductsModule } from "./admin/products/products.module.js";
 import { VariantsModule } from "./admin/variants/variants.module.js";
+import { StoreModule } from "./store/store.module.js";
 
-/** Core catalog (no feature flag). Each admin resource is its own module; add new ones to this list. */
+/** Core catalog (no feature flag). Each admin resource is its own module; the public read API is `StoreModule`. */
 @Module({
   imports: [
     AttributesModule,
@@ -19,6 +20,7 @@ import { VariantsModule } from "./admin/variants/variants.module.js";
     ProductOptionsModule,
     ProductsModule,
     VariantsModule,
+    StoreModule,
   ],
 })
 export class CatalogModule {}
