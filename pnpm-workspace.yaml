@@ -3,6 +3,7 @@ packages:
   - "packages/*"
   - "packages/features/*"
   - "packages/providers/*"
+  - "seeds"
 
 # Dependency install scripts are blocked by default. These two are explicitly ignored:
 # @scarf/scarf is a telemetry package pulled in by swagger-ui-dist (AGENTS.md: no telemetry);

@@ -1,3 +1,50 @@
-# seeds
+# seeds (`@fluxkit/seeds`)
 
-Demo data and product type presets. Never put client data here.
+Demo data and ProductType presets for the catalog, as pure data. No client data, no real brands, products, domains or images:
+every text exists in `uk` and `en`, every image URL is `https://example.com/placeholder/<name>.jpg`.
+
+This package only describes data (TypeScript objects, no runtime dependencies, types from `@fluxkit/core`). The code that writes it to the database is the runner in `apps/api/src/seed/`.
+
+## What is seeded
+
+| Kind | Content |
+|---|---|
+| Attributes (8) | `material` (select, filterable), `care_notes` (localized text), `supplier_reference` (**internal**, never public), `head_type` (select, filterable), `length` (number, mm), `weight` (number, g), `file_format` (select), `license_type` (select) |
+| Options (2) | `color` (black, white, red, blue), `size` (s, m, l, xl) |
+| ProductType presets (3) | `clothing` (options color + size; material required), `hand_tool` (no options; head type required; `requiresShipping` true), `digital_product` (no options; `requiresShipping` false; file format required) |
+| Brand (1) | `demo-brand` ("Demo Brand") |
+| Categories (9) | 3 roots (`demo-clothing`, `demo-tools`, `demo-digital-goods`), 2 children each |
+| Products (8, all published) | 3 clothing (variants: 9, 8 and 4), 3 hand tools and 2 digital products (one default variant each); 26 variants in total |
+
+## Run it
+
+The database must be migrated first. There is no root migration script yet: apply the migrations in `apps/api/drizzle/` with the Drizzle migrator
+(the integration tests do this in `apps/api/src/test/migrate.ts`; a `db:migrate` script is a later task).
+
+```bash
+cp .env.example .env     # DATABASE_URL must point at a migrated database
+pnpm seed                # = pnpm build && pnpm --filter @fluxkit/api seed (node dist/seed/seed.js, no ts-node)
+```
+
+The runner reads the same environment as the API (`DATABASE_URL`, `DEFAULT_LOCALE`, `LOCALES`; the root `.env` through Node's `--env-file`) and invents no defaults for missing variables.
+It prints how many entities were created and how many already existed. Any error is printed in full (including the field errors of the admin API) and the exit code is 1.
+
+## Rules of the runner
+
+- **Same rules as the admin API.** It boots the real application module (no HTTP server) and creates everything through the admin services, with the same request schemas.
+  Seed data therefore passes exactly the validation and the core rules (attribute values, variants, publish preconditions) that any admin request does.
+- **Idempotent.** Each entity is looked up by its stable code or slug and created only when missing. A second run changes nothing (no new rows in any table) and does not fail.
+- **No overwrite, no delete.** An entity that exists is left exactly as it is, with all its children (a product is never touched again, an attribute keeps its options, even when you edited them).
+  The seed never updates or removes anything. Consequence: a run that crashed halfway can leave a half-built product; delete it in the admin and run the seed again.
+- **Production guard.** With `NODE_ENV=production` the runner refuses to start (non-zero exit, before it touches the database). `--allow-production` overrides it:
+  `pnpm --filter @fluxkit/api seed --allow-production` after a build. Demo data does not belong in a client's production database.
+- Optional feature modules are not loaded while seeding.
+
+## Add or change a preset
+
+1. Add attributes or options to `src/dictionaries.ts` (codes are immutable and match `^[a-z][a-z0-9_]{0,63}$`; value codes may start with a digit).
+2. Add the ProductType to `src/presets.ts`: which attributes (product or variant level, required or not) and which options it allows. Niche-specific fields live here as data, never in the product schema.
+3. Add demo products to `src/products.ts` and categories or brands to `src/taxonomy.ts`; give every text a `uk` and an `en` value.
+4. `pnpm --filter @fluxkit/seeds test` checks codes, slugs, texts and references; the integration test `apps/api/src/seed/seed.spec.ts` seeds a real database and reads the result through the store API.
+
+A client fork replaces this content with its own presets and products; core and the runner stay unchanged.

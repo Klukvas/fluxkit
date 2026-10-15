@@ -40,6 +40,7 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --wait
 docker compose --env-file .env -f infra/docker-compose.yml exec postgres createdb -U fluxkit fluxkit_test
 
 pnpm build
+pnpm seed                               # optional: demo catalog (needs a migrated database, see seeds/README.md)
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
 pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000)
 pnpm --filter @fluxkit/admin dev                # Vite prints the URL (default http://localhost:5173)
@@ -68,6 +69,7 @@ Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.
 | `pnpm lint` / `pnpm format:check` (`pnpm format`) | ESLint (bans `any`, `@ts-ignore`, empty `catch`) / Prettier |
 | `pnpm check:boundaries` | module boundary rules (core must not import features, etc.); fails if nothing was checked |
 | `pnpm test` | builds, then runs Vitest in every package (needs the services above) |
+| `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
 | `pnpm check:docs` | docs-with-code rules against `origin/main` |
@@ -86,6 +88,7 @@ packages/ui         token-based components and i18n helpers
 packages/theme      design tokens and their guard tests
 packages/config     env and feature flag parsing
 packages/api-client typed API client (empty scaffold)
+seeds/              demo data and ProductType presets (pure data)
 infra/              Docker Compose for Postgres, Redis, Meilisearch
 scripts/            CI and policy scripts
 docs/               architecture decisions, contracts, API and file maps, plans
