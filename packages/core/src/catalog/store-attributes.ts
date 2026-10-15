@@ -8,7 +8,6 @@ import { resolveText } from "./i18n.js";
 import type {
   AttributeDefinition,
   AttributeOptionDefinition,
-  AttributeValidation,
   AttributeValues,
   I18nText,
 } from "./types.js";
@@ -130,7 +129,6 @@ export interface PublicAttributeDefinition {
   readonly inputType: AttributeDefinition["inputType"];
   readonly isLocalized: boolean;
   readonly unit: string | null;
-  readonly validation: AttributeValidation;
   readonly isFilterable: boolean;
   readonly isComparable: boolean;
   readonly isSortable: boolean;
@@ -145,7 +143,6 @@ export function publicAttributeDefinitions(
     inputType: definition.inputType,
     isLocalized: definition.isLocalized,
     unit: definition.unit,
-    validation: definition.validation,
     isFilterable: definition.isFilterable,
     isComparable: definition.isComparable,
     isSortable: definition.isSortable,

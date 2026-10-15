@@ -262,12 +262,12 @@ describe("publicAttributeDefinitions", () => {
       inputType: "number",
       isLocalized: false,
       unit: "g",
-      validation: { min: 0 },
       isFilterable: true,
       isComparable: true,
       isSortable: true,
       options: [],
     });
+    expect(weight).not.toHaveProperty("validation");
     expect(weight).not.toHaveProperty("isInternal");
     expect(weight).not.toHaveProperty("isSearchable");
     expect(weight).not.toHaveProperty("isVisibleOnStorefront");
