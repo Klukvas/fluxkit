@@ -65,7 +65,7 @@ function toMediaResponse(row: MediaRow): ProductMediaResponse {
   };
 }
 
-function toVariantResponse(
+export function toVariantResponse(
   row: VariantRow,
   optionValues: readonly VariantOptionValueRow[],
 ): ProductVariantResponse {
