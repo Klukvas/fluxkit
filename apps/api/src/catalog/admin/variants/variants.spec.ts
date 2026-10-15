@@ -7,6 +7,7 @@ import {
   caller,
   createCatalogFixture,
   expectVariantInvariants,
+  expectWaitsForProductLock,
   type CatalogFixture,
   type Call,
   type OptionFixture,
@@ -795,6 +796,48 @@ describe("admin variants API (real app, real Postgres)", () => {
       );
       expect((await call("PATCH", variantPath(MISSING_ID, MISSING_ID), {})).status).toBe(404);
       expect((await call("PATCH", variantPath(product.id, "not-a-uuid"), {})).status).toBe(400);
+    });
+  });
+
+  describe("serialization by the product row lock", () => {
+    it("generate waits for a transaction that holds the product row", async () => {
+      const product = await sixVariants();
+      await pool.query("delete from variant where id = $1", [variantOf(product, "red", "m").id]);
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () => call("POST", `${variantPath(product.id)}/generate`),
+        200,
+      );
+      expect(await variantRows(product.id)).toHaveLength(6);
+    });
+
+    it("create, update and delete wait for it too", async () => {
+      const product = await sixVariants();
+      const removed = variantOf(product, "red", "m");
+      const target = variantOf(product, "blue", "s");
+      await pool.query("delete from variant where id = $1", [removed.id]);
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () =>
+          call("POST", variantPath(product.id), {
+            optionValueIds: [fx.color.values.red, fx.size.values.m],
+          }),
+        201,
+      );
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () => call("PATCH", variantPath(product.id, target.id), { barcode: "1" }),
+        200,
+      );
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () => call("DELETE", variantPath(product.id, target.id)),
+        204,
+      );
     });
   });
 

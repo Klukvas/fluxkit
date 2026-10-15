@@ -89,6 +89,37 @@ export async function expectVariantInvariants(pool: pg.Pool, productId: string):
   expect(uncovered.rows, "every variant has a value for every product option").toEqual([]);
 }
 
+/**
+ * Proves that a write takes the product row lock: another transaction holds `FOR NO KEY UPDATE` on the product (unlike `FOR UPDATE` it does not block the key-share lock that foreign key checks take, so only a real row lock in the request can wait for it), the request
+ * must not finish until that transaction ends, and then it must succeed with `expectedStatus`. Outcome-based
+ * concurrency tests cannot show this, because unique constraints and SKU retries heal most races.
+ */
+export async function expectWaitsForProductLock(
+  pool: pg.Pool,
+  productId: string,
+  request: () => Promise<{ status: number }>,
+  expectedStatus: number,
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select id from product where id = $1 for no key update", [productId]);
+    let settled = false;
+    const pending = request().then((result) => {
+      settled = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(settled, "the request must wait for the product row lock").toBe(false);
+    await client.query("commit");
+    expect((await pending).status).toBe(expectedStatus);
+  } finally {
+    // A no-op after the commit; unblocks the request when an expectation failed above.
+    await client.query("rollback");
+    client.release();
+  }
+}
+
 export function newRunId(): string {
   return randomUUID().slice(0, 8);
 }

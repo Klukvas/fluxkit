@@ -6,6 +6,7 @@ import {
   caller,
   createCatalogFixture,
   expectVariantInvariants,
+  expectWaitsForProductLock,
   type CatalogFixture,
   type Call,
   type OptionFixture,
@@ -478,6 +479,27 @@ describe("admin product options API (real app, real Postgres)", () => {
       expect(result.status).toBe(409);
       expect(problem(result).code).toBe("in_use");
       expect(await dbState(product.id)).toEqual(before);
+    });
+  });
+
+  describe("serialization by the product row lock", () => {
+    it("PUT options and POST values wait for a transaction that holds the product row", async () => {
+      const product = await createProduct();
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () => putOptions(product.id, sel(fx.color, ["red"])),
+        200,
+      );
+      await expectWaitsForProductLock(
+        pool,
+        product.id,
+        () =>
+          call("POST", `/admin/products/${product.id}/options/${fx.color.id}/values`, {
+            valueId: fx.color.values.blue,
+          }),
+        201,
+      );
     });
   });
 
