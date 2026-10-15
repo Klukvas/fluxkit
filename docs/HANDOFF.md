@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (review fixes merged).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (auth plan proposed).
 
 ## Where we are
 
@@ -21,7 +21,7 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 
 ## Next steps (in order)
 
-1. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design; the global guard already denies every `/admin` path). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
+1. Auth and roles: plan `docs/plans/2026-10-16-auth-and-roles.md` written, waiting for the owner's approval (merge of the plan PR); decisions taken: sessions in Postgres with an HttpOnly cookie, fixed roles in code (owner, manager, viewer), first owner through `pnpm admin:create`. Then implement in the plan's steps. Background: auth and roles (admin endpoints return 401 for everyone until it lands, by design; the global guard already denies every `/admin` path). Small follow-up before it: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; seeding needs a migrated database).
 2. Before any launch: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production.
 3. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
 4. Next domain plan: pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
