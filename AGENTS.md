@@ -42,7 +42,7 @@ Every decision must keep these facts in mind:
 Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
-  `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
+  `pnpm seed` (demo catalog into the migrated `DATABASE_URL` database, idempotent, refuses `NODE_ENV=production`; see `seeds/README.md`), `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
 - Planned, added later: root `pnpm dev`, `pnpm test:e2e`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
@@ -150,7 +150,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
   /config            # env parsing and feature flag parsing
   /api-client        # typed client generated from OpenAPI (empty scaffold)
 /docs                # api, files, adr, plans, contracts, migrations, dependencies
-/seeds               # demo data, product type presets (none yet)
+/seeds               # @fluxkit/seeds: demo data and product type presets (pure data; runner in apps/api/src/seed)
 /infra               # docker compose for Postgres, Redis, Meilisearch
 /scripts             # CI and policy scripts (licenses, docs check, feature matrix, notices)
 /.github             # CI workflow and Dependabot

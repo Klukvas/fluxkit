@@ -2,7 +2,7 @@
 
 ## Root
 - `package.json` - private workspace root; scripts `build`, `typecheck`, `lint`, `format`, `format:check`, `check:boundaries`; pins pnpm and Node range; devDependencies pinned exactly (turbo, typescript 6.0.3, eslint, typescript-eslint, prettier, dependency-cruiser).
-- `pnpm-workspace.yaml` - workspace globs: `apps/*`, `packages/*`, `packages/features/*`, `packages/providers/*`.
+- `pnpm-workspace.yaml` - workspace globs: `apps/*`, `packages/*`, `packages/features/*`, `packages/providers/*`, `seeds`.
 - `turbo.json` - Turborepo tasks `build` (cached, outputs `dist/**`) and `typecheck`; both depend on upstream `build`.
 - `tsconfig.base.json` - strict TypeScript settings shared by all packages (ES2022, Bundler resolution, `noUncheckedIndexedAccess`).
 - `.nvmrc` - Node major version (22). `.editorconfig` - editor defaults. `.env.example` - documented env vars (empty for now).
@@ -24,7 +24,7 @@
 - `package.json` (name `@fluxkit/<name>`, scripts `build` and `typecheck`), `tsconfig.json` (extends base, `src` to `dist`), `src/index.ts` (placeholder export), `README.md`.
 
 ## Other
-- `infra/docker-compose.yml` - local/CI services: PostgreSQL 17, Redis 8, Meilisearch v1.55.0 (healthchecks, ports on 127.0.0.1, required vars via `.env`). `infra/README.md` - how to start. `seeds/` - demo data (no client data).
+- `infra/docker-compose.yml` - local/CI services: PostgreSQL 17, Redis 8, Meilisearch v1.55.0 (healthchecks, ports on 127.0.0.1, required vars via `.env`). `infra/README.md` - how to start. `seeds/` - demo data and ProductType presets (`@fluxkit/seeds`, no client data; see `seeds.md`).
 
 ## CI and scripts
 - `.github/workflows/ci.yml` - CI jobs (verify, feature-matrix, policy, docs, compose). `.github/dependabot.yml` - weekly dependency updates.
