@@ -113,6 +113,11 @@ export class ProductsService {
     return this.loadDetail(this.database, id);
   }
 
+  /** The detail read on a given executor, so option and variant writes answer from inside their transaction. */
+  getIn(db: DbExecutor, id: string): Promise<ProductDetailResponse> {
+    return this.loadDetail(db, id);
+  }
+
   async list(query: ListProductsQuery): Promise<Page<ProductResponse>> {
     const { rows, total } = await this.products.list(this.database, query, query);
     return toPage(rows.map(toProductResponse), total, query);

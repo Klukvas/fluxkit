@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-15 (4d-1).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-15 (4d-2).
 
 ## Where we are
 
@@ -13,14 +13,14 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 |---|---|
 | Monorepo scaffold, CI, licenses, docs | Done and merged (plan `2026-10-14-monorepo-scaffold.md`). |
 | Catalog plan `2026-10-14-catalog.md` | Step 1 (ADR 0006), step 2 (core rules in `packages/core/src/catalog`), step 3 (schema + migration `0001_catalog`) merged. |
-| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). 4c categories (+move with the tree advisory lock) merged (PR #20). **4d-1 products (CRUD, lifecycle, categories, media): in PR, pending.** |
-| Not started | 4d-2 product options and variants; step 5 store API, 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
+| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). 4c categories (+move with the tree advisory lock) merged (PR #20). 4d-1 products (CRUD, lifecycle, categories, media) merged. **4d-2 product options and variants: implemented, in PR pending; with it the step 4 admin write API is complete.** |
+| Not started | Step 5 store API, 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
 
 ## Next steps (in order)
 
-1. Review and merge the 4d-1 PR (owner's word). It adds `/admin/products` (create with the default variant, list, get, patch, delete of never-published), `POST /admin/products/:id/publish|unpublish|archive|restore` (core `publishPreconditions`, `nextPublishedAt`), `PUT /admin/products/:id/categories` (core `normalizeCategoryAssignments`) and `PUT /admin/products/:id/media` in `apps/api/src/catalog/admin/products/`. Publishing failures are `400 validation_failed` with one entry per violation; a wrong source status is `409 invalid_transition` (`rule` = `<from>_to_<target>`); deleting a once-published product is `409 rule_violation` (`product_was_published`). A `PATCH` of `attributes` on an active product is validated in publish mode. `title` is the product name field (ADR 0006).
-2. 4d-2 product options and variants: `PUT /admin/products/:id/options`, `POST .../options/:optionId/values`, the variant routes and `generate`. `GET /admin/products/:id` already returns `options` and `variants` read-only. Writes to variants or options must lock the product row first (`findByIdForUpdate`), like the products service does.
-3. Steps 5 to 8 of the catalog plan.
+1. Review and merge the 4d-2 PR (owner's word). It adds `PUT /admin/products/:id/options` (draft only; body `{ "options": [{ "optionId", "valueIds" }] }`; core `planProductOptionChange`), `POST /admin/products/:id/options/:optionId/values` (any status; new combinations only) and the variant routes (`GET|POST /admin/products/:id/variants`, `POST .../variants/generate`, `GET|PATCH|DELETE .../variants/:variantId`) in `apps/api/src/catalog/admin/product-options/` and `.../variants/`. Adding or removing options, or removing values, rebuilds all variants of the draft (the first becomes the default); only adding values keeps the existing ones. `POST .../variants` is draft only; `PATCH` with `isDefault: true` moves the default in one transaction; on an active product the default must stay active (`409 rule_violation`, `default_variant_inactive`). Variants generated for an active product start with empty `attributes`: required variant attributes are enforced on the next write, not on generation.
+2. Steps 5 to 8 of the catalog plan: store (public) API, seeds and product type presets, OpenAPI and written docs (`docs/api/catalog.md`, `docs/files/*`, `docs/contracts/api.md`), independent review.
+3. Test support for the option and variant specs lives in `apps/api/src/test/catalog-fixtures.ts` (dictionaries via the real routes, `expectVariantInvariants`).
 4. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design).
 
 ## Open decisions (owner)
