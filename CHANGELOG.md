@@ -21,3 +21,4 @@ One line per user-visible or schema change.
 - Add admin API foundation (default-deny `AdminGuard`, problem+json errors, zod validation, pagination, `DEFAULT_LOCALE`/`LOCALES` config) and `/admin/brands` CRUD as the reference resource.
 - Add admin catalog dictionaries: `/admin/attributes` (+options), `/admin/options` (+values), `/admin/product-types` (+attribute and option assignments), with the ADR 0006 change rules.
 - Add admin categories: `/admin/categories` CRUD (flat list, `?parentId`) and `POST /admin/categories/:id/move`, with depth limit 5, cycle rejection and a tree-wide advisory lock.
+- Add admin products: `/admin/products` CRUD (creates a draft with its default variant), publish/unpublish/archive/restore with the core publish preconditions, and `PUT` of categories (one primary) and media; variants and options routes follow in 4d-2.
