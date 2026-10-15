@@ -11,6 +11,7 @@
     "test": "vitest run",
     "openapi:export": "node dist/openapi-export.js",
     "db:generate": "drizzle-kit generate",
+    "db:drift": "bash ../../scripts/check-schema-drift.sh",
     "start": "node --env-file=../../.env dist/main.js"
   },
   "devDependencies": {

@@ -24,7 +24,7 @@ Status: accepted 2026-10-15 (owner answered the open questions; reviewed and par
 | Hidden but not deleted | `variant.is_active`, `category.is_active` booleans | Admin needs "temporarily hide one size / prepare a category" without deleting. |
 | Enumerations | `text` + `CHECK (col IN (...))`, not Postgres `enum` types | Altering a `CHECK` is trivial in up and down scripts; altering a Postgres enum is not reversible without a type rebuild. |
 | Naming | Tables singular snake_case (`product`, `product_option_value`); join tables `<a>_<b>`; PK `id`; FK `<entity>_id`; booleans `is_*`; ordering `position integer not null default 0`; constraint names `<table>_<cols>_key` (unique), `<table>_<cols>_idx`, `<table>_<col>_check`, `<table>_<col>_fkey`. **Composite foreign keys must be named explicitly (`foreignKey({ name: ... })`) and every constraint name must be at most 63 characters** | Matches `health_check` and Drizzle defaults. Verified: drizzle-kit's auto-generated names for composite FKs reach 118 characters, above Postgres' 63-character limit (it would silently truncate them). A test asserts that no catalog constraint name is longer than 63 characters. |
-| Codes | `code text` matching `^[a-z][a-z0-9_]{0,63}$` (enforced by `CHECK`), unique in their scope, immutable after creation | Codes are keys in JSONB and in API payloads (section 10), so they are never renamed. |
+| Codes | `code text` matching `^[a-z][a-z0-9_]{0,63}$` (enforced by `CHECK`) for attribute, option and product type codes; **value codes** (`option_value.code`, `attribute_option.code`) match `^[a-z0-9][a-z0-9_]{0,63}$` so that numeric values such as shoe size `42` or `2xl` are possible. Unique in their scope, immutable after creation | Codes are keys in JSONB and in API payloads (section 10), so they are never renamed. |
 | i18n text columns | `jsonb` map `{"<locale>": "<string>"}`. DB `CHECK (jsonb_typeof(col) = 'object' AND col <> '{}'::jsonb)` on required texts (shape and non-empty only); optional texts are nullable with `jsonb_typeof(col) = 'object'` when present. The service enforces that the **configured default locale** (`DEFAULT_LOCALE`, default `uk`) is present and non-empty, validates allowed locale keys and max lengths (locales come from config). | Owner decision 1: the DB stays market-agnostic, so a fork for EU or US changes configuration, not a migration. |
 | Ordering ties | Every list query orders by `position`, then a stable key (`code`, `slug` or `id`) | Deterministic pagination. |
 
@@ -142,7 +142,7 @@ Consistency test for `option_signature` (must return zero rows):
 ```sql
 SELECT v.id FROM variant v
 LEFT JOIN (
-  SELECT vov.variant_id, string_agg(o.code || '=' || ov.code, ';' ORDER BY o.code) AS signature
+  SELECT vov.variant_id, string_agg(o.code || '=' || ov.code, ';' ORDER BY o.code COLLATE "C") AS signature
   FROM variant_option_value vov
   JOIN option o ON o.id = vov.option_id
   JOIN option_value ov ON ov.id = vov.option_value_id
@@ -158,7 +158,7 @@ The plan's proposal is confirmed with two additions (`option_signature`, composi
 - Global `option` definitions with values (`color: red, black`) keep labels translated once and make codes stable across products; a product chooses a subset in `product_option_value`.
 - `product_type_option` lists which options a type *allows*; a product uses any subset of the allowed options (zero for a simple product). Rejected: making options required per type; a product that does not use an option is a simple product of that type.
 
-`option_signature`: the service computes, for every variant, the string of `<option_code>=<value_code>` pairs **sorted by option code** and joined with `;` (for example `color=red;size=m`); a variant of a product without options has the empty string. Sorting by code (not by `position`) keeps the signature stable when the admin reorders options. A test recomputes signatures from `variant_option_value` rows and asserts they match.
+`option_signature`: the service computes, for every variant, the string of `<option_code>=<value_code>` pairs **sorted by option code** and joined with `;` (for example `color=red;size=m`); a variant of a product without options has the empty string. Sorting by code (not by `position`) keeps the signature stable when the admin reorders options. The order is plain byte order: JavaScript's default string sort in `packages/core` and `COLLATE "C"` in SQL (a locale collation would order `a_b` and `aa` differently and break the consistency test). A test recomputes signatures from `variant_option_value` rows and asserts they match.
 
 | Invariant | Enforced by |
 |---|---|
@@ -336,6 +336,13 @@ The architect marked the generated-SQL behavior as unverified, so the key tables
 - 18 constraint scenarios behaved as the ADR says (each failing case failed with the expected constraint): a value the product did not choose; a variant pointed at another product; a value claimed for the wrong option; two values for one option on one variant; duplicate option signature; a second variant on an option-less product; a second default variant; duplicate and malformed SKU; title that fails the `uk` CHECK used in the spike (the accepted rule is shape-only, see section 1); bad slug; `active` without `published_at`; deleting a used option value (RESTRICT); media with only one of the pair; media for a value the product did not choose; cascade from product to variants, value rows and media.
 - Confirmed limits of the DB (as documented in section 3): the DB does not check option coverage (a product with option `color` accepts a variant without any value row) and trusts `option_signature` (a variant can claim `color=red` with no value row). Both are service-layer rules guarded by the consistency test, not DB guarantees.
 - Not verified: behavior on Postgres 17 (CI image) and concurrency under load; the migration and tests in step 3 cover Postgres 17 in CI.
+
+### Corrections after implementation (2026-10-15)
+
+Found while implementing steps 2 and 3 and reviewing them:
+- **Value codes may start with a digit.** The ADR's own scenario (d) uses `size=42`, which the letter-first pattern would have rejected in the DB and in `packages/core`. Option, attribute and product type codes stay letter-first (they are JSON and API keys); `option_value` and `attribute_option` codes use `^[a-z0-9][a-z0-9_]{0,63}$`. Migration `0001_catalog` was regenerated before merge (the only SQL change is these two CHECKs).
+- **Signature ordering** uses byte order (`COLLATE "C"` in SQL), see section 3.
+- `packages/core` also guarantees signature unambiguity by refusing codes that contain `;` or `=` (`computeOptionSignature` throws, `generateVariants` returns `invalid_code`).
 
 ### 13. Consequences and risks
 

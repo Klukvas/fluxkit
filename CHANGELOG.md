@@ -17,3 +17,4 @@ One line per user-visible or schema change.
 - Add the catalog domain plan (`docs/plans/2026-10-14-catalog.md`).
 - Add ADR 0006 (catalog schema), verified against real Postgres.
 - ADR 0006 accepted: owner decisions on default locale, slug redirects, frozen options, requires_shipping, barcode.
+- Add catalog database schema (16 tables, migration `0001_catalog` with down script, constraint tests on real Postgres) and a schema drift check (`pnpm --filter @fluxkit/api db:drift`, CI step).

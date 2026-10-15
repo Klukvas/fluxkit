@@ -67,6 +67,8 @@ jobs:
       - run: pnpm lint
       - run: pnpm format:check
       - run: pnpm typecheck
+      - name: Schema drift (Drizzle schema vs committed migrations)
+        run: pnpm --filter @fluxkit/api db:drift
       - run: pnpm check:boundaries
       - run: pnpm test
 
