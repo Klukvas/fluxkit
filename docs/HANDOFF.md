@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-15 (4d-2).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (step 5).
 
 ## Where we are
 
@@ -13,13 +13,14 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 |---|---|
 | Monorepo scaffold, CI, licenses, docs | Done and merged (plan `2026-10-14-monorepo-scaffold.md`). |
 | Catalog plan `2026-10-14-catalog.md` | Step 1 (ADR 0006), step 2 (core rules in `packages/core/src/catalog`), step 3 (schema + migration `0001_catalog`) merged. |
-| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). 4c categories (+move with the tree advisory lock) merged (PR #20). 4d-1 products (CRUD, lifecycle, categories, media) merged. **4d-2 product options and variants: implemented, in PR pending; with it the step 4 admin write API is complete.** |
-| Not started | Step 5 store API, 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
+| Step 4, admin write API (`2026-10-15-catalog-api-design.md`) | Design merged. Core rules for it merged. 4a foundation + Brands merged (PR #17). 4b dictionaries (attributes, options, product types) merged (PR #19). 4c categories (+move with the tree advisory lock) merged (PR #20). 4d-1 products (CRUD, lifecycle, categories, media) merged. 4d-2 product options and variants merged (PR #22); the step 4 admin write API is complete. |
+| Step 5, public store read API (`2026-10-16-catalog-store-api-design.md`) | Implemented in `apps/api/src/catalog/store/` (`GET /store/categories`, `GET /store/products`, `GET /store/products/:slug`; no auth; HTTP integration tests incl. leak and query-count tests); **PR pending**. |
+| Not started | Step 6 seeds and presets, 7 OpenAPI and docs, 8 independent review. |
 
 ## Next steps (in order)
 
-1. Review and merge the 4d-2 PR (owner's word). It adds `PUT /admin/products/:id/options` (draft only; body `{ "options": [{ "optionId", "valueIds" }] }`; core `planProductOptionChange`), `POST /admin/products/:id/options/:optionId/values` (any status; new combinations only) and the variant routes (`GET|POST /admin/products/:id/variants`, `POST .../variants/generate`, `GET|PATCH|DELETE .../variants/:variantId`) in `apps/api/src/catalog/admin/product-options/` and `.../variants/`. Adding or removing options, or removing values, rebuilds all variants of the draft (the first becomes the default); only adding values keeps the existing ones. `POST .../variants` is draft only; `PATCH` with `isDefault: true` moves the default in one transaction; on an active product the default must stay active (`409 rule_violation`, `default_variant_inactive`). Variants generated for an active product start with empty `attributes`: required variant attributes are enforced on the next write, not on generation.
-2. Steps 5 to 8 of the catalog plan: store (public) API, seeds and product type presets, OpenAPI and written docs (`docs/api/catalog.md`, `docs/files/*`, `docs/contracts/api.md`), independent review.
+1. Review and merge the step 5 PR (owner's word). The store API (`apps/api/src/catalog/store/`) is public and read-only: locale via `?locale=` (400 if not in `LOCALES`), texts resolved per field with core `resolveText`, only `active` products, `is_active` variants and categories whose ancestors are all active; attributes leave the API only through `store.serializer.ts`, which feeds core `selectPublicAttributes` / `publicAttributeDefinitions`. List order is `published_at desc, id desc`. Known gaps: no rate limiting yet (needs a dependency, red zone; follow-up before launch), core's public attribute definition has no display name (the serializer adds it by code from the rows core kept; a core change could carry it).
+2. Steps 6 to 8 of the catalog plan: seeds and product type presets, OpenAPI and written docs (`docs/api/catalog.md`, `docs/files/*`, `docs/contracts/api.md`), independent review.
 3. Test support for the option and variant specs lives in `apps/api/src/test/catalog-fixtures.ts` (dictionaries via the real routes, `expectVariantInvariants`).
 4. Separate plan: auth and roles (admin endpoints return 401 for everyone until it lands, by design).
 
