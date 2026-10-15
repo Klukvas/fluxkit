@@ -1,10 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { generateUniqueSlug, slugify, TEXT_LIMITS } from "@fluxkit/core";
+import { generateUniqueSlug, slugLookupPrefix, TEXT_LIMITS } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page, type PaginationQuery } from "../../../common/pagination.js";
 import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
 import { conflict, notFound, validationFailed, type FieldError } from "../../../common/problem.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
+import { retryLostRaces } from "../../shared/retry.js";
 import { toBrandResponse } from "./brands.mapper.js";
 import { BrandsRepository } from "./brands.repository.js";
 import type { BrandResponse, CreateBrandBody, UpdateBrandBody } from "./brands.schemas.js";
@@ -123,33 +124,39 @@ export class BrandsService {
     name: Record<string, string>,
   ): Promise<BrandResponse> {
     const title = name[this.locale.defaultLocale] ?? "";
-    const prefix = slugify(title);
-    for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt += 1) {
-      const generated = generateUniqueSlug(
-        title,
-        prefix === "" ? new Set() : await this.brands.findSlugsStartingWith(prefix),
+    const prefix = slugLookupPrefix(title);
+    try {
+      return await retryLostRaces(
+        {
+          maxAttempts: MAX_SLUG_ATTEMPTS,
+          isLostRace: (error) => isUniqueViolation(error, BRAND_SLUG_CONSTRAINT),
+          exhausted: () =>
+            conflict("Could not allocate a unique slug; try again or provide one.", {
+              field: "slug",
+              constraint: BRAND_SLUG_CONSTRAINT,
+            }),
+        },
+        async (log) => {
+          const generated = generateUniqueSlug(
+            title,
+            prefix === "" ? new Set() : await this.brands.findSlugsStartingWith(prefix),
+          );
+          if (!generated.ok) {
+            throw validationFailed([
+              {
+                path: "slug",
+                code: generated.reason,
+                message: "A slug cannot be generated from this name; provide one.",
+              },
+            ]);
+          }
+          log.record(generated.slug);
+          return toBrandResponse(await this.brands.insert({ ...values, slug: generated.slug }));
+        },
       );
-      if (!generated.ok) {
-        throw validationFailed([
-          {
-            path: "slug",
-            code: generated.reason,
-            message: "A slug cannot be generated from this name; provide one.",
-          },
-        ]);
-      }
-      try {
-        return toBrandResponse(await this.brands.insert({ ...values, slug: generated.slug }));
-      } catch (error) {
-        if (!isUniqueViolation(error, BRAND_SLUG_CONSTRAINT)) {
-          throw translatePostgresError(error);
-        }
-      }
+    } catch (error) {
+      throw translatePostgresError(error);
     }
-    throw conflict("Could not allocate a unique slug; try again or provide one.", {
-      field: "slug",
-      constraint: BRAND_SLUG_CONSTRAINT,
-    });
   }
 }
 

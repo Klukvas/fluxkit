@@ -308,6 +308,25 @@ describe("publishPreconditions", () => {
       ]);
     });
 
+    it("does not require variant-level required attributes on an inactive variant", () => {
+      // A variant that was generated for a live product stays inactive until its attributes are filled.
+      const inactive = { ...blackVariant, isActive: false, attributes: {} };
+      expect(check(product({ variants: [variant(), inactive] }))).toEqual([]);
+    });
+
+    it("still rejects invalid values and unknown keys on an inactive variant", () => {
+      const inactive = { ...blackVariant, isActive: false, attributes: { weight_g: "heavy" } };
+      expect(check(product({ variants: [variant(), inactive] }))).toEqual([
+        {
+          code: "attribute_invalid",
+          level: "variant",
+          variantIndex: 1,
+          attributeCode: "weight_g",
+          reason: "invalid_type",
+        },
+      ]);
+    });
+
     it("reports invalid values and unknown keys at both levels", () => {
       const result = check(
         product({

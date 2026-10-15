@@ -130,7 +130,21 @@ export type GenerateSlugResult =
   | { readonly ok: true; readonly slug: string }
   | { readonly ok: false; readonly reason: "empty_slug" };
 
-/** Slugifies the title and appends `-2`, `-3`, ... until the slug is not in `takenSlugs`. */
+// `generateUniqueSlug` shortens the base to make room for `-N`. Room for 10 digits is far more attempts than any
+// taken set can hold, so every candidate keeps the prefix below.
+const MAX_SUFFIX_LENGTH = 11;
+
+/**
+ * The prefix a caller must use to load the taken slugs for `generateUniqueSlug(title, ...)` (`slug LIKE prefix%`).
+ * Not the plain slug: for a slug of 160 characters the candidates are `base158-2`, `base158-3`, ..., which do not
+ * start with the full slug. Empty when the title yields no slug.
+ */
+export function slugLookupPrefix(title: string): string {
+  return truncateSlug(slugify(title), TEXT_LIMITS.slug - MAX_SUFFIX_LENGTH);
+}
+
+/** Slugifies the title and appends `-2`, `-3`, ... until the slug is not in `takenSlugs`.
+ * `takenSlugs` must contain every taken slug that starts with `slugLookupPrefix(title)`. */
 export function generateUniqueSlug(
   title: string,
   takenSlugs: ReadonlySet<string>,

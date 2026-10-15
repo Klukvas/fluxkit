@@ -1,7 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
   generateUniqueSlug,
-  slugify,
+  slugLookupPrefix,
   TEXT_LIMITS,
   validateMove,
   validateNewNode,
@@ -21,6 +21,7 @@ import {
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
+import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
 import { toCategoryResponse } from "./categories.mapper.js";
 import { CategoriesRepository } from "./categories.repository.js";
 import type {
@@ -54,21 +55,24 @@ export class CategoriesService {
         throw translatePostgresError(error, { detail: "Another category already uses this slug." });
       }
     }
-    for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt += 1) {
-      try {
+    try {
+      return await retryLostRaces(
+        {
+          maxAttempts: MAX_SLUG_ATTEMPTS,
+          isLostRace: (error) => isUniqueViolation(error, CATEGORY_SLUG_CONSTRAINT),
+          exhausted: () =>
+            conflict("Could not allocate a unique slug; try again or provide one.", {
+              field: "slug",
+              constraint: CATEGORY_SLUG_CONSTRAINT,
+            }),
+        },
         // The slug candidate is computed inside the transaction; a unique violation aborts it, so the retry
         // starts a new transaction and reads the taken slugs again.
-        return await withTransaction(this.database, (tx) => this.createIn(tx, body, undefined));
-      } catch (error) {
-        if (!isUniqueViolation(error, CATEGORY_SLUG_CONSTRAINT)) {
-          throw translatePostgresError(error);
-        }
-      }
+        (log) => withTransaction(this.database, (tx) => this.createIn(tx, body, undefined, log)),
+      );
+    } catch (error) {
+      throw translatePostgresError(error);
     }
-    throw conflict("Could not allocate a unique slug; try again or provide one.", {
-      field: "slug",
-      constraint: CATEGORY_SLUG_CONSTRAINT,
-    });
   }
 
   async get(id: string): Promise<CategoryResponse> {
@@ -155,11 +159,13 @@ export class CategoriesService {
     tx: DbExecutor,
     body: CreateCategoryBody,
     explicitSlug: string | undefined,
+    log?: ProposalLog,
   ): Promise<CategoryResponse> {
     const parentId = body.parentId ?? null;
     await this.categories.lockTree(tx);
     this.assertTreeAllows(validateNewNode(await this.categories.listNodes(tx), parentId));
     const slug = explicitSlug ?? (await this.generateSlug(tx, body.name));
+    log?.record(slug);
     const siblings = await this.categories.listSiblings(tx, parentId, undefined);
     const index = clampIndex(body.position, siblings.length);
     const row = await this.categories.insert(tx, {
@@ -176,7 +182,7 @@ export class CategoriesService {
 
   private async generateSlug(tx: DbExecutor, name: Record<string, string>): Promise<string> {
     const title = name[this.locale.defaultLocale] ?? "";
-    const prefix = slugify(title);
+    const prefix = slugLookupPrefix(title);
     const generated = generateUniqueSlug(
       title,
       prefix === "" ? new Set() : await this.categories.findSlugsStartingWith(tx, prefix),

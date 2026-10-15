@@ -10,6 +10,7 @@ export * from "./publish-timestamp.js";
 export * from "./sku.js";
 export * from "./slug.js";
 export * from "./store-attributes.js";
+export * from "./text-safety.js";
 export * from "./type-change-rules.js";
 export * from "./types.js";
 export * from "./variant-rules.js";

@@ -149,6 +149,66 @@ describe("keys", () => {
     }
   });
 
+  describe("a deeply nested value", () => {
+    function nested(depth: number): unknown {
+      let value: unknown = "leaf";
+      for (let level = 0; level < depth; level += 1) {
+        value = [value];
+      }
+      return value;
+    }
+    function nestedObject(depth: number): unknown {
+      let value: unknown = "leaf";
+      for (let level = 0; level < depth; level += 1) {
+        value = { inner: value };
+      }
+      return value;
+    }
+    const depth = 50_000;
+
+    it.each([
+      ["text", attribute("note", "text")],
+      ["localized text", attribute("note", "text", { isLocalized: true })],
+      ["number", attribute("note", "number")],
+      ["boolean", attribute("note", "boolean")],
+      ["date", attribute("note", "date")],
+      [
+        "multiselect",
+        attribute("note", "multiselect", { options: [{ code: "a", label: {}, position: 0 }] }),
+      ],
+    ] as const)(
+      "is an invalid_type error for a %s attribute and never throws",
+      (_name, definition) => {
+        for (const value of [nested(depth), nestedObject(depth)]) {
+          const result = validateAttributeValues(
+            productType([definition, "product"]),
+            "product",
+            { note: value },
+            { mode: "draft", ...locales },
+          );
+          expect(result.ok).toBe(false);
+          if (!result.ok) {
+            expect(result.errors.every((error) => error.attributeCode === "note")).toBe(true);
+            expect(result.errors.length).toBeGreaterThan(0);
+          }
+        }
+      },
+    );
+
+    it("is an unknown_attribute error when no attribute has that code", () => {
+      const result = validateAttributeValues(
+        productType([attribute("note", "text"), "product"]),
+        "product",
+        { other: nested(depth) },
+        { mode: "draft", ...locales },
+      );
+      expect(result).toEqual({
+        ok: false,
+        errors: [{ attributeCode: "other", reason: "unknown_attribute" }],
+      });
+    });
+  });
+
   it("rejects an attributes object above 64 KB", () => {
     const note = attribute("note", "text", { validation: { max_length: 100000 } });
     const result = validateAttributeValues(

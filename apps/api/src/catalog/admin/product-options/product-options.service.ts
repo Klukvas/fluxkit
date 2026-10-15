@@ -8,6 +8,7 @@ import { translatePostgresError } from "../../../common/postgres-errors.js";
 import { notFound, ruleViolation, validationFailed } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
+import type { ProposalLog } from "../../shared/retry.js";
 import { toStatus } from "../products/products.mapper.js";
 import { ProductsRepository, type ProductRow } from "../products/products.repository.js";
 import { ProductsService } from "../products/products.service.js";
@@ -48,7 +49,7 @@ export class ProductOptionsService {
    */
   async put(productId: string, body: PutProductOptionsBody): Promise<ProductDetailResponse> {
     const desired: ProductOptionSelection[] = body.options;
-    return this.run(async (tx) => {
+    return this.run(async (tx, log) => {
       const product = await this.lockProduct(tx, productId);
       const current = await this.currentSelections(tx, productId);
       const planned = planProductOptionChange({
@@ -68,7 +69,7 @@ export class ProductOptionsService {
         );
       }
       await this.assertValuesBelongToOptions(tx, desired);
-      await this.apply(tx, product, current, desired, planned.plan);
+      await this.apply(tx, log, product, current, desired, planned.plan);
       return this.productDetails.getIn(tx, productId);
     });
   }
@@ -82,7 +83,7 @@ export class ProductOptionsService {
     optionId: string,
     body: AddProductOptionValueBody,
   ): Promise<ProductDetailResponse> {
-    return this.run(async (tx) => {
+    return this.run(async (tx, log) => {
       const product = await this.lockProduct(tx, productId);
       if (!(await this.productOptions.optionExists(tx, optionId))) {
         throw notFound("Option");
@@ -120,15 +121,17 @@ export class ProductOptionsService {
             : "valueId",
         );
       }
-      await this.apply(tx, product, current, desired, planned.plan);
+      await this.apply(tx, log, product, current, desired, planned.plan);
       return this.productDetails.getIn(tx, productId);
     });
   }
 
   /** One transaction, run again when a proposed SKU lost a race; constraint violations become problems last. */
-  private async run<T>(work: (tx: DbExecutor) => Promise<T>): Promise<T> {
+  private async run<T>(work: (tx: DbExecutor, log: ProposalLog) => Promise<T>): Promise<T> {
     try {
-      return await retryOnProposedSkuCollision(() => withTransaction(this.database, work));
+      return await retryOnProposedSkuCollision((log) =>
+        withTransaction(this.database, (tx) => work(tx, log)),
+      );
     } catch (error) {
       throw translatePostgresError(error, { detail: CONFLICT_DETAIL });
     }
@@ -179,6 +182,7 @@ export class ProductOptionsService {
 
   private async apply(
     tx: DbExecutor,
+    log: ProposalLog,
     product: ProductRow,
     current: readonly StoredSelection[],
     desired: readonly ProductOptionSelection[],
@@ -252,7 +256,7 @@ export class ProductOptionsService {
     }
 
     if (plan.hasChanges) {
-      await this.generation.generateMissing(tx, product);
+      await this.generation.generateMissing(tx, product, log);
     }
   }
 }

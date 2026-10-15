@@ -11,3 +11,4 @@
 | [0005](0005-search-notes.md) | Search notes (Meilisearch spike) | findings recorded; two decisions open (Ukrainian morphology, variant-level facet counts) |
 | [0006](0006-catalog-schema.md) | Catalog schema | accepted (2026-10-15); refines the catalog part of ADR 0004 |
 | [0007](0007-store-hides-unsellable-option-values.md) | The store hides option values and images that no active variant can sell | accepted (2026-10-16); adds a rule to ADR 0006 section 10 |
+| [0008](0008-generated-variants-of-live-products.md) | Generated variants of live products | accepted (2026-10-16); extends ADR 0006 sections 4 and 6 |

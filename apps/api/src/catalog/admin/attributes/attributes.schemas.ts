@@ -3,6 +3,7 @@ import { timestampSchema, uuidSchema } from "../../../common/openapi-formats.js"
 import { paginationQuerySchema } from "../../../common/pagination.js";
 import { codeSchema, positionSchema, valueCodeSchema } from "../../shared/code-schemas.js";
 import { i18nTextSchema } from "../../shared/i18n-validation.js";
+import { isDatabaseSafeText, UNSAFE_TEXT_MESSAGE } from "../../shared/text.js";
 
 // Schemas check structure and static limits. Rules that depend on configuration (locales) or on other rows run
 // in the service with the core functions; see AttributesService.
@@ -18,10 +19,7 @@ export const ATTRIBUTE_INPUT_TYPES = [
 
 export const inputTypeSchema = z.enum(ATTRIBUTE_INPUT_TYPES);
 
-// A NUL character passes JSON parsing but Postgres rejects it in text columns (would be an HTTP 500).
-const unitSchema = z
-  .string()
-  .refine((unit) => !unit.includes("\u0000"), { error: "Must not contain NUL characters." });
+const unitSchema = z.string().refine(isDatabaseSafeText, { error: UNSAFE_TEXT_MESSAGE });
 
 const validationSchema = z.record(z.string(), z.unknown()).meta({
   description:

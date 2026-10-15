@@ -13,6 +13,7 @@ import {
   type OptionFixture,
 } from "../../../test/catalog-fixtures.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
+import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
 import type { GenerateVariantsResponse, VariantResponse } from "./variants.schemas.js";
@@ -188,6 +189,33 @@ describe("admin variants API (real app, real Postgres)", () => {
       expect(result.status).toBe(200);
       expect(result.body).toMatchObject({ created: 0, skipped: 1 });
       expect(result.body.variants).toHaveLength(1);
+    });
+
+    it("creates the missing variants of a live product inactive when the type requires a variant attribute", async () => {
+      const draft = await createProduct(fx.strictTypeId);
+      const product = await putOptions(draft.id, sel(fx.color, ["red", "blue"]));
+      for (const variant of product.variants) {
+        const filled = await call("PATCH", variantPath(product.id, variant.id), {
+          attributes: { [fx.batchAttributeCode]: "B-1" },
+        });
+        expect(filled.status).toBe(200);
+      }
+      await setStatus(product.id, "publish");
+      const blue = product.variants.find((variant) => variant.optionSignature.endsWith("=blue"));
+      await pool.query("delete from variant where id = $1", [blue?.id]);
+
+      const result = await call<GenerateVariantsResponse>(
+        "POST",
+        `${variantPath(product.id)}/generate`,
+      );
+      expect(result.status, JSON.stringify(result.body)).toBe(200);
+      expect(result.body.created).toBe(1);
+      const recreated = result.body.variants.filter((variant) =>
+        variant.optionSignature.endsWith("=blue"),
+      );
+      expect(recreated).toHaveLength(1);
+      expect(recreated[0]).toMatchObject({ isActive: false, attributes: {} });
+      expect(result.body.variants.filter((variant) => variant.isActive)).toHaveLength(1);
     });
 
     it("recreates missing combinations (2 x 3 = 6) and is idempotent", async () => {
@@ -527,6 +555,26 @@ describe("admin variants API (real app, real Postgres)", () => {
       expect(await variantRows(product.id)).toHaveLength(5);
     });
 
+    it.each([
+      ["NUL", "\u0000"],
+      ["a lone surrogate", "\ud800"],
+    ])("answers 400, not 500, for %s in sku and barcode", async (_name, bad) => {
+      const { product } = await withFreeSlot();
+      const base = { optionValueIds: [fx.color.values.red, fx.size.values.m] };
+      const sku = await call("POST", variantPath(product.id), { ...base, sku: `AB${bad}C` });
+      expect(sku.status, JSON.stringify(sku.body)).toBe(400);
+      expect(problem(sku).errors).toContainEqual(
+        expect.objectContaining({ path: "sku", code: "invalid_format" }),
+      );
+      const barcode = await call("POST", variantPath(product.id), {
+        ...base,
+        barcode: `48${bad}20`,
+      });
+      expect(barcode.status, JSON.stringify(barcode.body)).toBe(400);
+      expect(problem(barcode).errors).toContainEqual(expect.objectContaining({ path: "barcode" }));
+      expect(await variantRows(product.id)).toHaveLength(5);
+    });
+
     it("refuses the 251st variant", async () => {
       const product = await createProduct();
       await putOptions(
@@ -784,6 +832,37 @@ describe("admin variants API (real app, real Postgres)", () => {
       expect(strict.status).toBe(400);
       expect(problem(strict).errors).toEqual([
         { path: `attributes.${fx.batchAttributeCode}`, code: "required" },
+      ]);
+    });
+
+    it.each([
+      ["NUL", "\u0000"],
+      ["a lone surrogate", "\ud800"],
+    ])("answers 400, not 500, for %s in sku and barcode", async (_name, bad) => {
+      const product = await createProduct();
+      const path = variantPath(product.id, product.variants[0]?.id);
+      const barcode = await call("PATCH", path, { barcode: `48${bad}20` });
+      expect(barcode.status, JSON.stringify(barcode.body)).toBe(400);
+      expect(problem(barcode).errors).toContainEqual(expect.objectContaining({ path: "barcode" }));
+      const sku = await call("PATCH", path, { sku: `AB${bad}C` });
+      expect(sku.status, JSON.stringify(sku.body)).toBe(400);
+      expect(problem(sku).errors).toContainEqual(
+        expect.objectContaining({ path: "sku", code: "invalid_format" }),
+      );
+    });
+
+    it("answers 400, not 500, for a deeply nested attribute value", async () => {
+      const product = await createProduct();
+      const deep = `${"[".repeat(50_000)}"x"${"]".repeat(50_000)}`;
+      const result = await http(
+        running.baseUrl,
+        "PATCH",
+        variantPath(product.id, product.variants[0]?.id),
+        { rawBody: `{"attributes":{"${fx.supplierAttributeCode}":${deep}}}` },
+      );
+      expect(result.status).toBe(400);
+      expect(problem(result).errors).toEqual([
+        { path: `attributes.${fx.supplierAttributeCode}`, code: "invalid_type" },
       ]);
     });
 

@@ -25,6 +25,7 @@ import {
 } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
+import type { ProposalLog } from "../../shared/retry.js";
 import {
   toProductSnapshot,
   toProductTypeDefinition,
@@ -94,7 +95,7 @@ export class VariantsService {
 
   /** Creates one variant by hand. Draft products only: a manual variant changes the option structure. */
   async create(productId: string, body: CreateVariantBody): Promise<VariantResponse> {
-    const work = () =>
+    const work = (log?: ProposalLog) =>
       withTransaction(this.database, async (tx) => {
         const product = await this.lockProduct(tx, productId);
         assertVariantRule(
@@ -179,6 +180,7 @@ export class VariantsService {
                 pairs.map((pair) => pair.valueCode),
               )
             : this.normalizeSku(body.sku);
+        log?.record(sku);
 
         const created = await this.variants.insertVariant(tx, {
           productId,
@@ -229,6 +231,19 @@ export class VariantsService {
             await this.loadDefinition(tx, product),
             body.attributes,
             product.status === "active" ? "publish" : "draft",
+          );
+        }
+        if (
+          product.status === "active" &&
+          body.isActive === true &&
+          !current.isActive &&
+          body.attributes === undefined
+        ) {
+          // Switching a variant on sells it: it needs its required attributes first (ADR 0008).
+          this.assertAttributeValues(
+            await this.loadDefinition(tx, product),
+            current.attributes,
+            "publish",
           );
         }
         const changes: VariantChanges = {
@@ -305,10 +320,10 @@ export class VariantsService {
 
   /** Creates the variants missing for the product's current options. Idempotent; serialized by the product lock. */
   async generate(productId: string): Promise<GenerateVariantsResponse> {
-    return retryOnProposedSkuCollision(() =>
+    return retryOnProposedSkuCollision((log) =>
       withTransaction(this.database, async (tx) => {
         const product = await this.lockProduct(tx, productId);
-        const outcome = await this.generation.generateMissing(tx, product);
+        const outcome = await this.generation.generateMissing(tx, product, log);
         const rows = await this.products.listVariants(tx, productId);
         const optionValues = await this.products.listVariantOptionValues(tx, productId);
         return { ...outcome, variants: toVariantResponses(rows, optionValues) };

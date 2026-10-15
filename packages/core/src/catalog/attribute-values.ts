@@ -424,19 +424,6 @@ export function validateAttributeValues(
   if (!isPlainObject(values)) {
     return { ok: false, errors: [{ attributeCode: null, reason: "values_not_an_object" }] };
   }
-  if (utf8ByteLength(JSON.stringify(values)) > TEXT_LIMITS.attributesJsonBytes) {
-    return {
-      ok: false,
-      errors: [
-        {
-          attributeCode: null,
-          reason: "values_too_large",
-          limit: TEXT_LIMITS.attributesJsonBytes,
-        },
-      ],
-    };
-  }
-
   const assignments = productType.attributes.filter((assignment) => assignment.level === level);
   const byCode = new Map(assignments.map((assignment) => [assignment.attribute.code, assignment]));
   const errors: AttributeValueError[] = [];
@@ -460,6 +447,20 @@ export function validateAttributeValues(
         errors.push({ attributeCode: assignment.attribute.code, reason: "required" });
       }
     }
+  }
+
+  // Every value passed its type check above, so it is shallow (strings, numbers, booleans, flat arrays and
+  // maps of strings) and serializing it is safe. Stringifying first would overflow the stack on a value nested
+  // tens of thousands of levels deep.
+  if (
+    errors.length === 0 &&
+    utf8ByteLength(JSON.stringify(values)) > TEXT_LIMITS.attributesJsonBytes
+  ) {
+    errors.push({
+      attributeCode: null,
+      reason: "values_too_large",
+      limit: TEXT_LIMITS.attributesJsonBytes,
+    });
   }
 
   return errors.length === 0 ? { ok: true } : { ok: false, errors };

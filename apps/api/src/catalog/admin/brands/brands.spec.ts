@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
 import { startApp, type RunningApp } from "../../../test/app.js";
 import type { ProblemBody } from "../../../common/problem.filter.js";
 import type { Page } from "../../../common/pagination.js";
+import { BrandsRepository } from "./brands.repository.js";
 import type { BrandResponse } from "./brands.schemas.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -116,6 +117,50 @@ describe("admin brands API (real app, real Postgres)", () => {
       ]);
     });
 
+    it("generates distinct slugs of at most 160 characters for the same 200 character name", async () => {
+      const name = { uk: `${runId}${"a".repeat(192)}` };
+      const slugs: string[] = [];
+      for (let round = 0; round < 4; round += 1) {
+        slugs.push((await createBrand({ name })).slug);
+      }
+      const base = `${runId}${"a".repeat(152)}`;
+      expect(slugs).toEqual([
+        base,
+        `${base.slice(0, 158)}-2`,
+        `${base.slice(0, 158)}-3`,
+        `${base.slice(0, 158)}-4`,
+      ]);
+    });
+
+    describe("retries of a generated slug", () => {
+      afterEach(() => {
+        vi.restoreAllMocks();
+      });
+
+      it("answers 409 at once, without a retry, for an explicit slug that is taken", async () => {
+        const existing = await createBrand({ name: uniqueName(), slug: `fast-${runId}` });
+        const inserts = vi.spyOn(running.app.get(BrandsRepository), "insert");
+        const result = await http(running.baseUrl, "POST", "/admin/brands", {
+          body: { name: uniqueName(), slug: existing.slug },
+        });
+        expect(result.status).toBe(409);
+        expect(inserts).toHaveBeenCalledTimes(1);
+      });
+
+      it("stops with 409 when a retry would generate the same slug again", async () => {
+        const name = { uk: `Repeat ${runId}` };
+        await createBrand({ name });
+        const inserts = vi.spyOn(running.app.get(BrandsRepository), "insert");
+        // The lookup never sees the taken slug, so every attempt generates the colliding one.
+        vi.spyOn(running.app.get(BrandsRepository), "findSlugsStartingWith").mockResolvedValue(
+          new Set(),
+        );
+        const result = await http(running.baseUrl, "POST", "/admin/brands", { body: { name } });
+        expect(result.status).toBe(409);
+        expect(inserts).toHaveBeenCalledTimes(2);
+      });
+    });
+
     it("keeps slugs unique when several brands with the same name are created at once", async () => {
       const name = { uk: `Parallel ${runId}` };
       const results = await Promise.all(
@@ -222,6 +267,7 @@ describe("admin brands API (real app, real Postgres)", () => {
       ["data:image/png;base64,AAAA"],
       [`https://example.com/${"a".repeat(2048)}`],
       ["https://example.com/a\u0000b"],
+      ["https://example.com/a\ud800b"],
     ])("answers 400 for the logoUrl %j", async (logoUrl) => {
       const result = await http(running.baseUrl, "POST", "/admin/brands", {
         body: { name: uniqueName(), logoUrl },
