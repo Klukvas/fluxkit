@@ -18,6 +18,10 @@ export type AttributeValidation = Readonly<Record<string, unknown>>;
 
 export interface AttributeOptionDefinition {
   readonly code: string;
+  /** Translated label; only needed where values are shown to people (store serialization). */
+  readonly label?: I18nText;
+  /** Display order among the options of one attribute; options without it sort last. */
+  readonly position?: number;
 }
 
 export interface AttributeDefinition {
