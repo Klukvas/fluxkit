@@ -4,6 +4,7 @@ import { HttpException } from "@nestjs/common";
 export const PROBLEM_CODES = [
   "validation_failed",
   "unauthorized",
+  "forbidden",
   "not_found",
   "conflict",
   "in_use",
@@ -17,6 +18,7 @@ export type ProblemCode = (typeof PROBLEM_CODES)[number];
 export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   validation_failed: 400,
   unauthorized: 401,
+  forbidden: 403,
   not_found: 404,
   conflict: 409,
   in_use: 409,
@@ -28,6 +30,7 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   validation_failed: "Validation failed",
   unauthorized: "Authentication required",
+  forbidden: "Forbidden",
   not_found: "Not found",
   conflict: "Conflict",
   in_use: "Resource is in use",
@@ -83,6 +86,11 @@ export function validationFailed(
 
 export function unauthorized(detail = "Authentication is required."): ProblemException {
   return new ProblemException({ code: "unauthorized", detail });
+}
+
+/** Signed in (or a public route) but not allowed: the role lacks the permission, or the CSRF header is missing. */
+export function forbidden(detail = "You do not have permission to do this."): ProblemException {
+  return new ProblemException({ code: "forbidden", detail });
 }
 
 export function notFound(resource: string): ProblemException {

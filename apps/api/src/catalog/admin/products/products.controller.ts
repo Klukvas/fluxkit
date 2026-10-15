@@ -2,6 +2,7 @@ import { Body, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Res } from
 import { ApiNoContentResponse, ApiOperation, ApiParam, ApiQuery } from "@nestjs/swagger";
 import type { Response } from "express";
 import { AdminController } from "../../../auth/admin-controller.decorator.js";
+import { RequirePermission } from "../../../auth/route-access.js";
 import {
   ApiPaginationQuery,
   ApiProblemResponses,
@@ -104,6 +105,7 @@ export class ProductsController {
   }
 
   @Post(":id/publish")
+  @RequirePermission("catalog.publish")
   @HttpCode(200)
   @ApiOperation({
     summary: "Publish a draft product (draft to active); every publish precondition is checked",
@@ -116,6 +118,7 @@ export class ProductsController {
   }
 
   @Post(":id/unpublish")
+  @RequirePermission("catalog.publish")
   @HttpCode(200)
   @ApiOperation({ summary: "Take an active product back to draft" })
   @ApiParam(ID_PARAM)
@@ -126,6 +129,7 @@ export class ProductsController {
   }
 
   @Post(":id/archive")
+  @RequirePermission("catalog.publish")
   @HttpCode(200)
   @ApiOperation({ summary: "Archive a draft or active product (soft delete)" })
   @ApiParam(ID_PARAM)
@@ -136,6 +140,7 @@ export class ProductsController {
   }
 
   @Post(":id/restore")
+  @RequirePermission("catalog.publish")
   @HttpCode(200)
   @ApiOperation({ summary: "Restore an archived product as a draft (publish again to go live)" })
   @ApiParam(ID_PARAM)

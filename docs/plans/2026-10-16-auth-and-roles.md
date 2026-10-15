@@ -107,3 +107,14 @@ Migration `0002_admin_auth` (two new tables, nothing existing changes). New endp
 - Migration `0002_admin_auth`.
 - Public contract changes: new endpoints, `forbidden` problem code, the CSRF request header, the session cookie.
 - No new dependency is requested.
+
+## Implementation notes
+
+### Step 3a (infrastructure)
+- **Deviation: default permission by HTTP method.** The plan says every admin route declares exactly one permission by hand. To keep the 60-odd existing catalog routes untouched, `@AdminController` applies a default: a route without its own `@RequirePermission` needs `catalog.read` for GET and HEAD and `catalog.write` for every other method. Only the four product lifecycle routes (`publish`, `unpublish`, `archive`, `restore`) are annotated explicitly with `catalog.publish`. The safety property of the plan holds: a plain `@Controller("admin/...")` (no `@AdminController`, no metadata) has no default and is denied with `403 forbidden` once signed in (`401` before). `admin-permissions.spec.ts` resolves the permission of every route and fails when one is undeclared or differs from this rule.
+- **Check order** in `AdminGuard`: CSRF header (state-changing methods, also for anonymous callers), then `@PublicAdminRoute` short circuit, then authentication (401), then permission (403). CSRF applies to public routes too, so login needs the header.
+- **Both public and permissioned on one level** (`@PublicAdminRoute` with `@RequirePermission` on the same route or the same controller) throws, ending as a logged 500; it never silently becomes public. The route's own declaration wins over the controller's.
+- **Config bounds** (not in the plan): `ADMIN_SESSION_IDLE_MINUTES` at most 525 600 and `ADMIN_SESSION_MAX_HOURS` at most 8 760 (one year), whole decimal numbers only, so a typo cannot silently mean "never expires". `ADMIN_COOKIE_SECURE` accepts exactly `true` or `false`.
+- **scrypt bounds on stored strings**: `verify` treats `N` above 2^17, `r` or `p` above 16, a non power of two `N`, or a salt/hash that is not 16/64 bytes of strict base64 as malformed (returns false, never throws), so a corrupt row cannot make the API allocate gigabytes. Passwords are used as exact UTF-8 text without Unicode normalization.
+- `docs/contracts/api.md` (listing the contract items) is left for step 4 as planned; `docs/api/catalog.md` already documents what exists.
+

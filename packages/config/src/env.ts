@@ -11,6 +11,28 @@ const localeCode = z
 export const DEFAULT_LOCALE = "uk";
 export const DEFAULT_LOCALES: readonly string[] = ["uk", "en"];
 
+/**
+ * Defaults of the admin session limits. They equal `SESSION_DEFAULTS` of `@fluxkit/core` (a test in apps/api asserts it);
+ * this package does not depend on core, so the numbers are repeated here on purpose.
+ */
+export const DEFAULT_ADMIN_SESSION_IDLE_MINUTES = 720;
+export const DEFAULT_ADMIN_SESSION_MAX_HOURS = 168;
+/** One year: a larger value is almost certainly a typo and would only postpone session expiry to "never". */
+const MAX_ADMIN_SESSION_IDLE_MINUTES = 525_600;
+const MAX_ADMIN_SESSION_MAX_HOURS = 8_760;
+
+/** Exactly `true` or `false`: a typo in a security flag must fail loudly, not fall back to a default. */
+const strictBoolean = z.enum(["true", "false"]).transform((value) => value === "true");
+
+/** Plain decimal digits only (no sign, exponent, hex, spaces or decimals), within 1..max. */
+function positiveInteger(max: number) {
+  return z
+    .string()
+    .regex(/^[1-9][0-9]*$/, "must be a positive whole number")
+    .transform(Number)
+    .pipe(z.number().max(max, `must be at most ${max}`));
+}
+
 const envSchema = z
   .object({
     DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
@@ -24,6 +46,13 @@ const envSchema = z
       .default(DEFAULT_LOCALES.join(","))
       .transform((value) => value.split(",").map((locale) => locale.trim()))
       .pipe(z.array(localeCode).min(1)),
+    ADMIN_COOKIE_SECURE: strictBoolean.default(true),
+    ADMIN_SESSION_IDLE_MINUTES: positiveInteger(MAX_ADMIN_SESSION_IDLE_MINUTES).default(
+      DEFAULT_ADMIN_SESSION_IDLE_MINUTES,
+    ),
+    ADMIN_SESSION_MAX_HOURS: positiveInteger(MAX_ADMIN_SESSION_MAX_HOURS).default(
+      DEFAULT_ADMIN_SESSION_MAX_HOURS,
+    ),
   })
   .superRefine((env, context) => {
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
@@ -52,6 +81,12 @@ export interface AppEnv {
   defaultLocale: string;
   /** Locales accepted in translated texts; contains `defaultLocale`. */
   locales: string[];
+  /** `Secure` flag of the admin session cookie. Only `false` for local plain-HTTP development. */
+  adminCookieSecure: boolean;
+  /** Admin session is closed after this many idle minutes. */
+  adminSessionIdleMinutes: number;
+  /** Absolute admin session lifetime in hours. */
+  adminSessionMaxHours: number;
 }
 
 /** Validates and normalizes process environment variables. Throws with a readable message on invalid input. */
@@ -72,5 +107,8 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     featuresDir: env.FEATURES_DIR,
     defaultLocale: env.DEFAULT_LOCALE,
     locales: env.LOCALES,
+    adminCookieSecure: env.ADMIN_COOKIE_SECURE,
+    adminSessionIdleMinutes: env.ADMIN_SESSION_IDLE_MINUTES,
+    adminSessionMaxHours: env.ADMIN_SESSION_MAX_HOURS,
   };
 }

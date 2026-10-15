@@ -2,7 +2,7 @@
 
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
-- `src/app.factory.ts` - `createApp` (loads features, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
+- `src/app.factory.ts` - `createApp` (loads features, passes the admin session settings, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
 - `src/app.module.ts` - root module; composes database, auth, common, health, catalog and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
@@ -11,7 +11,7 @@
 
 - `common.module.ts` - global module: the problem filter for every route and the locale configuration (`LOCALE_CONFIG`).
 - `locale.ts` - `LOCALE_CONFIG` token and `LocaleConfig` (`defaultLocale`, `locales`), fed from `DEFAULT_LOCALE` and `LOCALES`.
-- `problem.ts` - error codes (`PROBLEM_CODES`), status and title maps, `ProblemException` and factories (`validationFailed`, `notFound`, `conflict`, `inUse`, `invalidTransition`, `ruleViolation`). Must not carry SQL or internals.
+- `problem.ts` - error codes (`PROBLEM_CODES`), status and title maps, `ProblemException` and factories (`validationFailed`, `notFound`, `conflict`, `inUse`, `invalidTransition`, `ruleViolation`, `unauthorized`, `forbidden`). Must not carry SQL or internals.
 - `problem.filter.ts` - the one `application/problem+json` writer: known problems pass through, framework 4xx get generic details, unknown errors are logged (method and path only) and answered as `internal_error`.
 - `postgres-errors.ts` - maps SQLSTATE and constraint names to problems (`23505` to `conflict` with `field`, `23503` to `in_use` or `invalid_reference`, `23514` to `validation_failed`). Never maps by message text.
 - `zod-validation.pipe.ts` - validates `@Body`, `@Query`, `@Param` with zod and turns issues into `errors[]` (`required`, `unknown_field`, ...); `uuidParam` for id parameters.
@@ -23,11 +23,21 @@
 
 ## Auth (`src/auth/`)
 
-- `admin-authenticator.ts` - `AdminAuthenticator` contract and `DenyAllAdminAuthenticator` (the production default: denies everything). No environment switch, no API key.
-- `admin.guard.ts` - `AdminGuard`: default deny; throws `401 unauthorized` unless the authenticator allows the request.
-- `admin-controller.decorator.ts` - `@AdminController(resource)`: `/admin/<resource>` with the guard, the Swagger tag, and the 401 and 500 problem responses. Use it for every admin controller.
-- `auth.module.ts` - global `AuthModule.register(authenticator?)`; the auth plan replaces the provider, not the guard.
-- `admin.guard.spec.ts` - proves the default denies.
+- `admin-authenticator.ts` - `AdminAuthenticator` contract (`authenticate(request)` returns an `AdminPrincipal` or `undefined`) and the `AdminPrincipal` type. No environment switch, no API key.
+- `session-admin-authenticator.ts` - the production authenticator: session cookie -> `SessionService.resolve` -> principal with the role's permissions. Rethrows internal failures (500), never turns them into access.
+- `session.service.ts` - sessions: `create` (32-byte random token, only its SHA-256 stored), `resolve` (core `evaluateSession`, active user, role read from the database every call, `last_seen_at` touched at most once a minute, expired sessions deleted), `revoke`, `revokeAllForUser`. Never logs tokens.
+- `session.repository.ts` - Drizzle queries on `admin_session` joined to `admin_user`. Tables only, no rules.
+- `session-cookie.ts` - cookie name, safe `Cookie` header parsing (first valid occurrence), `setSessionCookie` / `clearSessionCookie` with the fixed flags. Must not hold session rules.
+- `password-hasher.ts` - `PasswordHasher`: `node:crypto` scrypt (asynchronous), self-describing `scrypt$N$r$p$salt$hash`, `verify` (timing-safe, false on malformed input), `needsRehash`, `verifyDummy`.
+- `clock.ts` - `Clock` and `SystemClock`, injected so tests control time.
+- `auth-config.ts` - `AdminAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
+- `admin.guard.ts` - `AdminGuard`: CSRF check, public short circuit, authentication (401), permission (403), once per request; `AdminPathGuard`: the global guard for every path under `/admin`.
+- `csrf.ts` - `assertCsrfSafe`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods.
+- `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `UseDefaultPermissionByMethod` and `resolveRouteAccess` (route, then controller, then the default by HTTP method). Must not hold role tables: those are in `@fluxkit/core`.
+- `current-admin.ts` - `@CurrentAdmin()` parameter decorator; the principal lives in a `WeakMap` keyed by the request.
+- `admin-controller.decorator.ts` - `@AdminController(resource)`: `/admin/<resource>` with the guard, the default permission by method, the Swagger tag, and the 401, 403 and 500 problem responses. Use it for every admin controller.
+- `auth.module.ts` - global `AuthModule.register(options)`: config, clock, hasher, session service, the authenticator (session-based unless a test replaces it) and the guards.
+- `*.spec.ts` - hasher, cookie, CSRF, session service (real Postgres), guard unit tests; `admin-default-deny.spec.ts` (401 on every route, probe controllers), `admin-permissions.spec.ts` (route walk, role matrix), `admin-csrf.spec.ts` (CSRF and no-CORS), `session-authentication.spec.ts` (cookie end to end), `auth-consistency.spec.ts` (`ROLES` vs the database CHECK, config defaults vs core).
 
 ## Catalog (`src/catalog/`)
 
@@ -93,11 +103,14 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 
 ## Test support (`src/test/`)
 
-- `app.ts` - `startApp` (listening test app with an authenticator override).
-- `allow-all-admin-authenticator.ts` - TEST ONLY: lets admin requests through. Never import outside `src/test` or specs.
+- `app.ts` - `startApp` (listening test app): default test authenticator signs in as an owner (`adminPrincipal: { role }` for another role), `"production-default"` runs the real session authenticator, plus a controlled `clock`, `extraFeatures` (probe controllers) and cheap scrypt parameters.
+- `allow-all-admin-authenticator.ts` - TEST ONLY: signs every admin request in as one fixed user (owner by default) and `testPrincipal`. Never import outside `src/test` or specs.
+- `fake-clock.ts` - TEST ONLY: a `Clock` the test moves by hand.
+- `admin-user-fixtures.ts` - TEST ONLY: inserts and deletes admin users directly (no user endpoint yet).
+- `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
 - `env.ts` - `requireEnv` and `requireTestDatabaseUrl` (fail, never skip, when a service variable or a non-`_test` database is used).
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.
-- `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204).
+- `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204); sends `X-Fluxkit-CSRF: 1` and a JSON content type by default, with `csrf: false` / `contentType` / `headers` to override.
 - `catalog-fixtures.ts` - catalog fixtures through the real admin routes, `expectVariantInvariants`, and the product-lock wait check.
 - `fixtures/features/sample/` - sample feature package used by the core feature-loader tests.
 

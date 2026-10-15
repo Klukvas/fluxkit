@@ -29,12 +29,14 @@ export interface ProblemBody {
 const CODE_BY_HTTP_STATUS: Readonly<Record<number, ProblemCode>> = {
   400: "validation_failed",
   401: "unauthorized",
+  403: "forbidden",
   404: "not_found",
   409: "conflict",
 };
 
 const GENERIC_DETAIL: Readonly<Record<number, string>> = {
   401: "Authentication is required.",
+  403: "You do not have permission to do this.",
   404: "The requested resource was not found.",
   409: "The request conflicts with the current state.",
   413: "The request body is too large.",

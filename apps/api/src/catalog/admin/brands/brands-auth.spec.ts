@@ -63,7 +63,7 @@ describe("brands routes when the authenticator fails", () => {
   it("fails closed with 500 internal_error and logs the cause", async () => {
     const logged = vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
     const running = await startApp({
-      adminAuthenticator: { allows: () => Promise.reject(new Error("token store down")) },
+      adminAuthenticator: { authenticate: () => Promise.reject(new Error("token store down")) },
     });
     try {
       const result = await http<ProblemBody>(running.baseUrl, "GET", "/admin/brands");

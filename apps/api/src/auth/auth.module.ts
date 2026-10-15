@@ -1,29 +1,53 @@
 import { Global, Module, type DynamicModule } from "@nestjs/common";
-import {
-  ADMIN_AUTHENTICATOR,
-  DenyAllAdminAuthenticator,
-  type AdminAuthenticator,
-} from "./admin-authenticator.js";
 import { APP_GUARD } from "@nestjs/core";
+import { ADMIN_AUTHENTICATOR, type AdminAuthenticator } from "./admin-authenticator.js";
 import { AdminGuard, AdminPathGuard } from "./admin.guard.js";
+import { ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth-config.js";
+import { CLOCK, SystemClock, type Clock } from "./clock.js";
+import { PasswordHasher, type ScryptParams } from "./password-hasher.js";
+import { SessionAdminAuthenticator } from "./session-admin-authenticator.js";
+import { SessionRepository } from "./session.repository.js";
+import { SessionService } from "./session.service.js";
+
+export interface AuthModuleOptions {
+  config: AdminAuthConfig;
+  /** Tests only: replaces the session-based authenticator. */
+  authenticator?: AdminAuthenticator;
+  /** Tests only: a controlled clock for session expiry. */
+  clock?: Clock;
+  /** Tests only: cheap scrypt parameters. */
+  scrypt?: ScryptParams;
+}
 
 /** Global so that any admin controller can use `AdminGuard` without importing this module. */
 @Global()
 @Module({})
 export class AuthModule {
-  /** `authenticator` is for tests only (the auth plan will replace the default provider instead). */
-  static register(authenticator?: AdminAuthenticator): DynamicModule {
+  static register(options: AuthModuleOptions): DynamicModule {
     return {
       module: AuthModule,
       providers: [
-        authenticator === undefined
-          ? { provide: ADMIN_AUTHENTICATOR, useClass: DenyAllAdminAuthenticator }
-          : { provide: ADMIN_AUTHENTICATOR, useValue: authenticator },
+        { provide: ADMIN_AUTH_CONFIG, useValue: options.config },
+        { provide: CLOCK, useValue: options.clock ?? new SystemClock() },
+        { provide: PasswordHasher, useFactory: () => new PasswordHasher(options.scrypt) },
+        SessionRepository,
+        SessionService,
+        SessionAdminAuthenticator,
+        options.authenticator === undefined
+          ? { provide: ADMIN_AUTHENTICATOR, useExisting: SessionAdminAuthenticator }
+          : { provide: ADMIN_AUTHENTICATOR, useValue: options.authenticator },
         AdminGuard,
         // Default deny for everything under /admin, whether or not the controller uses @AdminController.
         { provide: APP_GUARD, useClass: AdminPathGuard },
       ],
-      exports: [ADMIN_AUTHENTICATOR, AdminGuard],
+      exports: [
+        ADMIN_AUTHENTICATOR,
+        ADMIN_AUTH_CONFIG,
+        CLOCK,
+        PasswordHasher,
+        SessionService,
+        AdminGuard,
+      ],
     };
   }
 }
