@@ -1,5 +1,5 @@
 import pg from "pg";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { ProblemException } from "../common/problem.js";
 import { TEST_SCRYPT_PARAMS } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
@@ -375,8 +375,14 @@ describe("runCreateAdminCommand (real app, real Postgres)", () => {
     ).rejects.toThrow(/DATABASE_URL/);
   });
 
-  it("does not write the password or the hash to stdout or stderr while running", async () => {
+  it("does not log the password or the hash through console or the standard streams", async () => {
     const captured: string[] = [];
+    // Vitest replaces console, so console output does not reach process.stdout.write: spy on both.
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((method) =>
+      vi.spyOn(console, method).mockImplementation((...args: unknown[]) => {
+        captured.push(args.map(String).join(" "));
+      }),
+    );
     const stdoutWrite = process.stdout.write.bind(process.stdout);
     const stderrWrite = process.stderr.write.bind(process.stderr);
     const capture = ((chunk: string | Uint8Array) => {
@@ -390,6 +396,7 @@ describe("runCreateAdminCommand (real app, real Postgres)", () => {
     } finally {
       process.stdout.write = stdoutWrite;
       process.stderr.write = stderrWrite;
+      spies.forEach((spy) => spy.mockRestore());
     }
     const [row] = await rows();
     const text = captured.join("");
