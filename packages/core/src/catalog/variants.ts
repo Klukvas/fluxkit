@@ -1,4 +1,4 @@
-import { CATALOG_LIMITS, isValidCode } from "./limits.js";
+import { CATALOG_LIMITS, isValidCode, isValidValueCode } from "./limits.js";
 import type { OptionValuePair, VariantSnapshot } from "./types.js";
 
 /**
@@ -8,7 +8,7 @@ import type { OptionValuePair, VariantSnapshot } from "./types.js";
  */
 export function computeOptionSignature(pairs: readonly OptionValuePair[]): string {
   for (const pair of pairs) {
-    if (!isValidCode(pair.optionCode) || !isValidCode(pair.valueCode)) {
+    if (!isValidCode(pair.optionCode) || !isValidValueCode(pair.valueCode)) {
       // A code containing ";" or "=" could make two different combinations share a signature.
       throw new RangeError(
         `Invalid option or value code in signature: "${pair.optionCode}=${pair.valueCode}"`,
@@ -116,7 +116,7 @@ export function generateVariants(input: GenerateVariantsInput): GenerateVariants
       structuralErrors.push({ reason: "invalid_code", optionCode: option.code });
     }
     for (const valueCode of option.valueCodes) {
-      if (!isValidCode(valueCode)) {
+      if (!isValidValueCode(valueCode)) {
         structuralErrors.push({ reason: "invalid_code", optionCode: option.code, valueCode });
       }
     }

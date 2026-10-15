@@ -178,11 +178,17 @@ describe("value codes may start with a digit (numeric sizes), option codes may n
   });
 
   it("still rejects option codes that start with a digit", () => {
-    expect(() => computeOptionSignature([{ optionCode: "2size", valueCode: "m" }])).toThrow(/code/i);
+    expect(() => computeOptionSignature([{ optionCode: "2size", valueCode: "m" }])).toThrow(
+      /code/i,
+    );
   });
 
   it("still rejects value codes with separators", () => {
-    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "4;2" }])).toThrow(/code/i);
-    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "a=b" }])).toThrow(/code/i);
+    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "4;2" }])).toThrow(
+      /code/i,
+    );
+    expect(() => computeOptionSignature([{ optionCode: "size", valueCode: "a=b" }])).toThrow(
+      /code/i,
+    );
   });
 });
