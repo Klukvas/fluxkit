@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
+import * as auth from "./auth/index.js";
+import * as cart from "./cart/index.js";
+import * as catalog from "./catalog/index.js";
 import * as core from "./index.js";
+import * as inventory from "./inventory/index.js";
+import * as orders from "./orders/index.js";
+import * as pricing from "./pricing/index.js";
 
 describe("public entry point", () => {
   it("exports the catalog domain functions", () => {
@@ -58,6 +64,27 @@ describe("public entry point", () => {
       "decideCommit",
       "decideExpire",
       "decideAdjustment",
+      "decideExtend",
+      "addLine",
+      "setLineQuantity",
+      "removeLine",
+      "mergeCarts",
+      "priceCart",
+      "computeOrderTotals",
+      "buildOrderLine",
+      "decideTransition",
+      "stockEffectOf",
+      "isTerminalStatus",
+      "formatOrderNumber",
+      "parseOrderNumber",
+      "normalizePhone",
+      "validatePersonName",
+      "validateAddress",
+      "shippingAddressRequired",
+      "orderExpiresAt",
+      "reservationExpiresAt",
+      "guestAccessExpiresAt",
+      "isGuestAccessValid",
     ] as const;
     for (const name of functions) {
       expect(typeof core[name], name).toBe("function");
@@ -71,5 +98,25 @@ describe("public entry point", () => {
     expect(core.MAX_QUANTITY).toBe(1_000_000);
     expect(core.CURRENCIES.UAH).toBe(2);
     expect(core.MAX_ON_HAND).toBe(1_000_000_000);
+    expect(core.MAX_CART_LINES).toBe(100);
+    expect(core.MAX_LINE_QUANTITY).toBe(999);
+    expect(core.ORDER_STATUSES).toHaveLength(5);
+    expect(core.ORDER_ACTORS).toHaveLength(4);
+    expect(core.ORDER_NUMBER_BYTES).toBe(5);
+    expect(core.ORDER_PAYMENT_TTL_MINUTES.default).toBe(30);
+    expect(core.RESERVATION_GRACE_MINUTES).toBe(10);
+    expect(core.GUEST_ACCESS_DAYS.default).toBe(90);
+  });
+
+  it("exports the new admin permissions", () => {
+    for (const permission of ["orders.read", "orders.write", "customers.read", "customers.write"]) {
+      expect(core.PERMISSIONS, permission).toContain(permission);
+    }
+  });
+
+  it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
+    const parts = [auth, cart, catalog, inventory, orders, pricing];
+    const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);
+    expect(Object.keys(core).length).toBe(total);
   });
 });
