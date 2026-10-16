@@ -91,12 +91,14 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `store-controller.decorator.ts` - `@StoreController(resource)`: `/store/<resource>`, no guard, read-only, the `store` Swagger tag.
 - `store-categories.controller.ts` - `GET /store/categories`.
 - `store-products.controller.ts` - `GET /store/products` and `GET /store/products/{slug}`.
+- `store-config.controller.ts` - `GET /store/config` (shop currency with exponent, tax flag, locales; no database access).
+- `store-pricing.ts` - feeds core `pickSellablePrice` and `availabilityOf` for the sellable variants and aggregates per product (`from`/`to`, best availability). Must NOT compute a price or an availability itself.
 - `store.schemas.ts` - query and response shapes of the store API; the page size default (24) lives here.
-- `store.service.ts` - store rules: locale resolution (400 on unknown), active-only visibility, category subtree filter, image choice, order. Must not return internal attributes.
+- `store.service.ts` - store rules: locale resolution (400 on unknown), active-only visibility, category subtree filter, image choice, order, sellable-variant set (ADR 0007 option hiding), 404 for a product with no sellable variant. Must not return internal attributes, quantities or non-shop prices.
 - `store.serializer.ts` - the one place that emits attribute values and definitions to clients, via core `selectPublicAttributes` and `publicAttributeDefinitions`; `requiredText` logs and degrades to `""` when a required text has no locale.
 - `store-categories.ts` - builds the visible category tree (every ancestor active) and the subtree of a slug.
-- `store.repository.ts` - read-only Drizzle queries (batch loads, no N+1). Must not apply business rules beyond SQL filters (`status`, `is_active`).
-- `store.spec.ts` - HTTP tests: visibility, leaks of internal attributes, locale, pagination bounds, query counts.
+- `store.repository.ts` - read-only Drizzle queries (batch loads, no N+1). Must not apply business rules beyond SQL filters (`status`, `is_active`, the shop-currency price join); prices and stock levels are loaded for a set of product ids in one query each.
+- `store.spec.ts` - HTTP tests: visibility, leaks of internal attributes, locale, pagination bounds, query counts, prices, availability, hiding of unpriced variants, `GET /store/config`, leak scans for stock and price data.
 
 ## Inventory (`src/inventory/`)
 
