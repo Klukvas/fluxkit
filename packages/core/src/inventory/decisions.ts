@@ -253,3 +253,48 @@ export function decideAdjustment(
     movement: { kind: adjustment.kind, delta, onHandAfter: onHand },
   };
 }
+
+export type ExtendRefusal = "not_active" | "already_committed" | "invalid_expiry" | "would_shorten";
+
+export type ExtendDecision =
+  | { readonly ok: true; readonly expiresAt: Date }
+  | { readonly ok: false; readonly reason: ExtendRefusal };
+
+function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime());
+}
+
+function refuseExtend(reason: ExtendRefusal): ExtendDecision {
+  return { ok: false, reason };
+}
+
+/**
+ * Moves the expiry of an ACTIVE reservation later, for example to hold a backordered line of a paid order until stock
+ * arrives (plan 2026-10-17, open question 3). It never shortens (`would_shorten`; the same time again is accepted, so a
+ * retry is harmless) and changes neither the level nor the journal. Status checks come first and use the reasons of
+ * release and commit; a new expiry that is not a valid Date is `invalid_expiry`. The caller decides whether an active
+ * reservation whose time already passed may still be extended: there is no clock here. A corrupt stored status or expiry
+ * throws a RangeError.
+ */
+export function decideExtend(
+  reservation: { readonly status: ReservationStatus; readonly expiresAt: Date },
+  newExpiresAt: Date,
+): ExtendDecision {
+  assertValidStatus(reservation.status);
+  if (!isValidDate(reservation.expiresAt)) {
+    throw new RangeError("A reservation needs a valid expiry date");
+  }
+  if (reservation.status === "committed") {
+    return refuseExtend("already_committed");
+  }
+  if (reservation.status !== "active") {
+    return refuseExtend("not_active");
+  }
+  if (!isValidDate(newExpiresAt)) {
+    return refuseExtend("invalid_expiry");
+  }
+  if (newExpiresAt.getTime() < reservation.expiresAt.getTime()) {
+    return refuseExtend("would_shorten");
+  }
+  return { ok: true, expiresAt: new Date(newExpiresAt.getTime()) };
+}

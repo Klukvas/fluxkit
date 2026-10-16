@@ -5,10 +5,12 @@ import {
   decideAdjustment,
   decideCommit,
   decideExpire,
+  decideExtend,
   decideRelease,
   decideReserve,
 } from "./decisions.js";
 import { MAX_ON_HAND, MAX_RESERVED } from "./limits.js";
+import type { ReservationStatus } from "./types.js";
 
 const tracked = { trackInventory: true, allowBackorder: false } as const;
 const backorder = { trackInventory: true, allowBackorder: true } as const;
@@ -376,5 +378,107 @@ describe("backorder fulfilment flow (R1)", () => {
     expect(commit(4)).toBe("committed");
     expect(commit(2)).toBe("committed");
     expect(current).toEqual({ onHand: 0, reserved: 0 });
+  });
+});
+
+describe("decideExtend", () => {
+  const current = new Date("2026-10-17T12:40:00.000Z");
+  const later = new Date("2026-10-18T12:40:00.000Z");
+  const reservation = (status: ReservationStatus) => deepFreeze({ status, expiresAt: current });
+
+  it("moves the expiry of an active reservation to a later time", () => {
+    expect(decideExtend(reservation("active"), later)).toEqual({ ok: true, expiresAt: later });
+    expect(decideExtend(reservation("active"), new Date(current.getTime() + 1))).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it("accepts the same time again (a retry) but never an earlier one", () => {
+    expect(decideExtend(reservation("active"), new Date(current.getTime()))).toEqual({
+      ok: true,
+      expiresAt: current,
+    });
+    expect(decideExtend(reservation("active"), new Date(current.getTime() - 1))).toEqual({
+      ok: false,
+      reason: "would_shorten",
+    });
+    expect(decideExtend(reservation("active"), new Date(0))).toEqual({
+      ok: false,
+      reason: "would_shorten",
+    });
+  });
+
+  it("refuses a reservation that is not active, with the same reasons as release and commit", () => {
+    expect(decideExtend(reservation("committed"), later)).toEqual({
+      ok: false,
+      reason: "already_committed",
+    });
+    expect(decideExtend(reservation("released"), later)).toEqual({
+      ok: false,
+      reason: "not_active",
+    });
+    expect(decideExtend(reservation("expired"), later)).toEqual({
+      ok: false,
+      reason: "not_active",
+    });
+  });
+
+  it("checks the status before the new time", () => {
+    expect(decideExtend(reservation("released"), new Date(Number.NaN))).toEqual({
+      ok: false,
+      reason: "not_active",
+    });
+    expect(decideExtend(reservation("committed"), new Date(0))).toEqual({
+      ok: false,
+      reason: "already_committed",
+    });
+  });
+
+  it("refuses a new expiry that is not a valid Date (invalid_expiry)", () => {
+    for (const value of [new Date(Number.NaN), "2027-01-01", 1_800_000_000_000, null, undefined]) {
+      expect(decideExtend(reservation("active"), value as Date), String(value)).toEqual({
+        ok: false,
+        reason: "invalid_expiry",
+      });
+    }
+  });
+
+  it("returns a new Date, so the caller can not change the result through its input", () => {
+    const input = new Date(later.getTime());
+    const result = decideExtend(reservation("active"), input);
+    if (!result.ok) throw new Error("expected ok");
+    expect(result.expiresAt).not.toBe(input);
+    input.setTime(0);
+    expect(result.expiresAt.getTime()).toBe(later.getTime());
+  });
+
+  it("does not change its input", () => {
+    const stored = deepFreeze({
+      status: "active" as const,
+      expiresAt: new Date(current.getTime()),
+    });
+    const target = new Date(later.getTime());
+    decideExtend(stored, target);
+    expect(stored.expiresAt.getTime()).toBe(current.getTime());
+    expect(target.getTime()).toBe(later.getTime());
+  });
+
+  it("treats corrupt stored data as a bug (RangeError): unknown status, invalid stored expiry", () => {
+    expect(() =>
+      decideExtend({ status: "pending" as ReservationStatus, expiresAt: current }, later),
+    ).toThrow(RangeError);
+    expect(() =>
+      decideExtend({ status: "active", expiresAt: new Date(Number.NaN) }, later),
+    ).toThrow(RangeError);
+    expect(() =>
+      decideExtend({ status: "active", expiresAt: "2026-10-17" as unknown as Date }, later),
+    ).toThrow(RangeError);
+  });
+
+  it("decides the expiry only: the result carries no level and no journal row", () => {
+    expect(Object.keys(decideExtend(reservation("active"), later)).sort()).toEqual([
+      "expiresAt",
+      "ok",
+    ]);
   });
 });
