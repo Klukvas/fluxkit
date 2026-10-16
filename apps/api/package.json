@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:drift": "bash ../../scripts/check-schema-drift.sh",
     "start": "node --env-file=../../.env dist/main.js",
+    "db:migrate": "node --env-file=../../.env dist/database/migrate.js",
     "seed": "node --env-file=../../.env dist/seed/seed.js",
     "admin:create": "node --env-file=../../.env dist/auth/create-admin.js",
     "admin:unlock": "node --env-file=../../.env dist/auth/unlock-admin.js"

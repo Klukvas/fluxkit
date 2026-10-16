@@ -105,6 +105,10 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `catalog-schema.spec.ts` - constraint tests on real Postgres (inside rolled-back transactions).
 - `admin-auth-schema.spec.ts` - constraint, cascade and name tests for the admin auth tables.
 - `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database; refuses other database names.
+- `migrate.ts` - entry of `pnpm db:migrate` (built output run by Node); prints the result, exit code 1 on any error.
+- `migrate-command.ts` - `runMigrateCommand`: applies the pending migrations of `drizzle/` with the Drizzle migrator under a session-level advisory lock (`MIGRATION_LOCK_KEY`), refuses a database that is ahead of the journal, redacts connection strings and passwords from errors. Forward only: must never roll back, drop or delete. The folder is resolved from the file location, not the working directory.
+- `migrate-command.spec.ts` - the command on scratch `*_test` databases: fresh, repeat, incremental, ahead refusal, advisory lock, concurrency, failing migration, redaction.
+- `migrate-entry.spec.ts` - the built `dist/database/migrate.js` as a real process: same cases plus missing `DATABASE_URL`, arguments, unreachable database and other working directories.
 
 ## Migrations (`drizzle/`)
 
@@ -130,6 +134,7 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `auth-http.ts` - TEST ONLY: `login`, `loginCookie` and `sessionCookieOf` for specs that sign in through the real endpoint.
 - `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
 - `env.ts` - `requireEnv` and `requireTestDatabaseUrl` (fail, never skip, when a service variable or a non-`_test` database is used).
+- `scratch-database.ts` - TEST ONLY: `createScratchDatabase()` creates (and drops) an empty `fluxkit_mig_<random>_test` database beside the test database, for specs that need "nothing migrated" without wiping the shared one.
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.
 - `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204); sends `X-Fluxkit-CSRF: 1` and a JSON content type by default, with `csrf: false` / `contentType` / `headers` to override.
 - `catalog-fixtures.ts` - catalog fixtures through the real admin routes, `expectVariantInvariants`, and the product-lock wait check.
