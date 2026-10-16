@@ -1,4 +1,4 @@
-import { MAX_QUANTITY } from "@fluxkit/core";
+import { MAX_QUANTITY, MAX_RESERVED } from "@fluxkit/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type RunningApp } from "../../test/app.js";
@@ -207,6 +207,68 @@ describe("ReservationsService (real Postgres, no HTTP route)", () => {
         await reserveOk(variantId, 2);
         expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 0, reserved: 5 });
         await expectLevelInvariants(pool, variantId, mainId, { allowBackorder: true });
+      });
+
+      it("refuses a reserved total above the stored limit and writes nothing (R5)", async () => {
+        const { variantId } = await world.variant({ allowBackorder: true });
+        await reserveOk(variantId, 1);
+        await pool.query("update inventory_level set reserved = $2 where variant_id = $1", [
+          variantId,
+          MAX_RESERVED - 5,
+        ]);
+        expect(await service.reserve({ variantId, quantity: 10, expiresAt: future() })).toEqual({
+          ok: false,
+          reason: "reserved_out_of_range",
+        });
+        expect(await levelOf(pool, variantId, mainId)).toEqual({
+          on_hand: 0,
+          reserved: MAX_RESERVED - 5,
+        });
+        expect(await reservationsOf(pool, variantId)).toHaveLength(1);
+        // A reservation that lands exactly on the bound still works.
+        await reserveOk(variantId, 5);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({
+          on_hand: 0,
+          reserved: MAX_RESERVED,
+        });
+      });
+
+      it("fulfils backorders in parts: reserve beyond stock, receive in parts, commit one by one (R1)", async () => {
+        const { productId, variantId } = await world.variant({ allowBackorder: true, onHand: 1 });
+        const first = await reserveOk(variantId, 4);
+        const second = await reserveOk(variantId, 4);
+        const third = await reserveOk(variantId, 2);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 1, reserved: 10 });
+
+        // A receipt smaller than the backorder is accepted; commits start as soon as one reservation is covered.
+        await world.receive({ productId, variantId }, 2);
+        expect(await service.commit(first.id, { actorId })).toEqual({
+          ok: false,
+          reason: "insufficient_stock",
+        });
+        await world.receive({ productId, variantId }, 1);
+        expect((await service.commit(first.id, { actorId })).ok).toBe(true);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 0, reserved: 6 });
+        expect(await service.commit(second.id, { actorId })).toEqual({
+          ok: false,
+          reason: "insufficient_stock",
+        });
+        await world.receive({ productId, variantId }, 6);
+        expect((await service.commit(third.id, { actorId })).ok).toBe(true);
+        expect((await service.commit(second.id, { actorId })).ok).toBe(true);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 0, reserved: 0 });
+        await expectLevelInvariants(pool, variantId, mainId, { allowBackorder: true });
+        const journal = await movementsOf(pool, variantId);
+        expect(journal.map((row) => `${row.kind}:${row.delta}`)).toEqual([
+          "receipt:1",
+          "receipt:2",
+          "receipt:1",
+          "sale:-4",
+          "receipt:6",
+          "sale:-2",
+          "sale:-4",
+        ]);
+        expectJournalReplays(journal, 0);
       });
 
       it("refuses to commit units that are not on hand and keeps the reservation active", async () => {

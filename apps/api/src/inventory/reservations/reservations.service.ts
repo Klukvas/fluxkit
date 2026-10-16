@@ -49,12 +49,15 @@ export interface ReserveInput {
 
 /**
  * Why `reserve` did not hold anything. `not_tracked` means the variant has no stock to hold: the caller skips the
- * reservation and sells it freely. `variant_not_sellable` means the variant is inactive or its product is not published.
+ * reservation and sells it freely. `variant_not_sellable` means the variant cannot be bought (see `isVariantSellable`).
+ * `reserved_out_of_range` means the level would hold more reserved units than the stored limit (`MAX_RESERVED`; only
+ * reachable with backorder).
  */
 export type ReserveRefusal =
   | "invalid_quantity"
   | "not_tracked"
   | "insufficient_stock"
+  | "reserved_out_of_range"
   | "variant_not_found"
   | "variant_not_sellable"
   | "location_not_found";

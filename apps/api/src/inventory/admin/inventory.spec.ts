@@ -357,6 +357,29 @@ describe("admin inventory API (real app, real Postgres)", () => {
         expect(await movementsOf(pool, variantId)).toHaveLength(1);
       });
 
+      it("accepts a receipt smaller than the backordered quantity and keeps reserved (R1)", async () => {
+        const { productId, variantId } = await newVariant();
+        await call("PATCH", `/admin/products/${productId}/variants/${variantId}`, {
+          allowBackorder: true,
+        });
+        await receive(productId, variantId, 1);
+        await setReserved(variantId, mainId, 10);
+        await pool.query(
+          "update inventory_level set on_hand = 0 where variant_id = $1 and location_id = $2",
+          [variantId, mainId],
+        );
+        const partial = await adjust(productId, variantId, { delta: 5, kind: "receipt" });
+        expect(partial.status, JSON.stringify(partial.body)).toBe(201);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 5, reserved: 10 });
+        // Lowering stays refused while the stock is below the reservations.
+        const lowering = await adjust(productId, variantId, { delta: -1, kind: "adjustment" });
+        expect(lowering.status).toBe(409);
+        expect(problem(lowering)).toMatchObject({ rule: "below_reserved" });
+        const raised = await adjust(productId, variantId, { setOnHand: 7, kind: "adjustment" });
+        expect(raised.status, JSON.stringify(raised.body)).toBe(201);
+        expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 7, reserved: 10 });
+      });
+
       it("creates neither a level nor a movement when the first adjustment is refused", async () => {
         const { productId, variantId } = await newVariant();
         const result = await adjust(productId, variantId, { delta: -1, kind: "adjustment" });

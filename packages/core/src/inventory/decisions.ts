@@ -1,5 +1,5 @@
 import { MAX_QUANTITY } from "../pricing/limits.js";
-import { MAX_ON_HAND } from "./limits.js";
+import { MAX_ON_HAND, MAX_RESERVED } from "./limits.js";
 import { assertValidFlags, assertValidLevel, assertValidStatus } from "./types.js";
 import type {
   ReservationStatus,
@@ -31,6 +31,7 @@ export type StockRefusal =
   | "negative_on_hand"
   | "below_reserved"
   | "on_hand_out_of_range"
+  | "reserved_out_of_range"
   | "kind_requires_increase";
 
 export interface StockRefused<Reason extends StockRefusal = StockRefusal> {
@@ -78,14 +79,19 @@ function isValidQuantity(quantity: unknown): quantity is number {
 }
 
 /**
- * Holds `quantity` units. Reserved never exceeds on hand unless backorder is allowed. A variant that is not tracked has
- * no stock to hold (`not_tracked`): the caller skips the reservation.
+ * Holds `quantity` units. Reserved never exceeds on hand unless backorder is allowed, and never exceeds `MAX_RESERVED`
+ * (`reserved_out_of_range`). A variant that is not tracked has no stock to hold (`not_tracked`): the caller skips the
+ * reservation.
  */
 export function decideReserve(
   level: StockLevel,
   flags: StockFlags,
   quantity: number,
-): StockDecision | StockRefused<"invalid_quantity" | "not_tracked" | "insufficient_stock"> {
+):
+  | StockDecision
+  | StockRefused<
+      "invalid_quantity" | "not_tracked" | "insufficient_stock" | "reserved_out_of_range"
+    > {
   assertValidLevel(level);
   assertValidFlags(flags);
   if (!isValidQuantity(quantity)) {
@@ -96,6 +102,9 @@ export function decideReserve(
   }
   if (!flags.allowBackorder && quantity > level.onHand - level.reserved) {
     return refuse("insufficient_stock");
+  }
+  if (level.reserved + quantity > MAX_RESERVED) {
+    return refuse("reserved_out_of_range");
   }
   return {
     ok: true,
@@ -192,7 +201,8 @@ const ADJUSTABLE_KINDS: readonly AdjustableKind[] = ["receipt", "adjustment", "r
 
 /**
  * An admin or system change of `on_hand` by a delta or to an absolute value. The result must be within 0 and
- * `MAX_ON_HAND` and not below `reserved` (also with backorder: lower the reservations first). A change of zero is
+ * `MAX_ON_HAND`. A change that LOWERS `on_hand` may not leave it below `reserved` (release the reservations first);
+ * a change that raises it is always allowed, so a partial receipt can reduce a backorder step by step. A change of zero is
  * refused because the journal never holds a zero delta. A receipt or a return must add stock. Sales go through
  * `decideCommit`, so `sale` is not an adjustable kind (RangeError). Works for untracked variants as well.
  */
@@ -234,7 +244,7 @@ export function decideAdjustment(
   if (onHand > MAX_ON_HAND) {
     return refuse("on_hand_out_of_range");
   }
-  if (onHand < level.reserved) {
+  if (delta < 0 && onHand < level.reserved) {
     return refuse("below_reserved");
   }
   return {

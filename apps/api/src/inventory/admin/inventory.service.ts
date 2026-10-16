@@ -38,7 +38,7 @@ const VALIDATION_REFUSALS: ReadonlySet<StockRefusal> = new Set([
 const RULE_DETAILS: Partial<Record<StockRefusal, string>> = {
   negative_on_hand: "The change would leave less than zero units on hand.",
   below_reserved:
-    "The change would leave fewer units on hand than are reserved; release the reservations first.",
+    "The change would lower the units on hand below the reserved units; release the reservations first.",
   no_change: "The change leaves the quantity on hand as it is.",
   kind_requires_increase: "A receipt or a return must add stock; use an adjustment to remove it.",
 };
