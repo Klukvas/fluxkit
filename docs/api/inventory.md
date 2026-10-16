@@ -2,14 +2,14 @@
 
 Admin stock endpoints and the reservation domain service. Model and decisions: `docs/adr/0011-money-and-stock-model.md`, `docs/adr/0012-pricing-inventory-schema.md`, plan `docs/plans/2026-10-16-pricing-and-inventory.md`. Pure stock rules (what a change may do): `packages/core/src/inventory` (`docs/files/core.md`).
 Conventions shared with the catalog (session cookie, CSRF header, problem+json, ids, timestamps, pagination): `docs/api/catalog.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: inventory is core.
-Prices are in `docs/api/pricing.md`. The public availability status and the store fields are a later step of the plan (not documented here, they do not exist yet).
+Prices are in `docs/api/pricing.md`. The public availability status and the store price fields are in the Store section of `docs/api/pricing.md`.
 
 ## Model in short
 
 - Per-variant flags `trackInventory` (default `true`; `false` for variants of a product type with `requires_shipping = false`, set when the variant is created) and `allowBackorder` (default `false`). An untracked variant has no stock to count and is never reserved.
 - Stock lives in a level per variant and location: `onHand` and `reserved`; `available = max(0, onHand - reserved)`. Reserved never exceeds on hand unless the variant allows backorder.
 - Every change of `onHand` is a row in the append-only `stock_movement` journal (`kind`: `receipt`, `adjustment`, `sale`, `return`), written in the same transaction as the level change, with `onHandAfter`, the acting admin (`actorId`), `reason` and `reference`. Nothing in the code updates or deletes a journal row.
-- Quantities and locations are admin-only. They never appear in a `/store/*` response.
+- Quantities and locations are admin-only. They never appear in a `/store/*` response; the store shows only the status `in_stock`, `low_stock` or `out_of_stock` (`docs/api/pricing.md`, Store).
 - Locations: one default location `main` is created by the migration. Locations are read-only in the API for now.
 
 ## Endpoints
@@ -29,7 +29,7 @@ Notes:
 
 - **Locking.** An adjustment is one transaction: product row lock (the lock publishing, variant edits and price writes take), then `SELECT ... FOR UPDATE` of the level row, then the core decision, the level update and the journal row. The order is always product, then level. A first change for a variant and location inserts the level row `ON CONFLICT DO NOTHING` and then locks it, so parallel first receipts create one row and all of them count.
 - **Journal order.** `created_at` of a journal row is taken when it is written under the level lock (`clock_timestamp()`), so parallel writers appear in the order they held the lock and `onHandAfter` is a running sum when sorted by time (ties broken by id).
-- **Actor.** `actorId` is the admin user of the session. If that user is deleted later the journal row stays and `actorId` becomes `null` (ADR 0012).
+- **Actor.** `actorId` is the admin user of the session. If that user is deleted later the journal row stays and `actorId` becomes `null` (ADR 0012). A change made by the system without an admin user (the demo seed, `InventoryService.adjust(..., null)`) has `actorId` `null` from the start; no HTTP route can do that.
 - **Deleting a product** that was never published removes its levels, journal and reservations with its variants (cascade, ADR 0012).
 
 ## Reservation domain service (no HTTP route)

@@ -106,7 +106,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 
 - `inventory.repository.ts` - `inventory_level`, `location` and `stock_movement` queries: `lockLevel` (`SELECT ... FOR UPDATE`), `insertEmptyLevel` (`ON CONFLICT DO NOTHING`), `updateLevel`, `insertMovement` (append only; `created_at` from `clock_timestamp()` under the lock) and the paginated journal read. The only writer of the journal; it has no update or delete of it.
 - `admin/inventory.controller.ts` - `GET .../variants/{variantId}/inventory`, `POST .../inventory/adjustments`, `GET .../inventory/movements` (HTTP only; the acting admin comes from `@CurrentAdmin()`, never the body).
-- `admin/inventory.service.ts` - the adjustment transaction (product row lock, level row lock, core `decideAdjustment`, level update, journal row; a refusal throws and rolls back) and the reads. Maps core refusals: bad numbers to 400, stock rules to 409 `rule_violation`.
+- `admin/inventory.service.ts` - the adjustment transaction (product row lock, level row lock, core `decideAdjustment`, level update, journal row; a refusal throws and rolls back; `actorId` may be `null` for a system change such as the demo seed) and the reads. Maps core refusals: bad numbers to 400, stock rules to 409 `rule_violation`.
 - `admin/inventory.schemas.ts`, `admin/inventory.mapper.ts` - request and response shapes (structure only; the mapper refuses stored values outside the supported range).
 - `admin/locations.controller.ts`, `admin/locations.schemas.ts` - `GET /admin/locations` (read only).
 - `reservations/reservations.service.ts` - `ReservationsService`: `reserve`, `release`, `commit`, `expireDue(now)`; one transaction each, level row lock first, core decisions, typed refusals. No HTTP route. Must NOT read the clock or implement a stock rule.
@@ -147,8 +147,8 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `seed.ts` - entry of `pnpm seed` (built output run by Node); exit code.
 - `seed-command.ts` - production guard (refuses `NODE_ENV=production` without `--allow-production`), standalone Nest context, summary and error output.
 - `catalog-seeder.ts` - `CatalogSeeder`: creates `@fluxkit/seeds` data through the admin services; idempotent, never updates or deletes. Must not write to the database except through the admin services.
-  Publishing needs a shop-currency price, so before publishing it writes one flat placeholder price per demo variant through `PricesService` (labelled `TODO(fluxkit)`; real demo prices come with plan step 6).
-- `seed.spec.ts` - runs the seeder on real Postgres and reads the result through the store API.
+  Publishing needs a shop-currency price, so before publishing it writes the demo price of every variant (from the seed data, matched by option values, stored in `SHOP_CURRENCY`) through `PricesService`, sets `allowBackorder` through `VariantsService`, and receives the demo stock through `InventoryService.adjust` with a `null` actor (a `receipt` movement, reason "Demo seed", default location). A tracked variant with stock 0 gets no level row.
+- `seed.spec.ts` - runs the seeder on real Postgres and reads the result through the store API (prices, compare-at, every availability state) and the admin inventory routes (levels, journal without an actor); a second run adds no row to any table.
 
 ## Test support (`src/test/`)
 
