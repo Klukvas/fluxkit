@@ -426,6 +426,9 @@ export const variant = pgTable(
     optionSignature: text("option_signature").notNull(),
     isDefault: boolean("is_default").notNull().default(false),
     isActive: boolean("is_active").notNull().default(true),
+    // Stock flags (ADR 0011): an untracked variant or one allowing backorder is always available.
+    trackInventory: boolean("track_inventory").notNull().default(true),
+    allowBackorder: boolean("allow_backorder").notNull().default(false),
     attributes: jsonb("attributes").$type<AttributeValues>().notNull().default({}),
     position: position(),
     createdAt: createdAt(),

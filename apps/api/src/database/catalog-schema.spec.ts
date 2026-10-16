@@ -40,6 +40,11 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "reservation",
+      "stock_movement",
+      "inventory_level",
+      "price",
+      "location",
       "admin_session",
       "admin_user",
       "media",
@@ -62,6 +67,7 @@ describe("catalog schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop function if exists "stock_movement_append_only"()');
   }
 
   beforeAll(async () => {
@@ -1399,7 +1405,10 @@ describe("catalog schema (real Postgres)", () => {
         from pg_constraint c
         join pg_class t on t.oid = c.conrelid
         join pg_namespace n on n.oid = c.connamespace
-        where n.nspname = 'public' and c.contype <> 'n' and t.relname not in ('health_check', 'admin_user', 'admin_session')
+        where n.nspname = 'public' and c.contype <> 'n' and t.relname not in (
+          'health_check', 'admin_user', 'admin_session',
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+        )
       `);
       const unnamed = result.rows.filter(
         (row) => !declared.has(row.name) && row.name !== `${row.table}_pkey`,
@@ -1415,7 +1424,10 @@ describe("catalog schema (real Postgres)", () => {
         join pg_class i on i.oid = x.indexrelid
         join pg_class t on t.oid = x.indrelid
         join pg_namespace n on n.oid = t.relnamespace
-        where n.nspname = 'public' and t.relname not in ('health_check', 'admin_user', 'admin_session')
+        where n.nspname = 'public' and t.relname not in (
+          'health_check', 'admin_user', 'admin_session',
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+        )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.
       const undeclared = result.rows.filter(
