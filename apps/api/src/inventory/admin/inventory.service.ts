@@ -86,12 +86,13 @@ export class InventoryService {
    * One transaction: product row lock (the order every variant write uses: product, then level), the level row lock,
    * the core decision, the level update and the journal row. A refusal throws, which rolls back everything including
    * the empty level row a first-time change may have created, so a refused change leaves no trace.
+   * `actorId` is the admin user; `null` records a system change (the demo seed has no user).
    */
   async adjust(
     productId: string,
     variantId: string,
     body: AdjustmentBody,
-    actorId: string,
+    actorId: string | null,
   ): Promise<AdjustmentResponse> {
     return withTransaction(this.database, async (tx) => {
       await this.lockProduct(tx, productId);
