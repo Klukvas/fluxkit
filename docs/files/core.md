@@ -1,10 +1,10 @@
 # packages/core
 
-Pure TypeScript domain logic of the catalog (ADR 0006, AGENTS.md section 2.3) and of admin authentication rules (ADR 0009). Rules only: no Nest, no Drizzle, no database, no network, no filesystem, no clock (time is a parameter). Enforced by dependency-cruiser (`core-must-not-import-infrastructure`). The one runtime dependency is `zod`, used only by `attribute-values.ts`.
+Pure TypeScript domain logic of the catalog (ADR 0006, AGENTS.md section 2.3), of admin authentication rules (ADR 0009) and of money (ADR 0011). Rules only: no Nest, no Drizzle, no database, no network, no filesystem, no clock (time is a parameter). Enforced by dependency-cruiser (`core-must-not-import-infrastructure`). The one runtime dependency is `zod`, used only by `attribute-values.ts`.
 The API (`apps/api`) reads facts from the database, calls these functions inside a transaction, and maps the results to HTTP problems. Core never decides HTTP status codes.
 
 - `package.json` - `@fluxkit/core`, private; runtime dependency `zod` only; devDependencies typescript and vitest.
-- `src/index.ts` - public entry; re-exports `./auth/index.js` and `./catalog/index.js`. Must not export anything else.
+- `src/index.ts` - public entry; re-exports `./auth/index.js`, `./catalog/index.js` and `./pricing/index.js`. Must not export anything else.
 - `src/catalog/index.ts` - barrel of the catalog modules below. Add new modules here.
 
 ## Entities and shared types
@@ -54,7 +54,16 @@ Pure decisions only: no hashing, no cookies, no random numbers, no clock (`now` 
 - `src/auth/session.ts` - `SESSION_DEFAULTS` (720 idle minutes, 168 hours), `evaluateSession` (`idle_timeout`, `max_lifetime`, `invalid_session`; a limit reached exactly is expired), `shouldTouchSession` (at most once a minute), `sessionExpiry`. Must not read the clock.
 - `src/auth/user-rules.ts` - `decideUserChange`: the last active owner cannot be demoted or deactivated; unknown roles are rejected. The caller passes the active owner ids read in the same transaction.
 
+## Money (ADR 0011)
+
+Pure and dependency-free: integers and BigInt only, no float arithmetic for anything rounded or multiplied, no clock, no randomness, never `-0`. Data errors are typed results; only misconfiguration throws `RangeError`. The API and later modules must not do their own money arithmetic or rounding.
+
+- `src/pricing/index.ts` - barrel of the pricing modules below. Add new modules here.
+- `src/pricing/currency.ts` - `CURRENCIES` (UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD: 2; JPY: 0; KWD: 3), `CURRENCY_CODES`, `SupportedCurrency`, `isSupportedCurrency` (exact, own-property check), `exponentOf`. Must not read configuration; the shop currency is validated elsewhere against this table.
+- `src/pricing/limits.ts` - `MAX_AMOUNT` (10^12 minor units), `MAX_QUANTITY` (1 000 000), `BASIS_POINTS_PER_UNIT` (10 000), `MAX_PERCENTAGE_BASIS_POINTS` (1 000 000). Constants only.
+- `src/pricing/money.ts` - `Money`, `createMoney`, `addMoney`, `subtractMoney`, `multiplyByQuantity`, `compareMoney`, `negateMoney`, `isZero`, `percentageOf` (modes `half_away_from_zero` default, `half_even`, `floor`, `ceil`), `toDecimalString`, `parseDecimalString`. Must not accept floats, mix currencies, exceed the limit or know about prices (non-negative prices are a price rule, not a money rule).
+
 ## Test-only and tests
 
 - `src/catalog/test-support.ts` - `deepFreeze` for tests; excluded from the build (`tsconfig.build.json`). Must not be imported by the API.
-- `src/auth/*.spec.ts`, `src/catalog/*.spec.ts` - Vitest unit tests next to each module (rules and edge cases); `src/index.spec.ts` checks the public entry point.
+- `src/auth/*.spec.ts`, `src/catalog/*.spec.ts`, `src/pricing/*.spec.ts` - Vitest unit tests next to each module (rules and edge cases); `src/pricing/money.property.spec.ts` compares rounding, arithmetic and decimal strings with independent BigInt references on tens of thousands of cases from a seeded generator (no `Math.random`); `src/index.spec.ts` checks the public entry point.
