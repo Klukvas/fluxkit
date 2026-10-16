@@ -79,6 +79,11 @@ export interface VariantSnapshot {
   readonly optionSignature: string;
   readonly optionValues: readonly OptionValuePair[];
   readonly attributes: AttributeValues;
+  /**
+   * Whether the variant has a valid price in the shop currency (`pickSellablePrice` found one). The API feeds this fact;
+   * catalog rules do not read prices themselves.
+   */
+  readonly hasShopPrice: boolean;
 }
 
 export interface ProductSnapshot {

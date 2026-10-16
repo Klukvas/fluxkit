@@ -179,6 +179,9 @@ export function toProductSnapshot(
       .filter((value) => value.variantId === variant.id)
       .map((value) => ({ optionCode: value.optionCode, valueCode: value.valueCode })),
     attributes: variant.attributes,
+    // TODO(fluxkit): step 4 supplies real price facts. No price table exists yet, so this keeps the current behaviour
+    // (prices do not block publishing) instead of reporting every active variant as priceless.
+    hasShopPrice: true,
   }));
   return {
     status: toStatus(row),
