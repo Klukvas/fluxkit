@@ -49,7 +49,8 @@ export type PublishViolationCode =
   | "variant_sku_invalid"
   | "duplicate_sku"
   | "attribute_invalid"
-  | "option_not_allowed";
+  | "option_not_allowed"
+  | "price_missing";
 
 export interface PublishViolation {
   readonly code: PublishViolationCode;
@@ -121,6 +122,13 @@ export function publishPreconditions(
       violations.push({ code: "no_active_variant" });
     }
   }
+
+  // A variant that is not sold may stay priceless; an active one without a shop-currency price would reach the store unpriced.
+  product.variants.forEach((variant, variantIndex) => {
+    if (variant.isActive && !variant.hasShopPrice) {
+      violations.push({ code: "price_missing", variantIndex });
+    }
+  });
 
   const seenSkus = new Set<string>();
   product.variants.forEach((variant, variantIndex) => {

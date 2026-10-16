@@ -53,6 +53,7 @@ describe("publishPreconditions cannot be switched to draft mode by its config ar
         optionSignature: "",
         optionValues: [],
         attributes: {},
+        hasShopPrice: true,
       },
     ],
   };

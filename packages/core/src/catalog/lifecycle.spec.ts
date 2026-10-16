@@ -94,6 +94,7 @@ function variant(overrides: Partial<VariantSnapshot> = {}): VariantSnapshot {
       { optionCode: "size", valueCode: "s" },
     ],
     attributes: { weight_g: 180 },
+    hasShopPrice: true,
     ...overrides,
   };
 }
@@ -381,6 +382,38 @@ describe("publishPreconditions", () => {
       const result = check(product({ attributes: { tip_type: "ph2" } }), handTool);
       expect(result).toContainEqual({ code: "option_not_allowed", optionCode: "color" });
       expect(result).toContainEqual({ code: "option_not_allowed", optionCode: "size" });
+    });
+  });
+
+  describe("shop-currency price (pricing plan, ADR 0008)", () => {
+    it("reports price_missing for every active variant without a shop-currency price", () => {
+      const result = check(
+        product({
+          variants: [variant({ hasShopPrice: false }), { ...blackVariant, hasShopPrice: false }],
+        }),
+      );
+      expect(result).toEqual([
+        { code: "price_missing", variantIndex: 0 },
+        { code: "price_missing", variantIndex: 1 },
+      ]);
+    });
+
+    it("does not report variants that have a price", () => {
+      expect(
+        check(product({ variants: [variant(), { ...blackVariant, hasShopPrice: false }] })),
+      ).toEqual([{ code: "price_missing", variantIndex: 1 }]);
+    });
+
+    it("an inactive priceless variant does not block publishing", () => {
+      const inactive = { ...blackVariant, isActive: false, hasShopPrice: false };
+      expect(check(product({ variants: [variant(), inactive] }))).toEqual([]);
+    });
+
+    it("an active priceless variant blocks publishing next to an inactive priceless one", () => {
+      const inactive = { ...blackVariant, isActive: false, hasShopPrice: false };
+      expect(check(product({ variants: [variant({ hasShopPrice: false }), inactive] }))).toEqual([
+        { code: "price_missing", variantIndex: 0 },
+      ]);
     });
   });
 

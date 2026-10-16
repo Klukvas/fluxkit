@@ -50,6 +50,14 @@ describe("public entry point", () => {
       "percentageOf",
       "toDecimalString",
       "parseDecimalString",
+      "validatePrice",
+      "pickSellablePrice",
+      "availabilityOf",
+      "decideReserve",
+      "decideRelease",
+      "decideCommit",
+      "decideExpire",
+      "decideAdjustment",
     ] as const;
     for (const name of functions) {
       expect(typeof core[name], name).toBe("function");
@@ -62,5 +70,6 @@ describe("public entry point", () => {
     expect(core.MAX_AMOUNT).toBe(1_000_000_000_000);
     expect(core.MAX_QUANTITY).toBe(1_000_000);
     expect(core.CURRENCIES.UAH).toBe(2);
+    expect(core.MAX_ON_HAND).toBe(1_000_000_000);
   });
 });
