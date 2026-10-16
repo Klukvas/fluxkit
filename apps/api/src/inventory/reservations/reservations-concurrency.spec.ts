@@ -7,6 +7,7 @@ import {
   defaultLocationId,
   expectJournalReplays,
   expectWaitsForLevelLock,
+  expectWaitsForVariantLock,
   insertAdminUserRow,
   levelCount,
   levelOf,
@@ -238,6 +239,17 @@ describe("ReservationsService under concurrency (real Postgres)", () => {
   });
 
   describe("row lock", () => {
+    it("makes reserve wait for a transaction that holds the variant row (FOR SHARE on the variant)", async () => {
+      const { variantId } = await world.variant({ onHand: 3 });
+      await expectWaitsForVariantLock(
+        pool,
+        variantId,
+        () => service.reserve({ variantId, quantity: 1, expiresAt: future() }),
+        (result) => expect(result.ok).toBe(true),
+      );
+      expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 3, reserved: 1 });
+    });
+
     it("makes reserve, release, commit and expireDue wait for the inventory_level row", async () => {
       const { variantId } = await world.variant({ onHand: 10 });
       const toRelease = await reserveOk(variantId, 1);

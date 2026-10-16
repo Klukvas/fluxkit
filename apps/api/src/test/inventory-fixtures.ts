@@ -129,3 +129,38 @@ export async function expectWaitsForLevelLock<T>(
     client.release();
   }
 }
+
+/**
+ * Proves that `ReservationsService.reserve` takes the `variant` row lock (`FOR SHARE`): another transaction holds the
+ * row `FOR NO KEY UPDATE` (what an UPDATE of a flag or of the activity does), the request must not finish until that
+ * transaction ends, and then it must pass `check`. It is not `FOR UPDATE` on purpose: that would also block the
+ * foreign key check (`FOR KEY SHARE`) of the reservation insert and hide a missing `FOR SHARE` in the lookup.
+ */
+export async function expectWaitsForVariantLock<T>(
+  pool: pg.Pool,
+  variantId: string,
+  request: () => Promise<T>,
+  check: (result: T) => void,
+): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const locked = await client.query("select 1 from variant where id = $1 for no key update", [
+      variantId,
+    ]);
+    expect(locked.rowCount, "the variant row to lock exists").toBe(1);
+    let settled = false;
+    const pending = request().then((result) => {
+      settled = true;
+      return result;
+    });
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(settled, "the operation must wait for the variant row lock").toBe(false);
+    await client.query("commit");
+    check(await pending);
+  } finally {
+    // A no-op after the commit; unblocks the request when an expectation failed above.
+    await client.query("rollback");
+    client.release();
+  }
+}
