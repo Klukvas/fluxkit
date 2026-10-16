@@ -43,3 +43,14 @@ export function canDeleteVariant(facts: {
 export function canCreateVariantManually(productStatus: ProductStatus): VariantRuleDecision {
   return productStatus === "draft" ? ALLOWED : forbid("product_not_draft");
 }
+
+/**
+ * Rebuilding all variants of a draft product (a change of its options that adds or removes an option or removes a
+ * value, ADR 0014) deletes every variant and so cascades their stock history away. It is refused while any variant
+ * of the product has stock history (same definition as `canDeleteVariant`, ADR 0013).
+ */
+export function canRebuildVariants(facts: {
+  readonly anyVariantHasStockHistory: boolean;
+}): VariantRuleDecision {
+  return facts.anyVariantHasStockHistory ? forbid("has_stock_history") : ALLOWED;
+}
