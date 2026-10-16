@@ -370,6 +370,8 @@ describe("admin products API (real app, real Postgres)", () => {
             optionSignature: "",
             isDefault: true,
             isActive: true,
+            trackInventory: true,
+            allowBackorder: false,
             attributes: {},
             position: 0,
             optionValues: [],

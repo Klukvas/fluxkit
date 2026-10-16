@@ -164,6 +164,8 @@ export const productVariantResponseSchema = z.object({
   optionSignature: z.string(),
   isDefault: z.boolean(),
   isActive: z.boolean(),
+  trackInventory: z.boolean(),
+  allowBackorder: z.boolean(),
   attributes: attributeValuesResponseSchema,
   position: z.number().int(),
   optionValues: z.array(variantOptionValueResponseSchema),

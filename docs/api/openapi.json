@@ -999,6 +999,690 @@
         "tags": ["health"]
       }
     },
+    "/admin/products/{id}/variants/{variantId}/inventory": {
+      "get": {
+        "description": "Reads create nothing: a variant without level rows has an empty `levels` list and `totalAvailable` 0.",
+        "operationId": "InventoryController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flags, the levels and the total available.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "variantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
+                      "type": "boolean"
+                    },
+                    "levels": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "locationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "locationCode": {
+                            "type": "string"
+                          },
+                          "onHand": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reserved": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "available": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "max(0, onHand - reserved)."
+                          }
+                        },
+                        "required": [
+                          "locationId",
+                          "locationCode",
+                          "onHand",
+                          "reserved",
+                          "available"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Only locations that hold a level row; none for a variant that never had stock."
+                    },
+                    "totalAvailable": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Sum of available over the levels, whatever the flags say."
+                    }
+                  },
+                  "required": [
+                    "variantId",
+                    "trackInventory",
+                    "allowBackorder",
+                    "levels",
+                    "totalAvailable"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the stock flags and the levels of a variant per location (admin only)",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/products/{id}/variants/{variantId}/inventory/adjustments": {
+      "post": {
+        "description": "Locks the level row, applies the core stock rules and appends a `stock_movement` row with the acting admin, in one transaction. The level is created by the first accepted change. Refusals: 400 `validation_failed` for an unusable number (`invalid_quantity`, `on_hand_out_of_range`), 409 `rule_violation` with the core reason (`negative_on_hand`, `below_reserved`, `no_change`, `kind_requires_increase`).",
+        "operationId": "InventoryController_adjust",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "locationId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                  },
+                  "delta": {
+                    "description": "Signed whole number of units to add (negative removes). The result must stay within 0 and 1000000000 and not below the reserved units.",
+                    "type": "number"
+                  },
+                  "setOnHand": {
+                    "description": "The counted quantity; the delta is computed under the row lock.",
+                    "type": "number"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["receipt", "adjustment", "return"],
+                    "description": "receipt and return must add stock; adjustment may add or remove (a count, damage, loss)."
+                  },
+                  "reason": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Free text, at most 500 characters. Empty means none."
+                  },
+                  "reference": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 255,
+                    "description": "External reference such as a purchase order number, at most 255 characters. Empty means none."
+                  }
+                },
+                "required": ["kind"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new level and the journal row.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "level": {
+                      "type": "object",
+                      "properties": {
+                        "locationId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "locationCode": {
+                          "type": "string"
+                        },
+                        "onHand": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "reserved": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "available": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991,
+                          "description": "max(0, onHand - reserved)."
+                        }
+                      },
+                      "required": ["locationId", "locationCode", "onHand", "reserved", "available"],
+                      "additionalProperties": false
+                    },
+                    "movement": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "variantId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "locationId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "locationCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["receipt", "adjustment", "sale", "return"]
+                        },
+                        "delta": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "onHandAfter": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "reason": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "reference": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "actorId": {
+                          "nullable": true,
+                          "description": "The admin user who made the change; null for a system change or a deleted user.",
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "variantId",
+                        "locationId",
+                        "locationCode",
+                        "kind",
+                        "delta",
+                        "onHandAfter",
+                        "reason",
+                        "reference",
+                        "actorId",
+                        "createdAt"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["level", "movement"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Receive, count or return stock: change on hand by a delta or set it, with a journal row",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/products/{id}/variants/{variantId}/inventory/movements": {
+      "get": {
+        "operationId": "InventoryController_listMovements",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of journal rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "locationId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "locationCode": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["receipt", "adjustment", "sale", "return"]
+                          },
+                          "delta": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "onHandAfter": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "reason": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "reference": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actorId": {
+                            "nullable": true,
+                            "description": "The admin user who made the change; null for a system change or a deleted user.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "locationId",
+                          "locationCode",
+                          "kind",
+                          "delta",
+                          "onHandAfter",
+                          "reason",
+                          "reference",
+                          "actorId",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the stock journal of a variant, newest first",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/locations": {
+      "get": {
+        "operationId": "LocationsController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The locations; exactly one is the default.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["id", "code", "name", "isDefault"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the stock locations, ordered by code",
+        "tags": ["admin-locations"]
+      }
+    },
     "/admin/attributes": {
       "post": {
         "operationId": "AttributesController_create",
@@ -7189,6 +7873,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -7241,6 +7931,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -7768,6 +8460,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -7820,6 +8518,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -8190,6 +8890,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -8242,6 +8948,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -8657,6 +9365,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -8709,6 +9423,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9042,6 +9758,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9094,6 +9816,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9427,6 +10151,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9479,6 +10209,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9812,6 +10544,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9864,6 +10602,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -10238,6 +10978,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -10290,6 +11036,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -10669,6 +11417,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -10721,6 +11475,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11083,6 +11839,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11135,6 +11897,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11497,6 +12261,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11549,6 +12319,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11768,6 +12540,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11820,6 +12598,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11953,6 +12733,14 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "trackInventory": {
+                    "type": "boolean",
+                    "description": "Whether stock is counted. false: always available, never reserved. Default true; false for a product type that does not ship."
+                  },
+                  "allowBackorder": {
+                    "type": "boolean",
+                    "description": "Whether the variant can be reserved beyond the stock on hand. Default false."
                   }
                 },
                 "required": ["optionValueIds"],
@@ -11995,6 +12783,12 @@
                       "type": "boolean"
                     },
                     "isActive": {
+                      "type": "boolean"
+                    },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -12049,6 +12843,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",
@@ -12191,6 +12987,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -12243,6 +13045,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -12375,6 +13179,12 @@
                     "isActive": {
                       "type": "boolean"
                     },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
+                      "type": "boolean"
+                    },
                     "attributes": {
                       "type": "object",
                       "additionalProperties": {}
@@ -12427,6 +13237,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",
@@ -12542,6 +13354,14 @@
                   "isActive": {
                     "type": "boolean"
                   },
+                  "trackInventory": {
+                    "type": "boolean",
+                    "description": "Whether stock is counted. false: always available, never reserved. Default true; false for a product type that does not ship."
+                  },
+                  "allowBackorder": {
+                    "type": "boolean",
+                    "description": "Whether the variant can be reserved beyond the stock on hand. Default false."
+                  },
                   "position": {
                     "type": "integer",
                     "minimum": 0,
@@ -12590,6 +13410,12 @@
                       "type": "boolean"
                     },
                     "isActive": {
+                      "type": "boolean"
+                    },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -12644,6 +13470,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",

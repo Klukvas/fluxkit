@@ -77,6 +77,8 @@ export function toVariantResponse(
     optionSignature: row.optionSignature,
     isDefault: row.isDefault,
     isActive: row.isActive,
+    trackInventory: row.trackInventory,
+    allowBackorder: row.allowBackorder,
     attributes: row.attributes,
     position: row.position,
     optionValues: optionValues

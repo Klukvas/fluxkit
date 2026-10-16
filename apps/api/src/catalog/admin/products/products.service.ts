@@ -33,6 +33,7 @@ import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
 import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
 import { assertAllowed } from "../../shared/rules.js";
+import { initialStockFlags } from "../../shared/stock-flags.js";
 import { emptyToNull } from "../../shared/text.js";
 import {
   toProductDetailResponse,
@@ -353,6 +354,7 @@ export class ProductsService {
       optionSignature: computeOptionSignature([]),
       isDefault: true,
       isActive: true,
+      ...initialStockFlags(await this.products.requiresShipping(tx, body.productTypeId)),
       attributes: {},
       position: 0,
     });

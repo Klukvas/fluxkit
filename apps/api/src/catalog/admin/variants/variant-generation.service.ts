@@ -7,6 +7,7 @@ import {
 } from "@fluxkit/core";
 import { isUniqueViolation } from "../../../common/postgres-errors.js";
 import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
+import { initialStockFlags } from "../../shared/stock-flags.js";
 import { conflict, validationFailed, type FieldError } from "../../../common/problem.js";
 import type { DbExecutor } from "../../../common/transaction.js";
 import { toProductTypeDefinition } from "../products/products.mapper.js";
@@ -140,6 +141,9 @@ export class VariantGenerationService {
     log.record(...skuValues);
 
     const isActive = await this.generatedVariantsAreActive(tx, product);
+    const stockFlags = initialStockFlags(
+      await this.products.requiresShipping(tx, product.productTypeId),
+    );
     const firstPosition =
       existing.reduce((highest, variant) => Math.max(highest, variant.position), -1) + 1;
     const inserted = await this.variants.insertVariants(
@@ -155,6 +159,7 @@ export class VariantGenerationService {
           optionSignature: variant.optionSignature,
           isDefault: variant.isDefault,
           isActive,
+          ...stockFlags,
           attributes: {},
           position: firstPosition + index,
         };

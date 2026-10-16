@@ -27,6 +27,7 @@ import {
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import type { ProposalLog } from "../../shared/retry.js";
+import { initialStockFlags } from "../../shared/stock-flags.js";
 import {
   toProductSnapshot,
   toProductTypeDefinition,
@@ -191,6 +192,9 @@ export class VariantsService {
           optionSignature: computeOptionSignature(pairs),
           isDefault: existing.length === 0,
           isActive: body.isActive ?? true,
+          ...initialStockFlags(await this.products.requiresShipping(tx, product.productTypeId)),
+          ...(body.trackInventory === undefined ? {} : { trackInventory: body.trackInventory }),
+          ...(body.allowBackorder === undefined ? {} : { allowBackorder: body.allowBackorder }),
           attributes,
           position: existing.reduce((highest, row) => Math.max(highest, row.position), -1) + 1,
         });
@@ -254,6 +258,8 @@ export class VariantsService {
           ...(body.attributes === undefined ? {} : { attributes: body.attributes }),
           ...(body.isActive === undefined ? {} : { isActive: body.isActive }),
           ...(body.position === undefined ? {} : { position: body.position }),
+          ...(body.trackInventory === undefined ? {} : { trackInventory: body.trackInventory }),
+          ...(body.allowBackorder === undefined ? {} : { allowBackorder: body.allowBackorder }),
           ...(body.isDefault === undefined ? {} : { isDefault: body.isDefault }),
         };
 
