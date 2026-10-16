@@ -975,6 +975,120 @@ describe("admin variants API (real app, real Postgres)", () => {
       expect(await variantRows(product.id)).toHaveLength(6);
     });
 
+    describe("variants with stock history (ADR 0013)", () => {
+      async function mainLocationId(): Promise<string> {
+        const result = await pool.query("select id from location where is_default");
+        return (result.rows[0] as { id: string }).id;
+      }
+
+      async function insertReceipt(variantId: string, quantity: number) {
+        const locationId = await mainLocationId();
+        await pool.query(
+          "insert into inventory_level (variant_id, location_id, on_hand) values ($1, $2, $3)",
+          [variantId, locationId, quantity],
+        );
+        await pool.query(
+          `insert into stock_movement (variant_id, location_id, delta, kind, on_hand_after)
+           values ($1, $2, $3, 'receipt', $3)`,
+          [variantId, locationId, quantity],
+        );
+      }
+
+      async function count(table: string, variantId: string): Promise<number> {
+        const result = await pool.query(
+          `select count(*)::int as count from ${table} where variant_id = $1`,
+          [variantId],
+        );
+        return (result.rows[0] as { count: number }).count;
+      }
+
+      it("refuses a variant with a stock movement, also after the sold product was unpublished", async () => {
+        const product = await sixVariants();
+        const target = variantOf(product, "blue", "s");
+        await insertReceipt(target.id, 5);
+
+        const draft = await call("DELETE", variantPath(product.id, target.id));
+        expect(draft.status, JSON.stringify(draft.body)).toBe(409);
+        expect(problem(draft)).toMatchObject({ code: "rule_violation", rule: "has_stock_history" });
+
+        await setStatus(product.id, "publish");
+        await setStatus(product.id, "unpublish");
+        const unpublished = await call("DELETE", variantPath(product.id, target.id));
+        expect(unpublished.status, JSON.stringify(unpublished.body)).toBe(409);
+        expect(problem(unpublished)).toMatchObject({ rule: "has_stock_history" });
+
+        expect(await variantRows(product.id)).toHaveLength(6);
+        expect(await count("stock_movement", target.id)).toBe(1);
+        expect(await count("inventory_level", target.id)).toBe(1);
+      });
+
+      it.each(["active", "released", "committed", "expired"])(
+        "refuses a variant with a %s reservation row even without movements",
+        async (status) => {
+          const product = await sixVariants();
+          const target = variantOf(product, "blue", "m");
+          await pool.query(
+            `insert into reservation (variant_id, location_id, quantity, status, expires_at)
+             values ($1, $2, 1, $3, now() + interval '1 hour')`,
+            [target.id, await mainLocationId(), status],
+          );
+          const result = await call("DELETE", variantPath(product.id, target.id));
+          expect(result.status, JSON.stringify(result.body)).toBe(409);
+          expect(problem(result)).toMatchObject({ rule: "has_stock_history" });
+          expect(await count("reservation", target.id)).toBe(1);
+        },
+      );
+
+      it("still deletes a variant that only has prices or an empty level, and still deletes a never-published product", async () => {
+        const product = await sixVariants();
+        const priced = variantOf(product, "green", "m");
+        const empty = variantOf(product, "green", "s");
+        await priceProductVariants(pool, product.id);
+        await pool.query(
+          "insert into inventory_level (variant_id, location_id, on_hand) values ($1, $2, 0)",
+          [empty.id, await mainLocationId()],
+        );
+        expect((await call("DELETE", variantPath(product.id, priced.id))).status).toBe(204);
+        expect((await call("DELETE", variantPath(product.id, empty.id))).status).toBe(204);
+        expect(await count("price", priced.id)).toBe(0);
+
+        const stocked = variantOf(product, "red", "m");
+        await insertReceipt(stocked.id, 2);
+        expect((await call("DELETE", `/admin/products/${product.id}`)).status).toBe(204);
+        expect(await count("stock_movement", stocked.id)).toBe(0);
+      });
+
+      it("waits for a reservation in progress (variant row lock) before it looks at the history", async () => {
+        const product = await sixVariants();
+        const target = variantOf(product, "blue", "m");
+        const client = await pool.connect();
+        try {
+          await client.query("begin");
+          await client.query("select id from variant where id = $1 for share", [target.id]);
+          let settled = false;
+          const pending = call("DELETE", variantPath(product.id, target.id)).then((result) => {
+            settled = true;
+            return result;
+          });
+          await new Promise((resolve) => setTimeout(resolve, 400));
+          expect(settled, "the delete must wait for the variant row lock").toBe(false);
+          // The reservation in progress commits; the delete then sees it and refuses.
+          await client.query(
+            `insert into reservation (variant_id, location_id, quantity, status, expires_at)
+             values ($1, $2, 1, 'active', now() + interval '1 hour')`,
+            [target.id, await mainLocationId()],
+          );
+          await client.query("commit");
+          const result = await pending;
+          expect(result.status, JSON.stringify(result.body)).toBe(409);
+          expect(problem(result)).toMatchObject({ rule: "has_stock_history" });
+        } finally {
+          await client.query("rollback");
+          client.release();
+        }
+      });
+    });
+
     it("answers 404 for an unknown variant and for a variant of another product", async () => {
       const product = await sixVariants();
       const other = await createProduct();

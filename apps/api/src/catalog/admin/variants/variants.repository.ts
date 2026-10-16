@@ -1,10 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import type { PaginationQuery } from "../../../common/pagination.js";
 import type { DbExecutor } from "../../../common/transaction.js";
 import {
   option,
   optionValue,
+  reservation,
+  stockMovement,
   variant,
   variantOptionValue,
 } from "../../../database/schema/index.js";
@@ -114,6 +116,30 @@ export class VariantsRepository {
   async update(db: DbExecutor, id: string, changes: VariantChanges): Promise<void> {
     // `updated_at` is refreshed by the column's $onUpdate, which only the query builder applies.
     await db.update(variant).set(changes).where(eq(variant.id, id));
+  }
+
+  /**
+   * Whether the variant has any `stock_movement` row or any `reservation` row (whatever its status): the history a
+   * delete would cascade away (ADR 0013). The variant row is locked `FOR NO KEY UPDATE` first, so a reservation in
+   * progress (which holds the row `FOR SHARE`) commits before the history is read; foreign key checks of stock writes
+   * (`FOR KEY SHARE`) do not conflict with this lock. The caller already holds the product lock; stock writes take
+   * product -> level, reservations variant -> level, so this adds no lock cycle.
+   */
+  async hasStockHistory(db: DbExecutor, variantId: string): Promise<boolean> {
+    await db
+      .select({ id: variant.id })
+      .from(variant)
+      .where(eq(variant.id, variantId))
+      .for("no key update");
+    const result = await db.execute<{ found: boolean }>(
+      sql`select (exists (select 1 from ${stockMovement} where ${stockMovement.variantId} = ${variantId})
+               or exists (select 1 from ${reservation} where ${reservation.variantId} = ${variantId})) as found`,
+    );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error("The stock history query returned no row.");
+    }
+    return row.found;
   }
 
   async delete(db: DbExecutor, id: string): Promise<void> {
