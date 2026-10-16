@@ -1,6 +1,6 @@
 # Plan: pricing and inventory (v1)
 
-Status: approved by the owner 2026-10-16 (decisions and assumptions below confirmed). Step 1 (ADR 0011, core money module) merged; step 2 (core price and stock rules, publish rule) merged (PR #41); step 3 (schema and migration, ADR 0012) merged (PR #42); step 4 is split: 4a (config, prices API, publish-rule integration) merged (PR #43), 4b (inventory API, stock flags, locations, reservation service) merged (PR #44); step 5 (store prices, availability, `GET /store/config`) implemented on branch `chore/pricing-step-5-store-api` (PR pending); steps 6 and 7 not started. Red zones covered by the approval: money logic, schema and migration, public contracts, a change to the core publish rule.
+Status: approved by the owner 2026-10-16 (decisions and assumptions below confirmed). Steps 1 to 5 merged (PRs #40 to #45: money module and ADR 0011, price and stock rules, migration `0003` and ADR 0012, admin prices and inventory API with the reservation service, store prices, availability and `GET /store/config`); step 6 (seeds and docs) implemented on branch `chore/pricing-step-6-seeds-docs` (PR pending); step 7 (independent review) not started. Red zones covered by the approval: money logic, schema and migration, public contracts, a change to the core publish rule.
 Roles: Developers (Sonnet), steps run one after another (the owner asked for no parallel runs); independent Reviewer (Opus, a different model than the authors); Docs inside each step.
 Follows: `docs/plans/2026-10-14-catalog.md` and `docs/plans/2026-10-16-auth-and-roles.md` (both completed). Design basis: ADR 0004 (price table, inventory levels, reservations, movement journal), ADR 0006 (catalog schema), ADR 0008 (variants of live products).
 
@@ -69,6 +69,8 @@ Cart, checkout, orders and payments (they will call the reservation operations b
 Demo variants get prices and stock; the runner stays additive: it fills a missing price or stock level only for its own variants and never updates existing rows (digital demo products are untracked). Documented in `seeds/README.md`.
 
 ## Steps (one branch and PR each, in order, merge only on the owner's word)
+
+Done: 1 to 6 (step 4 was split into 4a and 4b). Remaining: step 7.
 1. **ADR 0010-style decision record and core money module**, tests first, with the BigInt reference tests for rounding and the overflow bounds. (Developer, Sonnet.) The ADR number is the next free one at that time.
 2. **Core pricing and inventory rules**: price rules, availability, reserve/release/commit/expire decisions, and the publish-rule change, tests first, including the property-style tests that stock never goes negative. (Developer, Sonnet.)
 3. **Schema and migration `0003`**: tables, trigger, flags, default location, constraint tests, up/down/up/down. (Developer, Sonnet.)
@@ -105,3 +107,23 @@ Migration `0003_pricing_inventory` (five new tables, two new columns on `variant
 - Public contract changes: store API fields, `GET /store/config`, new admin endpoints, three config variables.
 - The change to core `publishPreconditions`.
 - No new dependency is requested.
+
+## Outcome (steps 1 to 6; step 7 pending)
+
+Built:
+- Core (`packages/core`): the money module (integers in minor units, ISO 4217 table, exact arithmetic, percentages in basis points with explicit rounding), price rules, availability, reserve/release/commit/expire/adjust decisions, and the `price_missing` publish rule.
+- Schema: migration `0003_pricing_inventory` (`price`, `location` with `main`, `inventory_level`, append-only `stock_movement`, `reservation`, variant flags `track_inventory` and `allow_backorder`), ADR 0011 and 0012.
+- Admin API: prices (single and bulk), variant stock flags, locations, inventory read, adjustments and movements, and the `ReservationsService` (no HTTP route) with concurrency tests on real Postgres.
+- Store API: variant, product and list `price` and `availability` without quantities, `GET /store/config`; variants without a shop-currency price are hidden.
+- Config: `SHOP_CURRENCY`, `PRICES_INCLUDE_TAX`, `LOW_STOCK_THRESHOLD`.
+- Seeds: demo prices on all 26 variants (three with a compare-at price) and demo stock showing in stock, low stock, out of stock and backorder; digital products untracked. The runner writes prices before publishing and stock through the inventory service with a system (`null`) actor; a second run adds no row.
+
+Deviation: the inventory service had to accept a `null` actor (the column already allowed it) because seeding has no admin user.
+
+Known follow-ups (each needs its own plan or a fix after the review):
+- Variants generated or created manually for a live product start active and priceless; the store hides them until they are priced, and a live product with such a variant cannot be republished after an unpublish until it is priced.
+- `ReservationsService.expireDue` needs a scheduler (a BullMQ job); nothing calls it yet.
+- One reservation holds one location; the checkout plan has to split an order across locations.
+- Adjustments of different variants of one product serialize on the product row lock.
+- `apps/api/src/catalog/store/store.spec.ts` is very large and could be split by topic.
+- Step 7, the independent review by a different model (Opus), covers rounding and overflow, oversell races, journal integrity, availability leaks, publish-rule regressions, migration reversibility and tests that cannot fail. Findings are fixed before the plan is closed.
