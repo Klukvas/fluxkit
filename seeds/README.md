@@ -40,6 +40,7 @@ It prints how many entities were created and how many already existed. Any error
   database in `DATABASE_URL` does not end in `_test`, `_dev`, `_demo` or `_local`. `--allow-production` is the single override for both:
   `pnpm --filter @fluxkit/api seed --allow-production` after a build. Demo data does not belong in a client's production database.
   Note: the database name `fluxkit` from `.env.example` does not match the suffix rule, so either name your database `fluxkit_dev` (or similar) or pass the flag.
+- **Prices (placeholder).** A product cannot be published without a price in `SHOP_CURRENCY` on every active variant, so the runner writes one flat placeholder price (100.00 in a two-decimal currency) for each variant of a product it creates, before publishing. The seed data itself has no prices yet (`TODO(fluxkit)`: real demo prices and stock arrive with step 6 of `docs/plans/2026-10-16-pricing-and-inventory.md`). Existing products are never repriced.
 - Optional feature modules are not loaded while seeding.
 - Seeding creates no users. The first admin owner comes from `pnpm admin:create` (README, Admin sign-in).
 

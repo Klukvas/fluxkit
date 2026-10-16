@@ -9,8 +9,9 @@
 
 ## Common (`src/common/`)
 
-- `common.module.ts` - global module: the problem filter for every route and the locale configuration (`LOCALE_CONFIG`).
+- `common.module.ts` - global module: the problem filter for every route and the locale and pricing configuration (`LOCALE_CONFIG`, `PRICING_CONFIG`).
 - `locale.ts` - `LOCALE_CONFIG` token and `LocaleConfig` (`defaultLocale`, `locales`), fed from `DEFAULT_LOCALE` and `LOCALES`.
+- `pricing-config.ts` - `PRICING_CONFIG` token, `PricingConfig` (`shopCurrency`, `pricesIncludeTax`, `lowStockThreshold`), its defaults and `toPricingConfig` (narrows the validated currency string to core's type, loud on a mismatch); fed from `SHOP_CURRENCY`, `PRICES_INCLUDE_TAX`, `LOW_STOCK_THRESHOLD`. `pricing-config.spec.ts` asserts the config package and core agree on the currency list.
 - `problem.ts` - error codes (`PROBLEM_CODES`), status and title maps, `ProblemException` and factories (`validationFailed`, `notFound`, `conflict`, `inUse`, `invalidTransition`, `ruleViolation`, `unauthorized`, `forbidden`, `tooManyRequests` with its `Retry-After` header). Must not carry SQL or internals.
 - `problem.filter.ts` - the one `application/problem+json` writer: known problems pass through, framework 4xx get generic details, unknown errors are logged (method and path only) and answered as `internal_error`. A query error (`DrizzleQueryError`, a `Failed query:` message, or `query`/`params` properties) is logged as class names plus the innermost cause's name and code, never its message. Sets `Cache-Control: no-store` on `/admin` errors that happen before any middleware (body-parser 413).
 - `postgres-errors.ts` - maps SQLSTATE and constraint names to problems (`23505` to `conflict` with `field`, `23503` to `in_use` or `invalid_reference`, `23514` to `validation_failed`). Never maps by message text.
@@ -79,7 +80,9 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `categories/` - `/admin/categories` and `POST .../move`; depth, cycles and the tree-wide advisory lock on move.
 - `products/` - `/admin/products` CRUD, lifecycle (`publish`, `unpublish`, `archive`, `restore`), `PUT .../categories`, `PUT .../media`; publish preconditions from core. `products.schemas.ts` holds the caps for categories and media.
 - `product-options/` - `PUT /admin/products/{id}/options` and `POST .../options/{optionId}/values`; draft-only replacement, frozen options after publish.
-- `variants/` - `/admin/products/{id}/variants` (list, create, get, patch, delete) and `POST .../variants/generate`; `variant-generation.service.ts` runs core `generateVariants` and retries proposed SKU collisions (never client-sent SKUs).
+- `variants/` - `/admin/products/{id}/variants` (list, create, get, patch, delete) and `POST .../variants/generate`; `variant-generation.service.ts` runs core `generateVariants` and retries proposed SKU collisions (never client-sent SKUs). Switching a variant on in an active product also needs a shop-currency price (core `price_missing`, only for the activated variant).
+- `prices/` - admin price endpoints (`docs/api/pricing.md`): `prices.controller.ts` (`GET|PUT|DELETE .../variants/{variantId}/prices[/{currency}]`, bulk `PUT /admin/products/{id}/prices`; HTTP only), `prices.service.ts` (core `validatePrice`, product row lock, the `last_shop_price` delete rule, all-or-nothing bulk; no money arithmetic), `prices.repository.ts` (`price` table queries, one-statement upsert), `prices.schemas.ts` (structure only, the 500-item bulk cap), `prices.mapper.ts` (row to money shape; `toSafeAmount` refuses a `bigint` outside the amount range), `prices.spec.ts` and `prices-auth.spec.ts` (HTTP tests on real Postgres). Must NOT sell, convert or compute totals.
+- `products/products.repository.ts` also answers the publish price fact (`findVariantIdsWithPrice`, one query per product); `products.mapper.ts` turns it into `hasShopPrice` for core.
 
 ### Store (`src/catalog/store/`)
 
@@ -126,6 +129,7 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `seed.ts` - entry of `pnpm seed` (built output run by Node); exit code.
 - `seed-command.ts` - production guard (refuses `NODE_ENV=production` without `--allow-production`), standalone Nest context, summary and error output.
 - `catalog-seeder.ts` - `CatalogSeeder`: creates `@fluxkit/seeds` data through the admin services; idempotent, never updates or deletes. Must not write to the database except through the admin services.
+  Publishing needs a shop-currency price, so before publishing it writes one flat placeholder price per demo variant through `PricesService` (labelled `TODO(fluxkit)`; real demo prices come with plan step 6).
 - `seed.spec.ts` - runs the seeder on real Postgres and reads the result through the store API.
 
 ## Test support (`src/test/`)
@@ -140,6 +144,7 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `scratch-database.ts` - TEST ONLY: `createScratchDatabase()` creates (and drops) an empty `fluxkit_mig_<random>_test` database beside the test database, for specs that need "nothing migrated" without wiping the shared one.
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.
 - `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204); sends `X-Fluxkit-CSRF: 1` and a JSON content type by default, with `csrf: false` / `contentType` / `headers` to override.
+- `pricing-fixtures.ts` - TEST ONLY: `priceProductVariants` gives every variant of a product a shop-currency price straight in the table, so specs of other features can publish products without using the price endpoints; `startApp({ shopCurrency })` runs the app with another shop currency.
 - `catalog-fixtures.ts` - catalog fixtures through the real admin routes, `expectVariantInvariants`, and the product-lock wait check.
 - `fixtures/features/sample/` - sample feature package used by the core feature-loader tests.
 
