@@ -69,6 +69,25 @@ export interface SeedMedia {
   optionValue?: { optionCode: string; valueCode: string };
 }
 
+/**
+ * Price and stock of one variant. A variant is identified by its option values (keyed by option code), because SKUs and
+ * ids are generated; the default variant of a product without options has an empty `optionValues`.
+ */
+export interface SeedVariantCommerce {
+  optionValues: Readonly<Record<string, string>>;
+  /** Minor units (for example kopiykas). The runner stores it in `SHOP_CURRENCY`; the data names no currency. */
+  amount: number;
+  /** Old price in minor units, strictly greater than `amount`. */
+  compareAtAmount?: number;
+  /**
+   * Units on hand in the default location. Omitted for an untracked variant. `0` means tracked with no stock: the
+   * runner writes no inventory level (and no movement) for it.
+   */
+  stock?: number;
+  /** The variant sells beyond its stock; the runner sets the flag through the variant admin service. */
+  allowBackorder?: boolean;
+}
+
 export interface SeedProduct {
   slug: string;
   title: I18nText;
@@ -81,6 +100,8 @@ export interface SeedProduct {
   attributes: Readonly<Record<string, unknown>>;
   options: readonly SeedProductOption[];
   media: readonly SeedMedia[];
+  /** Exactly one entry per variant that the options generate. */
+  variants: readonly SeedVariantCommerce[];
 }
 
 export interface CatalogSeed {
