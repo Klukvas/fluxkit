@@ -16,7 +16,7 @@ import {
 } from "../../test/inventory-fixtures.js";
 import { ensureMigrated } from "../../test/migrate.js";
 import { expectLevelInvariants, reservationsOf, StockWorld } from "../../test/stock-world.js";
-import { ReservationsService } from "./reservations.service.js";
+import { ReservationsService, type ExpireDueResult } from "./reservations.service.js";
 
 const HOUR = 3_600_000;
 const MISSING_ID = "00000000-0000-4000-8000-000000000000";
@@ -407,6 +407,7 @@ describe("ReservationsService (real Postgres, no HTTP route)", () => {
         expired: 2,
         skipped: 0,
         failures: [],
+        nextCursor: null,
       });
       const byId = new Map(
         (await reservationsOf(pool, variantId)).map((row) => [row.id, row.status]),
@@ -454,6 +455,76 @@ describe("ReservationsService (real Postgres, no HTTP route)", () => {
       expect((await reservationsOf(pool, broken))[0]?.status).toBe("active");
       // The damaged reservation would be reported by every later sweep of the shared database.
       await pool.query("update reservation set status = 'released' where id = $1", [bad.id]);
+    });
+
+    it("terminates with a cursor when more damaged reservations than the limit sit at the head (R6)", async () => {
+      const { variantId: broken } = await world.variant({ onHand: 10 });
+      const { variantId: fine } = await world.variant({ onHand: 10 });
+      const at = (month: string, ms: number) =>
+        new Date(`1997-${month}-01T00:00:00.000Z`).getTime() + ms;
+      const damaged: string[] = [];
+      for (let index = 0; index < 5; index += 1) {
+        const held = await reserveOk(broken, 1, { expiresAt: new Date(at("01", index)) });
+        damaged.push(held.id);
+      }
+      const healthy: string[] = [];
+      for (let index = 0; index < 4; index += 1) {
+        const held = await reserveOk(fine, 1, { expiresAt: new Date(at("02", index)) });
+        healthy.push(held.id);
+      }
+      await pool.query("update inventory_level set reserved = 0 where variant_id = $1", [broken]);
+      const now = new Date("1997-06-01T00:00:00.000Z");
+
+      try {
+        // Without a cursor the same damaged rows come first every time: this is what made a naive loop endless.
+        const first = await service.expireDue(now, { limit: 3 });
+        const again = await service.expireDue(now, { limit: 3 });
+        expect(first.failures.map((failure) => failure.reservationId)).toEqual(damaged.slice(0, 3));
+        expect(again.failures.map((failure) => failure.reservationId)).toEqual(damaged.slice(0, 3));
+        expect(first.nextCursor).not.toBeNull();
+
+        const failed: string[] = [];
+        let expired = 0;
+        let after = undefined as ExpireDueResult["nextCursor"] | undefined;
+        let calls = 0;
+        do {
+          const result: ExpireDueResult = await service.expireDue(now, {
+            limit: 3,
+            ...(after === undefined || after === null ? {} : { after }),
+          });
+          calls += 1;
+          expired += result.expired;
+          failed.push(...result.failures.map((failure) => failure.reservationId));
+          after = result.nextCursor;
+          expect(calls, "the loop must terminate").toBeLessThan(10);
+        } while (after !== null);
+
+        expect(calls).toBe(4);
+        expect(expired).toBe(4);
+        expect(failed).toEqual(damaged);
+        const statuses = new Map(
+          (await reservationsOf(pool, fine)).map((row) => [row.id, row.status]),
+        );
+        for (const id of healthy) {
+          expect(statuses.get(id)).toBe("expired");
+        }
+        expect(await levelOf(pool, fine, mainId)).toEqual({ on_hand: 10, reserved: 0 });
+      } finally {
+        // The damaged reservations would be reported by every later sweep of the shared database.
+        await pool.query("update reservation set status = 'released' where variant_id = $1", [
+          broken,
+        ]);
+      }
+    });
+
+    it("rejects an invalid cursor loudly (a caller bug)", async () => {
+      const now = new Date();
+      await expect(
+        service.expireDue(now, { after: { expiresAt: "yesterday", id: MISSING_ID } }),
+      ).rejects.toThrow(RangeError);
+      await expect(
+        service.expireDue(now, { after: { expiresAt: "1997-01-01T00:00:00.000000Z", id: "x" } }),
+      ).rejects.toThrow(RangeError);
     });
 
     it("rejects an invalid time or limit loudly", async () => {

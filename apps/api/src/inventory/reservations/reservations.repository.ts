@@ -19,6 +19,15 @@ export interface ReservableVariantRow {
   hasShopPrice: boolean;
 }
 
+/** Keyset position in the due list: the last reservation looked at. Both fields come from `DueReservation`. */
+export interface DueCursor {
+  /** UTC ISO text with microseconds, as the database printed it. */
+  expiresAt: string;
+  id: string;
+}
+
+export type DueReservation = DueCursor;
+
 /** Queries only (Drizzle query builder, parameterized). Level and journal queries live in `InventoryRepository`. */
 @Injectable()
 export class ReservationsRepository {
@@ -90,14 +99,34 @@ export class ReservationsRepository {
     return row;
   }
 
-  /** Ids of active reservations due at `now` (`expires_at <= now`), oldest first. Uses `reservation_status_expires_at_idx`. */
-  async listDueIds(db: DbExecutor, now: Date, limit: number): Promise<string[]> {
-    const rows = await db
-      .select({ id: reservation.id })
+  /**
+   * Active reservations due at `now` (`expires_at <= now`), ordered by `(expires_at, id)`, at most `limit`, strictly
+   * after the keyset cursor `after` when given. Uses `reservation_status_expires_at_idx`. `expiresAt` of each row is
+   * returned as text with microseconds (UTC ISO form) so a cursor built from it compares exactly: a JavaScript `Date`
+   * has milliseconds only and could name the same row again.
+   */
+  async listDue(
+    db: DbExecutor,
+    now: Date,
+    limit: number,
+    after: DueCursor | undefined,
+  ): Promise<DueReservation[]> {
+    return db
+      .select({
+        id: reservation.id,
+        expiresAt: sql<string>`to_char(${reservation.expiresAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+      })
       .from(reservation)
-      .where(and(eq(reservation.status, "active"), lte(reservation.expiresAt, now)))
+      .where(
+        and(
+          eq(reservation.status, "active"),
+          lte(reservation.expiresAt, now),
+          after === undefined
+            ? undefined
+            : sql`(${reservation.expiresAt}, ${reservation.id}) > (${after.expiresAt}::timestamptz, ${after.id}::uuid)`,
+        ),
+      )
       .orderBy(asc(reservation.expiresAt), asc(reservation.id))
       .limit(limit);
-    return rows.map((row) => row.id);
   }
 }
