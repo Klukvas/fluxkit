@@ -126,3 +126,49 @@ describe("loadEnv admin auth", () => {
     },
   );
 });
+
+describe("loadEnv pricing", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to UAH, prices including tax and a low-stock threshold of 5", () => {
+    const env = loadEnv(base);
+    expect(env.shopCurrency).toBe("UAH");
+    expect(env.pricesIncludeTax).toBe(true);
+    expect(env.lowStockThreshold).toBe(5);
+  });
+
+  it("parses explicit values", () => {
+    const env = loadEnv({
+      ...base,
+      SHOP_CURRENCY: "JPY",
+      PRICES_INCLUDE_TAX: "false",
+      LOW_STOCK_THRESHOLD: "0",
+    });
+    expect(env).toMatchObject({
+      shopCurrency: "JPY",
+      pricesIncludeTax: false,
+      lowStockThreshold: 0,
+    });
+  });
+
+  it.each(["uah", "Uah", "UAH ", " UAH", "XXX", "US", "USDD", "", "hryvnia", "__proto__"])(
+    "rejects SHOP_CURRENCY=%j loudly",
+    (value) => {
+      expect(() => loadEnv({ ...base, SHOP_CURRENCY: value })).toThrow(/SHOP_CURRENCY/);
+    },
+  );
+
+  it.each(["TRUE", "False", "1", "0", "yes", "", " true"])(
+    "rejects PRICES_INCLUDE_TAX=%j loudly instead of guessing",
+    (value) => {
+      expect(() => loadEnv({ ...base, PRICES_INCLUDE_TAX: value })).toThrow(/PRICES_INCLUDE_TAX/);
+    },
+  );
+
+  it.each(["-1", "1.5", "abc", "", "1e3", "0x10", " 5", "05", "+5", "1000000001"])(
+    "rejects LOW_STOCK_THRESHOLD=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, LOW_STOCK_THRESHOLD: value })).toThrow(/LOW_STOCK_THRESHOLD/);
+    },
+  );
+});

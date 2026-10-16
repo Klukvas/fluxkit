@@ -7,6 +7,7 @@ import { startApp, type RunningApp } from "../../../test/app.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { priceProductVariants } from "../../../test/pricing-fixtures.js";
 import { ProductsRepository } from "./products.repository.js";
 import type { ProductDetailResponse, ProductResponse } from "./products.schemas.js";
 
@@ -88,6 +89,10 @@ describe("admin products API (real app, real Postgres)", () => {
   }
 
   async function lifecycle(id: string, action: Action) {
+    if (action === "publish") {
+      // Publishing needs a shop-currency price on every active variant (the price rule has its own spec).
+      await priceProductVariants(pool, id);
+    }
     return call<ProductDetailResponse>("POST", `/admin/products/${id}/${action}`);
   }
 

@@ -2,6 +2,7 @@ import { NestFactory } from "@nestjs/core";
 import { loadEnv } from "@fluxkit/config";
 import { catalogSeed, type CatalogSeed } from "@fluxkit/seeds";
 import { AppModule } from "../app.module.js";
+import { toPricingConfig } from "../common/pricing-config.js";
 import { ProblemException } from "../common/problem.js";
 import { CatalogSeeder, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
 
@@ -95,6 +96,7 @@ export async function runSeedCommand(
       // Optional features are not part of the demo catalog and must not run side effects while seeding.
       features: [],
       locale: { defaultLocale: config.defaultLocale, locales: config.locales },
+      pricing: toPricingConfig(config),
     }),
     { logger: ["error", "warn"] },
   );

@@ -10,6 +10,7 @@ import {
   media,
   option,
   optionValue,
+  price,
   product,
   productCategory,
   productOption,
@@ -227,6 +228,20 @@ export class ProductsRepository {
       .from(variant)
       .where(eq(variant.productId, productId))
       .orderBy(asc(variant.position), asc(variant.sku), asc(variant.id));
+  }
+
+  /** Ids of the product's variants that have a price in `currency`: one query for the whole product (no N+1). */
+  async findVariantIdsWithPrice(
+    db: DbExecutor,
+    productId: string,
+    currency: string,
+  ): Promise<Set<string>> {
+    const rows = await db
+      .select({ variantId: price.variantId })
+      .from(price)
+      .innerJoin(variant, eq(variant.id, price.variantId))
+      .where(and(eq(variant.productId, productId), eq(price.currency, currency)));
+    return new Set(rows.map((row) => row.variantId));
   }
 
   listVariantOptionValues(db: DbExecutor, productId: string): Promise<VariantOptionValueRow[]> {

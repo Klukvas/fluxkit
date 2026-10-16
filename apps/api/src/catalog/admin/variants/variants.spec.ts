@@ -15,6 +15,7 @@ import {
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { priceProductVariants } from "../../../test/pricing-fixtures.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
 import type { GenerateVariantsResponse, VariantResponse } from "./variants.schemas.js";
 
@@ -84,6 +85,10 @@ describe("admin variants API (real app, real Postgres)", () => {
   }
 
   async function setStatus(productId: string, action: "publish" | "archive" | "unpublish") {
+    if (action === "publish") {
+      // Publishing needs a shop-currency price on every active variant.
+      await priceProductVariants(pool, productId);
+    }
     const result = await call("POST", `/admin/products/${productId}/${action}`);
     expect(result.status, JSON.stringify(result.body)).toBe(200);
   }

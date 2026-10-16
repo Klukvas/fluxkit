@@ -32,6 +32,8 @@ export interface StartAppOptions {
   adminCookieSecure?: boolean;
   adminSessionIdleMinutes?: number;
   adminSessionMaxHours?: number;
+  /** `SHOP_CURRENCY`; defaults to UAH. */
+  shopCurrency?: string;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -45,6 +47,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       adminCookieSecure: options.adminCookieSecure,
       adminSessionIdleMinutes: options.adminSessionIdleMinutes,
       adminSessionMaxHours: options.adminSessionMaxHours,
+      shopCurrency: options.shopCurrency,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,

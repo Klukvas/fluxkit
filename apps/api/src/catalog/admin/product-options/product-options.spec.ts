@@ -13,6 +13,7 @@ import {
 } from "../../../test/catalog-fixtures.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { priceProductVariants } from "../../../test/pricing-fixtures.js";
 import { ProductsRepository } from "../products/products.repository.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
 
@@ -74,13 +75,19 @@ describe("admin product options API (real app, real Postgres)", () => {
     return result.body;
   }
 
+  /** Publishing needs a shop-currency price on every active variant. */
+  async function publish(productId: string) {
+    await priceProductVariants(pool, productId);
+    return call("POST", `/admin/products/${productId}/publish`);
+  }
+
   async function productIn(
     status: "draft" | "active" | "archived",
   ): Promise<ProductDetailResponse> {
     const product = await createProduct(fx.teeTypeId, { [fx.materialAttributeCode]: "cotton" });
     await okPut(product.id, sel(fx.color, ["red", "blue"]), sel(fx.size, ["s", "m"]));
     if (status !== "draft") {
-      expect((await call("POST", `/admin/products/${product.id}/publish`)).status).toBe(200);
+      expect((await publish(product.id)).status).toBe(200);
     }
     if (status === "archived") {
       expect((await call("POST", `/admin/products/${product.id}/archive`)).status).toBe(200);
@@ -553,7 +560,7 @@ describe("admin product options API (real app, real Postgres)", () => {
         });
         expect(filled.status, JSON.stringify(filled.body)).toBe(200);
         if (status !== "draft") {
-          expect((await call("POST", `/admin/products/${product.id}/publish`)).status).toBe(200);
+          expect((await publish(product.id)).status).toBe(200);
         }
         if (status === "archived") {
           expect((await call("POST", `/admin/products/${product.id}/archive`)).status).toBe(200);
@@ -583,7 +590,7 @@ describe("admin product options API (real app, real Postgres)", () => {
 
         // Unpublish and publish again: an inactive variant does not need its required attributes.
         expect((await call("POST", `/admin/products/${active.id}/unpublish`)).status).toBe(200);
-        const republished = await call("POST", `/admin/products/${active.id}/publish`);
+        const republished = await publish(active.id);
         expect(republished.status, JSON.stringify(republished.body)).toBe(200);
 
         // Activating without the required attribute is refused, with it succeeds.
@@ -617,7 +624,7 @@ describe("admin product options API (real app, real Postgres)", () => {
           true,
         ]);
         expect((await call("POST", `/admin/products/${archived.id}/restore`)).status).toBe(200);
-        expect((await call("POST", `/admin/products/${archived.id}/publish`)).status).toBe(200);
+        expect((await publish(archived.id)).status).toBe(200);
       });
 
       it("keeps creating active variants on a draft", async () => {

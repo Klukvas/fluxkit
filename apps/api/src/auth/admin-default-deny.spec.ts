@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { http } from "../test/http.js";
+import { ensureMigrated } from "../test/migrate.js";
 import { adminRoutes, SOME_ID } from "../test/routes.js";
 import type { AdminAuthenticator } from "./admin-authenticator.js";
 
@@ -38,6 +39,8 @@ describe("admin default deny (global guard)", () => {
   let probeCalls = 0;
 
   beforeAll(async () => {
+    // Every HTTP spec migrates first: schema specs leave the shared database empty, so file order must not matter.
+    await ensureMigrated();
     running = await startApp({ adminAuthenticator: "production-default" });
     const countingDeny: AdminAuthenticator = {
       authenticate: () => {
