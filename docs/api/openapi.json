@@ -13831,6 +13831,76 @@
         "tags": ["store"]
       }
     },
+    "/store/config": {
+      "get": {
+        "operationId": "StoreConfigController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The public store settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "currencyExponent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pricesIncludeTax": {
+                      "type": "boolean"
+                    },
+                    "defaultLocale": {
+                      "type": "string"
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "currencyExponent",
+                    "pricesIncludeTax",
+                    "defaultLocale",
+                    "locales"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shop currency (with its minor-unit exponent), tax flag and locales, for formatting money and texts",
+        "tags": ["store"]
+      }
+    },
     "/store/products": {
       "get": {
         "operationId": "StoreProductsController_list",
@@ -13940,9 +14010,45 @@
                             "type": "string",
                             "format": "date-time",
                             "description": "ISO 8601, UTC."
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "to": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Always the shop currency."
+                              }
+                            },
+                            "required": ["from", "to", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"]
                           }
                         },
-                        "required": ["id", "slug", "title", "brand", "image", "publishedAt"],
+                        "required": [
+                          "id",
+                          "slug",
+                          "title",
+                          "brand",
+                          "image",
+                          "publishedAt",
+                          "price",
+                          "availability"
+                        ],
                         "additionalProperties": false
                       }
                     },
@@ -14317,11 +14423,73 @@
                                 }
                               ]
                             }
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Always the shop currency."
+                              },
+                              "compareAtAmount": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              }
+                            },
+                            "required": ["amount", "currency", "compareAtAmount"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"]
                           }
                         },
-                        "required": ["id", "sku", "optionValues", "attributes"],
+                        "required": [
+                          "id",
+                          "sku",
+                          "optionValues",
+                          "attributes",
+                          "price",
+                          "availability"
+                        ],
                         "additionalProperties": false
                       }
+                    },
+                    "price": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "to": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Always the shop currency."
+                        }
+                      },
+                      "required": ["from", "to", "currency"],
+                      "additionalProperties": false
+                    },
+                    "availability": {
+                      "type": "string",
+                      "enum": ["in_stock", "low_stock", "out_of_stock"]
                     },
                     "media": {
                       "type": "array",
@@ -14358,6 +14526,8 @@
                     "attributeDefinitions",
                     "options",
                     "variants",
+                    "price",
+                    "availability",
                     "media"
                   ],
                   "additionalProperties": false
