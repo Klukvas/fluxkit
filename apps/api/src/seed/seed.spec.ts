@@ -1,13 +1,22 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { INTERNAL_SUPPLIER_MARKER, catalogSeed, type SeedCategory } from "@fluxkit/seeds";
+import {
+  INTERNAL_SUPPLIER_MARKER,
+  catalogSeed,
+  type SeedCategory,
+  type SeedProduct,
+  type SeedVariantCommerce,
+} from "@fluxkit/seeds";
 import type { Page } from "../common/pagination.js";
 import { ProblemException } from "../common/problem.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
+import type { ProductDetailResponse } from "../catalog/admin/products/products.schemas.js";
+import type { InventoryResponse, MovementResponse } from "../inventory/admin/inventory.schemas.js";
 import type {
+  StoreConfig,
   StoreCategoryNode,
   StoreProductDetail,
   StoreProductListItem,
@@ -24,6 +33,61 @@ const { attributes, options, productTypes, brands, categories, products } = cata
 
 function allCategories(tree: readonly SeedCategory[]): SeedCategory[] {
   return tree.flatMap((node) => [node, ...allCategories(node.children ?? [])]);
+}
+
+/** The default LOW_STOCK_THRESHOLD of @fluxkit/config; the test app runs with the default pricing config. */
+const LOW_STOCK_THRESHOLD = 5;
+
+type Availability = "in_stock" | "low_stock" | "out_of_stock";
+
+interface PairLike {
+  optionCode: string;
+  valueCode: string;
+}
+
+/** Identifies a variant by its option values, for the seed data and for API responses alike. */
+function variantKey(optionValues: Readonly<Record<string, string>>): string {
+  return Object.entries(optionValues)
+    .map(([optionCode, valueCode]) => `${optionCode}=${valueCode}`)
+    .sort()
+    .join(";");
+}
+
+function keyOfPairs(pairs: readonly PairLike[]): string {
+  return variantKey(Object.fromEntries(pairs.map((pair) => [pair.optionCode, pair.valueCode])));
+}
+
+function commerceOf(product: SeedProduct, key: string): SeedVariantCommerce {
+  const found = product.variants.find((candidate) => variantKey(candidate.optionValues) === key);
+  if (found === undefined) {
+    throw new Error(`The seed data of ${product.slug} has no variant ${key}.`);
+  }
+  return found;
+}
+
+/** What the store must say about a variant of the seed data (the stock rules of core applied to the seed numbers). */
+function expectedAvailability(commerce: SeedVariantCommerce): Availability {
+  if (commerce.stock === undefined || commerce.allowBackorder === true) {
+    return "in_stock";
+  }
+  if (commerce.stock === 0) {
+    return "out_of_stock";
+  }
+  return commerce.stock <= LOW_STOCK_THRESHOLD ? "low_stock" : "in_stock";
+}
+
+function bestAvailability(states: readonly Availability[]): Availability {
+  if (states.includes("in_stock")) {
+    return "in_stock";
+  }
+  return states.includes("low_stock") ? "low_stock" : "out_of_stock";
+}
+
+function stockedVariantCount(): number {
+  return products.reduce(
+    (sum, product) => sum + product.variants.filter((commerce) => (commerce.stock ?? 0) > 0).length,
+    0,
+  );
 }
 
 function expectedCounts(): Record<(typeof SEED_ENTITY_KINDS)[number], number> {
@@ -56,6 +120,18 @@ describe("catalog seed (real app, real Postgres)", () => {
       counts[tablename] = result.rows[0]?.count ?? -1;
     }
     return counts;
+  }
+
+  /** Rows of a per-variant table that belong to the demo products. */
+  async function seedRowCount(
+    table: "price" | "inventory_level" | "stock_movement",
+  ): Promise<number> {
+    const result = await pool.query<{ count: number }>(
+      `select count(*)::int as count from ${table}
+        where variant_id in (select v.id from variant v join product p on p.id = v.product_id where p.slug = any($1))`,
+      [products.map((product) => product.slug)],
+    );
+    return result.rows[0]?.count ?? -1;
   }
 
   /** Removes only what the seed creates, found by its stable codes and slugs, children before parents. */
@@ -114,6 +190,19 @@ describe("catalog seed (real app, real Postgres)", () => {
     // 3 + 8 + 4 clothing variants, one default variant for each of the 5 products without options.
     expect(firstRun.variantsCreated).toBe(9 + 8 + 4 + 5);
     expect(formatSummary(firstRun)).toContain("products      created   8");
+  });
+
+  it("writes one price per variant in the shop currency, and a level and a journal row per stocked variant", async () => {
+    const variantCount = products.reduce((sum, product) => sum + product.variants.length, 0);
+    const prices = await pool.query<{ currency: string; count: number }>(
+      `select currency, count(*)::int as count from price
+        where variant_id in (select v.id from variant v join product p on p.id = v.product_id where p.slug = any($1))
+        group by currency`,
+      [products.map((product) => product.slug)],
+    );
+    expect(prices.rows).toEqual([{ currency: "UAH", count: variantCount }]);
+    expect(await seedRowCount("inventory_level")).toBe(stockedVariantCount());
+    expect(await seedRowCount("stock_movement")).toBe(stockedVariantCount());
   });
 
   describe("store API", () => {
@@ -264,15 +353,203 @@ describe("catalog seed (real app, real Postgres)", () => {
         expect(body).not.toContain("supplier_reference");
       }
     });
+
+    it("shows the seeded prices and compare-at prices on every variant, in the shop currency", async () => {
+      for (const product of products) {
+        const detail = await http<StoreProductDetail>(
+          running.baseUrl,
+          "GET",
+          `/store/products/${product.slug}`,
+        );
+        expect(detail.status, product.slug).toBe(200);
+        expect(detail.body.variants, product.slug).toHaveLength(product.variants.length);
+        for (const variant of detail.body.variants) {
+          const key = keyOfPairs(variant.optionValues);
+          const commerce = commerceOf(product, key);
+          expect(variant.price, `${product.slug} ${key}`).toEqual({
+            amount: commerce.amount,
+            currency: "UAH",
+            compareAtAmount: commerce.compareAtAmount ?? null,
+          });
+        }
+      }
+    });
+
+    it("shows each availability state of the seed data per variant, per product and in the list", async () => {
+      const seen = new Set<Availability>();
+      const list = await http<Page<StoreProductListItem>>(
+        running.baseUrl,
+        "GET",
+        `/store/products?brand=${brands[0]?.slug}&limit=100&locale=en`,
+      );
+      for (const product of products) {
+        const detail = await http<StoreProductDetail>(
+          running.baseUrl,
+          "GET",
+          `/store/products/${product.slug}`,
+        );
+        const states: Availability[] = [];
+        for (const variant of detail.body.variants) {
+          const key = keyOfPairs(variant.optionValues);
+          const expected = expectedAvailability(commerceOf(product, key));
+          expect(variant.availability, `${product.slug} ${key}`).toBe(expected);
+          states.push(expected);
+          seen.add(expected);
+        }
+        expect(detail.body.availability, product.slug).toBe(bestAvailability(states));
+        const item = list.body.items.find((candidate) => candidate.title === product.title.en);
+        expect(item?.availability, product.slug).toBe(bestAvailability(states));
+        const amounts = product.variants.map((commerce) => commerce.amount);
+        expect(item?.price, product.slug).toEqual({
+          from: Math.min(...amounts),
+          to: Math.max(...amounts),
+          currency: "UAH",
+        });
+      }
+      expect([...seen].sort()).toEqual(["in_stock", "low_stock", "out_of_stock"]);
+    });
+
+    it("shows the backorder variant and the untracked digital products as in stock", async () => {
+      const backorder = products.flatMap((product) =>
+        product.variants
+          .filter((commerce) => commerce.allowBackorder === true)
+          .map((commerce) => ({ product, commerce })),
+      );
+      expect(backorder.length).toBeGreaterThan(0);
+      for (const { product, commerce } of backorder) {
+        expect(commerce.stock).toBe(0);
+        const detail = await http<StoreProductDetail>(
+          running.baseUrl,
+          "GET",
+          `/store/products/${product.slug}`,
+        );
+        const variant = detail.body.variants.find(
+          (candidate) => keyOfPairs(candidate.optionValues) === variantKey(commerce.optionValues),
+        );
+        expect(variant?.availability).toBe("in_stock");
+      }
+      const digital = products.filter((product) => product.productTypeCode === "digital_product");
+      expect(digital.length).toBeGreaterThan(0);
+      for (const product of digital) {
+        const detail = await http<StoreProductDetail>(
+          running.baseUrl,
+          "GET",
+          `/store/products/${product.slug}`,
+        );
+        expect(detail.body.availability, product.slug).toBe("in_stock");
+        expect(detail.body.variants.map((variant) => variant.availability)).toEqual(["in_stock"]);
+      }
+      const tracked = await pool.query<{ track_inventory: boolean; levels: number }>(
+        `select v.track_inventory, (select count(*)::int from inventory_level l where l.variant_id = v.id) as levels
+           from variant v join product p on p.id = v.product_id where p.slug = any($1)`,
+        [digital.map((product) => product.slug)],
+      );
+      expect(tracked.rows).toHaveLength(digital.length);
+      expect(tracked.rows.every((row) => !row.track_inventory && row.levels === 0)).toBe(true);
+    });
+
+    it("serves the store settings", async () => {
+      const config = await http<StoreConfig>(running.baseUrl, "GET", "/store/config");
+      expect(config.status).toBe(200);
+      expect(config.body.currency).toBe("UAH");
+    });
+
+    it("never shows a stock quantity to the public", async () => {
+      for (const product of products) {
+        const detail = await http(running.baseUrl, "GET", `/store/products/${product.slug}`);
+        expect(JSON.stringify(detail.body), product.slug).not.toMatch(
+          /onHand|on_hand|reserved|quantity|"stock"/,
+        );
+      }
+    });
+  });
+
+  describe("admin inventory (read through the real admin routes)", () => {
+    async function adminIds(
+      product: SeedProduct,
+      commerce: SeedVariantCommerce,
+    ): Promise<{ productId: string; variantId: string }> {
+      const row = await pool.query<{ id: string }>("select id from product where slug = $1", [
+        product.slug,
+      ]);
+      const productId = row.rows[0]?.id;
+      if (productId === undefined) {
+        throw new Error(`Product ${product.slug} was not seeded.`);
+      }
+      const detail = await http<ProductDetailResponse>(
+        running.baseUrl,
+        "GET",
+        `/admin/products/${productId}`,
+      );
+      const variant = detail.body.variants.find(
+        (candidate) => keyOfPairs(candidate.optionValues) === variantKey(commerce.optionValues),
+      );
+      if (variant === undefined) {
+        throw new Error(
+          `Variant ${variantKey(commerce.optionValues)} of ${product.slug} is missing.`,
+        );
+      }
+      return { productId, variantId: variant.id };
+    }
+
+    it("shows the seeded level, a receipt in the journal without an actor, and the flags", async () => {
+      for (const product of products) {
+        for (const commerce of product.variants) {
+          const where = `${product.slug} ${variantKey(commerce.optionValues)}`;
+          const { productId, variantId } = await adminIds(product, commerce);
+          const base = `/admin/products/${productId}/variants/${variantId}/inventory`;
+          const inventory = await http<InventoryResponse>(running.baseUrl, "GET", base);
+          const movements = await http<Page<MovementResponse>>(
+            running.baseUrl,
+            "GET",
+            `${base}/movements`,
+          );
+          expect(inventory.status, where).toBe(200);
+          expect(inventory.body.trackInventory, where).toBe(commerce.stock !== undefined);
+          expect(inventory.body.allowBackorder, where).toBe(commerce.allowBackorder === true);
+          if ((commerce.stock ?? 0) > 0) {
+            expect(inventory.body.levels, where).toHaveLength(1);
+            expect(inventory.body.levels[0], where).toMatchObject({
+              locationCode: "main",
+              onHand: commerce.stock,
+              reserved: 0,
+              available: commerce.stock,
+            });
+            expect(movements.body.items, where).toHaveLength(1);
+            expect(movements.body.items[0], where).toMatchObject({
+              kind: "receipt",
+              delta: commerce.stock,
+              onHandAfter: commerce.stock,
+              reason: "Demo seed",
+              actorId: null,
+            });
+          } else {
+            expect(inventory.body.levels, where).toEqual([]);
+            expect(movements.body.items, where).toEqual([]);
+          }
+        }
+      }
+    });
   });
 
   describe("idempotency", () => {
     it("runs a second time without errors, duplicates or new rows", async () => {
       const before = await tableCounts();
+      const demoRows = async () => ({
+        price: await seedRowCount("price"),
+        inventory_level: await seedRowCount("inventory_level"),
+        stock_movement: await seedRowCount("stock_movement"),
+      });
+      const rowsBefore = await demoRows();
       const second = await runSeedCommand([], env);
       const after = await tableCounts();
 
       expect(after).toEqual(before);
+      // Named explicitly: a second run adds no price, no level and no journal row for the demo variants.
+      expect(rowsBefore.price).toBeGreaterThan(0);
+      expect(rowsBefore.inventory_level).toBeGreaterThan(0);
+      expect(rowsBefore.stock_movement).toBeGreaterThan(0);
+      expect(await demoRows()).toEqual(rowsBefore);
       expect(second.created).toEqual({
         attributes: 0,
         options: 0,

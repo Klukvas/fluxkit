@@ -1,6 +1,12 @@
 import type { INestApplicationContext } from "@nestjs/common";
 import { eq } from "drizzle-orm";
-import type { CatalogSeed, SeedAttribute, SeedCategory, SeedProduct } from "@fluxkit/seeds";
+import type {
+  CatalogSeed,
+  SeedAttribute,
+  SeedCategory,
+  SeedProduct,
+  SeedVariantCommerce,
+} from "@fluxkit/seeds";
 import type { z } from "zod";
 import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
@@ -26,8 +32,12 @@ import {
   createOptionSchema,
   createOptionValueSchema,
 } from "../catalog/admin/options/options.schemas.js";
+import { updateVariantSchema } from "../catalog/admin/variants/variants.schemas.js";
+import { VariantsService } from "../catalog/admin/variants/variants.service.js";
+import { InventoryService } from "../inventory/admin/inventory.service.js";
 import { PricesService } from "../catalog/admin/prices/prices.service.js";
 import { putProductPricesSchema } from "../catalog/admin/prices/prices.schemas.js";
+import { adjustmentSchema } from "../inventory/admin/inventory.schemas.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import { ProductOptionsService } from "../catalog/admin/product-options/product-options.service.js";
 import { putProductOptionsSchema } from "../catalog/admin/product-options/product-options.schemas.js";
@@ -44,8 +54,8 @@ import {
   putProductMediaSchema,
 } from "../catalog/admin/products/products.schemas.js";
 
-/** Minor units (100.00 in a two-decimal currency). TODO(fluxkit): replaced by demo prices in the seed data (plan step 6). */
-const PLACEHOLDER_PRICE_AMOUNT = 10_000;
+/** The demo stock is received at the default location (the `main` location of the migration). */
+const STOCK_REASON = "Demo seed";
 
 export const SEED_ENTITY_KINDS = [
   "attributes",
@@ -74,6 +84,14 @@ function emptyCounts(): Record<SeedEntityKind, number> {
     categories: 0,
     products: 0,
   };
+}
+
+/** Identifies a variant by its option values, the same way for the seed data and for the generated variants. */
+function variantKey(optionValues: Readonly<Record<string, string>>): string {
+  return Object.entries(optionValues)
+    .map(([optionCode, valueCode]) => `${optionCode}=${valueCode}`)
+    .sort()
+    .join(";");
 }
 
 /** Same validation as the HTTP layer: the bodies go through the very schemas the admin controllers use. */
@@ -111,6 +129,8 @@ export class CatalogSeeder {
     private readonly products: ProductsService,
     private readonly productOptions: ProductOptionsService,
     private readonly prices: PricesService,
+    private readonly variants: VariantsService,
+    private readonly inventory: InventoryService,
     private readonly pricing: PricingConfig,
   ) {}
 
@@ -127,6 +147,8 @@ export class CatalogSeeder {
       get(ProductsService),
       get(ProductOptionsService),
       get(PricesService),
+      get(VariantsService),
+      get(InventoryService),
       app.get<PricingConfig>(PRICING_CONFIG, { strict: false }),
     );
   }
@@ -403,23 +425,77 @@ export class CatalogSeeder {
       }),
     );
 
-    // Publishing needs a shop-currency price on every active variant. TODO(fluxkit): placeholder, one flat price for
-    // every demo variant; step 6 of docs/plans/2026-10-16-pricing-and-inventory.md moves real demo prices into seeds/.
+    // Publishing needs a shop-currency price on every active variant, so prices go in before the product goes live.
     const { variants } = await this.products.get(productId);
+    const commerceOf = new Map(
+      definition.variants.map((commerce) => [variantKey(commerce.optionValues), commerce]),
+    );
+    const matched = variants.map((variant) => ({
+      variant,
+      commerce: this.lookupCommerce(
+        commerceOf,
+        variantKey(
+          Object.fromEntries(variant.optionValues.map((pair) => [pair.optionCode, pair.valueCode])),
+        ),
+        definition.slug,
+      ),
+    }));
+    if (commerceOf.size !== variants.length) {
+      throw new Error(
+        `Seed data for product "${definition.slug}" describes ${commerceOf.size} variants but its options generate ${variants.length}.`,
+      );
+    }
     await this.prices.putMany(
       productId,
       parse(putProductPricesSchema, {
-        items: variants.map((item) => ({
-          variantId: item.id,
+        items: matched.map(({ variant, commerce }) => ({
+          variantId: variant.id,
           currency: this.pricing.shopCurrency,
-          amount: PLACEHOLDER_PRICE_AMOUNT,
+          amount: commerce.amount,
+          ...(commerce.compareAtAmount === undefined
+            ? {}
+            : { compareAtAmount: commerce.compareAtAmount }),
         })),
       }),
     );
 
+    for (const { variant, commerce } of matched) {
+      if (commerce.allowBackorder === true) {
+        await this.variants.update(
+          productId,
+          variant.id,
+          parse(updateVariantSchema, { allowBackorder: true }),
+        );
+      }
+      // A tracked variant with no stock gets no level row and no movement: its absence is the "out of stock" state.
+      if (commerce.stock !== undefined && commerce.stock > 0) {
+        // A system change: the seed has no admin user, so the journal row keeps a null actor.
+        await this.inventory.adjust(
+          productId,
+          variant.id,
+          parse(adjustmentSchema, { delta: commerce.stock, kind: "receipt", reason: STOCK_REASON }),
+          null,
+        );
+      }
+    }
+
     const published = await this.products.transition(productId, "publish");
     this.summary.variantsCreated += published.variants.length;
     this.summary.created.products += 1;
+  }
+
+  private lookupCommerce(
+    commerceOf: ReadonlyMap<string, SeedVariantCommerce>,
+    key: string,
+    slug: string,
+  ): SeedVariantCommerce {
+    const commerce = commerceOf.get(key);
+    if (commerce === undefined) {
+      throw new Error(
+        `Seed data for product "${slug}" has no price for the variant "${key || "default"}".`,
+      );
+    }
+    return commerce;
   }
 
   /** A reference that resolves to nothing is a bug in the seed data or a half-seeded database: fail loudly. */
