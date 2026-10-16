@@ -6,7 +6,7 @@ Inventory, stock flags, locations and the reservation service are in `docs/api/i
 
 ## Money in the API
 
-- An amount is a JSON **integer in minor units** (kopiykas, cents) from 0 to 1 000 000 000 000; never a decimal, never a string. A value that is not an integer, is negative, is above the maximum, or is not a number is rejected, never rounded.
+- An amount is a JSON **integer in minor units** (kopiykas, cents) from 0 to 1 000 000 000 000; never a decimal, never a string. A value that is not an integer, is negative, is above the maximum, or is not a number is rejected; the API never rounds. The API validates the **parsed JSON number**, not the text you sent: JSON parsing turns `100.0` into the integer 100 (accepted as 100), and a literal such as `1000000000000.0000001` that IEEE-754 rounds to an exact integer is accepted as that integer. The safe-integer and range checks still apply to the parsed value. Send integers.
 - `currency` is an upper-case ISO 4217 code from the supported table (`UAH`, `USD`, `EUR`, `PLN`, `GBP`, `CZK`, `CHF`, `CAD`, `JPY`, `KWD`), matched exactly (`uah` is rejected).
 - A price is `{amount, currency, compareAtAmount}`; `compareAtAmount` (the old price) is `null` or an integer strictly greater than `amount`.
 - One price per variant and currency. The shop sells only in `SHOP_CURRENCY` (default `UAH`, `docs/contracts/config.md`); prices in other currencies can be stored but are never sold and never converted.
@@ -46,7 +46,7 @@ Public, no auth, GET only, JSON. Source of truth for shapes: `docs/api/openapi.j
 
 | Endpoint | Auth | Response | Notes |
 |---|---|---|---|
-| `GET /store/config` | public | `{currency, currencyExponent, pricesIncludeTax, defaultLocale, locales}` | `currency` is `SHOP_CURRENCY`; `currencyExponent` is the number of minor-unit digits (`UAH` 2, `JPY` 0, `KWD` 3; from the core currency table); `pricesIncludeTax` is `PRICES_INCLUDE_TAX` (a display flag, no tax is calculated); `locales` are `LOCALES`. Nothing else (no thresholds, no internals). No cache headers, like the other store routes. |
+| `GET /store/config` | public | `{currency, currencyExponent, pricesIncludeTax, defaultLocale, locales}` | `currency` is `SHOP_CURRENCY`; `currencyExponent` is the number of minor-unit digits (`UAH` 2, `JPY` 0, `KWD` 3; from the core currency table); `pricesIncludeTax` is `PRICES_INCLUDE_TAX` (a display flag, no tax is calculated); `locales` are `LOCALES`. Nothing else (no thresholds, no internals). No `Cache-Control` header, like the other store routes; Express adds a weak `ETag` to every store response, so a client may revalidate with `If-None-Match`. |
 | `GET /store/products/{slug}` | public | each variant has `price: {amount, currency, compareAtAmount}` and `availability`; the product has `price: {from, to, currency}` and `availability` | 404 when the product has no sellable variant |
 | `GET /store/products` | public | each item has `price: {from, to, currency}` and `availability` | products without a sellable variant are not listed and not counted in `total`; sorting, filters and pagination are unchanged |
 

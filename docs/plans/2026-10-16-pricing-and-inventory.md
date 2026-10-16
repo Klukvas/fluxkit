@@ -66,7 +66,7 @@ Cart, checkout, orders and payments (they will call the reservation operations b
 `SHOP_CURRENCY`, `PRICES_INCLUDE_TAX`, `LOW_STOCK_THRESHOLD` in `packages/config`, `.env.example`, `docs/contracts/config.md`; malformed values fail loudly.
 
 ### Seeds
-Demo variants get prices and stock; the runner stays additive: it fills a missing price or stock level only for its own variants and never updates existing rows (digital demo products are untracked). Documented in `seeds/README.md`.
+Demo variants get prices and stock; the runner stays additive: it prices and stocks only the products it creates in that run, and never touches a product that already exists (so it does not fill a missing price or level on an existing demo product; digital demo products are untracked). Documented in `seeds/README.md`.
 
 ## Steps (one branch and PR each, in order, merge only on the owner's word)
 
