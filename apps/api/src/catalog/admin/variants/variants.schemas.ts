@@ -30,6 +30,14 @@ const attributeValuesSchema = z.record(z.string(), z.unknown()).meta({
     "Variant-level attribute values keyed by attribute code. Unknown codes and wrong types are rejected; required attributes are only enforced while the product is active.",
 });
 
+const trackInventorySchema = z.boolean().meta({
+  description:
+    "Whether stock is counted. false: always available, never reserved. Default true; false for a product type that does not ship.",
+});
+const allowBackorderSchema = z.boolean().meta({
+  description: "Whether the variant can be reserved beyond the stock on hand. Default false.",
+});
+
 /**
  * `POST /admin/products/:id/variants` (draft products only). `optionValueIds` holds one value of every option the
  * product uses, chosen among the values the product selected (an empty list for a product without options).
@@ -41,6 +49,8 @@ export const createVariantSchema = z.strictObject({
   barcode: barcodeSchema.nullable().optional(),
   attributes: attributeValuesSchema.optional(),
   isActive: z.boolean().optional(),
+  trackInventory: trackInventorySchema.optional(),
+  allowBackorder: allowBackorderSchema.optional(),
 });
 
 /**
@@ -53,6 +63,8 @@ export const updateVariantSchema = z.strictObject({
   barcode: barcodeSchema.nullable().optional(),
   attributes: attributeValuesSchema.optional(),
   isActive: z.boolean().optional(),
+  trackInventory: trackInventorySchema.optional(),
+  allowBackorder: allowBackorderSchema.optional(),
   position: z.number().int().min(0).max(1_000_000).optional(),
   isDefault: z.boolean().optional(),
 });

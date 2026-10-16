@@ -7189,6 +7189,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -7241,6 +7247,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -7768,6 +7776,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -7820,6 +7834,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -8190,6 +8206,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -8242,6 +8264,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -8657,6 +8681,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -8709,6 +8739,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9042,6 +9074,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9094,6 +9132,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9427,6 +9467,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9479,6 +9525,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -9812,6 +9860,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -9864,6 +9918,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -10238,6 +10294,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -10290,6 +10352,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -10669,6 +10733,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -10721,6 +10791,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11083,6 +11155,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11135,6 +11213,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11497,6 +11577,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11549,6 +11635,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11768,6 +11856,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -11820,6 +11914,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -11953,6 +12049,14 @@
                   },
                   "isActive": {
                     "type": "boolean"
+                  },
+                  "trackInventory": {
+                    "type": "boolean",
+                    "description": "Whether stock is counted. false: always available, never reserved. Default true; false for a product type that does not ship."
+                  },
+                  "allowBackorder": {
+                    "type": "boolean",
+                    "description": "Whether the variant can be reserved beyond the stock on hand. Default false."
                   }
                 },
                 "required": ["optionValueIds"],
@@ -11995,6 +12099,12 @@
                       "type": "boolean"
                     },
                     "isActive": {
+                      "type": "boolean"
+                    },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -12049,6 +12159,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",
@@ -12191,6 +12303,12 @@
                           "isActive": {
                             "type": "boolean"
                           },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
                           "attributes": {
                             "type": "object",
                             "additionalProperties": {}
@@ -12243,6 +12361,8 @@
                           "optionSignature",
                           "isDefault",
                           "isActive",
+                          "trackInventory",
+                          "allowBackorder",
                           "attributes",
                           "position",
                           "optionValues",
@@ -12375,6 +12495,12 @@
                     "isActive": {
                       "type": "boolean"
                     },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
+                      "type": "boolean"
+                    },
                     "attributes": {
                       "type": "object",
                       "additionalProperties": {}
@@ -12427,6 +12553,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",
@@ -12542,6 +12670,14 @@
                   "isActive": {
                     "type": "boolean"
                   },
+                  "trackInventory": {
+                    "type": "boolean",
+                    "description": "Whether stock is counted. false: always available, never reserved. Default true; false for a product type that does not ship."
+                  },
+                  "allowBackorder": {
+                    "type": "boolean",
+                    "description": "Whether the variant can be reserved beyond the stock on hand. Default false."
+                  },
                   "position": {
                     "type": "integer",
                     "minimum": 0,
@@ -12590,6 +12726,12 @@
                       "type": "boolean"
                     },
                     "isActive": {
+                      "type": "boolean"
+                    },
+                    "trackInventory": {
+                      "type": "boolean"
+                    },
+                    "allowBackorder": {
                       "type": "boolean"
                     },
                     "attributes": {
@@ -12644,6 +12786,8 @@
                     "optionSignature",
                     "isDefault",
                     "isActive",
+                    "trackInventory",
+                    "allowBackorder",
                     "attributes",
                     "position",
                     "optionValues",

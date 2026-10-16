@@ -177,6 +177,18 @@ export class ProductsRepository {
     return new Set(rows.map((row) => row.sku));
   }
 
+  /** Whether the product type ships goods; variants of a type that does not (digital) start untracked. */
+  async requiresShipping(db: DbExecutor, productTypeId: string): Promise<boolean> {
+    const [row] = await db
+      .select({ requiresShipping: productType.requiresShipping })
+      .from(productType)
+      .where(eq(productType.id, productTypeId));
+    if (row === undefined) {
+      throw new Error(`Product type ${productTypeId} is missing.`);
+    }
+    return row.requiresShipping;
+  }
+
   /** The product type with the attribute definitions (and select options) and option codes core needs. */
   async findProductTypeRows(db: DbExecutor, id: string): Promise<ProductTypeRows | undefined> {
     const [type] = await db.select().from(productType).where(eq(productType.id, id));

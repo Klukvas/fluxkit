@@ -16,7 +16,17 @@ import type {
 } from "../products/products.repository.js";
 
 export type VariantChanges = Partial<
-  Pick<NewVariant, "sku" | "barcode" | "attributes" | "isActive" | "isDefault" | "position">
+  Pick<
+    NewVariant,
+    | "sku"
+    | "barcode"
+    | "attributes"
+    | "isActive"
+    | "isDefault"
+    | "position"
+    | "trackInventory"
+    | "allowBackorder"
+  >
 >;
 export type NewVariantOptionValue = typeof variantOptionValue.$inferInsert;
 
