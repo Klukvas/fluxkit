@@ -54,12 +54,13 @@ No feature flag: the catalog is core.
 - **Per-field fallback**: each text is resolved to one string: the requested locale, else the default locale. Fallback is per field, never per entity. If neither locale has a required text (product title, category or option name, brand name), the value is an empty string and a warning is logged.
 - **Hard rules** (tested):
   - Only products with status `active` appear, in lists and in detail. Draft, archived, and unknown slugs answer `404 not_found` in detail.
-  - Only variants with `isActive = true` appear.
+  - Only sellable variants appear: `isActive = true` and a price in the shop currency (`SHOP_CURRENCY`). A product with no sellable variant is not listed and its detail answers `404 not_found`, like an unpublished product. Prices, availability and the rules are in `docs/api/pricing.md`, Store.
+  - Quantities, locations, movements, reservations, the stock flags and prices in other currencies never appear in any store response.
   - Only categories with `isActive = true` whose ancestors are all active appear, in the tree and in a product's `categories`.
   - Attributes flagged `isInternal` or not `isVisibleOnStorefront` never leave the API, neither as values nor as definitions. One serializer decides this (core `selectPublicAttributes`, `publicAttributeDefinitions`); unknown attribute keys are dropped.
   - Hidden internals: `optionSignature`, variant `isDefault`, `barcode`, `position` values, status fields, `createdAt`, `updatedAt`.
   - `publishedAt` is the only timestamp.
-- **Filters**: `?category=<slug>` matches the category and all its active descendants; an unknown, inactive or hidden category gives an empty list, not an error. `?brand=<slug>` matches one brand; unknown gives an empty list. No text search, facets or prices yet.
+- **Filters**: `?category=<slug>` matches the category and all its active descendants; an unknown, inactive or hidden category gives an empty list, not an error. `?brand=<slug>` matches one brand; unknown gives an empty list. No text search or facets; no sorting or filtering by price or availability yet (search plan).
 - **Order**: products by `publishedAt` descending, then `id`; categories by position, then slug; variants by position, then sku, then id.
 
 ## Attributes
@@ -174,8 +175,11 @@ Public read-only routes. Rules and locale handling: see Conventions.
 
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
+| `GET /store/config` | public | The settings a storefront needs to format money and pick a language | none | 200 `{currency, currencyExponent, pricesIncludeTax, defaultLocale, locales}` (`currencyExponent`: minor-unit digits of `currency`, from core; nothing else is exposed) | - | - |
 | `GET /store/categories` | public | Public category tree: active categories whose ancestors are all active, ordered by position, slug | `locale` | 200 `{items: [node]}`; a node is `{id, slug, name, description, children}`, at most 5 levels | 400 (`locale`) | - |
-| `GET /store/products` | public | List active products, newest first (`publishedAt` descending, then `id`); filter by category (with descendants) and brand | `locale`, `category` (slug), `brand` (slug), `limit`, `offset` | 200 page of items `{id, slug, title, brand: {slug, name} or null, image: {url, alt} or null, publishedAt}`; a well-formed unknown `category` or `brand` gives an empty list | 400 (`locale`, pagination, unknown query key, `category` or `brand` that is not a slug: `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 160) | - |
-| `GET /store/products/{slug}` | public | Get an active product by slug with its options, variants, media and public attributes | path `slug`, `locale` | 200 `{id, slug, title, description, brand, publishedAt, categories, attributes, attributeDefinitions, options, variants, media}`; `options` list only the values the product chose that an active variant uses (an option with none left is omitted); `variants` only active ones; `media` with an `optionValueId` only for the listed values (ADR 0007) | 400 (`locale`, slug longer than 160), 404 (draft, archived, unknown or malformed slug) | - |
+| `GET /store/products` | public | List active products, newest first (`publishedAt` descending, then `id`); filter by category (with descendants) and brand | `locale`, `category` (slug), `brand` (slug), `limit`, `offset` | 200 page of items `{id, slug, title, brand: {slug, name} or null, image: {url, alt} or null, publishedAt, price: {from, to, currency}, availability}`; only products with a sellable variant are listed and counted in `total`; a well-formed unknown `category` or `brand` gives an empty list | 400 (`locale`, pagination, unknown query key, `category` or `brand` that is not a slug: `^[a-z0-9]+(-[a-z0-9]+)*$`, at most 160) | - |
+| `GET /store/products/{slug}` | public | Get an active product by slug with its options, variants, media and public attributes | path `slug`, `locale` | 200 `{id, slug, title, description, brand, publishedAt, categories, attributes, attributeDefinitions, options, variants, media, price: {from, to, currency}, availability}`; a variant is `{id, sku, optionValues, attributes, price: {amount, currency, compareAtAmount}, availability}`; `options` list only the values the product chose that a sellable variant uses (an option with none left is omitted); `variants` only sellable ones; `media` with an `optionValueId` only for the listed values (ADR 0007) | 400 (`locale`, slug longer than 160), 404 (draft, archived, unknown or malformed slug, or no sellable variant) | - |
+
+Field shapes, the hiding rules and the availability rules of the store are in `docs/api/pricing.md`, Store.
 
 Store product `image` is the first media item of the product without an option value, else the first media item. Store `media` items carry `optionValueId` (or null).

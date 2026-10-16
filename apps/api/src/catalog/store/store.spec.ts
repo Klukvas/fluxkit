@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { MAX_AMOUNT } from "@fluxkit/core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Page } from "../../common/pagination.js";
@@ -7,6 +8,7 @@ import { PG_POOL } from "../../database/database.module.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { requireTestDatabaseUrl } from "../../test/env.js";
 import { http } from "../../test/http.js";
+import { defaultLocationId, insertLocation } from "../../test/inventory-fixtures.js";
 import { ensureMigrated } from "../../test/migrate.js";
 import type {
   StoreCategoryNode,
@@ -142,6 +144,23 @@ describe("store API (public, real app, real Postgres)", () => {
     );
   }
 
+  interface VariantPrice {
+    amount: number;
+    compareAt?: number;
+    currency?: string;
+  }
+
+  interface VariantStock {
+    onHand: number;
+    reserved?: number;
+    /** Key in `ids` of a location; the default location when missing. */
+    location?: string;
+  }
+
+  /**
+   * Fixture variants are priced in the shop currency and untracked (always in stock) unless a spec says otherwise, so
+   * the catalog specs stay about the catalog. `prices: []` makes a priceless variant.
+   */
   async function createVariant(
     productKey: string,
     sku: string,
@@ -152,11 +171,16 @@ describe("store API (public, real app, real Postgres)", () => {
       position: number;
       attributes?: object;
       optionValues?: [string, string][];
+      prices?: VariantPrice[];
+      trackInventory?: boolean;
+      allowBackorder?: boolean;
+      stock?: VariantStock[];
     },
   ): Promise<string> {
     const variantId = await insert(
-      `insert into variant (product_id, sku, option_signature, is_default, is_active, attributes, position)
-       values ($1, $2, $3, $4, $5, $6::jsonb, $7) returning id`,
+      `insert into variant (product_id, sku, option_signature, is_default, is_active, attributes, position,
+                            track_inventory, allow_backorder)
+       values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9) returning id`,
       [
         ids[productKey],
         `${upper}-${sku}`,
@@ -165,13 +189,33 @@ describe("store API (public, real app, real Postgres)", () => {
         values.isActive ?? true,
         JSON.stringify(values.attributes ?? {}),
         values.position,
+        values.trackInventory ?? false,
+        values.allowBackorder ?? false,
       ],
     );
+    ids[`variant:${sku}`] = variantId;
     for (const [optionKey, valueKey] of values.optionValues ?? []) {
       await pool.query(
         `insert into variant_option_value (variant_id, product_id, option_id, option_value_id)
          values ($1, $2, $3, $4)`,
         [variantId, ids[productKey], ids[optionKey], ids[valueKey]],
+      );
+    }
+    for (const price of values.prices ?? [{ amount: 1000 }]) {
+      await pool.query(
+        "insert into price (variant_id, currency, amount, compare_at_amount) values ($1, $2, $3, $4)",
+        [variantId, price.currency ?? "UAH", price.amount, price.compareAt ?? null],
+      );
+    }
+    for (const level of values.stock ?? []) {
+      await pool.query(
+        "insert into inventory_level (variant_id, location_id, on_hand, reserved) values ($1, $2, $3, $4)",
+        [
+          variantId,
+          level.location === undefined ? await defaultLocationId(pool) : ids[level.location],
+          level.onHand,
+          level.reserved ?? 0,
+        ],
       );
     }
     return variantId;
@@ -392,6 +436,7 @@ describe("store API (public, real app, real Postgres)", () => {
     await createVariant("p1", "RED-M", {
       signature: `color_${runId}=red;size_${runId}=m`,
       position: 1,
+      prices: [{ amount: 1500, compareAt: 1800 }],
       attributes: variantAttributes(181),
       optionValues: [
         ["optColor", "valRed"],
@@ -402,6 +447,7 @@ describe("store API (public, real app, real Postgres)", () => {
       signature: `color_${runId}=red;size_${runId}=s`,
       isDefault: true,
       position: 0,
+      prices: [{ amount: 1200 }],
       attributes: variantAttributes(180),
       optionValues: [
         ["optColor", "valRed"],
@@ -411,6 +457,7 @@ describe("store API (public, real app, real Postgres)", () => {
     await createVariant("p1", "BLUE-S", {
       signature: `color_${runId}=blue;size_${runId}=s`,
       position: 2,
+      prices: [{ amount: 1000 }],
       attributes: variantAttributes(182),
       optionValues: [
         ["optColor", "valBlue"],
@@ -467,9 +514,11 @@ describe("store API (public, real app, real Postgres)", () => {
 
     // P5: only in a category under an inactive parent; brand B.
     ids["p5"] = await createProduct("p5", { brand: "brandB", publishedDaysAgo: 4 });
+    await createVariant("p5", "P5", { signature: "", isDefault: true, position: 0 });
     await assignCategory("p5", "underInactive", true);
 
     ids["p6"] = await createProduct("p6", { brand: "brandA", publishedDaysAgo: 3 });
+    await createVariant("p6", "P6", { signature: "", isDefault: true, position: 0 });
     await assignCategory("p6", "zeta", true);
 
     // P8 (ADR 0007): colour red (default variant) and blue (both blue variants inactive), sizes s and m.
@@ -548,6 +597,12 @@ describe("store API (public, real app, real Postgres)", () => {
     // P7: every image has an option pair, so the list image is the first image.
     ids["p7"] = await createProduct("p7-colour", { brand: "brandB", publishedDaysAgo: 9 });
     await chooseOption("p7", "optColor", 0, ["valRed"]);
+    await createVariant("p7", "P7-RED", {
+      signature: `color_${runId}=red`,
+      isDefault: true,
+      position: 0,
+      optionValues: [["optColor", "valRed"]],
+    });
     await addMedia("p7", "https://img.test/p7-red.jpg", 0, {
       optionKey: "optColor",
       valueKey: "valRed",
@@ -562,6 +617,7 @@ describe("store API (public, real app, real Postgres)", () => {
     await pool.query("delete from attribute where code like $1", [`%\\_${runId}`]);
     await pool.query("delete from option where code like $1", [`%\\_${runId}`]);
     await pool.query("delete from brand where slug like $1", [`%-${runId}`]);
+    await pool.query("delete from location where code = $1", [`l${runId}`]);
     for (const key of [
       "underInactiveRoot",
       "inactiveRoot",
@@ -588,8 +644,10 @@ describe("store API (public, real app, real Postgres)", () => {
 
     it("is read-only: there are no write routes", async () => {
       for (const method of ["POST", "PUT", "PATCH", "DELETE"] as const) {
-        const result = await http(running.baseUrl, method, "/store/products", { body: {} });
-        expect(result.status, method).toBe(404);
+        for (const path of ["/store/products", "/store/config"]) {
+          const result = await http(running.baseUrl, method, path, { body: {} });
+          expect(result.status, `${method} ${path}`).toBe(404);
+        }
       }
     });
   });
@@ -662,10 +720,12 @@ describe("store API (public, real app, real Postgres)", () => {
         // The first gallery image wins over the colour image that has a lower position.
         image: { url: "https://img.test/p1-gallery-1.jpg", alt: "Галерея" },
         publishedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
+        price: { from: 1000, to: 1500, currency: "UAH" },
+        availability: "in_stock",
       });
       expect(second?.image).toBeNull();
       expect(Object.keys(first ?? {}).sort()).toEqual(
-        ["brand", "id", "image", "publishedAt", "slug", "title"].sort(),
+        ["availability", "brand", "id", "image", "price", "publishedAt", "slug", "title"].sort(),
       );
     });
 
@@ -815,12 +875,20 @@ describe("store API (public, real app, real Postgres)", () => {
         "insert into brand (slug, name) values ($1, $2::jsonb) returning id",
         [slug("brand-c"), JSON.stringify({ uk: "Бренд Ц" })],
       );
-      const insertTied = (key: string, publishedAt: Date): Promise<string> =>
-        insert(
+      const insertTied = async (key: string, publishedAt: Date): Promise<string> => {
+        const productId = await insert(
           `insert into product (product_type_id, brand_id, slug, title, status, published_at)
            values ($1, $2, $3, $4::jsonb, 'active', $5) returning id`,
           [ids["type"], ids["brandC"], slug(key), JSON.stringify({ uk: key }), publishedAt],
         );
+        ids[key] = productId;
+        await createVariant(key, key.toUpperCase(), {
+          signature: "",
+          isDefault: true,
+          position: 0,
+        });
+        return productId;
+      };
       const sameMoment = new Date(now - 20 * DAY_MS);
       const tied = [
         await insertTied("t1", sameMoment),
@@ -963,6 +1031,8 @@ describe("store API (public, real app, real Postgres)", () => {
               { optionCode: `size_${runId}`, valueCode: "s" },
             ],
             attributes: { [attributeCode("weight")]: { value: 180, unit: "g" } },
+            price: { amount: 1200, currency: "UAH", compareAtAmount: null },
+            availability: "in_stock",
           },
           {
             id: expect.stringMatching(UUID),
@@ -972,6 +1042,8 @@ describe("store API (public, real app, real Postgres)", () => {
               { optionCode: `size_${runId}`, valueCode: "m" },
             ],
             attributes: { [attributeCode("weight")]: { value: 181, unit: "g" } },
+            price: { amount: 1500, currency: "UAH", compareAtAmount: 1800 },
+            availability: "in_stock",
           },
           {
             id: expect.stringMatching(UUID),
@@ -981,6 +1053,8 @@ describe("store API (public, real app, real Postgres)", () => {
               { optionCode: `size_${runId}`, valueCode: "s" },
             ],
             attributes: { [attributeCode("weight")]: { value: 182, unit: "g" } },
+            price: { amount: 1000, currency: "UAH", compareAtAmount: null },
+            availability: "in_stock",
           },
         ],
         media: [
@@ -988,6 +1062,8 @@ describe("store API (public, real app, real Postgres)", () => {
           { url: "https://img.test/p1-gallery-1.jpg", alt: "Галерея", optionValueId: null },
           { url: "https://img.test/p1-gallery-2.jpg", alt: null, optionValueId: null },
         ],
+        price: { from: 1000, to: 1500, currency: "UAH" },
+        availability: "in_stock",
       });
     });
 
@@ -1033,6 +1109,8 @@ describe("store API (public, real app, real Postgres)", () => {
           sku: `${upper}-SIMPLE`,
           optionValues: [],
           attributes: {},
+          price: { amount: 1000, currency: "UAH", compareAtAmount: null },
+          availability: "in_stock",
         },
       ]);
     });
@@ -1191,12 +1269,14 @@ describe("store API (public, real app, real Postgres)", () => {
         [
           "attributeDefinitions",
           "attributes",
+          "availability",
           "brand",
           "categories",
           "description",
           "id",
           "media",
           "options",
+          "price",
           "publishedAt",
           "slug",
           "title",
@@ -1221,6 +1301,571 @@ describe("store API (public, real app, real Postgres)", () => {
           attributeCode("care"),
         ]);
       }
+    });
+  });
+
+  describe("prices and availability", () => {
+    const THRESHOLD = 5;
+    // Distinct numbers that must never appear in a response (stock and non-shop prices).
+    const SECRET_ON_HAND = 7341;
+    const SECRET_RESERVED = 2113;
+    const SECRET_USD_AMOUNT = 90817;
+    const SECRET_USD_COMPARE_AT = 90999;
+    let secondLocation = "";
+    let otherApp: RunningApp | undefined;
+
+    const idOf = (key: string): string => {
+      const value = ids[key];
+      if (value === undefined) {
+        throw new Error(`fixture "${key}" was not created`);
+      }
+      return value;
+    };
+    const detail = (key: string): Promise<StoreProductDetail> =>
+      getOk<StoreProductDetail>(`/store/products/${slug(key)}`);
+    const variantsBySku = (product: StoreProductDetail) =>
+      new Map(product.variants.map((entry) => [entry.sku.replace(`${upper}-`, ""), entry]));
+    const brandPage = (brand: string): Promise<Page<StoreProductListItem>> =>
+      getOk<Page<StoreProductListItem>>(`/store/products?brand=${slug(brand)}&limit=100`);
+
+    beforeAll(async () => {
+      ids["brandP"] = await insert(
+        "insert into brand (slug, name) values ($1, $2::jsonb) returning id",
+        [slug("brand-p"), JSON.stringify({ uk: "Бренд П" })],
+      );
+      secondLocation = `l${runId}`;
+      ids["location2"] = await insertLocation(pool, secondLocation);
+
+      // price-mix: sellable variants A, B, E; hidden: priceless C, USD-only D, inactive F.
+      ids["priceMix"] = await createProduct("price-mix", { brand: "brandP", publishedDaysAgo: 30 });
+      await createVariant("priceMix", "MIX-A", {
+        signature: "a",
+        isDefault: true,
+        position: 0,
+        prices: [{ amount: 1500 }],
+      });
+      await createVariant("priceMix", "MIX-B", {
+        signature: "b",
+        position: 1,
+        prices: [{ amount: 2000, compareAt: 2500 }],
+      });
+      await createVariant("priceMix", "MIX-C-PRICELESS", {
+        signature: "c",
+        position: 2,
+        prices: [],
+      });
+      await createVariant("priceMix", "MIX-D-USD-ONLY", {
+        signature: "d",
+        position: 3,
+        prices: [{ currency: "USD", amount: SECRET_USD_AMOUNT, compareAt: SECRET_USD_COMPARE_AT }],
+      });
+      await createVariant("priceMix", "MIX-E", {
+        signature: "e",
+        position: 4,
+        prices: [
+          { currency: "USD", amount: SECRET_USD_AMOUNT },
+          { currency: "UAH", amount: 3000 },
+        ],
+      });
+      await createVariant("priceMix", "MIX-F-INACTIVE", {
+        signature: "f",
+        isActive: false,
+        position: 5,
+        prices: [{ amount: 1 }],
+      });
+
+      // No sellable variant at all: priceless, USD-only and inactive-but-priced.
+      ids["noSellable"] = await createProduct("no-sellable", {
+        brand: "brandP",
+        publishedDaysAgo: 31,
+      });
+      await createVariant("noSellable", "NS-PRICELESS", {
+        signature: "a",
+        isDefault: true,
+        position: 0,
+        prices: [],
+      });
+      await createVariant("noSellable", "NS-USD", {
+        signature: "b",
+        position: 1,
+        prices: [{ currency: "USD", amount: SECRET_USD_AMOUNT }],
+      });
+      await createVariant("noSellable", "NS-INACTIVE", {
+        signature: "c",
+        isActive: false,
+        position: 2,
+      });
+
+      // Amounts at the limit stay exact in JSON.
+      ids["maxPrice"] = await createProduct("max-price", { brand: "brandP", publishedDaysAgo: 32 });
+      await createVariant("maxPrice", "MAX", {
+        signature: "",
+        isDefault: true,
+        position: 0,
+        prices: [{ amount: MAX_AMOUNT - 1, compareAt: MAX_AMOUNT }],
+      });
+
+      // ADR 0007 with prices: blue is carried only by a priceless variant, so it is not offered.
+      ids["pricedOptions"] = await createProduct("priced-options", {
+        brand: "brandP",
+        publishedDaysAgo: 33,
+      });
+      await chooseOption("pricedOptions", "optColor", 0, ["valRed", "valBlue"]);
+      await chooseOption("pricedOptions", "optSize", 1, ["valS", "valM"]);
+      await createVariant("pricedOptions", "PO-RED-S", {
+        signature: `color_${runId}=red;size_${runId}=s`,
+        isDefault: true,
+        position: 0,
+        optionValues: [
+          ["optColor", "valRed"],
+          ["optSize", "valS"],
+        ],
+      });
+      await createVariant("pricedOptions", "PO-BLUE-M", {
+        signature: `color_${runId}=blue;size_${runId}=m`,
+        position: 1,
+        prices: [],
+        optionValues: [
+          ["optColor", "valBlue"],
+          ["optSize", "valM"],
+        ],
+      });
+      await addMedia("pricedOptions", "https://img.test/po-red.jpg", 0, {
+        optionKey: "optColor",
+        valueKey: "valRed",
+      });
+      await addMedia("pricedOptions", "https://img.test/po-blue.jpg", 1, {
+        optionKey: "optColor",
+        valueKey: "valBlue",
+      });
+
+      // Availability of one variant each (threshold 5).
+      ids["stock"] = await createProduct("stock", { brand: "brandP", publishedDaysAgo: 34 });
+      const tracked = { trackInventory: true } as const;
+      const stockVariants: [
+        string,
+        Omit<Parameters<typeof createVariant>[2], "signature" | "position">,
+      ][] = [
+        ["ST-100", { ...tracked, stock: [{ onHand: 100 }] }],
+        ["ST-6", { ...tracked, stock: [{ onHand: THRESHOLD + 1 }] }],
+        ["ST-5", { ...tracked, stock: [{ onHand: THRESHOLD }] }],
+        ["ST-1", { ...tracked, stock: [{ onHand: 1 }] }],
+        ["ST-0", { ...tracked, stock: [{ onHand: 0 }] }],
+        ["ST-NOLEVEL", { ...tracked }],
+        ["ST-RESERVED-LOW", { ...tracked, stock: [{ onHand: 10, reserved: 7 }] }],
+        ["ST-RESERVED-ALL", { ...tracked, stock: [{ onHand: 10, reserved: 10 }] }],
+        [
+          "ST-TWO-LOCATIONS",
+          { ...tracked, stock: [{ onHand: 3 }, { onHand: 3, location: "location2" }] },
+        ],
+        ["ST-UNTRACKED-EMPTY", { trackInventory: false, stock: [{ onHand: 0 }] }],
+        ["ST-UNTRACKED-NOLEVEL", { trackInventory: false }],
+        ["ST-BACKORDER", { ...tracked, allowBackorder: true, stock: [{ onHand: 0 }] }],
+        [
+          "ST-SECRET",
+          {
+            ...tracked,
+            stock: [{ onHand: SECRET_ON_HAND, reserved: SECRET_RESERVED }],
+          },
+        ],
+      ];
+      let position = 0;
+      for (const [sku, values] of stockVariants) {
+        await createVariant("stock", sku, { signature: sku.toLowerCase(), position, ...values });
+        position += 1;
+      }
+
+      // Product-level availability: best of the sellable variants.
+      const rule = async (
+        key: string,
+        variants: Omit<Parameters<typeof createVariant>[2], "signature" | "position">[],
+        days: number,
+      ): Promise<void> => {
+        ids[key] = await createProduct(key, { brand: "brandP", publishedDaysAgo: days });
+        let index = 0;
+        for (const values of variants) {
+          await createVariant(key, `${key}-${index}`.toUpperCase(), {
+            signature: `v${index}`,
+            position: index,
+            ...values,
+          });
+          index += 1;
+        }
+      };
+      const outOfStock = { trackInventory: true, stock: [{ onHand: 0 }] };
+      const low = { trackInventory: true, stock: [{ onHand: 2 }] };
+      const inStock = { trackInventory: true, stock: [{ onHand: 50 }] };
+      await rule("rule-all-out", [outOfStock, outOfStock], 35);
+      await rule("rule-out-low", [outOfStock, low], 36);
+      await rule("rule-low-in", [low, inStock, outOfStock], 37);
+      // The only in-stock variant is priceless, so it does not count: the product is out of stock.
+      await rule("rule-hidden-in", [outOfStock, { ...inStock, prices: [] }], 38);
+    });
+
+    afterAll(async () => {
+      await otherApp?.app.close();
+    });
+
+    describe("variants without a shop-currency price", () => {
+      it("returns only active variants priced in the shop currency, in order", async () => {
+        const product = await detail("price-mix");
+        expect(product.variants.map((entry) => entry.sku)).toEqual([
+          `${upper}-MIX-A`,
+          `${upper}-MIX-B`,
+          `${upper}-MIX-E`,
+        ]);
+      });
+
+      it("shows price amounts as integers in minor units with the compare-at price or null", async () => {
+        const variants = variantsBySku(await detail("price-mix"));
+        expect(variants.get("MIX-A")?.price).toEqual({
+          amount: 1500,
+          currency: "UAH",
+          compareAtAmount: null,
+        });
+        expect(variants.get("MIX-B")?.price).toEqual({
+          amount: 2000,
+          currency: "UAH",
+          compareAtAmount: 2500,
+        });
+        // The USD price of E is ignored, never converted or mixed in.
+        expect(variants.get("MIX-E")?.price).toEqual({
+          amount: 3000,
+          currency: "UAH",
+          compareAtAmount: null,
+        });
+      });
+
+      it("takes from and to over the sellable variants only (list and detail agree)", async () => {
+        const product = await detail("price-mix");
+        expect(product.price).toEqual({ from: 1500, to: 3000, currency: "UAH" });
+        const listed = (await brandPage("brand-p")).items.find(
+          (item) => item.id === ids["priceMix"],
+        );
+        expect(listed?.price).toEqual({ from: 1500, to: 3000, currency: "UAH" });
+      });
+
+      it("does not list a product without a sellable variant and answers 404 for its detail", async () => {
+        const page = await brandPage("brand-p");
+        expect(page.items.map((item) => item.id)).not.toContain(ids["noSellable"]);
+        const result = await get(`/store/products/${slug("no-sellable")}`);
+        expect(result.status).toBe(404);
+        expect(problem(result).code).toBe("not_found");
+      });
+
+      it("keeps total and pagination consistent with the products that are shown", async () => {
+        const all = await brandPage("brand-p");
+        expect(all.total).toBe(all.items.length);
+        const first = await getOk<Page<StoreProductListItem>>(
+          `/store/products?brand=${slug("brand-p")}&limit=2&offset=0`,
+        );
+        const second = await getOk<Page<StoreProductListItem>>(
+          `/store/products?brand=${slug("brand-p")}&limit=2&offset=2`,
+        );
+        expect(first.total).toBe(all.total);
+        expect([...first.items, ...second.items].map((item) => item.id)).toEqual(
+          all.items.slice(0, 4).map((item) => item.id),
+        );
+      });
+
+      it("a product becomes visible when its priceless variant gets a shop price, and hidden when it loses it", async () => {
+        const target = ids["variant:NS-PRICELESS"];
+        await pool.query(
+          "insert into price (variant_id, currency, amount) values ($1, 'UAH', 4200)",
+          [target],
+        );
+        try {
+          const product = await detail("no-sellable");
+          expect(product.variants.map((entry) => entry.sku)).toEqual([`${upper}-NS-PRICELESS`]);
+          expect(product.price).toEqual({ from: 4200, to: 4200, currency: "UAH" });
+          expect((await brandPage("brand-p")).items.map((item) => item.id)).toContain(
+            ids["noSellable"],
+          );
+        } finally {
+          await pool.query("delete from price where variant_id = $1 and currency = 'UAH'", [
+            target,
+          ]);
+        }
+        expect((await get(`/store/products/${slug("no-sellable")}`)).status).toBe(404);
+      });
+
+      it("does not offer option values or images carried only by priceless variants (ADR 0007)", async () => {
+        const product = await detail("priced-options");
+        expect(product.variants.map((entry) => entry.sku)).toEqual([`${upper}-PO-RED-S`]);
+        expect(
+          product.options.map((entry) => [entry.code, entry.values.map((value) => value.code)]),
+        ).toEqual([
+          [`color_${runId}`, ["red"]],
+          [`size_${runId}`, ["s"]],
+        ]);
+        expect(product.media.map((entry) => entry.url)).toEqual(["https://img.test/po-red.jpg"]);
+      });
+
+      it("keeps amounts near the limit exact in the JSON text", async () => {
+        const result = await get(`/store/products/${slug("max-price")}`);
+        const text = JSON.stringify(result.body);
+        expect(text).toContain(`"amount":${MAX_AMOUNT - 1}`);
+        expect(text).toContain(`"compareAtAmount":${MAX_AMOUNT}`);
+        const product = result.body as StoreProductDetail;
+        expect(product.price).toEqual({
+          from: MAX_AMOUNT - 1,
+          to: MAX_AMOUNT - 1,
+          currency: "UAH",
+        });
+        expect(Number.isSafeInteger(product.variants[0]?.price.compareAtAmount)).toBe(true);
+      });
+    });
+
+    describe("availability", () => {
+      const expectations: [string, string][] = [
+        ["ST-100", "in_stock"],
+        ["ST-6", "in_stock"],
+        ["ST-5", "low_stock"],
+        ["ST-1", "low_stock"],
+        ["ST-0", "out_of_stock"],
+        ["ST-NOLEVEL", "out_of_stock"],
+        ["ST-RESERVED-LOW", "low_stock"],
+        ["ST-RESERVED-ALL", "out_of_stock"],
+        ["ST-TWO-LOCATIONS", "in_stock"],
+        ["ST-UNTRACKED-EMPTY", "in_stock"],
+        ["ST-UNTRACKED-NOLEVEL", "in_stock"],
+        ["ST-BACKORDER", "in_stock"],
+        ["ST-SECRET", "in_stock"],
+      ];
+
+      it.each(expectations)("variant %s is %s", async (sku, expected) => {
+        const variants = variantsBySku(await detail("stock"));
+        expect(variants.get(sku)?.availability).toBe(expected);
+      });
+
+      it("gives a product the best availability among its sellable variants (in_stock > low_stock > out_of_stock)", async () => {
+        const page = await brandPage("brand-p");
+        const byId = new Map(page.items.map((item) => [item.id, item]));
+        const detailOf = async (key: string) => (await detail(key)).availability;
+        expect(byId.get(idOf("rule-all-out"))?.availability).toBe("out_of_stock");
+        expect(byId.get(idOf("rule-out-low"))?.availability).toBe("low_stock");
+        expect(byId.get(idOf("rule-low-in"))?.availability).toBe("in_stock");
+        expect(byId.get(idOf("rule-hidden-in"))?.availability).toBe("out_of_stock");
+        expect(await detailOf("rule-all-out")).toBe("out_of_stock");
+        expect(await detailOf("rule-out-low")).toBe("low_stock");
+        expect(await detailOf("rule-low-in")).toBe("in_stock");
+        expect(await detailOf("rule-hidden-in")).toBe("out_of_stock");
+        // The stock product has an in-stock variant.
+        expect(byId.get(idOf("stock"))?.availability).toBe("in_stock");
+      });
+
+      it("still lists a product whose sellable variants are all out of stock", async () => {
+        const page = await brandPage("brand-p");
+        expect(page.items.map((item) => item.id)).toContain(ids["rule-all-out"]);
+      });
+
+      it("reflects a change of stock at once", async () => {
+        const target = ids["variant:ST-0"];
+        await pool.query("update inventory_level set on_hand = 50 where variant_id = $1", [target]);
+        try {
+          expect(variantsBySku(await detail("stock")).get("ST-0")?.availability).toBe("in_stock");
+        } finally {
+          await pool.query("update inventory_level set on_hand = 0 where variant_id = $1", [
+            target,
+          ]);
+        }
+      });
+    });
+
+    describe("configuration: threshold, shop currency, GET /store/config", () => {
+      it("returns exactly the documented settings", async () => {
+        const config = await getOk<Record<string, unknown>>("/store/config");
+        expect(config).toEqual({
+          currency: "UAH",
+          currencyExponent: 2,
+          pricesIncludeTax: true,
+          defaultLocale: "uk",
+          locales: ["uk", "en"],
+        });
+      });
+
+      it("follows the configured shop currency (exponent from core) and tax flag", async () => {
+        const jpy = await startApp({ shopCurrency: "JPY", pricesIncludeTax: false });
+        try {
+          const result = await http(jpy.baseUrl, "GET", "/store/config");
+          expect(result.status).toBe(200);
+          expect(result.body).toEqual({
+            currency: "JPY",
+            currencyExponent: 0,
+            pricesIncludeTax: false,
+            defaultLocale: "uk",
+            locales: ["uk", "en"],
+          });
+        } finally {
+          await jpy.app.close();
+        }
+      });
+
+      it("uses the configured low stock threshold", async () => {
+        otherApp = await startApp({ lowStockThreshold: 1 });
+        const result = await http<StoreProductDetail>(
+          otherApp.baseUrl,
+          "GET",
+          `/store/products/${slug("stock")}`,
+        );
+        const variants = variantsBySku(result.body);
+        // Threshold 1: one unit is low, five units are no longer low.
+        expect(variants.get("ST-1")?.availability).toBe("low_stock");
+        expect(variants.get("ST-5")?.availability).toBe("in_stock");
+        expect(variants.get("ST-RESERVED-LOW")?.availability).toBe("in_stock");
+      });
+
+      it("prices and hides variants by the configured shop currency", async () => {
+        const usd = await startApp({ shopCurrency: "USD" });
+        try {
+          const product = await http<StoreProductDetail>(
+            usd.baseUrl,
+            "GET",
+            `/store/products/${slug("price-mix")}`,
+          );
+          expect(product.status).toBe(200);
+          expect(product.body.variants.map((entry) => entry.sku)).toEqual([
+            `${upper}-MIX-D-USD-ONLY`,
+            `${upper}-MIX-E`,
+          ]);
+          expect(product.body.variants[0]?.price).toEqual({
+            amount: SECRET_USD_AMOUNT,
+            currency: "USD",
+            compareAtAmount: SECRET_USD_COMPARE_AT,
+          });
+          // The UAH-only products are gone in a USD shop.
+          const hidden = await http(usd.baseUrl, "GET", `/store/products/${slug("max-price")}`);
+          expect(hidden.status).toBe(404);
+        } finally {
+          await usd.app.close();
+        }
+      });
+    });
+
+    describe("leaks", () => {
+      const FORBIDDEN_KEYS = [
+        "onHand",
+        "on_hand",
+        "reserved",
+        "available",
+        "quantity",
+        "stock",
+        "location",
+        "locationId",
+        "location_id",
+        "locations",
+        "movement",
+        "movements",
+        "reservation",
+        "reservations",
+        "inventory",
+        "inventoryLevel",
+        "trackInventory",
+        "track_inventory",
+        "allowBackorder",
+        "allow_backorder",
+        "priceId",
+        "prices",
+        "createdAt",
+        "updatedAt",
+        "created_at",
+        "updated_at",
+        "lowStockThreshold",
+        "threshold",
+      ];
+
+      /** Every JSON number in the body: a substring search would match digits inside ids and timestamps. */
+      function collectNumbers(value: unknown, into: Set<number> = new Set()): Set<number> {
+        if (typeof value === "number") {
+          into.add(value);
+        } else if (Array.isArray(value)) {
+          for (const entry of value) {
+            collectNumbers(entry, into);
+          }
+        } else if (typeof value === "object" && value !== null) {
+          for (const entry of Object.values(value)) {
+            collectNumbers(entry, into);
+          }
+        }
+        return into;
+      }
+
+      function collectKeys(value: unknown, into: Set<string> = new Set()): Set<string> {
+        if (Array.isArray(value)) {
+          for (const entry of value) {
+            collectKeys(entry, into);
+          }
+        } else if (typeof value === "object" && value !== null) {
+          for (const [key, entry] of Object.entries(value)) {
+            into.add(key);
+            collectKeys(entry, into);
+          }
+        }
+        return into;
+      }
+
+      it("never exposes quantities, locations, flags, price ids, timestamps or other currencies on any store route", async () => {
+        const responses = [
+          await get("/store/categories"),
+          await get("/store/config"),
+          await get(`/store/products?brand=${slug("brand-p")}&limit=100`),
+          await get("/store/products?limit=100"),
+          await get(`/store/products/${slug("stock")}`),
+          await get(`/store/products/${slug("price-mix")}`),
+          await get(`/store/products/${slug("priced-options")}`),
+          await get(`/store/products/${slug("max-price")}`),
+          await get(`/store/products/${slug("p1")}`),
+        ];
+        for (const response of responses) {
+          expect(response.status).toBe(200);
+          const text = JSON.stringify(response.body);
+          const keys = collectKeys(response.body);
+          for (const forbidden of FORBIDDEN_KEYS) {
+            expect(keys.has(forbidden), `key ${forbidden}`).toBe(false);
+          }
+          const numbers = collectNumbers(response.body);
+          for (const secret of [
+            SECRET_ON_HAND,
+            SECRET_RESERVED,
+            SECRET_USD_AMOUNT,
+            SECRET_USD_COMPARE_AT,
+          ]) {
+            expect(numbers.has(secret), `number ${secret}`).toBe(false);
+          }
+          for (const secret of [secondLocation, "USD"]) {
+            expect(text, `value ${secret}`).not.toContain(secret);
+          }
+        }
+      });
+
+      it("limits each shape to the documented keys", async () => {
+        const product = await detail("price-mix");
+        expect(Object.keys(product.price).sort()).toEqual(["currency", "from", "to"]);
+        for (const entry of product.variants) {
+          expect(Object.keys(entry).sort()).toEqual(
+            ["attributes", "availability", "id", "optionValues", "price", "sku"].sort(),
+          );
+          expect(Object.keys(entry.price).sort()).toEqual([
+            "amount",
+            "compareAtAmount",
+            "currency",
+          ]);
+        }
+        const page = await brandPage("brand-p");
+        expect(page.items.length).toBeGreaterThan(0);
+        for (const entry of page.items) {
+          expect(Object.keys(entry.price).sort()).toEqual(["currency", "from", "to"]);
+          for (const value of [entry.price.from, entry.price.to]) {
+            expect(Number.isSafeInteger(value)).toBe(true);
+          }
+        }
+      });
+
+      it("keeps the is_internal attribute regression green next to the new fields", async () => {
+        const text = JSON.stringify(await detail("p1"));
+        expect(text).not.toContain(SECRET_INTERNAL);
+        expect(text).not.toContain(attributeCode("internalnote"));
+      });
     });
   });
 
@@ -1251,6 +1896,9 @@ describe("store API (public, real app, real Postgres)", () => {
             isDefault: position === 0,
             position,
             attributes: { [attributeCode("weight")]: 100 + position },
+            prices: [{ amount: 1000 + position }, { amount: 50 + position, currency: "USD" }],
+            trackInventory: true,
+            stock: [{ onHand: 10 + position }, { onHand: 1, location: "location2" }],
             optionValues: [
               ["optColor", `val${colour}`],
               ["optSize", `val${size}`],
@@ -1276,6 +1924,10 @@ describe("store API (public, real app, real Postgres)", () => {
       const many = await countStatements(`/store/products?brand=${slug("brand-a")}&limit=100`);
       expect(one).toBeGreaterThan(0);
       expect(many).toBe(one);
+      // Products with several priced variants and stock levels in two locations.
+      const priced = await countStatements(`/store/products?brand=${slug("brand-p")}&limit=100`);
+      const pricedOne = await countStatements(`/store/products?brand=${slug("brand-p")}&limit=1`);
+      expect(priced).toBe(pricedOne);
       const withCategory = await countStatements(`/store/products?category=${slug("root")}`);
       const withCategoryOne = await countStatements(
         `/store/products?category=${slug("root")}&limit=1`,

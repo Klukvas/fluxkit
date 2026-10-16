@@ -34,6 +34,10 @@ export interface StartAppOptions {
   adminSessionMaxHours?: number;
   /** `SHOP_CURRENCY`; defaults to UAH. */
   shopCurrency?: string;
+  /** `LOW_STOCK_THRESHOLD`; defaults to 5. */
+  lowStockThreshold?: number;
+  /** `PRICES_INCLUDE_TAX`; defaults to true. */
+  pricesIncludeTax?: boolean;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -48,6 +52,8 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       adminSessionIdleMinutes: options.adminSessionIdleMinutes,
       adminSessionMaxHours: options.adminSessionMaxHours,
       shopCurrency: options.shopCurrency,
+      lowStockThreshold: options.lowStockThreshold,
+      pricesIncludeTax: options.pricesIncludeTax,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,

@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { type StoreLocale } from "@fluxkit/core";
+import { exponentOf, type StoreLocale } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
+import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { toPage, type Page } from "../../common/pagination.js";
 import { notFound, validationFailed } from "../../common/problem.js";
 import {
@@ -9,6 +10,12 @@ import {
   visibleCategoryTree,
   type VisibleCategory,
 } from "./store-categories.js";
+import {
+  priceVariants,
+  summarizeProduct,
+  type StoreProductPricing,
+  type StoreVariantPricing,
+} from "./store-pricing.js";
 import {
   optionalText,
   requiredText,
@@ -20,9 +27,11 @@ import {
   type ProductDetailRow,
   type ProductListRow,
   type ProductMediaRow,
+  type SellableVariantRow,
 } from "./store.repository.js";
 import type {
   StoreCategoryNode,
+  StoreConfig,
   StoreProductDetail,
   StoreProductListItem,
   StoreProductsQuery,
@@ -37,6 +46,22 @@ function publishedAtOf(row: { publishedAt: Date | null; slug: string }): string 
     );
   }
   return row.publishedAt.toISOString();
+}
+
+/** The `price` and `availability` fields of one sellable variant; the caller only passes ids `priceVariants` kept. */
+function pricingOf(priced: ReadonlyMap<string, StoreVariantPricing>, variantId: string) {
+  const entry = priced.get(variantId);
+  if (entry === undefined) {
+    throw new Error(`Variant ${variantId} was listed as sellable but has no price.`);
+  }
+  return {
+    price: {
+      amount: entry.price.amount,
+      currency: entry.price.currency,
+      compareAtAmount: entry.price.compareAtAmount,
+    },
+    availability: entry.availability,
+  };
 }
 
 /** The list image: the first gallery image (no option pair), else the first image of any kind. */
@@ -63,7 +88,19 @@ export class StoreService {
   constructor(
     private readonly store: StoreRepository,
     @Inject(LOCALE_CONFIG) private readonly config: LocaleConfig,
+    @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
+
+  /** What the storefront needs to format money and pick a language; nothing else (no thresholds, no internals). */
+  getConfig(): StoreConfig {
+    return {
+      currency: this.pricing.shopCurrency,
+      currencyExponent: exponentOf(this.pricing.shopCurrency),
+      pricesIncludeTax: this.pricing.pricesIncludeTax,
+      defaultLocale: this.config.defaultLocale,
+      locales: [...this.config.locales],
+    };
+  }
 
   /** `?locale=` must be configured; missing means the default locale. Fallback to the default is per field. */
   private resolveLocale(requested: string | undefined): StoreLocale {
@@ -107,21 +144,43 @@ export class StoreService {
       }
     }
     const { rows, total } = await this.store.listProducts(
-      { categoryIds, brandSlug: query.brand },
+      { categoryIds, brandSlug: query.brand, shopCurrency: this.pricing.shopCurrency },
       query,
     );
-    const media = await this.store.listMediaForProducts(rows.map((row) => row.id));
-    const items = rows.map((row) => ({
-      id: row.id,
-      slug: row.slug,
-      title: requiredText(row.title, locale, `Product "${row.slug}" title`),
-      brand: toBrand(row, locale),
-      image: pickListImage(
-        media.filter((entry) => entry.productId === row.id),
-        locale,
-      ),
-      publishedAt: publishedAtOf(row),
-    }));
+    const productIds = rows.map((row) => row.id);
+    // Three batched reads for the whole page, whatever its size.
+    const [media, variants, levels] = await Promise.all([
+      this.store.listMediaForProducts(productIds),
+      this.store.listSellableVariants(productIds, this.pricing.shopCurrency),
+      this.store.listStockLevels(productIds),
+    ]);
+    const pricedVariants = priceVariants(variants, levels, this.pricing);
+    const items = rows.flatMap((row) => {
+      const summary = summarizeProduct(
+        variants
+          .filter((entry) => entry.productId === row.id)
+          .flatMap((entry) => pricedVariants.get(entry.id) ?? []),
+        this.pricing.shopCurrency,
+      );
+      // The product lost its last sellable variant between the page query and this one: it is no longer for sale.
+      if (summary === undefined) {
+        return [];
+      }
+      return [
+        {
+          id: row.id,
+          slug: row.slug,
+          title: requiredText(row.title, locale, `Product "${row.slug}" title`),
+          brand: toBrand(row, locale),
+          image: pickListImage(
+            media.filter((entry) => entry.productId === row.id),
+            locale,
+          ),
+          publishedAt: publishedAtOf(row),
+          ...summary,
+        },
+      ];
+    });
     return toPage(items, total, query);
   }
 
@@ -131,7 +190,7 @@ export class StoreService {
       // Not a possible slug (and NUL would be rejected by Postgres as a 500): no such product, no query.
       throw notFound("Product");
     }
-    const row = await this.store.findActiveProductBySlug(slug);
+    const row = await this.store.findActiveProductBySlug(slug, this.pricing.shopCurrency);
     if (row === undefined) {
       throw notFound("Product");
     }
@@ -145,24 +204,39 @@ export class StoreService {
       variants,
       variantOptionValues,
       media,
+      levels,
     ] = await Promise.all([
       this.store.listTypeAttributes(row.productTypeId),
       this.store.listActiveCategories(),
       this.store.listCategoryIds(row.id),
       this.store.listProductOptions(row.id),
       this.store.listProductOptionValues(row.id),
-      this.store.listActiveVariants(row.id),
+      this.store.listSellableVariants([row.id], this.pricing.shopCurrency),
       this.store.listActiveVariantOptionValues(row.id),
       this.store.listMediaForProducts([row.id]),
+      this.store.listStockLevels([row.id]),
     ]);
+    const pricedVariants = priceVariants(variants, levels, this.pricing);
+    const sellable = variants.filter((entry) => pricedVariants.has(entry.id));
+    const summary = summarizeProduct(
+      sellable.flatMap((entry) => pricedVariants.get(entry.id) ?? []),
+      this.pricing.shopCurrency,
+    );
+    if (summary === undefined) {
+      // The last sellable variant went away after the product row was read: the product is not for sale any more.
+      throw notFound("Product");
+    }
+    const sellableIds = new Set(sellable.map((entry) => entry.id));
     return this.toDetail(row, locale, {
       assignments,
       visibleCategories: flattenCategories(visibleCategoryTree(activeCategories)),
       categoryIds,
       options,
       optionValues,
-      variants,
-      variantOptionValues,
+      variants: sellable,
+      pricedVariants,
+      summary,
+      variantOptionValues: variantOptionValues.filter((entry) => sellableIds.has(entry.variantId)),
       media,
     });
   }
@@ -176,7 +250,9 @@ export class StoreService {
       categoryIds: string[];
       options: Awaited<ReturnType<StoreRepository["listProductOptions"]>>;
       optionValues: Awaited<ReturnType<StoreRepository["listProductOptionValues"]>>;
-      variants: Awaited<ReturnType<StoreRepository["listActiveVariants"]>>;
+      variants: SellableVariantRow[];
+      pricedVariants: Map<string, StoreVariantPricing>;
+      summary: StoreProductPricing;
       variantOptionValues: Awaited<ReturnType<StoreRepository["listActiveVariantOptionValues"]>>;
       media: ProductMediaRow[];
     },
@@ -197,7 +273,7 @@ export class StoreService {
     const optionPosition = new Map(
       loaded.options.map((entry, index) => [entry.id, index] as const),
     );
-    // ADR 0007: only values some ACTIVE variant uses are offered, so no choice leads to nothing to buy.
+    // ADR 0007: only values some sellable variant (active and priced; the caller filtered) uses are offered, so no choice leads to nothing to buy.
     const sellableValueIds = new Set(
       loaded.variantOptionValues.map((value) => value.optionValueId),
     );
@@ -229,6 +305,8 @@ export class StoreService {
       attributes: serializeAttributes(loaded.assignments, "product", row.attributes, locale),
       attributeDefinitions: serializeAttributeDefinitions(loaded.assignments, locale),
       options,
+      price: loaded.summary.price,
+      availability: loaded.summary.availability,
       variants: loaded.variants.map((entry) => ({
         id: entry.id,
         sku: entry.sku,
@@ -240,6 +318,7 @@ export class StoreService {
           )
           .map(({ optionCode, valueCode }) => ({ optionCode, valueCode })),
         attributes: serializeAttributes(loaded.assignments, "variant", entry.attributes, locale),
+        ...pricingOf(loaded.pricedVariants, entry.id),
       })),
       media: loaded.media
         .filter((entry) => entry.optionValueId === null || offeredValueIds.has(entry.optionValueId))

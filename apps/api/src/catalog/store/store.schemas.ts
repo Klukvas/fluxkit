@@ -1,4 +1,4 @@
-import { CATALOG_LIMITS, SLUG_PATTERN, type PublicAttributeValue } from "@fluxkit/core";
+import { CATALOG_LIMITS, MAX_AMOUNT, SLUG_PATTERN, type PublicAttributeValue } from "@fluxkit/core";
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
@@ -97,6 +97,38 @@ export const storeCategoryTreeSchema = z.object({
 
 const brandSchema = z.object({ slug: z.string(), name: z.string() });
 
+/** Money is a JSON integer in minor units (0 to MAX_AMOUNT, so it is exact in every JSON parser). */
+const amountSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_AMOUNT)
+  .meta({ description: "Minor units of the shop currency (for example kopiykas)." });
+
+const availabilitySchema = z.enum(["in_stock", "low_stock", "out_of_stock"]);
+
+const variantPriceSchema = z.object({
+  amount: amountSchema,
+  currency: z.string().meta({ description: "Always the shop currency." }),
+  compareAtAmount: amountSchema.nullable(),
+});
+
+const priceRangeSchema = z.object({
+  from: amountSchema,
+  to: amountSchema,
+  currency: z.string().meta({ description: "Always the shop currency." }),
+});
+
+export const storeConfigSchema = z.object({
+  currency: z.string(),
+  currencyExponent: z.number().int().min(0),
+  pricesIncludeTax: z.boolean(),
+  defaultLocale: z.string(),
+  locales: z.array(z.string()),
+});
+
+export type StoreConfig = z.output<typeof storeConfigSchema>;
+
 export const storeProductListItemSchema = z.object({
   id: uuidSchema,
   slug: z.string(),
@@ -104,6 +136,8 @@ export const storeProductListItemSchema = z.object({
   brand: brandSchema.nullable(),
   image: z.object({ url: z.string(), alt: nullableText }).nullable(),
   publishedAt: timestampSchema,
+  price: priceRangeSchema,
+  availability: availabilitySchema,
 });
 
 const publicOptionValueSchema = z.object({ code: z.string(), label: z.string() });
@@ -154,8 +188,12 @@ export const storeProductDetailSchema = z.object({
       sku: z.string(),
       optionValues: z.array(z.object({ optionCode: z.string(), valueCode: z.string() })),
       attributes: attributesSchema,
+      price: variantPriceSchema,
+      availability: availabilitySchema,
     }),
   ),
+  price: priceRangeSchema,
+  availability: availabilitySchema,
   media: z.array(
     z.object({ url: z.string(), alt: nullableText, optionValueId: uuidSchema.nullable() }),
   ),
