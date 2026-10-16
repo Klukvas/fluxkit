@@ -46,6 +46,17 @@ export class DatabaseModule {
                 error.stack,
               );
             });
+            // `pool.on("error")` covers idle clients only. A checked-out client (a running transaction) whose
+            // connection drops emits "error" on itself, and without a listener Node ends the whole process. The
+            // pending query still rejects with a normal error; this listener only keeps the process alive.
+            // Only the name and SQLSTATE are logged: error messages can embed query text and parameters.
+            pool.on("connect", (client) => {
+              client.on("error", (error: Error & { code?: string }) => {
+                new Logger("Database").error(
+                  `Database client error: ${error.name} code=${error.code ?? "none"}`,
+                );
+              });
+            });
             return pool;
           },
         },

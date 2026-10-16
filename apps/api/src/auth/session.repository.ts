@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, lte, ne, or, sql } from "drizzle-orm";
 import type { DbExecutor } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { adminSession, adminUser } from "../database/schema/index.js";
@@ -25,8 +25,8 @@ export interface SessionWithUser {
 export class SessionRepository {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  async insert(row: NewSessionRow): Promise<string> {
-    const [inserted] = await this.db
+  async insert(row: NewSessionRow, executor: DbExecutor = this.db): Promise<string> {
+    const [inserted] = await executor
       .insert(adminSession)
       .values(row)
       .returning({ id: adminSession.id });
@@ -93,6 +93,28 @@ export class SessionRepository {
           ? eq(adminSession.userId, userId)
           : and(eq(adminSession.userId, userId), ne(adminSession.id, exceptSessionId)),
       )
+      .returning({ id: adminSession.id });
+    return deleted.length;
+  }
+
+  /**
+   * Deletes sessions past their absolute end (`expires_at <= now`) or idle for `idleMinutes` or more, the same
+   * limits `evaluateSession` applies (a limit reached exactly counts as expired). Rows with unreadable timestamps
+   * are left to `resolve`, which logs them. `userId` narrows it to one user. Returns the number of deleted rows.
+   */
+  async deleteExpired(
+    now: Date,
+    idleMinutes: number,
+    userId?: string,
+    executor: DbExecutor = this.db,
+  ): Promise<number> {
+    const expired = or(
+      lte(adminSession.expiresAt, now),
+      sql`${adminSession.lastSeenAt} + make_interval(secs => ${idleMinutes * 60}) <= ${now}`,
+    );
+    const deleted = await executor
+      .delete(adminSession)
+      .where(userId === undefined ? expired : and(eq(adminSession.userId, userId), expired))
       .returning({ id: adminSession.id });
     return deleted.length;
   }

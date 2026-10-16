@@ -118,9 +118,9 @@ Migration `0002_admin_auth` (two new tables, nothing existing changes). New endp
 - **scrypt bounds on stored strings**: `verify` treats `N` above 2^17, `r` or `p` above 16, a non power of two `N`, or a salt/hash that is not 16/64 bytes of strict base64 as malformed (returns false, never throws), so a corrupt row cannot make the API allocate gigabytes. Passwords are used as exact UTF-8 text without Unicode normalization.
 - `docs/contracts/api.md` (listing the contract items) is left for step 4 as planned; `docs/api/catalog.md` already documents what exists.
 
-## Outcome (steps 1 to 4)
+## Outcome (steps 1 to 5)
 
-Done: ADR 0009 and the pure core rules (step 1), schema and migration `0002_admin_auth` (step 2), the API in two parts (steps 3a and 3b), and the CLI plus documentation (step 4). Step 5, the independent review by a different model, is pending; its findings are fixed before this plan is closed.
+Done: ADR 0009 and the pure core rules (step 1), schema and migration `0002_admin_auth` (step 2), the API in two parts (steps 3a and 3b), and the CLI plus documentation (step 4). Step 5, the independent review by a different model, is done; its findings were fixed or accepted (below), so the plan is complete.
 
 Deviations from the plan as written:
 - **Step 3 was split** into 3a (infrastructure: hasher, sessions, authenticator, guards, decorators, cookie, CSRF, `forbidden`, throttle class) and 3b (the auth and users endpoints), for reviewable PRs.
@@ -137,3 +137,24 @@ Follow-ups (each needs its own plan or task):
 - Customer accounts and storefront login (a separate plan).
 - A `db:migrate` script (`pnpm seed` and `pnpm admin:create` need a migrated database and there is no one-command way to migrate).
 - Decide whether Swagger UI and `/docs-json` stay public in production (they describe the admin routes).
+
+### Step 5: independent review (done 2026-10-16)
+
+Fixed (branch `fix/auth-review-hardening`, each with a regression test written first unless noted in the PR report):
+- **M2, crash**: a database connection dropped while a client was checked out for a transaction raised an unhandled `'error'` event and ended the process. Every pool client now has an error listener (`database.module.ts`).
+- **M3, log redaction**: a `DrizzleQueryError` over a plain `Error` (network loss, pool timeout) was logged with its message, which holds the SQL and the parameters (emails, hashes). Query errors are now logged as class names plus the innermost cause's name and code.
+- **L1, login race**: the session is created inside the login transaction under the user row lock, so a concurrent password reset cannot be followed by a session for the old password.
+- **L3, session cleanup**: expired sessions of the signing-in user are deleted at login; all expired sessions are deleted once at application start.
+- **L4, IPv6**: the IP login limit keys IPv6 by /64 and maps IPv4-mapped addresses to IPv4.
+- **L5, caching**: `Cache-Control: no-store` on every `/admin` response.
+- **Docs**: the timing claim in `docs/api/auth.md` and `docs/contracts/api.md` is softened (status, headers and body are identical; the time is dominated by one scrypt, a small difference from the failure write can exist).
+
+Owner decision: the lockout stays (5 failures, 15 minutes). Added: `pnpm admin:unlock --email <address>` and the IPv6 /64 key. Recorded in ADR 0010.
+
+Accepted and documented (ADR 0010): lockout denial of service, reset-password without the current password, no audit log yet, no token rotation on change-password, unlimited concurrent sessions, no revocation of an older cookie at login, cookie tossing, feature-module middleware runs before the guard.
+
+Still open (not fixed here):
+- Whether Swagger UI and `/docs-json` stay public in production (owner decision).
+- Audit log; session token rotation; Redis-backed throttle; Express `trust proxy`; a `db:migrate` script.
+- A database CHECK that stored emails are trimmed and lower-case (the application normalizes them, the database does not enforce it).
+- `pnpm seed` still runs the one-time expired-session cleanup at start (its code is outside this fix's paths).

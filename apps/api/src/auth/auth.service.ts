@@ -27,7 +27,7 @@ import { CLOCK, type Clock } from "./clock.js";
 import { LoginThrottle } from "./login-throttle.js";
 import { PasswordHasher } from "./password-hasher.js";
 import { passwordPolicyErrors } from "./password-policy-errors.js";
-import { SessionService } from "./session.service.js";
+import { SessionService, type CreatedSession } from "./session.service.js";
 
 /** The one answer to every failed login, whatever the reason (ADR 0009: no account enumeration). */
 const INVALID_CREDENTIALS = "The email or password is not correct.";
@@ -91,8 +91,7 @@ export class AuthService {
     const upgradedHash = this.hasher.needsRehash(user.passwordHash)
       ? await this.hasher.hash(body.password)
       : undefined;
-    const signedIn = await this.completeLogin(user, upgradedHash, now);
-    const session = await this.sessions.create(signedIn.id, now);
+    const { user: signedIn, session } = await this.completeLogin(user, upgradedHash, now);
     this.logger.log(`Admin login succeeded for user ${signedIn.id}`);
     return {
       user: toAuthUser(signedIn),
@@ -189,7 +188,8 @@ export class AuthService {
   }
 
   /**
-   * Commits a successful password check: resets the lockout, stamps `last_login_at` and stores a rehash. Under the
+   * Commits a successful password check: resets the lockout, stamps `last_login_at`, stores a rehash, removes the
+   * user's expired sessions and issues the new session, all in one transaction. Under the
    * row lock it first re-checks what could have changed during the scrypt work (a lock set by concurrent failures,
    * a deactivation, a new password); in those cases the login is refused although the password matched.
    */
@@ -197,7 +197,7 @@ export class AuthService {
     checked: AdminUserRow,
     upgradedHash: string | undefined,
     now: Date,
-  ): Promise<AdminUserRow> {
+  ): Promise<{ user: AdminUserRow; session: CreatedSession }> {
     const outcome = await withTransaction(this.db, async (transaction) => {
       const row = await this.users.findByIdForUpdate(checked.id, transaction);
       if (row === undefined || !row.isActive) {
@@ -218,7 +218,14 @@ export class AuthService {
         },
         transaction,
       );
-      return updated ?? "inactive";
+      if (updated === undefined) {
+        return "inactive" as const;
+      }
+      // Still under the row lock: a password reset or change that revokes sessions has to wait for this commit and
+      // then revokes this session too. Created after the commit, the session could outlive such a reset.
+      await this.sessions.deleteExpiredForUser(updated.id, now, transaction);
+      const session = await this.sessions.create(updated.id, now, transaction);
+      return { user: updated, session };
     });
     if (typeof outcome === "string") {
       throw this.refused(outcome);

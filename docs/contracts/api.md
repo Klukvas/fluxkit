@@ -29,7 +29,8 @@ Contract:
 | CSRF header | Every `POST`, `PUT`, `PATCH` and `DELETE` under `/admin`, login included and also for anonymous callers, must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers |
 | Roles | `owner`, `manager`, `viewer`; fixed in code (a new role is a code change, not data). The names are contract |
 | Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`. The names are contract |
-| Login response | `200 {"user": {id, email, role, isActive, lastLoginAt}}` plus the cookie. Every failure (unknown email, wrong password, locked account, inactive user) answers the same `401 unauthorized` with no cookie; the body does not say which. `GET /admin/auth/me` answers `{user, permissions}` |
+| Login response | `200 {"user": {id, email, role, isActive, lastLoginAt}}` plus the cookie. Every failure (unknown email, wrong password, locked account, inactive user) answers the same `401 unauthorized` with no cookie; status, headers and body do not say which. Response times are similar (one scrypt each) but not guaranteed equal: a wrong password also writes the failure count, so a small difference can exist. `GET /admin/auth/me` answers `{user, permissions}` |
+| Caching | Every response under `/admin` (matched like the guard: case-insensitive, trailing slash included), errors included, carries `Cache-Control: no-store`. `/store/*` and `/health` are not affected |
 | Users endpoints | `GET` and `POST /admin/users`, `GET` and `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-password`, owner only; no delete; the last active owner cannot be demoted or deactivated. Shapes and errors: `docs/api/auth.md` |
 
 | Role | `catalog.read` | `catalog.write` | `catalog.publish` | `users.manage` |
@@ -48,7 +49,7 @@ Problem codes added by auth:
 | `forbidden` | 403 | signed in but the role lacks the route's permission, or the CSRF rule above was broken |
 | `too_many_requests` | 429 | too many login attempts from one client address; `Retry-After` carries the seconds to wait |
 
-Not contract (internal, may change in a minor release): the scrypt parameters and the hash format, the session token format and how sessions are stored, the cookie name `fluxkit_admin_session`, the lockout numbers (5 failures, 15 minutes) and the IP limit numbers (20 attempts per 10 minutes), the exact `detail` texts. Clients keep the cookie jar of their HTTP client and do not read the cookie value.
+Not contract (internal, may change in a minor release): the scrypt parameters and the hash format, the session token format and how sessions are stored, the cookie name `fluxkit_admin_session`, the lockout numbers (5 failures, 15 minutes) and the IP limit numbers (20 attempts per 10 minutes; IPv6 counted per /64), the exact `detail` texts. Clients keep the cookie jar of their HTTP client and do not read the cookie value.
 
 Known limits:
 

@@ -2,6 +2,7 @@ import { Inject, Injectable, type CanActivate, type ExecutionContext } from "@ne
 import { Reflector } from "@nestjs/core";
 import { isAdminPermission, isAdminRole } from "@fluxkit/core";
 import type { Request } from "express";
+import { isAdminPath } from "../common/admin-path.js";
 import { forbidden, unauthorized } from "../common/problem.js";
 import {
   ADMIN_AUTHENTICATOR,
@@ -84,12 +85,6 @@ export class AdminGuard implements CanActivate {
 }
 
 /**
- * Express matches paths case-insensitively and ignores a trailing slash, so `/ADMIN/x` reaches the same handler
- * as `/admin/x`. The test must be just as lenient or it can be bypassed.
- */
-const ADMIN_PATH = /^\/admin(?:\/|$)/i;
-
-/**
  * Registered globally (`APP_GUARD`): every route under `/admin` is guarded, also a controller that forgot
  * `@AdminController` and every route of a feature module (features cannot import this API's decorator).
  */
@@ -102,6 +97,6 @@ export class AdminPathGuard implements CanActivate {
       return true;
     }
     const request = context.switchToHttp().getRequest<Request>();
-    return ADMIN_PATH.test(request.path) ? this.adminGuard.canActivate(context) : true;
+    return isAdminPath(request.path) ? this.adminGuard.canActivate(context) : true;
   }
 }

@@ -47,7 +47,7 @@ const PASSWORD_ARGUMENT_REFUSAL =
 
 const USAGE = "Usage: pnpm admin:create --email <address> [--role <owner|manager|viewer>]";
 
-function looksLikePasswordArgument(argument: string): boolean {
+export function looksLikePasswordArgument(argument: string): boolean {
   if (!argument.startsWith("-")) {
     return false;
   }
@@ -213,6 +213,7 @@ export async function runCreateAdminCommand(
         features: [],
         locale: { defaultLocale: config.defaultLocale, locales: config.locales },
         scrypt: options.scrypt,
+        cleanExpiredSessionsOnBootstrap: false,
       }),
       { logger: ["error", "warn"] },
     );

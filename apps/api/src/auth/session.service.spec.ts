@@ -232,6 +232,54 @@ describe("SessionService (real Postgres)", () => {
     expect(await service.resolve(drop2.token)).toBeUndefined();
   });
 
+  describe("deleteExpired and deleteExpiredForUser", () => {
+    const minutesBefore = (minutes: number): Date => new Date(Date.parse(START) - minutes * 60_000);
+
+    /** Three sessions of one user: expired by lifetime (but recently used), expired by idle time, still valid. */
+    async function seedKinds(
+      owner: TestAdminUser,
+    ): Promise<{ lifetime: string; idle: string; valid: string }> {
+      const lifetime = await service.create(owner.id, minutesBefore(25 * 60));
+      await db
+        .update(adminSession)
+        .set({ lastSeenAt: minutesBefore(1) })
+        .where(eq(adminSession.id, lifetime.sessionId));
+      const idle = await service.create(owner.id, minutesBefore(120));
+      const valid = await service.create(owner.id, minutesBefore(10));
+      return { lifetime: lifetime.sessionId, idle: idle.sessionId, valid: valid.sessionId };
+    }
+
+    const idsOf = async (owner: TestAdminUser): Promise<string[]> =>
+      (await storedSessions(owner.id)).map((row) => row.id).sort();
+
+    it("deleteExpired removes exactly the expired sessions of every user and keeps the valid ones", async () => {
+      const other = await newUser();
+      const mine = await seedKinds(user);
+      const theirs = await seedKinds(other);
+      expect(await service.deleteExpired(clock.now())).toBe(4);
+      expect(await idsOf(user)).toEqual([mine.valid]);
+      expect(await idsOf(other)).toEqual([theirs.valid]);
+    });
+
+    it("deleteExpired keeps a session until its limit is reached and removes it exactly at the limit", async () => {
+      const edge = await service.create(user.id, minutesBefore(59));
+      expect(await service.deleteExpired(clock.now())).toBe(0);
+      clock.advanceMinutes(1);
+      expect(await service.deleteExpired(clock.now())).toBe(1);
+      expect(await storedSessions(user.id)).toHaveLength(0);
+      expect(edge.sessionId).toBeDefined();
+    });
+
+    it("deleteExpiredForUser removes the expired sessions of that user only", async () => {
+      const other = await newUser();
+      const mine = await seedKinds(user);
+      const theirs = await seedKinds(other);
+      expect(await service.deleteExpiredForUser(user.id, clock.now())).toBe(2);
+      expect(await idsOf(user)).toEqual([mine.valid]);
+      expect(await idsOf(other)).toEqual([theirs.idle, theirs.lifetime, theirs.valid].sort());
+    });
+  });
+
   it("deleting the user deletes its sessions (database cascade)", async () => {
     await service.create(user.id);
     await deleteTestAdminUsers(db, [user.id]);

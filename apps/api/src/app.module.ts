@@ -23,6 +23,8 @@ export interface AppModuleOptions {
   clock?: Clock;
   /** Tests only: cheap scrypt parameters. */
   scrypt?: ScryptParams;
+  /** Default true. Command-line tools pass false so they change nothing but their own target. */
+  cleanExpiredSessionsOnBootstrap?: boolean;
 }
 
 @Module({})
@@ -38,6 +40,7 @@ export class AppModule {
           authenticator: options.adminAuthenticator,
           clock: options.clock,
           scrypt: options.scrypt,
+          cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
         }),
         HealthModule,
         CatalogModule,
