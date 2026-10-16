@@ -11,6 +11,7 @@ import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-con
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
 import { HealthModule } from "./health/health.module.js";
+import { InventoryModule } from "./inventory/inventory.module.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
@@ -47,6 +48,7 @@ export class AppModule {
         }),
         HealthModule,
         CatalogModule,
+        InventoryModule,
         ...options.features.map((feature) => feature.module),
       ],
     };
