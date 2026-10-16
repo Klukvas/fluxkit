@@ -490,6 +490,150 @@ describe("admin product options API (real app, real Postgres)", () => {
     });
   });
 
+  describe("option changes keep stock history (ADR 0014)", () => {
+    async function defaultLocationId(): Promise<string> {
+      const location = await pool.query("select id from location where is_default");
+      return (location.rows[0] as { id: string }).id;
+    }
+
+    async function receipt(variantId: string, quantity: number): Promise<void> {
+      const locationId = await defaultLocationId();
+      await pool.query(
+        "insert into inventory_level (variant_id, location_id, on_hand) values ($1, $2, $3)",
+        [variantId, locationId, quantity],
+      );
+      await pool.query(
+        `insert into stock_movement (variant_id, location_id, delta, kind, on_hand_after)
+         values ($1, $2, $3, 'receipt', $3)`,
+        [variantId, locationId, quantity],
+      );
+    }
+
+    async function historyRows(productId: string): Promise<{ movements: number; levels: number }> {
+      const result = await pool.query(
+        `select (select count(*) from stock_movement m join variant v on v.id = m.variant_id where v.product_id = $1)::int as movements,
+                (select count(*) from inventory_level l join variant v on v.id = l.variant_id where v.product_id = $1)::int as levels`,
+        [productId],
+      );
+      return result.rows[0] as { movements: number; levels: number };
+    }
+
+    /** Sold, then unpublished: a draft again, with a receipt on one variant. */
+    async function soldThenUnpublished(): Promise<ProductDetailResponse> {
+      const product = await productIn("draft");
+      const target = product.variants[0];
+      if (target === undefined) {
+        throw new Error("The product has no variant.");
+      }
+      await receipt(target.id, 5);
+      expect((await publish(product.id)).status).toBe(200);
+      expect((await call("POST", `/admin/products/${product.id}/unpublish`)).status).toBe(200);
+      return getProduct(product.id);
+    }
+
+    const rebuilding: [string, (productId: string) => ReturnType<typeof putOptions>][] = [
+      [
+        "removing a value",
+        (id) => putOptions(id, sel(fx.color, ["red"]), sel(fx.size, ["s", "m"])),
+      ],
+      ["removing an option", (id) => putOptions(id, sel(fx.color, ["red", "blue"]))],
+      [
+        "adding an option",
+        (id) =>
+          putOptions(
+            id,
+            sel(fx.color, ["red", "blue"]),
+            sel(fx.size, ["s", "m"]),
+            sel(fx.biga, ["a1"]),
+          ),
+      ],
+    ];
+
+    it.each(rebuilding)(
+      "refuses %s with has_stock_history and changes nothing",
+      async (_name, change) => {
+        const product = await soldThenUnpublished();
+        const before = await dbState(product.id);
+        const historyBefore = await historyRows(product.id);
+        expect(historyBefore.movements).toBe(1);
+
+        const result = await change(product.id);
+        expect(result.status, JSON.stringify(result.body)).toBe(409);
+        expect(problem(result)).toMatchObject({
+          code: "rule_violation",
+          rule: "has_stock_history",
+        });
+        expect(await dbState(product.id)).toEqual(before);
+        expect(await historyRows(product.id)).toEqual(historyBefore);
+      },
+    );
+
+    it.each(rebuilding)("allows %s on a product that only has prices", async (_name, change) => {
+      const product = await productIn("draft");
+      await priceProductVariants(pool, product.id);
+      const result = await change(product.id);
+      expect(result.status, JSON.stringify(result.body)).toBe(200);
+    });
+
+    it("still adds a value to an existing option and reorders, keeping the history", async () => {
+      const product = await soldThenUnpublished();
+      const historyBefore = await historyRows(product.id);
+      const added = await putOptions(
+        product.id,
+        sel(fx.color, ["red", "blue", "green"]),
+        sel(fx.size, ["s", "m"]),
+      );
+      expect(added.status, JSON.stringify(added.body)).toBe(200);
+      expect(added.body.variants).toHaveLength(6);
+      expect(await historyRows(product.id)).toEqual(historyBefore);
+
+      const reordered = await putOptions(
+        product.id,
+        sel(fx.size, ["m", "s"]),
+        sel(fx.color, ["green", "blue", "red"]),
+      );
+      expect(reordered.status, JSON.stringify(reordered.body)).toBe(200);
+      expect(await historyRows(product.id)).toEqual(historyBefore);
+    });
+
+    it("waits for a reservation in progress (variant row lock) before it looks at the history", async () => {
+      const product = await productIn("draft");
+      const target = product.variants[0];
+      if (target === undefined) {
+        throw new Error("The product has no variant.");
+      }
+      const locationId = await defaultLocationId();
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        await client.query("select id from variant where id = $1 for share", [target.id]);
+        let settled = false;
+        const pending = putOptions(
+          product.id,
+          sel(fx.color, ["red"]),
+          sel(fx.size, ["s", "m"]),
+        ).then((result) => {
+          settled = true;
+          return result;
+        });
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        expect(settled, "the option change must wait for the variant row lock").toBe(false);
+        await client.query(
+          `insert into reservation (variant_id, location_id, quantity, status, expires_at)
+           values ($1, $2, 1, 'active', now() + interval '1 hour')`,
+          [target.id, locationId],
+        );
+        await client.query("commit");
+        const result = await pending;
+        expect(result.status, JSON.stringify(result.body)).toBe(409);
+        expect(problem(result)).toMatchObject({ rule: "has_stock_history" });
+      } finally {
+        await client.query("rollback");
+        client.release();
+      }
+    });
+  });
+
   describe("serialization by the product row lock", () => {
     it("PUT options and POST values wait for a transaction that holds the product row", async () => {
       const product = await createProduct();

@@ -10,6 +10,6 @@ import { VariantsService } from "./variants.service.js";
   controllers: [VariantsController],
   providers: [VariantsService, VariantsRepository, VariantGenerationService],
   // The option routes regenerate variants through the same service.
-  exports: [VariantGenerationService],
+  exports: [VariantGenerationService, VariantsRepository],
 })
 export class VariantsModule {}

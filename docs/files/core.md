@@ -28,7 +28,7 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 ## Options and variants
 
 - `src/catalog/variants.ts` - `computeOptionSignature` (sorted `code=value` pairs joined with `;`; internal), `generateVariants` (cartesian product, skips existing combinations, enforces limits), invariant checks (`checkExactlyOneDefault`, `checkOptionCoverage`, `checkUniqueSignatures`, `checkSignatureConsistency`, `checkVariantInvariants`).
-- `src/catalog/variant-rules.ts` - `canDeleteVariant` (draft only, not the last, not the default, no stock history: `has_stock_history`, ADR 0013), `canCreateVariantManually` (draft only).
+- `src/catalog/variant-rules.ts` - `canDeleteVariant` (draft only, not the last, not the default, no stock history: `has_stock_history`, ADR 0013), `canRebuildVariants` (refuses an option change that rebuilds all variants while any variant has stock history, ADR 0014), `canCreateVariantManually` (draft only).
 - `src/catalog/sellable.ts` - `isVariantSellable({productStatus, variantIsActive, hasShopPrice})`: the one rule for "can be bought" that the store listing and `ReservationsService.reserve` both follow. Pure; must not know about SQL.
 - `src/catalog/product-option-change.ts` - `planProductOptionChange`: what a change of a product's options and chosen values does (works on ids, returns a plan; the service applies it in one transaction).
 

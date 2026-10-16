@@ -17,3 +17,4 @@
 | [0011](0011-money-and-stock-model.md) | Money and stock model | accepted (2026-10-16, owner decisions); refines the money and inventory parts of ADR 0004 |
 | [0012](0012-pricing-inventory-schema.md) | Pricing and inventory schema: journal deletion, SET NULL and cascades | accepted (2026-10-16); implements the data part of ADR 0011 |
 | [0013](0013-variants-with-stock-history-are-not-deleted.md) | Variants with stock history are not deleted | accepted (2026-10-16); adds one condition to the delete rule of ADR 0006 sections 3 and 5, supersedes an assumption of ADR 0012 |
+| [0014](0014-option-changes-keep-stock-history.md) | Option changes keep stock history | accepted (2026-10-16); adds one condition to the option-change rule of ADR 0006, supersedes the follow-up paragraph of ADR 0013 |

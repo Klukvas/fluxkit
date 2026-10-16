@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
+  canRebuildVariants,
   planProductOptionChange,
   type ProductOptionChangePlan,
   type ProductOptionSelection,
@@ -17,6 +18,7 @@ import {
   retryOnProposedSkuCollision,
   VariantGenerationService,
 } from "../variants/variant-generation.service.js";
+import { VariantsRepository } from "../variants/variants.repository.js";
 import {
   locateInPutBody,
   toOptionChangeProblem,
@@ -39,6 +41,7 @@ export class ProductOptionsService {
     private readonly productDetails: ProductsService,
     private readonly productOptions: ProductOptionsRepository,
     private readonly generation: VariantGenerationService,
+    private readonly variants: VariantsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
   ) {}
 
@@ -193,7 +196,17 @@ export class ProductOptionsService {
       plan.removedOptionIds.length > 0 ||
       plan.removedValues.length > 0;
     if (rebuildsVariants) {
-      // Nothing references the variants of a draft, and `variant_option_value` restricts removing a used value.
+      // A draft may have been sold and unpublished: deleting its variants would cascade their stock history away
+      // (ADR 0014). The product row is already locked; this locks the variants and reads the history.
+      const decision = canRebuildVariants({
+        anyVariantHasStockHistory: await this.variants.anyHasStockHistory(tx, product.id),
+      });
+      if (!decision.allowed) {
+        throw ruleViolation(
+          "This change would rebuild the variants, but some of them have stock history; create a new product or switch variants off instead.",
+          decision.reason,
+        );
+      }
       await this.generation.deleteAll(tx, product.id);
     }
 

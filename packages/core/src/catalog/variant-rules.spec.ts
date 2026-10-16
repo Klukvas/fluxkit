@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canCreateVariantManually, canDeleteVariant } from "./variant-rules.js";
+import { canCreateVariantManually, canDeleteVariant, canRebuildVariants } from "./variant-rules.js";
 
 describe("canDeleteVariant", () => {
   it("allows deleting a non-default variant of a draft product that has other variants", () => {
@@ -153,6 +153,19 @@ describe("canCreateVariantManually", () => {
     expect(canCreateVariantManually(status)).toEqual({
       allowed: false,
       reason: "product_not_draft",
+    });
+  });
+});
+
+describe("canRebuildVariants", () => {
+  it("allows rebuilding when no variant has stock history", () => {
+    expect(canRebuildVariants({ anyVariantHasStockHistory: false })).toEqual({ allowed: true });
+  });
+
+  it("refuses when any variant has stock history", () => {
+    expect(canRebuildVariants({ anyVariantHasStockHistory: true })).toEqual({
+      allowed: false,
+      reason: "has_stock_history",
     });
   });
 });
