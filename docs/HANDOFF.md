@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (`pnpm db:migrate` added; auth plan complete, review fixes in PR).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (pricing and inventory plan proposed).
 
 ## Where we are
 
@@ -19,14 +19,15 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 | Step 7 OpenAPI and docs | Done and merged (PR #25): `docs/api/catalog.md` (every `/admin` and `/store` route), `docs/contracts/api.md`, `docs/files/core.md`, `docs/files/api.md`, ADR index, README status, plan outcome. |
 | Step 8 independent review | Done 2026-10-16 by two reviewers (Opus: security; Fable: correctness and tests). No leak of internal data found. The medium and low findings are fixed (PRs #27, #28, #29; ADR 0007 and 0008). Still open: see `docs/plans/2026-10-16-catalog-review-findings.md` (C5, information items, surviving mutations). The catalog plan is complete. |
 | Auth and roles plan `2026-10-16-auth-and-roles.md` | Approved by the owner. Steps 1 (ADR 0009, core rules), 2 (migration `0002_admin_auth`), 3a (infrastructure) and 3b (login, logout, me, change-password, owner-only `/admin/users`) merged; admin routes are now protected by cookie sessions, roles and the CSRF header. Step 4 (`pnpm admin:create`, auth docs, README) merged. Step 5 (independent review by a different model) done; its findings are fixed in the branch `fix/auth-review-hardening` (PR pending; includes `pnpm admin:unlock`, ADR 0010), so the auth plan is complete once that PR is merged. Contract: `docs/contracts/api.md`. |
+| Pricing and inventory plan `2026-10-16-pricing-and-inventory.md` | Proposed, waiting for the owner's approval (merge of the plan PR). Decisions taken: one price per variant and currency plus a compare-at price; per-variant stock flags and a public availability status without quantities; shop currency (`SHOP_CURRENCY`, default `UAH`) required for active variants. Nothing implemented yet. |
 
 ## Next steps (in order)
 
-1. Auth and roles: merge the review-fix PR (`fix/auth-review-hardening`). First owner: `pnpm admin:create --email <address>`; locked out: `pnpm admin:unlock --email <address>` (README, Admin sign-in; ADR 0010). Auth follow-ups (each needs its own plan): decide whether Swagger UI and `/docs-json` stay public in production, audit log, `trust proxy`, session token rotation, Redis-backed login throttle, two-factor, password reset by email, customer accounts.
+1. Auth and roles are complete and merged. First owner: `pnpm admin:create --email <address>`; locked out: `pnpm admin:unlock --email <address>` (README, Admin sign-in; ADR 0010). Auth follow-ups (each needs its own plan): decide whether Swagger UI and `/docs-json` stay public in production, audit log, `trust proxy`, session token rotation, Redis-backed login throttle, two-factor, password reset by email, customer accounts.
 2. `pnpm db:migrate` exists (forward only; rollbacks stay manual through `drizzle/NNNN_name.down.sql`; no status or rollback command yet). `pnpm seed` and `pnpm admin:create` need a database migrated with it.
 3. Launch blockers: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; `trust proxy` for the login IP limit behind a proxy.
 4. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
-5. Next domain plan (the auth plan and its review are complete): pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
+5. Next domain plan: pricing and inventory, `docs/plans/2026-10-16-pricing-and-inventory.md` (money logic is TDD; implement in the plan's seven steps after the owner approves it). After it: cart and checkout, then search indexing (blocked by the open decisions in ADR 0005), the storefront and the admin UI.
 
 ## Open decisions (owner)
 
