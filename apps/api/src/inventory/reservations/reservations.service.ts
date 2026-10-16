@@ -5,10 +5,13 @@ import {
   decideExpire,
   decideRelease,
   decideReserve,
+  isVariantSellable,
   type ReservationStatus,
   type StockLevel,
   type StockReservation,
 } from "@fluxkit/core";
+import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
+import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { withTransaction, type DbExecutor, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { InventoryRepository, type LevelRow } from "../inventory.repository.js";
@@ -140,6 +143,7 @@ export class ReservationsService {
     private readonly inventory: InventoryRepository,
     private readonly reservations: ReservationsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
+    @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
   /**
@@ -150,11 +154,21 @@ export class ReservationsService {
   async reserve(input: ReserveInput): Promise<ReserveResult> {
     assertValidDate(input.expiresAt, "expiresAt");
     return withTransaction(this.database, async (tx) => {
-      const variant = await this.reservations.findVariantForReservation(tx, input.variantId);
+      const variant = await this.reservations.findVariantForReservation(
+        tx,
+        input.variantId,
+        this.pricing.shopCurrency,
+      );
       if (variant === undefined) {
         return { ok: false, reason: "variant_not_found" };
       }
-      if (!variant.isActive || variant.productStatus !== "active") {
+      // The same rule the store lists by (core `isVariantSellable`): a line the shop never showed is not reservable.
+      const sellable = isVariantSellable({
+        productStatus: productStatusSchema.parse(variant.productStatus),
+        variantIsActive: variant.isActive,
+        hasShopPrice: variant.hasShopPrice,
+      });
+      if (!sellable) {
         return { ok: false, reason: "variant_not_sellable" };
       }
       const flags = {

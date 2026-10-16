@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
-import { product, reservation, variant } from "../../database/schema/index.js";
+import { price, product, reservation, variant } from "../../database/schema/index.js";
 
 export type ReservationRow = typeof reservation.$inferSelect;
 export type NewReservation = Pick<
@@ -15,19 +15,22 @@ export interface ReservableVariantRow {
   trackInventory: boolean;
   allowBackorder: boolean;
   productStatus: string;
+  /** The variant has a price in the shop currency (part of the sellable rule, `isVariantSellable`). */
+  hasShopPrice: boolean;
 }
 
 /** Queries only (Drizzle query builder, parameterized). Level and journal queries live in `InventoryRepository`. */
 @Injectable()
 export class ReservationsRepository {
   /**
-   * The variant with its product status, the variant row locked `FOR SHARE` until the transaction ends: a flag or
+   * The variant with its product status and whether it has a price in `shopCurrency`, the variant row locked `FOR SHARE` until the transaction ends: a flag or
    * activity change (which updates the variant row) waits for the reservation in progress instead of slipping in
    * between the read and the write, and deleting the variant waits too.
    */
   async findVariantForReservation(
     db: DbExecutor,
     variantId: string,
+    shopCurrency: string,
   ): Promise<ReservableVariantRow | undefined> {
     const [row] = await db
       .select({
@@ -36,6 +39,10 @@ export class ReservationsRepository {
         trackInventory: variant.trackInventory,
         allowBackorder: variant.allowBackorder,
         productStatus: product.status,
+        hasShopPrice: sql<boolean>`exists (
+          select 1 from ${price}
+          where ${price.variantId} = ${variant.id} and ${price.currency} = ${shopCurrency}
+        )`,
       })
       .from(variant)
       .innerJoin(product, eq(product.id, variant.productId))
