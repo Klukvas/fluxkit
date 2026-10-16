@@ -6,9 +6,11 @@ import {
   attributeOption,
   brand,
   category,
+  inventoryLevel,
   media,
   option,
   optionValue,
+  price,
   product,
   productCategory,
   productOption,
@@ -65,10 +67,32 @@ export interface TypeAttributeRow {
   options: { code: string; label: I18nText; position: number }[];
 }
 
+/** An active variant with its price in the shop currency (the join drops active variants that have none). */
+export interface SellableVariantRow {
+  id: string;
+  productId: string;
+  sku: string;
+  attributes: Record<string, unknown>;
+  trackInventory: boolean;
+  allowBackorder: boolean;
+  priceAmount: number;
+  priceCurrency: string;
+  compareAtAmount: number | null;
+}
+
+/** One `inventory_level` row of an active variant, any location. Quantities stay inside the API (never serialized). */
+export interface StockLevelRow {
+  variantId: string;
+  onHand: number;
+  reserved: number;
+}
+
 export interface ProductListFilter {
   /** Category ids to match (the filtered category and its visible descendants); undefined = no category filter. */
   categoryIds: readonly string[] | undefined;
   brandSlug: string | undefined;
+  /** `SHOP_CURRENCY`: a listed product has an active variant with a price in it. */
+  shopCurrency: string;
 }
 
 /**
@@ -95,8 +119,31 @@ export class StoreRepository {
       .where(eq(category.isActive, true));
   }
 
+  /**
+   * The store shows a product only if it has at least one sellable variant: active and priced in the shop currency.
+   * Used by the list (so `total` and the pages count only shown products) and by the detail (404 otherwise).
+   */
+  private hasSellableVariant(shopCurrency: string): SQL {
+    return exists(
+      this.db
+        .select({ one: sql`1` })
+        .from(variant)
+        .innerJoin(price, eq(price.variantId, variant.id))
+        .where(
+          and(
+            eq(variant.productId, product.id),
+            eq(variant.isActive, true),
+            eq(price.currency, shopCurrency),
+          ),
+        ),
+    );
+  }
+
   private activeProductsWhere(filter: ProductListFilter): SQL | undefined {
-    const conditions: (SQL | undefined)[] = [eq(product.status, "active")];
+    const conditions: (SQL | undefined)[] = [
+      eq(product.status, "active"),
+      this.hasSellableVariant(filter.shopCurrency),
+    ];
     if (filter.brandSlug !== undefined) {
       conditions.push(
         inArray(
@@ -171,7 +218,10 @@ export class StoreRepository {
       .orderBy(asc(media.position), asc(media.id));
   }
 
-  async findActiveProductBySlug(slug: string): Promise<ProductDetailRow | undefined> {
+  async findActiveProductBySlug(
+    slug: string,
+    shopCurrency: string,
+  ): Promise<ProductDetailRow | undefined> {
     const [row] = await this.db
       .select({
         id: product.id,
@@ -186,7 +236,13 @@ export class StoreRepository {
       })
       .from(product)
       .leftJoin(brand, eq(brand.id, product.brandId))
-      .where(and(eq(product.slug, slug), eq(product.status, "active")));
+      .where(
+        and(
+          eq(product.slug, slug),
+          eq(product.status, "active"),
+          this.hasSellableVariant(shopCurrency),
+        ),
+      );
     return row;
   }
 
@@ -267,13 +323,49 @@ export class StoreRepository {
       .orderBy(asc(productOptionValue.position), asc(optionValue.position), asc(optionValue.code));
   }
 
-  /** Active variants only. */
-  listActiveVariants(productId: string) {
+  /**
+   * Active variants with their shop-currency price, of many products in one query, in display order. A price in any
+   * other currency never leaves the database: it is not selected and not joined.
+   */
+  listSellableVariants(
+    productIds: readonly string[],
+    shopCurrency: string,
+  ): Promise<SellableVariantRow[]> {
+    if (productIds.length === 0) {
+      return Promise.resolve([]);
+    }
     return this.db
-      .select({ id: variant.id, sku: variant.sku, attributes: variant.attributes })
+      .select({
+        id: variant.id,
+        productId: variant.productId,
+        sku: variant.sku,
+        attributes: variant.attributes,
+        trackInventory: variant.trackInventory,
+        allowBackorder: variant.allowBackorder,
+        priceAmount: price.amount,
+        priceCurrency: price.currency,
+        compareAtAmount: price.compareAtAmount,
+      })
       .from(variant)
-      .where(and(eq(variant.productId, productId), eq(variant.isActive, true)))
+      .innerJoin(price, and(eq(price.variantId, variant.id), eq(price.currency, shopCurrency)))
+      .where(and(inArray(variant.productId, [...productIds]), eq(variant.isActive, true)))
       .orderBy(asc(variant.position), asc(variant.sku), asc(variant.id));
+  }
+
+  /** The inventory levels (all locations) of the active variants of many products, in one query. */
+  listStockLevels(productIds: readonly string[]): Promise<StockLevelRow[]> {
+    if (productIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return this.db
+      .select({
+        variantId: inventoryLevel.variantId,
+        onHand: inventoryLevel.onHand,
+        reserved: inventoryLevel.reserved,
+      })
+      .from(inventoryLevel)
+      .innerJoin(variant, eq(variant.id, inventoryLevel.variantId))
+      .where(and(inArray(variant.productId, [...productIds]), eq(variant.isActive, true)));
   }
 
   /** Option value codes of the active variants of a product (all variants at once). */

@@ -1314,6 +1314,13 @@ describe("store API (public, real app, real Postgres)", () => {
     let secondLocation = "";
     let otherApp: RunningApp | undefined;
 
+    const idOf = (key: string): string => {
+      const value = ids[key];
+      if (value === undefined) {
+        throw new Error(`fixture "${key}" was not created`);
+      }
+      return value;
+    };
     const detail = (key: string): Promise<StoreProductDetail> =>
       getOk<StoreProductDetail>(`/store/products/${slug(key)}`);
     const variantsBySku = (product: StoreProductDetail) =>
@@ -1635,16 +1642,16 @@ describe("store API (public, real app, real Postgres)", () => {
         const page = await brandPage("brand-p");
         const byId = new Map(page.items.map((item) => [item.id, item]));
         const detailOf = async (key: string) => (await detail(key)).availability;
-        expect(byId.get(ids["rule-all-out"])?.availability).toBe("out_of_stock");
-        expect(byId.get(ids["rule-out-low"])?.availability).toBe("low_stock");
-        expect(byId.get(ids["rule-low-in"])?.availability).toBe("in_stock");
-        expect(byId.get(ids["rule-hidden-in"])?.availability).toBe("out_of_stock");
+        expect(byId.get(idOf("rule-all-out"))?.availability).toBe("out_of_stock");
+        expect(byId.get(idOf("rule-out-low"))?.availability).toBe("low_stock");
+        expect(byId.get(idOf("rule-low-in"))?.availability).toBe("in_stock");
+        expect(byId.get(idOf("rule-hidden-in"))?.availability).toBe("out_of_stock");
         expect(await detailOf("rule-all-out")).toBe("out_of_stock");
         expect(await detailOf("rule-out-low")).toBe("low_stock");
         expect(await detailOf("rule-low-in")).toBe("in_stock");
         expect(await detailOf("rule-hidden-in")).toBe("out_of_stock");
         // The stock product has an in-stock variant.
-        expect(byId.get(ids["stock"])?.availability).toBe("in_stock");
+        expect(byId.get(idOf("stock"))?.availability).toBe("in_stock");
       });
 
       it("still lists a product whose sellable variants are all out of stock", async () => {
@@ -1767,6 +1774,22 @@ describe("store API (public, real app, real Postgres)", () => {
         "threshold",
       ];
 
+      /** Every JSON number in the body: a substring search would match digits inside ids and timestamps. */
+      function collectNumbers(value: unknown, into: Set<number> = new Set()): Set<number> {
+        if (typeof value === "number") {
+          into.add(value);
+        } else if (Array.isArray(value)) {
+          for (const entry of value) {
+            collectNumbers(entry, into);
+          }
+        } else if (typeof value === "object" && value !== null) {
+          for (const entry of Object.values(value)) {
+            collectNumbers(entry, into);
+          }
+        }
+        return into;
+      }
+
       function collectKeys(value: unknown, into: Set<string> = new Set()): Set<string> {
         if (Array.isArray(value)) {
           for (const entry of value) {
@@ -1800,14 +1823,16 @@ describe("store API (public, real app, real Postgres)", () => {
           for (const forbidden of FORBIDDEN_KEYS) {
             expect(keys.has(forbidden), `key ${forbidden}`).toBe(false);
           }
+          const numbers = collectNumbers(response.body);
           for (const secret of [
-            String(SECRET_ON_HAND),
-            String(SECRET_RESERVED),
-            String(SECRET_USD_AMOUNT),
-            String(SECRET_USD_COMPARE_AT),
-            secondLocation,
-            "USD",
+            SECRET_ON_HAND,
+            SECRET_RESERVED,
+            SECRET_USD_AMOUNT,
+            SECRET_USD_COMPARE_AT,
           ]) {
+            expect(numbers.has(secret), `number ${secret}`).toBe(false);
+          }
+          for (const secret of [secondLocation, "USD"]) {
             expect(text, `value ${secret}`).not.toContain(secret);
           }
         }
