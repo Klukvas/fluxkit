@@ -15,6 +15,17 @@ This package only describes data (TypeScript objects, no runtime dependencies, t
 | Brand (1) | `demo-brand` ("Demo Brand") |
 | Categories (9) | 3 roots (`demo-clothing`, `demo-tools`, `demo-digital-goods`), 2 children each |
 | Products (8, all published) | 3 clothing (variants: 9, 8 and 4), 3 hand tools and 2 digital products (one default variant each); 26 variants in total |
+| Prices (26) | One price per variant, differing by product, color and size, as integer minor units without a currency (59900 is 599.00 in a two-decimal currency). The runner stores them in `SHOP_CURRENCY`. Three variants also have a `compareAtAmount` (an old, higher price) |
+| Stock | Received into the default location `main` for every tracked variant that has any. Digital products are untracked (no stock, always `in_stock`) |
+
+Stock states the demo shows in the store (default `LOW_STOCK_THRESHOLD` of 5):
+
+| State | Where |
+|---|---|
+| `in_stock` | most clothing variants, the screwdriver (120), the digital products (untracked) |
+| `low_stock` | T-shirt black/s (3), hoodie black/xl (5, the threshold itself), hoodie blue/s (2), the hammer (4) |
+| `out_of_stock` | T-shirt red/l (tracked, stock 0), the adjustable wrench (tracked, stock 0: its product is listed as `out_of_stock`) |
+| backorder (`in_stock` with no stock) | linen shirt blue/m (`allowBackorder`, stock 0) |
 
 ## Run it
 
@@ -40,7 +51,8 @@ It prints how many entities were created and how many already existed. Any error
   database in `DATABASE_URL` does not end in `_test`, `_dev`, `_demo` or `_local`. `--allow-production` is the single override for both:
   `pnpm --filter @fluxkit/api seed --allow-production` after a build. Demo data does not belong in a client's production database.
   Note: the database name `fluxkit` from `.env.example` does not match the suffix rule, so either name your database `fluxkit_dev` (or similar) or pass the flag.
-- **Prices (placeholder).** A product cannot be published without a price in `SHOP_CURRENCY` on every active variant, so the runner writes one flat placeholder price (100.00 in a two-decimal currency) for each variant of a product it creates, before publishing. The seed data itself has no prices yet (`TODO(fluxkit)`: real demo prices and stock arrive with step 6 of `docs/plans/2026-10-16-pricing-and-inventory.md`). Existing products are never repriced.
+- **Prices.** A product cannot be published without a price in `SHOP_CURRENCY` on every active variant, so for each product it creates the runner writes the prices from the seed data (matched to the generated variants by option values) through `PricesService`, before publishing. The amounts are the same whatever `SHOP_CURRENCY` is; pick the currency, the amounts are not converted. Existing products are never repriced.
+- **Stock.** For each stocked variant of a product it creates, the runner receives the stock through the real admin inventory service: one `receipt` movement with the reason "Demo seed" at the default location, so the journal replays to the level. The seed has no admin user, so these movements have no actor (`actorId` is `null`; `InventoryService.adjust` accepts a `null` actor for system changes). A tracked variant with stock 0 gets no level and no movement (that absence is "out of stock"). `allowBackorder` is set through the variant admin service. Existing variants are never restocked: a second run adds no price, level or movement.
 - Optional feature modules are not loaded while seeding.
 - Seeding creates no users. The first admin owner comes from `pnpm admin:create` (README, Admin sign-in).
 
@@ -48,7 +60,7 @@ It prints how many entities were created and how many already existed. Any error
 
 1. Add attributes or options to `src/dictionaries.ts` (codes are immutable and match `^[a-z][a-z0-9_]{0,63}$`; value codes may start with a digit).
 2. Add the ProductType to `src/presets.ts`: which attributes (product or variant level, required or not) and which options it allows. Niche-specific fields live here as data, never in the product schema.
-3. Add demo products to `src/products.ts` and categories or brands to `src/taxonomy.ts`; give every text a `uk` and an `en` value.
+3. Add demo products to `src/products.ts` and categories or brands to `src/taxonomy.ts`; give every text a `uk` and an `en` value, and one `variants` entry (option values, price, stock) for every variant the options generate.
 4. `pnpm --filter @fluxkit/seeds test` checks codes, slugs, texts and references; the integration test `apps/api/src/seed/seed.spec.ts` seeds a real database and reads the result through the store API.
 
 A client fork replaces this content with its own presets and products; core and the runner stay unchanged.

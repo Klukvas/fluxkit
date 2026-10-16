@@ -1,5 +1,5 @@
 import type { I18nText } from "@fluxkit/core";
-import type { SeedMedia, SeedProduct } from "./types.js";
+import type { SeedMedia, SeedProduct, SeedVariantCommerce } from "./types.js";
 
 // Demo products. Every title, text and image is a placeholder; there are no real products, brands or domains.
 
@@ -14,6 +14,24 @@ function image(name: string, alt: I18nText, color?: string): SeedMedia {
     alt,
     ...(color === undefined ? {} : { optionValue: { optionCode: "color", valueCode: color } }),
   };
+}
+
+// Demo prices are plain amounts in minor units (59900 = 599.00 in a two-decimal currency). Stock shows every store state
+// for the default LOW_STOCK_THRESHOLD of 5: plenty (in_stock), 1 to 5 (low_stock), none (out_of_stock) and backorder.
+function clothingVariant(
+  color: string,
+  size: string,
+  amount: number,
+  commerce: Omit<SeedVariantCommerce, "optionValues" | "amount">,
+): SeedVariantCommerce {
+  return { optionValues: { color, size }, amount, ...commerce };
+}
+
+function defaultVariant(
+  amount: number,
+  commerce: Omit<SeedVariantCommerce, "optionValues" | "amount">,
+): SeedVariantCommerce {
+  return { optionValues: {}, amount, ...commerce };
 }
 
 const COTTON_CARE: I18nText = {
@@ -46,6 +64,17 @@ const clothingProducts: readonly SeedProduct[] = [
       image("t-shirt-black", { uk: "Чорна футболка", en: "Black T-shirt" }, "black"),
       image("t-shirt-red", { uk: "Червона футболка", en: "Red T-shirt" }, "red"),
     ],
+    variants: [
+      clothingVariant("black", "s", 59900, { stock: 3 }),
+      clothingVariant("black", "m", 59900, { stock: 40, compareAtAmount: 79900 }),
+      clothingVariant("black", "l", 59900, { stock: 35 }),
+      clothingVariant("white", "s", 59900, { stock: 25 }),
+      clothingVariant("white", "m", 59900, { stock: 60 }),
+      clothingVariant("white", "l", 59900, { stock: 30 }),
+      clothingVariant("red", "s", 62900, { stock: 18 }),
+      clothingVariant("red", "m", 62900, { stock: 22 }),
+      clothingVariant("red", "l", 62900, { stock: 0 }),
+    ],
   },
   {
     slug: "demo-hoodie",
@@ -67,6 +96,16 @@ const clothingProducts: readonly SeedProduct[] = [
       { optionCode: "size", valueCodes: ["s", "m", "l", "xl"] },
     ],
     media: [image("hoodie-front", { uk: "Худі, вигляд спереду", en: "Hoodie, front view" })],
+    variants: [
+      clothingVariant("black", "s", 129900, { stock: 12 }),
+      clothingVariant("black", "m", 129900, { stock: 20 }),
+      clothingVariant("black", "l", 129900, { stock: 15 }),
+      clothingVariant("black", "xl", 134900, { stock: 5 }),
+      clothingVariant("blue", "s", 129900, { stock: 2 }),
+      clothingVariant("blue", "m", 129900, { stock: 28, compareAtAmount: 159900 }),
+      clothingVariant("blue", "l", 129900, { stock: 14 }),
+      clothingVariant("blue", "xl", 134900, { stock: 9 }),
+    ],
   },
   {
     slug: "demo-linen-shirt",
@@ -90,6 +129,12 @@ const clothingProducts: readonly SeedProduct[] = [
       image("linen-shirt-white", { uk: "Біла сорочка", en: "White shirt" }, "white"),
       image("linen-shirt-blue", { uk: "Синя сорочка", en: "Blue shirt" }, "blue"),
     ],
+    variants: [
+      clothingVariant("white", "m", 109900, { stock: 16 }),
+      clothingVariant("white", "l", 109900, { stock: 11 }),
+      clothingVariant("blue", "m", 114900, { stock: 0, allowBackorder: true }),
+      clothingVariant("blue", "l", 114900, { stock: 7 }),
+    ],
   },
 ];
 
@@ -107,6 +152,7 @@ const handToolProducts: readonly SeedProduct[] = [
     attributes: { head_type: "phillips", length: 200, material: "steel", weight: 120 },
     options: [],
     media: [image("screwdriver", { uk: "Викрутка", en: "Screwdriver" })],
+    variants: [defaultVariant(18900, { stock: 120 })],
   },
   {
     slug: "demo-hammer",
@@ -121,6 +167,7 @@ const handToolProducts: readonly SeedProduct[] = [
     attributes: { head_type: "claw", length: 330, material: "wood", weight: 450 },
     options: [],
     media: [image("hammer", { uk: "Молоток", en: "Hammer" })],
+    variants: [defaultVariant(34900, { stock: 4, compareAtAmount: 44900 })],
   },
   {
     slug: "demo-adjustable-wrench",
@@ -135,6 +182,7 @@ const handToolProducts: readonly SeedProduct[] = [
     attributes: { head_type: "adjustable", length: 250, material: "steel", weight: 300 },
     options: [],
     media: [image("wrench", { uk: "Розвідний ключ", en: "Adjustable wrench" })],
+    variants: [defaultVariant(42900, { stock: 0 })],
   },
 ];
 
@@ -152,6 +200,7 @@ const digitalProducts: readonly SeedProduct[] = [
     attributes: { file_format: "epub", license_type: "personal" },
     options: [],
     media: [image("e-book-cover", { uk: "Обкладинка книги", en: "Book cover" })],
+    variants: [defaultVariant(19900, {})],
   },
   {
     slug: "demo-template-pack",
@@ -166,6 +215,7 @@ const digitalProducts: readonly SeedProduct[] = [
     attributes: { file_format: "zip", license_type: "commercial" },
     options: [],
     media: [image("template-pack", { uk: "Набір шаблонів", en: "Template pack" })],
+    variants: [defaultVariant(49900, {})],
   },
 ];
 

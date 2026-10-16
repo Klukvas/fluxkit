@@ -1,4 +1,11 @@
-import { isValidCode, isValidValueCode, validateSlug, type I18nText } from "@fluxkit/core";
+import {
+  MAX_AMOUNT,
+  MAX_ON_HAND,
+  isValidCode,
+  isValidValueCode,
+  validateSlug,
+  type I18nText,
+} from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import { catalogSeed } from "./index.js";
 import type { SeedCategory } from "./types.js";
@@ -166,6 +173,98 @@ describe("catalog seed data", () => {
   it("keeps the leak-rule fixtures: an internal attribute and a filterable one", () => {
     expect(attributes.some((attribute) => attribute.isInternal === true)).toBe(true);
     expect(attributes.some((attribute) => attribute.isFilterable === true)).toBe(true);
+  });
+
+  describe("prices and stock", () => {
+    const typeByCode = new Map(productTypes.map((type) => [type.code, type]));
+    // Same as the default LOW_STOCK_THRESHOLD in @fluxkit/config.
+    const lowStockThreshold = 5;
+
+    /** Every combination of the chosen option values, as sorted `option=value` keys. */
+    function combinations(product: (typeof products)[number]): string[] {
+      return product.options
+        .reduce<string[][]>(
+          (rows, selection) =>
+            rows.flatMap((row) =>
+              selection.valueCodes.map((value) => [...row, `${selection.optionCode}=${value}`]),
+            ),
+          [[]],
+        )
+        .map((row) => [...row].sort().join(";"));
+    }
+
+    function keyOf(optionValues: Readonly<Record<string, string>>): string {
+      return Object.entries(optionValues)
+        .map(([code, value]) => `${code}=${value}`)
+        .sort()
+        .join(";");
+    }
+
+    it("describes exactly the variants that the options generate, each once", () => {
+      for (const product of products) {
+        const keys = product.variants.map((variant) => keyOf(variant.optionValues));
+        expect(unique(keys), product.slug).toBe(true);
+        expect([...keys].sort(), product.slug).toEqual([...combinations(product)].sort());
+      }
+    });
+
+    it("has a valid price for every variant, and compare-at prices above the price", () => {
+      for (const product of products) {
+        for (const variant of product.variants) {
+          const where = `${product.slug} ${keyOf(variant.optionValues)}`;
+          expect(Number.isInteger(variant.amount), where).toBe(true);
+          expect(variant.amount, where).toBeGreaterThan(0);
+          expect(variant.amount, where).toBeLessThanOrEqual(MAX_AMOUNT);
+          if (variant.compareAtAmount !== undefined) {
+            expect(Number.isInteger(variant.compareAtAmount), where).toBe(true);
+            expect(variant.compareAtAmount, where).toBeGreaterThan(variant.amount);
+            expect(variant.compareAtAmount, where).toBeLessThanOrEqual(MAX_AMOUNT);
+          }
+        }
+      }
+      const withCompareAt = products.flatMap((product) =>
+        product.variants.filter((variant) => variant.compareAtAmount !== undefined),
+      );
+      expect(withCompareAt.length).toBeGreaterThanOrEqual(2);
+      const amounts = products.flatMap((product) => product.variants.map((v) => v.amount));
+      expect(new Set(amounts).size).toBeGreaterThan(5);
+    });
+
+    it("gives stock only to tracked variants, as whole numbers within the limit", () => {
+      for (const product of products) {
+        const requiresShipping = typeByCode.get(product.productTypeCode)?.requiresShipping;
+        for (const variant of product.variants) {
+          const where = `${product.slug} ${keyOf(variant.optionValues)}`;
+          if (requiresShipping === false) {
+            // Digital goods are untracked (the product type default): no stock, no backorder.
+            expect(variant.stock, where).toBeUndefined();
+            expect(variant.allowBackorder, where).toBeUndefined();
+          } else {
+            expect(Number.isInteger(variant.stock), where).toBe(true);
+            expect(variant.stock, where).toBeGreaterThanOrEqual(0);
+            expect(variant.stock, where).toBeLessThanOrEqual(MAX_ON_HAND);
+          }
+        }
+      }
+    });
+
+    it("shows every store state: in stock, low stock, out of stock and backorder", () => {
+      const tracked = products.flatMap((product) =>
+        product.variants.filter((variant) => variant.stock !== undefined),
+      );
+      const stocks = tracked.map((variant) => variant.stock ?? 0);
+      expect(stocks.some((stock) => stock > lowStockThreshold)).toBe(true);
+      expect(stocks.some((stock) => stock > 0 && stock <= lowStockThreshold)).toBe(true);
+      expect(
+        tracked.some((variant) => variant.stock === 0 && variant.allowBackorder !== true),
+      ).toBe(true);
+      expect(tracked.some((variant) => variant.allowBackorder === true)).toBe(true);
+      expect(
+        products.some(
+          (product) => typeByCode.get(product.productTypeCode)?.requiresShipping === false,
+        ),
+      ).toBe(true);
+    });
   });
 
   it("does not look like client data", () => {

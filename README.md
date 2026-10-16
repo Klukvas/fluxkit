@@ -14,11 +14,12 @@ Sold as a template plus a team that adapts design and features for each client.
 
 ## Status
 
-Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): steps 1 to 4 done, step 5 (independent review) pending.
-**Not built yet**: customer accounts and storefront login, prices, inventory, search indexing, cart, checkout and orders. What exists and works:
+Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): steps 1 to 4 done, step 5 (independent review) pending. Pricing and inventory plan (`docs/plans/2026-10-16-pricing-and-inventory.md`): steps 1 to 6 done, step 7 (independent review) pending.
+**Not built yet**: customer accounts and storefront login, search indexing, cart, checkout and orders. What exists and works:
 
-- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`), BullMQ and Meilisearch spikes.
+- API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`, `0003_pricing_inventory`), BullMQ and Meilisearch spikes.
 - Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
+- Prices and stock: one price per variant and currency (plus an optional old price), per-variant stock levels with an append-only journal, a reservation service for the future checkout (no HTTP route), and public store fields `price` and `availability` (`in_stock`, `low_stock`, `out_of_stock`; never quantities) plus `GET /store/config`. Settings: `SHOP_CURRENCY` (default `UAH`; an active variant needs a price in it), `PRICES_INCLUDE_TAX` (default `true`, a display flag only, no tax is calculated) and `LOW_STOCK_THRESHOLD` (default `5`), see `.env.example` and `docs/contracts/config.md`. Endpoints: `docs/api/pricing.md` and `docs/api/inventory.md`. `pnpm seed` gives every demo variant a price and a stock level that shows each availability state.
 - Admin authentication: cookie sessions, roles `owner`, `manager`, `viewer`, owner-only user management, first owner through `pnpm admin:create` (see Admin sign-in below). Endpoints: `docs/api/auth.md`; contract: `docs/contracts/api.md`.
 - Storefront (`/uk`, `/en`) and admin: placeholder pages built from the shared UI and tokens (light and dark themes).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
@@ -145,7 +146,7 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 admin authentication and roles (index with status in `docs/adr/README.md`).
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
@@ -163,6 +164,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Independent review of the auth plan (step 5), then the next domain plan: pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
+2. Independent review of the pricing and inventory plan (step 7) and of the auth plan (step 5), then the next domain plans: cart and checkout (it will use the reservation service), orders; the pricing pipeline (discounts, tax) is a later plan (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
 3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.

@@ -25,6 +25,7 @@ import {
   ownerAuthenticator,
 } from "../../test/inventory-fixtures.js";
 import { ensureMigrated } from "../../test/migrate.js";
+import { InventoryService } from "./inventory.service.js";
 import type { ProductDetailResponse } from "../../catalog/admin/products/products.schemas.js";
 import type {
   AdjustmentResponse,
@@ -436,6 +437,21 @@ describe("admin inventory API (real app, real Postgres)", () => {
       expect(problem(result).errors).toContainEqual(
         expect.objectContaining({ path: "actorId", code: "unknown_field" }),
       );
+    });
+
+    it("journals a system change (no admin user, as the demo seed makes) with a null actor", async () => {
+      const { productId, variantId } = await newVariant();
+      const service = running.app.get(InventoryService, { strict: false });
+      const result = await service.adjust(
+        productId,
+        variantId,
+        { delta: 6, kind: "receipt", reason: "System change" },
+        null,
+      );
+      expect(result.movement.actorId).toBeNull();
+      const journal = await movementsOf(pool, variantId);
+      expect(journal).toHaveLength(1);
+      expect(journal[0]).toMatchObject({ delta: 6, on_hand_after: 6, actor_id: null });
     });
 
     it("keeps the journal row when the acting admin user is deleted later, without the actor", async () => {
