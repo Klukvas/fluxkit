@@ -1,6 +1,6 @@
 # Plan: pricing and inventory (v1)
 
-Status: approved by the owner 2026-10-16 (decisions and assumptions below confirmed). Step 1 (ADR 0011, core money module) in progress; steps 2 to 7 not started. Red zones covered by the approval: money logic, schema and migration, public contracts, a change to the core publish rule.
+Status: approved by the owner 2026-10-16 (decisions and assumptions below confirmed). Step 1 (ADR 0011, core money module) merged; step 2 (core price and stock rules, publish rule) in PR pending; steps 3 to 7 not started. Red zones covered by the approval: money logic, schema and migration, public contracts, a change to the core publish rule.
 Roles: Developers (Sonnet), steps run one after another (the owner asked for no parallel runs); independent Reviewer (Opus, a different model than the authors); Docs inside each step.
 Follows: `docs/plans/2026-10-14-catalog.md` and `docs/plans/2026-10-16-auth-and-roles.md` (both completed). Design basis: ADR 0004 (price table, inventory levels, reservations, movement journal), ADR 0006 (catalog schema), ADR 0008 (variants of live products).
 
