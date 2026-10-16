@@ -28,7 +28,8 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 ## Options and variants
 
 - `src/catalog/variants.ts` - `computeOptionSignature` (sorted `code=value` pairs joined with `;`; internal), `generateVariants` (cartesian product, skips existing combinations, enforces limits), invariant checks (`checkExactlyOneDefault`, `checkOptionCoverage`, `checkUniqueSignatures`, `checkSignatureConsistency`, `checkVariantInvariants`).
-- `src/catalog/variant-rules.ts` - `canDeleteVariant` (draft only, not the last, not the default), `canCreateVariantManually` (draft only).
+- `src/catalog/variant-rules.ts` - `canDeleteVariant` (draft only, not the last, not the default, no stock history: `has_stock_history`, ADR 0013), `canCreateVariantManually` (draft only).
+- `src/catalog/sellable.ts` - `isVariantSellable({productStatus, variantIsActive, hasShopPrice})`: the one rule for "can be bought" that the store listing and `ReservationsService.reserve` both follow. Pure; must not know about SQL.
 - `src/catalog/product-option-change.ts` - `planProductOptionChange`: what a change of a product's options and chosen values does (works on ids, returns a plan; the service applies it in one transaction).
 
 ## Categories
@@ -69,10 +70,10 @@ Pure and dependency-free: integers and BigInt only, no float arithmetic for anyt
 Pure decisions over one `inventory_level`; the API calls them under the row lock and writes the result and the journal row in one transaction. Bad caller data (a quantity, a reservation in the wrong state) is a typed refusal; corrupt stored data (negative level, unknown status, bad flags) is a `RangeError`.
 
 - `src/inventory/index.ts` - barrel of the inventory modules below. Add new modules here.
-- `src/inventory/limits.ts` - `MAX_ON_HAND` (10^9). Constants only.
+- `src/inventory/limits.ts` - `MAX_ON_HAND` (10^9) and `MAX_RESERVED` (the same bound for the reserved total of a level). Constants only.
 - `src/inventory/types.ts` - `StockFlags`, `StockLevel`, `StockReservation`, `ReservationStatus`, `StockMovement`, `StockMovementKind` and the `assertValid*` guards. Must not carry ORM types.
 - `src/inventory/availability.ts` - `availabilityOf(flags, levels, lowStockThreshold)`: `in_stock`, `low_stock` or `out_of_stock` from the sum of `max(0, onHand - reserved)`; never exposes a quantity.
-- `src/inventory/decisions.ts` - `decideReserve` (refuses `insufficient_stock` unless backorder, `not_tracked`), `decideRelease`, `decideExpire` (lower `reserved` only), `decideCommit` (lowers `onHand` and `reserved`, yields a `sale` movement with a negative delta), `decideAdjustment` (delta or `setOnHand`; refuses a result below 0 or below `reserved`, a zero change, receipts or returns that remove stock). A reservation leaves `active` once: `committed`, `released` or `expired`. Must not read the clock or a database.
+- `src/inventory/decisions.ts` - `decideReserve` (refuses `insufficient_stock` unless backorder, `not_tracked`, `reserved_out_of_range` above `MAX_RESERVED`), `decideRelease`, `decideExpire` (lower `reserved` only), `decideCommit` (lowers `onHand` and `reserved`, yields a `sale` movement with a negative delta), `decideAdjustment` (delta or `setOnHand`; refuses a result below 0, a change that lowers on hand below `reserved` (a raise is always allowed, so partial receipts reduce a backorder), a zero change, receipts or returns that remove stock). A reservation leaves `active` once: `committed`, `released` or `expired`. Must not read the clock or a database.
 
 ## Test-only and tests
 

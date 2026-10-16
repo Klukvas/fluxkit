@@ -66,11 +66,11 @@ Cart, checkout, orders and payments (they will call the reservation operations b
 `SHOP_CURRENCY`, `PRICES_INCLUDE_TAX`, `LOW_STOCK_THRESHOLD` in `packages/config`, `.env.example`, `docs/contracts/config.md`; malformed values fail loudly.
 
 ### Seeds
-Demo variants get prices and stock; the runner stays additive: it fills a missing price or stock level only for its own variants and never updates existing rows (digital demo products are untracked). Documented in `seeds/README.md`.
+Demo variants get prices and stock; the runner stays additive: it prices and stocks only the products it creates in that run, and never touches a product that already exists (so it does not fill a missing price or level on an existing demo product; digital demo products are untracked). Documented in `seeds/README.md`.
 
 ## Steps (one branch and PR each, in order, merge only on the owner's word)
 
-Done: 1 to 6 (step 4 was split into 4a and 4b). Remaining: step 7.
+Done: 1 to 7 (step 4 was split into 4a and 4b). Step 7, the review, is recorded in `docs/plans/2026-10-16-pricing-review-findings.md`; its findings are fixed in the branch `fix/pricing-review-findings` (the plan is closed when that PR is merged).
 1. **ADR 0010-style decision record and core money module**, tests first, with the BigInt reference tests for rounding and the overflow bounds. (Developer, Sonnet.) The ADR number is the next free one at that time.
 2. **Core pricing and inventory rules**: price rules, availability, reserve/release/commit/expire decisions, and the publish-rule change, tests first, including the property-style tests that stock never goes negative. (Developer, Sonnet.)
 3. **Schema and migration `0003`**: tables, trigger, flags, default location, constraint tests, up/down/up/down. (Developer, Sonnet.)
@@ -108,7 +108,7 @@ Migration `0003_pricing_inventory` (five new tables, two new columns on `variant
 - The change to core `publishPreconditions`.
 - No new dependency is requested.
 
-## Outcome (steps 1 to 6; step 7 pending)
+## Outcome (steps 1 to 7)
 
 Built:
 - Core (`packages/core`): the money module (integers in minor units, ISO 4217 table, exact arithmetic, percentages in basis points with explicit rounding), price rules, availability, reserve/release/commit/expire/adjust decisions, and the `price_missing` publish rule.
@@ -126,4 +126,4 @@ Known follow-ups (each needs its own plan or a fix after the review):
 - One reservation holds one location; the checkout plan has to split an order across locations.
 - Adjustments of different variants of one product serialize on the product row lock.
 - `apps/api/src/catalog/store/store.spec.ts` is very large and could be split by topic.
-- Step 7, the independent review by a different model (Opus), covers rounding and overflow, oversell races, journal integrity, availability leaks, publish-rule regressions, migration reversibility and tests that cannot fail. Findings are fixed before the plan is closed.
+- Step 7, the independent review by a different model (Opus), is done: `docs/plans/2026-10-16-pricing-review-findings.md` (R1 to R11, all fixed or documented in `fix/pricing-review-findings`; ADR 0013). Still open after it: rebuilding the variants of a draft product on an option change can delete the history of a variant that was sold and unpublished (ADR 0013); optional later migrations (`CHECK (reserved <= 1000000000)`, a `TRUNCATE` trigger on `stock_movement`); `expireDue` needs a scheduler that loops on `nextCursor`.

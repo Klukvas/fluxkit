@@ -314,21 +314,46 @@ describe("compareMoney (typed result, like every other money function)", () => {
 });
 
 describe("negateMoney and isZero", () => {
+  /** negateMoney gives a typed result; this unwraps it for the arithmetic cases. */
+  function negated(value: Money): Money {
+    const result = negateMoney(value);
+    if (!result.ok) {
+      throw new Error(`negateMoney refused: ${result.reason}`);
+    }
+    return result.money;
+  }
+
   it("flips the sign", () => {
-    expect(negateMoney(money(5))).toEqual({ amount: -5, currency: "UAH" });
-    expect(negateMoney(money(-5, "EUR"))).toEqual({ amount: 5, currency: "EUR" });
-    expect(negateMoney(money(MAX_AMOUNT))).toEqual({ amount: -MAX_AMOUNT, currency: "UAH" });
+    expect(negateMoney(money(5))).toEqual({ ok: true, money: { amount: -5, currency: "UAH" } });
+    expect(negated(money(-5, "EUR"))).toEqual({ amount: 5, currency: "EUR" });
+    expect(negated(money(MAX_AMOUNT))).toEqual({ amount: -MAX_AMOUNT, currency: "UAH" });
   });
 
   it("returns +0 for zero, never -0", () => {
-    expect(Object.is(negateMoney(money(0)).amount, 0)).toBe(true);
-    expect(Object.is(negateMoney(money(-0)).amount, 0)).toBe(true);
+    expect(Object.is(negated(money(0)).amount, 0)).toBe(true);
+    expect(Object.is(negated(money(-0)).amount, 0)).toBe(true);
   });
 
   it("is its own inverse and does not mutate", () => {
     const original = money(42);
-    expect(negateMoney(negateMoney(original))).toEqual(original);
+    expect(negated(negated(original))).toEqual(original);
     expect(original).toEqual({ amount: 42, currency: "UAH" });
+  });
+
+  it("reports invalid money instead of returning it unchanged (R10)", () => {
+    for (const bad of [
+      { amount: Number.NaN, currency: "XXX" },
+      { amount: 1.5, currency: "UAH" },
+      { amount: MAX_AMOUNT + 1, currency: "UAH" },
+      { amount: Number.POSITIVE_INFINITY, currency: "UAH" },
+      { amount: 1, currency: "XXX" },
+      null,
+    ]) {
+      expect(negateMoney(bad as never), JSON.stringify(bad)).toEqual({
+        ok: false,
+        reason: "invalid_money",
+      });
+    }
   });
 
   it("isZero is true only for zero (also negative zero)", () => {
@@ -336,6 +361,17 @@ describe("negateMoney and isZero", () => {
     expect(isZero(money(-0))).toBe(true);
     expect(isZero(money(1))).toBe(false);
     expect(isZero(money(-1))).toBe(false);
+  });
+
+  it("isZero throws a RangeError for invalid money instead of answering false (R10)", () => {
+    for (const bad of [
+      { amount: Number.NaN, currency: "UAH" },
+      { amount: 1.5, currency: "UAH" },
+      { amount: 0, currency: "XXX" },
+      undefined,
+    ]) {
+      expect(() => isZero(bad as never), JSON.stringify(bad)).toThrow(RangeError);
+    }
   });
 });
 

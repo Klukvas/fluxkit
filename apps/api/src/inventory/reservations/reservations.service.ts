@@ -5,14 +5,21 @@ import {
   decideExpire,
   decideRelease,
   decideReserve,
+  isVariantSellable,
   type ReservationStatus,
   type StockLevel,
   type StockReservation,
 } from "@fluxkit/core";
+import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
+import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { withTransaction, type DbExecutor, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { InventoryRepository, type LevelRow } from "../inventory.repository.js";
-import { ReservationsRepository, type ReservationRow } from "./reservations.repository.js";
+import {
+  ReservationsRepository,
+  type DueCursor,
+  type ReservationRow,
+} from "./reservations.repository.js";
 
 /*
  * The reservation domain service (docs/api/inventory.md, ADR 0011). It has no HTTP route: the checkout plan calls it.
@@ -49,12 +56,15 @@ export interface ReserveInput {
 
 /**
  * Why `reserve` did not hold anything. `not_tracked` means the variant has no stock to hold: the caller skips the
- * reservation and sells it freely. `variant_not_sellable` means the variant is inactive or its product is not published.
+ * reservation and sells it freely. `variant_not_sellable` means the variant cannot be bought (see `isVariantSellable`).
+ * `reserved_out_of_range` means the level would hold more reserved units than the stored limit (`MAX_RESERVED`; only
+ * reachable with backorder).
  */
 export type ReserveRefusal =
   | "invalid_quantity"
   | "not_tracked"
   | "insufficient_stock"
+  | "reserved_out_of_range"
   | "variant_not_found"
   | "variant_not_sellable"
   | "location_not_found";
@@ -85,9 +95,17 @@ export interface CommitOptions {
 }
 
 export interface ExpireDueOptions {
-  /** At most this many reservations are looked at per call (1 to 10 000, default 500). Call again while `scanned` equals it. */
+  /** At most this many reservations are looked at per call (1 to 10 000, default 500). */
   limit?: number;
+  /**
+   * Continue after this position: pass the `nextCursor` of the previous call unchanged. Without it the list starts at
+   * the oldest due reservation, where a reservation that could not be expired (see `failures`) comes first again.
+   */
+  after?: ExpireDueCursor;
 }
+
+/** Where the previous `expireDue` call stopped. Opaque: copy it from `nextCursor`, do not build it. */
+export type ExpireDueCursor = DueCursor;
 
 export interface ExpireDueResult {
   /** Due reservations looked at. */
@@ -97,6 +115,12 @@ export interface ExpireDueResult {
   skipped: number;
   /** Reservations that could not be expired (damaged data); the others were still processed. Never ignore these. */
   failures: { reservationId: string; reason: ReservationRefusal }[];
+  /**
+   * `null` when this call reached the end of the due list (it looked at fewer than `limit`): stop. Otherwise pass it
+   * as `after` to the next call. Looping on this value ends even when damaged reservations sit at the head, because
+   * the cursor moves past them.
+   */
+  nextCursor: ExpireDueCursor | null;
 }
 
 export const DEFAULT_EXPIRE_BATCH = 500;
@@ -131,12 +155,22 @@ function assertValidDate(value: unknown, what: string): asserts value is Date {
   }
 }
 
+const CURSOR_TIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function assertValidCursor(cursor: ExpireDueCursor): void {
+  if (!CURSOR_TIME.test(cursor.expiresAt) || !UUID.test(cursor.id)) {
+    throw new RangeError("after must be the nextCursor of a previous expireDue call");
+  }
+}
+
 @Injectable()
 export class ReservationsService {
   constructor(
     private readonly inventory: InventoryRepository,
     private readonly reservations: ReservationsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
+    @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
   /**
@@ -147,11 +181,21 @@ export class ReservationsService {
   async reserve(input: ReserveInput): Promise<ReserveResult> {
     assertValidDate(input.expiresAt, "expiresAt");
     return withTransaction(this.database, async (tx) => {
-      const variant = await this.reservations.findVariantForReservation(tx, input.variantId);
+      const variant = await this.reservations.findVariantForReservation(
+        tx,
+        input.variantId,
+        this.pricing.shopCurrency,
+      );
       if (variant === undefined) {
         return { ok: false, reason: "variant_not_found" };
       }
-      if (!variant.isActive || variant.productStatus !== "active") {
+      // The same rule the store lists by (core `isVariantSellable`): a line the shop never showed is not reservable.
+      const sellable = isVariantSellable({
+        productStatus: productStatusSchema.parse(variant.productStatus),
+        variantIsActive: variant.isActive,
+        hasShopPrice: variant.hasShopPrice,
+      });
+      if (!sellable) {
         return { ok: false, reason: "variant_not_sellable" };
       }
       const flags = {
@@ -263,9 +307,19 @@ export class ReservationsService {
     if (!Number.isInteger(limit) || limit < 1 || limit > MAX_EXPIRE_BATCH) {
       throw new RangeError(`limit must be a whole number from 1 to ${MAX_EXPIRE_BATCH}`);
     }
-    const ids = await this.reservations.listDueIds(this.database, now, limit);
-    const result: ExpireDueResult = { scanned: ids.length, expired: 0, skipped: 0, failures: [] };
-    for (const reservationId of ids) {
+    if (options.after !== undefined) {
+      assertValidCursor(options.after);
+    }
+    const due = await this.reservations.listDue(this.database, now, limit, options.after);
+    const last = due.at(-1);
+    const result: ExpireDueResult = {
+      scanned: due.length,
+      expired: 0,
+      skipped: 0,
+      failures: [],
+      nextCursor: due.length === limit && last !== undefined ? last : null,
+    };
+    for (const { id: reservationId } of due) {
       const outcome = await this.expireOne(reservationId, now);
       if (outcome === "expired") {
         result.expired += 1;

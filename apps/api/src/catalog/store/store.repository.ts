@@ -121,6 +121,8 @@ export class StoreRepository {
 
   /**
    * The store shows a product only if it has at least one sellable variant: active and priced in the shop currency.
+   * This is the SQL form of the core rule `isVariantSellable` (the product status is checked by the callers); keep the
+   * two in step. A spec compares them on every combination (`sellable-agreement.spec.ts`).
    * Used by the list (so `total` and the pages count only shown products) and by the detail (404 otherwise).
    */
   private hasSellableVariant(shopCurrency: string): SQL {

@@ -781,6 +781,88 @@ describe("pricing and inventory schema (real Postgres)", () => {
         expect(after.rows[0]).toEqual({ ...before.rows[0], actor_id: null });
       });
 
+      describe("changes at trigger depth above 1 (what only a referential action may do)", () => {
+        /**
+         * A helper function and a trigger on a temporary table, created inside the test transaction (the rollback
+         * of `afterEach` drops them): inserting into the probe table runs `assignments` as an UPDATE of the movement
+         * from a trigger body, so the append-only trigger sees `pg_trigger_depth()` of 2, like a foreign key action.
+         */
+        async function updateAtDepthTwo(movementId: string, assignments: string): Promise<void> {
+          await client.query(
+            `create function pg_temp.tamper_with_movement() returns trigger language plpgsql as $$
+             begin
+               update "stock_movement" set ${assignments} where id = '${movementId}';
+               return new;
+             end;
+             $$`,
+          );
+          await client.query("create temp table tamper_probe (id int)");
+          await client.query(
+            `create trigger tamper_probe_insert after insert on tamper_probe
+               for each row execute function pg_temp.tamper_with_movement()`,
+          );
+          await client.query("insert into tamper_probe (id) values (1)");
+        }
+
+        it("rejects an UPDATE that nulls actor_id and changes another column (R4)", async () => {
+          const variantId = await createVariant();
+          const userId = await createUser();
+          const movementId = await insertId(
+            "stock_movement",
+            movementRow(variantId, await defaultLocationId(), { actor_id: userId, delta: 5 }),
+          );
+          await expectViolation(
+            () => updateAtDepthTwo(movementId, "actor_id = NULL, delta = 6"),
+            RESTRICT_VIOLATION,
+            undefined,
+          );
+          await expectViolation(
+            () => updateAtDepthTwo(movementId, "actor_id = NULL, reason = 'edited'"),
+            RESTRICT_VIOLATION,
+            undefined,
+          );
+          const result = await client.query(
+            'select delta, reason, actor_id from "stock_movement" where id = $1',
+            [movementId],
+          );
+          expect(result.rows[0]).toEqual({ delta: 5, reason: null, actor_id: userId });
+        });
+
+        it("accepts an UPDATE that only nulls actor_id", async () => {
+          const variantId = await createVariant();
+          const userId = await createUser();
+          const movementId = await insertId(
+            "stock_movement",
+            movementRow(variantId, await defaultLocationId(), { actor_id: userId }),
+          );
+          await updateAtDepthTwo(movementId, "actor_id = NULL");
+          const result = await client.query(
+            'select delta, actor_id from "stock_movement" where id = $1',
+            [movementId],
+          );
+          expect(result.rows[0]).toEqual({ delta: 5, actor_id: null });
+        });
+
+        it("rejects an UPDATE of another column alone and one that sets actor_id to a value", async () => {
+          const variantId = await createVariant();
+          const userId = await createUser();
+          const movementId = await insertId(
+            "stock_movement",
+            movementRow(variantId, await defaultLocationId()),
+          );
+          await expectViolation(
+            () => updateAtDepthTwo(movementId, "reason = 'edited'"),
+            RESTRICT_VIOLATION,
+            undefined,
+          );
+          await expectViolation(
+            () => updateAtDepthTwo(movementId, `actor_id = '${userId}'`),
+            RESTRICT_VIOLATION,
+            undefined,
+          );
+        });
+      });
+
       it("still rejects a direct UPDATE that sets actor_id to a value", async () => {
         const variantId = await createVariant();
         const userId = await createUser();

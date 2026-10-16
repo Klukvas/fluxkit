@@ -7,6 +7,7 @@ export * from "./lifecycle.js";
 export * from "./limits.js";
 export * from "./product-option-change.js";
 export * from "./publish-timestamp.js";
+export * from "./sellable.js";
 export * from "./sku.js";
 export * from "./slug.js";
 export * from "./store-attributes.js";

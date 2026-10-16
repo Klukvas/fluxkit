@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_QUANTITY } from "../pricing/limits.js";
+import { MAX_RESERVED } from "./limits.js";
 import { availabilityOf } from "./availability.js";
 import type { Availability } from "./availability.js";
 import {
@@ -135,7 +136,7 @@ function runSequence(seed: number, steps: number): void {
       const kind: StockMovementKind = delta > 0 && random.chance(0.5) ? "receipt" : "adjustment";
       const result = decideAdjustment(level, { mode: "delta", delta, kind });
       const target = level.onHand + delta;
-      const expectedOk = delta !== 0 && target >= level.reserved;
+      const expectedOk = delta !== 0 && (delta > 0 || target >= level.reserved);
       expect(result.ok, context(step, "adjust delta")).toBe(expectedOk);
       if (result.ok) {
         level = result.level;
@@ -144,7 +145,8 @@ function runSequence(seed: number, steps: number): void {
     } else {
       const onHand = random.int(0, 15);
       const result = decideAdjustment(level, { mode: "setOnHand", onHand, kind: "adjustment" });
-      const expectedOk = onHand !== level.onHand && onHand >= level.reserved;
+      const expectedOk =
+        onHand !== level.onHand && (onHand > level.onHand || onHand >= level.reserved);
       expect(result.ok, context(step, "adjust set")).toBe(expectedOk);
       if (result.ok) {
         level = result.level;
@@ -191,6 +193,26 @@ describe("stock decisions: random operation sequences", () => {
   it("keep the invariants over 400 seeded sequences of 120 operations", () => {
     for (let seed = 1; seed <= 400; seed += 1) {
       runSequence(seed, 120);
+    }
+  });
+
+  it("keeps reserved within the stored bound for random quantities (R5)", () => {
+    const random = new Random(5);
+    const flags: StockFlags = { trackInventory: true, allowBackorder: true };
+    for (let round = 0; round < 2000; round += 1) {
+      const reserved = random.chance(0.5)
+        ? MAX_RESERVED - random.int(0, 2_000_000)
+        : random.int(0, 3_000_000_000);
+      const quantity = random.int(1, MAX_QUANTITY);
+      const result = decideReserve({ onHand: 0, reserved }, flags, quantity);
+      expect(result.ok, `reserved ${reserved} + ${quantity}`).toBe(
+        reserved + quantity <= MAX_RESERVED,
+      );
+      if (result.ok) {
+        expect(result.level.reserved).toBeLessThanOrEqual(MAX_RESERVED);
+      } else {
+        expect(result.reason).toBe("reserved_out_of_range");
+      }
     }
   });
 

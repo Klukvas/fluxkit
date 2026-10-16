@@ -175,12 +175,24 @@ export function compareMoney(left: Money, right: Money): CompareMoneyResult {
   return { ok: true, ordering };
 }
 
-/** The range is symmetric, so negating never leaves it. */
-export function negateMoney(money: Money): Money {
-  return build(-money.amount, money.currency);
+/** The range is symmetric, so negating a valid amount never leaves it; invalid money is a typed `invalid_money`. */
+export function negateMoney(money: Money): MoneyResult<"invalid_money"> {
+  if (!isValidMoney(money)) {
+    return fail("invalid_money");
+  }
+  return { ok: true, money: build(-money.amount, money.currency) };
 }
 
+/**
+ * A predicate has no room for a reason, and `false` would hide invalid money, so invalid money is a RangeError (a
+ * caller bug, as for a bad rounding mode). Functions that return a result use `invalid_money` instead.
+ */
 export function isZero(money: Money): boolean {
+  if (!isValidMoney(money)) {
+    throw new RangeError(
+      "isZero needs valid money: an integer amount within the limit and a supported currency",
+    );
+  }
   return money.amount === 0;
 }
 

@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
-import { product, reservation, variant } from "../../database/schema/index.js";
+import { price, product, reservation, variant } from "../../database/schema/index.js";
 
 export type ReservationRow = typeof reservation.$inferSelect;
 export type NewReservation = Pick<
@@ -15,19 +15,31 @@ export interface ReservableVariantRow {
   trackInventory: boolean;
   allowBackorder: boolean;
   productStatus: string;
+  /** The variant has a price in the shop currency (part of the sellable rule, `isVariantSellable`). */
+  hasShopPrice: boolean;
 }
+
+/** Keyset position in the due list: the last reservation looked at. Both fields come from `DueReservation`. */
+export interface DueCursor {
+  /** UTC ISO text with microseconds, as the database printed it. */
+  expiresAt: string;
+  id: string;
+}
+
+export type DueReservation = DueCursor;
 
 /** Queries only (Drizzle query builder, parameterized). Level and journal queries live in `InventoryRepository`. */
 @Injectable()
 export class ReservationsRepository {
   /**
-   * The variant with its product status, the variant row locked `FOR SHARE` until the transaction ends: a flag or
+   * The variant with its product status and whether it has a price in `shopCurrency`, the variant row locked `FOR SHARE` until the transaction ends: a flag or
    * activity change (which updates the variant row) waits for the reservation in progress instead of slipping in
    * between the read and the write, and deleting the variant waits too.
    */
   async findVariantForReservation(
     db: DbExecutor,
     variantId: string,
+    shopCurrency: string,
   ): Promise<ReservableVariantRow | undefined> {
     const [row] = await db
       .select({
@@ -36,6 +48,10 @@ export class ReservationsRepository {
         trackInventory: variant.trackInventory,
         allowBackorder: variant.allowBackorder,
         productStatus: product.status,
+        hasShopPrice: sql<boolean>`exists (
+          select 1 from ${price}
+          where ${price.variantId} = ${variant.id} and ${price.currency} = ${shopCurrency}
+        )`,
       })
       .from(variant)
       .innerJoin(product, eq(product.id, variant.productId))
@@ -83,14 +99,34 @@ export class ReservationsRepository {
     return row;
   }
 
-  /** Ids of active reservations due at `now` (`expires_at <= now`), oldest first. Uses `reservation_status_expires_at_idx`. */
-  async listDueIds(db: DbExecutor, now: Date, limit: number): Promise<string[]> {
-    const rows = await db
-      .select({ id: reservation.id })
+  /**
+   * Active reservations due at `now` (`expires_at <= now`), ordered by `(expires_at, id)`, at most `limit`, strictly
+   * after the keyset cursor `after` when given. Uses `reservation_status_expires_at_idx`. `expiresAt` of each row is
+   * returned as text with microseconds (UTC ISO form) so a cursor built from it compares exactly: a JavaScript `Date`
+   * has milliseconds only and could name the same row again.
+   */
+  async listDue(
+    db: DbExecutor,
+    now: Date,
+    limit: number,
+    after: DueCursor | undefined,
+  ): Promise<DueReservation[]> {
+    return db
+      .select({
+        id: reservation.id,
+        expiresAt: sql<string>`to_char(${reservation.expiresAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+      })
       .from(reservation)
-      .where(and(eq(reservation.status, "active"), lte(reservation.expiresAt, now)))
+      .where(
+        and(
+          eq(reservation.status, "active"),
+          lte(reservation.expiresAt, now),
+          after === undefined
+            ? undefined
+            : sql`(${reservation.expiresAt}, ${reservation.id}) > (${after.expiresAt}::timestamptz, ${after.id}::uuid)`,
+        ),
+      )
       .orderBy(asc(reservation.expiresAt), asc(reservation.id))
       .limit(limit);
-    return rows.map((row) => row.id);
   }
 }

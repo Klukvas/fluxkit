@@ -8,7 +8,7 @@ import {
   decideRelease,
   decideReserve,
 } from "./decisions.js";
-import { MAX_ON_HAND } from "./limits.js";
+import { MAX_ON_HAND, MAX_RESERVED } from "./limits.js";
 
 const tracked = { trackInventory: true, allowBackorder: false } as const;
 const backorder = { trackInventory: true, allowBackorder: true } as const;
@@ -51,6 +51,21 @@ describe("decideReserve", () => {
     expect(decideReserve(level(1, 1), backorder, 4)).toMatchObject({
       ok: true,
       level: { onHand: 1, reserved: 5 },
+    });
+  });
+
+  it("refuses a reserved total above the stored limit, also with backorder (R5)", () => {
+    expect(decideReserve(level(0, 2_147_000_000), backorder, 1_000_000)).toEqual({
+      ok: false,
+      reason: "reserved_out_of_range",
+    });
+    expect(decideReserve(level(0, MAX_RESERVED - 1), backorder, 1)).toMatchObject({
+      ok: true,
+      level: { onHand: 0, reserved: MAX_RESERVED },
+    });
+    expect(decideReserve(level(0, MAX_RESERVED), backorder, 1)).toEqual({
+      ok: false,
+      reason: "reserved_out_of_range",
     });
   });
 
@@ -228,7 +243,7 @@ describe("decideAdjustment", () => {
     ).toEqual({ ok: false, reason: "negative_on_hand" });
   });
 
-  it("refuses a result below reserved", () => {
+  it("refuses a change that lowers on hand below reserved", () => {
     expect(
       decideAdjustment(level(10, 6), { mode: "delta", delta: -5, kind: "adjustment" }),
     ).toEqual({ ok: false, reason: "below_reserved" });
@@ -238,6 +253,27 @@ describe("decideAdjustment", () => {
     expect(
       decideAdjustment(level(10, 6), { mode: "delta", delta: -4, kind: "adjustment" }).ok,
     ).toBe(true);
+    // Already backordered: lowering on hand further is still refused.
+    expect(
+      decideAdjustment(level(3, 10), { mode: "delta", delta: -1, kind: "adjustment" }),
+    ).toEqual({ ok: false, reason: "below_reserved" });
+    expect(
+      decideAdjustment(level(3, 10), { mode: "setOnHand", onHand: 2, kind: "adjustment" }),
+    ).toEqual({ ok: false, reason: "below_reserved" });
+  });
+
+  it("allows a change that raises on hand even while the result stays below reserved (R1)", () => {
+    expect(decideAdjustment(level(0, 10), { mode: "delta", delta: 5, kind: "receipt" })).toEqual({
+      ok: true,
+      level: { onHand: 5, reserved: 10 },
+      movement: { kind: "receipt", delta: 5, onHandAfter: 5 },
+    });
+    expect(
+      decideAdjustment(level(2, 10), { mode: "setOnHand", onHand: 4, kind: "adjustment" }).ok,
+    ).toBe(true);
+    expect(decideAdjustment(level(0, 10), { mode: "delta", delta: 1, kind: "return" }).ok).toBe(
+      true,
+    );
   });
 
   it("refuses a change of zero (the journal never holds a zero delta)", () => {
@@ -296,5 +332,49 @@ describe("decideAdjustment", () => {
     expect(decideAdjustment(level(0, 0), { mode: "delta", delta: 4, kind: "receipt" }).ok).toBe(
       true,
     );
+  });
+});
+
+describe("backorder fulfilment flow (R1)", () => {
+  it("reserves beyond stock, takes partial receipts and commits reservation by reservation", () => {
+    let current = { onHand: 0, reserved: 0 };
+    for (const quantity of [4, 4, 2]) {
+      const reserved = decideReserve(current, backorder, quantity);
+      if (!reserved.ok) {
+        throw new Error("reserve refused");
+      }
+      current = reserved.level;
+    }
+    expect(current).toEqual({ onHand: 0, reserved: 10 });
+    const active = (quantity: number) => ({ quantity, status: "active" as const });
+
+    const receive = (delta: number) => {
+      const result = decideAdjustment(current, { mode: "delta", delta, kind: "receipt" });
+      if (!result.ok) {
+        throw new Error(`receipt refused: ${result.reason}`);
+      }
+      current = result.level;
+    };
+    const commit = (quantity: number) => {
+      const result = decideCommit(current, active(quantity));
+      if (!result.ok) {
+        return result.reason;
+      }
+      current = result.level;
+      return "committed";
+    };
+
+    expect(commit(4)).toBe("insufficient_stock");
+    receive(3);
+    expect(current).toEqual({ onHand: 3, reserved: 10 });
+    expect(commit(4)).toBe("insufficient_stock");
+    receive(2);
+    expect(commit(4)).toBe("committed");
+    expect(current).toEqual({ onHand: 1, reserved: 6 });
+    expect(commit(4)).toBe("insufficient_stock");
+    receive(5);
+    expect(commit(4)).toBe("committed");
+    expect(commit(2)).toBe("committed");
+    expect(current).toEqual({ onHand: 0, reserved: 0 });
   });
 });

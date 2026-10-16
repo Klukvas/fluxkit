@@ -309,7 +309,7 @@ export class VariantsService {
     }
   }
 
-  /** Hard delete (core `canDeleteVariant`): draft products only, never the last or the default variant. */
+  /** Hard delete (core `canDeleteVariant`): draft products only, never the last or the default variant, never one with stock history (ADR 0013). */
   async delete(productId: string, variantId: string): Promise<void> {
     try {
       await withTransaction(this.database, async (tx) => {
@@ -321,6 +321,7 @@ export class VariantsService {
             productStatus: toStatus(product),
             isDefault: current.isDefault,
             variantCount: all.length,
+            hasStockHistory: await this.variants.hasStockHistory(tx, variantId),
           }),
           "This variant cannot be deleted; switch it off instead.",
         );
