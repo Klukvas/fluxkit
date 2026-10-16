@@ -22,6 +22,13 @@
       "when": 1792078437735,
       "tag": "0002_admin_auth",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792145613200,
+      "tag": "0003_pricing_inventory",
+      "breakpoints": true
     }
   ]
 }
