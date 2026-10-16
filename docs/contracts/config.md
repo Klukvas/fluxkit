@@ -15,6 +15,9 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 | `ADMIN_COOKIE_SECURE` | no | `true` | `Secure` flag of the admin session cookie. Exactly `true` or `false` (anything else, including an empty value, fails startup); `false` only for local plain-HTTP development |
 | `ADMIN_SESSION_IDLE_MINUTES` | no | `720` | Admin session ends after this many idle minutes. Positive whole number, at most 525 600 (one year) |
 | `ADMIN_SESSION_MAX_HOURS` | no | `168` | Absolute admin session lifetime in hours, even when used continuously. Positive whole number, at most 8 760 (one year) |
+| `SHOP_CURRENCY` | no | `UAH` | The one currency the shop sells in. Exactly one of `UAH`, `USD`, `EUR`, `PLN`, `GBP`, `CZK`, `CHF`, `CAD`, `JPY`, `KWD` (upper case, the table of `@fluxkit/core`); anything else, including a lower-case code or an empty value, fails startup. An active variant needs a price in this currency to be published or switched on; prices in other currencies may be stored but are never sold or converted |
+| `PRICES_INCLUDE_TAX` | no | `true` | Whether stored prices already include tax. Exactly `true` or `false`. Only a flag for the storefront: no tax is calculated |
+| `LOW_STOCK_THRESHOLD` | no | `5` | Available quantity at or below which (and above 0) a tracked variant is `low_stock`. Whole number from 0 to 1 000 000 000, digits only. Read by the API now, used by the store API in a later pricing step |
 
 Invalid values fail startup with a readable `Invalid environment: ...` error.
 

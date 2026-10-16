@@ -21,6 +21,28 @@ export const DEFAULT_ADMIN_SESSION_MAX_HOURS = 168;
 const MAX_ADMIN_SESSION_IDLE_MINUTES = 525_600;
 const MAX_ADMIN_SESSION_MAX_HOURS = 8_760;
 
+/**
+ * Defaults of the pricing variables, and the currencies a shop can sell in. The list equals `CURRENCY_CODES` of
+ * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so it is repeated here.
+ */
+export const DEFAULT_SHOP_CURRENCY = "UAH";
+export const DEFAULT_PRICES_INCLUDE_TAX = true;
+export const DEFAULT_LOW_STOCK_THRESHOLD = 5;
+export const SUPPORTED_SHOP_CURRENCIES: readonly string[] = [
+  "UAH",
+  "USD",
+  "EUR",
+  "PLN",
+  "GBP",
+  "CZK",
+  "CHF",
+  "CAD",
+  "JPY",
+  "KWD",
+];
+/** Same bound as the largest on-hand quantity of `@fluxkit/core`: a larger threshold is a typo, not a policy. */
+const MAX_LOW_STOCK_THRESHOLD = 1_000_000_000;
+
 /** Exactly `true` or `false`: a typo in a security flag must fail loudly, not fall back to a default. */
 const strictBoolean = z.enum(["true", "false"]).transform((value) => value === "true");
 
@@ -29,6 +51,15 @@ function positiveInteger(max: number) {
   return z
     .string()
     .regex(/^[1-9][0-9]*$/, "must be a positive whole number")
+    .transform(Number)
+    .pipe(z.number().max(max, `must be at most ${max}`));
+}
+
+/** Plain decimal digits only (no sign, exponent, hex, spaces, decimals or leading zeros), within 0..max. */
+function nonNegativeInteger(max: number) {
+  return z
+    .string()
+    .regex(/^(0|[1-9][0-9]*)$/, "must be a non-negative whole number")
     .transform(Number)
     .pipe(z.number().max(max, `must be at most ${max}`));
 }
@@ -52,6 +83,16 @@ const envSchema = z
     ),
     ADMIN_SESSION_MAX_HOURS: positiveInteger(MAX_ADMIN_SESSION_MAX_HOURS).default(
       DEFAULT_ADMIN_SESSION_MAX_HOURS,
+    ),
+    SHOP_CURRENCY: z
+      .string()
+      .refine((value) => SUPPORTED_SHOP_CURRENCIES.includes(value), {
+        message: `must be one of ${SUPPORTED_SHOP_CURRENCIES.join(", ")} (upper case, exact)`,
+      })
+      .default(DEFAULT_SHOP_CURRENCY),
+    PRICES_INCLUDE_TAX: strictBoolean.default(DEFAULT_PRICES_INCLUDE_TAX),
+    LOW_STOCK_THRESHOLD: nonNegativeInteger(MAX_LOW_STOCK_THRESHOLD).default(
+      DEFAULT_LOW_STOCK_THRESHOLD,
     ),
   })
   .superRefine((env, context) => {
@@ -87,6 +128,12 @@ export interface AppEnv {
   adminSessionIdleMinutes: number;
   /** Absolute admin session lifetime in hours. */
   adminSessionMaxHours: number;
+  /** The one currency the shop sells in (ISO 4217, upper case). An active variant needs a price in it. */
+  shopCurrency: string;
+  /** Whether stored prices already include tax; only exposed to the storefront, no tax is calculated. */
+  pricesIncludeTax: boolean;
+  /** `low_stock` when the available quantity is above 0 and at most this many. */
+  lowStockThreshold: number;
 }
 
 /** Validates and normalizes process environment variables. Throws with a readable message on invalid input. */
@@ -110,5 +157,8 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     adminCookieSecure: env.ADMIN_COOKIE_SECURE,
     adminSessionIdleMinutes: env.ADMIN_SESSION_IDLE_MINUTES,
     adminSessionMaxHours: env.ADMIN_SESSION_MAX_HOURS,
+    shopCurrency: env.SHOP_CURRENCY,
+    pricesIncludeTax: env.PRICES_INCLUDE_TAX,
+    lowStockThreshold: env.LOW_STOCK_THRESHOLD,
   };
 }
