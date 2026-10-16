@@ -15,3 +15,4 @@
 | [0009](0009-admin-auth.md) | Admin authentication and roles | accepted (2026-10-16, owner decisions) |
 | [0010](0010-admin-lockout-and-recovery.md) | Admin lockout, recovery and the limits of the session design | accepted (2026-10-16, owner decision); extends ADR 0009 |
 | [0011](0011-money-and-stock-model.md) | Money and stock model | accepted (2026-10-16, owner decisions); refines the money and inventory parts of ADR 0004 |
+| [0012](0012-pricing-inventory-schema.md) | Pricing and inventory schema: journal deletion, SET NULL and cascades | accepted (2026-10-16); implements the data part of ADR 0011 |
