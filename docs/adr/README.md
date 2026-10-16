@@ -14,3 +14,4 @@
 | [0008](0008-generated-variants-of-live-products.md) | Generated variants of live products | accepted (2026-10-16); extends ADR 0006 sections 4 and 6 |
 | [0009](0009-admin-auth.md) | Admin authentication and roles | accepted (2026-10-16, owner decisions) |
 | [0010](0010-admin-lockout-and-recovery.md) | Admin lockout, recovery and the limits of the session design | accepted (2026-10-16, owner decision); extends ADR 0009 |
+| [0011](0011-money-and-stock-model.md) | Money and stock model | accepted (2026-10-16, owner decisions); refines the money and inventory parts of ADR 0004 |

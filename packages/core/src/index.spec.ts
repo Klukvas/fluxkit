@@ -38,6 +38,18 @@ describe("public entry point", () => {
       "registerFailedLogin",
       "evaluateSession",
       "decideUserChange",
+      "isSupportedCurrency",
+      "exponentOf",
+      "createMoney",
+      "addMoney",
+      "subtractMoney",
+      "multiplyByQuantity",
+      "compareMoney",
+      "negateMoney",
+      "isZero",
+      "percentageOf",
+      "toDecimalString",
+      "parseDecimalString",
     ] as const;
     for (const name of functions) {
       expect(typeof core[name], name).toBe("function");
@@ -47,5 +59,8 @@ describe("public entry point", () => {
   it("exports the limits", () => {
     expect(core.CATALOG_LIMITS.maxVariantsPerProduct).toBe(250);
     expect(core.TEXT_LIMITS.sku).toBe(64);
+    expect(core.MAX_AMOUNT).toBe(1_000_000_000_000);
+    expect(core.MAX_QUANTITY).toBe(1_000_000);
+    expect(core.CURRENCIES.UAH).toBe(2);
   });
 });
