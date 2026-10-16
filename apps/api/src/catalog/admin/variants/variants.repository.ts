@@ -142,6 +142,32 @@ export class VariantsRepository {
     return row.found;
   }
 
+  /**
+   * Whether any variant of the product has stock history (ADR 0014), in one query. All variants of the product are
+   * locked `FOR NO KEY UPDATE` first, in id order, so a reservation in progress (variant `FOR SHARE`) commits before
+   * the history is read. Same lock order as `hasStockHistory`: the caller holds the product lock, then variants; no
+   * cycle with stock writes (product -> level) or reservations (variant -> level).
+   */
+  async anyHasStockHistory(db: DbExecutor, productId: string): Promise<boolean> {
+    await db
+      .select({ id: variant.id })
+      .from(variant)
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(variant.id))
+      .for("no key update");
+    const result = await db.execute<{ found: boolean }>(
+      sql`select (exists (select 1 from ${stockMovement} join ${variant} on ${variant.id} = ${stockMovement.variantId}
+                          where ${variant.productId} = ${productId})
+               or exists (select 1 from ${reservation} join ${variant} on ${variant.id} = ${reservation.variantId}
+                          where ${variant.productId} = ${productId})) as found`,
+    );
+    const row = result.rows[0];
+    if (row === undefined) {
+      throw new Error("The stock history query returned no row.");
+    }
+    return row.found;
+  }
+
   async delete(db: DbExecutor, id: string): Promise<void> {
     await db.delete(variant).where(eq(variant.id, id));
   }
