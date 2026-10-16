@@ -32,6 +32,7 @@ Notes:
 - **Actor.** `actorId` is the admin user of the session. If that user is deleted later the journal row stays and `actorId` becomes `null` (ADR 0012). A change made by the system without an admin user (the demo seed, `InventoryService.adjust(..., null)`) has `actorId` `null` from the start; no HTTP route can do that.
 - **Deleting a product** that was never published removes its levels, journal and reservations with its variants (cascade, ADR 0012).
 - **Deleting a variant** with any journal or reservation row is refused (`409 rule_violation` `has_stock_history`, ADR 0013): switch it off instead. A variant with only prices or an empty level can still be deleted.
+- **Changing the options** of a draft product (`PUT /admin/products/{id}/options`) in a way that rebuilds all variants (adds or removes an option, removes a value) is refused with `has_stock_history` while any variant of the product has a journal or reservation row (ADR 0014). Adding values and reordering keep working.
 
 ## Reservation domain service (no HTTP route)
 
