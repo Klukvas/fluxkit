@@ -109,9 +109,10 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `admin/inventory.service.ts` - the adjustment transaction (product row lock, level row lock, core `decideAdjustment`, level update, journal row; a refusal throws and rolls back; `actorId` may be `null` for a system change such as the demo seed) and the reads. Maps core refusals: bad numbers to 400, stock rules to 409 `rule_violation`.
 - `admin/inventory.schemas.ts`, `admin/inventory.mapper.ts` - request and response shapes (structure only; the mapper refuses stored values outside the supported range).
 - `admin/locations.controller.ts`, `admin/locations.schemas.ts` - `GET /admin/locations` (read only).
-- `reservations/reservations.service.ts` - `ReservationsService`: `reserve`, `release`, `commit`, `expireDue(now)`; one transaction each, level row lock first, core decisions, typed refusals. No HTTP route. Must NOT read the clock or implement a stock rule.
-- `reservations/reservations.repository.ts` - reservation queries (`findVariantForReservation` locks the variant row `FOR SHARE`, `lock`, `setStatus`, `listDueIds`).
+- `reservations/reservations.service.ts` - `ReservationsService`: `reserve`, `release`, `commit`, `expireDue(now, {limit, after})` with a keyset cursor; one transaction each, level row lock first, core decisions, typed refusals. No HTTP route. Must NOT read the clock or implement a stock rule.
+- `reservations/reservations.repository.ts` - reservation queries (`findVariantForReservation` locks the variant row `FOR SHARE` and reads the shop-currency price fact, `lock`, `setStatus`, `listDue` ordered by `(expires_at, id)` with a keyset cursor).
 - `admin/inventory.spec.ts`, `admin/inventory-auth.spec.ts`, `admin/locations.spec.ts` - HTTP tests on real Postgres: flags, refusals, journal content and actor, pagination, locks, parallel adjustments and first receipts, permissions, cascade on product delete.
+- `reservations/sellable-agreement.spec.ts` - the store detail and `reserve` against core `isVariantSellable` on every combination of product status, variant activity and shop price.
 - `reservations/reservations.spec.ts`, `reservations/reservations-concurrency.spec.ts` - service tests on real Postgres: every refusal, backorder, expiry batches, and parallel reservations, commits, releases and sweeps with the invariants checked after each round.
 - `inventory-journal.spec.ts` - no source file updates or deletes `stock_movement` and the repository is the only writer.
 
@@ -163,7 +164,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.
 - `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204); sends `X-Fluxkit-CSRF: 1` and a JSON content type by default, with `csrf: false` / `contentType` / `headers` to override.
 - `pricing-fixtures.ts` - TEST ONLY: `priceProductVariants` gives every variant of a product a shop-currency price straight in the table, so specs of other features can publish products without using the price endpoints; `startApp({ shopCurrency })` runs the app with another shop currency.
-- `inventory-fixtures.ts` - TEST ONLY: a real admin user row and an authenticator for it (the default test principal is not a row, and `stock_movement.actor_id` is a foreign key), the default and extra locations, level and journal readers, `expectJournalReplays` and `expectWaitsForLevelLock`.
+- `inventory-fixtures.ts` - TEST ONLY: a real admin user row and an authenticator for it (the default test principal is not a row, and `stock_movement.actor_id` is a foreign key), the default and extra locations, level and journal readers, `expectJournalReplays`, `expectWaitsForLevelLock` and `expectWaitsForVariantLock`.
 - `stock-world.ts` - TEST ONLY: `StockWorld` builds published, priced, stocked variants through the admin API; `expectLevelInvariants` checks `reserved` against the active reservations.
 - `catalog-fixtures.ts` - catalog fixtures through the real admin routes, `expectVariantInvariants`, and the product-lock wait check.
 - `fixtures/features/sample/` - sample feature package used by the core feature-loader tests.
