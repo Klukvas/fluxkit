@@ -110,7 +110,15 @@ describe("logout, me and change-password", () => {
       const promoted = await call("GET", "/admin/auth/me", cookie);
       expect(promoted.body).toMatchObject({
         user: { role: "manager" },
-        permissions: ["catalog.read", "catalog.write", "catalog.publish"],
+        permissions: [
+          "catalog.read",
+          "catalog.write",
+          "catalog.publish",
+          "orders.read",
+          "orders.write",
+          "customers.read",
+          "customers.write",
+        ],
       });
       await db.update(adminUser).set({ isActive: false }).where(eq(adminUser.id, user.id));
       expect((await call("GET", "/admin/auth/me", cookie)).status).toBe(401);

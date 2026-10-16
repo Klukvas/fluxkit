@@ -98,7 +98,15 @@ describe("admin sessions end to end (real SessionAdminAuthenticator, real Postgr
       userId: user.id,
       email: user.email,
       role: "manager",
-      permissions: ["catalog.read", "catalog.write", "catalog.publish"],
+      permissions: [
+        "catalog.read",
+        "catalog.write",
+        "catalog.publish",
+        "orders.read",
+        "orders.write",
+        "customers.read",
+        "customers.write",
+      ],
     });
     expect(result.body.sessionId).toMatch(/^[0-9a-f-]{36}$/);
     expect(JSON.stringify(result.body)).not.toContain("passwordHash");
