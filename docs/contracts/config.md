@@ -18,6 +18,8 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 
 Invalid values fail startup with a readable `Invalid environment: ...` error.
 
+`pnpm db:migrate` reads only `DATABASE_URL` (through `loadEnv`, like the other commands; no default, a missing value fails with exit code 1) and takes no arguments. It applies the migrations of `apps/api/drizzle/` forward only and never rolls back (rollbacks are the manual `drizzle/NNNN_name.down.sql` scripts). Details: `README.md` (Database migrations).
+
 `pnpm admin:create` reads the same file and `DATABASE_URL` (and the locale variables) through `loadEnv`, plus one variable that only that command reads: `ADMIN_PASSWORD`, the password of the user to create (12 to 128 characters). It is not a setting of the API and is deliberately absent from `.env.example`: pass it for one command (`ADMIN_PASSWORD=... pnpm admin:create --email ...`) or type the password at the prompt instead; do not store it in `.env`. Details: `README.md` (Admin sign-in).
 
 ## Feature package contract

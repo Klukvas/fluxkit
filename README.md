@@ -42,6 +42,7 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --wait
 docker compose --env-file .env -f infra/docker-compose.yml exec postgres createdb -U fluxkit fluxkit_test
 
 pnpm build
+pnpm db:migrate                         # applies the pending migrations to DATABASE_URL (forward only, safe to repeat), see Database migrations
 pnpm seed                               # optional: demo catalog (needs a migrated database, see seeds/README.md)
 pnpm admin:create --email you@example.com   # first owner (needs a migrated database); asks for the password, see Admin sign-in
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
@@ -62,6 +63,18 @@ Use a subshell so the test variables do not leak into your terminal: Node's `--e
 )
 ```
 
+## Database migrations
+
+```bash
+pnpm db:migrate     # = pnpm build && pnpm --filter @fluxkit/api db:migrate (node dist/database/migrate.js)
+```
+
+- Applies every pending migration of `apps/api/drizzle/` to `DATABASE_URL` (from `.env`) in journal order, with the Drizzle migrator. It prints the database name (never the user, password or host), then the applied migrations (`0000_health_check`, ...) or `Database is up to date (N migrations)`. Running it again applies nothing.
+- It takes no arguments: anything after the script name reaches the command as it is and is rejected (do not add `--`). Exit code 1 means nothing was applied or the failed migration was rolled back by the migrator (all pending migrations run in one transaction); the error is printed in full, with connection strings and passwords removed.
+- Forward only: this command never rolls back, drops or deletes. A rollback is manual: run the hand-written `apps/api/drizzle/NNNN_name.down.sql` of the newest migration against the database (see `docs/HANDOFF.md`, schema changes).
+- Safe for production and for several instances starting together: a Postgres advisory lock (key `7426002`) lets one instance migrate while the others wait and then find nothing to do. If the database holds a migration newer than every entry of the journal (the code is older than the database), the command refuses with exit code 1 and changes nothing.
+- Not for the `_test` database that `pnpm test` uses: the tests migrate it themselves.
+
 ## Admin sign-in
 
 Every `/admin` route needs a signed-in user. There is no sign-up and no default account: the first owner is created with the command line, then signs in with `POST /admin/auth/login` (`docs/api/auth.md`).
@@ -73,7 +86,7 @@ ADMIN_PASSWORD='a long password' pnpm admin:create --email you@example.com --rol
 
 - Options: `--email` (required) and `--role` (`owner`, `manager` or `viewer`; default `owner`). Arguments after the script name reach the command as they are; do not add `--` (it is rejected as an unknown argument).
 - The password comes from `ADMIN_PASSWORD` or the prompt, 12 to 128 characters. A `--password` argument is refused on purpose: command-line arguments leak through the process list and shell history. Without `ADMIN_PASSWORD` and without a terminal the command fails.
-- The command only creates. An email that already exists is refused and left untouched; it never changes a password or a role. It prints `Created owner you@example.com (id ...)` and never the password. The database must be migrated first (same as `pnpm seed`) and `DATABASE_URL` comes from `.env`.
+- The command only creates. An email that already exists is refused and left untouched; it never changes a password or a role. It prints `Created owner you@example.com (id ...)` and never the password. The database must be migrated first with `pnpm db:migrate` (same as `pnpm seed`) and `DATABASE_URL` comes from `.env`.
 - For plain-HTTP local development set `ADMIN_COOKIE_SECURE=false`; the default is a `Secure` cookie, which is meant for HTTPS. Every state-changing request must carry the header `X-Fluxkit-CSRF: 1`.
 
 | Role | Can do |
@@ -150,6 +163,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Independent review of the auth plan (step 5), then the next domain plan: pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), a `db:migrate` script, auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
+2. Independent review of the auth plan (step 5), then the next domain plan: pricing pipeline, inventory, cart, checkout, orders (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
 3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.

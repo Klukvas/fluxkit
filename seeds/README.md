@@ -18,11 +18,11 @@ This package only describes data (TypeScript objects, no runtime dependencies, t
 
 ## Run it
 
-The database must be migrated first. There is no root migration script yet: apply the migrations in `apps/api/drizzle/` with the Drizzle migrator
-(the integration tests do this in `apps/api/src/test/migrate.ts`; a `db:migrate` script is a later task).
+The database must be migrated first with `pnpm db:migrate` (applies the migrations in `apps/api/drizzle/`, forward only; see `README.md`, Database migrations).
 
 ```bash
-cp .env.example .env     # DATABASE_URL must point at a migrated database
+cp .env.example .env     # DATABASE_URL must point at the database you migrate and seed
+pnpm db:migrate          # = pnpm build && pnpm --filter @fluxkit/api db:migrate
 pnpm seed                # = pnpm build && pnpm --filter @fluxkit/api seed (node dist/seed/seed.js, no ts-node)
 ```
 

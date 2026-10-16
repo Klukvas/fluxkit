@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (auth plan complete, review fixes in PR).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-16 (`pnpm db:migrate` added; auth plan complete, review fixes in PR).
 
 ## Where we are
 
@@ -23,7 +23,7 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 ## Next steps (in order)
 
 1. Auth and roles: merge the review-fix PR (`fix/auth-review-hardening`). First owner: `pnpm admin:create --email <address>`; locked out: `pnpm admin:unlock --email <address>` (README, Admin sign-in; ADR 0010). Auth follow-ups (each needs its own plan): decide whether Swagger UI and `/docs-json` stay public in production, audit log, `trust proxy`, session token rotation, Redis-backed login throttle, two-factor, password reset by email, customer accounts.
-2. Small follow-up: a `db:migrate` script (there is none; the tests migrate through `apps/api/src/test/migrate.ts`; `pnpm seed` and `pnpm admin:create` need a migrated database).
+2. `pnpm db:migrate` exists (forward only; rollbacks stay manual through `drizzle/NNNN_name.down.sql`; no status or rollback command yet). `pnpm seed` and `pnpm admin:create` need a database migrated with it.
 3. Launch blockers: rate limiting on `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; `trust proxy` for the login IP limit behind a proxy.
 4. Smaller follow-ups from the review: C5 (attribute and product-type facts read without a lock that value writes also take); tests for the surviving mutations (variant `position`, store `optionValues` order, SKU prefix truncation for long slugs); `variant.title` column that no route writes; the public attribute definition gets its display name in the serializer, not in core; `requiredText` in the store serializer still degrades a missing required title to `""` with a warning.
 5. Next domain plan (the auth plan and its review are complete): pricing and inventory (money logic is TDD), or search indexing (blocked by the open decisions in ADR 0005). Ask the owner which comes first.
