@@ -1,8 +1,8 @@
 # API: pricing
 
-Admin price endpoints (`/admin/products/...`). Model and decisions: `docs/adr/0011-money-and-prices.md`, `docs/adr/0012-pricing-inventory-schema.md`, plan `docs/plans/2026-10-16-pricing-and-inventory.md`.
+Admin price endpoints (`/admin/products/...`). Model and decisions: `docs/adr/0011-money-and-stock-model.md`, `docs/adr/0012-pricing-inventory-schema.md`, plan `docs/plans/2026-10-16-pricing-and-inventory.md`.
 Conventions shared with the catalog (session cookie, CSRF header, problem+json, ids, timestamps): `docs/api/catalog.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: prices are core.
-Inventory and stock endpoints, and the price and availability fields of the store API, are later steps of the plan and are not documented here (they do not exist yet).
+Inventory, stock flags, locations and the reservation service are in `docs/api/inventory.md`. The price and availability fields of the store API are a later step of the plan and are not documented here (they do not exist yet).
 
 ## Money in the API
 

@@ -3,7 +3,7 @@
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
 - `src/app.factory.ts` - `createApp` (loads features, passes the admin session settings, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
-- `src/app.module.ts` - root module; composes database, auth, common, health, catalog and dynamically loaded feature modules. Must not import features statically.
+- `src/app.module.ts` - root module; composes database, auth, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
 
@@ -66,6 +66,7 @@
 - `shared/code-schemas.ts` - zod schemas for codes (`code`, value code) and the limits they use.
 - `shared/i18n-validation.ts` - zod schema for i18n texts that calls core `validateI18nText` with the configured locales.
 - `shared/rules.ts` - `assertAllowed`: turns a rejected core decision into `409 rule_violation` with the core reason as `rule`.
+- `shared/stock-flags.ts` - `initialStockFlags(requiresShipping)`: the stock flags a new variant starts with (untracked for a product type that does not ship). Must NOT decide stock rules.
 - `shared/text.ts` - `emptyToNull` for text maps; `isDatabaseSafeText` (zod refinement over core `hasJsonbUnsafeCharacters`: NUL and unpaired surrogates) for free-text columns.
 - `shared/retry.ts` - `retryLostRaces` and `ProposalLog`: run a whole transaction again when a slug or SKU the service proposed lost a race; stops with 409 when a round proposes what the previous round did. Never use it for a value the client sent.
 
@@ -80,9 +81,9 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `categories/` - `/admin/categories` and `POST .../move`; depth, cycles and the tree-wide advisory lock on move.
 - `products/` - `/admin/products` CRUD, lifecycle (`publish`, `unpublish`, `archive`, `restore`), `PUT .../categories`, `PUT .../media`; publish preconditions from core. `products.schemas.ts` holds the caps for categories and media.
 - `product-options/` - `PUT /admin/products/{id}/options` and `POST .../options/{optionId}/values`; draft-only replacement, frozen options after publish.
-- `variants/` - `/admin/products/{id}/variants` (list, create, get, patch, delete) and `POST .../variants/generate`; `variant-generation.service.ts` runs core `generateVariants` and retries proposed SKU collisions (never client-sent SKUs). Switching a variant on in an active product also needs a shop-currency price (core `price_missing`, only for the activated variant).
+- `variants/` - `/admin/products/{id}/variants` (list, create, get, patch, delete) and `POST .../variants/generate`; `variant-generation.service.ts` runs core `generateVariants` and retries proposed SKU collisions (never client-sent SKUs). Switching a variant on in an active product also needs a shop-currency price (core `price_missing`, only for the activated variant). Variant create and patch also take the stock flags `trackInventory` and `allowBackorder`; generated variants of a product type that does not ship start untracked.
 - `prices/` - admin price endpoints (`docs/api/pricing.md`): `prices.controller.ts` (`GET|PUT|DELETE .../variants/{variantId}/prices[/{currency}]`, bulk `PUT /admin/products/{id}/prices`; HTTP only), `prices.service.ts` (core `validatePrice`, product row lock, the `last_shop_price` delete rule, all-or-nothing bulk; no money arithmetic), `prices.repository.ts` (`price` table queries, one-statement upsert), `prices.schemas.ts` (structure only, the 500-item bulk cap), `prices.mapper.ts` (row to money shape; `toSafeAmount` refuses a `bigint` outside the amount range), `prices.spec.ts` and `prices-auth.spec.ts` (HTTP tests on real Postgres). Must NOT sell, convert or compute totals.
-- `products/products.repository.ts` also answers the publish price fact (`findVariantIdsWithPrice`, one query per product); `products.mapper.ts` turns it into `hasShopPrice` for core.
+- `products/products.repository.ts` also answers `requiresShipping` (a product type that does not ship starts its variants untracked, `shared/stock-flags.ts` `initialStockFlags`) and the publish price fact (`findVariantIdsWithPrice`, one query per product); `products.mapper.ts` turns it into `hasShopPrice` for core.
 
 ### Store (`src/catalog/store/`)
 
@@ -96,6 +97,21 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `store-categories.ts` - builds the visible category tree (every ancestor active) and the subtree of a slug.
 - `store.repository.ts` - read-only Drizzle queries (batch loads, no N+1). Must not apply business rules beyond SQL filters (`status`, `is_active`).
 - `store.spec.ts` - HTTP tests: visibility, leaks of internal attributes, locale, pagination bounds, query counts.
+
+## Inventory (`src/inventory/`)
+
+Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.module.ts` wires the admin stock API and the reservation service and exports `ReservationsService` for the checkout plan. Stock rules live in `packages/core/src/inventory` (`decide*`, `availabilityOf`); nothing here duplicates them: the code feeds core the current level under a row lock and writes what it decides.
+
+- `inventory.repository.ts` - `inventory_level`, `location` and `stock_movement` queries: `lockLevel` (`SELECT ... FOR UPDATE`), `insertEmptyLevel` (`ON CONFLICT DO NOTHING`), `updateLevel`, `insertMovement` (append only; `created_at` from `clock_timestamp()` under the lock) and the paginated journal read. The only writer of the journal; it has no update or delete of it.
+- `admin/inventory.controller.ts` - `GET .../variants/{variantId}/inventory`, `POST .../inventory/adjustments`, `GET .../inventory/movements` (HTTP only; the acting admin comes from `@CurrentAdmin()`, never the body).
+- `admin/inventory.service.ts` - the adjustment transaction (product row lock, level row lock, core `decideAdjustment`, level update, journal row; a refusal throws and rolls back) and the reads. Maps core refusals: bad numbers to 400, stock rules to 409 `rule_violation`.
+- `admin/inventory.schemas.ts`, `admin/inventory.mapper.ts` - request and response shapes (structure only; the mapper refuses stored values outside the supported range).
+- `admin/locations.controller.ts`, `admin/locations.schemas.ts` - `GET /admin/locations` (read only).
+- `reservations/reservations.service.ts` - `ReservationsService`: `reserve`, `release`, `commit`, `expireDue(now)`; one transaction each, level row lock first, core decisions, typed refusals. No HTTP route. Must NOT read the clock or implement a stock rule.
+- `reservations/reservations.repository.ts` - reservation queries (`findVariantForReservation` locks the variant row `FOR SHARE`, `lock`, `setStatus`, `listDueIds`).
+- `admin/inventory.spec.ts`, `admin/inventory-auth.spec.ts`, `admin/locations.spec.ts` - HTTP tests on real Postgres: flags, refusals, journal content and actor, pagination, locks, parallel adjustments and first receipts, permissions, cascade on product delete.
+- `reservations/reservations.spec.ts`, `reservations/reservations-concurrency.spec.ts` - service tests on real Postgres: every refusal, backorder, expiry batches, and parallel reservations, commits, releases and sweeps with the invariants checked after each round.
+- `inventory-journal.spec.ts` - no source file updates or deletes `stock_movement` and the repository is the only writer.
 
 ## Database (`src/database/`)
 
@@ -145,6 +161,8 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.
 - `http.ts` - `http()` helper for specs (parsed JSON, `undefined` for 204); sends `X-Fluxkit-CSRF: 1` and a JSON content type by default, with `csrf: false` / `contentType` / `headers` to override.
 - `pricing-fixtures.ts` - TEST ONLY: `priceProductVariants` gives every variant of a product a shop-currency price straight in the table, so specs of other features can publish products without using the price endpoints; `startApp({ shopCurrency })` runs the app with another shop currency.
+- `inventory-fixtures.ts` - TEST ONLY: a real admin user row and an authenticator for it (the default test principal is not a row, and `stock_movement.actor_id` is a foreign key), the default and extra locations, level and journal readers, `expectJournalReplays` and `expectWaitsForLevelLock`.
+- `stock-world.ts` - TEST ONLY: `StockWorld` builds published, priced, stocked variants through the admin API; `expectLevelInvariants` checks `reserved` against the active reservations.
 - `catalog-fixtures.ts` - catalog fixtures through the real admin routes, `expectVariantInvariants`, and the product-lock wait check.
 - `fixtures/features/sample/` - sample feature package used by the core feature-loader tests.
 
