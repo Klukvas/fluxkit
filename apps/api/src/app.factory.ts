@@ -7,6 +7,7 @@ import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
 import type { Clock } from "./auth/clock.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
+import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
 import {
   DEFAULT_FEATURES_DIR,
   loadFeatures,
@@ -22,6 +23,9 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "adminCookieSecure"
       | "adminSessionIdleMinutes"
       | "adminSessionMaxHours"
+      | "shopCurrency"
+      | "pricesIncludeTax"
+      | "lowStockThreshold"
     >
   >;
 
@@ -52,6 +56,11 @@ export async function createApp(
         defaultLocale: env.defaultLocale ?? DEFAULT_LOCALE,
         locales: env.locales ?? DEFAULT_LOCALES,
       },
+      pricing: toPricingConfig({
+        shopCurrency: env.shopCurrency ?? DEFAULT_PRICING_CONFIG.shopCurrency,
+        pricesIncludeTax: env.pricesIncludeTax ?? DEFAULT_PRICING_CONFIG.pricesIncludeTax,
+        lowStockThreshold: env.lowStockThreshold ?? DEFAULT_PRICING_CONFIG.lowStockThreshold,
+      }),
       adminAuth: {
         cookieSecure: env.adminCookieSecure ?? DEFAULT_ADMIN_AUTH_CONFIG.cookieSecure,
         idleMinutes: env.adminSessionIdleMinutes ?? DEFAULT_ADMIN_AUTH_CONFIG.idleMinutes,

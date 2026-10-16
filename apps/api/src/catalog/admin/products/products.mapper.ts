@@ -165,10 +165,15 @@ function toAttributeDefinition(
   };
 }
 
-/** What core's publish preconditions check: the product, its option codes and its variants with option values. */
+/**
+ * What core's publish preconditions check: the product, its option codes and its variants with option values.
+ * `pricedVariantIds` holds the variants that have a price in the shop currency
+ * (`ProductsRepository.findVariantIdsWithPrice`).
+ */
 export function toProductSnapshot(
   row: ProductRow,
   children: Pick<ProductChildren, "variants" | "variantOptionValues" | "options">,
+  pricedVariantIds: ReadonlySet<string>,
 ): ProductSnapshot {
   const variants: VariantSnapshot[] = children.variants.map((variant) => ({
     sku: variant.sku,
@@ -179,9 +184,7 @@ export function toProductSnapshot(
       .filter((value) => value.variantId === variant.id)
       .map((value) => ({ optionCode: value.optionCode, valueCode: value.valueCode })),
     attributes: variant.attributes,
-    // TODO(fluxkit): step 4 supplies real price facts. No price table exists yet, so this keeps the current behaviour
-    // (prices do not block publishing) instead of reporting every active variant as priceless.
-    hasShopPrice: true,
+    hasShopPrice: pricedVariantIds.has(variant.id),
   }));
   return {
     status: toStatus(row),

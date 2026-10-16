@@ -18,6 +18,7 @@ import {
 } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page } from "../../../common/pagination.js";
+import { PRICING_CONFIG, type PricingConfig } from "../../../common/pricing-config.js";
 import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
 import {
   conflict,
@@ -82,6 +83,7 @@ export class ProductsService {
     private readonly products: ProductsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
   /** Creates a draft and its single default variant in one transaction. */
@@ -401,7 +403,11 @@ export class ProductsService {
       await this.products.listVariantOptionValues(tx, row.id),
       await this.products.listProductOptions(tx, row.id),
     ];
-    const snapshot = toProductSnapshot(row, { variants, variantOptionValues, options });
+    const snapshot = toProductSnapshot(
+      row,
+      { variants, variantOptionValues, options },
+      await this.products.findVariantIdsWithPrice(tx, row.id, this.pricing.shopCurrency),
+    );
     const violations = publishPreconditions(snapshot, definition, this.locale);
     if (violations.length > 0) {
       throw validationFailed(

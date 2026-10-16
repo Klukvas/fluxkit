@@ -6310,9 +6310,9 @@
         "tags": ["admin-product-types"]
       }
     },
-    "/admin/products/{id}/options": {
-      "put": {
-        "operationId": "ProductOptionsController_put",
+    "/admin/products/{id}/variants/{variantId}/prices": {
+      "get": {
+        "operationId": "PricesController_list",
         "parameters": [
           {
             "name": "id",
@@ -6321,6 +6321,171 @@
             "description": "Product id.",
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The prices (one per currency, possibly none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the prices of a variant, ordered by currency",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/products/{id}/variants/{variantId}/prices/{currency}": {
+      "put": {
+        "description": "Answers 201 when the price is new and 200 when it replaced one. `compareAtAmount` null or absent clears the old price. Only the shop currency is ever sold.",
+        "operationId": "PricesController_put",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "path",
+            "description": "Upper-case ISO 4217 code of a supported currency, for example UAH.",
+            "schema": {
               "type": "string"
             }
           }
@@ -6332,33 +6497,17 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "options": {
-                    "maxItems": 30,
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "optionId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
-                        },
-                        "valueIds": {
-                          "maxItems": 300,
-                          "type": "array",
-                          "items": {
-                            "type": "string",
-                            "format": "uuid",
-                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
-                          }
-                        }
-                      },
-                      "required": ["optionId", "valueIds"],
-                      "additionalProperties": false
-                    }
+                  "amount": {
+                    "type": "number",
+                    "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
+                  },
+                  "compareAtAmount": {
+                    "nullable": true,
+                    "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
+                    "type": "number"
                   }
                 },
-                "required": ["options"],
+                "required": ["amount"],
                 "additionalProperties": false
               }
             }
@@ -6366,7 +6515,7 @@
         },
         "responses": {
           "200": {
-            "description": "The product with its new options and variants.",
+            "description": "The replaced price.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6376,46 +6525,23 @@
                       "type": "string",
                       "format": "uuid"
                     },
-                    "productTypeId": {
+                    "variantId": {
                       "type": "string",
                       "format": "uuid"
                     },
-                    "brandId": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "slug": {
+                    "currency": {
                       "type": "string"
                     },
-                    "title": {
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
                     },
-                    "description": {
+                    "compareAtAmount": {
                       "nullable": true,
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "description": "Translated text: locale code to text. The default locale is required for required texts."
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["draft", "active", "archived"]
-                    },
-                    "attributes": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "publishedAt": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "ISO 8601, UTC."
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
                     },
                     "createdAt": {
                       "type": "string",
@@ -6426,248 +6552,167 @@
                       "type": "string",
                       "format": "date-time",
                       "description": "ISO 8601, UTC."
-                    },
-                    "categories": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "categoryId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "isPrimary": {
-                            "type": "boolean"
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          }
-                        },
-                        "required": ["categoryId", "isPrimary", "position"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "media": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "url": {
-                            "type": "string"
-                          },
-                          "alt": {
-                            "nullable": true,
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "Translated text: locale code to text. The default locale is required for required texts."
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "optionId": {
-                            "nullable": true,
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "optionValueId": {
-                            "nullable": true,
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "url",
-                          "alt",
-                          "position",
-                          "optionId",
-                          "optionValueId",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "variants": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "sku": {
-                            "type": "string"
-                          },
-                          "barcode": {
-                            "nullable": true,
-                            "type": "string"
-                          },
-                          "title": {
-                            "nullable": true,
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "Translated text: locale code to text. The default locale is required for required texts."
-                          },
-                          "optionSignature": {
-                            "type": "string"
-                          },
-                          "isDefault": {
-                            "type": "boolean"
-                          },
-                          "isActive": {
-                            "type": "boolean"
-                          },
-                          "attributes": {
-                            "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "optionValues": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "optionId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "optionCode": {
-                                  "type": "string"
-                                },
-                                "optionValueId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "valueCode": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["optionId", "optionCode", "optionValueId", "valueCode"],
-                              "additionalProperties": false
-                            }
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "sku",
-                          "barcode",
-                          "title",
-                          "optionSignature",
-                          "isDefault",
-                          "isActive",
-                          "attributes",
-                          "position",
-                          "optionValues",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "options": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "optionId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "optionCode": {
-                            "type": "string"
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "values": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "optionValueId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "valueCode": {
-                                  "type": "string"
-                                },
-                                "position": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991
-                                }
-                              },
-                              "required": ["optionValueId", "valueCode", "position"],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": ["optionId", "optionCode", "position", "values"],
-                        "additionalProperties": false
-                      }
                     }
                   },
                   "required": [
                     "id",
-                    "productTypeId",
-                    "brandId",
-                    "slug",
-                    "title",
-                    "description",
-                    "status",
-                    "attributes",
-                    "publishedAt",
+                    "variantId",
+                    "currency",
+                    "amount",
+                    "compareAtAmount",
                     "createdAt",
-                    "updatedAt",
-                    "categories",
-                    "media",
-                    "variants",
-                    "options"
+                    "updatedAt"
                   ],
                   "additionalProperties": false
                 }
               }
             }
+          },
+          "201": {
+            "description": "The new price.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "variantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "amount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
+                    },
+                    "compareAtAmount": {
+                      "nullable": true,
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "variantId",
+                    "currency",
+                    "amount",
+                    "compareAtAmount",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set the price of a variant in one currency (creates it or replaces it entirely)",
+        "tags": ["admin-products"]
+      },
+      "delete": {
+        "description": "Refused with 409 `rule_violation` (rule `last_shop_price`) for the shop-currency price of an active variant of a published product.",
+        "operationId": "PricesController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "currency",
+            "required": true,
+            "in": "path",
+            "description": "Upper-case ISO 4217 code of a supported currency, for example UAH.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
@@ -6730,29 +6775,20 @@
             }
           }
         },
-        "summary": "Replace the options and chosen values of a draft product; the variants are regenerated",
+        "summary": "Delete the price of a variant in one currency",
         "tags": ["admin-products"]
       }
     },
-    "/admin/products/{id}/options/{optionId}/values": {
-      "post": {
-        "operationId": "ProductOptionsController_addValue",
+    "/admin/products/{id}/prices": {
+      "put": {
+        "description": "At most 500 items. Every item is validated; errors carry indexed paths (`items.3.amount`). A variant of another product, or the same variant and currency twice, is rejected.",
+        "operationId": "PricesController_putMany",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
             "description": "Product id.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "optionId",
-            "required": true,
-            "in": "path",
-            "description": "Option id.",
             "schema": {
               "format": "uuid",
               "type": "string"
@@ -6766,104 +6802,52 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "valueId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "variantId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Upper-case ISO 4217 code, exactly as listed: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD."
+                        },
+                        "amount": {
+                          "type": "number",
+                          "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
+                        },
+                        "compareAtAmount": {
+                          "nullable": true,
+                          "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
+                          "type": "number"
+                        }
+                      },
+                      "required": ["variantId", "currency", "amount"],
+                      "additionalProperties": false
+                    }
                   }
                 },
-                "required": ["valueId"],
+                "required": ["items"],
                 "additionalProperties": false
               }
             }
           }
         },
         "responses": {
-          "201": {
-            "description": "The product with the new value and variants.",
+          "200": {
+            "description": "The written prices, in request order.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "productTypeId": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "brandId": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "slug": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "description": "Translated text: locale code to text. The default locale is required for required texts."
-                    },
-                    "description": {
-                      "nullable": true,
-                      "type": "object",
-                      "additionalProperties": {
-                        "type": "string"
-                      },
-                      "description": "Translated text: locale code to text. The default locale is required for required texts."
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["draft", "active", "archived"]
-                    },
-                    "attributes": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "publishedAt": {
-                      "nullable": true,
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "ISO 8601, UTC."
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "ISO 8601, UTC."
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "ISO 8601, UTC."
-                    },
-                    "categories": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "categoryId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "isPrimary": {
-                            "type": "boolean"
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          }
-                        },
-                        "required": ["categoryId", "isPrimary", "position"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "media": {
+                    "items": {
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -6872,31 +6856,23 @@
                             "type": "string",
                             "format": "uuid"
                           },
-                          "url": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
                             "type": "string"
                           },
-                          "alt": {
-                            "nullable": true,
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
                           },
-                          "position": {
+                          "compareAtAmount": {
+                            "nullable": true,
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991
-                          },
-                          "optionId": {
-                            "nullable": true,
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "optionValueId": {
-                            "nullable": true,
-                            "type": "string",
-                            "format": "uuid"
                           },
                           "createdAt": {
                             "type": "string",
@@ -6911,173 +6887,18 @@
                         },
                         "required": [
                           "id",
-                          "url",
-                          "alt",
-                          "position",
-                          "optionId",
-                          "optionValueId",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
                           "createdAt",
                           "updatedAt"
                         ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "variants": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "sku": {
-                            "type": "string"
-                          },
-                          "barcode": {
-                            "nullable": true,
-                            "type": "string"
-                          },
-                          "title": {
-                            "nullable": true,
-                            "type": "object",
-                            "additionalProperties": {
-                              "type": "string"
-                            },
-                            "description": "Translated text: locale code to text. The default locale is required for required texts."
-                          },
-                          "optionSignature": {
-                            "type": "string"
-                          },
-                          "isDefault": {
-                            "type": "boolean"
-                          },
-                          "isActive": {
-                            "type": "boolean"
-                          },
-                          "attributes": {
-                            "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "optionValues": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "optionId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "optionCode": {
-                                  "type": "string"
-                                },
-                                "optionValueId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "valueCode": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["optionId", "optionCode", "optionValueId", "valueCode"],
-                              "additionalProperties": false
-                            }
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "sku",
-                          "barcode",
-                          "title",
-                          "optionSignature",
-                          "isDefault",
-                          "isActive",
-                          "attributes",
-                          "position",
-                          "optionValues",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "options": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "optionId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "optionCode": {
-                            "type": "string"
-                          },
-                          "position": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "values": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "optionValueId": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "valueCode": {
-                                  "type": "string"
-                                },
-                                "position": {
-                                  "type": "integer",
-                                  "minimum": -9007199254740991,
-                                  "maximum": 9007199254740991
-                                }
-                              },
-                              "required": ["optionValueId", "valueCode", "position"],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": ["optionId", "optionCode", "position", "values"],
                         "additionalProperties": false
                       }
                     }
                   },
-                  "required": [
-                    "id",
-                    "productTypeId",
-                    "brandId",
-                    "slug",
-                    "title",
-                    "description",
-                    "status",
-                    "attributes",
-                    "publishedAt",
-                    "createdAt",
-                    "updatedAt",
-                    "categories",
-                    "media",
-                    "variants",
-                    "options"
-                  ],
+                  "required": ["items"],
                   "additionalProperties": false
                 }
               }
@@ -7123,16 +6944,6 @@
               }
             }
           },
-          "409": {
-            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -7144,7 +6955,7 @@
             }
           }
         },
-        "summary": "Add a value to an option of the product (any status) and generate the variants of the new combinations",
+        "summary": "Set many prices of one product's variants in one transaction (all or nothing)",
         "tags": ["admin-products"]
       }
     },
@@ -11038,6 +10849,844 @@
           }
         },
         "summary": "Replace the media list of a product",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/products/{id}/options": {
+      "put": {
+        "operationId": "ProductOptionsController_put",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "options": {
+                    "maxItems": 30,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "optionId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                        },
+                        "valueIds": {
+                          "maxItems": 300,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                          }
+                        }
+                      },
+                      "required": ["optionId", "valueIds"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["options"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The product with its new options and variants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "productTypeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "brandId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["draft", "active", "archived"]
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "publishedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "isPrimary": {
+                            "type": "boolean"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["categoryId", "isPrimary", "position"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "alt": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "optionId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "optionValueId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "alt",
+                          "position",
+                          "optionId",
+                          "optionValueId",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "variants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "barcode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "title": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "optionSignature": {
+                            "type": "string"
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "optionCode": {
+                                  "type": "string"
+                                },
+                                "optionValueId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "valueCode": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["optionId", "optionCode", "optionValueId", "valueCode"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sku",
+                          "barcode",
+                          "title",
+                          "optionSignature",
+                          "isDefault",
+                          "isActive",
+                          "attributes",
+                          "position",
+                          "optionValues",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "optionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "optionCode": {
+                            "type": "string"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionValueId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "valueCode": {
+                                  "type": "string"
+                                },
+                                "position": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["optionValueId", "valueCode", "position"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["optionId", "optionCode", "position", "values"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "productTypeId",
+                    "brandId",
+                    "slug",
+                    "title",
+                    "description",
+                    "status",
+                    "attributes",
+                    "publishedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "categories",
+                    "media",
+                    "variants",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replace the options and chosen values of a draft product; the variants are regenerated",
+        "tags": ["admin-products"]
+      }
+    },
+    "/admin/products/{id}/options/{optionId}/values": {
+      "post": {
+        "operationId": "ProductOptionsController_addValue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "optionId",
+            "required": true,
+            "in": "path",
+            "description": "Option id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "valueId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                  }
+                },
+                "required": ["valueId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The product with the new value and variants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "productTypeId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "brandId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["draft", "active", "archived"]
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "publishedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "categoryId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "isPrimary": {
+                            "type": "boolean"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["categoryId", "isPrimary", "position"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "alt": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "optionId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "optionValueId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "alt",
+                          "position",
+                          "optionId",
+                          "optionValueId",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "variants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "barcode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "title": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "optionSignature": {
+                            "type": "string"
+                          },
+                          "isDefault": {
+                            "type": "boolean"
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "optionCode": {
+                                  "type": "string"
+                                },
+                                "optionValueId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "valueCode": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["optionId", "optionCode", "optionValueId", "valueCode"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sku",
+                          "barcode",
+                          "title",
+                          "optionSignature",
+                          "isDefault",
+                          "isActive",
+                          "attributes",
+                          "position",
+                          "optionValues",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "optionId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "optionCode": {
+                            "type": "string"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionValueId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "valueCode": {
+                                  "type": "string"
+                                },
+                                "position": {
+                                  "type": "integer",
+                                  "minimum": -9007199254740991,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["optionValueId", "valueCode", "position"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["optionId", "optionCode", "position", "values"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "productTypeId",
+                    "brandId",
+                    "slug",
+                    "title",
+                    "description",
+                    "status",
+                    "attributes",
+                    "publishedAt",
+                    "createdAt",
+                    "updatedAt",
+                    "categories",
+                    "media",
+                    "variants",
+                    "options"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a value to an option of the product (any status) and generate the variants of the new combinations",
         "tags": ["admin-products"]
       }
     },

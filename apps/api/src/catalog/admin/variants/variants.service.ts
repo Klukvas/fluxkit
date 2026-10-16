@@ -16,6 +16,7 @@ import {
 } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page } from "../../../common/pagination.js";
+import { PRICING_CONFIG, type PricingConfig } from "../../../common/pricing-config.js";
 import { translatePostgresError } from "../../../common/postgres-errors.js";
 import {
   notFound,
@@ -76,6 +77,7 @@ export class VariantsService {
     private readonly generation: VariantGenerationService,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
   async list(productId: string, query: ListVariantsQuery): Promise<Page<VariantResponse>> {
@@ -273,7 +275,12 @@ export class VariantsService {
           product.status === "active" &&
           (body.isActive !== undefined || body.isDefault !== undefined)
         ) {
-          await this.assertActiveProductStillSellable(tx, product, resulting);
+          await this.assertActiveProductStillSellable(
+            tx,
+            product,
+            resulting,
+            body.isActive === true && !current.isActive ? variantId : undefined,
+          );
         }
 
         // The partial unique index allows one default at a time: unset the old one before setting the new one.
@@ -445,26 +452,40 @@ export class VariantsService {
    * Switching off the default variant, or the last active one, of a live product would break a publish
    * precondition. Core decides; only the two rules about active variants are enforced here, so unrelated gaps
    * (a generated variant that still lacks a required attribute) do not block an edit.
+   * Switching a variant on sells it, so `price_missing` is enforced for that one variant (`activatedVariantId`) and
+   * for no other: an active variant that was already priceless must not block unrelated edits.
    */
   private async assertActiveProductStillSellable(
     tx: DbExecutor,
     product: ProductRow,
     resulting: readonly VariantRow[],
+    activatedVariantId: string | undefined,
   ): Promise<void> {
     const options = await this.products.listProductOptions(tx, product.id);
     const optionValues = await this.products.listVariantOptionValues(tx, product.id);
     const definition = await this.loadDefinition(tx, product);
-    const snapshot = toProductSnapshot(product, {
-      variants: [...resulting],
-      variantOptionValues: optionValues,
-      options,
-    });
-    const violation = publishPreconditions(snapshot, definition, this.locale).find((candidate) =>
-      ACTIVE_PRODUCT_VARIANT_RULES.has(candidate.code),
+    const snapshot = toProductSnapshot(
+      product,
+      {
+        variants: [...resulting],
+        variantOptionValues: optionValues,
+        options,
+      },
+      await this.products.findVariantIdsWithPrice(tx, product.id, this.pricing.shopCurrency),
+    );
+    const violation = publishPreconditions(snapshot, definition, this.locale).find(
+      (candidate) =>
+        ACTIVE_PRODUCT_VARIANT_RULES.has(candidate.code) ||
+        (candidate.code === "price_missing" &&
+          candidate.variantIndex !== undefined &&
+          activatedVariantId !== undefined &&
+          resulting[candidate.variantIndex]?.id === activatedVariantId),
     );
     if (violation !== undefined) {
       throw ruleViolation(
-        "A published product keeps an active default variant and at least one active variant.",
+        violation.code === "price_missing"
+          ? "A variant of a published product needs a price in the shop currency before it is switched on."
+          : "A published product keeps an active default variant and at least one active variant.",
         violation.code,
       );
     }

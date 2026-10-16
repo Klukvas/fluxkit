@@ -26,6 +26,9 @@ import {
   createOptionSchema,
   createOptionValueSchema,
 } from "../catalog/admin/options/options.schemas.js";
+import { PricesService } from "../catalog/admin/prices/prices.service.js";
+import { putProductPricesSchema } from "../catalog/admin/prices/prices.schemas.js";
+import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import { ProductOptionsService } from "../catalog/admin/product-options/product-options.service.js";
 import { putProductOptionsSchema } from "../catalog/admin/product-options/product-options.schemas.js";
 import { ProductTypesService } from "../catalog/admin/product-types/product-types.service.js";
@@ -40,6 +43,9 @@ import {
   putProductCategoriesSchema,
   putProductMediaSchema,
 } from "../catalog/admin/products/products.schemas.js";
+
+/** Minor units (100.00 in a two-decimal currency). TODO(fluxkit): replaced by demo prices in the seed data (plan step 6). */
+const PLACEHOLDER_PRICE_AMOUNT = 10_000;
 
 export const SEED_ENTITY_KINDS = [
   "attributes",
@@ -104,6 +110,8 @@ export class CatalogSeeder {
     private readonly categories: CategoriesService,
     private readonly products: ProductsService,
     private readonly productOptions: ProductOptionsService,
+    private readonly prices: PricesService,
+    private readonly pricing: PricingConfig,
   ) {}
 
   static fromContext(app: INestApplicationContext): CatalogSeeder {
@@ -118,6 +126,8 @@ export class CatalogSeeder {
       get(CategoriesService),
       get(ProductsService),
       get(ProductOptionsService),
+      get(PricesService),
+      app.get<PricingConfig>(PRICING_CONFIG, { strict: false }),
     );
   }
 
@@ -389,6 +399,20 @@ export class CatalogSeeder {
                   "option value",
                 ),
               }),
+        })),
+      }),
+    );
+
+    // Publishing needs a shop-currency price on every active variant. TODO(fluxkit): placeholder, one flat price for
+    // every demo variant; step 6 of docs/plans/2026-10-16-pricing-and-inventory.md moves real demo prices into seeds/.
+    const { variants } = await this.products.get(productId);
+    await this.prices.putMany(
+      productId,
+      parse(putProductPricesSchema, {
+        items: variants.map((item) => ({
+          variantId: item.id,
+          currency: this.pricing.shopCurrency,
+          amount: PLACEHOLDER_PRICE_AMOUNT,
         })),
       }),
     );
