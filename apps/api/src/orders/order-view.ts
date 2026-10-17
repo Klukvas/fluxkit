@@ -21,8 +21,8 @@ import type { StoreOrder, StoreOrderSummary } from "./orders.schemas.js";
  * that exists (an old order must stay readable after the configured locales change).
  */
 
-const textMap = z.record(z.string(), z.string());
-const optionValues = z.array(z.object({ option: textMap, value: textMap }));
+export const textMap = z.record(z.string(), z.string());
+export const optionValuesSchema = z.array(z.object({ option: textMap, value: textMap }));
 const address = z.object({
   countryCode: z.string(),
   region: z.string().optional(),
@@ -42,7 +42,7 @@ function text(map: Readonly<Record<string, string>> | null, locale: StoreLocale)
   return resolveText(map, locale.locale, locale.defaultLocale) ?? Object.values(map)[0] ?? "";
 }
 
-function parseAddress(value: unknown): z.output<typeof address> | null {
+export function parseAddress(value: unknown): z.output<typeof address> | null {
   // Stored by the checkout after the core address rules: a stored value that does not parse is damaged data.
   return value === null || value === undefined ? null : address.parse(value);
 }
@@ -52,7 +52,7 @@ function money(amount: number, currency: string) {
 }
 
 function toItem(row: OrderItemRow, locale: StoreLocale): StoreOrder["items"][number] {
-  const options = optionValues.parse(row.optionValues);
+  const options = optionValuesSchema.parse(row.optionValues);
   return {
     sku: row.sku,
     productTitle: text(textMap.parse(row.productTitle), locale),

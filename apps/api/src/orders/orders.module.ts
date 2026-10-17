@@ -7,10 +7,13 @@ import {
   type NestModule,
 } from "@nestjs/common";
 import type { NextFunction, Request, Response } from "express";
-import { ORDER_PAYMENTS_PORT } from "@fluxkit/core";
+import { ORDER_PAYMENTS_PORT, ORDER_READ_PORT } from "@fluxkit/core";
 import { StoreModule } from "../catalog/store/store.module.js";
 import { markStoreOrderResponseUncacheable } from "../common/store-path.js";
 import { InventoryModule } from "../inventory/inventory.module.js";
+import { AdminOrderViewService } from "./admin/admin-order-view.js";
+import { AdminOrdersController } from "./admin/admin-orders.controller.js";
+import { AdminOrdersService } from "./admin/admin-orders.service.js";
 import { AccountOrdersController } from "./account-orders.controller.js";
 import { CheckoutController } from "./checkout.controller.js";
 import { CheckoutService } from "./checkout.service.js";
@@ -32,10 +35,10 @@ export interface OrdersModuleOptions {
 }
 
 /**
- * Checkout and orders (ADR 0015, 0017, plan step 5b): `POST /store/checkout`, the guest order routes under
- * `/store/orders` and the customer's own under `/store/account/orders`, plus the order domain service (status
- * transitions, `markPaid`, cancellations, expiry of one order) that the admin API and the scheduler use later. Core, no
- * feature flag. Global because `OrdersService` (and the `ORDER_PAYMENTS_PORT` it implements) is how other modules and
+ * Checkout and orders (ADR 0015, 0017, plan steps 5b and 6): `POST /store/checkout`, the guest order routes under
+ * `/store/orders` and the customer's own under `/store/account/orders`, the admin order routes under `/admin/orders`,
+ * plus the order domain service (status transitions, `markPaid`, cancellations, expiry of one order) that the admin API
+ * and the scheduler use, and the `OrderReadPort` (the admin order view). Core, no feature flag. Global because `OrdersService` (and the `ORDER_PAYMENTS_PORT` it implements) is how other modules and
  * plugins act on orders. Needs the globals of `AuthModule` (clock), `CustomerAuthModule`, `RateLimitModule`,
  * `CommonModule`, `CartModule` (pricing, repository) and the database; stock comes from `InventoryModule`.
  */
@@ -46,7 +49,12 @@ export class OrdersModule implements NestModule {
     return {
       module: OrdersModule,
       imports: [StoreModule, InventoryModule],
-      controllers: [CheckoutController, StoreOrdersController, AccountOrdersController],
+      controllers: [
+        CheckoutController,
+        StoreOrdersController,
+        AccountOrdersController,
+        AdminOrdersController,
+      ],
       providers: [
         { provide: ORDERS_CONFIG, useValue: options.config },
         OrdersRepository,
@@ -54,9 +62,19 @@ export class OrdersModule implements NestModule {
         OrderViewService,
         CheckoutService,
         StoreOrdersService,
+        AdminOrderViewService,
+        AdminOrdersService,
         { provide: ORDER_PAYMENTS_PORT, useExisting: OrdersService },
+        { provide: ORDER_READ_PORT, useExisting: AdminOrderViewService },
       ],
-      exports: [OrdersService, OrdersRepository, OrderViewService, ORDER_PAYMENTS_PORT],
+      exports: [
+        OrdersService,
+        OrdersRepository,
+        OrderViewService,
+        AdminOrderViewService,
+        ORDER_PAYMENTS_PORT,
+        ORDER_READ_PORT,
+      ],
     };
   }
 
