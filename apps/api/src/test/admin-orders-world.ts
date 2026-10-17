@@ -1,4 +1,4 @@
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 import pg from "pg";
 import type { AdminRole } from "@fluxkit/core";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
@@ -204,5 +204,16 @@ export class AdminOrdersWorld {
     await this.catalog.cleanup();
     await this.pool.query("delete from admin_user where id = any($1::uuid[])", [this.adminIds]);
     await this.pool.end();
+  }
+}
+
+/** TEST ONLY. How many statements `run` sends to Postgres (every client of the process, so run nothing else beside it). */
+export async function countStatements(run: () => Promise<unknown>): Promise<number> {
+  const spy = vi.spyOn(pg.Client.prototype, "query");
+  try {
+    await run();
+    return spy.mock.calls.length;
+  } finally {
+    spy.mockRestore();
   }
 }

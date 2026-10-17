@@ -62,8 +62,20 @@ const CUSTOMERS_ROUTES = [
   "POST /admin/customers/:id/unlock",
 ];
 
+/** Order management: declared once on the controller with its own default pair (`orders.read`, `orders.write`). */
+const ORDERS_ROUTES = [
+  "GET /admin/orders",
+  "GET /admin/orders/:id",
+  "POST /admin/orders/:id/cancel",
+  "POST /admin/orders/:id/mark-paid",
+  "POST /admin/orders/:id/mark-fulfilled",
+];
+
 function expectedPermission(method: string, pattern: string): AdminPermission {
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
+  if (ORDERS_ROUTES.includes(`${method} ${pattern}`)) {
+    return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";
+  }
   if (CUSTOMERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "customers.read" : "customers.write";
   }
@@ -202,12 +214,29 @@ describe("admin route permissions", () => {
       }
     });
 
+    it("gives the orders routes the order pair by the controller default: read for GET, write for the rest", () => {
+      const orders = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/orders"),
+      );
+      expect(orders.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...ORDERS_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of orders) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: method === "GET" ? "orders.read" : "orders.write",
+          source: "default",
+        });
+      }
+    });
+
     it("keeps every other controller on the catalog pair: no catalog route changed its permission", () => {
       const others = declaredAdminRoutes(manager.app).filter(
         ({ method, pattern, access }) =>
           access.kind === "permission" &&
           access.source === "default" &&
-          !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`),
+          !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`) &&
+          !ORDERS_ROUTES.includes(`${method} ${pattern}`),
       );
       expect(others.length).toBeGreaterThan(30);
       for (const { method, pattern, access } of others) {
@@ -248,6 +277,8 @@ describe("admin route permissions", () => {
         "catalog.write",
         "customers.read",
         "customers.write",
+        "orders.read",
+        "orders.write",
         "users.manage",
       ]);
       for (const permission of needed) {
@@ -256,7 +287,12 @@ describe("admin route permissions", () => {
       expect(permissionsOf("manager")).not.toContain("users.manage");
       expect(permissionsOf("viewer")).not.toContain("users.manage");
       // The customer permissions hold personal data: manager and owner have them, the viewer has neither.
-      for (const permission of ["customers.read", "customers.write"] as const) {
+      for (const permission of [
+        "customers.read",
+        "customers.write",
+        "orders.read",
+        "orders.write",
+      ] as const) {
         expect(permissionsOf("manager")).toContain(permission);
         expect(permissionsOf("viewer")).not.toContain(permission);
       }
@@ -299,6 +335,19 @@ describe("admin route permissions", () => {
 
     it("is forbidden on every customers route", async () => {
       for (const route of CUSTOMERS_ROUTES) {
+        const [method, pattern] = route.split(" ") as ["GET", string];
+        const result = await http<ProblemBody>(
+          viewer.baseUrl,
+          method,
+          pattern.replace(":id", SOME_ID),
+          method === "GET" ? {} : { body: {} },
+        );
+        expect(result.status, route).toBe(403);
+      }
+    });
+
+    it("is forbidden on every orders route (they hold personal data)", async () => {
+      for (const route of ORDERS_ROUTES) {
         const [method, pattern] = route.split(" ") as ["GET", string];
         const result = await http<ProblemBody>(
           viewer.baseUrl,
@@ -399,6 +448,40 @@ describe("admin route permissions", () => {
         name: "POST /admin/customers/:id/unlock",
         permission: "customers.write",
         call: (url) => http(url, "POST", `/admin/customers/${SOME_ID}/unlock`),
+        allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/orders",
+        permission: "orders.read",
+        call: (url) => http(url, "GET", "/admin/orders"),
+        allowedStatus: 200,
+      },
+      {
+        name: "GET /admin/orders/:id",
+        permission: "orders.read",
+        call: (url) => http(url, "GET", `/admin/orders/${SOME_ID}`),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/orders/:id/cancel",
+        permission: "orders.write",
+        call: (url) =>
+          http(url, "POST", `/admin/orders/${SOME_ID}/cancel`, { body: { reason: "test" } }),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/orders/:id/mark-paid",
+        permission: "orders.write",
+        call: (url) =>
+          http(url, "POST", `/admin/orders/${SOME_ID}/mark-paid`, {
+            body: { reference: "REF", amount: { amount: 1, currency: "UAH" } },
+          }),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/orders/:id/mark-fulfilled",
+        permission: "orders.write",
+        call: (url) => http(url, "POST", `/admin/orders/${SOME_ID}/mark-fulfilled`),
         allowedStatus: 404,
       },
       {
