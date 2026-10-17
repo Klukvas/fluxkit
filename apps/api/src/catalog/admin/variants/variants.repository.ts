@@ -5,6 +5,7 @@ import type { DbExecutor } from "../../../common/transaction.js";
 import {
   option,
   optionValue,
+  orderItem,
   reservation,
   stockMovement,
   variant,
@@ -31,6 +32,13 @@ export type VariantChanges = Partial<
   >
 >;
 export type NewVariantOptionValue = typeof variantOptionValue.$inferInsert;
+
+function requiredFound(row: { found: boolean } | undefined): boolean {
+  if (row === undefined) {
+    throw new Error("The existence query returned no row.");
+  }
+  return row.found;
+}
 
 /** Queries only (Drizzle query builder, parameterized). Every method runs on the executor it is given. */
 @Injectable()
@@ -166,6 +174,28 @@ export class VariantsRepository {
       throw new Error("The stock history query returned no row.");
     }
     return row.found;
+  }
+
+  /**
+   * Whether any order line refers to the variant (ADR 0020): one indexed lookup on `order_item.variant_id`. A sold
+   * variant that never had stock rows (digital goods) has no history the stock rule could see. The caller holds the
+   * product lock and has locked the variant (`hasStockHistory`), so a checkout in progress (product and variant
+   * `FOR SHARE`) has committed its order line before this reads, or waits for the delete to finish.
+   */
+  async hasOrderLines(db: DbExecutor, variantId: string): Promise<boolean> {
+    const result = await db.execute<{ found: boolean }>(
+      sql`select exists (select 1 from ${orderItem} where ${orderItem.variantId} = ${variantId}) as found`,
+    );
+    return requiredFound(result.rows[0]);
+  }
+
+  /** Whether any variant of the product is referenced by an order line (ADR 0020), in one query. */
+  async anyHasOrderLines(db: DbExecutor, productId: string): Promise<boolean> {
+    const result = await db.execute<{ found: boolean }>(
+      sql`select exists (select 1 from ${orderItem} join ${variant} on ${variant.id} = ${orderItem.variantId}
+                         where ${variant.productId} = ${productId}) as found`,
+    );
+    return requiredFound(result.rows[0]);
   }
 
   async delete(db: DbExecutor, id: string): Promise<void> {

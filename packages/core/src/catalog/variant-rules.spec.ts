@@ -9,6 +9,7 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 2,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: true,
@@ -22,6 +23,7 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 3,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -36,6 +38,7 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 1,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -50,6 +53,7 @@ describe("canDeleteVariant", () => {
         isDefault: true,
         variantCount: 3,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -64,6 +68,7 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 0,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -78,6 +83,7 @@ describe("canDeleteVariant", () => {
         isDefault: true,
         variantCount: 1,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -92,6 +98,7 @@ describe("canDeleteVariant", () => {
         isDefault: true,
         variantCount: 1,
         hasStockHistory: false,
+        hasOrderLines: false,
       }),
     ).toEqual({
       allowed: false,
@@ -106,6 +113,7 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 3,
         hasStockHistory: true,
+        hasOrderLines: false,
       });
       expect(decision).toEqual({
         allowed: false,
@@ -121,6 +129,7 @@ describe("canDeleteVariant", () => {
         isDefault: true,
         variantCount: 3,
         hasStockHistory: true,
+        hasOrderLines: false,
       }),
     ).toEqual({ allowed: false, reason: "default_variant" });
     expect(
@@ -129,8 +138,49 @@ describe("canDeleteVariant", () => {
         isDefault: false,
         variantCount: 1,
         hasStockHistory: true,
+        hasOrderLines: false,
       }),
     ).toEqual({ allowed: false, reason: "last_variant" });
+  });
+
+  it("refuses a variant that an order line refers to (ADR 0020), even without stock history", () => {
+    expect(
+      canDeleteVariant({
+        productStatus: "draft",
+        isDefault: false,
+        variantCount: 3,
+        hasStockHistory: false,
+        hasOrderLines: true,
+      }),
+    ).toEqual({ allowed: false, reason: "has_order_lines" });
+  });
+
+  it("reports the structural rules and the stock history before the order lines", () => {
+    const base = { variantCount: 3, hasOrderLines: true } as const;
+    expect(
+      canDeleteVariant({
+        ...base,
+        productStatus: "active",
+        isDefault: false,
+        hasStockHistory: false,
+      }),
+    ).toEqual({ allowed: false, reason: "product_not_draft" });
+    expect(
+      canDeleteVariant({
+        ...base,
+        productStatus: "draft",
+        isDefault: true,
+        hasStockHistory: false,
+      }),
+    ).toEqual({ allowed: false, reason: "default_variant" });
+    expect(
+      canDeleteVariant({
+        ...base,
+        productStatus: "draft",
+        isDefault: false,
+        hasStockHistory: true,
+      }),
+    ).toEqual({ allowed: false, reason: "has_stock_history" });
   });
 
   it("is pure: two calls agree", () => {
@@ -139,6 +189,7 @@ describe("canDeleteVariant", () => {
       isDefault: false,
       variantCount: 2,
       hasStockHistory: false,
+      hasOrderLines: false,
     });
     expect(canDeleteVariant(input)).toEqual(canDeleteVariant(input));
   });
@@ -159,13 +210,29 @@ describe("canCreateVariantManually", () => {
 
 describe("canRebuildVariants", () => {
   it("allows rebuilding when no variant has stock history", () => {
-    expect(canRebuildVariants({ anyVariantHasStockHistory: false })).toEqual({ allowed: true });
+    expect(
+      canRebuildVariants({ anyVariantHasStockHistory: false, anyVariantHasOrderLines: false }),
+    ).toEqual({ allowed: true });
   });
 
   it("refuses when any variant has stock history", () => {
-    expect(canRebuildVariants({ anyVariantHasStockHistory: true })).toEqual({
+    expect(
+      canRebuildVariants({ anyVariantHasStockHistory: true, anyVariantHasOrderLines: false }),
+    ).toEqual({
       allowed: false,
       reason: "has_stock_history",
     });
+  });
+
+  it("refuses when any variant is referenced by an order line (ADR 0020)", () => {
+    expect(
+      canRebuildVariants({ anyVariantHasStockHistory: false, anyVariantHasOrderLines: true }),
+    ).toEqual({ allowed: false, reason: "has_order_lines" });
+  });
+
+  it("reports the stock history before the order lines", () => {
+    expect(
+      canRebuildVariants({ anyVariantHasStockHistory: true, anyVariantHasOrderLines: true }),
+    ).toEqual({ allowed: false, reason: "has_stock_history" });
   });
 });

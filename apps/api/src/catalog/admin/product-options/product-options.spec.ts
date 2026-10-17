@@ -13,6 +13,7 @@ import {
 } from "../../../test/catalog-fixtures.js";
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { insertSoldLine, deleteOrders } from "../../../test/order-fixtures.js";
 import { priceProductVariants } from "../../../test/pricing-fixtures.js";
 import { ProductsRepository } from "../products/products.repository.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
@@ -565,6 +566,37 @@ describe("admin product options API (real app, real Postgres)", () => {
         });
         expect(await dbState(product.id)).toEqual(before);
         expect(await historyRows(product.id)).toEqual(historyBefore);
+      },
+    );
+
+    it.each(rebuilding)(
+      "refuses %s with has_order_lines when a sold variant has no stock rows (ADR 0020)",
+      async (_name, change) => {
+        const product = await productIn("draft");
+        const target = product.variants[0];
+        if (target === undefined) {
+          throw new Error("The product has no variant.");
+        }
+        const { orderId, itemId } = await insertSoldLine(pool, {
+          productId: product.id,
+          variantId: target.id,
+        });
+        try {
+          const before = await dbState(product.id);
+          const result = await change(product.id);
+          expect(result.status, JSON.stringify(result.body)).toBe(409);
+          expect(problem(result)).toMatchObject({
+            code: "rule_violation",
+            rule: "has_order_lines",
+          });
+          expect(await dbState(product.id)).toEqual(before);
+          const line = await pool.query("select variant_id from order_item where id = $1", [
+            itemId,
+          ]);
+          expect(line.rows).toEqual([{ variant_id: target.id }]);
+        } finally {
+          await deleteOrders(pool, [orderId]);
+        }
       },
     );
 

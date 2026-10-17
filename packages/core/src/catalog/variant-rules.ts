@@ -1,7 +1,11 @@
 import type { ProductStatus } from "./types.js";
 
 export type VariantRuleReason =
-  "product_not_draft" | "last_variant" | "default_variant" | "has_stock_history";
+  | "product_not_draft"
+  | "last_variant"
+  | "default_variant"
+  | "has_stock_history"
+  | "has_order_lines";
 
 export type VariantRuleDecision =
   { readonly allowed: true } | { readonly allowed: false; readonly reason: VariantRuleReason };
@@ -15,14 +19,18 @@ function forbid(reason: VariantRuleReason): VariantRuleDecision {
 /**
  * Hard-deleting a variant (ADR 0006 sections 3 and 5, ADR 0013): only while the product is a draft, never the
  * last variant, never the default one, and never one with stock history (any `stock_movement` or `reservation` row,
- * whatever its status), because deleting the variant would cascade the history away. After publishing, or once the
- * variant has stock history, it is switched off instead.
+ * whatever its status), because deleting the variant would cascade the history away, and never one that an order
+ * line refers to (`has_order_lines`, ADR 0020): a sold variant that never had stock rows (digital goods) would
+ * otherwise lose the link of its order lines. After publishing, or once the variant was sold or has stock history,
+ * it is switched off instead.
  */
 export function canDeleteVariant(facts: {
   readonly productStatus: ProductStatus;
   readonly isDefault: boolean;
   readonly variantCount: number;
   readonly hasStockHistory: boolean;
+  /** Any `order_item` row refers to the variant (whatever the order status). */
+  readonly hasOrderLines: boolean;
 }): VariantRuleDecision {
   if (facts.productStatus !== "draft") {
     return forbid("product_not_draft");
@@ -36,6 +44,9 @@ export function canDeleteVariant(facts: {
   if (facts.hasStockHistory) {
     return forbid("has_stock_history");
   }
+  if (facts.hasOrderLines) {
+    return forbid("has_order_lines");
+  }
   return ALLOWED;
 }
 
@@ -47,10 +58,15 @@ export function canCreateVariantManually(productStatus: ProductStatus): VariantR
 /**
  * Rebuilding all variants of a draft product (a change of its options that adds or removes an option or removes a
  * value, ADR 0014) deletes every variant and so cascades their stock history away. It is refused while any variant
- * of the product has stock history (same definition as `canDeleteVariant`, ADR 0013).
+ * of the product has stock history (same definition as `canDeleteVariant`, ADR 0013) or is referenced by an order
+ * line (ADR 0020).
  */
 export function canRebuildVariants(facts: {
   readonly anyVariantHasStockHistory: boolean;
+  readonly anyVariantHasOrderLines: boolean;
 }): VariantRuleDecision {
-  return facts.anyVariantHasStockHistory ? forbid("has_stock_history") : ALLOWED;
+  if (facts.anyVariantHasStockHistory) {
+    return forbid("has_stock_history");
+  }
+  return facts.anyVariantHasOrderLines ? forbid("has_order_lines") : ALLOWED;
 }
