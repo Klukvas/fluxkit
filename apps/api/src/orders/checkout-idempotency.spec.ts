@@ -396,6 +396,39 @@ describe("checkout idempotency (real app, real Postgres)", () => {
       expect(level.rows).toEqual([{ reserved: 4 }]);
     });
 
+    it("two different keys for one signed-in customer's cart make one order, whatever the number of devices", async () => {
+      const account = await createTestCustomer(db, { password: PASSWORD });
+      customers.push(account.id);
+      const devices = await Promise.all(
+        Array.from({ length: 4 }, async () => {
+          const device = new Shopper(running.baseUrl);
+          const login = await device.post("/store/account/login", {
+            email: account.email,
+            password: PASSWORD,
+          });
+          expect(login.status).toBe(200);
+          return device;
+        }),
+      );
+      const { variantId } = await stocked(10, 1_000);
+      await add(devices[0] as Shopper, variantId, 4);
+      const results = await Promise.all(
+        devices.map((device) => checkoutAs(device, checkoutBody(4_000), randomUUID())),
+      );
+      expect(results.filter((result) => result.status === 201)).toHaveLength(1);
+      expect(results.filter((result) => result.status === 409)).toHaveLength(3);
+      for (const result of results) {
+        placedOrders.track(result.body.order?.number ?? "");
+        if (result.status === 409) {
+          expect(result.body).toMatchObject({ code: "cart_empty" });
+        }
+      }
+      const level = await pool.query("select reserved from inventory_level where variant_id = $1", [
+        variantId,
+      ]);
+      expect(level.rows).toEqual([{ reserved: 4 }]);
+    });
+
     it("the same key from two different carts makes one order; the other is idempotency_key_reused and leaves nothing behind", async () => {
       const a = await stocked(10, 1_000);
       const b = await stocked(10, 1_000);
