@@ -4,6 +4,7 @@ import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
+import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
 import { AllowAllAdminAuthenticator } from "./allow-all-admin-authenticator.js";
 import { requireEnv } from "./env.js";
 
@@ -25,6 +26,8 @@ export interface StartAppOptions {
   adminAuthenticator?: AdminAuthenticator | "production-default";
   /** Starts the default test authenticator as another role, for permission matrix tests. */
   adminPrincipal?: { role: AdminRole };
+  /** Other numbers for the named rate limits (default: the production ones). */
+  rateLimits?: RateLimitOverrides;
   /** A controlled clock for session expiry (use with `"production-default"`). */
   clock?: Clock;
   /** Extra modules loaded like enabled features, for probe controllers. */
@@ -37,6 +40,10 @@ export interface StartAppOptions {
   customerSessionMaxHours?: number;
   /** `CART_TTL_DAYS`; defaults to 30. */
   cartTtlDays?: number;
+  /** `ORDER_PAYMENT_TTL_MINUTES`; defaults to 30. */
+  orderPaymentTtlMinutes?: number;
+  /** `ORDER_GUEST_ACCESS_DAYS`; defaults to 90. */
+  orderGuestAccessDays?: number;
   /** `SHOP_CURRENCY`; defaults to UAH. */
   shopCurrency?: string;
   /** `LOW_STOCK_THRESHOLD`; defaults to 5. */
@@ -60,12 +67,15 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       customerSessionIdleMinutes: options.customerSessionIdleMinutes,
       customerSessionMaxHours: options.customerSessionMaxHours,
       cartTtlDays: options.cartTtlDays,
+      orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
+      orderGuestAccessDays: options.orderGuestAccessDays,
       shopCurrency: options.shopCurrency,
       lowStockThreshold: options.lowStockThreshold,
       pricesIncludeTax: options.pricesIncludeTax,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,
+      rateLimits: options.rateLimits,
       clock: options.clock,
       scrypt: TEST_SCRYPT_PARAMS,
       extraFeatures: options.extraFeatures,

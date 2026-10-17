@@ -96,6 +96,12 @@ export class ProblemDetailsDoc {
   constraint?: string;
   @ApiPropertyOptional({ description: "Core rule code of a rule_violation or invalid_transition." })
   rule?: string;
+  @ApiPropertyOptional({
+    description: "Only on `cart_changed`: the fresh cart, as `GET /store/cart` returns it.",
+    type: "object",
+    additionalProperties: true,
+  })
+  cart?: Record<string, unknown>;
 }
 
 const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
@@ -106,11 +112,12 @@ const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
   409: "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
   429: `${PROBLEM_TITLE.too_many_requests}: try again after the number of seconds in the Retry-After header.`,
   500: `${PROBLEM_TITLE.internal_error}. Details are only in the server log.`,
+  503: `${PROBLEM_TITLE.service_unavailable}: a transient failure, try again after the number of seconds in the Retry-After header.`,
 };
 
 /** Adds `application/problem+json` responses for the given statuses to a route or controller. */
 export function ApiProblemResponses(
-  ...statuses: (400 | 401 | 403 | 404 | 409 | 429 | 500)[]
+  ...statuses: (400 | 401 | 403 | 404 | 409 | 429 | 500 | 503)[]
 ): MethodDecorator & ClassDecorator {
   const options = (status: number): ApiResponseOptions => ({
     status,

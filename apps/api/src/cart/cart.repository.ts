@@ -115,6 +115,22 @@ export class CartRepository {
     return true;
   }
 
+  /**
+   * Takes `FOR KEY SHARE` on the customer row WITHOUT creating a cart: the first lock of a customer's checkout, so it
+   * follows the order customer row -> cart that carts writes and the sign-in merge already follow. (The order insert
+   * takes this lock anyway for its foreign key; taking it before the cart lock keeps the sign-in merge, which holds the
+   * customer row `FOR UPDATE`, from waiting for a cart that the checkout holds while the checkout waits for the
+   * customer row.) Returns `false` when the customer does not exist any more.
+   */
+  async keyShareCustomer(customerId: string, transaction: Transaction): Promise<boolean> {
+    const owner = await transaction
+      .select({ id: customer.id })
+      .from(customer)
+      .where(eq(customer.id, customerId))
+      .for("key share");
+    return owner.length > 0;
+  }
+
   /** The customer's cart, locked until the transaction ends. */
   async lockByCustomerId(
     customerId: string,

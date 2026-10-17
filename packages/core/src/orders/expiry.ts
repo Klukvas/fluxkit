@@ -14,6 +14,12 @@ export const ORDER_PAYMENT_TTL_MINUTES = Object.freeze({ min: 5, max: 1440, defa
  */
 export const RESERVATION_GRACE_MINUTES = 10;
 
+/**
+ * How long a paid order holds the reservations of its backordered lines while the stock is on the way (owner quiz
+ * 2026-10-17, ADR 0017): `markPaid` commits what is on hand and extends the rest by this much; fulfilment commits them.
+ */
+export const BACKORDER_HOLD_DAYS = 365;
+
 /** Days a guest may open an order with its access token. The default is 90. */
 export const GUEST_ACCESS_DAYS = Object.freeze({ min: 1, max: 3650, default: 90 });
 
@@ -58,6 +64,12 @@ export function orderExpiresAt(placedAt: Date, ttlMinutes: number): Date {
 export function reservationExpiresAt(orderExpiry: Date): Date {
   assertDate(orderExpiry, "orderExpiry");
   return shifted(orderExpiry, RESERVATION_GRACE_MINUTES * MILLISECONDS_PER_MINUTE);
+}
+
+/** The new expiry of the still-active reservations of an order paid at `now` (see `BACKORDER_HOLD_DAYS`). */
+export function backorderHoldUntil(now: Date): Date {
+  assertDate(now, "now");
+  return shifted(now, BACKORDER_HOLD_DAYS * MILLISECONDS_PER_DAY);
 }
 
 /** The value of `access_expires_at` of a guest order created at `createdAt`. */

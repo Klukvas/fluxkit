@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { deepFreeze } from "../catalog/test-support.js";
 import {
+  BACKORDER_HOLD_DAYS,
   GUEST_ACCESS_DAYS,
   ORDER_PAYMENT_TTL_MINUTES,
   RESERVATION_GRACE_MINUTES,
@@ -8,6 +9,7 @@ import {
   isGuestAccessCurrent,
   isGuestAccessValid,
   orderExpiresAt,
+  backorderHoldUntil,
   reservationExpiresAt,
 } from "./expiry.js";
 
@@ -179,5 +181,23 @@ describe("isGuestAccessCurrent", () => {
     expect(() => isGuestAccessCurrent(new Date(Number.NaN), expiry)).toThrow(RangeError);
     expect(() => isGuestAccessCurrent(expiry, "2027-01-01" as unknown as Date)).toThrow(RangeError);
     expect(() => isGuestAccessCurrent(null as unknown as Date, expiry)).toThrow(RangeError);
+  });
+});
+
+describe("backorderHoldUntil", () => {
+  it("holds the backordered lines of a paid order for 365 days from now (owner quiz 2026-10-17)", () => {
+    expect(BACKORDER_HOLD_DAYS).toBe(365);
+    const now = at("2026-10-17T12:00:00.500Z");
+    expect(backorderHoldUntil(now)).toEqual(at("2027-10-17T12:00:00.500Z"));
+    expect(backorderHoldUntil(now).getTime() - now.getTime()).toBe(365 * DAY);
+  });
+
+  it("refuses an invalid date and an overflow, and does not change its input", () => {
+    expect(() => backorderHoldUntil(new Date(Number.NaN))).toThrow(RangeError);
+    expect(() => backorderHoldUntil("2026-10-17" as unknown as Date)).toThrow(RangeError);
+    expect(() => backorderHoldUntil(new Date(8_640_000_000_000_000))).toThrow(RangeError);
+    const now = deepFreeze(at("2026-10-17T12:00:00.000Z"));
+    backorderHoldUntil(now);
+    expect(now.getTime()).toBe(at("2026-10-17T12:00:00.000Z").getTime());
   });
 });

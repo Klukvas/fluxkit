@@ -20,7 +20,10 @@ import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
+import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config.js";
+import { OrdersModule } from "./orders/orders.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
+import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
@@ -34,6 +37,10 @@ export interface AppModuleOptions {
   customerAuth?: CustomerAuthConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (30 days). */
   cart?: CartConfig;
+  /** Defaults to the defaults of `docs/contracts/config.md` (30 minutes to pay, 90 days of guest access). */
+  orders?: OrdersConfig;
+  /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
+  rateLimits?: RateLimitOverrides;
   /** Tests only: replaces the session-based authenticator. */
   adminAuthenticator?: AdminAuthenticator;
   /** Tests only: a controlled clock for session expiry. */
@@ -59,7 +66,7 @@ export class AppModule {
           scrypt: options.scrypt,
           cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
         }),
-        RateLimitModule.register(),
+        RateLimitModule.register(options.rateLimits),
         CustomerAuthModule.register({
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
@@ -68,6 +75,7 @@ export class AppModule {
         CatalogModule,
         InventoryModule,
         CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
+        OrdersModule.register({ config: options.orders ?? DEFAULT_ORDERS_CONFIG }),
         ...options.features.map((feature) => feature.module),
       ],
     };

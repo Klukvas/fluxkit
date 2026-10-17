@@ -27,7 +27,8 @@ import {
 } from "../customers/auth/customer-auth-config.js";
 import { RateLimit } from "../rate-limit/rate-limit.decorator.js";
 import { CART_CONFIG, type CartConfig } from "./cart-config.js";
-import { clearCartCookie, readCartCookie, setCartCookie } from "./cart-cookie.js";
+import { clearCartCookie, setCartCookie } from "./cart-cookie.js";
+import { resolveShopper } from "./cart-owner.js";
 import {
   addCartItemSchema,
   cartQuerySchema,
@@ -180,10 +181,7 @@ export class CartController {
 
   /** The signed-in customer if the session cookie is valid, else the guest of the cart cookie. Never a request field. */
   private async ownerOf(request: Request): Promise<CartOwner> {
-    const principal = await this.authenticator.authenticate(request);
-    return principal === undefined
-      ? { kind: "guest", token: readCartCookie(request.headers.cookie) }
-      : { kind: "customer", customerId: principal.customerId };
+    return (await resolveShopper(this.authenticator, request)).owner;
   }
 
   private respond(

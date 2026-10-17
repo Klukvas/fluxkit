@@ -7,8 +7,10 @@ import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
 import type { Clock } from "./auth/clock.js";
 import { DEFAULT_CART_CONFIG } from "./cart/cart-config.js";
+import { DEFAULT_ORDERS_CONFIG } from "./orders/orders-config.js";
 import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-config.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
+import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
 import {
   DEFAULT_FEATURES_DIR,
@@ -29,6 +31,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "customerSessionIdleMinutes"
       | "customerSessionMaxHours"
       | "cartTtlDays"
+      | "orderPaymentTtlMinutes"
+      | "orderGuestAccessDays"
       | "shopCurrency"
       | "pricesIncludeTax"
       | "lowStockThreshold"
@@ -38,6 +42,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
 export interface CreateAppOptions {
   /** Tests only. Without it admin requests are authenticated by the session cookie (`SessionAdminAuthenticator`). */
   adminAuthenticator?: AdminAuthenticator;
+  /** Tests only: other numbers for the named rate limits. */
+  rateLimits?: RateLimitOverrides;
   /** Tests only: a controlled clock for session expiry. */
   clock?: Clock;
   /** Tests only: cheap scrypt parameters. */
@@ -78,6 +84,11 @@ export async function createApp(
         maxHours: env.customerSessionMaxHours ?? DEFAULT_CUSTOMER_AUTH_CONFIG.maxHours,
       },
       cart: { ttlDays: env.cartTtlDays ?? DEFAULT_CART_CONFIG.ttlDays },
+      orders: {
+        paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
+        guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
+      },
+      rateLimits: options.rateLimits,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
       scrypt: options.scrypt,

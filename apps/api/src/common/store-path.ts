@@ -51,3 +51,23 @@ export function markStoreCartResponseUncacheable(
     response.setHeader("Cache-Control", "no-store");
   }
 }
+
+const STORE_ORDER_PATH = /^\/store\/(?:checkout|orders)(?:\/|$)/i;
+
+/** `/store/checkout` and `/store/orders` (the guest order routes), matched like `isStorePath`. */
+export function isStoreOrderPath(path: string): boolean {
+  return STORE_ORDER_PATH.test(path);
+}
+
+/**
+ * Checkout and guest order responses carry personal data and access tokens: never stored by a browser or a shared cache,
+ * errors included. The customer's own orders are under `/store/account` and covered by `markStoreAccountResponseUncacheable`.
+ */
+export function markStoreOrderResponseUncacheable(
+  request: { path: string },
+  response: { setHeader(name: string, value: string): unknown },
+): void {
+  if (isStoreOrderPath(request.path)) {
+    response.setHeader("Cache-Control", "no-store");
+  }
+}
