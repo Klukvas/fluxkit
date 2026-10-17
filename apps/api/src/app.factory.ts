@@ -6,6 +6,7 @@ import { AppModule } from "./app.module.js";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
 import type { Clock } from "./auth/clock.js";
+import { DEFAULT_CART_CONFIG } from "./cart/cart-config.js";
 import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-config.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
 import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
@@ -27,6 +28,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "storeCookieSecure"
       | "customerSessionIdleMinutes"
       | "customerSessionMaxHours"
+      | "cartTtlDays"
       | "shopCurrency"
       | "pricesIncludeTax"
       | "lowStockThreshold"
@@ -75,6 +77,7 @@ export async function createApp(
         idleMinutes: env.customerSessionIdleMinutes ?? DEFAULT_CUSTOMER_AUTH_CONFIG.idleMinutes,
         maxHours: env.customerSessionMaxHours ?? DEFAULT_CUSTOMER_AUTH_CONFIG.maxHours,
       },
+      cart: { ttlDays: env.cartTtlDays ?? DEFAULT_CART_CONFIG.ttlDays },
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
       scrypt: options.scrypt,

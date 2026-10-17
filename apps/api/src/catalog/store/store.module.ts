@@ -9,5 +9,7 @@ import { StoreService } from "./store.service.js";
 @Module({
   controllers: [StoreCategoriesController, StoreConfigController, StoreProductsController],
   providers: [StoreService, StoreRepository],
+  // The cart reads the same catalog facts and resolves locales the same way.
+  exports: [StoreService, StoreRepository],
 })
 export class StoreModule {}

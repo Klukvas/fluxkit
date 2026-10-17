@@ -30,6 +30,10 @@ export const DEFAULT_CUSTOMER_SESSION_MAX_HOURS = 2_160;
 const MAX_CUSTOMER_SESSION_IDLE_MINUTES = 525_600;
 const MAX_CUSTOMER_SESSION_MAX_HOURS = 8_760;
 
+/** Default and upper bound of the cart lifetime in days (ADR 0015). A year is the longest a cart is worth keeping. */
+export const DEFAULT_CART_TTL_DAYS = 30;
+const MAX_CART_TTL_DAYS = 365;
+
 /**
  * Defaults of the pricing variables, and the currencies a shop can sell in. The list equals `CURRENCY_CODES` of
  * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so it is repeated here.
@@ -100,6 +104,7 @@ const envSchema = z
     CUSTOMER_SESSION_MAX_HOURS: positiveInteger(MAX_CUSTOMER_SESSION_MAX_HOURS).default(
       DEFAULT_CUSTOMER_SESSION_MAX_HOURS,
     ),
+    CART_TTL_DAYS: positiveInteger(MAX_CART_TTL_DAYS).default(DEFAULT_CART_TTL_DAYS),
     SHOP_CURRENCY: z
       .string()
       .refine((value) => SUPPORTED_SHOP_CURRENCIES.includes(value), {
@@ -150,6 +155,8 @@ export interface AppEnv {
   customerSessionIdleMinutes: number;
   /** Absolute customer session lifetime in hours. */
   customerSessionMaxHours: number;
+  /** A cart expires this many days after its last write; also the `Max-Age` of the guest cart cookie. */
+  cartTtlDays: number;
   /** The one currency the shop sells in (ISO 4217, upper case). An active variant needs a price in it. */
   shopCurrency: string;
   /** Whether stored prices already include tax; only exposed to the storefront, no tax is calculated. */
@@ -182,6 +189,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     storeCookieSecure: env.STORE_COOKIE_SECURE,
     customerSessionIdleMinutes: env.CUSTOMER_SESSION_IDLE_MINUTES,
     customerSessionMaxHours: env.CUSTOMER_SESSION_MAX_HOURS,
+    cartTtlDays: env.CART_TTL_DAYS,
     shopCurrency: env.SHOP_CURRENCY,
     pricesIncludeTax: env.PRICES_INCLUDE_TAX,
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,

@@ -35,6 +35,8 @@ export interface StartAppOptions {
   storeCookieSecure?: boolean;
   customerSessionIdleMinutes?: number;
   customerSessionMaxHours?: number;
+  /** `CART_TTL_DAYS`; defaults to 30. */
+  cartTtlDays?: number;
   /** `SHOP_CURRENCY`; defaults to UAH. */
   shopCurrency?: string;
   /** `LOW_STOCK_THRESHOLD`; defaults to 5. */
@@ -57,6 +59,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       storeCookieSecure: options.storeCookieSecure,
       customerSessionIdleMinutes: options.customerSessionIdleMinutes,
       customerSessionMaxHours: options.customerSessionMaxHours,
+      cartTtlDays: options.cartTtlDays,
       shopCurrency: options.shopCurrency,
       lowStockThreshold: options.lowStockThreshold,
       pricesIncludeTax: options.pricesIncludeTax,

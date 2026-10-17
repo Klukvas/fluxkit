@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
 import { MAX_CREDENTIAL_LENGTH } from "../../auth/auth.schemas.js";
+import { cartNoticeSchema } from "../../cart/cart.schemas.js";
 
 export { changePasswordSchema, loginSchema } from "../../auth/auth.schemas.js";
 export type { ChangePasswordBody, LoginBody } from "../../auth/auth.schemas.js";
@@ -42,7 +43,17 @@ export const customerResponseSchema = z.object({
 
 export const accountResponseSchema = z.object({ customer: customerResponseSchema });
 
+/**
+ * Register and login: the customer plus what the merge of the guest cart did. `cartNotices` is always present and empty
+ * when nothing was capped or dropped (or there was no guest cart).
+ */
+export const signInResponseSchema = z.object({
+  customer: customerResponseSchema,
+  cartNotices: z.array(cartNoticeSchema),
+});
+
 export type RegisterBody = z.output<typeof registerSchema>;
 export type UpdateProfileBody = z.output<typeof updateProfileSchema>;
 export type CustomerResponse = z.output<typeof customerResponseSchema>;
 export type AccountResponse = z.output<typeof accountResponseSchema>;
+export type SignInResponse = z.output<typeof signInResponseSchema>;

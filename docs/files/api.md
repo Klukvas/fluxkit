@@ -2,8 +2,8 @@
 
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
-- `src/app.factory.ts` - `createApp` (loads features, passes the admin session settings, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
-- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
+- `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings and `CART_TTL_DAYS`, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
+- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory, the cart and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
 
@@ -20,7 +20,7 @@
 - `openapi.ts` - OpenAPI helpers: `ApiZodBody`, `ApiZodResponse` (schema from the same zod schema as the validation), `ApiPaginationQuery`, `ApiProblemResponses` and the problem document models.
 - `openapi-formats.ts` - response-only schemas (`uuidSchema`, `timestampSchema`) with OpenAPI formats.
 - `admin-path.ts` - `isAdminPath` (the `/admin` test, case-insensitive like Express routing) and `markAdminResponseUncacheable` (`Cache-Control: no-store`); used by the guard, the auth middleware and the problem filter.
-- `store-path.ts` - `isStorePath` and `isStoreAccountPath` (case-insensitive like Express routing) and `markStoreAccountResponseUncacheable` (`Cache-Control: no-store` for everything under `/store/account`); used by the store CSRF guard, the customers module middleware and the problem filter.
+- `store-path.ts` - `isStorePath`, `isStoreAccountPath` and `isStoreCartPath` (case-insensitive like Express routing) and `markStoreAccountResponseUncacheable` / `markStoreCartResponseUncacheable` (`Cache-Control: no-store` for everything under `/store/account` and `/store/cart`); used by the store CSRF guard, the customers module middleware and the problem filter.
 - `error-summary.ts` - `summarizeError`, `innermostCause`, `errorCode`: what is safe to log about a failure (class names and a code, never the message, which can hold SQL and parameters).
 - `transaction.ts` - `withTransaction` and the `DbExecutor` / `Transaction` types used by repositories and services.
 - `*.spec.ts` - unit tests for the filter, pipe, pagination, Postgres error mapping and transaction helper.
@@ -89,11 +89,24 @@ Infrastructure of plan step 3a (ADR 0016, `docs/api/customers.md`); the routes t
 Plan step 3b (ADR 0016, `docs/api/customers.md`). Core, no feature flag. `customers.module.ts` registers both controllers and a middleware that sets `Cache-Control: no-store` on `/store/account/*`.
 
 - `customer.repository.ts` - Drizzle queries on `customer` (find by normalized email or id, `FOR UPDATE`, list with a literal email prefix via `starts_with`, insert, update, order count over `sales_order`). Tables only, no rules.
-- `account/account.service.ts` - register, login, me, profile update and change-password. The sign-in flow mirrors the admin `AuthService` (identical `401`, one scrypt per failure, lockout through core `registerFailedLogin`, row-locked completion, new session, previous session revoked); rules (email, names, phone, password policy) are core functions. `afterSignIn` is an empty step with `TODO(fluxkit): step 4 merges the guest cart here`. Must not log emails, passwords, tokens or ids.
+- `account/account.service.ts` - register, login, me, profile update and change-password. The sign-in flow mirrors the admin `AuthService` (identical `401`, one scrypt per failure, lockout through core `registerFailedLogin`, row-locked completion, new session, previous session revoked); rules (email, names, phone, password policy) are core functions. `afterSignIn` runs inside the sign-in transaction, after the checks, and calls `CartMergeService` with the `fluxkit_cart` token of the request (a refused login never reaches it); the result `cartNotices` is returned. Must not log emails, passwords, tokens or ids.
 - `account/account.controller.ts` - `/store/account/*`: validates, calls the service, sets or clears the cookie. Register and login are the only routes without `@CustomerAuthenticated()`; they carry `@RateLimit("registration")` and `@RateLimit("login")`. No rules here.
 - `account/account.schemas.ts`, `account/customer.mapper.ts` - strict zod bodies (structure only; the admin login and change-password schemas are reused) and the allow-list mapper to `{id, email, firstName, lastName, phone, createdAt}`.
 - `admin/admin-customers.controller.ts`, `admin/admin-customers.service.ts`, `admin/admin-customers.schemas.ts` - `/admin/customers`: `@AdminController("customers", {read: "customers.read", write: "customers.write"})`; list, get with a real order count, activate/deactivate (revokes all sessions in the same transaction under the row lock) and unlock. No create, delete or password route.
 - `*.spec.ts` (real Postgres, HTTP level) - `account-register`, `account-login` (cookie attributes, identical failures, one hash computation per failure, lockout with the injected clock, fixation, rate limit), `account-session` (logout, me ownership, strict PATCH, change-password and session revocation), `account-secrecy` (logs, tables, hash format, responses), `account-separation` (customer and admin principals on the real routes, same email), `admin-customers` (permission matrix, list, get, deactivation, unlock).
+
+## Cart (`src/cart/`)
+
+Plan step 4 (ADR 0015, `docs/api/cart.md`). Core, no feature flag. `cart.module.ts` is global (`CartModule.register({config})`, so the sign-in code can use the merge) and sets `Cache-Control: no-store` on `/store/cart/*`.
+
+- `cart-config.ts` - `CartConfig` (`ttlDays` from `CART_TTL_DAYS`), its default and `cartExpiry`.
+- `cart-cookie.ts` - cookie name `fluxkit_cart`, `readCartCookie` (that name only, well-formed tokens only), `setCartCookie` / `clearCartCookie` (`HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` flag).
+- `cart.repository.ts` - Drizzle queries on `cart` and `cart_item`: lookups by token hash or customer id, the row locks (`FOR UPDATE`; `FOR KEY SHARE` on the customer row first), `ON CONFLICT DO NOTHING` creation of a customer cart, bulk line writes (one statement however many lines). Tables only, no rules, and no cart id ever comes from a request.
+- `cart-pricing.service.ts` - reads the catalog facts of all lines through `StoreRepository` in a fixed number of statements, applies the store's sellable rule and price/availability pipeline (`isVariantSellable`, `priceVariants`), calls core `priceCart` and builds the cart response (titles, option values and images through the store serializer). Turns a core overflow refusal into the `409 rule_violation`. Does no money arithmetic.
+- `cart.service.ts` - the lifecycle: lazy creation, one transaction per write that locks the cart row, core `addLine` / `setLineQuantity` / `removeLine` for every quantity rule, sliding expiry, the cookie decision, expired carts read as empty. Never trusts a client price.
+- `cart-merge.service.ts` - the merge at sign-in (core `mergeCarts`), run inside the sign-in transaction; locks both carts lower id first.
+- `cart.controller.ts`, `cart.schemas.ts` - `/store/cart/*`: finds the owner (customer session, else cookie), validates, applies the cookie decision; zod request and response schemas (also used for OpenAPI).
+- `*.spec.ts` (real Postgres, HTTP level) - `cart-basics` (lazy creation, cookie attributes, lines, limits, refusals, expiry, CSRF, no-store, rate limit, locale and images), `cart-pricing` (repricing, notices, unavailable lines, availability, `SHOP_CURRENCY`, amounts and overflow, leak scans, statement counts), `cart-ownership` (two shoppers, swapped and forged cookies, customer versus guest carts, parallel writes), `cart-merge` (every merge case, failed sign-ins, parallel sign-ins).
 
 ## Catalog (`src/catalog/`)
 
@@ -123,7 +136,7 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 
 ### Store (`src/catalog/store/`)
 
-- `store.module.ts` - `StoreModule`: public controllers and read-only repository.
+- `store.module.ts` - `StoreModule`: public controllers and read-only repository; exports `StoreService` and `StoreRepository` for the cart.
 - `store-controller.decorator.ts` - `@StoreController(resource)`: `/store/<resource>`, no guard, read-only, the `store` Swagger tag.
 - `store-categories.controller.ts` - `GET /store/categories`.
 - `store-products.controller.ts` - `GET /store/products` and `GET /store/products/{slug}`.
@@ -133,7 +146,7 @@ Each resource folder has `<name>.controller.ts` (HTTP only), `<name>.service.ts`
 - `store.service.ts` - store rules: locale resolution (400 on unknown), active-only visibility, category subtree filter, image choice, order, sellable-variant set (ADR 0007 option hiding), 404 for a product with no sellable variant. Must not return internal attributes, quantities or non-shop prices.
 - `store.serializer.ts` - the one place that emits attribute values and definitions to clients, via core `selectPublicAttributes` and `publicAttributeDefinitions`; `requiredText` logs and degrades to `""` when a required text has no locale.
 - `store-categories.ts` - builds the visible category tree (every ancestor active) and the subtree of a slug.
-- `store.repository.ts` - read-only Drizzle queries (batch loads, no N+1). Must not apply business rules beyond SQL filters (`status`, `is_active`, the shop-currency price join); prices and stock levels are loaded for a set of product ids in one query each.
+- `store.repository.ts` - read-only Drizzle queries (batch loads, no N+1). Must not apply business rules beyond SQL filters (`status`, `is_active`, the shop-currency price join); prices and stock levels are loaded for a set of product ids in one query each. The cart reads through it too, by variant id and with an optional open transaction: `listVariantsByIds` (any state, with the product and the shop-currency price or `null`), `listStockLevelsForVariants`, `listVariantOptionLabels`, and `listMediaForProducts(productIds, executor)`.
 - `store.spec.ts` - HTTP tests: visibility, leaks of internal attributes, locale, pagination bounds, query counts, prices, availability, hiding of unpriced variants, `GET /store/config`, leak scans for stock and price data.
 
 ## Inventory (`src/inventory/`)
@@ -203,6 +216,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
 - `store-routes.ts` - TEST ONLY: `storeRoutes` lists the `/store` routes of the real router with whether each is marked `@CustomerAuthenticated()` (read from the controllers' metadata; an unmatched route fails loudly).
 - `customer-probe.ts` - TEST ONLY, excluded from the build: probe controllers (customer-authenticated, public, rate-limited, sign-in and sign-out stand-ins) registered through `extraFeatures`, and a route under `/store/account` that forgot the decorator, for the route-walk test.
+- `cart-fixtures.ts` - TEST ONLY: `CartCatalog`, direct catalog rows for the cart specs (products, variants, option values, prices in any currency, stock, media) with a unique run id and cleanup; `cart-helpers.ts` - cart row queries, key scans and the `CartResult` type; `shopper.ts` - `Shopper`, a cookie-jar HTTP client (one per simulated browser).
 - `customer-fixtures.ts` - TEST ONLY: inserts and deletes customers directly (placeholder hash, or a real one with `password`, so the customer can sign in).
 - `customer-http.ts` - TEST ONLY: `customerLogin`, `customerLoginCookie`, `customerCookieOf` and `customerSetCookieOf` for specs that sign in through the real endpoint.
 - `env.ts` - `requireEnv` and `requireTestDatabaseUrl` (fail, never skip, when a service variable or a non-`_test` database is used).
