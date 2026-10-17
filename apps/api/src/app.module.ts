@@ -20,6 +20,8 @@ import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
+import { JobsModule } from "./jobs/jobs.module.js";
+import { DISABLED_SCHEDULER_CONFIG, type SchedulerConfig } from "./jobs/scheduler-config.js";
 import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
@@ -39,6 +41,8 @@ export interface AppModuleOptions {
   cart?: CartConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (30 minutes to pay, 90 days of guest access). */
   orders?: OrdersConfig;
+  /** Defaults to OFF (a caller without an environment must not start a timer); the API process passes `SCHEDULER_ENABLED`. */
+  scheduler?: SchedulerConfig;
   /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
   rateLimits?: RateLimitOverrides;
   /** Tests only: replaces the session-based authenticator. */
@@ -76,6 +80,10 @@ export class AppModule {
         InventoryModule,
         CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
         OrdersModule.register({ config: options.orders ?? DEFAULT_ORDERS_CONFIG }),
+        JobsModule.register({
+          config: options.scheduler ?? DISABLED_SCHEDULER_CONFIG,
+          databaseUrl: options.databaseUrl,
+        }),
         ...options.features.map((feature) => feature.module),
       ],
     };

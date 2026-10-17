@@ -44,6 +44,12 @@ const MAX_ORDER_PAYMENT_TTL_MINUTES = 1440;
 export const DEFAULT_ORDER_GUEST_ACCESS_DAYS = 90;
 const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
 
+/** Defaults and bounds of the in-process scheduler (ADR 0018): a tick every 10 seconds to every hour. */
+export const DEFAULT_SCHEDULER_ENABLED = true;
+export const DEFAULT_SCHEDULER_INTERVAL_SECONDS = 60;
+const MIN_SCHEDULER_INTERVAL_SECONDS = 10;
+const MAX_SCHEDULER_INTERVAL_SECONDS = 3600;
+
 /**
  * Defaults of the pricing variables, and the currencies a shop can sell in. The list equals `CURRENCY_CODES` of
  * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so it is repeated here.
@@ -125,6 +131,17 @@ const envSchema = z
     ORDER_GUEST_ACCESS_DAYS: positiveInteger(MAX_ORDER_GUEST_ACCESS_DAYS).default(
       DEFAULT_ORDER_GUEST_ACCESS_DAYS,
     ),
+    SCHEDULER_ENABLED: strictBoolean.default(DEFAULT_SCHEDULER_ENABLED),
+    SCHEDULER_INTERVAL_SECONDS: positiveInteger(MAX_SCHEDULER_INTERVAL_SECONDS)
+      .pipe(
+        z
+          .number()
+          .min(
+            MIN_SCHEDULER_INTERVAL_SECONDS,
+            `must be at least ${MIN_SCHEDULER_INTERVAL_SECONDS}`,
+          ),
+      )
+      .default(DEFAULT_SCHEDULER_INTERVAL_SECONDS),
     SHOP_CURRENCY: z
       .string()
       .refine((value) => SUPPORTED_SHOP_CURRENCIES.includes(value), {
@@ -181,6 +198,10 @@ export interface AppEnv {
   orderPaymentTtlMinutes: number;
   /** A guest can open their order with its access token for this many days (1 to 3650). */
   orderGuestAccessDays: number;
+  /** Whether this API process runs the scheduler (order expiry, stock sweep, cleanup, event dispatch). */
+  schedulerEnabled: boolean;
+  /** Seconds between scheduler ticks (10 to 3600). */
+  schedulerIntervalSeconds: number;
   /** The one currency the shop sells in (ISO 4217, upper case). An active variant needs a price in it. */
   shopCurrency: string;
   /** Whether stored prices already include tax; only exposed to the storefront, no tax is calculated. */
@@ -216,6 +237,8 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     cartTtlDays: env.CART_TTL_DAYS,
     orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
     orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
+    schedulerEnabled: env.SCHEDULER_ENABLED,
+    schedulerIntervalSeconds: env.SCHEDULER_INTERVAL_SECONDS,
     shopCurrency: env.SHOP_CURRENCY,
     pricesIncludeTax: env.PRICES_INCLUDE_TAX,
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,

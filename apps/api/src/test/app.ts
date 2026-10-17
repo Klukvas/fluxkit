@@ -44,6 +44,10 @@ export interface StartAppOptions {
   orderPaymentTtlMinutes?: number;
   /** `ORDER_GUEST_ACCESS_DAYS`; defaults to 90. */
   orderGuestAccessDays?: number;
+  /** `SCHEDULER_ENABLED`; defaults to FALSE here so a spec stays deterministic (jobs are called directly). */
+  schedulerEnabled?: boolean;
+  /** `SCHEDULER_INTERVAL_SECONDS`; defaults to 60. */
+  schedulerIntervalSeconds?: number;
   /** `SHOP_CURRENCY`; defaults to UAH. */
   shopCurrency?: string;
   /** `LOW_STOCK_THRESHOLD`; defaults to 5. */
@@ -69,6 +73,8 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       cartTtlDays: options.cartTtlDays,
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
+      schedulerEnabled: options.schedulerEnabled ?? false,
+      schedulerIntervalSeconds: options.schedulerIntervalSeconds,
       shopCurrency: options.shopCurrency,
       lowStockThreshold: options.lowStockThreshold,
       pricesIncludeTax: options.pricesIncludeTax,

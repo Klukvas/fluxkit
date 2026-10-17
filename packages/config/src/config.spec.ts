@@ -253,6 +253,43 @@ describe("loadEnv orders", () => {
   );
 });
 
+describe("loadEnv scheduler", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to enabled with a 60 second tick", () => {
+    const env = loadEnv(base);
+    expect(env.schedulerEnabled).toBe(true);
+    expect(env.schedulerIntervalSeconds).toBe(60);
+  });
+
+  it("accepts the bounds and both switch values", () => {
+    expect(loadEnv({ ...base, SCHEDULER_ENABLED: "false" }).schedulerEnabled).toBe(false);
+    expect(loadEnv({ ...base, SCHEDULER_ENABLED: "true" }).schedulerEnabled).toBe(true);
+    expect(loadEnv({ ...base, SCHEDULER_INTERVAL_SECONDS: "10" }).schedulerIntervalSeconds).toBe(
+      10,
+    );
+    expect(loadEnv({ ...base, SCHEDULER_INTERVAL_SECONDS: "3600" }).schedulerIntervalSeconds).toBe(
+      3600,
+    );
+  });
+
+  it.each(["TRUE", "yes", "1", "0", "", " true", "off"])(
+    "rejects SCHEDULER_ENABLED=%j (exactly true or false)",
+    (value) => {
+      expect(() => loadEnv({ ...base, SCHEDULER_ENABLED: value })).toThrow(/SCHEDULER_ENABLED/);
+    },
+  );
+
+  it.each(["0", "9", "3601", "-60", "60.5", "abc", "", "1e2", "0x3c", " 60", "060"])(
+    "rejects SCHEDULER_INTERVAL_SECONDS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, SCHEDULER_INTERVAL_SECONDS: value })).toThrow(
+        /SCHEDULER_INTERVAL_SECONDS/,
+      );
+    },
+  );
+});
+
 describe("loadEnv pricing", () => {
   const base = { DATABASE_URL: "postgres://x" };
 

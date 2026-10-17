@@ -20,6 +20,7 @@
     "seed": "pnpm build && pnpm --filter @fluxkit/api seed",
     "admin:create": "pnpm build && pnpm --filter @fluxkit/api admin:create",
     "admin:unlock": "pnpm build && pnpm --filter @fluxkit/api admin:unlock",
+    "jobs:run-once": "pnpm build && pnpm --filter @fluxkit/api jobs:run-once",
     "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export",
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:docs": "node scripts/check-docs.mjs --base origin/main",

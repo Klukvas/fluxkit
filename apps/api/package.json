@@ -16,7 +16,8 @@
     "db:migrate": "node --env-file=../../.env dist/database/migrate.js",
     "seed": "node --env-file=../../.env dist/seed/seed.js",
     "admin:create": "node --env-file=../../.env dist/auth/create-admin.js",
-    "admin:unlock": "node --env-file=../../.env dist/auth/unlock-admin.js"
+    "admin:unlock": "node --env-file=../../.env dist/auth/unlock-admin.js",
+    "jobs:run-once": "node --env-file=../../.env dist/jobs/run-once.js"
   },
   "devDependencies": {
     "@nestjs/testing": "12.1.3",
