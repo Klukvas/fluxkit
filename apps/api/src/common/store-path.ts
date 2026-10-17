@@ -30,3 +30,24 @@ export function markStoreAccountResponseUncacheable(
     response.setHeader("Cache-Control", "no-store");
   }
 }
+
+const STORE_CART_PATH = /^\/store\/cart(?:\/|$)/i;
+
+/** `/store/cart` and everything below it, matched like `isStorePath`. */
+export function isStoreCartPath(path: string): boolean {
+  return STORE_CART_PATH.test(path);
+}
+
+/**
+ * Cart responses depend on a cookie and change with every write: they must never be stored by a browser or a shared
+ * cache, errors included. Called by the cart middleware and, like the account one, by the problem filter for failures
+ * that happen before any middleware runs.
+ */
+export function markStoreCartResponseUncacheable(
+  request: { path: string },
+  response: { setHeader(name: string, value: string): unknown },
+): void {
+  if (isStoreCartPath(request.path)) {
+    response.setHeader("Cache-Control", "no-store");
+  }
+}

@@ -4,6 +4,8 @@ import { DEFAULT_ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth/auth-con
 import { AuthModule } from "./auth/auth.module.js";
 import type { Clock } from "./auth/clock.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
+import { CartModule } from "./cart/cart.module.js";
+import { DEFAULT_CART_CONFIG, type CartConfig } from "./cart/cart-config.js";
 import { CatalogModule } from "./catalog/catalog.module.js";
 import { CustomerAuthModule } from "./customers/auth/customer-auth.module.js";
 import {
@@ -30,6 +32,8 @@ export interface AppModuleOptions {
   adminAuth?: AdminAuthConfig;
   /** Defaults to the secure defaults of `docs/contracts/config.md`. */
   customerAuth?: CustomerAuthConfig;
+  /** Defaults to the defaults of `docs/contracts/config.md` (30 days). */
+  cart?: CartConfig;
   /** Tests only: replaces the session-based authenticator. */
   adminAuthenticator?: AdminAuthenticator;
   /** Tests only: a controlled clock for session expiry. */
@@ -59,6 +63,7 @@ export class AppModule {
         CustomerAuthModule.register({
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
+        CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
         HealthModule,
         CustomersModule,
         CatalogModule,

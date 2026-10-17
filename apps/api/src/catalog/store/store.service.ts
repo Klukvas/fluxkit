@@ -65,7 +65,7 @@ function pricingOf(priced: ReadonlyMap<string, StoreVariantPricing>, variantId: 
 }
 
 /** The list image: the first gallery image (no option pair), else the first image of any kind. */
-function pickListImage(media: readonly ProductMediaRow[], locale: StoreLocale) {
+export function pickListImage(media: readonly ProductMediaRow[], locale: StoreLocale) {
   const chosen = media.find((entry) => entry.optionValueId === null) ?? media[0];
   return chosen === undefined ? null : { url: chosen.url, alt: optionalText(chosen.alt, locale) };
 }
@@ -103,7 +103,7 @@ export class StoreService {
   }
 
   /** `?locale=` must be configured; missing means the default locale. Fallback to the default is per field. */
-  private resolveLocale(requested: string | undefined): StoreLocale {
+  resolveLocale(requested: string | undefined): StoreLocale {
     const locale = requested ?? this.config.defaultLocale;
     if (!this.config.locales.includes(locale)) {
       throw validationFailed([

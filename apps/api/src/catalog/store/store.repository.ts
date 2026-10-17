@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, exists, inArray, sql, type SQL } from "drizzle-orm";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
+import type { DbExecutor } from "../../common/transaction.js";
 import {
   attribute,
   attributeOption,
@@ -85,6 +86,36 @@ export interface StockLevelRow {
   variantId: string;
   onHand: number;
   reserved: number;
+}
+
+/**
+ * One variant by id for the cart, whatever its state: the cart keeps lines the store no longer sells and must say so.
+ * The price is the shop-currency one or `null`; the sellable rule itself is core's `isVariantSellable`, applied by the caller.
+ * Product facts are included so the cart needs no second read for titles.
+ */
+export interface CartVariantRow {
+  id: string;
+  productId: string;
+  productSlug: string;
+  productTitle: I18nText;
+  productStatus: string;
+  sku: string;
+  variantTitle: I18nText | null;
+  isActive: boolean;
+  attributes: Record<string, unknown>;
+  trackInventory: boolean;
+  allowBackorder: boolean;
+  priceAmount: number | null;
+  priceCurrency: string | null;
+  compareAtAmount: number | null;
+}
+
+/** An option value chosen by one variant, with the option name, in the product's option order. */
+export interface VariantOptionLabelRow {
+  variantId: string;
+  optionValueId: string;
+  optionName: I18nText;
+  valueLabel: I18nText;
 }
 
 export interface ProductListFilter {
@@ -203,12 +234,18 @@ export class StoreRepository {
     return { rows, total };
   }
 
-  /** Media of many products in one query, in display order. */
-  listMediaForProducts(productIds: readonly string[]): Promise<ProductMediaRow[]> {
+  /**
+   * Media of many products in one query, in display order. Pass the open transaction as `executor` when the caller
+   * holds one (the cart): a second pool connection taken while a transaction is open could starve the pool.
+   */
+  listMediaForProducts(
+    productIds: readonly string[],
+    executor: DbExecutor = this.db,
+  ): Promise<ProductMediaRow[]> {
     if (productIds.length === 0) {
       return Promise.resolve([]);
     }
-    return this.db
+    return executor
       .select({
         productId: media.productId,
         url: media.url,
@@ -352,6 +389,88 @@ export class StoreRepository {
       .innerJoin(price, and(eq(price.variantId, variant.id), eq(price.currency, shopCurrency)))
       .where(and(inArray(variant.productId, [...productIds]), eq(variant.isActive, true)))
       .orderBy(asc(variant.position), asc(variant.sku), asc(variant.id));
+  }
+
+  /**
+   * The variants of a cart by id, any state, each with its product and its shop-currency price (left join: no price
+   * gives `null`). A price in another currency is not joined and never leaves the database.
+   */
+  listVariantsByIds(
+    variantIds: readonly string[],
+    shopCurrency: string,
+    executor: DbExecutor = this.db,
+  ): Promise<CartVariantRow[]> {
+    if (variantIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return executor
+      .select({
+        id: variant.id,
+        productId: variant.productId,
+        productSlug: product.slug,
+        productTitle: product.title,
+        productStatus: product.status,
+        sku: variant.sku,
+        variantTitle: variant.title,
+        isActive: variant.isActive,
+        attributes: variant.attributes,
+        trackInventory: variant.trackInventory,
+        allowBackorder: variant.allowBackorder,
+        priceAmount: price.amount,
+        priceCurrency: price.currency,
+        compareAtAmount: price.compareAtAmount,
+      })
+      .from(variant)
+      .innerJoin(product, eq(product.id, variant.productId))
+      .leftJoin(price, and(eq(price.variantId, variant.id), eq(price.currency, shopCurrency)))
+      .where(inArray(variant.id, [...variantIds]));
+  }
+
+  /** The inventory levels (all locations) of the given variants, in one query (the cart shows an availability, never a quantity). */
+  listStockLevelsForVariants(
+    variantIds: readonly string[],
+    executor: DbExecutor = this.db,
+  ): Promise<StockLevelRow[]> {
+    if (variantIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return executor
+      .select({
+        variantId: inventoryLevel.variantId,
+        onHand: inventoryLevel.onHand,
+        reserved: inventoryLevel.reserved,
+      })
+      .from(inventoryLevel)
+      .where(inArray(inventoryLevel.variantId, [...variantIds]));
+  }
+
+  /** Option names and value labels of many variants in one query, in the order the product lists its options. */
+  listVariantOptionLabels(
+    variantIds: readonly string[],
+    executor: DbExecutor = this.db,
+  ): Promise<VariantOptionLabelRow[]> {
+    if (variantIds.length === 0) {
+      return Promise.resolve([]);
+    }
+    return executor
+      .select({
+        variantId: variantOptionValue.variantId,
+        optionValueId: variantOptionValue.optionValueId,
+        optionName: option.name,
+        valueLabel: optionValue.label,
+      })
+      .from(variantOptionValue)
+      .innerJoin(option, eq(option.id, variantOptionValue.optionId))
+      .innerJoin(optionValue, eq(optionValue.id, variantOptionValue.optionValueId))
+      .innerJoin(
+        productOption,
+        and(
+          eq(productOption.productId, variantOptionValue.productId),
+          eq(productOption.optionId, variantOptionValue.optionId),
+        ),
+      )
+      .where(inArray(variantOptionValue.variantId, [...variantIds]))
+      .orderBy(asc(productOption.position), asc(option.code));
   }
 
   /** The inventory levels (all locations) of the active variants of many products, in one query. */
