@@ -97,6 +97,24 @@ Known limits:
 - `request.ip` is the socket address unless Express `trust proxy` is configured, which the API does not do yet. Behind a reverse proxy all clients then share one IP window.
 - No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in is described in the Cart section.
 
+## Checkout and orders (ADR 0015, 0017, `docs/api/orders.md`)
+
+Plan step 5b. The rules every order route follows:
+
+| Item | Rule |
+|---|---|
+| Checkout | `POST /store/checkout` with the header `Idempotency-Key` (a UUID) and the body of `docs/api/orders.md`. The body has no field for a cart, a customer, a price or a total: `expectedTotal` is a consent check and never a price. `201 {order, accessToken?}`, `200` for a replay of the same checkout |
+| Idempotency | The same key with the same normalized request, from whoever can still reach the same cart, returns the same order (`200`); a guest gets a NEW `accessToken` and the old one stops working. Any other use of a key is `409 idempotency_key_reused`, always the same answer |
+| Guest access | `accessToken` (43 characters, base64url) is shown once. It opens one order through `POST /store/orders/lookup` and `POST /store/orders/cancel` (a POST, so it is never in a URL); the storefront keeps it in the URL fragment. Every failed lookup or cancel is the same `404` |
+| Customer orders | `GET /store/account/orders`, `GET /store/account/orders/{number}`, `POST /store/account/orders/{number}/cancel`: customer session only; another customer's number is the same `404` as an unknown one |
+| Order shape | `{number, status, placedAt, expiresAt, currency, items, subtotal, shippingTotal, discountTotal, taxTotal, total, adjustments, contact, shippingAddress, billingAddress, history}` (`docs/api/orders.md`); the summary of the list is `{number, status, placedAt, expiresAt, total, itemCount}`. Money is `{amount, currency}` in minor units. Statuses: `awaiting_payment`, `paid`, `fulfilled`, `cancelled`, `expired` |
+| Order number | `XXXX-XXXX` (Crockford base32, 40 random bits); input is normalized. Not a secret, not sequential |
+| Problem codes | `409` `cart_empty`, `cart_changed` (member `cart`: the fresh cart), `checkout_refused` (`errors[]` with `path: "lines.N"` and a code: `insufficient_stock`, `variant_not_sellable`, `reserved_out_of_range`, `line_total_out_of_range`), `idempotency_key_reused`; `503` `service_unavailable` with `Retry-After`; `rule_violation` rules `invalid_transition`, `subtotal_out_of_range`, and for variants `has_order_lines` (ADR 0020). Validation codes: `idempotency_key_required`, `invalid_idempotency_key`, `shipping_address_required` |
+| Caching and limits | Every response is `Cache-Control: no-store`; writes need the store CSRF header; `checkout`, the lookup and the guest cancel are rate limited per address (`429` with `Retry-After`; the numbers are internal) |
+| Config | `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS` (`docs/contracts/config.md`) |
+
+Not contract (internal): the number of days and minutes behind the defaults beyond what `docs/contracts/config.md` lists, the rate-limit numbers, how many statements a request issues, the order of `errors[]` entries. The domain events (`order.placed`, ...), the handler registration and the ports are described in ADR 0018 and the core exports (`packages/core/src/orders/events.ts`); their contract file `docs/contracts/events.md` is written in plan step 7 together with the dispatcher (step 5c), so until then they are NOT yet a stable contract.
+
 ## Stability of identifiers (ADR 0006 section 10)
 
 | Identifier | Rule |
@@ -113,7 +131,7 @@ Known limits:
 - Internal attributes (`isInternal`) and attributes not visible on the storefront: never returned by `/store/*`, never documented as a store shape. Admin responses show them to admins; their existence and codes are not a storefront contract.
 - Store fields not listed in `docs/api/catalog.md` (for example `barcode`, `isDefault`, variant `position`, timestamps other than `publishedAt`).
 - The order of JSON object keys, and the exact wording of `detail` and `message` texts in problem bodies. Clients use `code`, `status` and `errors[].path` / `errors[].code`.
-- Routes and fields that are documented as not yet implemented (for example price or availability sorting and filtering, search, checkout, orders) are not in this contract; they arrive with their own plans.
+- Routes and fields that are documented as not yet implemented (for example price or availability sorting and filtering, search, the admin order routes) are not in this contract; they arrive with their own plans.
 - The `pnpm admin:create` command is a tool, not an API; its options are described in `README.md` (Admin sign-in).
 
 ## Versioning

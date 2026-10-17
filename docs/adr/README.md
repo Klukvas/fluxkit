@@ -23,3 +23,4 @@
 | [0017](0017-orders.md) | Orders | accepted (2026-10-17, owner decisions and quiz); refines ADR 0004 decision 4 (one explicit status until the payment plan) |
 | [0018](0018-scheduler-domain-events-and-ports.md) | Scheduler, domain events and ports | accepted (2026-10-17, owner quiz); extends ADR 0002 and 0011 |
 | [0019](0019-orders-schema.md) | Orders schema: foreign key actions, immutability triggers and known gaps | accepted (2026-10-17); implements the data part of ADR 0015 to 0018, follows ADR 0012 |
+| [0020](0020-variants-with-order-lines-are-not-deleted.md) | Variants with order lines are not deleted | accepted (2026-10-17); extends the delete rule of ADR 0013 and the option-change rule of ADR 0014, closes the known gap of ADR 0019 |
