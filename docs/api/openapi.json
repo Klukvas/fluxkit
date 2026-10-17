@@ -1008,6 +1008,1078 @@
         "tags": ["health"]
       }
     },
+    "/store/account/register": {
+      "post": {
+        "description": "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked.",
+        "operationId": "AccountController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "password": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "firstName": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "phone": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": ["email", "password", "firstName", "lastName"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new customer. The session cookie is in `Set-Cookie`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["customer"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create an account and sign in",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/login": {
+      "post": {
+        "description": "Every failure (unknown email, wrong password, locked or inactive account) is the same 401. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued.",
+        "operationId": "AccountController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "password": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": ["email", "password"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The customer. The session cookie is in `Set-Cookie`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["customer"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Sign in with email and password; sets the session cookie",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/logout": {
+      "post": {
+        "operationId": "AccountController_logout",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "The session is deleted; the old cookie no longer works."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "End the current session and clear the cookie",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/me": {
+      "get": {
+        "operationId": "AccountController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The own profile, read from the database.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["customer"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The signed-in customer",
+        "tags": ["store"]
+      },
+      "patch": {
+        "description": "The email is not editable. `phone: null` removes the phone.",
+        "operationId": "AccountController_updateMe",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "phone": {
+                    "nullable": true,
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        }
+                      },
+                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["customer"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the own names and phone",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/change-password": {
+      "post": {
+        "operationId": "AccountController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": ["currentPassword", "newPassword"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; the current session stays signed in."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change the own password; all other sessions end",
+        "tags": ["store"]
+      }
+    },
+    "/admin/customers": {
+      "get": {
+        "operationId": "AdminCustomersController_list",
+        "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Start of the email; case and surrounding spaces do not matter.",
+            "schema": {
+              "type": "string",
+              "maxLength": 254
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of customers (summary fields).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "firstName": {
+                            "type": "string"
+                          },
+                          "lastName": {
+                            "type": "string"
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "lastLoginAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "email",
+                          "firstName",
+                          "lastName",
+                          "isActive",
+                          "lastLoginAt",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List customers, ordered by email",
+        "tags": ["admin-customers"]
+      }
+    },
+    "/admin/customers/{id}": {
+      "get": {
+        "operationId": "AdminCustomersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The customer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "firstName": {
+                      "type": "string"
+                    },
+                    "lastName": {
+                      "type": "string"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "lastLoginAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "phone": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isLocked": {
+                      "type": "boolean"
+                    },
+                    "orderCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "firstName",
+                    "lastName",
+                    "isActive",
+                    "lastLoginAt",
+                    "createdAt",
+                    "phone",
+                    "isLocked",
+                    "orderCount",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one customer with the number of their orders",
+        "tags": ["admin-customers"]
+      },
+      "patch": {
+        "description": "Deactivating ends all sessions of the customer and refuses their sign-in. Nothing else can be changed.",
+        "operationId": "AdminCustomersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "isActive": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["isActive"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated customer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "email": {
+                      "type": "string"
+                    },
+                    "firstName": {
+                      "type": "string"
+                    },
+                    "lastName": {
+                      "type": "string"
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "lastLoginAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "phone": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "isLocked": {
+                      "type": "boolean"
+                    },
+                    "orderCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "email",
+                    "firstName",
+                    "lastName",
+                    "isActive",
+                    "lastLoginAt",
+                    "createdAt",
+                    "phone",
+                    "isLocked",
+                    "orderCount",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Activate or deactivate a customer",
+        "tags": ["admin-customers"]
+      }
+    },
+    "/admin/customers/{id}/unlock": {
+      "post": {
+        "operationId": "AdminCustomersController_unlock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Customer id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The failure counter and the lock are cleared."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Clear the lockout of a customer after too many failed sign-ins",
+        "tags": ["admin-customers"]
+      }
+    },
     "/admin/products/{id}/variants/{variantId}/inventory": {
       "get": {
         "description": "Reads create nothing: a variant without level rows has an empty `levels` list and `totalAvailable` 0.",

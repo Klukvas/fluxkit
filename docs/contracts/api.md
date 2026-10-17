@@ -34,9 +34,10 @@ Contract:
 | Session | `POST /admin/auth/login` answers `200` and sets a session cookie; every other `/admin` request is authenticated by that cookie alone (an `Authorization` header, API key or query parameter is ignored). `POST /admin/auth/logout` ends the session. Idle and absolute lifetimes come from `ADMIN_SESSION_IDLE_MINUTES` and `ADMIN_SESSION_MAX_HOURS` (`docs/contracts/config.md`). The cookie is `HttpOnly`, `SameSite=Strict`, `Path=/admin`, and `Secure` unless `ADMIN_COOKIE_SECURE=false` |
 | CSRF header | Every `POST`, `PUT`, `PATCH` and `DELETE` under `/admin`, login included and also for anonymous callers, must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers |
 | Roles | `owner`, `manager`, `viewer`; fixed in code (a new role is a code change, not data). The names are contract |
-| Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`, `orders.read`, `orders.write`, `customers.read`, `customers.write`. The names are contract. The orders and customers permissions exist in core; no route requires them yet (ADR 0017, plan `docs/plans/2026-10-17-cart-and-orders.md`) |
+| Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`, `orders.read`, `orders.write`, `customers.read`, `customers.write`. The names are contract. `customers.read` and `customers.write` are required by the `/admin/customers` routes; the orders permissions exist in core and no route requires them yet (ADR 0017, plan `docs/plans/2026-10-17-cart-and-orders.md`) |
 | Login response | `200 {"user": {id, email, role, isActive, lastLoginAt}}` plus the cookie. Every failure (unknown email, wrong password, locked account, inactive user) answers the same `401 unauthorized` with no cookie; status, headers and body do not say which. Response times are similar (one scrypt each) but not guaranteed equal: a wrong password also writes the failure count, so a small difference can exist. `GET /admin/auth/me` answers `{user, permissions}` |
 | Caching | Every response under `/admin` (matched like the guard: case-insensitive, trailing slash included), errors included, carries `Cache-Control: no-store`. `/store/*` and `/health` are not affected, except that customer-authenticated store routes are `no-store` too (`docs/api/customers.md`) |
+| Customer endpoints | `GET /admin/customers`, `GET` and `PATCH /admin/customers/{id}`, `POST /admin/customers/{id}/unlock`; `GET` needs `customers.read`, the others `customers.write`; no create, delete or password route. Shapes and errors: `docs/api/customers.md` |
 | Users endpoints | `GET` and `POST /admin/users`, `GET` and `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-password`, owner only; no delete; the last active owner cannot be demoted or deactivated. Shapes and errors: `docs/api/auth.md` |
 
 | Role | `catalog.read` | `catalog.write` | `catalog.publish` | `users.manage` | `orders.read` | `orders.write` | `customers.read` | `customers.write` |
@@ -45,7 +46,7 @@ Contract:
 | `manager` | yes | yes | yes | no | yes | yes | yes | yes |
 | `viewer` | yes | no | no | no | no | no | no | no |
 
-Route to permission: `GET` and `HEAD` need `catalog.read`; every other method needs `catalog.write`; `publish`, `unpublish`, `archive` and `restore` of a product need `catalog.publish`; the users routes need `users.manage`. `logout`, `me` and `change-password` need only a session. A route that declares no permission is denied.
+Route to permission: `GET` and `HEAD` need `catalog.read`; every other method needs `catalog.write`; `publish`, `unpublish`, `archive` and `restore` of a product need `catalog.publish`; the users routes need `users.manage`; the customers routes need `customers.read` (`GET`) or `customers.write` (every other method). A route without its own declaration gets the default pair of its controller: `@AdminController(resource)` means the catalog pair, `@AdminController(resource, {read, write})` names another (the pair is internal, the resulting permission per route is contract). `logout`, `me` and `change-password` need only a session. A route that declares no permission is denied.
 
 Problem codes added by auth:
 
@@ -59,14 +60,16 @@ Not contract (internal, may change in a minor release): the scrypt parameters an
 
 ## Customer authentication and the store (ADR 0016, `docs/api/customers.md`)
 
-Infrastructure only (plan step 3a): no customer endpoint exists yet, so the rows below are the rules routes added later must follow.
+Plan steps 3a and 3b. Endpoints: `POST /store/account/register`, `POST /store/account/login`, `POST /store/account/logout`, `GET` and `PATCH /store/account/me`, `POST /store/account/change-password` (shapes, errors and rules in `docs/api/customers.md`). Register and login are the only public routes under `/store/account`. The rows below are the rules every customer route follows.
 
 | Item | Rule |
 |---|---|
 | Store CSRF header | Every `POST`, `PUT`, `PATCH` and `DELETE` under `/store` (matched like Express: case-insensitive, trailing slash included), signed in or not, must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`, before authentication. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers. New in this release (the store was GET-only, so no existing request changes) |
 | Customer cookie | `fluxkit_customer_session`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`; idle and absolute lifetimes from `CUSTOMER_SESSION_IDLE_MINUTES` and `CUSTOMER_SESSION_MAX_HOURS` (`docs/contracts/config.md`). A separate principal from the admin: an admin cookie never authenticates a customer route and a customer cookie never authenticates an `/admin` route (`401`); only the cookie is read |
 | Public by default | A `/store` route is public unless it is marked customer-authenticated; a customer-authenticated route answers `401 unauthorized` (identical for every cause) and carries `Cache-Control: no-store` |
-| Rate limit | A limited store route answers `429 too_many_requests` with `Retry-After` |
+| Rate limit | A limited store route answers `429 too_many_requests` with `Retry-After`; register and login are limited |
+| Account responses | `{customer: {id, email, firstName, lastName, phone, createdAt}}` and nothing else: never the hash, lockout state or flags. Every response under `/store/account` is `Cache-Control: no-store` |
+| Sign-in failures | Unknown email, wrong password, locked and inactive account answer the identical `401` (status, headers, body) with no cookie. Registration with a taken email is `409 conflict` on `email` (accepted trade-off, ADR 0016) |
 
 Not contract (internal): the cookie name, the token format and how sessions are stored, the rate-limit numbers.
 
@@ -74,7 +77,7 @@ Known limits:
 
 - The IP login limit is in memory, per API process: it resets on restart and is not shared between instances. The account lockout is in the database and does span instances.
 - `request.ip` is the socket address unless Express `trust proxy` is configured, which the API does not do yet. Behind a reverse proxy all clients then share one IP window.
-- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (infrastructure: `docs/api/customers.md`).
+- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in arrives with step 4.
 
 ## Stability of identifiers (ADR 0006 section 10)
 
