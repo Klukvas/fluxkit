@@ -301,6 +301,28 @@ describe("admin orders: access and input validation (real Postgres)", () => {
       expect(row.rows[0]).toEqual({ status: "awaiting_payment" });
     });
 
+    it("a 400 never echoes what was sent (no reason, reference, email or filter text in the problem body)", async () => {
+      const order = await world.place([{ quantity: 1 }]);
+      const echo = "ECHO-MARKER-7731";
+      const responses = [
+        await cancelRaw(order.id, { reason: `${echo}${"x".repeat(600)}` }),
+        await cancelRaw(order.id, { reason: `${echo}\u0000` }),
+        await payRaw(order.id, {
+          reference: `${echo}${"r".repeat(300)}`,
+          amount: { amount: 1.5, currency: echo },
+        }),
+        await payRaw(order.id, { reference: echo, amount: { amount: echo, currency: "UAH" } }),
+        await world.list(`?q=${echo}${"a".repeat(300)}`),
+        await world.list(`?status=${echo}`),
+        await world.list(`?placedFrom=${echo}`),
+        await http<ProblemBody>(world.owner.baseUrl, "GET", `/admin/orders/${echo}`),
+      ];
+      for (const response of responses) {
+        expect(response.status).toBe(400);
+        expect(JSON.stringify(response.body)).not.toContain("ECHO-MARKER");
+      }
+    });
+
     it("cancel accepts 1 and exactly 500 characters, trims them, and keeps tabs and line feeds", async () => {
       const [short, long, multiline] = [
         await world.place([{ quantity: 1 }]),
