@@ -123,6 +123,83 @@ If every owner is locked out or has lost the password, create a new owner with `
 
 Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`.
 
+## Checkout walkthrough
+
+A copy-pasteable run of the whole flow with `curl` and `jq` against a local API: browse, fill a cart, register, place an order, pay and fulfil it as an admin, cancel another one, run the jobs. It uses only documented routes (`docs/api/cart.md`, `customers.md`, `orders.md`, `auth.md`) and was run against a freshly migrated and seeded database.
+
+Prerequisites:
+
+- Quick start done: migrated database (`pnpm db:migrate`), `pnpm seed` (the database name must end in `_test`, `_dev`, `_demo` or `_local`; the default `fluxkit_dev` does), an owner (`pnpm admin:create --email owner@example.com`), the API running (`pnpm --filter @fluxkit/api start`).
+- Plain HTTP on localhost: put `ADMIN_COOKIE_SECURE=false` and `STORE_COOKIE_SECURE=false` into `.env` before starting the API, otherwise the cookies carry `Secure` and `curl` does not send them back over `http://`.
+- The seed creates no customers and no orders (see `seeds/README.md`); the flow below creates them.
+- Every state-changing request carries `X-Fluxkit-CSRF: 1` and, with a body, a JSON content type (`403 forbidden` otherwise). Cookies live in two jars: `shop.jar` (cart and customer session, `Path=/store`) and `admin.jar` (admin session, `Path=/admin`).
+
+```bash
+API=http://localhost:3000                      # PORT from .env
+H=(-H 'X-Fluxkit-CSRF: 1' -H 'Content-Type: application/json')
+
+# 1. Read the shop settings and the catalog (public, no cookie)
+curl -s $API/store/config
+curl -s "$API/store/products?limit=20" | jq -r '.items[] | "\(.slug)  \(.price.from) \(.price.currency)  \(.availability)"'
+VARIANT_ID=$(curl -s $API/store/products/demo-e-book | jq -r '.variants[0].id')   # a digital product: no shipping address needed
+
+# 2. Add to the cart as a guest (the first write creates the cart and sets the fluxkit_cart cookie), then read it
+curl -s -c shop.jar -b shop.jar "${H[@]}" -X POST $API/store/cart/items \
+  -d "{\"variantId\":\"$VARIANT_ID\",\"quantity\":2}" | jq -c '{itemCount, total, purchasable}'
+curl -s -b shop.jar $API/store/cart | jq '.lines[0], .total'
+
+# 3. Register a customer: signs in with a new session and merges the guest cart into the account's cart
+curl -s -c shop.jar -b shop.jar "${H[@]}" -X POST $API/store/account/register \
+  -d '{"email":"shopper@example.com","password":"a long demo password","firstName":"Demo","lastName":"Shopper","phone":"+380501234567"}' | jq -c .
+curl -s -b shop.jar $API/store/cart | jq -c '{itemCount, total}'          # still 2 items
+
+# 4. Check out. The Idempotency-Key makes a retry safe; expectedTotal is the total the shopper saw (a consent check, never a price)
+TOTAL=$(curl -s -b shop.jar $API/store/cart | jq -c '.total')
+KEY=$(cat /proc/sys/kernel/random/uuid)                                    # any new UUID per attempt
+curl -s -c shop.jar -b shop.jar "${H[@]}" -H "Idempotency-Key: $KEY" -X POST $API/store/checkout \
+  -d "{\"phone\":\"+380501234567\",\"firstName\":\"Demo\",\"lastName\":\"Shopper\",\"expectedTotal\":$TOTAL}" \
+  -w '\nHTTP %{http_code}\n' | tee order.json
+NUMBER=$(head -1 order.json | jq -r '.order.number')
+# the same request with the same key answers 200 with the same order, nothing is reserved twice (rerun the curl above to see it)
+
+# 5. Read the order as its owner (status awaiting_payment, 30 minutes to pay by default)
+curl -s -b shop.jar "$API/store/account/orders/$NUMBER" | jq -c '{number, status, total, expiresAt}'
+curl -s -b shop.jar "$API/store/account/orders" | jq -c '.items'
+
+# 6. Admin: sign in, find the order, mark it paid (no payment provider exists yet), fulfil it
+curl -s -c admin.jar "${H[@]}" -X POST $API/admin/auth/login \
+  -d '{"email":"owner@example.com","password":"<the owner password>"}' | jq -c .user
+ORDER_ID=$(curl -s -b admin.jar "$API/admin/orders?q=$NUMBER" | jq -r '.items[0].id')
+AMOUNT=$(echo "$TOTAL" | jq '.amount'); CURRENCY=$(echo "$TOTAL" | jq -r '.currency')
+curl -s -b admin.jar "${H[@]}" -X POST $API/admin/orders/$ORDER_ID/mark-paid \
+  -d "{\"reference\":\"demo-payment-1\",\"amount\":{\"amount\":$AMOUNT,\"currency\":\"$CURRENCY\"}}" | jq -c '{number, status, paymentReference, paidAt}'
+curl -s -b admin.jar "${H[@]}" -X POST $API/admin/orders/$ORDER_ID/mark-fulfilled | jq -c '{number, status, fulfilledAt}'
+curl -s -b shop.jar "$API/store/account/orders/$NUMBER" | jq -c '{status, history}'   # the customer sees the same history
+
+# 7. A second order, cancelled by its owner while it is unpaid (its stock reservations are released)
+curl -s -b shop.jar "${H[@]}" -X POST $API/store/cart/items -d "{\"variantId\":\"$VARIANT_ID\",\"quantity\":1}" > /dev/null
+TOTAL=$(curl -s -b shop.jar $API/store/cart | jq -c '.total')
+NUMBER2=$(curl -s -b shop.jar "${H[@]}" -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" -X POST $API/store/checkout \
+  -d "{\"phone\":\"+380501234567\",\"firstName\":\"Demo\",\"lastName\":\"Shopper\",\"expectedTotal\":$TOTAL}" | jq -r '.order.number')
+curl -s -b shop.jar "${H[@]}" -X POST "$API/store/account/orders/$NUMBER2/cancel" | jq -c '{number, status}'
+```
+
+Guest variant (no account): send `email` in the checkout body instead of a session. A guest checkout answers `201 {order, accessToken}`; the token is shown once and opens that one order:
+
+```bash
+# a fresh cookie jar (not shop.jar): add to the cart as in step 2, then run step 4 with "email":"guest@example.com" in the body
+# and a new Idempotency-Key; NUMBER is .order.number and TOKEN is .accessToken of that 201 response
+BODY="{\"number\":\"$NUMBER\",\"accessToken\":\"$TOKEN\"}"
+curl -s "${H[@]}" -X POST $API/store/orders/lookup -d "$BODY" | jq -c '{number, status}'
+curl -s "${H[@]}" -X POST $API/store/orders/cancel -d "$BODY" | jq -c '{number, status}'    # only while awaiting_payment
+```
+
+Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) releases their stock after `ORDER_PAYMENT_TTL_MINUTES`. To run the jobs once by hand (also what a system cron does when `SCHEDULER_ENABLED=false`):
+
+```bash
+pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock
+```
+
 ## Scripts (root)
 
 | Script | What it does |
