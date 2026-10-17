@@ -48,6 +48,9 @@ describe("customer route walk (default for the store is public; customer routes 
       [
         "DELETE /store/probe-customer-class/two",
         "GET /store/account/me",
+        "GET /store/account/orders",
+        "GET /store/account/orders/:number",
+        "POST /store/account/orders/:number/cancel",
         "GET /store/probe-customer-class/one",
         "GET /store/probe-customer/me",
         "PATCH /store/account/me",

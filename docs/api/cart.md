@@ -1,6 +1,6 @@
 # API: cart
 
-The shopper's cart (`/store/cart/*`), plan step 4 of `docs/plans/2026-10-17-cart-and-orders.md`. Decisions: `docs/adr/0015-cart-and-checkout.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: the cart is core. **Checkout, orders and the scheduler that deletes expired carts are not built yet** (steps 5 to 7): a cart reserves nothing and nothing turns it into an order.
+The shopper's cart (`/store/cart/*`), plan step 4 of `docs/plans/2026-10-17-cart-and-orders.md`. Decisions: `docs/adr/0015-cart-and-checkout.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: the cart is core. A cart reserves nothing; `POST /store/checkout` turns it into an order (`docs/api/orders.md`) and then empties it (the lines go, the cart row and the cookie stay). The scheduler that deletes expired carts is not built yet (step 5c).
 
 Every route is public (no login needed), sends `Cache-Control: no-store` (errors included), and every write needs `X-Fluxkit-CSRF: 1` and, with a body, `Content-Type: application/json` (otherwise `403 forbidden`, before anything else). Writes are limited per client address (`cartWrite`, 120 per minute, internal number): over the limit `429 too_many_requests` with `Retry-After`. All routes accept `?locale` (one of `LOCALES`, default `DEFAULT_LOCALE`, unknown is `400`); texts fall back to the default locale per field.
 

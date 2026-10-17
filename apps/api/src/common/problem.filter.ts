@@ -16,6 +16,7 @@ import {
 import {
   markStoreAccountResponseUncacheable,
   markStoreCartResponseUncacheable,
+  markStoreOrderResponseUncacheable,
 } from "./store-path.js";
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
@@ -31,6 +32,8 @@ export interface ProblemBody {
   field?: string;
   constraint?: string;
   rule?: string;
+  /** Members of the codes that document them: `cart` of `cart_changed`. */
+  [member: string]: unknown;
 }
 
 const CODE_BY_HTTP_STATUS: Readonly<Record<number, ProblemCode>> = {
@@ -57,6 +60,7 @@ export function buildProblemBody(
   detail: string,
   errors?: readonly FieldError[],
   extensions: ProblemExtensions = {},
+  members: Readonly<Record<string, unknown>> = {},
 ): ProblemBody {
   return {
     type: "about:blank",
@@ -66,6 +70,7 @@ export function buildProblemBody(
     detail,
     ...(errors === undefined ? {} : { errors }),
     ...extensions,
+    ...members,
   };
 }
 
@@ -85,6 +90,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     markAdminResponseUncacheable(request, response);
     markStoreAccountResponseUncacheable(request, response);
     markStoreCartResponseUncacheable(request, response);
+    markStoreOrderResponseUncacheable(request, response);
     if (
       exception instanceof HttpException &&
       !(exception instanceof ProblemException) &&
@@ -112,6 +118,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         exception.detail,
         exception.errors,
         exception.extensions,
+        exception.members,
       );
     }
     if (exception instanceof HttpException && exception.getStatus() < 500) {

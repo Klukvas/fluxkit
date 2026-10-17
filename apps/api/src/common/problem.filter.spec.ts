@@ -14,12 +14,17 @@ import { ProblemDetailsFilter, type ProblemBody } from "./problem.filter.js";
 import {
   PROBLEM_CODES,
   PROBLEM_STATUS,
+  cartChanged,
+  cartEmpty,
+  checkoutRefused,
   conflict,
   forbidden,
+  idempotencyKeyReused,
   inUse,
   invalidTransition,
   notFound,
   ruleViolation,
+  serviceUnavailable,
   tooManyRequests,
   unauthorized,
   validationFailed,
@@ -81,6 +86,11 @@ describe("ProblemDetailsFilter", () => {
       invalid_transition: invalidTransition("Cannot publish.", "no_default_variant"),
       rule_violation: ruleViolation("Not allowed.", "product_type_change_forbidden"),
       too_many_requests: tooManyRequests("Slow down.", 30),
+      cart_empty: cartEmpty(),
+      cart_changed: cartChanged({ lines: [] }),
+      checkout_refused: checkoutRefused([{ path: "lines.0", code: "insufficient_stock" }]),
+      idempotency_key_reused: idempotencyKeyReused(),
+      service_unavailable: serviceUnavailable(),
     } as const;
     for (const [code, exception] of Object.entries(samples)) {
       const result = run(exception);
@@ -93,16 +103,52 @@ describe("ProblemDetailsFilter", () => {
     }
   });
 
+  it("puts the fresh cart of cart_changed into the body, and the lines of checkout_refused into errors", () => {
+    const changed = run(cartChanged({ lines: [{ sku: "A" }], subtotal: { amount: 5 } }));
+    expect(changed.status).toBe(409);
+    expect(changed.body).toMatchObject({
+      code: "cart_changed",
+      cart: { lines: [{ sku: "A" }], subtotal: { amount: 5 } },
+    });
+    const refused = run(
+      checkoutRefused([
+        { path: "lines.1", code: "insufficient_stock" },
+        { path: "lines.3", code: "variant_not_sellable" },
+      ]),
+    );
+    expect(refused.status).toBe(409);
+    expect(refused.body).toMatchObject({
+      code: "checkout_refused",
+      errors: [
+        { path: "lines.1", code: "insufficient_stock" },
+        { path: "lines.3", code: "variant_not_sellable" },
+      ],
+    });
+  });
+
+  it("answers service_unavailable with 503 and a Retry-After header", () => {
+    const result = run(serviceUnavailable(2.2));
+    expect(result.status).toBe(503);
+    expect(result.contentType).toBe("application/problem+json");
+    expect(result.headers["Retry-After"]).toBe("3");
+    expect(result.body).toMatchObject({ code: "service_unavailable", status: 503 });
+  });
+
   it("covers every documented problem code", () => {
     expect([...PROBLEM_CODES].sort()).toEqual(
       [
+        "cart_changed",
+        "cart_empty",
+        "checkout_refused",
         "conflict",
         "forbidden",
         "in_use",
+        "idempotency_key_reused",
         "internal_error",
         "invalid_transition",
         "not_found",
         "rule_violation",
+        "service_unavailable",
         "too_many_requests",
         "unauthorized",
         "validation_failed",

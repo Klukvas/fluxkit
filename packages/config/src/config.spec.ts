@@ -216,6 +216,43 @@ describe("loadEnv cart", () => {
   );
 });
 
+describe("loadEnv orders", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to 30 minutes to pay and 90 days of guest access", () => {
+    const env = loadEnv(base);
+    expect(env.orderPaymentTtlMinutes).toBe(30);
+    expect(env.orderGuestAccessDays).toBe(90);
+  });
+
+  it("accepts the bounds exactly", () => {
+    expect(loadEnv({ ...base, ORDER_PAYMENT_TTL_MINUTES: "5" }).orderPaymentTtlMinutes).toBe(5);
+    expect(loadEnv({ ...base, ORDER_PAYMENT_TTL_MINUTES: "1440" }).orderPaymentTtlMinutes).toBe(
+      1440,
+    );
+    expect(loadEnv({ ...base, ORDER_GUEST_ACCESS_DAYS: "1" }).orderGuestAccessDays).toBe(1);
+    expect(loadEnv({ ...base, ORDER_GUEST_ACCESS_DAYS: "3650" }).orderGuestAccessDays).toBe(3650);
+  });
+
+  it.each(["0", "4", "1441", "-5", "30.5", "abc", "", "1e2", "0x10", " 30", "030"])(
+    "rejects ORDER_PAYMENT_TTL_MINUTES=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, ORDER_PAYMENT_TTL_MINUTES: value })).toThrow(
+        /ORDER_PAYMENT_TTL_MINUTES/,
+      );
+    },
+  );
+
+  it.each(["0", "3651", "-1", "1.5", "abc", "", "1e2", "0x10", " 90", "090"])(
+    "rejects ORDER_GUEST_ACCESS_DAYS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, ORDER_GUEST_ACCESS_DAYS: value })).toThrow(
+        /ORDER_GUEST_ACCESS_DAYS/,
+      );
+    },
+  );
+});
+
 describe("loadEnv pricing", () => {
   const base = { DATABASE_URL: "postgres://x" };
 

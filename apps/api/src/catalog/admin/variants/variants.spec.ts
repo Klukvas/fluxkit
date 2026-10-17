@@ -15,6 +15,7 @@ import {
 import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { http } from "../../../test/http.js";
 import { ensureMigrated } from "../../../test/migrate.js";
+import { insertSoldLine, deleteOrders } from "../../../test/order-fixtures.js";
 import { priceProductVariants } from "../../../test/pricing-fixtures.js";
 import type { ProductDetailResponse } from "../products/products.schemas.js";
 import type { GenerateVariantsResponse, VariantResponse } from "./variants.schemas.js";
@@ -169,6 +170,45 @@ describe("admin variants API (real app, real Postgres)", () => {
       const result = await call<VariantResponse>("GET", variantPath(product.id, expected.id));
       expect(result.status).toBe(200);
       expect(result.body).toEqual(expected);
+    });
+
+    describe("variants that were sold (ADR 0020)", () => {
+      it("refuses a variant an order line refers to, although it has no stock rows (untracked, digital)", async () => {
+        const product = await sixVariants();
+        const target = variantOf(product, "blue", "s");
+        const { orderId, itemId } = await insertSoldLine(pool, {
+          productId: product.id,
+          variantId: target.id,
+        });
+        try {
+          const result = await call("DELETE", variantPath(product.id, target.id));
+          expect(result.status, JSON.stringify(result.body)).toBe(409);
+          expect(problem(result)).toMatchObject({
+            code: "rule_violation",
+            rule: "has_order_lines",
+          });
+          expect(await variantRows(product.id)).toHaveLength(6);
+          const line = await pool.query("select variant_id from order_item where id = $1", [
+            itemId,
+          ]);
+          expect(line.rows).toEqual([{ variant_id: target.id }]);
+        } finally {
+          await deleteOrders(pool, [orderId]);
+        }
+      });
+
+      it("still deletes a sibling variant that no order line refers to, and the sold one once its order is gone", async () => {
+        const product = await sixVariants();
+        const sold = variantOf(product, "blue", "s");
+        const sibling = variantOf(product, "blue", "m");
+        const { orderId } = await insertSoldLine(pool, {
+          productId: product.id,
+          variantId: sold.id,
+        });
+        expect((await call("DELETE", variantPath(product.id, sibling.id))).status).toBe(204);
+        await deleteOrders(pool, [orderId]);
+        expect((await call("DELETE", variantPath(product.id, sold.id))).status).toBe(204);
+      });
     });
 
     it("answers 404 for an unknown variant and for a variant of another product", async () => {

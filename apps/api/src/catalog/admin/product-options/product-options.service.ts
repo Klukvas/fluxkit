@@ -200,10 +200,11 @@ export class ProductOptionsService {
       // (ADR 0014). The product row is already locked; this locks the variants and reads the history.
       const decision = canRebuildVariants({
         anyVariantHasStockHistory: await this.variants.anyHasStockHistory(tx, product.id),
+        anyVariantHasOrderLines: await this.variants.anyHasOrderLines(tx, product.id),
       });
       if (!decision.allowed) {
         throw ruleViolation(
-          "This change would rebuild the variants, but some of them have stock history; create a new product or switch variants off instead.",
+          "This change would rebuild the variants, but some of them have stock history or were sold; create a new product or switch variants off instead.",
           decision.reason,
         );
       }

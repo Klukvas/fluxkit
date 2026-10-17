@@ -34,6 +34,7 @@ export interface CartVariantOptions {
 export class CartCatalog {
   readonly runId = randomUUID().slice(0, 8);
   private typeId = "";
+  private digitalTypeId = "";
   private colorOptionId = "";
   private readonly colorValueIds = new Map<string, string>();
   private readonly productIds: string[] = [];
@@ -45,6 +46,10 @@ export class CartCatalog {
     this.typeId = await this.insert(
       "insert into product_type (code, name) values ($1, $2::jsonb) returning id",
       [`cart_type_${this.runId}`, JSON.stringify({ uk: "Тип", en: "Type" })],
+    );
+    this.digitalTypeId = await this.insert(
+      "insert into product_type (code, name, requires_shipping) values ($1, $2::jsonb, false) returning id",
+      [`cart_digital_${this.runId}`, JSON.stringify({ uk: "Цифровий", en: "Digital" })],
     );
     this.colorOptionId = await this.insert(
       "insert into option (code, name) values ($1, $2::jsonb) returning id",
@@ -79,6 +84,8 @@ export class CartCatalog {
       status?: "draft" | "active" | "archived";
       title?: Record<string, string>;
       withColors?: boolean;
+      /** A product type that ships nothing (`requires_shipping = false`): the order needs no shipping address. */
+      digital?: boolean;
     } = {},
   ): Promise<CartTestProduct> {
     this.counter += 1;
@@ -88,7 +95,7 @@ export class CartCatalog {
       `insert into product (product_type_id, slug, title, status, published_at)
        values ($1, $2, $3::jsonb, $4, $5) returning id`,
       [
-        this.typeId,
+        options.digital === true ? this.digitalTypeId : this.typeId,
         slug,
         JSON.stringify(
           options.title ?? { uk: `Товар ${this.counter}`, en: `Product ${this.counter}` },
@@ -168,10 +175,20 @@ export class CartCatalog {
 
   /** A product with one default variant: the common "simple product". */
   async simple(
-    options: CartVariantOptions & { status?: "draft" | "active" | "archived" } = {},
+    options: CartVariantOptions & {
+      status?: "draft" | "active" | "archived";
+      /** The title of the PRODUCT (`title` is the variant's own title). */
+      productTitle?: Record<string, string>;
+      digital?: boolean;
+    } = {},
   ): Promise<{ productId: string; slug: string; variantId: string }> {
-    const product = await this.product({ status: options.status });
-    const variantId = await this.variant(product.id, { isDefault: true, ...options });
+    const { productTitle, digital, ...variantOptions } = options;
+    const product = await this.product({
+      status: options.status,
+      title: productTitle,
+      digital,
+    });
+    const variantId = await this.variant(product.id, { isDefault: true, ...variantOptions });
     return { productId: product.id, slug: product.slug, variantId };
   }
 
@@ -239,7 +256,9 @@ export class CartCatalog {
   async cleanup(): Promise<void> {
     // Products first (cascade to variants, prices, levels, option rows, media and cart lines), then the dictionaries.
     await this.pool.query("delete from product where id = any($1::uuid[])", [this.productIds]);
-    await this.pool.query("delete from product_type where id = $1", [this.typeId]);
+    await this.pool.query("delete from product_type where id = any($1::uuid[])", [
+      [this.typeId, this.digitalTypeId],
+    ]);
     await this.pool.query("delete from option where id = $1", [this.colorOptionId]);
   }
 }

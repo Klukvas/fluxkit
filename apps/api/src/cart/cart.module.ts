@@ -47,7 +47,7 @@ export class CartModule implements NestModule {
         CartService,
         CartMergeService,
       ],
-      exports: [CartMergeService],
+      exports: [CartMergeService, CartPricingService, CartRepository, CART_CONFIG],
     };
   }
 

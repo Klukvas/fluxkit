@@ -12,6 +12,12 @@ export const PROBLEM_CODES = [
   "rule_violation",
   "too_many_requests",
   "internal_error",
+  // Checkout (plan 2026-10-17, docs/api/orders.md).
+  "cart_empty",
+  "cart_changed",
+  "checkout_refused",
+  "idempotency_key_reused",
+  "service_unavailable",
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -27,6 +33,11 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   rule_violation: 409,
   too_many_requests: 429,
   internal_error: 500,
+  cart_empty: 409,
+  cart_changed: 409,
+  checkout_refused: 409,
+  idempotency_key_reused: 409,
+  service_unavailable: 503,
 };
 
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
@@ -40,6 +51,11 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   rule_violation: "Business rule violated",
   too_many_requests: "Too many requests",
   internal_error: "Internal server error",
+  cart_empty: "The cart is empty",
+  cart_changed: "The cart changed",
+  checkout_refused: "Checkout refused",
+  idempotency_key_reused: "Idempotency key reused",
+  service_unavailable: "Service unavailable",
 };
 
 /** One problem with a request field. `path` is dotted (`name.uk`, `attributes.size`); empty for the whole body. */
@@ -61,6 +77,8 @@ export interface ProblemInit {
   status?: number;
   /** Extra response headers (`Retry-After` of a 429). Never put secrets or internals here. */
   headers?: Readonly<Record<string, string>>;
+  /** Extra JSON members of the body for a code that documents them (`cart` of `cart_changed`). Never put internals here. */
+  members?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -73,6 +91,7 @@ export class ProblemException extends HttpException {
   readonly errors: readonly FieldError[] | undefined;
   readonly extensions: ProblemExtensions;
   readonly headers: Readonly<Record<string, string>>;
+  readonly members: Readonly<Record<string, unknown>>;
 
   constructor(init: ProblemInit) {
     super(init.detail, init.status ?? PROBLEM_STATUS[init.code]);
@@ -81,6 +100,7 @@ export class ProblemException extends HttpException {
     this.errors = init.errors;
     this.extensions = init.extensions ?? {};
     this.headers = init.headers ?? {};
+    this.members = init.members ?? {};
   }
 }
 
@@ -131,4 +151,43 @@ export function invalidTransition(detail: string, rule?: string): ProblemExcepti
 
 export function ruleViolation(detail: string, rule: string): ProblemException {
   return new ProblemException({ code: "rule_violation", detail, extensions: { rule } });
+}
+
+/** The cart has no line to order (also: a parallel checkout of the same cart already emptied it). */
+export function cartEmpty(): ProblemException {
+  return new ProblemException({ code: "cart_empty", detail: "The cart is empty." });
+}
+
+/** What the shopper agreed to is no longer true; `cart` is the fresh cart as `GET /store/cart` shows it. */
+export function cartChanged(cart: unknown): ProblemException {
+  return new ProblemException({
+    code: "cart_changed",
+    detail: "The cart changed since you saw it. Check it and try again.",
+    members: { cart },
+  });
+}
+
+/** Lines that cannot be ordered, one error per line: `path` is `lines.<index in the cart>`. */
+export function checkoutRefused(errors: readonly FieldError[]): ProblemException {
+  return new ProblemException({
+    code: "checkout_refused",
+    detail: "Some lines cannot be ordered right now.",
+    errors,
+  });
+}
+
+export function idempotencyKeyReused(): ProblemException {
+  return new ProblemException({
+    code: "idempotency_key_reused",
+    detail: "This Idempotency-Key was already used for a different request.",
+  });
+}
+
+/** A transient failure the caller may retry (a database deadlock that survived its retry). */
+export function serviceUnavailable(retryAfterSeconds = 1): ProblemException {
+  return new ProblemException({
+    code: "service_unavailable",
+    detail: "The service is busy. Please try again.",
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  });
 }

@@ -1,6 +1,6 @@
 # API: customer accounts
 
-Customer accounts of the store (`/store/account/*`) and customer management for admins (`/admin/customers/*`), plan step 3b of `docs/plans/2026-10-17-cart-and-orders.md`, on the infrastructure of step 3a. Decisions: `docs/adr/0016-customer-accounts-and-sessions.md`. Admin counterpart: `docs/api/auth.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: accounts are core. The cart (`docs/api/cart.md`) is built and register and login merge the guest cart (below); **checkout and order history are not built yet** (step 5), and no password reset or email verification exists (`TODO(fluxkit): needs the email provider plan`).
+Customer accounts of the store (`/store/account/*`) and customer management for admins (`/admin/customers/*`), plan step 3b of `docs/plans/2026-10-17-cart-and-orders.md`, on the infrastructure of step 3a. Decisions: `docs/adr/0016-customer-accounts-and-sessions.md`. Admin counterpart: `docs/api/auth.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: accounts are core. The cart (`docs/api/cart.md`) is built and register and login merge the guest cart (below); checkout and the customer's order history are in `docs/api/orders.md` (`POST /store/checkout`, `GET /store/account/orders`, `GET /store/account/orders/{number}`, `POST /store/account/orders/{number}/cancel`); no password reset or email verification exists (`TODO(fluxkit): needs the email provider plan`).
 
 Every state-changing request needs `X-Fluxkit-CSRF: 1` and, with a body, `Content-Type: application/json` (otherwise `403 forbidden`, before authentication and rate limiting). Every response under `/store/account`, errors and public routes included, carries `Cache-Control: no-store`. Auth levels below: `public` (no session) and `customer` (a valid customer session cookie).
 
@@ -84,4 +84,4 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` under `/store` (matched like Express: 
 
 ## Not built yet
 
-The customer's orders (`/store/account/orders`, step 5), email verification and password reset (a later email plan), a scheduler job that deletes expired customer sessions (step 6).
+Email verification and password reset (a later email plan), a scheduler job that deletes expired customer sessions (step 5c). The customer's orders are built (`docs/api/orders.md`).
