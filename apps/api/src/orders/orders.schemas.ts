@@ -12,12 +12,17 @@ const localeField = z
   .max(16)
   .meta({ description: "One of the configured locales. Missing means the default locale." });
 
+// `countryCode`, `city` and `line1` are required, but judged by the core address rules together with every other
+// field (one answer with all the errors), so the structure check here accepts them as missing.
 const addressInput = z.strictObject({
-  countryCode: z.string().meta({ description: "ISO 3166-1 alpha-2, upper case (pattern only)." }),
+  countryCode: z
+    .string()
+    .optional()
+    .meta({ description: "Required. ISO 3166-1 alpha-2, upper case (pattern only)." }),
   region: z.string().optional(),
-  city: z.string(),
+  city: z.string().optional().meta({ description: "Required." }),
   postalCode: z.string().optional(),
-  line1: z.string(),
+  line1: z.string().optional().meta({ description: "Required." }),
   line2: z.string().optional(),
   recipientFirstName: z.string().optional(),
   recipientLastName: z.string().optional(),
@@ -25,12 +30,9 @@ const addressInput = z.strictObject({
 });
 
 export const checkoutBodySchema = z.strictObject({
-  email: z
-    .string()
-    .optional()
-    .meta({
-      description: "Required for a guest; a signed-in customer's account email by default.",
-    }),
+  email: z.string().optional().meta({
+    description: "Required for a guest; a signed-in customer's account email by default.",
+  }),
   phone: z.string(),
   firstName: z.string(),
   lastName: z.string(),
@@ -120,11 +122,9 @@ export const storeOrderItemSchema = z.object({
 });
 
 export const storeOrderSchema = z.object({
-  number: z
-    .string()
-    .meta({
-      description: "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token.",
-    }),
+  number: z.string().meta({
+    description: "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token.",
+  }),
   status: statusSchema,
   placedAt: timestampSchema,
   expiresAt: timestampSchema.meta({

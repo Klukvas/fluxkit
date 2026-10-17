@@ -177,16 +177,18 @@ export class CartCatalog {
   async simple(
     options: CartVariantOptions & {
       status?: "draft" | "active" | "archived";
-      title?: Record<string, string>;
+      /** The title of the PRODUCT (`title` is the variant's own title). */
+      productTitle?: Record<string, string>;
       digital?: boolean;
     } = {},
   ): Promise<{ productId: string; slug: string; variantId: string }> {
+    const { productTitle, digital, ...variantOptions } = options;
     const product = await this.product({
       status: options.status,
-      title: options.title,
-      digital: options.digital,
+      title: productTitle,
+      digital,
     });
-    const variantId = await this.variant(product.id, { isDefault: true, ...options });
+    const variantId = await this.variant(product.id, { isDefault: true, ...variantOptions });
     return { productId: product.id, slug: product.slug, variantId };
   }
 

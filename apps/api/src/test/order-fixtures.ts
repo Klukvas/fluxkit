@@ -44,3 +44,30 @@ export async function insertSoldLine(
 export async function deleteOrders(pool: pg.Pool, orderIds: readonly string[]): Promise<void> {
   await pool.query("delete from sales_order where id = any($1::uuid[])", [orderIds]);
 }
+
+/**
+ * TEST ONLY. Remembers the orders a spec placed and removes them (and their outbox rows) at the end, before the catalog
+ * is cleaned: the reservations of an order are RESTRICTed by its lines, so the order has to go first.
+ */
+export class PlacedOrders {
+  private readonly numbers = new Set<string>();
+
+  constructor(private readonly pool: pg.Pool) {}
+
+  track(number: string): string {
+    this.numbers.add(number);
+    return number;
+  }
+
+  async cleanup(): Promise<void> {
+    const numbers = [...this.numbers];
+    const orders = await this.pool.query<{ id: string }>(
+      "select id from sales_order where number = any($1::text[])",
+      [numbers],
+    );
+    const ids = orders.rows.map((row) => row.id);
+    await this.pool.query("delete from domain_event where aggregate_id = any($1::uuid[])", [ids]);
+    await this.pool.query("delete from sales_order where id = any($1::uuid[])", [ids]);
+    this.numbers.clear();
+  }
+}
