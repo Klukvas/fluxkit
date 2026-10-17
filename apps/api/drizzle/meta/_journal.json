@@ -29,6 +29,13 @@
       "when": 1792145613200,
       "tag": "0003_pricing_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792222060348,
+      "tag": "0004_cart_customers_orders",
+      "breakpoints": true
     }
   ]
 }
