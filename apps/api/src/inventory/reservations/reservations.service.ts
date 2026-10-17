@@ -3,9 +3,11 @@ import {
   assertValidStatus,
   decideCommit,
   decideExpire,
+  decideExtend,
   decideRelease,
   decideReserve,
   isVariantSellable,
+  type ExtendRefusal,
   type ReservationStatus,
   type StockLevel,
   type StockReservation,
@@ -14,22 +16,29 @@ import { productStatusSchema } from "../../catalog/admin/products/products.schem
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
 import { withTransaction, type DbExecutor, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
-import { InventoryRepository, type LevelRow } from "../inventory.repository.js";
+import { InventoryRepository, type LevelRow, type LocationRow } from "../inventory.repository.js";
 import {
   ReservationsRepository,
   type DueCursor,
+  type ReservableVariantRow,
   type ReservationRow,
 } from "./reservations.repository.js";
 
 /*
  * The reservation domain service (docs/api/inventory.md, ADR 0011). It has no HTTP route: the checkout plan calls it.
  *
- * Every operation is one transaction that takes the `inventory_level` row lock first (`SELECT ... FOR UPDATE`), then,
- * when it works on an existing reservation, the reservation row lock; it asks the core decision (`decideReserve`,
- * `decideRelease`, `decideExpire`, `decideCommit`) and writes what the decision says: the level, the reservation
- * status, and, for a commit only, the `sale` journal row. Nothing here decides a stock rule, reads the clock, or
- * updates or deletes a journal row. Refusals are returned as typed results (not thrown) so the caller can act on
- * them; bugs and damaged data throw.
+ * There is ONE implementation per rule, in the transaction-scoped operations that take the CALLER's open transaction
+ * and never open their own: `reserveMany`, `releaseIn`, `commitIn`, `extend`. The self-transacting methods `reserve`,
+ * `release` and `commit` are wrappers that open a transaction and call them; `expireDue` opens one per reservation.
+ *
+ * Lock order (ADR 0015; the checkout holds the cart row first): product rows `FOR SHARE` by id -> variant rows
+ * `FOR SHARE` by id -> `inventory_level` rows `FOR UPDATE` by (variant id, location id) -> reservation rows. Every
+ * multi-row pass is sorted, so two callers with crossing variant sets cannot wait for each other. An operation on an
+ * existing reservation takes the level row first, then the reservation row. Each operation asks the core decision
+ * (`decideReserve`, `decideRelease`, `decideExpire`, `decideCommit`, `decideExtend`) and writes what it says: the
+ * level, the reservation, and, for a commit only, the `sale` journal row. Nothing here decides a stock rule, reads the
+ * clock, or updates or deletes a journal row. Refusals are returned as typed results (not thrown) so the caller can
+ * act on them; bugs and damaged data throw.
  */
 
 /** A reservation as the caller sees it. */
@@ -93,6 +102,44 @@ export interface CommitOptions {
   /** Reference of the `sale` movement (an order number). Defaults to the reservation's own reference. */
   reference?: string | null;
 }
+
+/** `extend` refuses with the reasons of `decideExtend` (an invalid date is a caller bug and throws instead). */
+export type ExtendReservationRefusal =
+  Exclude<ExtendRefusal, "invalid_expiry"> | "reservation_not_found";
+
+export type ExtendResult =
+  { ok: true; reservation: ReservationView } | { ok: false; reason: ExtendReservationRefusal };
+
+export interface ReserveManyLine {
+  variantId: string;
+  /** A whole number from 1 to `MAX_QUANTITY`; anything else is refused as `invalid_quantity` for that line. */
+  quantity: number;
+}
+
+export interface ReserveManyOptions {
+  /** When the holds end. The caller chooses it (order expiry plus grace), the service never reads the clock. */
+  expiresAt: Date;
+  /** Written on every reservation (the order number, so the journal and the sweep can tell whose hold it is). */
+  reference: string | null;
+}
+
+/**
+ * Why a line of `reserveMany` was refused. Like `ReserveRefusal` without `not_tracked` (an untracked line is not
+ * refused, it comes back as `untracked`) and without `location_not_found` (`reserveMany` always uses the default
+ * location).
+ */
+export type ReserveManyRefusal = Exclude<ReserveRefusal, "not_tracked" | "location_not_found">;
+
+/** One line of a successful `reserveMany`, in the order the caller sent them. */
+export type ReservedLine =
+  | { kind: "reserved"; variantId: string; quantity: number; reservation: ReservationView }
+  /** The variant does not track stock: nothing is held, it can always be sold. The caller keeps the line. */
+  | { kind: "untracked"; variantId: string; quantity: number };
+
+export type ReserveManyResult =
+  | { ok: true; lines: ReservedLine[] }
+  /** Nothing was written. One entry per refused line, in input order (every refused line is listed). */
+  | { ok: false; refusals: { variantId: string; reason: ReserveManyRefusal }[] };
 
 export interface ExpireDueOptions {
   /** At most this many reservations are looked at per call (1 to 10 000, default 500). */
@@ -164,6 +211,68 @@ function assertValidCursor(cursor: ExpireDueCursor): void {
   }
 }
 
+interface LineRequest {
+  variantId: string;
+  quantity: number;
+  /** Defaults to the default location. */
+  locationId: string | undefined;
+}
+
+type LineOutcome =
+  | { kind: "reserved"; reservation: ReservationView }
+  | { kind: "untracked" }
+  | { kind: "refused"; reason: ReserveRefusal }
+  /** Would have been held, but another line was refused and nothing is written. */
+  | { kind: "not_reserved" };
+
+interface Candidate {
+  index: number;
+  line: LineRequest;
+  variant: ReservableVariantRow;
+  flags: { trackInventory: boolean; allowBackorder: boolean };
+  locationId: string;
+}
+
+/** Thrown inside the savepoint of `reserveLines` to undo it when a line is refused; never leaves the service. */
+class HoldRefused extends Error {}
+
+function hasRefusal(outcomes: readonly LineOutcome[]): boolean {
+  return outcomes.some((outcome) => outcome.kind === "refused");
+}
+
+/** Plain code-unit order: for the lower-case hex uuids of the database it is the order Postgres sorts them in. */
+function compareText(a: string, b: string): number {
+  if (a < b) {
+    return -1;
+  }
+  return a > b ? 1 : 0;
+}
+
+/** Looks each location up once per call (reads only; location rows are never locked). */
+class LocationCache {
+  private defaultLocation: LocationRow | undefined;
+  private readonly byId = new Map<string, LocationRow | undefined>();
+
+  constructor(
+    private readonly inventory: InventoryRepository,
+    private readonly tx: Transaction,
+  ) {}
+
+  async get(locationId: string | undefined): Promise<LocationRow | undefined> {
+    if (locationId === undefined) {
+      this.defaultLocation ??= await this.inventory.findDefaultLocation(this.tx);
+      if (this.defaultLocation === undefined) {
+        throw new Error("There is no default location; the migration creates one named main.");
+      }
+      return this.defaultLocation;
+    }
+    if (!this.byId.has(locationId)) {
+      this.byId.set(locationId, await this.inventory.findLocation(this.tx, locationId));
+    }
+    return this.byId.get(locationId);
+  }
+}
+
 @Injectable()
 export class ReservationsService {
   constructor(
@@ -174,126 +283,178 @@ export class ReservationsService {
   ) {}
 
   /**
-   * Holds `quantity` units of a variant at a location. Refuses (writing nothing) when the quantity is not usable, the
-   * variant is not tracked, inactive or in an unpublished product, or the available units do not cover it. With
-   * `allow_backorder` it holds beyond `on_hand`. The first reservation of a backordered variant creates its level row.
+   * Holds `quantity` units of a variant at a location in its own transaction (a wrapper of the logic `reserveMany`
+   * uses). Refuses (writing nothing) when the quantity is not usable, the variant is not tracked, inactive or in an
+   * unpublished product, or the available units do not cover it. With `allow_backorder` it holds beyond `on_hand`.
+   * The first reservation of a backordered variant creates its level row.
    */
   async reserve(input: ReserveInput): Promise<ReserveResult> {
     assertValidDate(input.expiresAt, "expiresAt");
     return withTransaction(this.database, async (tx) => {
-      const variant = await this.reservations.findVariantForReservation(
+      const [outcome] = await this.reserveLines(
         tx,
-        input.variantId,
-        this.pricing.shopCurrency,
+        [{ variantId: input.variantId, quantity: input.quantity, locationId: input.locationId }],
+        { expiresAt: input.expiresAt, reference: input.reference ?? null },
       );
-      if (variant === undefined) {
-        return { ok: false, reason: "variant_not_found" };
+      switch (outcome?.kind) {
+        case "reserved":
+          return { ok: true, reservation: outcome.reservation };
+        case "untracked":
+          return { ok: false, reason: "not_tracked" };
+        case "refused":
+          return { ok: false, reason: outcome.reason };
+        default:
+          throw new Error("A single reservation line came back without an outcome.");
       }
-      // The same rule the store lists by (core `isVariantSellable`): a line the shop never showed is not reservable.
-      const sellable = isVariantSellable({
-        productStatus: productStatusSchema.parse(variant.productStatus),
-        variantIsActive: variant.isActive,
-        hasShopPrice: variant.hasShopPrice,
-      });
-      if (!sellable) {
-        return { ok: false, reason: "variant_not_sellable" };
-      }
-      const flags = {
-        trackInventory: variant.trackInventory,
-        allowBackorder: variant.allowBackorder,
-      };
-      // The refusals that do not depend on the level (a bad quantity, an untracked variant) come first, so they never
-      // touch a row. Only "insufficient_stock" of an empty level is expected here and is decided again below.
-      const probe = decideReserve({ onHand: 0, reserved: 0 }, flags, input.quantity);
-      if (!probe.ok && probe.reason !== "insufficient_stock") {
-        return probe;
-      }
-
-      const location =
-        input.locationId === undefined
-          ? await this.inventory.findDefaultLocation(tx)
-          : await this.inventory.findLocation(tx, input.locationId);
-      if (location === undefined) {
-        if (input.locationId === undefined) {
-          throw new Error("There is no default location; the migration creates one named main.");
-        }
-        return { ok: false, reason: "location_not_found" };
-      }
-
-      let row = await this.inventory.lockLevel(tx, variant.id, location.id);
-      if (row === undefined) {
-        if (!flags.allowBackorder) {
-          // No level row means nothing on hand: refuse without creating an empty row.
-          return { ok: false, reason: "insufficient_stock" };
-        }
-        // Parallel first reservations: one insert wins, the others do nothing, and all of them then lock the same row.
-        await this.inventory.insertEmptyLevel(tx, variant.id, location.id);
-        row = await this.inventory.lockLevel(tx, variant.id, location.id);
-      }
-      if (row === undefined) {
-        throw new Error("The inventory level row vanished after it was created.");
-      }
-
-      const decision = decideReserve(toLevel(row), flags, input.quantity);
-      if (!decision.ok) {
-        return decision;
-      }
-      await this.inventory.updateLevel(tx, variant.id, location.id, decision.level);
-      const created = await this.reservations.insert(tx, {
-        variantId: variant.id,
-        locationId: location.id,
-        quantity: input.quantity,
-        expiresAt: input.expiresAt,
-        reference: input.reference ?? null,
-      });
-      return { ok: true, reservation: toView(created) };
-    });
-  }
-
-  /** Gives the held units back (a cancelled cart or order). Lowers `reserved`; writes no journal row. */
-  async release(reservationId: string): Promise<ReservationResult> {
-    return withTransaction(this.database, async (tx) => {
-      const locked = await this.lockPair(tx, reservationId);
-      if (locked === undefined) {
-        return { ok: false, reason: "reservation_not_found" };
-      }
-      const decision = decideRelease(toLevel(locked.level), toHeld(locked.reservation));
-      if (!decision.ok) {
-        return { ok: false, reason: decision.reason };
-      }
-      return this.apply(tx, locked.reservation, decision.level, "released");
     });
   }
 
   /**
-   * Turns an active reservation into a sale: lowers `on_hand` and `reserved` and appends the `sale` movement. The
-   * expiry time is not checked: a reservation that is overdue but not yet swept by `expireDue` can still be sold
-   * (the customer paid); after the sweep it answers `not_active`. Backordered units that are not on hand yet answer
-   * `insufficient_stock` and the reservation stays active.
+   * Holds several variants at once at the default location, inside the CALLER's transaction (the checkout), all or
+   * nothing. Every line is evaluated with the core decisions against the locked rows BEFORE anything is written; if
+   * any line is refused nothing is written (not even an empty level row) and every refused line is returned. Otherwise
+   * each tracked line gets one reservation (`reference` and `expiresAt` from `options`) and its level is updated;
+   * untracked lines come back as `untracked` without a row. Lines come back in input order. A variant may appear once
+   * (a duplicate, an empty list or an invalid date is a caller bug: `RangeError`, nothing written). Locks: product rows
+   * `FOR SHARE`, variant rows `FOR SHARE`, then level rows `FOR UPDATE`, each pass in id order (see the header).
    */
+  async reserveMany(
+    tx: Transaction,
+    lines: readonly ReserveManyLine[],
+    options: ReserveManyOptions,
+  ): Promise<ReserveManyResult> {
+    assertValidDate(options.expiresAt, "expiresAt");
+    if (lines.length === 0) {
+      throw new RangeError("reserveMany needs at least one line");
+    }
+    const seen = new Set<string>();
+    for (const line of lines) {
+      const key = line.variantId.toLowerCase();
+      if (seen.has(key)) {
+        throw new RangeError(`reserveMany got the variant ${line.variantId} more than once`);
+      }
+      seen.add(key);
+    }
+
+    const outcomes = await this.reserveLines(
+      tx,
+      lines.map((line) => ({
+        variantId: line.variantId,
+        quantity: line.quantity,
+        locationId: undefined,
+      })),
+      options,
+    );
+    const refusals: { variantId: string; reason: ReserveManyRefusal }[] = [];
+    const reserved: ReservedLine[] = [];
+    for (const [index, line] of lines.entries()) {
+      const outcome = outcomes[index];
+      if (outcome === undefined) {
+        throw new Error("A reservation line came back without an outcome.");
+      }
+      if (outcome.kind === "refused") {
+        if (outcome.reason === "not_tracked" || outcome.reason === "location_not_found") {
+          throw new Error(`reserveMany can not be refused with ${outcome.reason}.`);
+        }
+        refusals.push({ variantId: line.variantId, reason: outcome.reason });
+      } else if (outcome.kind === "reserved") {
+        reserved.push({
+          kind: "reserved",
+          variantId: line.variantId,
+          quantity: line.quantity,
+          reservation: outcome.reservation,
+        });
+      } else if (outcome.kind === "untracked") {
+        reserved.push({ kind: "untracked", variantId: line.variantId, quantity: line.quantity });
+      }
+    }
+    return refusals.length > 0 ? { ok: false, refusals } : { ok: true, lines: reserved };
+  }
+
+  /** Gives the held units back (a cancelled cart or order) in its own transaction. See `releaseIn`. */
+  async release(reservationId: string): Promise<ReservationResult> {
+    return withTransaction(this.database, (tx) => this.releaseIn(tx, reservationId));
+  }
+
+  /** Lowers `reserved`, status `released`, writes no journal row; in the caller's transaction. */
+  async releaseIn(tx: Transaction, reservationId: string): Promise<ReservationResult> {
+    const locked = await this.lockPair(tx, reservationId);
+    if (locked === undefined) {
+      return { ok: false, reason: "reservation_not_found" };
+    }
+    const decision = decideRelease(toLevel(locked.level), toHeld(locked.reservation));
+    if (!decision.ok) {
+      return { ok: false, reason: decision.reason };
+    }
+    return this.apply(tx, locked.reservation, decision.level, "released");
+  }
+
+  /** Turns an active reservation into a sale in its own transaction. See `commitIn`. */
   async commit(reservationId: string, options: CommitOptions = {}): Promise<CommitResult> {
-    return withTransaction(this.database, async (tx) => {
-      const locked = await this.lockPair(tx, reservationId);
-      if (locked === undefined) {
-        return { ok: false, reason: "reservation_not_found" };
-      }
-      const decision = decideCommit(toLevel(locked.level), toHeld(locked.reservation));
-      if (!decision.ok) {
-        return { ok: false, reason: decision.reason };
-      }
-      const result = await this.apply(tx, locked.reservation, decision.level, "committed");
-      await this.inventory.insertMovement(tx, {
-        variantId: locked.reservation.variantId,
-        locationId: locked.reservation.locationId,
-        delta: decision.movement.delta,
-        kind: decision.movement.kind,
-        onHandAfter: decision.movement.onHandAfter,
-        reason: null,
-        reference: options.reference ?? locked.reservation.reference,
-        actorId: options.actorId ?? null,
-      });
-      return result;
+    return withTransaction(this.database, (tx) => this.commitIn(tx, reservationId, options));
+  }
+
+  /**
+   * Turns an active reservation into a sale in the caller's transaction: lowers `on_hand` and `reserved` and appends
+   * the `sale` movement. The expiry time is not checked: a reservation that is overdue but not yet swept by
+   * `expireDue` can still be sold (the customer paid); after the sweep it answers `not_active`. Backordered units that
+   * are not on hand yet answer `insufficient_stock` and the reservation stays active.
+   */
+  async commitIn(
+    tx: Transaction,
+    reservationId: string,
+    options: CommitOptions = {},
+  ): Promise<CommitResult> {
+    const locked = await this.lockPair(tx, reservationId);
+    if (locked === undefined) {
+      return { ok: false, reason: "reservation_not_found" };
+    }
+    const decision = decideCommit(toLevel(locked.level), toHeld(locked.reservation));
+    if (!decision.ok) {
+      return { ok: false, reason: decision.reason };
+    }
+    const result = await this.apply(tx, locked.reservation, decision.level, "committed");
+    await this.inventory.insertMovement(tx, {
+      variantId: locked.reservation.variantId,
+      locationId: locked.reservation.locationId,
+      delta: decision.movement.delta,
+      kind: decision.movement.kind,
+      onHandAfter: decision.movement.onHandAfter,
+      reason: null,
+      reference: options.reference ?? locked.reservation.reference,
+      actorId: options.actorId ?? null,
     });
+    return result;
+  }
+
+  /**
+   * Moves the expiry of an ACTIVE reservation later, in the caller's transaction (a paid order's backordered line is
+   * held until stock arrives). Takes the level and reservation locks like every operation on an existing reservation,
+   * so it is mutually exclusive with commit, release and expiry: the one that locks first wins, and an extend that
+   * comes after the sweep expired the reservation answers `not_active`. Core `decideExtend`: never shortens
+   * (`would_shorten`), the same time again is accepted. Changes `expires_at` only: no level or journal write. Like
+   * `commit` it does not look at the clock, so an overdue reservation that has not been swept yet can still be
+   * extended. An invalid date throws `RangeError`.
+   */
+  async extend(tx: Transaction, reservationId: string, expiresAt: Date): Promise<ExtendResult> {
+    assertValidDate(expiresAt, "expiresAt");
+    const locked = await this.lockPair(tx, reservationId);
+    if (locked === undefined) {
+      return { ok: false, reason: "reservation_not_found" };
+    }
+    assertValidStatus(locked.reservation.status);
+    const decision = decideExtend(
+      { status: locked.reservation.status, expiresAt: locked.reservation.expiresAt },
+      expiresAt,
+    );
+    if (!decision.ok) {
+      if (decision.reason === "invalid_expiry") {
+        throw new RangeError("expiresAt must be a valid Date");
+      }
+      return { ok: false, reason: decision.reason };
+    }
+    const updated = await this.reservations.setExpiresAt(tx, reservationId, decision.expiresAt);
+    return { ok: true, reservation: toView(updated) };
   }
 
   /**
@@ -353,6 +514,144 @@ export class ReservationsService {
       await this.apply(tx, locked.reservation, decision.level, "expired");
       return "expired";
     });
+  }
+
+  /**
+   * The ONE implementation of "hold stock", for one line (`reserve`) or many (`reserveMany`), in the caller's
+   * transaction. Passes, each in id order: product rows `FOR SHARE`, variant rows `FOR SHARE` (with the facts the
+   * sellable rule needs), then, for the lines that can still be held, level rows `FOR UPDATE` by (variant, location).
+   * Every line is evaluated against the locked rows before the first write. The level pass and the writes run in a
+   * savepoint, so when any line is refused everything done there (a created empty level row included) is undone and
+   * nothing is written; the locks of the product and variant passes stay until the caller's transaction ends.
+   */
+  private async reserveLines(
+    tx: Transaction,
+    lines: readonly LineRequest[],
+    hold: { expiresAt: Date; reference: string | null },
+  ): Promise<LineOutcome[]> {
+    const outcomes: LineOutcome[] = lines.map(() => ({ kind: "not_reserved" }));
+    const variantIds = [...new Set(lines.map((line) => line.variantId))];
+
+    const productIds = await this.reservations.findProductIdsOfVariants(tx, variantIds);
+    if (productIds.size > 0) {
+      await this.reservations.lockProductsShared(tx, [...new Set(productIds.values())]);
+    }
+    const found = await this.reservations.findVariantsForReservation(
+      tx,
+      variantIds,
+      this.pricing.shopCurrency,
+    );
+    const factsById = new Map(found.map((row) => [row.id, row]));
+
+    const locations = new LocationCache(this.inventory, tx);
+    const candidates: Candidate[] = [];
+    for (const [index, line] of lines.entries()) {
+      const variant = factsById.get(line.variantId.toLowerCase());
+      if (variant === undefined) {
+        outcomes[index] = { kind: "refused", reason: "variant_not_found" };
+        continue;
+      }
+      if (productIds.get(variant.id) !== variant.productId) {
+        throw new Error(`Variant ${variant.id} changed its product while it was being reserved.`);
+      }
+      // The same rule the store lists by (core `isVariantSellable`): a line the shop never showed is not reservable.
+      const sellable = isVariantSellable({
+        productStatus: productStatusSchema.parse(variant.productStatus),
+        variantIsActive: variant.isActive,
+        hasShopPrice: variant.hasShopPrice,
+      });
+      if (!sellable) {
+        outcomes[index] = { kind: "refused", reason: "variant_not_sellable" };
+        continue;
+      }
+      const flags = {
+        trackInventory: variant.trackInventory,
+        allowBackorder: variant.allowBackorder,
+      };
+      // The refusals that do not depend on the level (a bad quantity, an untracked variant) come first, so they never
+      // touch a row. Only "insufficient_stock" of an empty level is expected here and is decided again below.
+      const probe = decideReserve({ onHand: 0, reserved: 0 }, flags, line.quantity);
+      if (!probe.ok && probe.reason !== "insufficient_stock") {
+        outcomes[index] =
+          probe.reason === "not_tracked"
+            ? { kind: "untracked" }
+            : { kind: "refused", reason: probe.reason };
+        continue;
+      }
+      const location = await locations.get(line.locationId);
+      if (location === undefined) {
+        outcomes[index] = { kind: "refused", reason: "location_not_found" };
+        continue;
+      }
+      candidates.push({ index, line, variant, flags, locationId: location.id });
+    }
+    if (candidates.length === 0) {
+      return outcomes;
+    }
+
+    // Level locks in (variant id, location id) order: the sorted pass that keeps crossing carts from deadlocking.
+    const sorted = [...candidates].sort(
+      (a, b) => compareText(a.variant.id, b.variant.id) || compareText(a.locationId, b.locationId),
+    );
+    try {
+      await tx.transaction(async (savepoint) => {
+        const decided: { candidate: Candidate; level: StockLevel }[] = [];
+        let refused = hasRefusal(outcomes);
+        for (const candidate of sorted) {
+          const { variant, line, flags, locationId } = candidate;
+          let row = await this.inventory.lockLevel(savepoint, variant.id, locationId);
+          if (row === undefined) {
+            if (!flags.allowBackorder) {
+              // No level row means nothing on hand: refuse without creating an empty row.
+              outcomes[candidate.index] = { kind: "refused", reason: "insufficient_stock" };
+              refused = true;
+              continue;
+            }
+            // Parallel first reservations: one insert wins, the others do nothing, and all of them then lock the row.
+            await this.inventory.insertEmptyLevel(savepoint, variant.id, locationId);
+            row = await this.inventory.lockLevel(savepoint, variant.id, locationId);
+          }
+          if (row === undefined) {
+            throw new Error("The inventory level row vanished after it was created.");
+          }
+          const decision = decideReserve(toLevel(row), flags, line.quantity);
+          if (!decision.ok) {
+            outcomes[candidate.index] = { kind: "refused", reason: decision.reason };
+            refused = true;
+            continue;
+          }
+          decided.push({ candidate, level: decision.level });
+        }
+        if (refused) {
+          throw new HoldRefused();
+        }
+        for (const { candidate, level } of decided) {
+          await this.inventory.updateLevel(
+            savepoint,
+            candidate.variant.id,
+            candidate.locationId,
+            level,
+          );
+        }
+        // Inserted in input order, so the rows read like the order.
+        decided.sort((a, b) => a.candidate.index - b.candidate.index);
+        for (const { candidate } of decided) {
+          const created = await this.reservations.insert(savepoint, {
+            variantId: candidate.variant.id,
+            locationId: candidate.locationId,
+            quantity: candidate.line.quantity,
+            expiresAt: hold.expiresAt,
+            reference: hold.reference,
+          });
+          outcomes[candidate.index] = { kind: "reserved", reservation: toView(created) };
+        }
+      });
+    } catch (error) {
+      if (!(error instanceof HoldRefused)) {
+        throw error;
+      }
+    }
+    return outcomes;
   }
 
   /**
