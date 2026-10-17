@@ -14,12 +14,12 @@ Sold as a template plus a team that adapts design and features for each client.
 
 ## Status
 
-Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): steps 1 to 4 done, step 5 (independent review) pending. Pricing and inventory plan (`docs/plans/2026-10-16-pricing-and-inventory.md`): steps 1 to 6 done, step 7 (independent review) pending.
-**Not built yet**: the storefront login screens, search indexing, payment and shipping providers. What exists and works:
+Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): complete. Pricing and inventory plan (`docs/plans/2026-10-16-pricing-and-inventory.md`): complete. Cart, customers and orders plan (`docs/plans/2026-10-17-cart-and-orders.md`): steps 1 to 7 done (the API, the scheduler and the docs), step 8 (independent review) pending.
+**Not built yet**: payment and shipping providers (an admin marks an order paid by hand), email delivery (no password reset or email verification), search indexing, the storefront cart, checkout and account screens, and the admin screens for orders and customers (the placeholder pages only). What exists and works:
 
 - API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`, `0003_pricing_inventory`, `0004_cart_customers_orders`), BullMQ and Meilisearch spikes.
 - Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
-- Prices and stock: one price per variant and currency (plus an optional old price), per-variant stock levels with an append-only journal, a reservation service for the future checkout (no HTTP route), and public store fields `price` and `availability` (`in_stock`, `low_stock`, `out_of_stock`; never quantities) plus `GET /store/config`. Settings: `SHOP_CURRENCY` (default `UAH`; an active variant needs a price in it), `PRICES_INCLUDE_TAX` (default `true`, a display flag only, no tax is calculated) and `LOW_STOCK_THRESHOLD` (default `5`), see `.env.example` and `docs/contracts/config.md`. Endpoints: `docs/api/pricing.md` and `docs/api/inventory.md`. `pnpm seed` gives every demo variant a price and a stock level that shows each availability state, but only for products it creates: it never prices or stocks a product that already exists, so on a database seeded before prices existed the store stays empty until the variants are priced (bulk price endpoint). Changing `SHOP_CURRENCY` after data exists hides every live product without a price in the new currency; price them first.
+- Prices and stock: one price per variant and currency (plus an optional old price), per-variant stock levels with an append-only journal, a reservation service used by the checkout, the order service and the scheduler (no HTTP route), and public store fields `price` and `availability` (`in_stock`, `low_stock`, `out_of_stock`; never quantities) plus `GET /store/config`. Settings: `SHOP_CURRENCY` (default `UAH`; an active variant needs a price in it), `PRICES_INCLUDE_TAX` (default `true`, a display flag only, no tax is calculated) and `LOW_STOCK_THRESHOLD` (default `5`), see `.env.example` and `docs/contracts/config.md`. Endpoints: `docs/api/pricing.md` and `docs/api/inventory.md`. `pnpm seed` gives every demo variant a price and a stock level that shows each availability state, but only for products it creates: it never prices or stocks a product that already exists, so on a database seeded before prices existed the store stays empty until the variants are priced (bulk price endpoint). Changing `SHOP_CURRENCY` after data exists hides every live product without a price in the new currency; price them first.
 - Admin authentication: cookie sessions, roles `owner`, `manager`, `viewer`, owner-only user management, first owner through `pnpm admin:create` (see Admin sign-in below). Endpoints: `docs/api/auth.md`; contract: `docs/contracts/api.md`.
 - Customer accounts (`/store/account/*`: register, login, logout, profile, change password; separate cookie session, CSRF header on every `/store` write, lockout, rate limits) and admin customer management (`/admin/customers`, permissions `customers.read` and `customers.write`); no password reset or email verification yet: `docs/api/customers.md`.
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
@@ -109,8 +109,8 @@ ADMIN_PASSWORD='a long password' pnpm admin:create --email you@example.com --rol
 | Role | Can do |
 |---|---|
 | `owner` | everything, including managing users |
-| `manager` | read, write and publish the catalog |
-| `viewer` | read the catalog |
+| `manager` | read, write and publish the catalog; read and manage orders and customers |
+| `viewer` | read the catalog (no orders and no customers: they hold personal data) |
 
 More users: an owner calls `POST /admin/users` with `{email, role, password}` (and `PATCH /admin/users/{id}` to change a role or deactivate, `POST /admin/users/{id}/reset-password` to set a new password). There is no self-service password reset by email yet.
 If every owner is locked out or has lost the password, create a new owner with `pnpm admin:create`; the command works against the database directly and needs no existing session.
@@ -122,6 +122,84 @@ If every owner is locked out or has lost the password, create a new owner with `
 - run `pnpm admin:unlock --email owner@example.com` on the server. It sets the failed-login counter to 0 and removes the lock, nothing else (no password, role, active flag or session is touched), and prints `Unlocked owner@example.com` (or `owner@example.com was not locked`). An unknown email exits with code 1. Like `admin:create` it reads `DATABASE_URL` from `.env` and needs no session.
 
 Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`.
+
+## Checkout walkthrough
+
+A copy-pasteable run of the whole flow with `curl` and `jq` against a local API: browse, fill a cart, register, place an order, pay and fulfil it as an admin, cancel another one, run the jobs. It uses only documented routes (`docs/api/cart.md`, `customers.md`, `orders.md`, `auth.md`) and was run against a freshly migrated and seeded database.
+
+Prerequisites:
+
+- Quick start done: migrated database (`pnpm db:migrate`), `pnpm seed` (the database name must end in `_test`, `_dev`, `_demo` or `_local`; the default `fluxkit_dev` does), an owner (`pnpm admin:create --email owner@example.com`), the API running (`pnpm --filter @fluxkit/api start`).
+- Plain HTTP on localhost: put `ADMIN_COOKIE_SECURE=false` and `STORE_COOKIE_SECURE=false` into `.env` before starting the API, otherwise the cookies carry `Secure` and `curl` does not send them back over `http://`.
+- The seed creates no customers and no orders (see `seeds/README.md`); the flow below creates them.
+- Every state-changing request carries `X-Fluxkit-CSRF: 1` and, with a body, a JSON content type (`403 forbidden` otherwise). Cookies live in two jars: `shop.jar` (cart and customer session, `Path=/store`) and `admin.jar` (admin session, `Path=/admin`).
+
+```bash
+API=http://localhost:3000                      # PORT from .env
+H=(-H 'X-Fluxkit-CSRF: 1' -H 'Content-Type: application/json')
+
+# 1. Read the shop settings and the catalog (public, no cookie)
+curl -s $API/store/config
+curl -s "$API/store/products?limit=20" | jq -r '.items[] | "\(.slug)  \(.price.from) \(.price.currency)  \(.availability)"'
+VARIANT_ID=$(curl -s $API/store/products/demo-e-book | jq -r '.variants[0].id')   # a digital product: no shipping address needed
+
+# 2. Add to the cart as a guest (the first write creates the cart and sets the fluxkit_cart cookie), then read it
+curl -s -c shop.jar -b shop.jar "${H[@]}" -X POST $API/store/cart/items \
+  -d "{\"variantId\":\"$VARIANT_ID\",\"quantity\":2}" | jq -c '{itemCount, total, purchasable}'
+curl -s -b shop.jar $API/store/cart | jq '.lines[0], .total'
+
+# 3. Register a customer: signs in with a new session and merges the guest cart into the account's cart
+#    (a taken email is 409: use another address when you repeat the run)
+curl -s -c shop.jar -b shop.jar "${H[@]}" -X POST $API/store/account/register \
+  -d '{"email":"shopper@example.com","password":"a long demo password","firstName":"Demo","lastName":"Shopper","phone":"+380501234567"}' | jq -c .
+curl -s -b shop.jar $API/store/cart | jq -c '{itemCount, total}'          # still 2 items
+
+# 4. Check out. The Idempotency-Key makes a retry safe; expectedTotal is the total the shopper saw (a consent check, never a price)
+TOTAL=$(curl -s -b shop.jar $API/store/cart | jq -c '.total')
+KEY=$(cat /proc/sys/kernel/random/uuid)                                    # any new UUID per attempt
+curl -s -c shop.jar -b shop.jar "${H[@]}" -H "Idempotency-Key: $KEY" -X POST $API/store/checkout \
+  -d "{\"phone\":\"+380501234567\",\"firstName\":\"Demo\",\"lastName\":\"Shopper\",\"expectedTotal\":$TOTAL}" \
+  -w '\nHTTP %{http_code}\n' | tee order.json
+NUMBER=$(head -1 order.json | jq -r '.order.number')
+# the same request with the same key answers 200 with the same order, nothing is reserved twice (rerun the curl above to see it)
+
+# 5. Read the order as its owner (status awaiting_payment, 30 minutes to pay by default)
+curl -s -b shop.jar "$API/store/account/orders/$NUMBER" | jq -c '{number, status, total, expiresAt}'
+curl -s -b shop.jar "$API/store/account/orders" | jq -c '.items'
+
+# 6. Admin: sign in, find the order, mark it paid (no payment provider exists yet), fulfil it
+curl -s -c admin.jar "${H[@]}" -X POST $API/admin/auth/login \
+  -d '{"email":"owner@example.com","password":"<the owner password>"}' | jq -c .user
+ORDER_ID=$(curl -s -b admin.jar "$API/admin/orders?q=$NUMBER" | jq -r '.items[0].id')
+AMOUNT=$(echo "$TOTAL" | jq '.amount'); CURRENCY=$(echo "$TOTAL" | jq -r '.currency')
+curl -s -b admin.jar "${H[@]}" -X POST $API/admin/orders/$ORDER_ID/mark-paid \
+  -d "{\"reference\":\"demo-payment-1\",\"amount\":{\"amount\":$AMOUNT,\"currency\":\"$CURRENCY\"}}" | jq -c '{number, status, paymentReference, paidAt}'
+curl -s -b admin.jar "${H[@]}" -X POST $API/admin/orders/$ORDER_ID/mark-fulfilled | jq -c '{number, status, fulfilledAt}'
+curl -s -b shop.jar "$API/store/account/orders/$NUMBER" | jq -c '{status, history}'   # the customer sees the same history
+
+# 7. A second order, cancelled by its owner while it is unpaid (its stock reservations are released)
+curl -s -b shop.jar "${H[@]}" -X POST $API/store/cart/items -d "{\"variantId\":\"$VARIANT_ID\",\"quantity\":1}" > /dev/null
+TOTAL=$(curl -s -b shop.jar $API/store/cart | jq -c '.total')
+NUMBER2=$(curl -s -b shop.jar "${H[@]}" -H "Idempotency-Key: $(cat /proc/sys/kernel/random/uuid)" -X POST $API/store/checkout \
+  -d "{\"phone\":\"+380501234567\",\"firstName\":\"Demo\",\"lastName\":\"Shopper\",\"expectedTotal\":$TOTAL}" | jq -r '.order.number')
+curl -s -b shop.jar "${H[@]}" -X POST "$API/store/account/orders/$NUMBER2/cancel" | jq -c '{number, status}'
+```
+
+Guest variant (no account): send `email` in the checkout body instead of a session. A guest checkout answers `201 {order, accessToken}`; the token is shown once and opens that one order:
+
+```bash
+# a fresh cookie jar (not shop.jar): add to the cart as in step 2, then run step 4 with "email":"guest@example.com" in the body
+# and a new Idempotency-Key; NUMBER is .order.number and TOKEN is .accessToken of that 201 response
+BODY="{\"number\":\"$NUMBER\",\"accessToken\":\"$TOKEN\"}"
+curl -s "${H[@]}" -X POST $API/store/orders/lookup -d "$BODY" | jq -c '{number, status}'
+curl -s "${H[@]}" -X POST $API/store/orders/cancel -d "$BODY" | jq -c '{number, status}'    # only while awaiting_payment
+```
+
+Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) releases their stock after `ORDER_PAYMENT_TTL_MINUTES`. To run the jobs once by hand (also what a system cron does when `SCHEDULER_ENABLED=false`):
+
+```bash
+pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock
+```
 
 ## Scripts (root)
 
@@ -146,7 +224,7 @@ Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.
 apps/api            NestJS API (REST + OpenAPI)
 apps/storefront     Next.js storefront (App Router, Tailwind, tokens, uk/en)
 apps/admin          React + Vite admin
-packages/core       catalog domain rules, pure TypeScript (pricing and the rest not yet)
+packages/core       domain rules, pure TypeScript: catalog, money, pricing, stock, auth, cart and orders (shipping, discounts and tax not yet)
 packages/features   optional feature modules (sample: _example)
 packages/providers  payment and shipping provider plugins (none yet)
 packages/ui         token-based components and i18n helpers
@@ -163,7 +241,7 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema (index with status in `docs/adr/README.md`).
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0022 cart, customers, orders, the scheduler and the order schema (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API, domain events and order ports).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
@@ -181,6 +259,6 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Independent review of the pricing and inventory plan (step 7) and of the auth plan (step 5), then the next domain plans: cart and checkout (it will use the reservation service), orders; the pricing pipeline (discounts, tax) is a later plan (TDD for all money logic). Known follow-ups: rate limiting for `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, password reset by email, shared login throttle, `trust proxy`) listed in the auth plan outcome.
-3. Payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta).
+2. Independent review of the cart, customers and orders plan (step 8 of `docs/plans/2026-10-17-cart-and-orders.md`, by a different agent than the author), then its follow-ups (listed in the plan Outcome and `docs/HANDOFF.md`).
+3. Next domain plans, each with its own plan file and approval: payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), email delivery (password reset, email verification, order mails), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), the storefront and admin screens for cart, checkout, accounts and orders. Known follow-ups: rate limiting for the catalog routes of `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, shared login throttle, `trust proxy`) listed in the auth plan outcome.
 4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.

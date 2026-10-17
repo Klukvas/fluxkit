@@ -38,7 +38,7 @@ All need an admin session; the permission is the default pair of the controller 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
 | `GET /admin/customers` | `customers.read` | List customers ordered by email, then id | `?limit` (1 to 100, default 50), `?offset`, `?q` (start of the email, case and surrounding spaces ignored; `%` and `_` are literal; at most 254 characters) | `200 {items, total, limit, offset}`; item `{id, email, firstName, lastName, isActive, lastLoginAt, createdAt}` | `400` |
-| `GET /admin/customers/{id}` | `customers.read` | One customer with the number of their orders | none | `200` item plus `{phone, isLocked, orderCount, updatedAt}`; `orderCount` is a real `COUNT` over `sales_order` (0 until orders exist, step 5); `isLocked` is true while a lock is in force | `400` malformed id; `404` |
+| `GET /admin/customers/{id}` | `customers.read` | One customer with the number of their orders | none | `200` item plus `{phone, isLocked, orderCount, updatedAt}`; `orderCount` is a real `COUNT` over `sales_order`; `isLocked` is true while a lock is in force | `400` malformed id; `404` |
 | `PATCH /admin/customers/{id}` | `customers.write` | Activate or deactivate. Deactivating deletes ALL sessions of the customer in the same transaction, so their cookies stop working at once and sign-in is refused with the identical `401` | `{isActive}` (boolean, required, strict) | `200` detail as above | `400`; `404` |
 | `POST /admin/customers/{id}/unlock` | `customers.write` | Clear the failure counter and the lock; sessions are untouched | none | `204` | `400`; `404` |
 
@@ -57,7 +57,7 @@ Responses never contain the password hash, the failure counter or `lockedUntil`.
 | Cookie | `fluxkit_customer_session`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`, `Max-Age` = the session's remaining lifetime in seconds (at most `CUSTOMER_SESSION_MAX_HOURS`). `Path=/store` means a browser never sends it to `/admin`; the admin cookie (`fluxkit_admin_session`, `Path=/admin`, `SameSite=Strict`) is never read by the customer guard. Logout clears it, with the same path and flags |
 | Token | 32 random bytes (base64url, 43 characters), a NEW one for every session; only its SHA-256 is stored in `customer_session.token_hash`. The raw token exists in the cookie only. When a request carries the cookie twice, only the first well-formed value is read |
 | Authentication | The customer guard reads only that cookie. An `Authorization` header, a query parameter, a body field or any other cookie name never authenticates |
-| Lifetime | Idle `CUSTOMER_SESSION_IDLE_MINUTES` (default 43 200 = 30 days) and absolute `CUSTOMER_SESSION_MAX_HOURS` (default 2 160 = 90 days), the admin rules of `evaluateSession` (a limit reached exactly is expired). `last_seen_at` is touched at most once a minute. An expired session is deleted when it is presented; a scheduler job that deletes the rest is planned (step 6) |
+| Lifetime | Idle `CUSTOMER_SESSION_IDLE_MINUTES` (default 43 200 = 30 days) and absolute `CUSTOMER_SESSION_MAX_HOURS` (default 2 160 = 90 days), the admin rules of `evaluateSession` (a limit reached exactly is expired). `last_seen_at` is touched at most once a minute. An expired session is deleted when it is presented; the scheduler job `delete-customer-sessions` deletes the rest once the ABSOLUTE expiry has passed (`docs/api/jobs.md`) |
 | Checked on every request | The session row, its expiry and `customer.is_active` are read from the database each time; deactivating a customer takes effect on the next request |
 | Failure | Missing, malformed, unknown, expired, revoked and inactive all answer the identical `401 unauthorized` (same status, headers and body, no `Set-Cookie`) |
 | Caching | Every response under `/store/account`, `401`, `403`, `429` and a `413` included, carries `Cache-Control: no-store`. Public catalog routes are unchanged |
@@ -77,11 +77,11 @@ Every `POST`, `PUT`, `PATCH` and `DELETE` under `/store` (matched like Express: 
 |---|---|---|
 | `login` | 20 per 10 minutes | `POST /store/account/login`; the admin login keeps its own window of the same size |
 | `registration` | 10 per hour | `POST /store/account/register` |
-| `checkout` | 10 per 10 minutes | checkout (step 5) |
-| `orderLookup` | 20 per 10 minutes | guest order lookup (step 5) |
-| `guestCancel` | 20 per 10 minutes | guest cancel (step 5) |
+| `checkout` | 10 per 10 minutes | `POST /store/checkout` (`docs/api/orders.md`) |
+| `orderLookup` | 20 per 10 minutes | `POST /store/orders/lookup` |
+| `guestCancel` | 20 per 10 minutes | `POST /store/orders/cancel` |
 | `cartWrite` | 120 per minute | the cart writes (`docs/api/cart.md`) |
 
 ## Not built yet
 
-Email verification and password reset (a later email plan), a scheduler job that deletes expired customer sessions (step 5c). The customer's orders are built (`docs/api/orders.md`).
+Email verification and password reset (a later email plan). The customer's orders (`docs/api/orders.md`) and the scheduler job that deletes expired customer sessions (`docs/api/jobs.md`) are built.
