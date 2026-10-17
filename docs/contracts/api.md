@@ -36,7 +36,7 @@ Contract:
 | Roles | `owner`, `manager`, `viewer`; fixed in code (a new role is a code change, not data). The names are contract |
 | Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`, `orders.read`, `orders.write`, `customers.read`, `customers.write`. The names are contract. The orders and customers permissions exist in core; no route requires them yet (ADR 0017, plan `docs/plans/2026-10-17-cart-and-orders.md`) |
 | Login response | `200 {"user": {id, email, role, isActive, lastLoginAt}}` plus the cookie. Every failure (unknown email, wrong password, locked account, inactive user) answers the same `401 unauthorized` with no cookie; status, headers and body do not say which. Response times are similar (one scrypt each) but not guaranteed equal: a wrong password also writes the failure count, so a small difference can exist. `GET /admin/auth/me` answers `{user, permissions}` |
-| Caching | Every response under `/admin` (matched like the guard: case-insensitive, trailing slash included), errors included, carries `Cache-Control: no-store`. `/store/*` and `/health` are not affected |
+| Caching | Every response under `/admin` (matched like the guard: case-insensitive, trailing slash included), errors included, carries `Cache-Control: no-store`. `/store/*` and `/health` are not affected, except that customer-authenticated store routes are `no-store` too (`docs/api/customers.md`) |
 | Users endpoints | `GET` and `POST /admin/users`, `GET` and `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-password`, owner only; no delete; the last active owner cannot be demoted or deactivated. Shapes and errors: `docs/api/auth.md` |
 
 | Role | `catalog.read` | `catalog.write` | `catalog.publish` | `users.manage` | `orders.read` | `orders.write` | `customers.read` | `customers.write` |
@@ -57,11 +57,24 @@ Problem codes added by auth:
 
 Not contract (internal, may change in a minor release): the scrypt parameters and the hash format, the session token format and how sessions are stored, the cookie name `fluxkit_admin_session`, the lockout numbers (5 failures, 15 minutes) and the IP limit numbers (20 attempts per 10 minutes; IPv6 counted per /64), the exact `detail` texts. Clients keep the cookie jar of their HTTP client and do not read the cookie value.
 
+## Customer authentication and the store (ADR 0016, `docs/api/customers.md`)
+
+Infrastructure only (plan step 3a): no customer endpoint exists yet, so the rows below are the rules routes added later must follow.
+
+| Item | Rule |
+|---|---|
+| Store CSRF header | Every `POST`, `PUT`, `PATCH` and `DELETE` under `/store` (matched like Express: case-insensitive, trailing slash included), signed in or not, must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`, before authentication. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers. New in this release (the store was GET-only, so no existing request changes) |
+| Customer cookie | `fluxkit_customer_session`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`; idle and absolute lifetimes from `CUSTOMER_SESSION_IDLE_MINUTES` and `CUSTOMER_SESSION_MAX_HOURS` (`docs/contracts/config.md`). A separate principal from the admin: an admin cookie never authenticates a customer route and a customer cookie never authenticates an `/admin` route (`401`); only the cookie is read |
+| Public by default | A `/store` route is public unless it is marked customer-authenticated; a customer-authenticated route answers `401 unauthorized` (identical for every cause) and carries `Cache-Control: no-store` |
+| Rate limit | A limited store route answers `429 too_many_requests` with `Retry-After` |
+
+Not contract (internal): the cookie name, the token format and how sessions are stored, the rate-limit numbers.
+
 Known limits:
 
 - The IP login limit is in memory, per API process: it resets on restart and is not shared between instances. The account lockout is in the database and does span instances.
 - `request.ip` is the socket address unless Express `trust proxy` is configured, which the API does not do yet. Behind a reverse proxy all clients then share one IP window.
-- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are a separate plan.
+- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (infrastructure: `docs/api/customers.md`).
 
 ## Stability of identifiers (ADR 0006 section 10)
 
