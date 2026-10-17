@@ -1,3 +1,4 @@
+import type { LogLevel } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from "@nestjs/swagger";
@@ -8,6 +9,7 @@ import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
 import type { Clock } from "./auth/clock.js";
 import { DEFAULT_CART_CONFIG } from "./cart/cart-config.js";
 import { DEFAULT_ORDERS_CONFIG } from "./orders/orders-config.js";
+import { DISABLED_SCHEDULER_CONFIG } from "./jobs/scheduler-config.js";
 import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-config.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
@@ -33,6 +35,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "cartTtlDays"
       | "orderPaymentTtlMinutes"
       | "orderGuestAccessDays"
+      | "schedulerEnabled"
+      | "schedulerIntervalSeconds"
       | "shopCurrency"
       | "pricesIncludeTax"
       | "lowStockThreshold"
@@ -50,6 +54,10 @@ export interface CreateAppOptions {
   scrypt?: ScryptParams;
   /** Tests only: extra modules loaded as if they were enabled features (for example a probe controller). */
   extraFeatures?: LoadedFeature[];
+  /** Default true. `pnpm jobs:run-once` passes false: it changes nothing but the data its jobs handle. */
+  cleanExpiredSessionsOnBootstrap?: boolean;
+  /** Default `["error", "warn", "log"]`. The command line passes `["error", "warn"]` and prints its own report. */
+  logLevels?: LogLevel[];
 }
 
 export async function createApp(
@@ -88,12 +96,18 @@ export async function createApp(
         paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
         guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
       },
+      // An environment-less caller (tests, the OpenAPI export) gets no timer; the API passes `SCHEDULER_ENABLED`.
+      scheduler: {
+        enabled: env.schedulerEnabled ?? DISABLED_SCHEDULER_CONFIG.enabled,
+        intervalSeconds: env.schedulerIntervalSeconds ?? DISABLED_SCHEDULER_CONFIG.intervalSeconds,
+      },
       rateLimits: options.rateLimits,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
       scrypt: options.scrypt,
+      cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
     }),
-    { logger: ["error", "warn", "log"] },
+    { logger: options.logLevels ?? ["error", "warn", "log"] },
   );
   app.enableShutdownHooks();
   return app;

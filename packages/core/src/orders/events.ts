@@ -28,6 +28,56 @@ export type CustomerEventType = (typeof CUSTOMER_EVENT_TYPES)[number];
 /** Metadata key a plugin's provider sets to be found as a domain event handler (`SetMetadata`). */
 export const DOMAIN_EVENT_HANDLER_METADATA = "fluxkit:domain-event-handler";
 
+/** The shape of an event name, equal to the CHECK of `domain_event.type`: a dotted lower-case name such as `order.paid`. */
+export const DOMAIN_EVENT_TYPE_PATTERN = /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/;
+
+/**
+ * The value of `SetMetadata(DOMAIN_EVENT_HANDLER_METADATA, ...)` on a handler's provider class. Build it with
+ * `domainEventHandlerMetadata`, which checks the names.
+ */
+export interface DomainEventHandlerMetadata {
+  /** The event types this handler receives (exact names; a handler is never called for another type). */
+  readonly eventTypes: readonly string[];
+}
+
+/** The value for `SetMetadata(DOMAIN_EVENT_HANDLER_METADATA, ...)`. A malformed or empty list is a bug (RangeError). */
+export function domainEventHandlerMetadata(
+  eventTypes: readonly string[],
+): DomainEventHandlerMetadata {
+  if (!Array.isArray(eventTypes) || eventTypes.length === 0) {
+    throw new RangeError("A domain event handler needs at least one event type");
+  }
+  for (const type of eventTypes) {
+    if (typeof type !== "string" || !DOMAIN_EVENT_TYPE_PATTERN.test(type)) {
+      throw new RangeError(`Not a domain event type: ${String(type)}`);
+    }
+  }
+  return Object.freeze({ eventTypes: Object.freeze([...new Set(eventTypes)]) });
+}
+
+/** One stored event as a handler receives it. Ids and the order number only, never personal data. */
+export interface DomainEventEnvelope {
+  /** The idempotency key of a handler: the same event can be delivered more than once (at-least-once). */
+  readonly id: string;
+  readonly type: string;
+  /** The order or customer the event is about. */
+  readonly aggregateId: string;
+  /** The stored payload (for an order event: `OrderEventPayload`). */
+  readonly payload: Readonly<Record<string, unknown>>;
+  /** When the change committed (the creation time of the outbox row). */
+  readonly occurredAt: Date;
+  /** Failed deliveries so far: 0 on the first attempt. */
+  readonly previousFailures: number;
+}
+
+/**
+ * What a provider that carries `DOMAIN_EVENT_HANDLER_METADATA` implements. It must be idempotent by `event.id`, must
+ * bound its own I/O, and signals failure by throwing (the event is then retried with backoff).
+ */
+export interface DomainEventHandler {
+  handle(event: DomainEventEnvelope): Promise<void>;
+}
+
 /** Injection token of the payment port: `@Inject(ORDER_PAYMENTS_PORT)` in a plugin, implemented by `apps/api`. */
 export const ORDER_PAYMENTS_PORT = "fluxkit:order-payments-port";
 

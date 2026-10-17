@@ -91,7 +91,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 | `markFulfilled(orderId, actor)` | `paid -> fulfilled`; `awaiting_stock` (nothing changes) while a held backordered line is not on hand; `invalid_transition` otherwise |
 | `cancelAsGuest(number, token)`, `cancelAsCustomer(customerId, number)` | Owner cancels; `not_found` as in the routes, `invalid_transition` unless `awaiting_payment` |
 | `cancelAsAdmin(orderId, adminId, reason)` | `awaiting_payment` or `paid`; reason 1 to 500 characters stored on the order and in the journal; sold units are not restocked |
-| `expireOne(orderId, now)` | Expires the order when it is `awaiting_payment` and `expires_at <= now` (`expired`, `not_due`, `not_found`); the loop and the schedule are step 5c |
+| `expireOne(orderId, now)` | Expires the order when it is `awaiting_payment` and `expires_at <= now` (`expired`, `not_due`, `not_found`); the scheduler calls it for every due order (`docs/api/jobs.md`) |
 
 Races on one order have one winner: a payment, a cancellation and the expiry all lock the order row first (tested: payment against cancel, payment against expiry, parallel payments, crossing orders).
 

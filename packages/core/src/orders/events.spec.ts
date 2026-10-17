@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   CUSTOMER_EVENT_TYPES,
   DOMAIN_EVENT_HANDLER_METADATA,
+  DOMAIN_EVENT_TYPE_PATTERN,
   ORDER_EVENT_TYPES,
   ORDER_PAYMENTS_PORT,
   buildOrderEventPayload,
+  domainEventHandlerMetadata,
   orderEventTypeFor,
 } from "./events.js";
 import { ORDER_STATUSES } from "./status.js";
@@ -83,5 +85,27 @@ describe("buildOrderEventPayload", () => {
     expect(() => buildOrderEventPayload({ ...ids, status: "shipped" as never })).toThrow(
       RangeError,
     );
+  });
+});
+
+describe("domainEventHandlerMetadata", () => {
+  it("lists the event types a handler receives, once each, frozen", () => {
+    const metadata = domainEventHandlerMetadata(["order.paid", "order.paid", "order.expired"]);
+    expect([...metadata.eventTypes]).toEqual(["order.paid", "order.expired"]);
+    expect(Object.isFrozen(metadata)).toBe(true);
+    expect(Object.isFrozen(metadata.eventTypes)).toBe(true);
+  });
+
+  it("refuses an empty list and a name the outbox could never hold (RangeError)", () => {
+    expect(() => domainEventHandlerMetadata([])).toThrow(RangeError);
+    expect(() => domainEventHandlerMetadata(["Order.Paid"])).toThrow(RangeError);
+    expect(() => domainEventHandlerMetadata(["paid"])).toThrow(RangeError);
+    expect(() => domainEventHandlerMetadata(["order.paid", 7 as never])).toThrow(RangeError);
+  });
+
+  it("the type pattern accepts every event of the contract", () => {
+    for (const type of [...ORDER_EVENT_TYPES, ...CUSTOMER_EVENT_TYPES]) {
+      expect(DOMAIN_EVENT_TYPE_PATTERN.test(type)).toBe(true);
+    }
   });
 });
