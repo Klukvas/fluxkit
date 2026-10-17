@@ -83,9 +83,12 @@ describe("customer and admin principals are separate on the real routes", () => 
     );
     expect(routes.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual([
       "GET /store/account/me",
+      "GET /store/account/orders",
+      "GET /store/account/orders/:number",
       "PATCH /store/account/me",
       "POST /store/account/change-password",
       "POST /store/account/logout",
+      "POST /store/account/orders/:number/cancel",
     ]);
     for (const { method, path } of routes) {
       const result = await http<ProblemBody>(running.baseUrl, method as "GET", path, {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { Logger } from "@nestjs/common";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { VariantsService } from "../catalog/admin/variants/variants.service.js";
 import { InventoryService } from "../inventory/admin/inventory.service.js";
@@ -142,11 +143,24 @@ describe("checkout under concurrency (real app, real Postgres)", () => {
     await catalog.init();
   });
 
+  // The checkout retries a deadlock once, which would hide a broken lock order behind a green test: so every test also
+  // proves that no deadlock happened at all (the retry logs a warning).
+  let warnings: string[] = [];
+
   beforeEach(() => {
     clock.advanceMinutes(11);
+    warnings = [];
+    vi.spyOn(Logger.prototype, "warn").mockImplementation((message: unknown) => {
+      warnings.push(String(message));
+    });
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
+    expect(
+      warnings.filter((message) => message.includes("Deadlock")),
+      "a deadlock happened (and was retried)",
+    ).toEqual([]);
     await placedOrders.cleanup();
     await deleteTestCustomers(db, customers.splice(0));
   });

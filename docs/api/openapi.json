@@ -4484,6 +4484,2960 @@
         "tags": ["store"]
       }
     },
+    "/store/checkout": {
+      "post": {
+        "description": "One transaction, all or nothing: the stock of every line is reserved (30 minutes by default), the prices are read again, the totals are computed on the server, the order is stored with an immutable snapshot and the cart is emptied. `expectedTotal` is the total the shopper saw; if it differs, or a line became unavailable, the answer is 409 `cart_changed` with the fresh cart and nothing is reserved. A guest gets an `accessToken` once. The same `Idempotency-Key` with the same request returns the same order with 200 (a guest gets a NEW token and the old one stops working); with another request it is 409 `idempotency_key_reused`.",
+        "operationId": "CheckoutController_place",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A UUID the client generates for each checkout attempt.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "description": "Required for a guest; a signed-in customer's account email by default.",
+                    "type": "string"
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "shippingAddress": {
+                    "description": "Required when any line's product type ships physical goods.",
+                    "nullable": true,
+                    "type": "object",
+                    "properties": {
+                      "countryCode": {
+                        "description": "Required. ISO 3166-1 alpha-2, upper case (pattern only).",
+                        "type": "string"
+                      },
+                      "region": {
+                        "type": "string"
+                      },
+                      "city": {
+                        "description": "Required.",
+                        "type": "string"
+                      },
+                      "postalCode": {
+                        "type": "string"
+                      },
+                      "line1": {
+                        "description": "Required.",
+                        "type": "string"
+                      },
+                      "line2": {
+                        "type": "string"
+                      },
+                      "recipientFirstName": {
+                        "type": "string"
+                      },
+                      "recipientLastName": {
+                        "type": "string"
+                      },
+                      "recipientPhone": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "billingAddress": {
+                    "nullable": true,
+                    "type": "object",
+                    "properties": {
+                      "countryCode": {
+                        "description": "Required. ISO 3166-1 alpha-2, upper case (pattern only).",
+                        "type": "string"
+                      },
+                      "region": {
+                        "type": "string"
+                      },
+                      "city": {
+                        "description": "Required.",
+                        "type": "string"
+                      },
+                      "postalCode": {
+                        "type": "string"
+                      },
+                      "line1": {
+                        "description": "Required.",
+                        "type": "string"
+                      },
+                      "line2": {
+                        "type": "string"
+                      },
+                      "recipientFirstName": {
+                        "type": "string"
+                      },
+                      "recipientLastName": {
+                        "type": "string"
+                      },
+                      "recipientPhone": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "locale": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 16,
+                    "description": "One of the configured locales. Missing means the default locale."
+                  },
+                  "expectedTotal": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "number"
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The total the shopper saw. A consent check only: the server prices everything itself, and a different total answers 409 `cart_changed`."
+                  }
+                },
+                "required": ["phone", "firstName", "lastName", "expectedTotal"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The same checkout again: the order it created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "string",
+                          "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                        },
+                        "placedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                        },
+                        "currency": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sku": {
+                                "type": "string"
+                              },
+                              "productTitle": {
+                                "type": "string"
+                              },
+                              "variantTitle": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "optionValues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "option": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["option", "value"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "imageUrl": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "unitPrice": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000000000000,
+                                    "description": "Minor units of the order currency."
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              },
+                              "compareAtAmount": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              "lineTotal": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000000000000,
+                                    "description": "Minor units of the order currency."
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "sku",
+                              "productTitle",
+                              "variantTitle",
+                              "optionValues",
+                              "imageUrl",
+                              "unitPrice",
+                              "compareAtAmount",
+                              "quantity",
+                              "lineTotal"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "subtotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "shippingTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "discountTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": -1000000000000,
+                              "maximum": 1000000000000
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "taxTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "adjustments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "amount": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": -1000000000000,
+                                    "maximum": 1000000000000
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              },
+                              "includedInPrice": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "contact": {
+                          "type": "object",
+                          "properties": {
+                            "email": {
+                              "type": "string"
+                            },
+                            "phone": {
+                              "type": "string"
+                            },
+                            "firstName": {
+                              "type": "string"
+                            },
+                            "lastName": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["email", "phone", "firstName", "lastName"],
+                          "additionalProperties": false
+                        },
+                        "shippingAddress": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "countryCode": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "city": {
+                              "type": "string"
+                            },
+                            "postalCode": {
+                              "type": "string"
+                            },
+                            "line1": {
+                              "type": "string"
+                            },
+                            "line2": {
+                              "type": "string"
+                            },
+                            "recipientFirstName": {
+                              "type": "string"
+                            },
+                            "recipientLastName": {
+                              "type": "string"
+                            },
+                            "recipientPhone": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["countryCode", "city", "line1"],
+                          "additionalProperties": false
+                        },
+                        "billingAddress": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "countryCode": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "city": {
+                              "type": "string"
+                            },
+                            "postalCode": {
+                              "type": "string"
+                            },
+                            "line1": {
+                              "type": "string"
+                            },
+                            "line2": {
+                              "type": "string"
+                            },
+                            "recipientFirstName": {
+                              "type": "string"
+                            },
+                            "recipientLastName": {
+                              "type": "string"
+                            },
+                            "recipientPhone": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["countryCode", "city", "line1"],
+                          "additionalProperties": false
+                        },
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "awaiting_payment",
+                                  "paid",
+                                  "fulfilled",
+                                  "cancelled",
+                                  "expired"
+                                ]
+                              },
+                              "at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": ["status", "at"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "status",
+                        "placedAt",
+                        "expiresAt",
+                        "currency",
+                        "items",
+                        "subtotal",
+                        "shippingTotal",
+                        "discountTotal",
+                        "taxTotal",
+                        "total",
+                        "adjustments",
+                        "contact",
+                        "shippingAddress",
+                        "billingAddress",
+                        "history"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "accessToken": {
+                      "description": "Guests only: the secret that opens this order (`POST /store/orders/lookup`). Shown once; a replay of the same checkout returns a NEW token and the old one stops working.",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["order"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "The new order (and the access token of a guest).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order": {
+                      "type": "object",
+                      "properties": {
+                        "number": {
+                          "type": "string",
+                          "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                        },
+                        "placedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                        },
+                        "currency": {
+                          "type": "string"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "sku": {
+                                "type": "string"
+                              },
+                              "productTitle": {
+                                "type": "string"
+                              },
+                              "variantTitle": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "optionValues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "option": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["option", "value"],
+                                  "additionalProperties": false
+                                }
+                              },
+                              "imageUrl": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "unitPrice": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000000000000,
+                                    "description": "Minor units of the order currency."
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              },
+                              "compareAtAmount": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "quantity": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 999
+                              },
+                              "lineTotal": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000000000000,
+                                    "description": "Minor units of the order currency."
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "sku",
+                              "productTitle",
+                              "variantTitle",
+                              "optionValues",
+                              "imageUrl",
+                              "unitPrice",
+                              "compareAtAmount",
+                              "quantity",
+                              "lineTotal"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "subtotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "shippingTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "discountTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": -1000000000000,
+                              "maximum": 1000000000000
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "taxTotal": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "adjustments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "amount": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": -1000000000000,
+                                    "maximum": 1000000000000
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              },
+                              "includedInPrice": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "contact": {
+                          "type": "object",
+                          "properties": {
+                            "email": {
+                              "type": "string"
+                            },
+                            "phone": {
+                              "type": "string"
+                            },
+                            "firstName": {
+                              "type": "string"
+                            },
+                            "lastName": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["email", "phone", "firstName", "lastName"],
+                          "additionalProperties": false
+                        },
+                        "shippingAddress": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "countryCode": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "city": {
+                              "type": "string"
+                            },
+                            "postalCode": {
+                              "type": "string"
+                            },
+                            "line1": {
+                              "type": "string"
+                            },
+                            "line2": {
+                              "type": "string"
+                            },
+                            "recipientFirstName": {
+                              "type": "string"
+                            },
+                            "recipientLastName": {
+                              "type": "string"
+                            },
+                            "recipientPhone": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["countryCode", "city", "line1"],
+                          "additionalProperties": false
+                        },
+                        "billingAddress": {
+                          "nullable": true,
+                          "type": "object",
+                          "properties": {
+                            "countryCode": {
+                              "type": "string"
+                            },
+                            "region": {
+                              "type": "string"
+                            },
+                            "city": {
+                              "type": "string"
+                            },
+                            "postalCode": {
+                              "type": "string"
+                            },
+                            "line1": {
+                              "type": "string"
+                            },
+                            "line2": {
+                              "type": "string"
+                            },
+                            "recipientFirstName": {
+                              "type": "string"
+                            },
+                            "recipientLastName": {
+                              "type": "string"
+                            },
+                            "recipientPhone": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["countryCode", "city", "line1"],
+                          "additionalProperties": false
+                        },
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "awaiting_payment",
+                                  "paid",
+                                  "fulfilled",
+                                  "cancelled",
+                                  "expired"
+                                ]
+                              },
+                              "at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": ["status", "at"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "number",
+                        "status",
+                        "placedAt",
+                        "expiresAt",
+                        "currency",
+                        "items",
+                        "subtotal",
+                        "shippingTotal",
+                        "discountTotal",
+                        "taxTotal",
+                        "total",
+                        "adjustments",
+                        "contact",
+                        "shippingAddress",
+                        "billingAddress",
+                        "history"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "accessToken": {
+                      "description": "Guests only: the secret that opens this order (`POST /store/orders/lookup`). Shown once; a replay of the same checkout returns a NEW token and the old one stops working.",
+                      "type": "string"
+                    }
+                  },
+                  "required": ["order"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Place the order of the cart",
+        "tags": ["store"]
+      }
+    },
+    "/store/orders/lookup": {
+      "post": {
+        "description": "404 for an unknown number, a wrong or expired token and an order of a signed-in customer alike.",
+        "operationId": "StoreOrdersController_lookup",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "accessToken": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                },
+                "required": ["number", "accessToken"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                    },
+                    "placedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "productTitle": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "imageUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "unitPrice": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000,
+                            "description": "Minor units of the order currency."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "lineTotal": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "productTitle",
+                          "variantTitle",
+                          "optionValues",
+                          "imageUrl",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "quantity",
+                          "lineTotal"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "shippingTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "discountTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000000000000,
+                          "maximum": 1000000000000
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "taxTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "adjustments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": -1000000000000,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "includedInPrice": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "contact": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["email", "phone", "firstName", "lastName"],
+                      "additionalProperties": false
+                    },
+                    "shippingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "billingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": ["status", "at"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "status",
+                    "placedAt",
+                    "expiresAt",
+                    "currency",
+                    "items",
+                    "subtotal",
+                    "shippingTotal",
+                    "discountTotal",
+                    "taxTotal",
+                    "total",
+                    "adjustments",
+                    "contact",
+                    "shippingAddress",
+                    "billingAddress",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Read a guest order with its access token",
+        "tags": ["store"]
+      }
+    },
+    "/store/orders/cancel": {
+      "post": {
+        "description": "Releases the reserved stock. Only while the order is `awaiting_payment`; 404 as for the lookup.",
+        "operationId": "StoreOrdersController_cancel",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "number": {
+                    "type": "string",
+                    "maxLength": 64
+                  },
+                  "accessToken": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                },
+                "required": ["number", "accessToken"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cancelled order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                    },
+                    "placedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "productTitle": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "imageUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "unitPrice": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000,
+                            "description": "Minor units of the order currency."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "lineTotal": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "productTitle",
+                          "variantTitle",
+                          "optionValues",
+                          "imageUrl",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "quantity",
+                          "lineTotal"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "shippingTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "discountTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000000000000,
+                          "maximum": 1000000000000
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "taxTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "adjustments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": -1000000000000,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "includedInPrice": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "contact": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["email", "phone", "firstName", "lastName"],
+                      "additionalProperties": false
+                    },
+                    "shippingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "billingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": ["status", "at"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "status",
+                    "placedAt",
+                    "expiresAt",
+                    "currency",
+                    "items",
+                    "subtotal",
+                    "shippingTotal",
+                    "discountTotal",
+                    "taxTotal",
+                    "total",
+                    "adjustments",
+                    "contact",
+                    "shippingAddress",
+                    "billingAddress",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel an unpaid guest order",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/orders": {
+      "get": {
+        "operationId": "AccountOrdersController_list",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of order summaries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "number": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "placedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "total": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "itemCount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Units over all lines."
+                          }
+                        },
+                        "required": [
+                          "number",
+                          "status",
+                          "placedAt",
+                          "expiresAt",
+                          "total",
+                          "itemCount"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The signed-in customer's orders, newest first",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/orders/{number}": {
+      "get": {
+        "operationId": "AccountOrdersController_get",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "description": "The order number, `XXXX-XXXX`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                    },
+                    "placedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "productTitle": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "imageUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "unitPrice": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000,
+                            "description": "Minor units of the order currency."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "lineTotal": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "productTitle",
+                          "variantTitle",
+                          "optionValues",
+                          "imageUrl",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "quantity",
+                          "lineTotal"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "shippingTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "discountTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000000000000,
+                          "maximum": 1000000000000
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "taxTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "adjustments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": -1000000000000,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "includedInPrice": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "contact": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["email", "phone", "firstName", "lastName"],
+                      "additionalProperties": false
+                    },
+                    "shippingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "billingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": ["status", "at"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "status",
+                    "placedAt",
+                    "expiresAt",
+                    "currency",
+                    "items",
+                    "subtotal",
+                    "shippingTotal",
+                    "discountTotal",
+                    "taxTotal",
+                    "total",
+                    "adjustments",
+                    "contact",
+                    "shippingAddress",
+                    "billingAddress",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "One of the signed-in customer's orders",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/orders/{number}/cancel": {
+      "post": {
+        "description": "Releases the reserved stock. Only while the order is `awaiting_payment`.",
+        "operationId": "AccountOrdersController_cancel",
+        "parameters": [
+          {
+            "name": "number",
+            "required": true,
+            "in": "path",
+            "description": "The order number, `XXXX-XXXX`.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "number": {
+                      "type": "string",
+                      "description": "`XXXX-XXXX`. Not a secret: reading an order needs a session or a token."
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["awaiting_payment", "paid", "fulfilled", "cancelled", "expired"]
+                    },
+                    "placedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "While the order is `awaiting_payment`: when it expires and gives its stock back."
+                    },
+                    "currency": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sku": {
+                            "type": "string"
+                          },
+                          "productTitle": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "imageUrl": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "unitPrice": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000,
+                            "description": "Minor units of the order currency."
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "lineTotal": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "sku",
+                          "productTitle",
+                          "variantTitle",
+                          "optionValues",
+                          "imageUrl",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "quantity",
+                          "lineTotal"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "shippingTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "discountTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": -1000000000000,
+                          "maximum": 1000000000000
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "taxTotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "adjustments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": -1000000000000,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "includedInPrice": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["kind", "code", "label", "amount", "includedInPrice"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "contact": {
+                      "type": "object",
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        },
+                        "phone": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["email", "phone", "firstName", "lastName"],
+                      "additionalProperties": false
+                    },
+                    "shippingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "billingAddress": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "countryCode": {
+                          "type": "string"
+                        },
+                        "region": {
+                          "type": "string"
+                        },
+                        "city": {
+                          "type": "string"
+                        },
+                        "postalCode": {
+                          "type": "string"
+                        },
+                        "line1": {
+                          "type": "string"
+                        },
+                        "line2": {
+                          "type": "string"
+                        },
+                        "recipientFirstName": {
+                          "type": "string"
+                        },
+                        "recipientLastName": {
+                          "type": "string"
+                        },
+                        "recipientPhone": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["countryCode", "city", "line1"],
+                      "additionalProperties": false
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": ["status", "at"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "number",
+                    "status",
+                    "placedAt",
+                    "expiresAt",
+                    "currency",
+                    "items",
+                    "subtotal",
+                    "shippingTotal",
+                    "discountTotal",
+                    "taxTotal",
+                    "total",
+                    "adjustments",
+                    "contact",
+                    "shippingAddress",
+                    "billingAddress",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel an own unpaid order",
+        "tags": ["store"]
+      }
+    },
     "/store/categories": {
       "get": {
         "operationId": "StoreCategoriesController_list",
@@ -17424,7 +20378,12 @@
               "invalid_transition",
               "rule_violation",
               "too_many_requests",
-              "internal_error"
+              "internal_error",
+              "cart_empty",
+              "cart_changed",
+              "checkout_refused",
+              "idempotency_key_reused",
+              "service_unavailable"
             ]
           },
           "detail": {
@@ -17447,6 +20406,11 @@
           "rule": {
             "type": "string",
             "description": "Core rule code of a rule_violation or invalid_transition."
+          },
+          "cart": {
+            "type": "object",
+            "description": "Only on `cart_changed`: the fresh cart, as `GET /store/cart` returns it.",
+            "additionalProperties": true
           }
         },
         "required": ["type", "title", "status", "code", "detail"]
