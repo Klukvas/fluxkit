@@ -63,11 +63,11 @@ export class AppModule {
         CustomerAuthModule.register({
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
-        CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
         HealthModule,
         CustomersModule,
         CatalogModule,
         InventoryModule,
+        CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
         ...options.features.map((feature) => feature.module),
       ],
     };

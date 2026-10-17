@@ -1010,7 +1010,7 @@
     },
     "/store/account/register": {
       "post": {
-        "description": "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked.",
+        "description": "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked. The guest cart of the `fluxkit_cart` cookie is merged into the new account's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
         "operationId": "AccountController_register",
         "parameters": [],
         "requestBody": {
@@ -1049,7 +1049,7 @@
         },
         "responses": {
           "201": {
-            "description": "The new customer. The session cookie is in `Set-Cookie`.",
+            "description": "The new customer and the notices of the cart merge. The session cookie is in `Set-Cookie`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1083,9 +1083,23 @@
                       },
                       "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
                       "additionalProperties": false
+                    },
+                    "cartNotices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
                     }
                   },
-                  "required": ["customer"],
+                  "required": ["customer", "cartNotices"],
                   "additionalProperties": false
                 }
               }
@@ -1138,7 +1152,7 @@
     },
     "/store/account/login": {
       "post": {
-        "description": "Every failure (unknown email, wrong password, locked or inactive account) is the same 401. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued.",
+        "description": "Every failure (unknown email, wrong password, locked or inactive account) is the same 401 and leaves the guest cart alone. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued. On success the guest cart of the `fluxkit_cart` cookie is merged into the customer's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
         "operationId": "AccountController_login",
         "parameters": [],
         "requestBody": {
@@ -1165,7 +1179,7 @@
         },
         "responses": {
           "200": {
-            "description": "The customer. The session cookie is in `Set-Cookie`.",
+            "description": "The customer and the notices of the cart merge. The session cookie is in `Set-Cookie`.",
             "content": {
               "application/json": {
                 "schema": {
@@ -1199,9 +1213,23 @@
                       },
                       "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
                       "additionalProperties": false
+                    },
+                    "cartNotices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
                     }
                   },
-                  "required": ["customer"],
+                  "required": ["customer", "cartNotices"],
                   "additionalProperties": false
                 }
               }
@@ -2762,6 +2790,2628 @@
         },
         "summary": "List the stock locations, ordered by code",
         "tags": ["admin-locations"]
+      }
+    },
+    "/store/cart": {
+      "get": {
+        "description": "An empty cart when there is none; a read never creates a cart or a cookie. The cart is found through the customer session cookie, else the `fluxkit_cart` cookie.",
+        "operationId": "CartController_read",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cart.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lines": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productSlug": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "unitPrice": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "lineTotal": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"],
+                            "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                          },
+                          "notices": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["price_changed"]
+                                    },
+                                    "previousAmount": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1000000000000,
+                                          "description": "Minor units of the shop currency (for example kopiykas)."
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false,
+                                      "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                                    }
+                                  },
+                                  "required": ["code", "previousAmount"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["out_of_stock"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "productSlug",
+                          "sku",
+                          "title",
+                          "variantTitle",
+                          "optionValues",
+                          "image",
+                          "quantity",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "lineTotal",
+                          "availability",
+                          "notices"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+                    },
+                    "itemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "purchasable": {
+                      "type": "boolean",
+                      "description": "At least one line and no unavailable line."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The current cart, repriced with the current catalog prices",
+        "tags": ["store"]
+      },
+      "delete": {
+        "description": "Deletes the cart and clears the `fluxkit_cart` cookie. The next add starts a new cart. Creates nothing.",
+        "operationId": "CartController_clear",
+        "parameters": [],
+        "responses": {
+          "204": {
+            "description": "The cart is gone (or there was none)."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete the cart",
+        "tags": ["store"]
+      }
+    },
+    "/store/cart/items": {
+      "post": {
+        "description": "The first write of a guest creates the cart and sets the `fluxkit_cart` cookie. The line keeps the current unit price as the price the shopper has seen. A cart holds no stock.",
+        "operationId": "CartController_addItem",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variantId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+                    "description": "The variant to buy (never the product)."
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "Whole number from 1 to 999."
+                  }
+                },
+                "required": ["variantId", "quantity"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cart after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lines": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productSlug": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "unitPrice": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "lineTotal": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"],
+                            "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                          },
+                          "notices": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["price_changed"]
+                                    },
+                                    "previousAmount": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1000000000000,
+                                          "description": "Minor units of the shop currency (for example kopiykas)."
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false,
+                                      "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                                    }
+                                  },
+                                  "required": ["code", "previousAmount"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["out_of_stock"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "productSlug",
+                          "sku",
+                          "title",
+                          "variantTitle",
+                          "optionValues",
+                          "image",
+                          "quantity",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "lineTotal",
+                          "availability",
+                          "notices"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+                    },
+                    "itemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "purchasable": {
+                      "type": "boolean",
+                      "description": "At least one line and no unavailable line."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Add a variant to the cart, or add to the quantity of its line",
+        "tags": ["store"]
+      }
+    },
+    "/store/cart/items/{variantId}": {
+      "patch": {
+        "operationId": "CartController_setQuantity",
+        "parameters": [
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "The variant of the line.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quantity": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "Whole number from 1 to 999."
+                  }
+                },
+                "required": ["quantity"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The cart after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lines": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productSlug": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "unitPrice": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "lineTotal": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"],
+                            "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                          },
+                          "notices": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["price_changed"]
+                                    },
+                                    "previousAmount": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1000000000000,
+                                          "description": "Minor units of the shop currency (for example kopiykas)."
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false,
+                                      "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                                    }
+                                  },
+                                  "required": ["code", "previousAmount"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["out_of_stock"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "productSlug",
+                          "sku",
+                          "title",
+                          "variantTitle",
+                          "optionValues",
+                          "image",
+                          "quantity",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "lineTotal",
+                          "availability",
+                          "notices"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+                    },
+                    "itemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "purchasable": {
+                      "type": "boolean",
+                      "description": "At least one line and no unavailable line."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set the quantity of a cart line",
+        "tags": ["store"]
+      },
+      "delete": {
+        "operationId": "CartController_removeItem",
+        "parameters": [
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "The variant of the line.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cart after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lines": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productSlug": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "unitPrice": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "lineTotal": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"],
+                            "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                          },
+                          "notices": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["price_changed"]
+                                    },
+                                    "previousAmount": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1000000000000,
+                                          "description": "Minor units of the shop currency (for example kopiykas)."
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false,
+                                      "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                                    }
+                                  },
+                                  "required": ["code", "previousAmount"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["out_of_stock"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "productSlug",
+                          "sku",
+                          "title",
+                          "variantTitle",
+                          "optionValues",
+                          "image",
+                          "quantity",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "lineTotal",
+                          "availability",
+                          "notices"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+                    },
+                    "itemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "purchasable": {
+                      "type": "boolean",
+                      "description": "At least one line and no unavailable line."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Remove a line from the cart",
+        "tags": ["store"]
+      }
+    },
+    "/store/cart/acknowledge": {
+      "post": {
+        "description": "Marks the current unit price of every available line as seen, which ends its `price_changed` notice. Unavailable lines are unchanged.",
+        "operationId": "CartController_acknowledge",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cart after the change.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "lines": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "productSlug": {
+                            "type": "string"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "variantTitle": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "option": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["option", "value"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 999
+                          },
+                          "unitPrice": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "lineTotal": {
+                            "nullable": true,
+                            "description": "`null` on an unavailable line.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"],
+                            "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                          },
+                          "notices": {
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["price_changed"]
+                                    },
+                                    "previousAmount": {
+                                      "type": "object",
+                                      "properties": {
+                                        "amount": {
+                                          "type": "integer",
+                                          "minimum": 0,
+                                          "maximum": 1000000000000,
+                                          "description": "Minor units of the shop currency (for example kopiykas)."
+                                        },
+                                        "currency": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "required": ["amount", "currency"],
+                                      "additionalProperties": false,
+                                      "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                                    }
+                                  },
+                                  "required": ["code", "previousAmount"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["out_of_stock"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "productSlug",
+                          "sku",
+                          "title",
+                          "variantTitle",
+                          "optionValues",
+                          "image",
+                          "quantity",
+                          "unitPrice",
+                          "compareAtAmount",
+                          "lineTotal",
+                          "availability",
+                          "notices"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+                    },
+                    "itemCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "purchasable": {
+                      "type": "boolean",
+                      "description": "At least one line and no unavailable line."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string",
+                            "enum": ["quantity_capped", "lines_dropped"]
+                          }
+                        },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Accept the current prices",
+        "tags": ["store"]
+      }
+    },
+    "/store/categories": {
+      "get": {
+        "operationId": "StoreCategoriesController_list",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The tree, wrapped in `items`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "children": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "slug": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "children": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                      },
+                                      "slug": {
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "description": {
+                                        "nullable": true,
+                                        "type": "string"
+                                      },
+                                      "children": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "id": {
+                                              "type": "string",
+                                              "format": "uuid"
+                                            },
+                                            "slug": {
+                                              "type": "string"
+                                            },
+                                            "name": {
+                                              "type": "string"
+                                            },
+                                            "description": {
+                                              "nullable": true,
+                                              "type": "string"
+                                            },
+                                            "children": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                  "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                  },
+                                                  "slug": {
+                                                    "type": "string"
+                                                  },
+                                                  "name": {
+                                                    "type": "string"
+                                                  },
+                                                  "description": {
+                                                    "nullable": true,
+                                                    "type": "string"
+                                                  },
+                                                  "children": {
+                                                    "type": "array",
+                                                    "items": {
+                                                      "not": {}
+                                                    }
+                                                  }
+                                                },
+                                                "required": [
+                                                  "id",
+                                                  "slug",
+                                                  "name",
+                                                  "description",
+                                                  "children"
+                                                ],
+                                                "additionalProperties": false
+                                              }
+                                            }
+                                          },
+                                          "required": [
+                                            "id",
+                                            "slug",
+                                            "name",
+                                            "description",
+                                            "children"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": ["id", "slug", "name", "description", "children"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              },
+                              "required": ["id", "slug", "name", "description", "children"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["id", "slug", "name", "description", "children"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Public category tree: active categories whose ancestors are all active, ordered by position, slug",
+        "tags": ["store"]
+      }
+    },
+    "/store/config": {
+      "get": {
+        "operationId": "StoreConfigController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The public store settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "currencyExponent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "pricesIncludeTax": {
+                      "type": "boolean"
+                    },
+                    "defaultLocale": {
+                      "type": "string"
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "currencyExponent",
+                    "pricesIncludeTax",
+                    "defaultLocale",
+                    "locales"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Shop currency (with its minor-unit exponent), tax flag and locales, for formatting money and texts",
+        "tags": ["store"]
+      }
+    },
+    "/store/products": {
+      "get": {
+        "operationId": "StoreProductsController_list",
+        "parameters": [
+          {
+            "name": "brand",
+            "required": false,
+            "in": "query",
+            "description": "Brand slug. Unknown gives an empty list.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "required": false,
+            "in": "query",
+            "description": "Category slug: the category and all its active descendants. Unknown or inactive gives an empty list.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 24
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of products.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "brand": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["slug", "name"],
+                            "additionalProperties": false
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "publishedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "to": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Always the shop currency."
+                              }
+                            },
+                            "required": ["from", "to", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "title",
+                          "brand",
+                          "image",
+                          "publishedAt",
+                          "price",
+                          "availability"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List active products, newest first (published_at desc, id desc); filter by category (with descendants) and brand",
+        "tags": ["store"]
+      }
+    },
+    "/store/products/{slug}": {
+      "get": {
+        "operationId": "StoreProductsController_get",
+        "parameters": [
+          {
+            "name": "slug",
+            "required": true,
+            "in": "path",
+            "description": "Product slug.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The product.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "slug": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "brand": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "slug": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["slug", "name"],
+                      "additionalProperties": false
+                    },
+                    "publishedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "categories": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id", "slug", "name"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "attributes": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "value": {
+                                "type": "number"
+                              },
+                              "unit": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["value", "unit"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["code", "label"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["code", "label"],
+                              "additionalProperties": false
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "attributeDefinitions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "inputType": {
+                            "type": "string",
+                            "enum": ["text", "number", "boolean", "select", "multiselect", "date"]
+                          },
+                          "isLocalized": {
+                            "type": "boolean"
+                          },
+                          "unit": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "isFilterable": {
+                            "type": "boolean"
+                          },
+                          "isComparable": {
+                            "type": "boolean"
+                          },
+                          "isSortable": {
+                            "type": "boolean"
+                          },
+                          "options": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["code", "label"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "code",
+                          "name",
+                          "inputType",
+                          "isLocalized",
+                          "unit",
+                          "isFilterable",
+                          "isComparable",
+                          "isSortable",
+                          "options"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "code": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "code": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["id", "code", "name"],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": ["id", "code", "name", "values"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "variants": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "sku": {
+                            "type": "string"
+                          },
+                          "optionValues": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "optionCode": {
+                                  "type": "string"
+                                },
+                                "valueCode": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["optionCode", "valueCode"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "attributes": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "value": {
+                                      "type": "number"
+                                    },
+                                    "unit": {
+                                      "nullable": true,
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["value", "unit"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["code", "label"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "code": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": ["code", "label"],
+                                    "additionalProperties": false
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Always the shop currency."
+                              },
+                              "compareAtAmount": {
+                                "nullable": true,
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              }
+                            },
+                            "required": ["amount", "currency", "compareAtAmount"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sku",
+                          "optionValues",
+                          "attributes",
+                          "price",
+                          "availability"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "price": {
+                      "type": "object",
+                      "properties": {
+                        "from": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "to": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Always the shop currency."
+                        }
+                      },
+                      "required": ["from", "to", "currency"],
+                      "additionalProperties": false
+                    },
+                    "availability": {
+                      "type": "string",
+                      "enum": ["in_stock", "low_stock", "out_of_stock"]
+                    },
+                    "media": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string"
+                          },
+                          "alt": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "optionValueId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": ["url", "alt", "optionValueId"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "slug",
+                    "title",
+                    "description",
+                    "brand",
+                    "publishedAt",
+                    "categories",
+                    "attributes",
+                    "attributeDefinitions",
+                    "options",
+                    "variants",
+                    "price",
+                    "availability",
+                    "media"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get an active product by slug with options, variants, media and public attributes",
+        "tags": ["store"]
       }
     },
     "/admin/attributes": {
@@ -14719,936 +17369,6 @@
         },
         "summary": "Delete a variant of a draft product (never the last or the default one)",
         "tags": ["admin-products"]
-      }
-    },
-    "/store/categories": {
-      "get": {
-        "operationId": "StoreCategoriesController_list",
-        "parameters": [
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The tree, wrapped in `items`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "description": {
-                            "nullable": true,
-                            "type": "string"
-                          },
-                          "children": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "slug": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                },
-                                "description": {
-                                  "nullable": true,
-                                  "type": "string"
-                                },
-                                "children": {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "id": {
-                                        "type": "string",
-                                        "format": "uuid"
-                                      },
-                                      "slug": {
-                                        "type": "string"
-                                      },
-                                      "name": {
-                                        "type": "string"
-                                      },
-                                      "description": {
-                                        "nullable": true,
-                                        "type": "string"
-                                      },
-                                      "children": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "object",
-                                          "properties": {
-                                            "id": {
-                                              "type": "string",
-                                              "format": "uuid"
-                                            },
-                                            "slug": {
-                                              "type": "string"
-                                            },
-                                            "name": {
-                                              "type": "string"
-                                            },
-                                            "description": {
-                                              "nullable": true,
-                                              "type": "string"
-                                            },
-                                            "children": {
-                                              "type": "array",
-                                              "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                  "id": {
-                                                    "type": "string",
-                                                    "format": "uuid"
-                                                  },
-                                                  "slug": {
-                                                    "type": "string"
-                                                  },
-                                                  "name": {
-                                                    "type": "string"
-                                                  },
-                                                  "description": {
-                                                    "nullable": true,
-                                                    "type": "string"
-                                                  },
-                                                  "children": {
-                                                    "type": "array",
-                                                    "items": {
-                                                      "not": {}
-                                                    }
-                                                  }
-                                                },
-                                                "required": [
-                                                  "id",
-                                                  "slug",
-                                                  "name",
-                                                  "description",
-                                                  "children"
-                                                ],
-                                                "additionalProperties": false
-                                              }
-                                            }
-                                          },
-                                          "required": [
-                                            "id",
-                                            "slug",
-                                            "name",
-                                            "description",
-                                            "children"
-                                          ],
-                                          "additionalProperties": false
-                                        }
-                                      }
-                                    },
-                                    "required": ["id", "slug", "name", "description", "children"],
-                                    "additionalProperties": false
-                                  }
-                                }
-                              },
-                              "required": ["id", "slug", "name", "description", "children"],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": ["id", "slug", "name", "description", "children"],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": ["items"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Public category tree: active categories whose ancestors are all active, ordered by position, slug",
-        "tags": ["store"]
-      }
-    },
-    "/store/config": {
-      "get": {
-        "operationId": "StoreConfigController_get",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "The public store settings.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "currency": {
-                      "type": "string"
-                    },
-                    "currencyExponent": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "pricesIncludeTax": {
-                      "type": "boolean"
-                    },
-                    "defaultLocale": {
-                      "type": "string"
-                    },
-                    "locales": {
-                      "type": "array",
-                      "items": {
-                        "type": "string"
-                      }
-                    }
-                  },
-                  "required": [
-                    "currency",
-                    "currencyExponent",
-                    "pricesIncludeTax",
-                    "defaultLocale",
-                    "locales"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Shop currency (with its minor-unit exponent), tax flag and locales, for formatting money and texts",
-        "tags": ["store"]
-      }
-    },
-    "/store/products": {
-      "get": {
-        "operationId": "StoreProductsController_list",
-        "parameters": [
-          {
-            "name": "brand",
-            "required": false,
-            "in": "query",
-            "description": "Brand slug. Unknown gives an empty list.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "category",
-            "required": false,
-            "in": "query",
-            "description": "Category slug: the category and all its active descendants. Unknown or inactive gives an empty list.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "offset",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 0,
-              "maximum": 10000,
-              "default": 0
-            }
-          },
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 100,
-              "default": 24
-            }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of products.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "slug": {
-                            "type": "string"
-                          },
-                          "title": {
-                            "type": "string"
-                          },
-                          "brand": {
-                            "nullable": true,
-                            "type": "object",
-                            "properties": {
-                              "slug": {
-                                "type": "string"
-                              },
-                              "name": {
-                                "type": "string"
-                              }
-                            },
-                            "required": ["slug", "name"],
-                            "additionalProperties": false
-                          },
-                          "image": {
-                            "nullable": true,
-                            "type": "object",
-                            "properties": {
-                              "url": {
-                                "type": "string"
-                              },
-                              "alt": {
-                                "nullable": true,
-                                "type": "string"
-                              }
-                            },
-                            "required": ["url", "alt"],
-                            "additionalProperties": false
-                          },
-                          "publishedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "price": {
-                            "type": "object",
-                            "properties": {
-                              "from": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000000000000,
-                                "description": "Minor units of the shop currency (for example kopiykas)."
-                              },
-                              "to": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000000000000,
-                                "description": "Minor units of the shop currency (for example kopiykas)."
-                              },
-                              "currency": {
-                                "type": "string",
-                                "description": "Always the shop currency."
-                              }
-                            },
-                            "required": ["from", "to", "currency"],
-                            "additionalProperties": false
-                          },
-                          "availability": {
-                            "type": "string",
-                            "enum": ["in_stock", "low_stock", "out_of_stock"]
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "slug",
-                          "title",
-                          "brand",
-                          "image",
-                          "publishedAt",
-                          "price",
-                          "availability"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "total": {
-                      "type": "integer",
-                      "minimum": 0,
-                      "maximum": 9007199254740991
-                    },
-                    "limit": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    },
-                    "offset": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991
-                    }
-                  },
-                  "required": ["items", "total", "limit", "offset"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "List active products, newest first (published_at desc, id desc); filter by category (with descendants) and brand",
-        "tags": ["store"]
-      }
-    },
-    "/store/products/{slug}": {
-      "get": {
-        "operationId": "StoreProductsController_get",
-        "parameters": [
-          {
-            "name": "slug",
-            "required": true,
-            "in": "path",
-            "description": "Product slug.",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "locale",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The product.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "format": "uuid"
-                    },
-                    "slug": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "description": {
-                      "nullable": true,
-                      "type": "string"
-                    },
-                    "brand": {
-                      "nullable": true,
-                      "type": "object",
-                      "properties": {
-                        "slug": {
-                          "type": "string"
-                        },
-                        "name": {
-                          "type": "string"
-                        }
-                      },
-                      "required": ["slug", "name"],
-                      "additionalProperties": false
-                    },
-                    "publishedAt": {
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "ISO 8601, UTC."
-                    },
-                    "categories": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "slug": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          }
-                        },
-                        "required": ["id", "slug", "name"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "attributes": {
-                      "type": "object",
-                      "additionalProperties": {
-                        "anyOf": [
-                          {
-                            "type": "string"
-                          },
-                          {
-                            "type": "boolean"
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "value": {
-                                "type": "number"
-                              },
-                              "unit": {
-                                "nullable": true,
-                                "type": "string"
-                              }
-                            },
-                            "required": ["value", "unit"],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "object",
-                            "properties": {
-                              "code": {
-                                "type": "string"
-                              },
-                              "label": {
-                                "type": "string"
-                              }
-                            },
-                            "required": ["code", "label"],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "code": {
-                                  "type": "string"
-                                },
-                                "label": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["code", "label"],
-                              "additionalProperties": false
-                            }
-                          }
-                        ]
-                      }
-                    },
-                    "attributeDefinitions": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "code": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "inputType": {
-                            "type": "string",
-                            "enum": ["text", "number", "boolean", "select", "multiselect", "date"]
-                          },
-                          "isLocalized": {
-                            "type": "boolean"
-                          },
-                          "unit": {
-                            "nullable": true,
-                            "type": "string"
-                          },
-                          "isFilterable": {
-                            "type": "boolean"
-                          },
-                          "isComparable": {
-                            "type": "boolean"
-                          },
-                          "isSortable": {
-                            "type": "boolean"
-                          },
-                          "options": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "code": {
-                                  "type": "string"
-                                },
-                                "label": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["code", "label"],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": [
-                          "code",
-                          "name",
-                          "inputType",
-                          "isLocalized",
-                          "unit",
-                          "isFilterable",
-                          "isComparable",
-                          "isSortable",
-                          "options"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "options": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "code": {
-                            "type": "string"
-                          },
-                          "name": {
-                            "type": "string"
-                          },
-                          "values": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "id": {
-                                  "type": "string",
-                                  "format": "uuid"
-                                },
-                                "code": {
-                                  "type": "string"
-                                },
-                                "name": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["id", "code", "name"],
-                              "additionalProperties": false
-                            }
-                          }
-                        },
-                        "required": ["id", "code", "name", "values"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "variants": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "sku": {
-                            "type": "string"
-                          },
-                          "optionValues": {
-                            "type": "array",
-                            "items": {
-                              "type": "object",
-                              "properties": {
-                                "optionCode": {
-                                  "type": "string"
-                                },
-                                "valueCode": {
-                                  "type": "string"
-                                }
-                              },
-                              "required": ["optionCode", "valueCode"],
-                              "additionalProperties": false
-                            }
-                          },
-                          "attributes": {
-                            "type": "object",
-                            "additionalProperties": {
-                              "anyOf": [
-                                {
-                                  "type": "string"
-                                },
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "value": {
-                                      "type": "number"
-                                    },
-                                    "unit": {
-                                      "nullable": true,
-                                      "type": "string"
-                                    }
-                                  },
-                                  "required": ["value", "unit"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "code": {
-                                      "type": "string"
-                                    },
-                                    "label": {
-                                      "type": "string"
-                                    }
-                                  },
-                                  "required": ["code", "label"],
-                                  "additionalProperties": false
-                                },
-                                {
-                                  "type": "array",
-                                  "items": {
-                                    "type": "object",
-                                    "properties": {
-                                      "code": {
-                                        "type": "string"
-                                      },
-                                      "label": {
-                                        "type": "string"
-                                      }
-                                    },
-                                    "required": ["code", "label"],
-                                    "additionalProperties": false
-                                  }
-                                }
-                              ]
-                            }
-                          },
-                          "price": {
-                            "type": "object",
-                            "properties": {
-                              "amount": {
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000000000000,
-                                "description": "Minor units of the shop currency (for example kopiykas)."
-                              },
-                              "currency": {
-                                "type": "string",
-                                "description": "Always the shop currency."
-                              },
-                              "compareAtAmount": {
-                                "nullable": true,
-                                "type": "integer",
-                                "minimum": 0,
-                                "maximum": 1000000000000,
-                                "description": "Minor units of the shop currency (for example kopiykas)."
-                              }
-                            },
-                            "required": ["amount", "currency", "compareAtAmount"],
-                            "additionalProperties": false
-                          },
-                          "availability": {
-                            "type": "string",
-                            "enum": ["in_stock", "low_stock", "out_of_stock"]
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "sku",
-                          "optionValues",
-                          "attributes",
-                          "price",
-                          "availability"
-                        ],
-                        "additionalProperties": false
-                      }
-                    },
-                    "price": {
-                      "type": "object",
-                      "properties": {
-                        "from": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 1000000000000,
-                          "description": "Minor units of the shop currency (for example kopiykas)."
-                        },
-                        "to": {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 1000000000000,
-                          "description": "Minor units of the shop currency (for example kopiykas)."
-                        },
-                        "currency": {
-                          "type": "string",
-                          "description": "Always the shop currency."
-                        }
-                      },
-                      "required": ["from", "to", "currency"],
-                      "additionalProperties": false
-                    },
-                    "availability": {
-                      "type": "string",
-                      "enum": ["in_stock", "low_stock", "out_of_stock"]
-                    },
-                    "media": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "url": {
-                            "type": "string"
-                          },
-                          "alt": {
-                            "nullable": true,
-                            "type": "string"
-                          },
-                          "optionValueId": {
-                            "nullable": true,
-                            "type": "string",
-                            "format": "uuid"
-                          }
-                        },
-                        "required": ["url", "alt", "optionValueId"],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "slug",
-                    "title",
-                    "description",
-                    "brand",
-                    "publishedAt",
-                    "categories",
-                    "attributes",
-                    "attributeDefinitions",
-                    "options",
-                    "variants",
-                    "price",
-                    "availability",
-                    "media"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Get an active product by slug with options, variants, media and public attributes",
-        "tags": ["store"]
       }
     }
   },

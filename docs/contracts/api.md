@@ -17,6 +17,7 @@ Breaking changes follow AGENTS.md section 17: major version, migration guide in 
 | Publish and activation need a price | yes (behavior change, pre-1.0) | `POST /admin/products/{id}/publish` answers `400 validation_failed` with `price_missing` at `variants.N` for an active variant without a price in `SHOP_CURRENCY`; `PATCH .../variants/{variantId}` with `isActive: true` on an active product answers `409 rule_violation` `price_missing`. Before this release publishing did not look at prices. Clients that publish must price first; no migration guide because the contract is not released yet |
 | Admin inventory endpoints and locations | yes (new in this release, additive) | `GET /admin/locations`; `GET /admin/products/{id}/variants/{variantId}/inventory`; `POST .../inventory/adjustments` (`kind` `receipt`, `adjustment`, `return`; exactly one of `delta` and `setOnHand`; 400 `validation_failed` with `invalid_quantity`, `on_hand_out_of_range`, `delta_or_set_on_hand`; 409 `rule_violation` with rule `negative_on_hand`, `below_reserved` (only for a change that lowers `onHand`), `no_change` or `kind_requires_increase`); `GET .../inventory/movements` (newest first, standard pagination). The response shapes and the journal fields (`kind`, `delta`, `onHandAfter`, `reason`, `reference`, `actorId`) are in `docs/api/inventory.md`. Quantities and locations are admin-only and never part of a `/store/*` response |
 | Variant stock flags | yes (new in this release, additive) | `trackInventory` and `allowBackorder` (booleans) in the admin variant response, in `POST /admin/products/{id}/variants` and in `PATCH .../variants/{variantId}`. Variants of a product type with `requires_shipping = false` start untracked. Existing clients that ignore unknown response fields are not affected; the strict request schemas still reject unknown fields |
+| Cart endpoints | yes (new in this release, additive) | `GET /store/cart`, `POST /store/cart/items`, `PATCH` and `DELETE /store/cart/items/{variantId}`, `DELETE /store/cart`, `POST /store/cart/acknowledge`: request and response shapes (lines, `unitPrice`, `lineTotal`, `compareAtAmount`, `availability`, `notices` `price_changed` / `unavailable` / `out_of_stock`, `subtotal`, `total`, `itemCount`, `purchasable`), the error codes (`validation_failed` with `invalid_quantity`, `not_found`, `rule_violation` with rules `variant_not_sellable`, `quantity_limit`, `too_many_lines`, `line_total_out_of_range`, `subtotal_out_of_range`) and the rules in "Cart (ADR 0015)" below. Shapes and errors: `docs/api/cart.md` |
 | Admin authentication | yes | cookie session, CSRF header, roles and permissions, login and users endpoints: see "Admin authentication" below |
 | Default deny for `/admin` | yes | A global guard (`AdminPathGuard`, `APP_GUARD`) protects EVERY route whose path starts with `/admin` (matched case-insensitively, trailing slash included), whether or not its controller uses `@AdminController`. This covers routes added by feature modules: a feature may declare a plain `@Controller("admin/<name>")`; it is `401` without a session and `403` for a signed-in admin (no permission is declared), never open. An oversized JSON body (over 100 KB) is rejected with `413` before any guard runs, also on `/admin/*`; malformed JSON answers `400`; both are `application/problem+json` and not logged as errors |
 | Error model | yes | `application/problem+json` with the `code` values and status mapping in `docs/api/catalog.md` (Conventions). New codes are additive (minor); removing or renaming one is breaking |
@@ -68,16 +69,33 @@ Plan steps 3a and 3b. Endpoints: `POST /store/account/register`, `POST /store/ac
 | Customer cookie | `fluxkit_customer_session`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`; idle and absolute lifetimes from `CUSTOMER_SESSION_IDLE_MINUTES` and `CUSTOMER_SESSION_MAX_HOURS` (`docs/contracts/config.md`). A separate principal from the admin: an admin cookie never authenticates a customer route and a customer cookie never authenticates an `/admin` route (`401`); only the cookie is read |
 | Public by default | A `/store` route is public unless it is marked customer-authenticated; a customer-authenticated route answers `401 unauthorized` (identical for every cause) and carries `Cache-Control: no-store` |
 | Rate limit | A limited store route answers `429 too_many_requests` with `Retry-After`; register and login are limited |
-| Account responses | `{customer: {id, email, firstName, lastName, phone, createdAt}}` and nothing else: never the hash, lockout state or flags. Every response under `/store/account` is `Cache-Control: no-store` |
+| Account responses | `{customer: {id, email, firstName, lastName, phone, createdAt}}` (register and login add `cartNotices`, see Cart) and nothing else: never the hash, lockout state or flags. Every response under `/store/account` is `Cache-Control: no-store` |
 | Sign-in failures | Unknown email, wrong password, locked and inactive account answer the identical `401` (status, headers, body) with no cookie. Registration with a taken email is `409 conflict` on `email` (accepted trade-off, ADR 0016) |
 
 Not contract (internal): the cookie name, the token format and how sessions are stored, the rate-limit numbers.
+
+## Cart (ADR 0015, `docs/api/cart.md`)
+
+Plan step 4. The rules every cart route follows:
+
+| Item | Rule |
+|---|---|
+| Who owns a cart | Only the customer session cookie (a signed-in customer has one cart) or the guest cookie `fluxkit_cart`. No cart id, token or customer id in a path, query, body or header selects a cart; the API has no route that takes one |
+| Guest cookie | `fluxkit_cart`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`, `Max-Age` = `CART_TTL_DAYS` (`docs/contracts/config.md`), set again by every write. The name and the attributes are contract (a storefront proxy forwards it); the token format is not |
+| Creation | Lazy: a read never creates a cart or a cookie; the first successful `POST /store/cart/items` does. A cookie that matches no cart is no cart; a write replaces it with a new token |
+| Prices | Never client input. Every response shows the CURRENT catalog price, availability and notices; a cart holds no stock |
+| Money | `{amount, currency}` in minor units of the shop currency; overflow of a line total or subtotal is `409 rule_violation` (`line_total_out_of_range`, `subtotal_out_of_range`), never a clamp |
+| Limits | 1 to 999 per line (never capped silently on a request), 100 lines per cart, one line per variant. The numbers are internal and may change in a minor release; the codes are contract |
+| Sign-in | `POST /store/account/register` and `login` merge the guest cart and answer `{customer, cartNotices}`; `cartNotices` is an array of `{code}` with `quantity_capped` or `lines_dropped`, `[]` when there is nothing to report (additive change of those two responses) |
+| Caching | Every `/store/cart` response, errors included, is `Cache-Control: no-store`; writes need the store CSRF header and are rate limited (`429`) |
+
+Not contract (internal): the cart-level `notices` array of the cart shape is always empty today (reserved), the order of lines within the cart is insertion order, the rate-limit numbers, the sliding expiry mechanism beyond `CART_TTL_DAYS`.
 
 Known limits:
 
 - The IP login limit is in memory, per API process: it resets on restart and is not shared between instances. The account lockout is in the database and does span instances.
 - `request.ip` is the socket address unless Express `trust proxy` is configured, which the API does not do yet. Behind a reverse proxy all clients then share one IP window.
-- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in arrives with step 4.
+- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in is described in the Cart section.
 
 ## Stability of identifiers (ADR 0006 section 10)
 
@@ -95,7 +113,7 @@ Known limits:
 - Internal attributes (`isInternal`) and attributes not visible on the storefront: never returned by `/store/*`, never documented as a store shape. Admin responses show them to admins; their existence and codes are not a storefront contract.
 - Store fields not listed in `docs/api/catalog.md` (for example `barcode`, `isDefault`, variant `position`, timestamps other than `publishedAt`).
 - The order of JSON object keys, and the exact wording of `detail` and `message` texts in problem bodies. Clients use `code`, `status` and `errors[].path` / `errors[].code`.
-- Routes and fields that are documented as not yet implemented (for example price or availability sorting and filtering, search, cart, customer accounts) are not in this contract; they arrive with their own plans.
+- Routes and fields that are documented as not yet implemented (for example price or availability sorting and filtering, search, checkout, orders) are not in this contract; they arrive with their own plans.
 - The `pnpm admin:create` command is a tool, not an API; its options are described in `README.md` (Admin sign-in).
 
 ## Versioning
