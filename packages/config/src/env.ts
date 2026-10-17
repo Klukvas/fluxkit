@@ -35,6 +35,16 @@ export const DEFAULT_CART_TTL_DAYS = 30;
 const MAX_CART_TTL_DAYS = 365;
 
 /**
+ * Defaults and bounds of the order variables (ADR 0017). They equal `ORDER_PAYMENT_TTL_MINUTES` and `GUEST_ACCESS_DAYS` of
+ * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so the numbers are repeated here.
+ */
+export const DEFAULT_ORDER_PAYMENT_TTL_MINUTES = 30;
+const MIN_ORDER_PAYMENT_TTL_MINUTES = 5;
+const MAX_ORDER_PAYMENT_TTL_MINUTES = 1440;
+export const DEFAULT_ORDER_GUEST_ACCESS_DAYS = 90;
+const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
+
+/**
  * Defaults of the pricing variables, and the currencies a shop can sell in. The list equals `CURRENCY_CODES` of
  * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so it is repeated here.
  */
@@ -105,6 +115,16 @@ const envSchema = z
       DEFAULT_CUSTOMER_SESSION_MAX_HOURS,
     ),
     CART_TTL_DAYS: positiveInteger(MAX_CART_TTL_DAYS).default(DEFAULT_CART_TTL_DAYS),
+    ORDER_PAYMENT_TTL_MINUTES: positiveInteger(MAX_ORDER_PAYMENT_TTL_MINUTES)
+      .pipe(
+        z
+          .number()
+          .min(MIN_ORDER_PAYMENT_TTL_MINUTES, `must be at least ${MIN_ORDER_PAYMENT_TTL_MINUTES}`),
+      )
+      .default(DEFAULT_ORDER_PAYMENT_TTL_MINUTES),
+    ORDER_GUEST_ACCESS_DAYS: positiveInteger(MAX_ORDER_GUEST_ACCESS_DAYS).default(
+      DEFAULT_ORDER_GUEST_ACCESS_DAYS,
+    ),
     SHOP_CURRENCY: z
       .string()
       .refine((value) => SUPPORTED_SHOP_CURRENCIES.includes(value), {
@@ -157,6 +177,10 @@ export interface AppEnv {
   customerSessionMaxHours: number;
   /** A cart expires this many days after its last write; also the `Max-Age` of the guest cart cookie. */
   cartTtlDays: number;
+  /** An order waits this many minutes for payment before it expires and gives its stock back (5 to 1440). */
+  orderPaymentTtlMinutes: number;
+  /** A guest can open their order with its access token for this many days (1 to 3650). */
+  orderGuestAccessDays: number;
   /** The one currency the shop sells in (ISO 4217, upper case). An active variant needs a price in it. */
   shopCurrency: string;
   /** Whether stored prices already include tax; only exposed to the storefront, no tax is calculated. */
@@ -190,6 +214,8 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     customerSessionIdleMinutes: env.CUSTOMER_SESSION_IDLE_MINUTES,
     customerSessionMaxHours: env.CUSTOMER_SESSION_MAX_HOURS,
     cartTtlDays: env.CART_TTL_DAYS,
+    orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
+    orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
     shopCurrency: env.SHOP_CURRENCY,
     pricesIncludeTax: env.PRICES_INCLUDE_TAX,
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,

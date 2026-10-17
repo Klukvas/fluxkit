@@ -110,6 +110,12 @@ export type ExtendReservationRefusal =
 export type ExtendResult =
   { ok: true; reservation: ReservationView } | { ok: false; reason: ExtendReservationRefusal };
 
+/** The result of one reservation of a batch call (`releaseManyIn`, `commitManyIn`, `extendManyIn`). */
+export interface BatchEntry<Result> {
+  reservationId: string;
+  result: Result;
+}
+
 export interface ReserveManyLine {
   variantId: string;
   /** A whole number from 1 to `MAX_QUANTITY`; anything else is refused as `invalid_quantity` for that line. */
@@ -371,6 +377,17 @@ export class ReservationsService {
     return refusals.length > 0 ? { ok: false, refusals } : { ok: true, lines: reserved };
   }
 
+  /**
+   * Takes the product and variant locks a sale needs (`FOR SHARE`, each pass in id order, until the transaction ends)
+   * without reserving anything. The checkout calls it BEFORE it reads the catalog facts of the cart, so a price write,
+   * an unpublish, a variant switch-off or a variant delete either finished before those facts are read (and is seen) or
+   * waits until the order is committed. `reserveMany` takes the same locks again (a transaction is never blocked by
+   * its own lock). Unknown variants are simply not locked.
+   */
+  async lockVariantsForSale(tx: Transaction, variantIds: readonly string[]): Promise<void> {
+    await this.lockCatalogRows(tx, [...new Set(variantIds)]);
+  }
+
   /** Gives the held units back (a cancelled cart or order) in its own transaction. See `releaseIn`. */
   async release(reservationId: string): Promise<ReservationResult> {
     return withTransaction(this.database, (tx) => this.releaseIn(tx, reservationId));
@@ -425,6 +442,39 @@ export class ReservationsService {
       actorId: options.actorId ?? null,
     });
     return result;
+  }
+
+  /**
+   * Releases the reservations of ONE order (cancel, expiry) in the caller's transaction, in a fixed order: sorted by
+   * (variant id, location id) whatever order the ids come in, so two orders with crossing lines can never wait for each
+   * other (`40P01`, finding of step 5a). The ONLY way an order's reservations are released. Answers one entry per id, in
+   * the order the locks were taken (unknown ids last, in input order); a refusal of one does not stop the others. A
+   * duplicate id is a caller bug (`RangeError`).
+   */
+  async releaseManyIn(
+    tx: Transaction,
+    reservationIds: readonly string[],
+  ): Promise<BatchEntry<ReservationResult>[]> {
+    return this.inLevelOrder(tx, reservationIds, (id) => this.releaseIn(tx, id));
+  }
+
+  /** The sorted batch of `commitIn` (payment, fulfilment); see `releaseManyIn` for the order and the answers. */
+  async commitManyIn(
+    tx: Transaction,
+    reservationIds: readonly string[],
+    options: CommitOptions = {},
+  ): Promise<BatchEntry<CommitResult>[]> {
+    return this.inLevelOrder(tx, reservationIds, (id) => this.commitIn(tx, id, options));
+  }
+
+  /** The sorted batch of `extend` (a paid order's backordered lines); see `releaseManyIn`. */
+  async extendManyIn(
+    tx: Transaction,
+    reservationIds: readonly string[],
+    expiresAt: Date,
+  ): Promise<BatchEntry<ExtendResult>[]> {
+    assertValidDate(expiresAt, "expiresAt");
+    return this.inLevelOrder(tx, reservationIds, (id) => this.extend(tx, id, expiresAt));
   }
 
   /**
@@ -516,6 +566,54 @@ export class ReservationsService {
     });
   }
 
+  /** Runs `work` for each id in (variant id, location id) order: the one place a batch decides its lock order. */
+  private async inLevelOrder<Result>(
+    tx: Transaction,
+    reservationIds: readonly string[],
+    work: (reservationId: string) => Promise<Result>,
+  ): Promise<BatchEntry<Result>[]> {
+    if (new Set(reservationIds).size !== reservationIds.length) {
+      throw new RangeError("A batch got the same reservation id more than once");
+    }
+    const rows = await this.reservations.findMany(tx, reservationIds);
+    const ordered = rows
+      .map((row) => ({ id: row.id, variantId: row.variantId, locationId: row.locationId }))
+      .sort(
+        (a, b) =>
+          compareText(a.variantId, b.variantId) ||
+          compareText(a.locationId, b.locationId) ||
+          compareText(a.id, b.id),
+      )
+      .map((row) => row.id);
+    const known = new Set(ordered);
+    const missing = reservationIds.filter((id) => !known.has(id.toLowerCase()));
+    const entries: BatchEntry<Result>[] = [];
+    for (const reservationId of [...ordered, ...missing]) {
+      entries.push({ reservationId, result: await work(reservationId) });
+    }
+    return entries;
+  }
+
+  /**
+   * The first two passes of every sale, shared by `reserveLines` and `lockVariantsForSale`: the product rows
+   * `FOR SHARE` in id order, then the variant rows `FOR SHARE` in id order with the facts the sellable rule needs.
+   */
+  private async lockCatalogRows(
+    tx: Transaction,
+    variantIds: readonly string[],
+  ): Promise<{ productIds: Map<string, string>; found: ReservableVariantRow[] }> {
+    const productIds = await this.reservations.findProductIdsOfVariants(tx, variantIds);
+    if (productIds.size > 0) {
+      await this.reservations.lockProductsShared(tx, [...new Set(productIds.values())]);
+    }
+    const found = await this.reservations.findVariantsForReservation(
+      tx,
+      variantIds,
+      this.pricing.shopCurrency,
+    );
+    return { productIds, found };
+  }
+
   /**
    * The ONE implementation of "hold stock", for one line (`reserve`) or many (`reserveMany`), in the caller's
    * transaction. Passes, each in id order: product rows `FOR SHARE`, variant rows `FOR SHARE` (with the facts the
@@ -532,15 +630,7 @@ export class ReservationsService {
     const outcomes: LineOutcome[] = lines.map(() => ({ kind: "not_reserved" }));
     const variantIds = [...new Set(lines.map((line) => line.variantId))];
 
-    const productIds = await this.reservations.findProductIdsOfVariants(tx, variantIds);
-    if (productIds.size > 0) {
-      await this.reservations.lockProductsShared(tx, [...new Set(productIds.values())]);
-    }
-    const found = await this.reservations.findVariantsForReservation(
-      tx,
-      variantIds,
-      this.pricing.shopCurrency,
-    );
+    const { productIds, found } = await this.lockCatalogRows(tx, variantIds);
     const factsById = new Map(found.map((row) => [row.id, row]));
 
     const locations = new LocationCache(this.inventory, tx);

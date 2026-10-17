@@ -110,6 +110,17 @@ export class ReservationsRepository {
     return row;
   }
 
+  /** Plain reads of several reservations at once (no lock), to learn which levels to lock and in which order. */
+  async findMany(db: DbExecutor, ids: readonly string[]): Promise<ReservationRow[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(reservation)
+      .where(inArray(reservation.id, [...ids]));
+  }
+
   /** The reservation row locked until the transaction ends; always taken after the level row lock. */
   async lock(db: DbExecutor, id: string): Promise<ReservationRow | undefined> {
     const [row] = await db.select().from(reservation).where(eq(reservation.id, id)).for("update");

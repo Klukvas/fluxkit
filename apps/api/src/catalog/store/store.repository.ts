@@ -16,6 +16,7 @@ import {
   productCategory,
   productOption,
   productOptionValue,
+  productType,
   productTypeAttribute,
   variant,
   variantOptionValue,
@@ -108,6 +109,8 @@ export interface CartVariantRow {
   priceAmount: number | null;
   priceCurrency: string | null;
   compareAtAmount: number | null;
+  /** The product type ships physical goods (`product_type.requires_shipping`); checkout needs a shipping address then. */
+  requiresShipping: boolean;
 }
 
 /** An option value chosen by one variant, with the option name, in the product's option order. */
@@ -419,9 +422,11 @@ export class StoreRepository {
         priceAmount: price.amount,
         priceCurrency: price.currency,
         compareAtAmount: price.compareAtAmount,
+        requiresShipping: productType.requiresShipping,
       })
       .from(variant)
       .innerJoin(product, eq(product.id, variant.productId))
+      .innerJoin(productType, eq(productType.id, product.productTypeId))
       .leftJoin(price, and(eq(price.variantId, variant.id), eq(price.currency, shopCurrency)))
       .where(inArray(variant.id, [...variantIds]));
   }

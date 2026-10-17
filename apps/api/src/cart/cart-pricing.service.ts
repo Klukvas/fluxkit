@@ -5,11 +5,17 @@ import {
   priceCart,
   type CartLine,
   type Money,
+  type OrderLineFacts,
+  type PriceCartResult,
   type PricedLineInput,
   type StoreLocale,
 } from "@fluxkit/core";
 import { productStatusSchema } from "../catalog/admin/products/products.schemas.js";
-import type { ProductMediaRow, CartVariantRow } from "../catalog/store/store.repository.js";
+import type {
+  ProductMediaRow,
+  CartVariantRow,
+  VariantOptionLabelRow,
+} from "../catalog/store/store.repository.js";
 import { StoreRepository } from "../catalog/store/store.repository.js";
 import { pickListImage } from "../catalog/store/store.service.js";
 import { priceVariants, type StoreVariantPricing } from "../catalog/store/store-pricing.js";
@@ -25,6 +31,23 @@ export interface VariantPriceLookup {
   /** The current shop-currency unit price of a sellable variant, else `null`. */
   readonly unitPrice: Money | null;
 }
+
+/** Everything one pricing pass read and decided; `CartPricingService.toResponse` and `orderLineFacts` build on it. */
+export interface PricedCart {
+  /** The stored lines as given. */
+  readonly stored: readonly CartLine[];
+  /** The stored lines whose variant row exists (a variant deleted meanwhile is missing). */
+  readonly present: readonly CartLine[];
+  readonly rowsById: ReadonlyMap<string, CartVariantRow>;
+  /** The sellable variants with their shop price and availability, exactly as the store computes them. */
+  readonly priced: ReadonlyMap<string, StoreVariantPricing>;
+  readonly labelsByVariant: ReadonlyMap<string, readonly VariantOptionLabelRow[]>;
+  readonly media: readonly ProductMediaRow[];
+  readonly result: PriceCartResult;
+}
+
+/** `pickLineImage` needs a locale only for the alt text, which an order does not keep. */
+const NO_LOCALE: StoreLocale = { locale: "und", defaultLocale: "und" };
 
 /** The empty cart: no row exists, or it holds no line. The subtotal is zero in the shop currency. */
 export function emptyCart(shopCurrency: PricingConfig["shopCurrency"]): CartResponse {
@@ -141,6 +164,15 @@ export class CartPricingService {
     if (lines.length === 0) {
       return this.emptyCart();
     }
+    return this.toResponse(await this.price(lines, executor), locale);
+  }
+
+  /**
+   * Reads the catalog facts of the lines and prices them with core `priceCart`, in a fixed number of statements. The
+   * ONE pricing pass: the cart view and the checkout both build on its result, so an order is priced from exactly the
+   * facts the cart showed. It does not throw when core refuses (`context.result.ok` is false); `view` does.
+   */
+  async price(lines: readonly CartLine[], executor: DbExecutor): Promise<PricedCart> {
     const variantIds = lines.map((line) => line.variantId);
     const rows = await this.store.listVariantsByIds(
       variantIds,
@@ -171,16 +203,21 @@ export class CartPricingService {
       };
     });
     const result = priceCart(this.pricing.shopCurrency, inputs);
-    if (!result.ok) {
-      throw this.unpriceable(result, present);
-    }
-
-    const labelsByVariant = new Map<string, typeof labels>();
+    const labelsByVariant = new Map<string, VariantOptionLabelRow[]>();
     for (const label of labels) {
       labelsByVariant.set(label.variantId, [
         ...(labelsByVariant.get(label.variantId) ?? []),
         label,
       ]);
+    }
+    return { stored: lines, present, rowsById, priced, labelsByVariant, media, result };
+  }
+
+  /** The cart response of a pricing pass. Throws the `409 rule_violation` of `view` when core refused to price it. */
+  toResponse(context: PricedCart, locale: StoreLocale): CartResponse {
+    const { present, rowsById, labelsByVariant, media, result } = context;
+    if (!result.ok) {
+      throw this.unpriceable(result, present);
     }
     return {
       lines: result.lines.map((line) => {
@@ -229,6 +266,46 @@ export class CartPricingService {
       purchasable: result.purchasable,
       notices: [],
     };
+  }
+
+  /**
+   * The facts `buildOrderLine` needs for every line of a priced, purchasable cart, in cart order: full translated
+   * texts (not resolved to one locale), the chosen option values, the image and the unit price that `priceCart` used.
+   * The caller has checked `context.result.ok`, that no line is unavailable and that no stored line went missing.
+   */
+  orderLineFacts(context: PricedCart): OrderLineFacts[] {
+    const { present, rowsById, labelsByVariant, media, priced } = context;
+    return present.map((line) => {
+      const row = rowsById.get(line.variantId);
+      const entry = priced.get(line.variantId);
+      if (row === undefined || entry === undefined) {
+        throw new Error(
+          `Line ${line.variantId} is not priced; the caller must check purchasable first`,
+        );
+      }
+      const chosen = labelsByVariant.get(line.variantId) ?? [];
+      return {
+        productId: row.productId,
+        variantId: row.id,
+        sku: row.sku,
+        productTitle: row.productTitle,
+        variantTitle: row.variantTitle,
+        optionValues: chosen.map((label) => ({
+          option: label.optionName,
+          value: label.valueLabel,
+        })),
+        // The URL does not depend on the locale (only the alt text does); the alt is not part of the snapshot.
+        imageUrl:
+          pickLineImage(
+            media.filter((item) => item.productId === row.productId),
+            new Set(chosen.map((label) => label.optionValueId)),
+            NO_LOCALE,
+          )?.url ?? null,
+        unitPrice: entry.price,
+        quantity: line.quantity,
+        requiresShipping: row.requiresShipping,
+      };
+    });
   }
 
   private unpriceable(
