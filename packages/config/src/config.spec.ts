@@ -196,6 +196,26 @@ describe("loadEnv customer auth", () => {
   });
 });
 
+describe("loadEnv cart", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults the cart lifetime to 30 days", () => {
+    expect(loadEnv(base).cartTtlDays).toBe(30);
+  });
+
+  it("accepts the bounds 1 and 365 exactly", () => {
+    expect(loadEnv({ ...base, CART_TTL_DAYS: "1" }).cartTtlDays).toBe(1);
+    expect(loadEnv({ ...base, CART_TTL_DAYS: "365" }).cartTtlDays).toBe(365);
+  });
+
+  it.each(["0", "366", "-5", "1.5", "abc", "", "1e2", "0x10", " 12", "012", "99999999"])(
+    "rejects CART_TTL_DAYS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, CART_TTL_DAYS: value })).toThrow(/CART_TTL_DAYS/);
+    },
+  );
+});
+
 describe("loadEnv pricing", () => {
   const base = { DATABASE_URL: "postgres://x" };
 
