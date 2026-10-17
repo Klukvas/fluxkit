@@ -54,8 +54,19 @@ const USERS_ROUTES = [
   "POST /admin/users/:id/reset-password",
 ];
 
+/** Customer management: declared once on the controller with its own default pair (`customers.read`, `customers.write`). */
+const CUSTOMERS_ROUTES = [
+  "GET /admin/customers",
+  "GET /admin/customers/:id",
+  "PATCH /admin/customers/:id",
+  "POST /admin/customers/:id/unlock",
+];
+
 function expectedPermission(method: string, pattern: string): AdminPermission {
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
+  if (CUSTOMERS_ROUTES.includes(`${method} ${pattern}`)) {
+    return method === "GET" || method === "HEAD" ? "customers.read" : "customers.write";
+  }
   if (PUBLISH_ROUTES.has(`${method} ${pattern}`)) return "catalog.publish";
   return method === "GET" || method === "HEAD" ? "catalog.read" : "catalog.write";
 }
@@ -175,7 +186,38 @@ describe("admin route permissions", () => {
       }
     });
 
-    it("resolves each route to the documented permission: users.manage for users, publish for the four lifecycle routes, read for GET, write otherwise", () => {
+    it("gives the customers routes the customer pair by the controller default: read for GET, write for the rest", () => {
+      const customers = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/customers"),
+      );
+      expect(customers.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...CUSTOMERS_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of customers) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: method === "GET" ? "customers.read" : "customers.write",
+          source: "default",
+        });
+      }
+    });
+
+    it("keeps every other controller on the catalog pair: no catalog route changed its permission", () => {
+      const others = declaredAdminRoutes(manager.app).filter(
+        ({ method, pattern, access }) =>
+          access.kind === "permission" &&
+          access.source === "default" &&
+          !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`),
+      );
+      expect(others.length).toBeGreaterThan(30);
+      for (const { method, pattern, access } of others) {
+        expect(access, `${method} ${pattern}`).toMatchObject({
+          permission: method === "GET" || method === "HEAD" ? "catalog.read" : "catalog.write",
+        });
+      }
+    });
+
+    it("resolves each route to the documented permission: users.manage for users, the customer pair for customers, publish for the four lifecycle routes, read for GET, write otherwise", () => {
       const routes = declaredAdminRoutes(manager.app);
       for (const { method, pattern, access } of routes) {
         // Public and any-signed-in routes (the sign-in flow) have no permission to resolve.
@@ -204,6 +246,8 @@ describe("admin route permissions", () => {
         "catalog.publish",
         "catalog.read",
         "catalog.write",
+        "customers.read",
+        "customers.write",
         "users.manage",
       ]);
       for (const permission of needed) {
@@ -211,6 +255,11 @@ describe("admin route permissions", () => {
       }
       expect(permissionsOf("manager")).not.toContain("users.manage");
       expect(permissionsOf("viewer")).not.toContain("users.manage");
+      // The customer permissions hold personal data: manager and owner have them, the viewer has neither.
+      for (const permission of ["customers.read", "customers.write"] as const) {
+        expect(permissionsOf("manager")).toContain(permission);
+        expect(permissionsOf("viewer")).not.toContain(permission);
+      }
     });
   });
 
@@ -246,6 +295,19 @@ describe("admin route permissions", () => {
       }
       expect(allowedCount).toBeGreaterThan(10);
       expect(forbiddenCount).toBeGreaterThan(30);
+    });
+
+    it("is forbidden on every customers route", async () => {
+      for (const route of CUSTOMERS_ROUTES) {
+        const [method, pattern] = route.split(" ") as ["GET", string];
+        const result = await http<ProblemBody>(
+          viewer.baseUrl,
+          method,
+          pattern.replace(":id", SOME_ID),
+          method === "GET" ? {} : { body: {} },
+        );
+        expect(result.status, route).toBe(403);
+      }
     });
 
     it("is forbidden on every users route", async () => {
@@ -318,6 +380,25 @@ describe("admin route permissions", () => {
           http(url, "POST", `/admin/users/${SOME_ID}/reset-password`, {
             body: { newPassword: "a long enough passphrase" },
           }),
+        allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/customers",
+        permission: "customers.read",
+        call: (url) => http(url, "GET", "/admin/customers"),
+        allowedStatus: 200,
+      },
+      {
+        name: "PATCH /admin/customers/:id",
+        permission: "customers.write",
+        call: (url) =>
+          http(url, "PATCH", `/admin/customers/${SOME_ID}`, { body: { isActive: false } }),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/customers/:id/unlock",
+        permission: "customers.write",
+        call: (url) => http(url, "POST", `/admin/customers/${SOME_ID}/unlock`),
         allowedStatus: 404,
       },
       {

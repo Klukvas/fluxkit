@@ -7,17 +7,22 @@ import { ensureMigrated } from "../../test/migrate.js";
 import { storeRoutes, type StoreRoute } from "../../test/store-routes.js";
 
 /**
- * Store routes that are PUBLIC under `/store/account` on purpose (register and login, step 3b adds them here). Every
- * other route there must be marked `@CustomerAuthenticated()`.
+ * Store routes that are PUBLIC under `/store/account` on purpose: register and login, nothing else. Every other
+ * route there must be marked `@CustomerAuthenticated()`. A new public account route is a decision: it has to be
+ * added here by name, and the walk below fails until it is.
  */
-const PUBLIC_ACCOUNT_ROUTES: readonly string[] = [];
+const PUBLIC_ACCOUNT_ROUTES: readonly string[] = [
+  "POST /store/account/login",
+  "POST /store/account/register",
+];
 
+/** Every route under `/store/account` that is NOT marked `@CustomerAuthenticated()`, public ones included. */
 function unmarkedAccountRoutes(routes: StoreRoute[]): string[] {
   return routes
     .filter(({ pattern }) => /^\/store\/account(\/|$)/i.test(pattern))
     .filter(({ customerAuthenticated }) => !customerAuthenticated)
     .map(({ method, pattern }) => `${method} ${pattern}`)
-    .filter((route) => !PUBLIC_ACCOUNT_ROUTES.includes(route));
+    .sort();
 }
 
 describe("customer route walk (default for the store is public; customer routes must be marked)", () => {
@@ -42,8 +47,12 @@ describe("customer route walk (default for the store is public; customer routes 
     expect(marked.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
       [
         "DELETE /store/probe-customer-class/two",
+        "GET /store/account/me",
         "GET /store/probe-customer-class/one",
         "GET /store/probe-customer/me",
+        "PATCH /store/account/me",
+        "POST /store/account/change-password",
+        "POST /store/account/logout",
         "POST /store/probe-customer/sign-out",
         "POST /store/probe-customer/write",
       ].sort(),
@@ -70,13 +79,25 @@ describe("customer route walk (default for the store is public; customer routes 
     }
   });
 
-  it("every route under /store/account is marked, except the explicit public list", () => {
-    expect(unmarkedAccountRoutes(storeRoutes(running.app))).toEqual([]);
+  it("every route under /store/account is marked, except exactly the explicit public list (register and login)", () => {
+    expect(unmarkedAccountRoutes(storeRoutes(running.app))).toEqual(
+      [...PUBLIC_ACCOUNT_ROUTES].sort(),
+    );
+  });
+
+  it("register and login are public on purpose: an anonymous call reaches the handler (400 for an empty body, not 401)", async () => {
+    for (const path of ["/store/account/register", "/store/account/login"]) {
+      const result = await http<ProblemBody>(running.baseUrl, "POST", path, { body: {} });
+      expect(result.status, path).toBe(400);
+      expect(result.body, path).toMatchObject({ code: "validation_failed" });
+    }
   });
 
   it("the walk catches a route under /store/account that forgot the decorator", async () => {
     const routes = storeRoutes(broken.app);
-    expect(unmarkedAccountRoutes(routes)).toEqual(["GET /store/account/probe-unmarked"]);
+    expect(unmarkedAccountRoutes(routes)).toEqual(
+      [...PUBLIC_ACCOUNT_ROUTES, "GET /store/account/probe-unmarked"].sort(),
+    );
     // And it really is open, which is what the walk protects against.
     const leak = await http(broken.baseUrl, "GET", "/store/account/probe-unmarked");
     expect(leak.status).toBe(200);
