@@ -20,6 +20,7 @@ const MAX_HOURS = 24;
 
 interface RegisterResponse {
   customer: Record<string, unknown>;
+  cartNotices: unknown[];
 }
 
 function body(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -94,7 +95,8 @@ describe("POST /store/account/register", () => {
     });
     const result = await registered(payload);
     expect(result.status).toBe(201);
-    expect(Object.keys(result.body)).toEqual(["customer"]);
+    expect(Object.keys(result.body)).toEqual(["customer", "cartNotices"]);
+    expect(result.body.cartNotices).toEqual([]);
     expect(Object.keys(result.body.customer).sort()).toEqual(
       ["createdAt", "email", "firstName", "id", "lastName", "phone"].sort(),
     );

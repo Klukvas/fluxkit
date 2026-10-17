@@ -20,7 +20,9 @@ const PASSWORD = "correct horse battery staple";
 const WRONG = "definitely not the password";
 const MAX_HOURS = 24;
 
-type LoginResult = HttpResult<{ customer: Record<string, unknown> } & ProblemBody>;
+type LoginResult = HttpResult<
+  { customer: Record<string, unknown>; cartNotices: unknown[] } & ProblemBody
+>;
 
 describe("POST /store/account/login", () => {
   const clock = new FakeClock("2030-05-01T08:00:00.000Z");
@@ -76,7 +78,8 @@ describe("POST /store/account/login", () => {
       const shopper = await newCustomer();
       const result = await login(shopper.email, PASSWORD);
       expect(result.status).toBe(200);
-      expect(Object.keys(result.body)).toEqual(["customer"]);
+      expect(Object.keys(result.body)).toEqual(["customer", "cartNotices"]);
+      expect(result.body.cartNotices).toEqual([]);
       expect(Object.keys(result.body.customer).sort()).toEqual(
         ["createdAt", "email", "firstName", "id", "lastName", "phone"].sort(),
       );

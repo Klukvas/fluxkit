@@ -1,6 +1,7 @@
 import { Body, Get, HttpCode, Inject, Patch, Post, Req, Res } from "@nestjs/common";
 import { ApiNoContentResponse, ApiOperation } from "@nestjs/swagger";
 import type { Request, Response } from "express";
+import { clearCartCookie, readCartCookie } from "../../cart/cart-cookie.js";
 import { ApiProblemResponses, ApiZodBody, ApiZodResponse } from "../../common/openapi.js";
 import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { StoreController } from "../../catalog/store/store-controller.decorator.js";
@@ -20,11 +21,13 @@ import {
   changePasswordSchema,
   loginSchema,
   registerSchema,
+  signInResponseSchema,
   updateProfileSchema,
   type AccountResponse,
   type ChangePasswordBody,
   type LoginBody,
   type RegisterBody,
+  type SignInResponse,
   type UpdateProfileBody,
 } from "./account.schemas.js";
 import { CustomerAccountService, type SignInResult } from "./account.service.js";
@@ -48,25 +51,27 @@ export class AccountController {
   @ApiOperation({
     summary: "Create an account and sign in",
     description:
-      "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked.",
+      "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked. The guest cart of the `fluxkit_cart` cookie is merged into the new account's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
   })
   @ApiZodBody(registerSchema)
   @ApiZodResponse(
     201,
-    accountResponseSchema,
-    "The new customer. The session cookie is in `Set-Cookie`.",
+    signInResponseSchema,
+    "The new customer and the notices of the cart merge. The session cookie is in `Set-Cookie`.",
   )
   @ApiProblemResponses(400, 409, 429)
   async register(
     @Body(new ZodValidationPipe(registerSchema)) body: RegisterBody,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<AccountResponse> {
+  ): Promise<SignInResponse> {
+    const guestCartToken = readCartCookie(request.headers.cookie);
     const result = await this.account.register(
       body,
       readCustomerSessionCookie(request.headers.cookie),
+      guestCartToken,
     );
-    return this.withSessionCookie(response, result);
+    return this.withSessionCookie(response, result, request);
   }
 
   @Post("login")
@@ -75,25 +80,27 @@ export class AccountController {
   @ApiOperation({
     summary: "Sign in with email and password; sets the session cookie",
     description:
-      "Every failure (unknown email, wrong password, locked or inactive account) is the same 401. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued.",
+      "Every failure (unknown email, wrong password, locked or inactive account) is the same 401 and leaves the guest cart alone. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued. On success the guest cart of the `fluxkit_cart` cookie is merged into the customer's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
   })
   @ApiZodBody(loginSchema)
   @ApiZodResponse(
     200,
-    accountResponseSchema,
-    "The customer. The session cookie is in `Set-Cookie`.",
+    signInResponseSchema,
+    "The customer and the notices of the cart merge. The session cookie is in `Set-Cookie`.",
   )
   @ApiProblemResponses(400, 401, 429)
   async login(
     @Body(new ZodValidationPipe(loginSchema)) body: LoginBody,
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<AccountResponse> {
+  ): Promise<SignInResponse> {
+    const guestCartToken = readCartCookie(request.headers.cookie);
     const result = await this.account.login(
       body,
       readCustomerSessionCookie(request.headers.cookie),
+      guestCartToken,
     );
-    return this.withSessionCookie(response, result);
+    return this.withSessionCookie(response, result, request);
   }
 
   @Post("logout")
@@ -149,11 +156,19 @@ export class AccountController {
     await this.account.changePassword(customer, body);
   }
 
-  private withSessionCookie(response: Response, result: SignInResult): AccountResponse {
+  /** Sets the session cookie and, when the request carried a guest cart cookie, clears it: that cart was merged. */
+  private withSessionCookie(
+    response: Response,
+    result: SignInResult,
+    request: Request,
+  ): SignInResponse {
     setCustomerSessionCookie(response, result.token, {
       secure: this.config.cookieSecure,
       maxAgeSeconds: result.maxAgeSeconds,
     });
-    return { customer: result.customer };
+    if (readCartCookie(request.headers.cookie) !== undefined) {
+      clearCartCookie(response, { secure: this.config.cookieSecure });
+    }
+    return { customer: result.customer, cartNotices: result.cartNotices };
   }
 }

@@ -9,6 +9,8 @@ import {
   validatePersonName,
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
+import { CartMergeService } from "../../cart/cart-merge.service.js";
+import type { CartNoticeResponse } from "../../cart/cart.schemas.js";
 import { PasswordHasher } from "../../auth/password-hasher.js";
 import { passwordPolicyErrors } from "../../auth/password-policy-errors.js";
 import { isUniqueViolation, translatePostgresError } from "../../common/postgres-errors.js";
@@ -18,7 +20,7 @@ import {
   type FieldError,
   type ProblemException,
 } from "../../common/problem.js";
-import { withTransaction } from "../../common/transaction.js";
+import { withTransaction, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import type { CustomerPrincipal } from "../auth/customer-authenticator.js";
 import {
@@ -60,6 +62,8 @@ const PHONE_MESSAGES = {
 } as const;
 
 export interface SignInResult extends AccountResponse {
+  /** What the merge of the guest cart capped or dropped; empty when nothing was. */
+  cartNotices: CartNoticeResponse[];
   /** The raw session token. It exists only here and in the cookie; the database keeps its SHA-256. */
   token: string;
   maxAgeSeconds: number;
@@ -81,14 +85,21 @@ export class CustomerAccountService {
     @Inject(PasswordHasher) private readonly hasher: PasswordHasher,
     @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CartMergeService) private readonly cartMerge: CartMergeService,
   ) {}
 
   /**
    * Creates the account and signs it in with a NEW session. `previousToken` is the session cookie the request
    * carried, if any: it is revoked, so a token planted before registration never survives (no fixation).
    * A taken email is `409 conflict` on `email` (accepted trade-off while no email can be sent, ADR 0016).
+   * `guestCartToken` is the `fluxkit_cart` cookie of the request: that cart is merged into the new account's cart in
+   * the same transaction.
    */
-  async register(body: RegisterBody, previousToken: string | undefined): Promise<SignInResult> {
+  async register(
+    body: RegisterBody,
+    previousToken: string | undefined,
+    guestCartToken: string | undefined,
+  ): Promise<SignInResult> {
     const errors: FieldError[] = [];
     const email = validateEmail(body.email);
     if (!email.ok) {
@@ -105,16 +116,20 @@ export class CustomerAccountService {
     }
     const passwordHash = await this.hasher.hash(body.password);
     const now = this.clock.now();
-    let created: { row: CustomerRow; session: CreatedCustomerSession };
+    let created: {
+      row: CustomerRow;
+      session: CreatedCustomerSession;
+      cartNotices: CartNoticeResponse[];
+    };
     try {
       created = await withTransaction(this.db, async (transaction) => {
         const row = await this.customers.insert(
           { email: email.email, passwordHash, firstName, lastName, phone },
           transaction,
         );
-        await this.afterSignIn();
+        const cartNotices = await this.afterSignIn(transaction, row.id, guestCartToken, now);
         const session = await this.sessions.create(row.id, now, transaction);
-        return { row, session };
+        return { row, session, cartNotices };
       });
     } catch (error) {
       if (isUniqueViolation(error, "customer_email_key")) {
@@ -123,16 +138,21 @@ export class CustomerAccountService {
       throw error;
     }
     await this.revokePrevious(previousToken);
-    return this.signedIn(created.row, created.session, now);
+    return this.signedIn(created.row, created.session, created.cartNotices, now);
   }
 
   /**
    * Every failure ends in the same `401` and does exactly one scrypt verification (a dummy one when there is no
    * hash to check or the account may not sign in), so neither the body nor the response time tells which case it
    * was. The per-address limit is `@RateLimit("login")` on the route, which runs before this method.
-   * `previousToken` is the session cookie the request carried: revoked on success only.
+   * `previousToken` is the session cookie the request carried: revoked on success only. `guestCartToken` is the
+   * `fluxkit_cart` cookie: its cart is merged in the success transaction, and a refused login never touches it.
    */
-  async login(body: LoginBody, previousToken: string | undefined): Promise<SignInResult> {
+  async login(
+    body: LoginBody,
+    previousToken: string | undefined,
+    guestCartToken: string | undefined,
+  ): Promise<SignInResult> {
     const now = this.clock.now();
     const row = await this.customers.findByEmail(normalizeEmail(body.email));
     if (row === undefined) {
@@ -154,9 +174,14 @@ export class CustomerAccountService {
     const upgradedHash = this.hasher.needsRehash(row.passwordHash)
       ? await this.hasher.hash(body.password)
       : undefined;
-    const { customer, session } = await this.completeLogin(row, upgradedHash, now);
+    const { customer, session, cartNotices } = await this.completeLogin(
+      row,
+      upgradedHash,
+      guestCartToken,
+      now,
+    );
     await this.revokePrevious(previousToken);
-    return this.signedIn(customer, session, now);
+    return this.signedIn(customer, session, cartNotices, now);
   }
 
   /** The caller's own record. The id comes from the principal the guard authenticated, never from the request. */
@@ -251,17 +276,27 @@ export class CustomerAccountService {
   }
 
   /**
-   * Runs inside the register and login transaction, after the customer is known and before the session exists.
-   * TODO(fluxkit): step 4 merges the guest cart here (it will take the open transaction and the customer id).
-   * Intentionally empty today: no cart code exists yet.
+   * Runs inside the register and login transaction, after the customer is known and before the session exists: merges
+   * the guest cart of the request into the customer's cart (ADR 0015). Reached only after the password check passed.
    */
-  private afterSignIn(): Promise<void> {
-    return Promise.resolve();
+  private afterSignIn(
+    transaction: Transaction,
+    customerId: string,
+    guestCartToken: string | undefined,
+    now: Date,
+  ): Promise<CartNoticeResponse[]> {
+    return this.cartMerge.mergeGuestCart(transaction, customerId, guestCartToken, now);
   }
 
-  private signedIn(row: CustomerRow, session: CreatedCustomerSession, now: Date): SignInResult {
+  private signedIn(
+    row: CustomerRow,
+    session: CreatedCustomerSession,
+    cartNotices: CartNoticeResponse[],
+    now: Date,
+  ): SignInResult {
     return {
       customer: toCustomerResponse(row),
+      cartNotices,
       token: session.token,
       maxAgeSeconds: Math.max(1, Math.floor((session.expiresAt.getTime() - now.getTime()) / 1000)),
     };
@@ -329,8 +364,13 @@ export class CustomerAccountService {
   private async completeLogin(
     checked: CustomerRow,
     upgradedHash: string | undefined,
+    guestCartToken: string | undefined,
     now: Date,
-  ): Promise<{ customer: CustomerRow; session: CreatedCustomerSession }> {
+  ): Promise<{
+    customer: CustomerRow;
+    session: CreatedCustomerSession;
+    cartNotices: CartNoticeResponse[];
+  }> {
     const outcome = await withTransaction(this.db, async (transaction) => {
       const row = await this.customers.findByIdForUpdate(checked.id, transaction);
       if (row === undefined || !row.isActive) {
@@ -354,9 +394,9 @@ export class CustomerAccountService {
       if (updated === undefined) {
         return "inactive" as const;
       }
-      await this.afterSignIn();
+      const cartNotices = await this.afterSignIn(transaction, updated.id, guestCartToken, now);
       const session = await this.sessions.create(updated.id, now, transaction);
-      return { customer: updated, session };
+      return { customer: updated, session, cartNotices };
     });
     if (typeof outcome === "string") {
       throw this.refused(outcome);
