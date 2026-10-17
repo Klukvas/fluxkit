@@ -1,6 +1,6 @@
 # API: checkout and orders
 
-Placing an order (`POST /store/checkout`), the guest's own order (`/store/orders/*`), the signed-in customer's orders (`/store/account/orders*`) and the order domain service behind them (status transitions, payment, cancellation, expiry). Plan step 5b of `docs/plans/2026-10-17-cart-and-orders.md`; decisions in `docs/adr/0015-cart-and-checkout.md`, `0017-orders.md`, `0018-scheduler-domain-events-and-ports.md`, `0019-orders-schema.md`, `0020-variants-with-order-lines-are-not-deleted.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: orders are core. **Not built yet:** the admin order routes (step 6), the scheduler that expires orders by itself (step 5c, `OrdersService.expireOne` is ready for it), the events contract file and dispatcher (steps 5c and 7), payment and shipping providers.
+Placing an order (`POST /store/checkout`), the guest's own order (`/store/orders/*`), the signed-in customer's orders (`/store/account/orders*`) and the order domain service behind them (status transitions, payment, cancellation, expiry). Plan steps 5b and 6 of `docs/plans/2026-10-17-cart-and-orders.md`; decisions in `docs/adr/0015-cart-and-checkout.md`, `0017-orders.md`, `0018-scheduler-domain-events-and-ports.md`, `0019-orders-schema.md`, `0020-variants-with-order-lines-are-not-deleted.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: orders are core. The admin order routes (`/admin/orders*`, plan step 6) are described under "Admin endpoints" below. **Not built yet:** payment and shipping providers (an order stays `awaiting_payment` until an admin marks it paid or it expires). The scheduler that expires orders is `docs/api/jobs.md`; the events and ports are `docs/contracts/events.md`.
 
 Every route sends `Cache-Control: no-store` (errors included). Every `POST` needs `X-Fluxkit-CSRF: 1` and a JSON content type (otherwise `403 forbidden`, before anything else). Money is `{amount, currency}` in minor units of the shop currency (ADR 0011). Texts of an order are resolved to `?locale` (one of `LOCALES`, else `400`), by default the locale the order was placed in (or the default locale if that one is no longer configured), with the usual per-field fallback; the stored snapshot keeps every locale.
 
@@ -81,7 +81,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 | `paid` | `fulfilled` | admin or system | commit the reservations still active; `awaiting_stock` while one is not on hand |
 | `paid` | `cancelled` | admin only, with a reason | none (sold units stay sold; restock is an inventory `return`) |
 
-## Order domain service (internal, no route yet)
+## Order domain service (internal; the admin routes below call it)
 
 `OrdersService` (`apps/api/src/orders/orders.service.ts`, exported globally; implements the core `OrderPaymentsPort`, injectable as `ORDER_PAYMENTS_PORT`). Each method opens one transaction, locks the order row `FOR UPDATE` FIRST, asks the state machine, applies the stock effect through the sorted batch helpers of `ReservationsService` (`docs/api/inventory.md`) inside a savepoint, writes the order, the journal row and the event, and retries a deadlock once.
 
@@ -95,9 +95,46 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 
 Races on one order have one winner: a payment, a cancellation and the expiry all lock the order row first (tested: payment against cancel, payment against expiry, parallel payments, crossing orders).
 
+## Admin endpoints (plan step 6)
+
+All need an admin session; the permission is the default pair of the controller (`@AdminController("orders", {read: "orders.read", write: "orders.write"})`): `GET` needs `orders.read`, every `POST` needs `orders.write`. Owner and manager hold both, the viewer neither (`403 forbidden`: orders hold personal data, ADR 0017). Anonymous callers get `401` (a customer cookie, a guest access token or any other credential is not an admin credential), a `POST` without `X-Fluxkit-CSRF: 1` gets `403` (a body also needs `Content-Type: application/json`). Every response is `no-store` and every error `application/problem+json`. The acting admin is read from the session, never from the request; it is recorded as `actor_admin_id` in the status journal and, for a payment, on the `sale` stock movements.
+
+| Endpoint | Auth | Purpose | Request | Response | Errors |
+|---|---|---|---|---|---|
+| `GET /admin/orders` | `orders.read` | List orders, newest first | `?limit` (1 to 100, default 20), `?offset` (0 to 10 000), `?status` (one of the five), `?placedFrom` (inclusive) and `?placedTo` (exclusive): ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01, `placedFrom` not after `placedTo`; `?q` (at most 254 characters, below). A parameter that is not listed is `400` | `200 {items, total, limit, offset}`; item `{id, number, status, placedAt, expiresAt, total, currency, customerId, email, itemCount}` (`itemCount` = units over all lines; `customerId` is `null` for a guest and for a deleted account) | `400` |
+| `GET /admin/orders/{id}` | `orders.read` | The order in full (below) | none | `200` the admin order | `400` malformed id; `404` |
+| `POST /admin/orders/{id}/cancel` | `orders.write` | Cancel an `awaiting_payment` order (its reservations are released) or, admin only, a `paid` one | `{reason}`: trimmed, 1 to 500 characters, no control characters other than tab and line breaks (strict) | `200` the admin order | `400`; `404`; `409 rule_violation` `invalid_transition` (already cancelled, expired or fulfilled) |
+| `POST /admin/orders/{id}/mark-paid` | `orders.write` | Record a payment received outside the system, through the same `OrdersService.markPaid` entry point a payment plugin uses | `{reference, amount: {amount, currency}}` (strict): `reference` trimmed, 1 to 255 characters, no control characters; `amount` an integer of minor units, 0 to 10^12, a supported currency | `200` the admin order. The same `reference` on an order that is already paid (or fulfilled) answers `200` with the order unchanged | `400`; `404`; `409 rule_violation` `order_not_payable` (expired or cancelled, or a reservation is no longer held), `amount_mismatch` (not the total, or another currency; also checked on an already paid order), `payment_reference_conflict` (already paid with another reference), `invalid_transition` |
+| `POST /admin/orders/{id}/mark-fulfilled` | `orders.write` | Mark a paid order fulfilled | none | `200` the admin order | `400`; `404`; `409 rule_violation` `awaiting_stock` (a backordered line is not on hand yet; nothing changes), `invalid_transition` (not `paid`, also a second call) |
+
+**`q`** is an order number (the way a person types it: lower case, dash optional, `O`, `I`, `L` read as `0`, `1`, `1`) OR an email (trimmed and lower-cased). Both are compared for EQUALITY: nothing matches by prefix, suffix or substring, `%` and `_` are plain characters, and an empty or blank `q` is no filter. The filters are ANDed. The order is `placed_at` descending, then `id` descending, so orders placed at the same instant keep their place from page to page. `total` counts the whole match.
+
+**The admin order** (`GET` and every action answer with it; it is also what `OrderReadPort.getOrder` returns, built by one function in `apps/api/src/orders/admin/admin-order-view.ts`):
+
+```
+{ id, number, status, locale, currency, customerId | null, isGuest,
+  contact: {email, phone, firstName, lastName}, shippingAddress | null, billingAddress | null,
+  items: [{position, productId | null, variantId | null, sku, productTitle {locale: text}, variantTitle {locale: text} | null,
+           optionValues: [{option {locale: text}, value {locale: text}}], imageUrl | null, unitPrice, compareAtAmount | null,
+           quantity, lineTotal, requiresShipping, reservations: [{status, quantity}]}],
+  subtotal, shippingTotal, discountTotal, taxTotal, total,
+  adjustments: [{kind, code, label {locale: text}, amount, includedInPrice, source | null}],
+  history: [{fromStatus | null, toStatus, actorType, actorAdminId | null, reason | null, at}],
+  placedAt, expiresAt, paidAt, fulfilledAt, cancelledAt, expiredAt, cancellationReason, paymentReference }
+```
+
+Texts are the full locale maps of the snapshot (an admin sees every translation). `isGuest` is true for an order placed without an account (an order whose customer account was deleted afterwards has `customerId: null` and `isGuest: false`). A line's `reservations` show the status (`active`, `committed`, `released`, `expired`) and the quantity only. Never in the view, in a list, in a plugin's hands or in a log: the guest access token or its hash, the idempotency key, the request fingerprint, reservation ids, locations and stock figures. The view is read in one repeatable-read, read-only transaction (a consistent snapshot) with a fixed number of statements whatever the number of lines (tested: 1 and 20 lines; the list issues the same number for 1 and 50 orders).
+
+Rules of the actions (all through `OrdersService`, which locks the order row first, so a payment, a cancellation and the expiry job on one order have exactly one winner; tested with many rounds, also from two API instances):
+
+- **Cancel of a paid order**: allowed for an admin only, with the reason; the sold units stay sold, NOTHING is restocked and NOTHING is refunded: record the stock `return` and the refund by hand (ADR 0017). The reservations stay `committed`.
+- **Mark-paid** commits every reservation that is on hand (a `sale` movement each, `reference` = the order number, the admin as actor); a backordered line is committed up to what is on hand and the rest is held 365 days until `mark-fulfilled`. The amount is judged by core money validation first (`400` for a float, a negative, a too big amount or an unknown currency) and against the order afterwards (`409 amount_mismatch`).
+- **Mark-fulfilled** commits the reservations still active (backordered lines) or answers `awaiting_stock` with everything rolled back.
+- Every change writes one journal row (`from`, `to`, `actor_type = admin`, `actor_admin_id`, `reason`) and one outbox event (`order.cancelled`, `order.paid`, `order.fulfilled`; ids and the order number only). A refused action writes nothing.
+
 ## Problem codes of this step (additive)
 
-`409` `cart_empty`, `cart_changed` (`cart` member), `checkout_refused` (`errors[]` per line), `idempotency_key_reused`; `503` `service_unavailable`; `rule_violation` rules `invalid_transition` (owner cancel), `subtotal_out_of_range`. The admin routes will add `order_not_payable`, `amount_mismatch`, `payment_reference_conflict` and `awaiting_stock` (step 6).
+`409` `cart_empty`, `cart_changed` (`cart` member), `checkout_refused` (`errors[]` per line), `idempotency_key_reused`; `503` `service_unavailable`; `rule_violation` rules `invalid_transition` (owner and admin cancel, mark-paid, mark-fulfilled), `subtotal_out_of_range`, and for the admin routes `order_not_payable`, `amount_mismatch`, `payment_reference_conflict` and `awaiting_stock`.
 
 ## Limits and notes
 

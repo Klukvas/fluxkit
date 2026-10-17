@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lt, or, sql, type SQL } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../common/transaction.js";
 import {
   domainEvent,
@@ -28,6 +28,29 @@ export interface OrderReservationRow {
   status: string;
 }
 
+/** The reservation of one order line as the admin view shows it: status and quantity, nothing else. */
+export interface OrderItemReservationRow {
+  orderItemId: string;
+  status: string;
+  quantity: number;
+}
+
+/**
+ * The filters of the admin order list, all optional and ANDed. `number` and `email` are the two halves of `q` and are
+ * ORed: both are compared for equality (never LIKE), so `%` and `_` are plain characters and nothing matches by prefix.
+ */
+export interface AdminOrderFilter {
+  readonly status?: string;
+  /** Inclusive. */
+  readonly placedFrom?: Date;
+  /** Exclusive. */
+  readonly placedTo?: Date;
+  /** Stored form of an order number (`XXXX-XXXX`). */
+  readonly number?: string;
+  /** Normalized (trimmed, lower case) email. */
+  readonly email?: string;
+}
+
 /** The columns a status change may write (everything else on the order never changes after placement). */
 export interface OrderStatusUpdate {
   status: string;
@@ -37,6 +60,30 @@ export interface OrderStatusUpdate {
   expiredAt?: Date;
   cancellationReason?: string | null;
   paymentReference?: string | null;
+}
+
+function adminOrderWhere(filter: AdminOrderFilter): SQL | undefined {
+  const conditions: (SQL | undefined)[] = [];
+  if (filter.status !== undefined) {
+    conditions.push(eq(salesOrder.status, filter.status));
+  }
+  if (filter.placedFrom !== undefined) {
+    conditions.push(gte(salesOrder.placedAt, filter.placedFrom));
+  }
+  if (filter.placedTo !== undefined) {
+    conditions.push(lt(salesOrder.placedAt, filter.placedTo));
+  }
+  const search: SQL[] = [];
+  if (filter.number !== undefined) {
+    search.push(eq(salesOrder.number, filter.number));
+  }
+  if (filter.email !== undefined) {
+    search.push(eq(salesOrder.email, filter.email));
+  }
+  if (search.length > 0) {
+    conditions.push(or(...search));
+  }
+  return and(...conditions);
 }
 
 /**
@@ -127,6 +174,33 @@ export class OrdersRepository {
       .select({ total: sql<number>`count(*)::int` })
       .from(salesOrder)
       .where(eq(salesOrder.customerId, customerId));
+    return row?.total ?? 0;
+  }
+
+  /**
+   * One page of the admin list, newest first. The order is total: `placed_at desc`, then `id desc`, so two orders with
+   * the same instant never swap places between pages (`sales_order_placed_at_idx` serves the first key).
+   */
+  async listForAdmin(
+    db: DbExecutor,
+    filter: AdminOrderFilter,
+    limit: number,
+    offset: number,
+  ): Promise<OrderRow[]> {
+    return db
+      .select()
+      .from(salesOrder)
+      .where(adminOrderWhere(filter))
+      .orderBy(desc(salesOrder.placedAt), desc(salesOrder.id))
+      .limit(limit)
+      .offset(offset);
+  }
+
+  async countForAdmin(db: DbExecutor, filter: AdminOrderFilter): Promise<number> {
+    const [row] = await db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(salesOrder)
+      .where(adminOrderWhere(filter));
     return row?.total ?? 0;
   }
 
@@ -237,6 +311,31 @@ export class OrdersRepository {
       .innerJoin(reservation, eq(reservation.id, orderItemReservation.reservationId))
       .where(eq(orderItem.orderId, orderId))
       .orderBy(asc(reservation.variantId), asc(reservation.locationId), asc(reservation.id));
+  }
+
+  /** Status and quantity of every reservation of the lines of many orders, in one statement. */
+  async listItemReservations(
+    db: DbExecutor,
+    orderIds: readonly string[],
+  ): Promise<OrderItemReservationRow[]> {
+    if (orderIds.length === 0) {
+      return [];
+    }
+    return db
+      .select({
+        orderItemId: orderItemReservation.orderItemId,
+        status: reservation.status,
+        quantity: reservation.quantity,
+      })
+      .from(orderItemReservation)
+      .innerJoin(orderItem, eq(orderItem.id, orderItemReservation.orderItemId))
+      .innerJoin(reservation, eq(reservation.id, orderItemReservation.reservationId))
+      .where(inArray(orderItem.orderId, [...orderIds]))
+      .orderBy(
+        asc(orderItemReservation.orderItemId),
+        asc(reservation.createdAt),
+        asc(reservation.id),
+      );
   }
 
   async updateStatus(

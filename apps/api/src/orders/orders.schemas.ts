@@ -81,23 +81,23 @@ export const accountOrdersQuerySchema = z.strictObject({
 
 export type AccountOrdersQuery = z.output<typeof accountOrdersQuerySchema>;
 
-const amountSchema = z
+export const amountSchema = z
   .number()
   .int()
   .min(0)
   .max(MAX_AMOUNT)
   .meta({ description: "Minor units of the order currency." });
 
-const moneySchema = z.object({ amount: amountSchema, currency: z.string() });
+export const moneySchema = z.object({ amount: amountSchema, currency: z.string() });
 
-const signedMoneySchema = z.object({
+export const signedMoneySchema = z.object({
   amount: z.number().int().min(-MAX_AMOUNT).max(MAX_AMOUNT),
   currency: z.string(),
 });
 
-const statusSchema = z.enum(ORDER_STATUSES);
+export const statusSchema = z.enum(ORDER_STATUSES);
 
-const addressOutput = z.object({
+export const addressOutput = z.object({
   countryCode: z.string(),
   region: z.string().optional(),
   city: z.string(),
