@@ -54,7 +54,7 @@ It prints how many entities were created and how many already existed. Any error
 - **Prices.** A product cannot be published without a price in `SHOP_CURRENCY` on every active variant, so for each product it creates the runner writes the prices from the seed data (matched to the generated variants by option values) through `PricesService`, before publishing. The amounts are the same whatever `SHOP_CURRENCY` is; pick the currency, the amounts are not converted. Existing products are never repriced and never priced: on a database seeded before prices existed, the store stays empty until the variants are priced with the bulk price endpoint.
 - **Stock.** For each stocked variant of a product it creates, the runner receives the stock through the real admin inventory service: one `receipt` movement with the reason "Demo seed" at the default location, so the journal replays to the level. The seed has no admin user, so these movements have no actor (`actorId` is `null`; `InventoryService.adjust` accepts a `null` actor for system changes). A tracked variant with stock 0 gets no level and no movement (that absence is "out of stock"). `allowBackorder` is set through the variant admin service. Existing variants are never restocked: a second run adds no price, level or movement.
 - Optional feature modules are not loaded while seeding.
-- Seeding creates no users. The first admin owner comes from `pnpm admin:create` (README, Admin sign-in).
+- Seeding creates no users, no customers, no carts and no orders (no personal or fake order data in the template). The first admin owner comes from `pnpm admin:create` (README, Admin sign-in); a cart, a customer and an order come from the curl run in the README, Checkout walkthrough.
 
 ## Add or change a preset
 
