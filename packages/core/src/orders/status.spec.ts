@@ -22,7 +22,7 @@ const PLAN: Readonly<Record<string, { actors: readonly OrderActor[]; effect: Sto
   "awaiting_payment>cancelled": { actors: ["customer", "guest", "admin"], effect: "release" },
   "awaiting_payment>expired": { actors: ["system"], effect: "release" },
   "paid>fulfilled": { actors: ["admin", "system"], effect: "commit" },
-  "paid>cancelled": { actors: ["admin"], effect: "none" },
+  "paid>cancelled": { actors: ["admin"], effect: "release_unsold" },
 };
 
 const asStatus = (start: Start): OrderStatus | null => (start === "(new)" ? null : start);
@@ -191,6 +191,15 @@ describe("stockEffectOf", () => {
       const [from, to] = key.split(">") as [Start, OrderStatus];
       expect(stockEffectOf(asStatus(from), to), key).toBe(rule.effect);
     }
+  });
+
+  it("cancelling a paid order releases only what is still unsold (ADR 0022), no other transition does", () => {
+    expect(stockEffectOf("paid", "cancelled")).toBe("release_unsold");
+    expect(
+      ORDER_TRANSITIONS.filter((entry) => entry.stockEffect === "release_unsold").map(
+        (entry) => `${String(entry.from)}>${entry.to}`,
+      ),
+    ).toEqual(["paid>cancelled"]);
   });
 
   it("refuses to guess for a pair that is not in the table (RangeError)", () => {

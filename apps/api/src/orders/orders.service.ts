@@ -12,6 +12,7 @@ import {
   type OrderActor,
   type OrderPaymentsPort,
   type OrderStatus,
+  type StockEffect,
   ORDER_STATUSES,
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../auth/clock.js";
@@ -125,7 +126,7 @@ export class OrdersService implements OrderPaymentsPort {
 
   /**
    * Moves a LOCKED order to `to`. The caller holds the row `FOR UPDATE` and passes the row as read under that lock.
-   * Asks `decideTransition`, then does the stock effect of the table (commit, release, none) on the order's
+   * Asks `decideTransition`, then does the stock effect of the table (commit, release, release_unsold) on the order's
    * reservations in a savepoint, updates the order, journals the change and writes the event. A refusal changes
    * nothing. A reservation in a state that can only come from damaged data throws.
    */
@@ -360,20 +361,18 @@ export class OrdersService implements OrderPaymentsPort {
     order: OrderRow,
     from: OrderStatus,
     to: OrderStatus,
-    effect: "reserve" | "commit" | "release" | "none",
+    effect: StockEffect,
     actor: OrderActorRef,
     options: TransitionOptions,
   ): Promise<void> {
-    if (effect === "none") {
-      return;
-    }
     if (effect === "reserve") {
       throw new RangeError("Reservations are created by the checkout, not by a transition");
     }
     const held = await this.orders.listReservationsOfOrder(tx, order.id);
     const active = held.filter((entry) => entry.status === "active");
-    if (effect === "release") {
-      if (held.some((entry) => entry.status === "committed")) {
+    if (effect === "release" || effect === "release_unsold") {
+      // `release_unsold` (a paid order, ADR 0022) leaves the committed ones alone: sold units stay sold, no restock.
+      if (effect === "release" && held.some((entry) => entry.status === "committed")) {
         throw new Error(
           `Order ${order.number} is awaiting payment but holds a committed reservation.`,
         );

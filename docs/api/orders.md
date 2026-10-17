@@ -79,7 +79,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 | `awaiting_payment` | `cancelled` | the owner (customer, or guest with the token), admin | release every reservation |
 | `awaiting_payment` | `expired` | system (`expireOne`) | release every reservation |
 | `paid` | `fulfilled` | admin or system | commit the reservations still active; `awaiting_stock` while one is not on hand |
-| `paid` | `cancelled` | admin only, with a reason | none (sold units stay sold; restock is an inventory `return`) |
+| `paid` | `cancelled` | admin only, with a reason | `release_unsold` (ADR 0022): still-`active` reservations (the held remainder of a backordered line) are released; `committed` ones are sold units and stay sold, restock is an inventory `return` |
 
 ## Order domain service (internal; the admin routes below call it)
 
@@ -90,7 +90,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 | `markPaid(orderId, {amount, providerReference, source}, actor?)` | The idempotent payment entry point. `order_not_found`; an `expired` or `cancelled` order is `order_not_payable` and nothing changes; on a `paid` or `fulfilled` order a different reference is `payment_reference_conflict`, the same reference is ok with `alreadyPaid: true` (and still checks the amount); the amount must equal the total in the order currency (`amount_mismatch`); a reservation that is no longer active (swept) is `order_not_payable`. The clock is not consulted: an order past its expiry that the job has not expired yet can still be paid. The reference is 1 to 255 characters (a caller bug throws `RangeError`) |
 | `markFulfilled(orderId, actor)` | `paid -> fulfilled`; `awaiting_stock` (nothing changes) while a held backordered line is not on hand; `invalid_transition` otherwise |
 | `cancelAsGuest(number, token)`, `cancelAsCustomer(customerId, number)` | Owner cancels; `not_found` as in the routes, `invalid_transition` unless `awaiting_payment` |
-| `cancelAsAdmin(orderId, adminId, reason)` | `awaiting_payment` or `paid`; reason 1 to 500 characters stored on the order and in the journal; sold units are not restocked |
+| `cancelAsAdmin(orderId, adminId, reason)` | `awaiting_payment` or `paid`; reason 1 to 500 characters stored on the order and in the journal; sold units are not restocked, the still-`active` reservations of a paid order are released (ADR 0022) |
 | `expireOne(orderId, now)` | Expires the order when it is `awaiting_payment` and `expires_at <= now` (`expired`, `not_due`, `not_found`); the scheduler calls it for every due order (`docs/api/jobs.md`) |
 
 Races on one order have one winner: a payment, a cancellation and the expiry all lock the order row first (tested: payment against cancel, payment against expiry, parallel payments, crossing orders).
@@ -127,7 +127,7 @@ Texts are the full locale maps of the snapshot (an admin sees every translation)
 
 Rules of the actions (all through `OrdersService`, which locks the order row first, so a payment, a cancellation and the expiry job on one order have exactly one winner; tested with many rounds, also from two API instances):
 
-- **Cancel of a paid order**: allowed for an admin only, with the reason; the sold units stay sold, NOTHING is restocked and NOTHING is refunded: record the stock `return` and the refund by hand (ADR 0017). The reservations stay `committed`.
+- **Cancel of a paid order**: allowed for an admin only, with the reason; the sold units stay sold, NOTHING is restocked and NOTHING is refunded: record the stock `return` and the refund by hand (ADR 0017). The `committed` reservations stay `committed`, no `return` movement is written. A backordered line's remainder is still an `active` reservation (held 365 days since payment): the cancel releases it (`reserved` goes down, no journal row, no `on_hand` change; ADR 0022). An already expired or released one is left as it is.
 - **Mark-paid** commits every reservation that is on hand (a `sale` movement each, `reference` = the order number, the admin as actor); a backordered line is committed up to what is on hand and the rest is held 365 days until `mark-fulfilled`. The amount is judged by core money validation first (`400` for a float, a negative, a too big amount or an unknown currency) and against the order afterwards (`409 amount_mismatch`).
 - **Mark-fulfilled** commits the reservations still active (backordered lines) or answers `awaiting_stock` with everything rolled back.
 - Every change writes one journal row (`from`, `to`, `actor_type = admin`, `actor_admin_id`, `reason`) and one outbox event (`order.cancelled`, `order.paid`, `order.fulfilled`; ids and the order number only). A refused action writes nothing.

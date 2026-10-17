@@ -20,8 +20,12 @@ export const ORDER_ACTORS = Object.freeze(["customer", "guest", "admin", "system
 
 export type OrderActor = (typeof ORDER_ACTORS)[number];
 
-/** What a transition does to the stock reservations of the order's lines. */
-export type StockEffect = "reserve" | "commit" | "release" | "none";
+/**
+ * What a transition does to the stock reservations of the order's lines. `release_unsold` (ADR 0022) is the
+ * cancellation of a paid order: reservations that are still `active` (the held remainder of a backordered line) are
+ * released, `committed` ones are sold units and stay sold (no restock, no `return` movement).
+ */
+export type StockEffect = "reserve" | "commit" | "release" | "release_unsold";
 
 export interface TransitionRule {
   /** `null` is the creation of the order (checkout). */
@@ -42,7 +46,8 @@ function rule(
 
 /**
  * Every allowed transition. `system` is the scheduler (expiry) and, later, a payment or shipping plugin acting through a
- * port. A paid order is cancelled by an admin only and its sold units stay sold (no automatic restock).
+ * port. A paid order is cancelled by an admin only; its sold units stay sold (no automatic restock) but the unsold,
+ * still reserved remainder of a backordered line is released (ADR 0022).
  * Everything not listed is refused, and `fulfilled`, `cancelled` and `expired` have no way out.
  */
 export const ORDER_TRANSITIONS: readonly TransitionRule[] = Object.freeze([
@@ -51,7 +56,7 @@ export const ORDER_TRANSITIONS: readonly TransitionRule[] = Object.freeze([
   rule("awaiting_payment", "cancelled", ["customer", "guest", "admin"], "release"),
   rule("awaiting_payment", "expired", ["system"], "release"),
   rule("paid", "fulfilled", ["admin", "system"], "commit"),
-  rule("paid", "cancelled", ["admin"], "none"),
+  rule("paid", "cancelled", ["admin"], "release_unsold"),
 ]);
 
 export type TransitionRefusal = "invalid_transition" | "not_allowed_for_actor";
