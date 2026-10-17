@@ -52,8 +52,15 @@ export async function ensureMigrated(): Promise<void> {
         `drop table if exists "public".${client.escapeIdentifier(row.tablename)} cascade`,
       );
     }
-    // Dropping a table does not drop the trigger function of migration 0003; leaving it would make the migration fail.
-    await client.query('drop function if exists "public"."stock_movement_append_only"()');
+    // Dropping a table does not drop the trigger functions of migrations 0003 and 0004; leaving one would make the migration fail.
+    for (const name of [
+      "stock_movement_append_only",
+      "order_item_immutable",
+      "order_adjustment_append_only",
+      "order_status_change_append_only",
+    ]) {
+      await client.query(`drop function if exists "public".${client.escapeIdentifier(name)}()`);
+    }
     await migrate(drizzle(pool), { migrationsFolder });
   } finally {
     await client.query("select pg_advisory_unlock($1)", [SCHEMA_LOCK_KEY]);

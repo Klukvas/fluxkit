@@ -40,6 +40,16 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "domain_event",
+      "order_item_reservation",
+      "order_status_change",
+      "order_adjustment",
+      "order_item",
+      "sales_order",
+      "cart_item",
+      "cart",
+      "customer_session",
+      "customer",
       "reservation",
       "stock_movement",
       "inventory_level",
@@ -67,6 +77,9 @@ describe("catalog schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop function if exists "order_status_change_append_only"()');
+    await pool.query('drop function if exists "order_adjustment_append_only"()');
+    await pool.query('drop function if exists "order_item_immutable"()');
     await pool.query('drop function if exists "stock_movement_append_only"()');
   }
 
@@ -1407,7 +1420,9 @@ describe("catalog schema (real Postgres)", () => {
         join pg_namespace n on n.oid = c.connamespace
         where n.nspname = 'public' and c.contype <> 'n' and t.relname not in (
           'health_check', 'admin_user', 'admin_session',
-          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
+          'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1426,7 +1441,9 @@ describe("catalog schema (real Postgres)", () => {
         join pg_namespace n on n.oid = t.relnamespace
         where n.nspname = 'public' and t.relname not in (
           'health_check', 'admin_user', 'admin_session',
-          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
+          'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.

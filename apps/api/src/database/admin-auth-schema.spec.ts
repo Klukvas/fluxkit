@@ -41,6 +41,16 @@ describe("admin auth schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "domain_event",
+      "order_item_reservation",
+      "order_status_change",
+      "order_adjustment",
+      "order_item",
+      "sales_order",
+      "cart_item",
+      "cart",
+      "customer_session",
+      "customer",
       "reservation",
       "stock_movement",
       "inventory_level",
@@ -68,6 +78,9 @@ describe("admin auth schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop function if exists "order_status_change_append_only"()');
+    await pool.query('drop function if exists "order_adjustment_append_only"()');
+    await pool.query('drop function if exists "order_item_immutable"()');
     await pool.query('drop function if exists "stock_movement_append_only"()');
   }
 

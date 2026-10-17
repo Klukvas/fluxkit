@@ -125,10 +125,15 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `schema/catalog.ts` - the 16 catalog tables (ADR 0006 section 2) with constraints and indexes.
 - `schema/admin-auth.ts` - `admin_user` and `admin_session` tables (admin login; sessions store only a SHA-256 token hash, no IP address or user agent).
 - `schema/pricing-inventory.ts` - `price`, `location`, `inventory_level`, `stock_movement` and `reservation` tables (ADR 0011, ADR 0012); limits mirror `packages/core`. The append-only trigger and the `main` location row are in the migration, not here.
+- `schema/customers.ts` - `customer` (normalized unique email, scrypt hash, lockout fields) and `customer_session` (SHA-256 token hash only; ADR 0016). No link to `admin_user`.
+- `schema/carts.ts` - `cart` (exactly one owner: token hash or customer) and `cart_item` (one line per cart and variant, seen price for the "price changed" notice; ADR 0015).
+- `schema/orders.ts` - `sales_order`, `order_item` (immutable snapshot), `order_adjustment`, `order_status_change` and `order_item_reservation` (ADR 0017, ADR 0019); limits mirror `packages/core`. The three triggers are in the migration, not here.
+- `schema/domain-events.ts` - `domain_event`, the transactional outbox (ADR 0018); no foreign key on the aggregate.
 - `catalog-schema.spec.ts` - constraint tests on real Postgres (inside rolled-back transactions).
 - `admin-auth-schema.spec.ts` - constraint, cascade and name tests for the admin auth tables.
 - `pricing-inventory-schema.spec.ts` - CHECK boundaries, uniqueness, cascades, RESTRICT, the default location and the `stock_movement` trigger (rejections and the two documented exceptions) on real Postgres.
-- `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database; refuses other database names.
+- `cart-orders-schema.spec.ts` - CHECK boundaries tied to the `@fluxkit/core` constants, uniqueness, foreign key actions (customer, admin user, product, variant, reservation, location, order), the three triggers (direct rejections, depth-2 exceptions through a helper trigger) and the outbox index on real Postgres.
+- `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database (0000 to 0004), the down script of 0004 refusing a dependent object, and an upgrade from a database holding 0003 data; refuses other database names.
 - `migrate.ts` - entry of `pnpm db:migrate` (built output run by Node); prints the result, exit code 1 on any error.
 - `migrate-command.ts` - `runMigrateCommand`: applies the pending migrations of `drizzle/` with the Drizzle migrator under a session-level advisory lock (`MIGRATION_LOCK_KEY`), refuses a database that is ahead of the journal, redacts connection strings and passwords from errors. Forward only: must never roll back, drop or delete. The folder is resolved from the file location, not the working directory.
 - `migrate-command.spec.ts` - the command on scratch `*_test` databases: fresh, repeat, incremental, ahead refusal, advisory lock, concurrency, failing migration, redaction.
@@ -140,6 +145,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `0001_catalog.sql` and `0001_catalog.down.sql` - the 16 catalog tables; the down script drops them in reverse order and removes the migration's bookkeeping row.
 - `0002_admin_auth.sql` and `0002_admin_auth.down.sql` - `admin_user` and `admin_session`; the down script drops them (sessions first) and removes the bookkeeping row.
 - `0003_pricing_inventory.sql` and `0003_pricing_inventory.down.sql` - price and inventory tables, the `variant` stock flags, the `stock_movement_append_only` trigger function and trigger (hand-written tail of the generated file) and the default `main` location; the down script drops tables in reverse order, then the function and the variant columns, and removes the bookkeeping row.
+- `0004_cart_customers_orders.sql` and `0004_cart_customers_orders.down.sql` - customer, cart, order and outbox tables and the three trigger functions and triggers (`order_item_immutable`, `order_adjustment_append_only`, `order_status_change_append_only`; hand-written tail of the generated file); the down script drops tables in reverse order, then the functions, and removes the bookkeeping row. It never touches 0003 data.
 - `meta/_journal.json`, `meta/*_snapshot.json` - drizzle-kit bookkeeping; generated, never edited by hand.
 - `drizzle.config.ts` (in `apps/api/`) - drizzle-kit config; schema from `src/database/schema/index.ts`. `pnpm --filter @fluxkit/api db:generate` creates a migration; `db:drift` checks that the schema and migrations agree.
 
