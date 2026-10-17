@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lte, sql } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
 import { price, product, reservation, variant } from "../../database/schema/index.js";
 
@@ -11,6 +11,7 @@ export type NewReservation = Pick<
 
 export interface ReservableVariantRow {
   id: string;
+  productId: string;
   isActive: boolean;
   trackInventory: boolean;
   allowBackorder: boolean;
@@ -32,18 +33,50 @@ export type DueReservation = DueCursor;
 @Injectable()
 export class ReservationsRepository {
   /**
-   * The variant with its product status and whether it has a price in `shopCurrency`, the variant row locked `FOR SHARE` until the transaction ends: a flag or
-   * activity change (which updates the variant row) waits for the reservation in progress instead of slipping in
-   * between the read and the write, and deleting the variant waits too.
+   * The product id of each variant, read WITHOUT a lock, so the caller knows which product rows to lock first. A
+   * variant that does not exist is missing from the map. Keys are the ids as the database prints them (lower case).
    */
-  async findVariantForReservation(
+  async findProductIdsOfVariants(
     db: DbExecutor,
-    variantId: string,
+    variantIds: readonly string[],
+  ): Promise<Map<string, string>> {
+    const rows = await db
+      .select({ id: variant.id, productId: variant.productId })
+      .from(variant)
+      .where(inArray(variant.id, [...variantIds]));
+    return new Map(rows.map((row) => [row.id, row.productId]));
+  }
+
+  /**
+   * Locks the product rows `FOR SHARE`, in id order, until the transaction ends: publishing, unpublishing, price
+   * writes, variant edits and variant deletes all take the product row (`FOR UPDATE`), so they either finish before
+   * the reservation reads the sellable facts or wait until it ends. Taking the rows in id order is part of the lock
+   * order (checkout: cart -> products -> variants -> levels); a caller that already holds them is not blocked.
+   */
+  async lockProductsShared(db: DbExecutor, productIds: readonly string[]): Promise<void> {
+    await db
+      .select({ id: product.id })
+      .from(product)
+      .where(inArray(product.id, [...productIds]))
+      .orderBy(asc(product.id))
+      .for("share");
+  }
+
+  /**
+   * The variants with their product status and whether each has a price in `shopCurrency`, the variant rows locked
+   * `FOR SHARE` in id order until the transaction ends: a flag or activity change (which updates the variant row)
+   * waits for the reservation in progress instead of slipping in between the read and the write, and deleting the
+   * variant waits too. A variant that does not exist is missing from the result.
+   */
+  async findVariantsForReservation(
+    db: DbExecutor,
+    variantIds: readonly string[],
     shopCurrency: string,
-  ): Promise<ReservableVariantRow | undefined> {
-    const [row] = await db
+  ): Promise<ReservableVariantRow[]> {
+    return db
       .select({
         id: variant.id,
+        productId: variant.productId,
         isActive: variant.isActive,
         trackInventory: variant.trackInventory,
         allowBackorder: variant.allowBackorder,
@@ -55,9 +88,9 @@ export class ReservationsRepository {
       })
       .from(variant)
       .innerJoin(product, eq(product.id, variant.productId))
-      .where(eq(variant.id, variantId))
+      .where(inArray(variant.id, [...variantIds]))
+      .orderBy(asc(variant.id))
       .for("share", { of: variant });
-    return row;
   }
 
   async insert(db: DbExecutor, values: NewReservation): Promise<ReservationRow> {
@@ -80,6 +113,19 @@ export class ReservationsRepository {
   /** The reservation row locked until the transaction ends; always taken after the level row lock. */
   async lock(db: DbExecutor, id: string): Promise<ReservationRow | undefined> {
     const [row] = await db.select().from(reservation).where(eq(reservation.id, id)).for("update");
+    return row;
+  }
+
+  /** Only the expiry changes; the caller holds the level and reservation locks and has asked `decideExtend`. */
+  async setExpiresAt(db: DbExecutor, id: string, expiresAt: Date): Promise<ReservationRow> {
+    const [row] = await db
+      .update(reservation)
+      .set({ expiresAt })
+      .where(eq(reservation.id, id))
+      .returning();
+    if (row === undefined) {
+      throw new Error("An updated reservation was not returned.");
+    }
     return row;
   }
 
