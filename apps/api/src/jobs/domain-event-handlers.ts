@@ -33,7 +33,9 @@ function isHandler(value: unknown): value is DomainEventHandler {
  * fails the startup loudly instead of being skipped. Discovery order is the delivery order within one event.
  */
 @Injectable()
-export class DomainEventHandlerRegistry implements OnApplicationBootstrap, DomainEventHandlerSource {
+export class DomainEventHandlerRegistry
+  implements OnApplicationBootstrap, DomainEventHandlerSource
+{
   private byType = new Map<string, RegisteredHandler[]>();
 
   constructor(@Inject(DiscoveryService) private readonly discovery: DiscoveryService) {}

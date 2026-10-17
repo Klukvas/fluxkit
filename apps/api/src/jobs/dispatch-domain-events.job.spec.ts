@@ -74,7 +74,9 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
 
   beforeAll(async () => {
     await ensureMigrated();
-    running = await startApp({ extraFeatures: [{ name: "fixture", module: EventHandlerFixtureModule }] });
+    running = await startApp({
+      extraFeatures: [{ name: "fixture", module: EventHandlerFixtureModule }],
+    });
     deps = {
       database: running.app.get<Database>(DRIZZLE),
       repository: running.app.get(JobsRepository),
@@ -102,7 +104,9 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
         "FixtureHandlerA",
         "FixtureHandlerB",
       ]);
-      expect(registry.handlersFor("order.paid").map((entry) => entry.name)).toEqual(["FixtureHandlerA"]);
+      expect(registry.handlersFor("order.paid").map((entry) => entry.name)).toEqual([
+        "FixtureHandlerA",
+      ]);
       expect(registry.handlersFor("order.cancelled")).toEqual([]);
       expect(registry.names().sort()).toEqual(["FixtureHandlerA", "FixtureHandlerB"]);
     });
@@ -189,7 +193,9 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
 
     it("refuses nonsensical options", async () => {
       await expect(dispatchDomainEvents(deps, at(1), { batchSize: 0 })).rejects.toThrow(RangeError);
-      await expect(dispatchDomainEvents(deps, at(1), { maxBatches: 0 })).rejects.toThrow(RangeError);
+      await expect(dispatchDomainEvents(deps, at(1), { maxBatches: 0 })).rejects.toThrow(
+        RangeError,
+      );
       await expect(dispatchDomainEvents(deps, at(1), { handlerTimeoutMs: 0 })).rejects.toThrow(
         RangeError,
       );
@@ -209,7 +215,12 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       expect(result).toMatchObject({ scanned: 1, dispatched: 0, failed: 1, abandoned: [] });
       expect(result.failures).toEqual([
         { eventId: id, type: "order.expired", handler: "FixtureHandlerA", code: "TypeError" },
-        { eventId: id, type: "order.expired", handler: "FixtureHandlerB", code: "Error:ECONNRESET" },
+        {
+          eventId: id,
+          type: "order.expired",
+          handler: "FixtureHandlerB",
+          code: "Error:ECONNRESET",
+        },
       ]);
       expect(JSON.stringify(result)).not.toContain("buyer@example.test");
       const [row] = await rows([id]);
@@ -245,9 +256,9 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       async (attempts) => {
         const id = await insertEvent({ attempts, type: "order.cancelled" });
         const eligibleAt = new Date(T0.getTime() + (2 ** attempts - 1) * BACKOFF_UNIT_MS);
-        expect(
-          await dispatchDomainEvents(deps, new Date(eligibleAt.getTime() - 1)),
-        ).toMatchObject({ scanned: 0 });
+        expect(await dispatchDomainEvents(deps, new Date(eligibleAt.getTime() - 1))).toMatchObject({
+          scanned: 0,
+        });
         expect(await dispatchDomainEvents(deps, eligibleAt)).toMatchObject({
           scanned: 1,
           dispatched: 1,
@@ -262,7 +273,10 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
         throw new Error("down");
       };
       const result = await dispatchDomainEvents(deps, at(24 * 60));
-      expect(result).toMatchObject({ failed: 1, abandoned: [{ eventId: id, type: "order.expired" }] });
+      expect(result).toMatchObject({
+        failed: 1,
+        abandoned: [{ eventId: id, type: "order.expired" }],
+      });
       expect((await rows([id]))[0]).toMatchObject({ attempts: 10, dispatched_at: null });
 
       handlerA.calls.length = 0;
@@ -355,9 +369,9 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       expect(first.dispatched + second.dispatched).toBe(4);
       const delivered = handlerA.calls.map((call) => call.id).sort();
       expect(delivered).toEqual([...ids].sort());
-      expect((await rows(ids)).every((row) => row.dispatched_at !== null && row.attempts === 0)).toBe(
-        true,
-      );
+      expect(
+        (await rows(ids)).every((row) => row.dispatched_at !== null && row.attempts === 0),
+      ).toBe(true);
     });
   });
 });

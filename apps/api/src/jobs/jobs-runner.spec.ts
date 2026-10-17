@@ -104,7 +104,9 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     // The order reservations outlive the order by the grace period: nothing of the order is touched before its expiry.
     await runner.runAll(new Date(row.expires_at.getTime() - 1));
     expect((await orderRow(pool, order.number)).status).toBe("awaiting_payment");
-    expect((await reservationsOfOrder(pool, order.id)).map((held) => held.status)).toEqual(["active"]);
+    expect((await reservationsOfOrder(pool, order.id)).map((held) => held.status)).toEqual([
+      "active",
+    ]);
     // The orphan was swept (its own expiry has passed), the order's hold was not.
     expect(await levelOf(pool, orphanVariant, mainId)).toEqual({ on_hand: 9, reserved: 0 });
 
@@ -113,16 +115,22 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     const reports = await runner.runAll(stale);
     expect(reports.every((report) => report.ok)).toBe(true);
     expect((await orderRow(pool, order.number)).status).toBe("expired");
-    expect((await reservationsOfOrder(pool, order.id)).map((held) => held.status)).toEqual(["released"]);
+    expect((await reservationsOfOrder(pool, order.id)).map((held) => held.status)).toEqual([
+      "released",
+    ]);
     expect((await eventsOf(pool, order.id)).map((event) => event.type)).toEqual([
       "order.placed",
       "order.expired",
     ]);
     // Outbox rows are stamped by the database clock (the real time), so a tick at a faked 2025 does not see them yet; a
     // tick at the real time dispatches them (no handler is registered: they are simply marked dispatched).
-    expect((await eventsOf(pool, order.id)).every((event) => event.dispatched_at === null)).toBe(true);
+    expect((await eventsOf(pool, order.id)).every((event) => event.dispatched_at === null)).toBe(
+      true,
+    );
     await runner.runAll(new Date());
-    expect((await eventsOf(pool, order.id)).every((event) => event.dispatched_at !== null)).toBe(true);
+    expect((await eventsOf(pool, order.id)).every((event) => event.dispatched_at !== null)).toBe(
+      true,
+    );
   });
 
   it("a job that throws is logged by class and cause only and does not stop the others", async () => {
@@ -153,12 +161,16 @@ describe("JobsRunner (real Postgres, injected time)", () => {
       reference: "orphan",
     });
     if (!held.ok) throw new Error("Test setup: reserve refused");
-    await pool.query("update inventory_level set reserved = 0 where variant_id = $1", [brokenVariant]);
+    await pool.query("update inventory_level set reserved = 0 where variant_id = $1", [
+      brokenVariant,
+    ]);
 
     const reports = await runner.runAll(new Date(row.expires_at.getTime() + 11 * MINUTE));
     expect(reports.every((report) => report.ok)).toBe(true);
     const logged = lines(errors).join("\n");
-    expect(logged).toContain(`Job expire-orders: {"orderNumber":"${order.number}","error":"RangeError cause=RangeError"}`);
+    expect(logged).toContain(
+      `Job expire-orders: {"orderNumber":"${order.number}","error":"RangeError cause=RangeError"}`,
+    );
     expect(logged).toContain(
       `Job sweep-reservations: {"reservationId":"${held.reservation.id}","reason":"level_inconsistent"}`,
     );

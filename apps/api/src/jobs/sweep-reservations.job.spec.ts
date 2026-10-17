@@ -25,7 +25,12 @@ describe("sweepReservations (real Postgres, injected time)", () => {
   }
 
   async function hold(variantId: string, quantity: number, expiresAt: Date): Promise<string> {
-    const result = await reservations.reserve({ variantId, quantity, expiresAt, reference: "orphan" });
+    const result = await reservations.reserve({
+      variantId,
+      quantity,
+      expiresAt,
+      reference: "orphan",
+    });
     if (!result.ok) {
       throw new Error(`Test setup: reserve refused: ${result.reason}`);
     }
@@ -73,7 +78,9 @@ describe("sweepReservations (real Postgres, injected time)", () => {
     const variantId = await variant();
     const expiresAt = new Date(START.getTime() + 5 * MINUTE);
     const id = await hold(variantId, 3, expiresAt);
-    expect(await sweepReservations({ reservations }, new Date(expiresAt.getTime() - 1))).toMatchObject({
+    expect(
+      await sweepReservations({ reservations }, new Date(expiresAt.getTime() - 1)),
+    ).toMatchObject({
       scanned: 0,
     });
     expect(await levelOf(pool, variantId, mainId)).toEqual({ on_hand: 20, reserved: 3 });

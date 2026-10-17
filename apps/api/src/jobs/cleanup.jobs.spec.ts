@@ -213,11 +213,15 @@ describe("cart, customer session and dispatched event cleanup (real Postgres, in
       for (let index = 0; index < 3; index += 1) {
         await insertSession(new Date(NOW.getTime() - (index + 1) * MINUTE));
       }
-      expect(await deleteExpiredCustomerSessions(deps, NOW, { batchSize: 2, maxBatches: 1 })).toEqual({
+      expect(
+        await deleteExpiredCustomerSessions(deps, NOW, { batchSize: 2, maxBatches: 1 }),
+      ).toEqual({
         deleted: 2,
         truncated: true,
       });
-      expect(await deleteExpiredCustomerSessions(deps, NOW, { batchSize: 2, maxBatches: 1 })).toEqual({
+      expect(
+        await deleteExpiredCustomerSessions(deps, NOW, { batchSize: 2, maxBatches: 1 }),
+      ).toEqual({
         deleted: 1,
         truncated: false,
       });
@@ -236,7 +240,9 @@ describe("cart, customer session and dispatched event cleanup (real Postgres, in
 
     it("never deletes an undispatched event, however old", async () => {
       const waiting = await insertEvent(null);
-      expect(await deleteDispatchedEvents(deps, new Date(NOW.getTime() + 3650 * DAY))).toMatchObject({
+      expect(
+        await deleteDispatchedEvents(deps, new Date(NOW.getTime() + 3650 * DAY)),
+      ).toMatchObject({
         deleted: 0,
       });
       expect(await surviving("domain_event", [waiting])).toEqual([waiting]);

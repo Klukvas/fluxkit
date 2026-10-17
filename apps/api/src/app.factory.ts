@@ -99,8 +99,7 @@ export async function createApp(
       // An environment-less caller (tests, the OpenAPI export) gets no timer; the API passes `SCHEDULER_ENABLED`.
       scheduler: {
         enabled: env.schedulerEnabled ?? DISABLED_SCHEDULER_CONFIG.enabled,
-        intervalSeconds:
-          env.schedulerIntervalSeconds ?? DISABLED_SCHEDULER_CONFIG.intervalSeconds,
+        intervalSeconds: env.schedulerIntervalSeconds ?? DISABLED_SCHEDULER_CONFIG.intervalSeconds,
       },
       rateLimits: options.rateLimits,
       adminAuthenticator: options.adminAuthenticator,

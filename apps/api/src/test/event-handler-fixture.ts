@@ -28,7 +28,10 @@ abstract class RecordingHandler implements DomainEventHandler {
 }
 
 @Injectable()
-@SetMetadata(DOMAIN_EVENT_HANDLER_METADATA, domainEventHandlerMetadata(["order.expired", "order.paid"]))
+@SetMetadata(
+  DOMAIN_EVENT_HANDLER_METADATA,
+  domainEventHandlerMetadata(["order.expired", "order.paid"]),
+)
 export class FixtureHandlerA extends RecordingHandler {}
 
 @Injectable()
@@ -40,7 +43,10 @@ export class FixtureHandlerB extends RecordingHandler {}
 @SetMetadata(DOMAIN_EVENT_HANDLER_METADATA, domainEventHandlerMetadata(["order.placed"]))
 export class BrokenFixtureHandler {}
 
-@Module({ providers: [FixtureHandlerA, FixtureHandlerB], exports: [FixtureHandlerA, FixtureHandlerB] })
+@Module({
+  providers: [FixtureHandlerA, FixtureHandlerB],
+  exports: [FixtureHandlerA, FixtureHandlerB],
+})
 export class EventHandlerFixtureModule {}
 
 @Module({ providers: [BrokenFixtureHandler] })

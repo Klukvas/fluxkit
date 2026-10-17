@@ -31,10 +31,7 @@ export interface DispatchEventsResult {
 
 export interface DispatchEventsDeps {
   database: Database;
-  repository: Pick<
-    JobsRepository,
-    "lockDueEvents" | "markEventDispatched" | "recordEventFailure"
-  >;
+  repository: Pick<JobsRepository, "lockDueEvents" | "markEventDispatched" | "recordEventFailure">;
   handlers: DomainEventHandlerSource;
 }
 

@@ -67,9 +67,7 @@ export function formatRunOnce(outcome: RunOnceOutcome): string {
   }
   return outcome.reports
     .map((report) =>
-      report.ok
-        ? `${report.name}: ${describeAllCounts(report.result)}`
-        : `${report.name}: FAILED`,
+      report.ok ? `${report.name}: ${describeAllCounts(report.result)}` : `${report.name}: FAILED`,
     )
     .join("\n");
 }
@@ -88,7 +86,5 @@ export function exitCodeOf(outcome: RunOnceOutcome): number {
   if (outcome.kind === "lock_held") {
     return RUN_ONCE_EXIT.lockHeld;
   }
-  return outcome.reports.some((report) => !report.ok)
-    ? RUN_ONCE_EXIT.jobFailed
-    : RUN_ONCE_EXIT.ok;
+  return outcome.reports.some((report) => !report.ok) ? RUN_ONCE_EXIT.jobFailed : RUN_ONCE_EXIT.ok;
 }

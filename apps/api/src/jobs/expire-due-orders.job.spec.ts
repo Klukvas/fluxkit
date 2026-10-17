@@ -198,7 +198,9 @@ describe("expireDueOrders (real Postgres, injected time)", () => {
       batchSize: 1,
     });
     expect(result).toMatchObject({ scanned: 3, expired: 2, notDue: 0, truncated: false });
-    expect(result.failures).toEqual([{ orderNumber: broken.number, error: "TypeError cause=TypeError" }]);
+    expect(result.failures).toEqual([
+      { orderNumber: broken.number, error: "TypeError cause=TypeError" },
+    ]);
     expect(JSON.stringify(result)).not.toContain("buyer@example.test");
     expect((await orderRow(pool, first.number)).status).toBe("expired");
     expect((await orderRow(pool, broken.number)).status).toBe("awaiting_payment");

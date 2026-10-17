@@ -25,8 +25,7 @@ export const JOB_NAMES = [
 export type JobName = (typeof JOB_NAMES)[number];
 
 export type JobReport =
-  | { name: JobName; ok: true; result: object }
-  | { name: JobName; ok: false; error: unknown };
+  { name: JobName; ok: true; result: object } | { name: JobName; ok: false; error: unknown };
 
 /**
  * Runs the scheduler jobs for one instant. Transport-agnostic: the timer (`SchedulerService`) and the command line

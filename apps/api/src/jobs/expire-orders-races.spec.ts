@@ -4,10 +4,7 @@ import { DRIZZLE, type Database } from "../database/database.module.js";
 import { OrdersService } from "../orders/orders.service.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { CartCatalog } from "../test/cart-fixtures.js";
-import {
-  createTestCustomer,
-  type TestCustomer,
-} from "../test/customer-fixtures.js";
+import { createTestCustomer, type TestCustomer } from "../test/customer-fixtures.js";
 import { customerCookieOf, customerLogin } from "../test/customer-http.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { FakeClock } from "../test/fake-clock.js";
@@ -44,7 +41,9 @@ describe("order expiry against payment and cancellation: the order row lock pick
   let customerShopper: Shopper;
 
   const terminalEvents = async (orderId: string) =>
-    (await eventsOf(pool, orderId)).map((event) => event.type).filter((type) => type !== "order.placed");
+    (await eventsOf(pool, orderId))
+      .map((event) => event.type)
+      .filter((type) => type !== "order.placed");
 
   /** Stock and records of an order that lost or won; the same invariants for every race. */
   async function expectConsistent(order: MadeOrder, winner: "paid" | "cancelled" | "expired") {
@@ -59,9 +58,9 @@ describe("order expiry against payment and cancellation: the order row lock pick
       expect(now.on_hand).toBe(winner === "paid" ? 50 - line.quantity : 50);
       expect(await movementsOf(pool, line.variantId)).toHaveLength(winner === "paid" ? 1 : 0);
     }
-    expect(held.every((entry) => entry.status === (winner === "paid" ? "committed" : "released"))).toBe(
-      true,
-    );
+    expect(
+      held.every((entry) => entry.status === (winner === "paid" ? "committed" : "released")),
+    ).toBe(true);
   }
 
   /**
