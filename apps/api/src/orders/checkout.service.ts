@@ -5,6 +5,7 @@ import {
   compareMoney,
   computeOrderTotals,
   formatOrderNumber,
+  ORDER_NUMBER_BYTES,
   guestAccessExpiresAt,
   orderExpiresAt,
   reservationExpiresAt,
@@ -383,10 +384,15 @@ export class CheckoutService {
     });
   }
 
+  /** The 40 random bits of the next order number. Public only as a seam: a spec forces collisions through it. */
+  nextOrderNumberBytes(): Uint8Array {
+    return randomBytes(ORDER_NUMBER_BYTES);
+  }
+
   /** Inserts the order with a fresh random number; a collision of the 40-bit number retries, at most 5 times. */
   private async insertOrder(tx: Transaction, values: Omit<NewOrder, "number">): Promise<OrderRow> {
-    for (let attempt = 1; ; attempt += 1) {
-      const number = formatOrderNumber(randomBytes(5));
+    for (let attempt = 1; attempt <= ORDER_NUMBER_ATTEMPTS; attempt += 1) {
+      const number = formatOrderNumber(this.nextOrderNumberBytes());
       try {
         // A savepoint, so a collision does not abort the transaction that holds the cart and catalog locks.
         return await tx.transaction((savepoint) =>
@@ -396,13 +402,13 @@ export class CheckoutService {
         if (!isUniqueViolation(error, ORDER_NUMBER_KEY)) {
           throw error;
         }
-        if (attempt >= ORDER_NUMBER_ATTEMPTS) {
-          throw new Error(
-            `No free order number after ${String(ORDER_NUMBER_ATTEMPTS)} attempts; the number space is damaged or exhausted.`,
-            { cause: error },
-          );
-        }
+        // A collision of the 40-bit number: draw another one.
       }
     }
+    // Thrown outside the catch on purpose: the unique violation must not travel along as a cause, or the problem filter
+    // would answer it as a 409 conflict instead of the loud 500 this is.
+    throw new Error(
+      `No free order number after ${String(ORDER_NUMBER_ATTEMPTS)} attempts; the number space is damaged or exhausted.`,
+    );
   }
 }

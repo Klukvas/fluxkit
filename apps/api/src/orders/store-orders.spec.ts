@@ -381,7 +381,10 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
       const limited = await startApp({
         adminAuthenticator: "production-default",
         clock,
-        rateLimits: { orderLookup: { maxAttempts: 2, windowMinutes: 10 } },
+        rateLimits: {
+          orderLookup: { maxAttempts: 2, windowMinutes: 10 },
+          guestCancel: { maxAttempts: 2, windowMinutes: 10 },
+        },
       });
       try {
         const who = new Shopper(limited.baseUrl);
@@ -390,8 +393,12 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
         const blocked = await lookup(who, "ZZZZ-ZZZZ", "t");
         expect(blocked.status).toBe(429);
         expect(blocked.headers.get("retry-after")).toMatch(/^\d+$/);
-        // The cancel limit is its own window.
+        // The cancel limit is its own window with its own count.
         expect((await cancel(who, "ZZZZ-ZZZZ", "t")).status).toBe(404);
+        expect((await cancel(who, "ZZZZ-ZZZZ", "t")).status).toBe(404);
+        const cancelBlocked = await cancel(who, "ZZZZ-ZZZZ", "t");
+        expect(cancelBlocked.status).toBe(429);
+        expect(cancelBlocked.headers.get("retry-after")).toMatch(/^\d+$/);
       } finally {
         await limited.app.close();
       }
@@ -667,6 +674,16 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
       const refused = await browser.post(`/store/account/orders/${paidOne.number}/cancel`);
       expect(refused.status).toBe(409);
       expect((await orderRow(pool, paidOne.number)).status).toBe("paid");
+    });
+
+    it("the cancel of a customer needs the CSRF header like every store write", async () => {
+      const { browser } = await newCustomer();
+      const mine = await customerOrder(browser, 1);
+      const result = await browser.request("POST", `/store/account/orders/${mine.number}/cancel`, {
+        csrf: false,
+      });
+      expect(result.status).toBe(403);
+      expect((await orderRow(pool, mine.number)).status).toBe("awaiting_payment");
     });
 
     it("every route answers 401 without a customer session, also with other cookies", async () => {

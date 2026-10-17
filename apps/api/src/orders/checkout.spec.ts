@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import pg from "pg";
+import { Logger } from "@nestjs/common";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { customer as customerTable } from "../database/schema/index.js";
@@ -29,6 +30,8 @@ import {
 } from "../test/order-http.js";
 import { PlacedOrders } from "../test/order-fixtures.js";
 import { Shopper, setCookieOf } from "../test/shopper.js";
+import { CheckoutService } from "./checkout.service.js";
+import { OrdersRepository } from "./orders.repository.js";
 
 const START = new Date("2034-03-01T08:00:00.000Z");
 const MINUTE = 60_000;
@@ -55,6 +58,14 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
   /** A physical, tracked variant with stock. */
   const stocked = (onHand = 5, price = 2_500, extra: Record<string, unknown> = {}) =>
     catalog.simple({ trackInventory: true, onHand, price, ...extra });
+
+  const levelOfVariant = async (variantId: string) =>
+    (
+      await pool.query<{ on_hand: number; reserved: number }>(
+        "select on_hand, reserved from inventory_level where variant_id = $1",
+        [variantId],
+      )
+    ).rows[0];
 
   async function place(
     who: Shopper,
@@ -746,6 +757,120 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
       });
       expect(lookup.status).toBe(200);
       expect(lookup.body).toEqual(result.body.order);
+    });
+  });
+
+  describe("retries", () => {
+    const FIXED_BYTES = Uint8Array.from([1, 2, 3, 4, 5]);
+    const OTHER_BYTES = Uint8Array.from([9, 8, 7, 6, 5]);
+
+    it("a collision of the order number retries with a new number (at most 5 attempts) without losing the cart locks", async () => {
+      const service = running.app.get(CheckoutService);
+      const spy = vi.spyOn(service, "nextOrderNumberBytes");
+      try {
+        const { variantId } = await stocked(10, 1_000);
+        const first = new Shopper(running.baseUrl);
+        await add(first, variantId, 1);
+        spy.mockReturnValue(FIXED_BYTES);
+        const one = await place(first, 1_000);
+        expect(one.status, JSON.stringify(one.body)).toBe(201);
+        const taken = one.body.order?.number ?? "";
+
+        // The next order draws the taken number twice, then a free one: it still succeeds, with the third number.
+        const second = new Shopper(running.baseUrl);
+        await add(second, variantId, 1);
+        spy.mockReset();
+        spy
+          .mockReturnValueOnce(FIXED_BYTES)
+          .mockReturnValueOnce(FIXED_BYTES)
+          .mockReturnValue(OTHER_BYTES);
+        const two = await place(second, 1_000);
+        expect(two.status, JSON.stringify(two.body)).toBe(201);
+        expect(two.body.order?.number).not.toBe(taken);
+        expect(spy).toHaveBeenCalledTimes(3);
+        expect(await levelOfVariant(variantId)).toEqual({ on_hand: 10, reserved: 2 });
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    it("five collisions in a row fail loudly (500), and leave no order, no hold and the cart intact", async () => {
+      const service = running.app.get(CheckoutService);
+      const spy = vi.spyOn(service, "nextOrderNumberBytes");
+      try {
+        const { variantId } = await stocked(10, 1_000);
+        const taken = new Shopper(running.baseUrl);
+        await add(taken, variantId, 1);
+        spy.mockReturnValue(FIXED_BYTES);
+        expect((await place(taken, 1_000)).status).toBe(201);
+
+        const who = new Shopper(running.baseUrl);
+        await add(who, variantId, 1);
+        const before = await orderTableCounts(pool, [variantId]);
+        spy.mockClear();
+        const failed = await checkoutAs(who, checkoutBody(1_000));
+        expect(failed.status).toBe(500);
+        expect(failed.body).toMatchObject({ code: "internal_error" });
+        expect(spy).toHaveBeenCalledTimes(5);
+        expect(await orderTableCounts(pool, [variantId])).toEqual(before);
+        expect((await cartOf(who)).lines).toHaveLength(1);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+
+    function deadlock(): Error {
+      const error = new pg.DatabaseError("deadlock detected buyer@example.test", 0, "error");
+      error.code = "40P01";
+      return error;
+    }
+
+    it("a deadlock is retried once and the checkout then succeeds; the retry is logged without personal data", async () => {
+      const repository = running.app.get(OrdersRepository);
+      const original = repository.insertOrder.bind(repository);
+      const warnings: string[] = [];
+      const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation((message: unknown) => {
+        warnings.push(String(message));
+      });
+      const spy = vi
+        .spyOn(repository, "insertOrder")
+        .mockImplementationOnce(() => Promise.reject(deadlock()))
+        .mockImplementation(original);
+      try {
+        const { variantId } = await stocked(5, 1_000);
+        await add(shopper, variantId, 2);
+        const result = await place(shopper, 2_000);
+        expect(result.status, JSON.stringify(result.body)).toBe(201);
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(warnings.some((message) => message.includes("Deadlock"))).toBe(true);
+        expect(warnings.join("")).not.toContain("buyer@example.test");
+        expect(await levelOfVariant(variantId)).toEqual({ on_hand: 5, reserved: 2 });
+      } finally {
+        spy.mockRestore();
+        warn.mockRestore();
+      }
+    });
+
+    it("two deadlocks in a row answer 503 service_unavailable with Retry-After and leave nothing behind", async () => {
+      const repository = running.app.get(OrdersRepository);
+      const spy = vi
+        .spyOn(repository, "insertOrder")
+        .mockImplementation(() => Promise.reject(deadlock()));
+      try {
+        const { variantId } = await stocked(5, 1_000);
+        await add(shopper, variantId, 2);
+        const before = await orderTableCounts(pool, [variantId]);
+        const result = await checkoutAs(shopper, checkoutBody(2_000));
+        expect(result.status).toBe(503);
+        expect(result.body).toMatchObject({ code: "service_unavailable", status: 503 });
+        expect(result.headers.get("retry-after")).toMatch(/^\d+$/);
+        expect(result.headers.get("cache-control")).toBe("no-store");
+        expect(spy).toHaveBeenCalledTimes(2);
+        expect(await orderTableCounts(pool, [variantId])).toEqual(before);
+        expect((await cartOf(shopper)).lines).toHaveLength(1);
+      } finally {
+        spy.mockRestore();
+      }
     });
   });
 
