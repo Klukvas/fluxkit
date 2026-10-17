@@ -34,16 +34,16 @@ Contract:
 | Session | `POST /admin/auth/login` answers `200` and sets a session cookie; every other `/admin` request is authenticated by that cookie alone (an `Authorization` header, API key or query parameter is ignored). `POST /admin/auth/logout` ends the session. Idle and absolute lifetimes come from `ADMIN_SESSION_IDLE_MINUTES` and `ADMIN_SESSION_MAX_HOURS` (`docs/contracts/config.md`). The cookie is `HttpOnly`, `SameSite=Strict`, `Path=/admin`, and `Secure` unless `ADMIN_COOKIE_SECURE=false` |
 | CSRF header | Every `POST`, `PUT`, `PATCH` and `DELETE` under `/admin`, login included and also for anonymous callers, must send `X-Fluxkit-CSRF: 1` and, when it has a body, `Content-Type: application/json`; otherwise `403 forbidden`. `GET`, `HEAD` and `OPTIONS` are exempt. The API sends no CORS headers |
 | Roles | `owner`, `manager`, `viewer`; fixed in code (a new role is a code change, not data). The names are contract |
-| Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`. The names are contract |
+| Permissions | `catalog.read`, `catalog.write`, `catalog.publish`, `users.manage`, `orders.read`, `orders.write`, `customers.read`, `customers.write`. The names are contract. The orders and customers permissions exist in core; no route requires them yet (ADR 0017, plan `docs/plans/2026-10-17-cart-and-orders.md`) |
 | Login response | `200 {"user": {id, email, role, isActive, lastLoginAt}}` plus the cookie. Every failure (unknown email, wrong password, locked account, inactive user) answers the same `401 unauthorized` with no cookie; status, headers and body do not say which. Response times are similar (one scrypt each) but not guaranteed equal: a wrong password also writes the failure count, so a small difference can exist. `GET /admin/auth/me` answers `{user, permissions}` |
 | Caching | Every response under `/admin` (matched like the guard: case-insensitive, trailing slash included), errors included, carries `Cache-Control: no-store`. `/store/*` and `/health` are not affected |
 | Users endpoints | `GET` and `POST /admin/users`, `GET` and `PATCH /admin/users/{id}`, `POST /admin/users/{id}/reset-password`, owner only; no delete; the last active owner cannot be demoted or deactivated. Shapes and errors: `docs/api/auth.md` |
 
-| Role | `catalog.read` | `catalog.write` | `catalog.publish` | `users.manage` |
-|---|---|---|---|---|
-| `owner` | yes | yes | yes | yes |
-| `manager` | yes | yes | yes | no |
-| `viewer` | yes | no | no | no |
+| Role | `catalog.read` | `catalog.write` | `catalog.publish` | `users.manage` | `orders.read` | `orders.write` | `customers.read` | `customers.write` |
+|---|---|---|---|---|---|---|---|---|
+| `owner` | yes | yes | yes | yes | yes | yes | yes | yes |
+| `manager` | yes | yes | yes | no | yes | yes | yes | yes |
+| `viewer` | yes | no | no | no | no | no | no | no |
 
 Route to permission: `GET` and `HEAD` need `catalog.read`; every other method needs `catalog.write`; `publish`, `unpublish`, `archive` and `restore` of a product need `catalog.publish`; the users routes need `users.manage`. `logout`, `me` and `change-password` need only a session. A route that declares no permission is denied.
 

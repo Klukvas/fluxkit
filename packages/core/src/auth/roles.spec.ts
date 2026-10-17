@@ -17,6 +17,10 @@ describe("role table", () => {
       "catalog.write",
       "catalog.publish",
       "users.manage",
+      "orders.read",
+      "orders.write",
+      "customers.read",
+      "customers.write",
     ]);
   });
 
@@ -26,6 +30,10 @@ describe("role table", () => {
       "catalog.read",
       "catalog.write",
       "catalog.publish",
+      "orders.read",
+      "orders.write",
+      "customers.read",
+      "customers.write",
     ]);
     expect([...ROLE_PERMISSIONS.viewer]).toEqual(["catalog.read"]);
   });
@@ -87,8 +95,25 @@ describe("permissionsOf", () => {
 
 describe("hasPermission", () => {
   const expected: Record<string, readonly string[]> = {
-    owner: ["catalog.read", "catalog.write", "catalog.publish", "users.manage"],
-    manager: ["catalog.read", "catalog.write", "catalog.publish"],
+    owner: [
+      "catalog.read",
+      "catalog.write",
+      "catalog.publish",
+      "users.manage",
+      "orders.read",
+      "orders.write",
+      "customers.read",
+      "customers.write",
+    ],
+    manager: [
+      "catalog.read",
+      "catalog.write",
+      "catalog.publish",
+      "orders.read",
+      "orders.write",
+      "customers.read",
+      "customers.write",
+    ],
     viewer: ["catalog.read"],
   };
 
@@ -104,6 +129,8 @@ describe("hasPermission", () => {
 
   it("denies the viewer every write permission", () => {
     expect(hasPermission("viewer", "catalog.write")).toBe(false);
+    expect(hasPermission("viewer", "orders.write")).toBe(false);
+    expect(hasPermission("viewer", "customers.write")).toBe(false);
     expect(hasPermission("viewer", "catalog.publish")).toBe(false);
     expect(hasPermission("viewer", "users.manage")).toBe(false);
     expect(hasPermission("manager", "users.manage")).toBe(false);
@@ -140,6 +167,91 @@ describe("hasPermission", () => {
       "0",
     ]) {
       expect(hasPermission("owner", permission)).toBe(false);
+    }
+  });
+});
+
+describe("orders and customers permissions (plan 2026-10-17, open question 6)", () => {
+  // Typed out by hand: role -> permission -> allowed. Not derived from the table under test.
+  const matrix = {
+    owner: {
+      "catalog.read": true,
+      "catalog.write": true,
+      "catalog.publish": true,
+      "users.manage": true,
+      "orders.read": true,
+      "orders.write": true,
+      "customers.read": true,
+      "customers.write": true,
+    },
+    manager: {
+      "catalog.read": true,
+      "catalog.write": true,
+      "catalog.publish": true,
+      "users.manage": false,
+      "orders.read": true,
+      "orders.write": true,
+      "customers.read": true,
+      "customers.write": true,
+    },
+    viewer: {
+      "catalog.read": true,
+      "catalog.write": false,
+      "catalog.publish": false,
+      "users.manage": false,
+      "orders.read": false,
+      "orders.write": false,
+      "customers.read": false,
+      "customers.write": false,
+    },
+  } as const;
+
+  const personalData = ["orders.read", "orders.write", "customers.read", "customers.write"];
+
+  it("lists exactly the eight permissions of the matrix", () => {
+    expect([...PERMISSIONS].sort()).toEqual(Object.keys(matrix.owner).sort());
+  });
+
+  it("matches the whole role x permission matrix", () => {
+    for (const role of ROLES) {
+      for (const permission of PERMISSIONS) {
+        expect(hasPermission(role, permission), `${role} ${permission}`).toBe(
+          matrix[role][permission],
+        );
+      }
+    }
+  });
+
+  it("keeps personal data away from the viewer: no order and no customer permission", () => {
+    expect(permissionsOf("viewer")).toEqual(["catalog.read"]);
+    for (const permission of personalData) {
+      expect(hasPermission("viewer", permission), permission).toBe(false);
+    }
+  });
+
+  it("gives the manager all four and the owner every permission", () => {
+    for (const permission of personalData) {
+      expect(hasPermission("manager", permission), permission).toBe(true);
+      expect(hasPermission("owner", permission), permission).toBe(true);
+    }
+    expect(permissionsOf("owner")).toHaveLength(8);
+    expect(permissionsOf("manager")).toHaveLength(7);
+  });
+
+  it("recognizes the new names as permissions and nothing close to them", () => {
+    for (const permission of personalData) {
+      expect(isAdminPermission(permission), permission).toBe(true);
+    }
+    for (const value of [
+      "orders",
+      "orders.delete",
+      "order.read",
+      "customer.read",
+      "orders.manage",
+      "Orders.read",
+    ]) {
+      expect(isAdminPermission(value), value).toBe(false);
+      expect(hasPermission("owner", value), value).toBe(false);
     }
   });
 });
