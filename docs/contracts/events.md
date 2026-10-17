@@ -1,6 +1,6 @@
 # Contract: domain events and order ports
 
-Status: draft (introduced in plan step 5c of `docs/plans/2026-10-17-cart-and-orders.md`, ADR 0018 and 0021). Covered by SemVer (AGENTS.md section 17); no release has been made yet. Everything exported from `@fluxkit/core` named here is contract; anything not listed is internal.
+Status: draft (introduced in plan step 5c of `docs/plans/2026-10-17-cart-and-orders.md`, ADR 0018 and 0021; the `OrderReadPort` was added in step 6). Covered by SemVer (AGENTS.md section 17); no release has been made yet. Everything exported from `@fluxkit/core` named here is contract; anything not listed is internal.
 
 Plugins (payment, shipping, email, features) reach the order domain only through this contract and never import `apps/api`. Core never imports a plugin.
 
@@ -63,12 +63,14 @@ Delivery rules a handler can rely on, and must respect:
 | Port | Token | Status |
 |---|---|---|
 | `OrderPaymentsPort` | `ORDER_PAYMENTS_PORT` = `"fluxkit:order-payments-port"` (implemented by `OrdersService`; inject with `@Inject(ORDER_PAYMENTS_PORT)`) | exists |
-| `OrderReadPort` | - | NOT built yet: arrives with plan step 6 (the admin order view). Until then a handler gets the order id and number from the event and has no read port |
+| `OrderReadPort` | `ORDER_READ_PORT` = `"fluxkit:order-read-port"` (implemented by `AdminOrderViewService`; inject with `@Inject(ORDER_READ_PORT)`) | exists |
 
 `OrderPaymentsPort.markPaid(orderId, {amount, providerReference, source}): Promise<MarkPaidOutcome>`: the only way a plugin marks an order paid. Idempotent (the same reference on a paid order answers `{ok: true, alreadyPaid: true}`; a different reference is `payment_reference_conflict`); the amount must equal the order total in the order currency (`amount_mismatch`); an expired or cancelled order is `order_not_payable` and nothing changes; also `order_not_found`, `invalid_transition`. Types: `MarkPaidRequest`, `MarkPaidOutcome`, `MarkPaidRefusal`.
+
+`OrderReadPort.getOrder(orderId): Promise<AdminOrderView | undefined>`: how a plugin reads an order (a payment plugin before it asks the provider for a payment, an email plugin when an event arrives with only an id and a number). Reads only; `undefined` for an unknown id and for text that is not an id (it never throws for those). The view is exactly the one `GET /admin/orders/{id}` returns (one builder serves both, tested for equality in every status): contact and addresses (personal data: the plugin handles them under the shop's privacy rules), the item snapshot with every locale, totals, adjustments, the status journal with the acting admin id, and each line's reservations as `{status, quantity}`. It never contains the guest access token or its hash, the idempotency key, the request fingerprint, reservation ids, locations or stock figures. Types: `AdminOrderView`, `AdminOrderItemView`, `AdminOrderAdjustmentView`, `AdminOrderHistoryEntry`, `AdminOrderReservationView`, `AdminOrderMoney`, `AdminOrderTexts`; each is read-only. Changes to an order go through `OrderPaymentsPort` (payment) and, for fulfilment, a port the shipping plan adds.
 
 A payment plugin registers its own routes, verifies the provider's signature and calls this port; a shipping plugin reacts to `order.paid`; an email plugin handles `order.placed`, `order.paid`, `order.cancelled`. Removing any of them leaves orders working: an order stays `awaiting_payment` until an admin marks it paid or it expires.
 
 ## Changing this contract
 
-Adding an event type, an optional payload field or an envelope field is a minor change. Removing or renaming any of them, changing the stored payload of an existing event, the metadata key, a token or the delivery rules above is breaking (major version, migration guide in `docs/migrations/`, `CHANGELOG.md` entry).
+Adding an event type, an optional payload field, an envelope field or a field of the order view is a minor change. Removing or renaming any of them, changing the stored payload of an existing event, the metadata key, a token, the delivery rules above, or removing or retyping a field of the order view is breaking (major version, migration guide in `docs/migrations/`, `CHANGELOG.md` entry).
