@@ -22,6 +22,15 @@ const MAX_ADMIN_SESSION_IDLE_MINUTES = 525_600;
 const MAX_ADMIN_SESSION_MAX_HOURS = 8_760;
 
 /**
+ * Defaults and bounds of the customer session limits (ADR 0016). They equal `CUSTOMER_SESSION_DEFAULTS` and
+ * `SESSION_BOUNDS` of `@fluxkit/core` (a test in apps/api asserts it). The bounds are the admin ones: one year.
+ */
+export const DEFAULT_CUSTOMER_SESSION_IDLE_MINUTES = 43_200;
+export const DEFAULT_CUSTOMER_SESSION_MAX_HOURS = 2_160;
+const MAX_CUSTOMER_SESSION_IDLE_MINUTES = 525_600;
+const MAX_CUSTOMER_SESSION_MAX_HOURS = 8_760;
+
+/**
  * Defaults of the pricing variables, and the currencies a shop can sell in. The list equals `CURRENCY_CODES` of
  * `@fluxkit/core` (a test in apps/api asserts it); this package does not depend on core, so it is repeated here.
  */
@@ -84,6 +93,13 @@ const envSchema = z
     ADMIN_SESSION_MAX_HOURS: positiveInteger(MAX_ADMIN_SESSION_MAX_HOURS).default(
       DEFAULT_ADMIN_SESSION_MAX_HOURS,
     ),
+    STORE_COOKIE_SECURE: strictBoolean.default(true),
+    CUSTOMER_SESSION_IDLE_MINUTES: positiveInteger(MAX_CUSTOMER_SESSION_IDLE_MINUTES).default(
+      DEFAULT_CUSTOMER_SESSION_IDLE_MINUTES,
+    ),
+    CUSTOMER_SESSION_MAX_HOURS: positiveInteger(MAX_CUSTOMER_SESSION_MAX_HOURS).default(
+      DEFAULT_CUSTOMER_SESSION_MAX_HOURS,
+    ),
     SHOP_CURRENCY: z
       .string()
       .refine((value) => SUPPORTED_SHOP_CURRENCIES.includes(value), {
@@ -128,6 +144,12 @@ export interface AppEnv {
   adminSessionIdleMinutes: number;
   /** Absolute admin session lifetime in hours. */
   adminSessionMaxHours: number;
+  /** `Secure` flag of the customer session cookie. Only `false` for local plain-HTTP development. */
+  storeCookieSecure: boolean;
+  /** Customer session is closed after this many idle minutes. */
+  customerSessionIdleMinutes: number;
+  /** Absolute customer session lifetime in hours. */
+  customerSessionMaxHours: number;
   /** The one currency the shop sells in (ISO 4217, upper case). An active variant needs a price in it. */
   shopCurrency: string;
   /** Whether stored prices already include tax; only exposed to the storefront, no tax is calculated. */
@@ -157,6 +179,9 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     adminCookieSecure: env.ADMIN_COOKIE_SECURE,
     adminSessionIdleMinutes: env.ADMIN_SESSION_IDLE_MINUTES,
     adminSessionMaxHours: env.ADMIN_SESSION_MAX_HOURS,
+    storeCookieSecure: env.STORE_COOKIE_SECURE,
+    customerSessionIdleMinutes: env.CUSTOMER_SESSION_IDLE_MINUTES,
+    customerSessionMaxHours: env.CUSTOMER_SESSION_MAX_HOURS,
     shopCurrency: env.SHOP_CURRENCY,
     pricesIncludeTax: env.PRICES_INCLUDE_TAX,
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,
