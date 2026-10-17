@@ -72,6 +72,15 @@ export function guestAccessExpiresAt(createdAt: Date, days: number): Date {
  * (clock skew between servers) is still valid.
  */
 export function isGuestAccessValid(createdAt: Date, now: Date, days: number): boolean {
+  return isGuestAccessCurrent(guestAccessExpiresAt(createdAt, days), now);
+}
+
+/**
+ * The same rule for an expiry that was stored (`access_expires_at`, set by `guestAccessExpiresAt`, also after a token
+ * rotation): true before `accessExpiresAt`, false at that instant and after it. The one place the boundary is decided.
+ */
+export function isGuestAccessCurrent(accessExpiresAt: Date, now: Date): boolean {
+  assertDate(accessExpiresAt, "accessExpiresAt");
   assertDate(now, "now");
-  return now.getTime() < guestAccessExpiresAt(createdAt, days).getTime();
+  return now.getTime() < accessExpiresAt.getTime();
 }

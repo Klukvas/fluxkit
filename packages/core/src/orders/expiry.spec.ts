@@ -5,6 +5,7 @@ import {
   ORDER_PAYMENT_TTL_MINUTES,
   RESERVATION_GRACE_MINUTES,
   guestAccessExpiresAt,
+  isGuestAccessCurrent,
   isGuestAccessValid,
   orderExpiresAt,
   reservationExpiresAt,
@@ -151,5 +152,32 @@ describe("guestAccessExpiresAt and isGuestAccessValid", () => {
     isGuestAccessValid(first, second, 90);
     expect(first.getTime()).toBe(created.getTime());
     expect(second.getTime()).toBe(created.getTime() + DAY);
+  });
+});
+
+describe("isGuestAccessCurrent", () => {
+  const expiry = at("2027-01-15T12:00:00.000Z");
+
+  it("is true before the stored expiry and false at it and after it", () => {
+    expect(isGuestAccessCurrent(expiry, new Date(expiry.getTime() - 1))).toBe(true);
+    expect(isGuestAccessCurrent(expiry, expiry)).toBe(false);
+    expect(isGuestAccessCurrent(expiry, new Date(expiry.getTime() + 1))).toBe(false);
+  });
+
+  it("agrees with isGuestAccessValid for an expiry made by guestAccessExpiresAt", () => {
+    const created = at("2026-10-17T12:00:00.000Z");
+    const stored = guestAccessExpiresAt(created, 90);
+    for (const offset of [-DAY, 0, 89 * DAY, 90 * DAY - 1, 90 * DAY, 91 * DAY]) {
+      const now = new Date(created.getTime() + offset);
+      expect(isGuestAccessCurrent(stored, now), String(offset)).toBe(
+        isGuestAccessValid(created, now, 90),
+      );
+    }
+  });
+
+  it("refuses invalid dates (RangeError)", () => {
+    expect(() => isGuestAccessCurrent(new Date(Number.NaN), expiry)).toThrow(RangeError);
+    expect(() => isGuestAccessCurrent(expiry, "2027-01-01" as unknown as Date)).toThrow(RangeError);
+    expect(() => isGuestAccessCurrent(null as unknown as Date, expiry)).toThrow(RangeError);
   });
 });
