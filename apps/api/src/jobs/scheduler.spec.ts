@@ -15,7 +15,7 @@ import { PlacedOrders } from "../test/order-fixtures.js";
 import { eventsOf, orderRow } from "../test/order-http.js";
 import { OrderMaker } from "../test/order-maker.js";
 import { JobsRunner, type JobReport } from "./jobs-runner.js";
-import { SCHEDULER_LOCK_KEY } from "./scheduler-lock.js";
+import { SCHEDULER_LOCK_APPLICATION_NAME, SCHEDULER_LOCK_KEY } from "./scheduler-lock.js";
 import { SchedulerService } from "./scheduler.service.js";
 
 const START = new Date("2025-10-01T08:00:00.000Z");
@@ -139,6 +139,31 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       }
       expect(overlapped).toBe(false);
       expect(runs).toBeGreaterThanOrEqual(10);
+    });
+
+    it("leaves no connection behind after a tick, a skipped tick or a failed tick", async () => {
+      vi.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+      vi.spyOn(runnerOf(first), "runAll").mockResolvedValue([]);
+      await schedulerOf(first).tick();
+      vi.spyOn(runnerOf(second), "runAll").mockRejectedValueOnce(new Error("boom"));
+      await schedulerOf(second).tick();
+      const entered = gate();
+      const release = gate();
+      vi.spyOn(runnerOf(first), "runAll").mockImplementationOnce(async () => {
+        entered.open();
+        await release.promise;
+        return [];
+      });
+      const holding = schedulerOf(first).tick();
+      await entered.promise;
+      await schedulerOf(second).tick();
+      release.open();
+      await holding;
+      const open = await pool.query(
+        "select count(*)::int as count from pg_stat_activity where application_name = $1",
+        [SCHEDULER_LOCK_APPLICATION_NAME],
+      );
+      expect(open.rows[0]).toEqual({ count: 0 });
     });
 
     it("releases the lock when the jobs throw (the tick reports failed and logs, and the next tick runs)", async () => {
@@ -287,13 +312,15 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
 
   describe("the timer", () => {
     it("is not started when the scheduler is disabled (the default of the test app)", async () => {
-      const idle = await app();
+      const idle = await app({ schedulerEnabled: false, schedulerIntervalSeconds: 0.05 });
       const runner = vi.spyOn(runnerOf(idle), "runAll").mockResolvedValue([]);
       await sleep(300);
       expect(runner).not.toHaveBeenCalled();
     });
 
     it("ticks on its interval, with the injected clock, and stops for good at shutdown", async () => {
+      const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
+      const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
       const ticking = await startApp({
         clock,
         adminAuthenticator: "production-default",
@@ -306,7 +333,11 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       }
       expect(runner.mock.calls.length).toBeGreaterThanOrEqual(3);
       expect(runner.mock.calls.every((call) => call[0].getTime() === START.getTime())).toBe(true);
+      const created = setIntervalSpy.mock.calls.findIndex((call) => call[1] === 100);
+      expect(created).toBeGreaterThanOrEqual(0);
+      const handle = setIntervalSpy.mock.results[created]?.value as NodeJS.Timeout;
       await ticking.app.close();
+      expect(clearIntervalSpy).toHaveBeenCalledWith(handle);
       const after = runner.mock.calls.length;
       await sleep(400);
       expect(runner.mock.calls.length).toBe(after);

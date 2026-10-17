@@ -6,7 +6,9 @@ import { DRIZZLE, type Database } from "../database/database.module.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import {
+  BadTypeHandlerFixtureModule,
   BrokenHandlerFixtureModule,
+  RequestScopedHandlerFixtureModule,
   EventHandlerFixtureModule,
   FixtureHandlerA,
   FixtureHandlerB,
@@ -120,17 +122,32 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       }
     });
 
-    it("a marked provider without handle() stops the startup loudly instead of being skipped", async () => {
-      const app = await createApp(
-        { databaseUrl: requireTestDatabaseUrl(), enabledFeatures: [], featuresDir: undefined },
-        { extraFeatures: [{ name: "broken", module: BrokenHandlerFixtureModule }] },
-      );
-      try {
-        await expect(app.init()).rejects.toThrow(/BrokenFixtureHandler.*handle\(event\)/);
-      } finally {
-        await app.close();
-      }
-    });
+    it.each([
+      ["has no handle()", BrokenHandlerFixtureModule, /BrokenFixtureHandler.*handle\(event\)/],
+      [
+        "is request scoped",
+        RequestScopedHandlerFixtureModule,
+        /RequestScopedFixtureHandler.*static provider/,
+      ],
+      [
+        "declares a malformed event type",
+        BadTypeHandlerFixtureModule,
+        /BadTypeFixtureHandler.*valid event types/,
+      ],
+    ])(
+      "a marked provider that %s stops the startup loudly instead of being skipped",
+      async (_label, module, message) => {
+        const app = await createApp(
+          { databaseUrl: requireTestDatabaseUrl(), enabledFeatures: [], featuresDir: undefined },
+          { extraFeatures: [{ name: "broken", module }], logLevels: [] },
+        );
+        try {
+          await expect(app.init()).rejects.toThrow(message);
+        } finally {
+          await app.close();
+        }
+      },
+    );
   });
 
   describe("delivery", () => {

@@ -2,8 +2,8 @@
 
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
-- `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings, `CART_TTL_DAYS`, `ORDER_PAYMENT_TTL_MINUTES` and `ORDER_GUEST_ACCESS_DAYS`, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
-- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory, the cart, orders and dynamically loaded feature modules. Must not import features statically.
+- `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings, `CART_TTL_DAYS`, `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`, `SCHEDULER_ENABLED` and `SCHEDULER_INTERVAL_SECONDS` (off when the caller passes no environment), builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export, `pnpm jobs:run-once`.
+- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory, the cart, orders, the scheduler (`src/jobs/`) and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
 
@@ -127,6 +127,21 @@ Plan step 5b (ADR 0015, 0017, 0018, 0020, `docs/api/orders.md`). Core, no featur
 - `checkout.controller.ts`, `store-orders.controller.ts`, `account-orders.controller.ts`, `orders.schemas.ts` - the HTTP layer and the zod request and response schemas (also used for OpenAPI). No rules.
 - `*.spec.ts` (real Postgres) - `checkout` (placement, validation, cart changes, stock refusals, totals, snapshot, CSRF, rate limit, secrecy and log capture), `checkout-idempotency` (replay, token rotation, mismatches, parallel keys), `checkout-concurrency` (last units, crossing carts, catalog and stock writes, the sign-in merge, no deadlock), `store-orders` (guest lookup and cancel, identical 404s, customer history, IDOR, query counts), `orders-service` (markPaid, backorder, cancel, expiry, races), and unit specs for the input, fingerprint, token and config.
 
+## Jobs (`src/jobs/`)
+
+Plan step 5c (ADR 0018, 0021, `docs/api/jobs.md`, `docs/contracts/events.md`). Core, no feature flag, no HTTP route. `jobs.module.ts` (`JobsModule.register({config, databaseUrl})`) imports `DiscoveryModule` and `InventoryModule`. Job functions take `now`, return a small result object, read no clock and start no timer; they must not log (the runner does) and must not reimplement expiry rules (`OrdersService.expireOne` and `ReservationsService.expireDue` own them).
+
+- `scheduler-config.ts` - `SchedulerConfig` (`enabled`, `intervalSeconds` from `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`) and `DISABLED_SCHEDULER_CONFIG` (the default of an application built without an environment).
+- `scheduler.service.ts` - `SchedulerService`: the timer (`onApplicationBootstrap`), `tick()` (never throws, never overlaps itself, `lock_held` / `overlap` / `failed` / `stopped` / `ran`), `runOnce()` (lock without waiting, jobs with `now = clock.now()`), shutdown (`beforeApplicationShutdown` clears the timer and waits for a running tick). Must not contain a job.
+- `scheduler-lock.ts` - `withSchedulerLock(databaseUrl, work)`: `pg_try_advisory_lock(7426003)` on a dedicated `pg.Client` per call, explicit unlock, session end in `finally`. Must not use the application pool.
+- `jobs-runner.ts` - `JobsRunner.runAll(now)`: the six jobs in the documented order, each in its own try/catch, the one place that logs job results (ids, numbers and codes only); `JOB_NAMES`, `describeCounts`.
+- `jobs.repository.ts` - the queries of the jobs (due orders by keyset cursor, `SKIP LOCKED` event locking with the backoff predicate, batch deletes through a materialized CTE). Every time is a parameter; nothing reads the database clock. Knows tables, not rules.
+- `expire-due-orders.job.ts`, `sweep-reservations.job.ts`, `dispatch-domain-events.job.ts`, `delete-dispatched-events.job.ts`, `delete-expired-carts.job.ts`, `delete-expired-customer-sessions.job.ts` - one job each. `batches.ts` - `drainInBatches` (bounded delete loop, `truncated`) and the cleanup limits.
+- `domain-event-handlers.ts` - `DomainEventHandlerRegistry`: finds providers whose class carries `DOMAIN_EVENT_HANDLER_METADATA` once at bootstrap and refuses a malformed one loudly; `handlersFor(type)`.
+- `event-error-code.ts` - `eventErrorCode(error)` (class name plus the cause's code, fits the column CHECK, never the message) and `HandlerTimeoutError`.
+- `run-once-command.ts`, `run-once.ts` - `pnpm jobs:run-once`: the command (builds the application without timer and listener, `runOnce()`, exit codes 0/1/2) and its entry point.
+- `*.spec.ts` (real Postgres, injected time) - one per job (`expire-due-orders.job`, `sweep-reservations.job`, `dispatch-domain-events.job` with the discovery, `cleanup.jobs`), `expire-orders-races` (expiry against payment and the three cancels, many rounds), `jobs-runner` (order, isolation, logging), `scheduler` (lock, two instances, ticks, timer, shutdown, `/health`), `run-once` (the built entry as a real process), `batches`, `event-error-code`.
+
 ## Catalog (`src/catalog/`)
 
 - `catalog.module.ts` - core catalog module (no feature flag); imports every admin resource module and `StoreModule`.
@@ -230,7 +245,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 
 ## Test support (`src/test/`)
 
-- `app.ts` - `startApp` (listening test app; `storeCookieSecure`, `customerSessionIdleMinutes` and `customerSessionMaxHours` configure customer sessions): default test authenticator signs in as an owner (`adminPrincipal: { role }` for another role), `"production-default"` runs the real session authenticator, plus a controlled `clock`, `extraFeatures` (probe controllers) and cheap scrypt parameters.
+- `app.ts` - `startApp` (listening test app; `schedulerEnabled` defaults to FALSE here so a spec has no timer, `schedulerIntervalSeconds`; `storeCookieSecure`, `customerSessionIdleMinutes` and `customerSessionMaxHours` configure customer sessions): default test authenticator signs in as an owner (`adminPrincipal: { role }` for another role), `"production-default"` runs the real session authenticator, plus a controlled `clock`, `extraFeatures` (probe controllers) and cheap scrypt parameters.
 - `allow-all-admin-authenticator.ts` - TEST ONLY: signs every admin request in as one fixed user (owner by default) and `testPrincipal`. Never import outside `src/test` or specs.
 - `fake-clock.ts` - TEST ONLY: a `Clock` the test moves by hand.
 - `admin-user-fixtures.ts` - TEST ONLY: inserts and deletes admin users directly; with `password` the hash is real, so the user can log in.
@@ -240,6 +255,8 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `customer-probe.ts` - TEST ONLY, excluded from the build: probe controllers (customer-authenticated, public, rate-limited, sign-in and sign-out stand-ins) registered through `extraFeatures`, and a route under `/store/account` that forgot the decorator, for the route-walk test.
 - `order-fixtures.ts` - TEST ONLY: `insertSoldLine` (an order with one line written straight into the tables, for the variant delete rule) and `PlacedOrders` (removes the orders a spec placed before the catalog is cleaned).
 - `order-http.ts` - TEST ONLY: `checkoutBody`, `checkoutAs` and readers of the order tables (`orderRow`, `itemsOf`, `changesOf`, `eventsOf`, `reservationsOfOrder`, `orderTableCounts`).
+- `order-maker.ts` - TEST ONLY: `OrderMaker.place(lines, shopper?)` places an order through the real checkout (guest by default) and returns its id, number, total, access token and lines.
+- `event-handler-fixture.ts` - TEST ONLY: handlers written the way a plugin writes them (`FixtureHandlerA`, `FixtureHandlerB`, with a controllable `behaviour` and recorded `calls`) and malformed ones (no `handle`, request scoped, bad event type) in modules for `extraFeatures`. Not a feature.
 - `cart-fixtures.ts` - TEST ONLY: `CartCatalog`, direct catalog rows for the cart specs (products, variants, option values, prices in any currency, stock, media) with a unique run id and cleanup; `cart-helpers.ts` - cart row queries, key scans and the `CartResult` type; `shopper.ts` - `Shopper`, a cookie-jar HTTP client (one per simulated browser).
 - `customer-fixtures.ts` - TEST ONLY: inserts and deletes customers directly (placeholder hash, or a real one with `password`, so the customer can sign in).
 - `customer-http.ts` - TEST ONLY: `customerLogin`, `customerLoginCookie`, `customerCookieOf` and `customerSetCookieOf` for specs that sign in through the real endpoint.

@@ -70,7 +70,8 @@ export class DomainEventHandlerRegistry
         );
       }
       const instance: unknown = wrapper.instance;
-      if (!isHandler(instance)) {
+      // A request-scoped (or transient) provider has no single instance to call: its placeholder has no dependencies.
+      if (!wrapper.isDependencyTreeStatic() || wrapper.isTransient || !isHandler(instance)) {
         throw new Error(
           `Domain event handler ${name} must be a static provider with a handle(event) method.`,
         );

@@ -9,6 +9,9 @@ import { DB_CONNECTION_TIMEOUT_MS } from "../database/database.module.js";
  */
 export const SCHEDULER_LOCK_KEY = 7_426_003;
 
+/** Shown in `pg_stat_activity`, so an operator (and a test) can tell the lock connection from the pool's. */
+export const SCHEDULER_LOCK_APPLICATION_NAME = "fluxkit-scheduler-lock";
+
 export type LockedRun<T> = { acquired: false } | { acquired: true; value: T };
 
 /**
@@ -25,6 +28,7 @@ export async function withSchedulerLock<T>(
   const client = new pg.Client({
     connectionString: databaseUrl,
     connectionTimeoutMillis: DB_CONNECTION_TIMEOUT_MS,
+    application_name: SCHEDULER_LOCK_APPLICATION_NAME,
   });
   // Without a listener a dropped connection would end the process. Only the SQLSTATE or system code is logged
   // (an error text can embed connection details); the lock is gone with the session, and every job is safe to run twice.
