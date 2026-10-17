@@ -6,6 +6,7 @@ import { AppModule } from "./app.module.js";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
 import type { Clock } from "./auth/clock.js";
+import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-config.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
 import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
 import {
@@ -23,6 +24,9 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "adminCookieSecure"
       | "adminSessionIdleMinutes"
       | "adminSessionMaxHours"
+      | "storeCookieSecure"
+      | "customerSessionIdleMinutes"
+      | "customerSessionMaxHours"
       | "shopCurrency"
       | "pricesIncludeTax"
       | "lowStockThreshold"
@@ -65,6 +69,11 @@ export async function createApp(
         cookieSecure: env.adminCookieSecure ?? DEFAULT_ADMIN_AUTH_CONFIG.cookieSecure,
         idleMinutes: env.adminSessionIdleMinutes ?? DEFAULT_ADMIN_AUTH_CONFIG.idleMinutes,
         maxHours: env.adminSessionMaxHours ?? DEFAULT_ADMIN_AUTH_CONFIG.maxHours,
+      },
+      customerAuth: {
+        cookieSecure: env.storeCookieSecure ?? DEFAULT_CUSTOMER_AUTH_CONFIG.cookieSecure,
+        idleMinutes: env.customerSessionIdleMinutes ?? DEFAULT_CUSTOMER_AUTH_CONFIG.idleMinutes,
+        maxHours: env.customerSessionMaxHours ?? DEFAULT_CUSTOMER_AUTH_CONFIG.maxHours,
       },
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,

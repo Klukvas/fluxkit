@@ -1,4 +1,3 @@
-import { createHash, randomBytes } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   evaluateSession,
@@ -11,9 +10,11 @@ import type { DbExecutor } from "../common/transaction.js";
 import { ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth-config.js";
 import { CLOCK, type Clock } from "./clock.js";
 import { SessionRepository } from "./session.repository.js";
-import { SESSION_TOKEN_PATTERN } from "./session-cookie.js";
-
-const TOKEN_BYTES = 32;
+import {
+  generateSessionToken,
+  hashSessionToken as hashToken,
+  isWellFormedSessionToken as isWellFormedToken,
+} from "./session-token.js";
 
 export interface CreatedSession {
   /** The raw token. It exists only here and in the cookie; the database keeps its SHA-256. */
@@ -25,15 +26,6 @@ export interface CreatedSession {
 export interface ResolvedSession {
   sessionId: string;
   user: { id: string; email: string; role: AdminRole };
-}
-
-/** SHA-256 hex of the token text. A random 256-bit token needs no salt or slow hash; this only makes a database leak useless. */
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-function isWellFormedToken(token: unknown): token is string {
-  return typeof token === "string" && SESSION_TOKEN_PATTERN.test(token);
 }
 
 /**
@@ -56,7 +48,7 @@ export class SessionService {
     now: Date = this.clock.now(),
     executor?: DbExecutor,
   ): Promise<CreatedSession> {
-    const token = randomBytes(TOKEN_BYTES).toString("base64url");
+    const token = generateSessionToken();
     const expiresAt = sessionExpiry(now, this.config);
     const sessionId = await this.sessions.insert(
       { userId, tokenHash: hashToken(token), createdAt: now, lastSeenAt: now, expiresAt },
