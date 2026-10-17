@@ -399,6 +399,7 @@ export class CheckoutService {
         if (attempt >= ORDER_NUMBER_ATTEMPTS) {
           throw new Error(
             `No free order number after ${String(ORDER_NUMBER_ATTEMPTS)} attempts; the number space is damaged or exhausted.`,
+            { cause: error },
           );
         }
       }

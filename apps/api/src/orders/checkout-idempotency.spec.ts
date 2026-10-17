@@ -5,11 +5,7 @@ import { DRIZZLE, type Database } from "../database/database.module.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { CartCatalog } from "../test/cart-fixtures.js";
 import { type CartResult } from "../test/cart-helpers.js";
-import {
-  createTestCustomer,
-  deleteTestCustomers,
-  type TestCustomer,
-} from "../test/customer-fixtures.js";
+import { createTestCustomer, deleteTestCustomers } from "../test/customer-fixtures.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { FakeClock } from "../test/fake-clock.js";
 import { ensureMigrated } from "../test/migrate.js";

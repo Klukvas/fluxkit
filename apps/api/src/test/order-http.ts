@@ -8,7 +8,7 @@ import type { Shopper } from "./shopper.js";
 /** TEST ONLY. Shared by the checkout and order specs. */
 
 export type CheckoutResult = Partial<CheckoutResponse> & ProblemBody;
-export type OrderResult = StoreOrder & ProblemBody;
+export type OrderResult = StoreOrder & Pick<ProblemBody, "code" | "detail" | "errors">;
 
 export const ADDRESS = {
   countryCode: "UA",

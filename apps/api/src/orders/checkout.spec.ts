@@ -864,7 +864,7 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
         lastName: "Покупець",
         shippingAddress: { countryCode: "UA", city: "Секретне місто", line1: "Таємна вулиця 7" },
       });
-      let token = "";
+      const tokens: string[] = [];
       try {
         const { variantId } = await stocked(1, 1_000);
         await add(shopper, variantId, 1);
@@ -877,7 +877,7 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
         const placed = await checkoutAs(shopper, secretBody, key);
         expect(placed.status, JSON.stringify(placed.body)).toBe(201);
         placedOrders.track(placed.body.order?.number ?? "");
-        token = placed.body.accessToken ?? "";
+        tokens.push(placed.body.accessToken ?? "");
         // And one that fails with a validation error and one that is an unexpected error path (unknown field).
         await checkoutAs(shopper, { ...secretBody, phone: "1" }, randomUUID());
       } finally {
@@ -893,7 +893,7 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
         "Секретне місто",
         "Таємна вулиця",
         key,
-        token,
+        ...tokens,
       ]) {
         expect(secret.length).toBeGreaterThan(5);
         expect(logged, secret).not.toContain(secret);

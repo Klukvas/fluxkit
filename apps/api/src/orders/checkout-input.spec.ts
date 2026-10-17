@@ -16,6 +16,10 @@ const valid: CheckoutBody = {
   expectedTotal: { amount: 12_500, currency: "UAH" },
 };
 
+function without(body: CheckoutBody, key: keyof CheckoutBody): CheckoutBody {
+  return Object.fromEntries(Object.entries(body).filter(([name]) => name !== key)) as CheckoutBody;
+}
+
 function errorsOf(body: CheckoutBody, signedInEmail?: string): { path: string; code: string }[] {
   try {
     parseCheckoutInput(body, signedInEmail);
@@ -52,16 +56,14 @@ describe("parseCheckoutInput", () => {
   });
 
   it("takes the account email of a signed-in customer when none is sent, and the sent one otherwise", () => {
-    const { email: _omitted, ...withoutEmail } = valid;
-    expect(parseCheckoutInput(withoutEmail, "account@example.com").email).toBe(
+    expect(parseCheckoutInput(without(valid, "email"), "account@example.com").email).toBe(
       "account@example.com",
     );
     expect(parseCheckoutInput(valid, "account@example.com").email).toBe("buyer@example.com");
   });
 
   it("requires an email of a guest", () => {
-    const { email: _omitted, ...withoutEmail } = valid;
-    expect(errorsOf(withoutEmail)).toEqual([{ path: "email", code: "required" }]);
+    expect(errorsOf(without(valid, "email"))).toEqual([{ path: "email", code: "required" }]);
   });
 
   it("accepts null addresses as not sent", () => {
