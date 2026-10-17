@@ -18,7 +18,9 @@ import { Shopper } from "./shopper.js";
 
 /** TEST ONLY. Shared by the admin order specs. */
 
-export type DetailResult = AdminOrderDetail & ProblemBody;
+/** A detail view, or a problem body (`status` means the order status in one and the HTTP status in the other). */
+export type DetailResult = AdminOrderDetail &
+  Pick<ProblemBody, "code" | "detail" | "errors" | "rule">;
 export interface ListResult extends ProblemBody {
   items: AdminOrderSummary[];
   total: number;
@@ -198,7 +200,13 @@ export class AdminOrdersWorld {
 
   async stop(): Promise<void> {
     await this.placed.cleanup();
-    for (const running of [this.owner, this.manager, this.viewer, this.anonymous, ...this.extraApps]) {
+    for (const running of [
+      this.owner,
+      this.manager,
+      this.viewer,
+      this.anonymous,
+      ...this.extraApps,
+    ]) {
       await running.app.close();
     }
     await this.catalog.cleanup();

@@ -49,9 +49,7 @@ describe("admin order actions racing each other and the scheduler: exactly one w
     expect(changes.at(-1)?.to_status).toBe(row.status);
     expect(events.map((event) => event.type)).toEqual(
       changes.map((change) =>
-        change.to_status === "awaiting_payment"
-          ? "order.placed"
-          : `order.${change.to_status}`,
+        change.to_status === "awaiting_payment" ? "order.placed" : `order.${change.to_status}`,
       ),
     );
 
@@ -147,7 +145,10 @@ describe("admin order actions racing each other and the scheduler: exactly one w
       } else {
         expect(paid.status).toBe(409);
         expect(paid.body).toMatchObject({ rule: "order_not_payable" });
-        expect(changes.map((change) => change.to_status)).toEqual(["awaiting_payment", "cancelled"]);
+        expect(changes.map((change) => change.to_status)).toEqual([
+          "awaiting_payment",
+          "cancelled",
+        ]);
         expect(await level(line?.variantId ?? "")).toEqual({ on_hand: 50, reserved: 0 });
         expect((await reservationsOfOrder(world.pool, order.id)).map((e) => e.status)).toEqual([
           "released",
@@ -181,7 +182,10 @@ describe("admin order actions racing each other and the scheduler: exactly one w
       ]);
       expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
       const loser = results.find((result) => result.status === 409);
-      expect(loser?.body).toMatchObject({ code: "rule_violation", rule: "payment_reference_conflict" });
+      expect(loser?.body).toMatchObject({
+        code: "rule_violation",
+        rule: "payment_reference_conflict",
+      });
       expect(await expectConsistent(order)).toBe("paid");
       const winner = results.find((result) => result.status === 200);
       expect((await orderRow(world.pool, order.number)).payment_reference).toBe(

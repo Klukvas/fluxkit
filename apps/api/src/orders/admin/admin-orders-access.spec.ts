@@ -90,15 +90,17 @@ describe("admin orders: access and input validation (real Postgres)", () => {
           ).toBe(403);
         }
 
-        const statusBefore = (await world.pool.query("select status from sales_order where id = $1", [target.id]))
-          .rows[0] as { status: string };
+        const statusBefore = (
+          await world.pool.query("select status from sales_order where id = $1", [target.id])
+        ).rows[0] as { status: string };
         const asViewer = await route.call(world.viewer.baseUrl, target.id);
         expect(asViewer.status, "viewer").toBe(403);
         expect(asViewer.body).toMatchObject({ code: "forbidden" });
         expect((asViewer.body as ProblemBody).detail).toContain(route.permission);
         expect(permissionsOf("viewer")).not.toContain(route.permission);
-        const statusAfter = (await world.pool.query("select status from sales_order where id = $1", [target.id]))
-          .rows[0] as { status: string };
+        const statusAfter = (
+          await world.pool.query("select status from sales_order where id = $1", [target.id])
+        ).rows[0] as { status: string };
         expect(statusAfter, "a forbidden call must not change the order").toEqual(statusBefore);
 
         for (const [role, running] of [
@@ -120,12 +122,13 @@ describe("admin orders: access and input validation (real Postgres)", () => {
       customers.push(account.id);
       const cookie = await customerLoginCookie(world.anonymous.baseUrl, account.email, PASSWORD);
       const order = await world.place([{ quantity: 1 }]);
-      for (const headers of [
+      const credentials: Record<string, string>[] = [
         { cookie },
         { authorization: `Bearer ${order.accessToken}` },
         { "x-access-token": order.accessToken },
         { cookie: `fluxkit_admin_session=${order.accessToken}` },
-      ]) {
+      ];
+      for (const headers of credentials) {
         for (const [method, path, body] of [
           ["GET", "/admin/orders", undefined],
           ["GET", `/admin/orders/${order.id}`, undefined],
@@ -146,7 +149,9 @@ describe("admin orders: access and input validation (real Postgres)", () => {
           );
         }
       }
-      const row = await world.pool.query("select status from sales_order where id = $1", [order.id]);
+      const row = await world.pool.query("select status from sales_order where id = $1", [
+        order.id,
+      ]);
       expect(row.rows[0]).toEqual({ status: "awaiting_payment" });
     });
 
@@ -290,7 +295,9 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         expect((await cancelRaw(order.id, body)).status, JSON.stringify(body)).toBe(400);
       }
       // Nothing above touched the order.
-      const row = await world.pool.query("select status from sales_order where id = $1", [order.id]);
+      const row = await world.pool.query("select status from sales_order where id = $1", [
+        order.id,
+      ]);
       expect(row.rows[0]).toEqual({ status: "awaiting_payment" });
     });
 
@@ -332,7 +339,9 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         expect(result.status, JSON.stringify(body).slice(0, 80)).toBe(400);
         expect(paths(result)).toContain(expected);
       }
-      const row = await world.pool.query("select status from sales_order where id = $1", [order.id]);
+      const row = await world.pool.query("select status from sales_order where id = $1", [
+        order.id,
+      ]);
       expect(row.rows[0]).toEqual({ status: "awaiting_payment" });
 
       const edge = await world.place([{ quantity: 1 }]);
@@ -341,7 +350,10 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         amount: { amount: edge.total, currency: "UAH" },
       });
       expect(ok.status, JSON.stringify(ok.body)).toBe(200);
-      const stored = await world.pool.query("select payment_reference from sales_order where id = $1", [edge.id]);
+      const stored = await world.pool.query(
+        "select payment_reference from sales_order where id = $1",
+        [edge.id],
+      );
       expect(stored.rows[0]).toEqual({ payment_reference: "r".repeat(255) });
     });
 
@@ -355,14 +367,32 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         [{ reference, amount: { currency: "UAH" } }, "amount.amount:required"],
         [{ reference, amount: { amount: 1000 } }, "amount.currency:required"],
         [{ reference, amount: { amount: "1000", currency: "UAH" } }, "amount.amount:invalid_type"],
-        [{ reference, amount: { amount: 1000.5, currency: "UAH" } }, "amount.amount:not_an_integer"],
+        [
+          { reference, amount: { amount: 1000.5, currency: "UAH" } },
+          "amount.amount:not_an_integer",
+        ],
         [{ reference, amount: { amount: -1, currency: "UAH" } }, "amount.amount:negative_amount"],
-        [{ reference, amount: { amount: 10 ** 12 + 1, currency: "UAH" } }, "amount.amount:amount_out_of_range"],
-        [{ reference, amount: { amount: 1e21, currency: "UAH" } }, "amount.amount:amount_out_of_range"],
-        [{ reference, amount: { amount: 1000, currency: "uah" } }, "amount.currency:unsupported_currency"],
-        [{ reference, amount: { amount: 1000, currency: "XXX" } }, "amount.currency:unsupported_currency"],
+        [
+          { reference, amount: { amount: 10 ** 12 + 1, currency: "UAH" } },
+          "amount.amount:amount_out_of_range",
+        ],
+        [
+          { reference, amount: { amount: 1e21, currency: "UAH" } },
+          "amount.amount:amount_out_of_range",
+        ],
+        [
+          { reference, amount: { amount: 1000, currency: "uah" } },
+          "amount.currency:unsupported_currency",
+        ],
+        [
+          { reference, amount: { amount: 1000, currency: "XXX" } },
+          "amount.currency:unsupported_currency",
+        ],
         [{ reference, amount: { amount: 1000, currency: 980 } }, "amount.currency:invalid_type"],
-        [{ reference, amount: { amount: 1000, currency: "UAH", extra: 1 } }, "amount.extra:unknown_field"],
+        [
+          { reference, amount: { amount: 1000, currency: "UAH", extra: 1 } },
+          "amount.extra:unknown_field",
+        ],
       ];
       for (const [body, expected] of bad) {
         const result = await payRaw(order.id, body);
@@ -379,7 +409,9 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         },
       );
       expect(infinity.status).toBe(400);
-      const row = await world.pool.query("select status from sales_order where id = $1", [order.id]);
+      const row = await world.pool.query("select status from sales_order where id = $1", [
+        order.id,
+      ]);
       expect(row.rows[0]).toEqual({ status: "awaiting_payment" });
     });
 

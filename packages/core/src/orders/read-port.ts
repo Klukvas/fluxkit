@@ -40,7 +40,10 @@ export interface AdminOrderItemView {
   readonly sku: string;
   readonly productTitle: AdminOrderTexts;
   readonly variantTitle: AdminOrderTexts | null;
-  readonly optionValues: readonly { readonly option: AdminOrderTexts; readonly value: AdminOrderTexts }[];
+  readonly optionValues: readonly {
+    readonly option: AdminOrderTexts;
+    readonly value: AdminOrderTexts;
+  }[];
   readonly imageUrl: string | null;
   readonly unitPrice: AdminOrderMoney;
   readonly compareAtAmount: number | null;

@@ -293,9 +293,9 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
       const order = await world.place([{ quantity: 1 }], {}, shopper);
       const asCustomer = (await world.detail(order.id)).body;
       expect(asCustomer).toMatchObject({ customerId: account.id, isGuest: false });
-      expect((await world.list(`?q=${encodeURIComponent(order.number)}`)).body.items[0]).toMatchObject(
-        { customerId: account.id },
-      );
+      expect(
+        (await world.list(`?q=${encodeURIComponent(order.number)}`)).body.items[0],
+      ).toMatchObject({ customerId: account.id });
 
       await deleteTestCustomers(world.db, [account.id]);
       customers.splice(customers.indexOf(account.id), 1);
@@ -304,7 +304,10 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
       expect(afterDelete.contact).toEqual(asCustomer.contact);
 
       const guest = await world.place([{ quantity: 1 }]);
-      expect((await world.detail(guest.id)).body).toMatchObject({ customerId: null, isGuest: true });
+      expect((await world.detail(guest.id)).body).toMatchObject({
+        customerId: null,
+        isGuest: true,
+      });
     });
   });
 
@@ -420,12 +423,10 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
         }),
       );
       const secretEmail = "secret.person@example.test";
-      let secretToken = "";
-      let secretKey = "";
+      const rich = await placeRich();
+      const secretToken = rich.accessToken;
+      const secretKey = rich.key;
       try {
-        const order = await placeRich();
-        secretToken = order.accessToken;
-        secretKey = order.key;
         const secretOrder = await world.place([{ quantity: 1 }], {
           email: secretEmail,
           phone: "+380509998877",
@@ -486,7 +487,9 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
     for (const result of results) {
       expect(result.headers.get("cache-control")).toBe("no-store");
     }
-    expect(results.map((result) => result.status)).toEqual([200, 200, 404, 400, 400, 200, 409, 409]);
+    expect(results.map((result) => result.status)).toEqual([
+      200, 200, 404, 400, 400, 200, 409, 409,
+    ]);
     expect(await changesOf(world.pool, order.id)).toHaveLength(2);
   });
 });

@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { ProblemBody } from "../../common/problem.filter.js";
 import { InventoryService } from "../../inventory/admin/inventory.service.js";
 import { AdminOrdersWorld, type PlacedForAdmin } from "../../test/admin-orders-world.js";
 import { defaultLocationId, levelOf, movementsOf } from "../../test/inventory-fixtures.js";
@@ -137,7 +136,10 @@ describe("admin order actions: cancel, mark-paid, mark-fulfilled (real Postgres)
       const fulfilledBefore = await snapshotOf(fulfilled);
       const onFulfilled = await world.cancel(fulfilled.id, "too late");
       expect(onFulfilled.status).toBe(409);
-      expect(onFulfilled.body).toMatchObject({ code: "rule_violation", rule: "invalid_transition" });
+      expect(onFulfilled.body).toMatchObject({
+        code: "rule_violation",
+        rule: "invalid_transition",
+      });
       expect(await snapshotOf(fulfilled)).toEqual(fulfilledBefore);
 
       const expired = await world.place([{ quantity: 1 }]);
@@ -374,7 +376,7 @@ describe("admin order actions: cancel, mark-paid, mark-fulfilled (real Postgres)
         const before = await snapshotOf(order);
         const result = await world.fulfil(order.id);
         expect(result.status).toBe(409);
-        expect((result.body as ProblemBody).rule).toBe("invalid_transition");
+        expect(result.body.rule).toBe("invalid_transition");
         expect(await snapshotOf(order)).toEqual(before);
       }
     });

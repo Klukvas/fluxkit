@@ -37,8 +37,7 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
     return {
       from,
       to,
-      at: (minute: number) =>
-        new Date(Date.UTC(nextYear, 5, 1, 0, minute, 0)).toISOString(),
+      at: (minute: number) => new Date(Date.UTC(nextYear, 5, 1, 0, minute, 0)).toISOString(),
       query: `placedFrom=${encodeURIComponent(from)}&placedTo=${encodeURIComponent(to)}`,
     };
   }
@@ -191,9 +190,7 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
       expect(await ids(`placedFrom=${encodeURIComponent(shifted)}&placedTo=${at(30)}`)).toEqual([
         b?.id,
       ]);
-      expect(await ids(`placedFrom=${at(0)}&placedTo=${at(59)}&limit=1&offset=1`)).toEqual([
-        b?.id,
-      ]);
+      expect(await ids(`placedFrom=${at(0)}&placedTo=${at(59)}&limit=1&offset=1`)).toEqual([b?.id]);
     });
 
     it("the total counts the whole match, not the page; an offset past the end is an empty page with the same total", async () => {
@@ -233,7 +230,15 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
         expect(await ids(typed), typed).toEqual([target?.id]);
       }
       // Exactly the whole number: a prefix, a suffix, a half or an extra symbol finds nothing.
-      for (const typed of ["1A0B", "C2D3", "1A0B-C2D", "1A0B-C2D3X", "A0B-C2D3", "1A0B-C2D4", "1A0B C2D3"]) {
+      for (const typed of [
+        "1A0B",
+        "C2D3",
+        "1A0B-C2D",
+        "1A0B-C2D3X",
+        "A0B-C2D3",
+        "1A0B-C2D4",
+        "1A0B C2D3",
+      ]) {
         expect(await ids(typed), typed).toEqual([]);
       }
       expect(await ids(other?.number ?? "")).toEqual([other?.id]);
@@ -278,7 +283,9 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
         "alice.exact@example.test' --",
         "1; drop table sales_order",
       ]) {
-        expect(await emails(q), q).not.toEqual(expect.arrayContaining(["alice.exact@example.test"]));
+        expect(await emails(q), q).not.toEqual(
+          expect.arrayContaining(["alice.exact@example.test"]),
+        );
         expect((await world.list(`?${win.query}&q=${encodeURIComponent(q)}`)).status, q).toBe(200);
       }
       expect(await emails("alice_exact@example.test")).toEqual(["alice_exact@example.test"]);
@@ -294,9 +301,7 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
       expect((await world.list(`?${win.query}&q=%20%20`)).body.total).toBe(2);
       const both = await world.list(`?${win.query}&q=shared.buyer%40example.test`);
       expect(both.body.items.map((item) => item.id)).toEqual([two?.id, one?.id]);
-      const paidOnly = await world.list(
-        `?${win.query}&q=shared.buyer%40example.test&status=paid`,
-      );
+      const paidOnly = await world.list(`?${win.query}&q=shared.buyer%40example.test&status=paid`);
       expect(paidOnly.body.items.map((item) => item.id)).toEqual([two?.id]);
       const none = await world.list(
         `?${win.query}&q=${encodeURIComponent(one?.number ?? "")}&status=paid`,
@@ -318,12 +323,10 @@ describe("GET /admin/orders: filters, paging, order and cost (real Postgres)", (
       }
       // Warm the connection pool and the prepared statements so the counts compare like with like.
       await world.list(`?${small.query}`);
-      let one = 0;
-      let fifty = 0;
-      one = await countStatements(() => world.list(`?${small.query}&limit=50`));
+      const one = await countStatements(() => world.list(`?${small.query}&limit=50`));
       const response = await world.list(`?${large.query}&limit=50`);
       expect(response.body.items).toHaveLength(50);
-      fifty = await countStatements(() => world.list(`?${large.query}&limit=50`));
+      const fifty = await countStatements(() => world.list(`?${large.query}&limit=50`));
       expect(one).toBeGreaterThan(0);
       expect(fifty).toBe(one);
     });
