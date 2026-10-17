@@ -45,12 +45,19 @@ export class DomainEventHandlerRegistry implements OnApplicationBootstrap, Domai
   /** Reads the providers again; called once at bootstrap (public so a test can assert on a fresh scan). */
   discover(): void {
     const found = new Map<string, RegisteredHandler[]>();
-    const providers = this.discovery.getProviders({ metadataKey: DOMAIN_EVENT_HANDLER_METADATA });
-    for (const wrapper of providers) {
-      const name = wrapper.name === undefined ? "(unnamed)" : String(wrapper.name);
-      const target: unknown = wrapper.metatype ?? wrapper.instance?.constructor;
-      const raw: unknown = Reflect.getMetadata(DOMAIN_EVENT_HANDLER_METADATA, target as object);
-      const declared = (raw as { eventTypes?: readonly string[] } | undefined)?.eventTypes;
+    // `getProviders({ metadataKey })` only knows decorators made by `DiscoveryService.createDecorator`; a plugin marks
+    // itself with the plain `SetMetadata` (ADR 0018), so the class of every provider is asked for the key here.
+    for (const wrapper of this.discovery.getProviders()) {
+      const target: unknown = wrapper.instance?.constructor ?? wrapper.metatype;
+      if (typeof target !== "function") {
+        continue;
+      }
+      const raw: unknown = Reflect.getMetadata(DOMAIN_EVENT_HANDLER_METADATA, target);
+      if (raw === undefined) {
+        continue;
+      }
+      const name = wrapper.name === undefined ? target.name : String(wrapper.name);
+      const declared = (raw as { eventTypes?: readonly string[] }).eventTypes;
       let metadata;
       try {
         metadata = domainEventHandlerMetadata(declared ?? []);

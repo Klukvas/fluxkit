@@ -29,8 +29,11 @@ export class OrderMaker {
     private readonly baseUrl: () => string,
   ) {}
 
-  async place(lines: MadeLine[] = [{ quantity: 1 }]): Promise<MadeOrder> {
-    const who = new Shopper(this.baseUrl());
+  /** A guest order by default; pass a `Shopper` that holds a customer session cookie for a customer's order. */
+  async place(
+    lines: MadeLine[] = [{ quantity: 1 }],
+    who: Shopper = new Shopper(this.baseUrl()),
+  ): Promise<MadeOrder> {
     const made: MadeOrder["lines"] = [];
     let total = 0;
     for (const line of lines) {

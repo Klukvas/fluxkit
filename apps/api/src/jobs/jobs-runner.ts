@@ -110,10 +110,13 @@ export class JobsRunner {
   }
 }
 
-/** `key=count` for every number or list in a job result that is not zero or empty; `""` when the job did nothing. */
+/** `key=count` for every number or list in a job result that is not zero or empty (`iterations` is bookkeeping); `""` when the job did nothing. */
 export function describeCounts(result: object): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(result)) {
+    if (key === "iterations") {
+      continue;
+    }
     if (typeof value === "number" && value !== 0) {
       parts.push(`${key}=${String(value)}`);
     } else if (Array.isArray(value) && value.length > 0) {

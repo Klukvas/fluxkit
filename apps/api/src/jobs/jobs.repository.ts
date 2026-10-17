@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, inArray, lt, sql, type AnyColumn } from "drizzle-orm";
+import { and, asc, eq, sql, type AnyColumn } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../common/transaction.js";
 import { domainEvent, salesOrder } from "../database/schema/index.js";
 
@@ -42,6 +42,10 @@ function micros(column: AnyColumn) {
  * The queries of the scheduler jobs (Drizzle, parameterized). Knows tables and locks, not rules: the expiry itself is
  * `OrdersService.expireOne`, the cart and session lifetimes are decided when they are written. EVERY time here is a
  * parameter (`now` comes from the caller): nothing reads the database clock, so a test with a fake clock decides.
+ *
+ * The batch deletes name their rows in a MATERIALIZED CTE on purpose. `delete ... where id in (select ... limit n for
+ * update skip locked)` is planned as a nested-loop semi join that runs the subquery again for every candidate row and
+ * deletes MORE than `n` rows (seen in a test: 5 rows for a limit of 2); the CTE is evaluated once.
  */
 @Injectable()
 export class JobsRepository {
@@ -81,17 +85,16 @@ export class JobsRepository {
   }
 
   /**
-   * Deletes up to `limit` carts with `expires_at <= now` (lines go with them by the foreign key). Rows another
-   * transaction holds (a write to the cart in progress) are skipped, and the predicate is repeated on the delete, so a
-   * cart that was written and got a new expiry in the meantime is never deleted. Returns the number deleted.
+   * Deletes up to `limit` carts with `expires_at <= now` (lines go with them by the foreign key). The rows are locked
+   * with `SKIP LOCKED` first: a cart another transaction is writing right now (which will give it a new expiry) is
+   * skipped and stays. Returns the number deleted.
    */
   async deleteExpiredCarts(db: DbExecutor, now: Date, limit: number): Promise<number> {
     const result = await db.execute(sql`
-      delete from cart
-      where id in (
+      with doomed as materialized (
         select id from cart where expires_at <= ${now} order by expires_at limit ${limit} for update skip locked
-      ) and expires_at <= ${now}
-      returning id
+      )
+      delete from cart where id in (select id from doomed) returning id
     `);
     return result.rows.length;
   }
@@ -99,11 +102,10 @@ export class JobsRepository {
   /** Same for customer sessions: the ABSOLUTE `expires_at <= now` only (idle expiry is decided, and deleted, when a session is used). */
   async deleteExpiredCustomerSessions(db: DbExecutor, now: Date, limit: number): Promise<number> {
     const result = await db.execute(sql`
-      delete from customer_session
-      where id in (
+      with doomed as materialized (
         select id from customer_session where expires_at <= ${now} order by expires_at limit ${limit} for update skip locked
-      ) and expires_at <= ${now}
-      returning id
+      )
+      delete from customer_session where id in (select id from doomed) returning id
     `);
     return result.rows.length;
   }
@@ -174,15 +176,12 @@ export class JobsRepository {
 
   /** Deletes up to `limit` events dispatched strictly before `cutoff`. Returns the number deleted. */
   async deleteDispatchedBefore(db: DbExecutor, cutoff: Date, limit: number): Promise<number> {
-    const doomed = db
-      .select({ id: domainEvent.id })
-      .from(domainEvent)
-      .where(lt(domainEvent.dispatchedAt, cutoff))
-      .limit(limit);
-    const deleted = await db
-      .delete(domainEvent)
-      .where(and(inArray(domainEvent.id, doomed), lt(domainEvent.dispatchedAt, cutoff)))
-      .returning({ id: domainEvent.id });
-    return deleted.length;
+    const result = await db.execute(sql`
+      with doomed as materialized (
+        select id from domain_event where dispatched_at < ${cutoff} order by dispatched_at limit ${limit}
+      )
+      delete from domain_event where id in (select id from doomed) returning id
+    `);
+    return result.rows.length;
   }
 }
