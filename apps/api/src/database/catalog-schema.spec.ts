@@ -1420,7 +1420,9 @@ describe("catalog schema (real Postgres)", () => {
         join pg_namespace n on n.oid = c.connamespace
         where n.nspname = 'public' and c.contype <> 'n' and t.relname not in (
           'health_check', 'admin_user', 'admin_session',
-          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
+          'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1439,7 +1441,9 @@ describe("catalog schema (real Postgres)", () => {
         join pg_namespace n on n.oid = t.relnamespace
         where n.nspname = 'public' and t.relname not in (
           'health_check', 'admin_user', 'admin_session',
-          'price', 'location', 'inventory_level', 'stock_movement', 'reservation'
+          'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
+          'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.
