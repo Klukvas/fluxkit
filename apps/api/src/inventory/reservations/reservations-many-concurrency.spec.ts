@@ -594,6 +594,71 @@ describe("transaction-scoped reservations under concurrency (real Postgres)", ()
       expect(await levelOf(pool, entry.variantId, mainId)).toEqual({ on_hand: 5, reserved: 3 });
     });
 
+    it("takes the product, variant and level locks of an order in id order, whatever the order of its lines", async () => {
+      const first = await world.variant({ onHand: 5 });
+      const second = await world.variant({ onHand: 5 });
+      const probe = async (sql: string, params: unknown[]) => {
+        // The order must already hold this row (shared or exclusive), so a NOWAIT lock request is refused.
+        await expect(pool.query(sql, params)).rejects.toMatchObject({ code: "55P03" });
+      };
+      const byVariant = [first, second].sort((a, b) => (a.variantId < b.variantId ? -1 : 1));
+      const byProduct = [first, second].sort((a, b) => (a.productId < b.productId ? -1 : 1));
+      const [lowVariant, highVariant] = [byVariant[0], byVariant[1]];
+      const [lowProduct, highProduct] = [byProduct[0], byProduct[1]];
+      if (!lowVariant || !highVariant || !lowProduct || !highProduct) {
+        throw new Error("two variants expected");
+      }
+      const linesFor = (high: { variantId: string }, low: { variantId: string }) => [
+        { variantId: high.variantId, quantity: 1 },
+        { variantId: low.variantId, quantity: 1 },
+      ];
+
+      // Blocked at the higher product: the lower product row must already be locked.
+      const afterProducts = await expectWaitsForLock(
+        pool,
+        (client) => lockRow(client, "product", highProduct.productId),
+        () => reserveMany(linesFor(highProduct, lowProduct)),
+        "reserveMany (higher product)",
+        () =>
+          probe("select 1 from product where id = $1 for no key update nowait", [
+            lowProduct.productId,
+          ]),
+      );
+      expect(afterProducts.ok).toBe(true);
+
+      // Blocked at the higher variant: the lower variant row must already be locked.
+      const afterVariants = await expectWaitsForLock(
+        pool,
+        (client) => lockRow(client, "variant", highVariant.variantId),
+        () => reserveMany(linesFor(highVariant, lowVariant)),
+        "reserveMany (higher variant)",
+        () =>
+          probe("select 1 from variant where id = $1 for no key update nowait", [
+            lowVariant.variantId,
+          ]),
+      );
+      expect(afterVariants.ok).toBe(true);
+
+      // Blocked at the higher level: the lower level row must already be locked.
+      const afterLevels = await expectWaitsForLock(
+        pool,
+        async (client) => {
+          const locked = await client.query(
+            "select 1 from inventory_level where variant_id = $1 for no key update",
+            [highVariant.variantId],
+          );
+          expect(locked.rowCount).toBe(1);
+        },
+        () => reserveMany(linesFor(highVariant, lowVariant)),
+        "reserveMany (higher level)",
+        () =>
+          probe("select 1 from inventory_level where variant_id = $1 for no key update nowait", [
+            lowVariant.variantId,
+          ]),
+      );
+      expect(afterLevels.ok).toBe(true);
+    });
+
     it("makes releaseIn, commitIn and extend wait for the level row", async () => {
       const entry = await world.variant({ onHand: 10 });
       const toRelease = await reservedLine(

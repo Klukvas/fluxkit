@@ -50,6 +50,8 @@ export async function expectWaitsForLock<T>(
   hold: (client: pg.PoolClient) => Promise<void>,
   request: () => Promise<T>,
   what: string,
+  /** Runs while the request is blocked and the lock is still held (probe which other locks the request holds). */
+  whileBlocked: () => Promise<void> = async () => undefined,
 ): Promise<T> {
   const client = await pool.connect();
   try {
@@ -62,6 +64,7 @@ export async function expectWaitsForLock<T>(
     });
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(settled, `${what} must wait for the lock`).toBe(false);
+    await whileBlocked();
     await client.query("commit");
     return await pending;
   } finally {
