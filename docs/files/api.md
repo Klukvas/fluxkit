@@ -3,7 +3,7 @@
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
 - `src/app.factory.ts` - `createApp` (loads features, passes the admin session settings, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
-- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
+- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
 
@@ -20,6 +20,7 @@
 - `openapi.ts` - OpenAPI helpers: `ApiZodBody`, `ApiZodResponse` (schema from the same zod schema as the validation), `ApiPaginationQuery`, `ApiProblemResponses` and the problem document models.
 - `openapi-formats.ts` - response-only schemas (`uuidSchema`, `timestampSchema`) with OpenAPI formats.
 - `admin-path.ts` - `isAdminPath` (the `/admin` test, case-insensitive like Express routing) and `markAdminResponseUncacheable` (`Cache-Control: no-store`); used by the guard, the auth middleware and the problem filter.
+- `store-path.ts` - `isStorePath` and `isStoreAccountPath` (case-insensitive like Express routing) and `markStoreAccountResponseUncacheable` (`Cache-Control: no-store` for everything under `/store/account`); used by the store CSRF guard, the customers module middleware and the problem filter.
 - `error-summary.ts` - `summarizeError`, `innermostCause`, `errorCode`: what is safe to log about a failure (class names and a code, never the message, which can hold SQL and parameters).
 - `transaction.ts` - `withTransaction` and the `DbExecutor` / `Transaction` types used by repositories and services.
 - `*.spec.ts` - unit tests for the filter, pipe, pagination, Postgres error mapping and transaction helper.
@@ -37,7 +38,7 @@
 - `auth-config.ts` - `AdminAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
 - `admin.guard.ts` - `AdminGuard`: CSRF check, public short circuit, authentication (401), permission (403), once per request; `AdminPathGuard`: the global guard for every path under `/admin`.
 - `csrf.ts` - `assertCsrfSafe(request, scope)`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods; the one rule behind `/admin` (`AdminGuard`, scope `admin`, the default) and `/store` (`StoreCsrfGuard`, scope `store`; only the message differs).
-- `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `@AuthenticatedAdminRoute` (any signed-in admin, no permission: logout, me, change-password), `UseDefaultPermissionByMethod` and `resolveRouteAccess` (route, then controller, then the default by HTTP method). Must not hold role tables: those are in `@fluxkit/core`.
+- `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `@AuthenticatedAdminRoute` (any signed-in admin, no permission: logout, me, change-password), `UseDefaultPermissionByMethod(defaults?)` and `resolveRouteAccess` (route, then controller, then the controller's default pair by HTTP method: `read` for GET and HEAD, `write` otherwise; `CATALOG_DEFAULT_PERMISSIONS` when none is named). Must not hold role tables: those are in `@fluxkit/core`.
 - `auth.controller.ts` - `/admin/auth/*`: login (public; sets the cookie), logout, me, change-password. Thin: validates, calls the service, sets or clears the cookie. No rules.
 - `auth.service.ts` - login (one scrypt per failure, identical 401, core lockout under a row lock, rehash, expired-session cleanup and the new session inside the same locked transaction), me, change-password; logs reason codes only. Must not log emails, passwords, hashes or tokens.
 - `auth.schemas.ts` - zod schemas of the auth bodies and responses (structural limits only; policy runs in core).
@@ -49,7 +50,7 @@
 - `password-policy-errors.ts` - core `validatePassword` result as `errors[]` for a request path.
 - `users/` - owner-only user management: `users.controller.ts` (`@RequirePermission("users.manage")` on the class), `users.service.ts` (core email and password rules, last-owner rule inside a locked transaction, session revocation), `users.schemas.ts`, `users.mapper.ts`; `users.spec.ts` (every route, role matrix, escalation), `users-concurrency.spec.ts` (last owner under concurrent requests and the lock).
 - `current-admin.ts` - `@CurrentAdmin()` parameter decorator; the principal lives in a `WeakMap` keyed by the request.
-- `admin-controller.decorator.ts` - `@AdminController(resource)`: `/admin/<resource>` with the guard, the default permission by method, the Swagger tag, and the 401, 403 and 500 problem responses. Use it for every admin controller.
+- `admin-controller.decorator.ts` - `@AdminController(resource, defaults?)`: `/admin/<resource>` with the guard, the default permission by method (the catalog pair unless `{read, write}` is given, as `/admin/customers` does), the Swagger tag, and the 401, 403 and 500 problem responses. Use it for every admin controller.
 - `auth.module.ts` - global `AuthModule.register(options)`: config, clock, hasher, session service, login throttle, auth and users controllers and services, the authenticator (session-based unless a test replaces it) and the guards.
 - `create-admin.ts` - entry of `pnpm admin:create` (built output run by Node, like `seed.ts`): wires the real terminal prompt, prints `Created <role> <email> (id ...)` or the error, exit code 1 on failure. No logic.
 - `create-admin-command.ts` - the command: argument parsing (`--email`, `--role`; any password-like argument is refused), password from `ADMIN_PASSWORD` or the prompt, core email and password rules, standalone Nest context, insert through `AdminUserRepository`. Creates only: an existing email is refused. Must NOT print or log the password or the hash (unexpected errors are redacted).
@@ -70,7 +71,7 @@
 
 ## Customer auth (`src/customers/auth/`)
 
-Infrastructure of plan step 3a (ADR 0016, `docs/api/customers.md`); no controller yet (register, login and the rest are step 3b).
+Infrastructure of plan step 3a (ADR 0016, `docs/api/customers.md`); the routes that use it are in "Customer accounts" below.
 
 - `customer-auth-config.ts` - `CustomerAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
 - `customer-session.repository.ts` - Drizzle queries on `customer_session` joined to `customer`. Tables only, no rules.
@@ -82,6 +83,17 @@ Infrastructure of plan step 3a (ADR 0016, `docs/api/customers.md`); no controlle
 - `store-csrf.guard.ts` - global `StoreCsrfGuard`: `X-Fluxkit-CSRF: 1` on every state-changing request under `/store`, whatever module serves it (reuses `assertCsrfSafe`).
 - `customer-auth.module.ts` - global `CustomerAuthModule.register({config})`: sessions, authenticator, guards and the `APP_GUARD` of the store CSRF rule.
 - `*.spec.ts` - session service (real Postgres), cookie flags (real Express), guard units, `customer-auth.spec.ts` (end to end through a test probe: identical 401s, expiry, deactivation, revoke, cookie-only, hash-only storage), `customer-admin-separation.spec.ts` (customer cookie on every `/admin` route, admin cookie on customer routes, both cookies, same email), `store-csrf.spec.ts`, `customer-routes.spec.ts` (route walk: marked routes reject anonymous callers, `/store/account` routes must be marked), `customer-auth-config.spec.ts` (config wiring and consistency with core).
+
+## Customer accounts (`src/customers/`)
+
+Plan step 3b (ADR 0016, `docs/api/customers.md`). Core, no feature flag. `customers.module.ts` registers both controllers and a middleware that sets `Cache-Control: no-store` on `/store/account/*`.
+
+- `customer.repository.ts` - Drizzle queries on `customer` (find by normalized email or id, `FOR UPDATE`, list with a literal email prefix via `starts_with`, insert, update, order count over `sales_order`). Tables only, no rules.
+- `account/account.service.ts` - register, login, me, profile update and change-password. The sign-in flow mirrors the admin `AuthService` (identical `401`, one scrypt per failure, lockout through core `registerFailedLogin`, row-locked completion, new session, previous session revoked); rules (email, names, phone, password policy) are core functions. `afterSignIn` is an empty step with `TODO(fluxkit): step 4 merges the guest cart here`. Must not log emails, passwords, tokens or ids.
+- `account/account.controller.ts` - `/store/account/*`: validates, calls the service, sets or clears the cookie. Register and login are the only routes without `@CustomerAuthenticated()`; they carry `@RateLimit("registration")` and `@RateLimit("login")`. No rules here.
+- `account/account.schemas.ts`, `account/customer.mapper.ts` - strict zod bodies (structure only; the admin login and change-password schemas are reused) and the allow-list mapper to `{id, email, firstName, lastName, phone, createdAt}`.
+- `admin/admin-customers.controller.ts`, `admin/admin-customers.service.ts`, `admin/admin-customers.schemas.ts` - `/admin/customers`: `@AdminController("customers", {read: "customers.read", write: "customers.write"})`; list, get with a real order count, activate/deactivate (revokes all sessions in the same transaction under the row lock) and unlock. No create, delete or password route.
+- `*.spec.ts` (real Postgres, HTTP level) - `account-register`, `account-login` (cookie attributes, identical failures, one hash computation per failure, lockout with the injected clock, fixation, rate limit), `account-session` (logout, me ownership, strict PATCH, change-password and session revocation), `account-secrecy` (logs, tables, hash format, responses), `account-separation` (customer and admin principals on the real routes, same email), `admin-customers` (permission matrix, list, get, deactivation, unlock).
 
 ## Catalog (`src/catalog/`)
 
@@ -191,7 +203,8 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
 - `store-routes.ts` - TEST ONLY: `storeRoutes` lists the `/store` routes of the real router with whether each is marked `@CustomerAuthenticated()` (read from the controllers' metadata; an unmatched route fails loudly).
 - `customer-probe.ts` - TEST ONLY, excluded from the build: probe controllers (customer-authenticated, public, rate-limited, sign-in and sign-out stand-ins) registered through `extraFeatures`, and a route under `/store/account` that forgot the decorator, for the route-walk test.
-- `customer-fixtures.ts` - TEST ONLY: inserts and deletes customers directly (placeholder hash; sessions come from the session service).
+- `customer-fixtures.ts` - TEST ONLY: inserts and deletes customers directly (placeholder hash, or a real one with `password`, so the customer can sign in).
+- `customer-http.ts` - TEST ONLY: `customerLogin`, `customerLoginCookie`, `customerCookieOf` and `customerSetCookieOf` for specs that sign in through the real endpoint.
 - `env.ts` - `requireEnv` and `requireTestDatabaseUrl` (fail, never skip, when a service variable or a non-`_test` database is used).
 - `scratch-database.ts` - TEST ONLY: `createScratchDatabase()` creates (and drops) an empty `fluxkit_mig_<random>_test` database beside the test database, for specs that need "nothing migrated" without wiping the shared one.
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.

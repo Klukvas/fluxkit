@@ -10,6 +10,7 @@ import {
   DEFAULT_CUSTOMER_AUTH_CONFIG,
   type CustomerAuthConfig,
 } from "./customers/auth/customer-auth-config.js";
+import { CustomersModule } from "./customers/customers.module.js";
 import { CommonModule } from "./common/common.module.js";
 import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
@@ -59,6 +60,7 @@ export class AppModule {
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
         HealthModule,
+        CustomersModule,
         CatalogModule,
         InventoryModule,
         ...options.features.map((feature) => feature.module),

@@ -1,6 +1,6 @@
 # API: admin auth and users
 
-Sign-in flow and user management of the admin API (`/admin/auth/*`, `/admin/users/*`). Model and decisions: `docs/adr/0009-admin-auth.md`. Customer accounts have their own page, `docs/api/customers.md`. Conventions shared with the catalog (CSRF header, problem+json, pagination, session cookie): `docs/api/catalog.md`.
+Sign-in flow and user management of the admin API (`/admin/auth/*`, `/admin/users/*`). Model and decisions: `docs/adr/0009-admin-auth.md`. Customer accounts and `/admin/customers` (permissions `customers.read` and `customers.write`, owner and manager) have their own page, `docs/api/customers.md`. Conventions shared with the catalog (CSRF header, problem+json, pagination, session cookie): `docs/api/catalog.md`.
 Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: auth is core.
 
 Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: application/json` with a body), also login. Auth levels used below: `public` (no session), `signed in` (any role, no particular permission), `users.manage` (owner only).

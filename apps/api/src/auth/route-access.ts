@@ -1,6 +1,6 @@
 import { SetMetadata, type Type } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
-import type { AdminPermission } from "@fluxkit/core";
+import { isAdminPermission, type AdminPermission } from "@fluxkit/core";
 
 const PERMISSION_KEY = "fluxkit:admin:permission";
 const PUBLIC_KEY = "fluxkit:admin:public";
@@ -22,14 +22,43 @@ export const PublicAdminRoute = (): MethodDecorator & ClassDecorator =>
 export const AuthenticatedAdminRoute = (): MethodDecorator & ClassDecorator =>
   SetMetadata(AUTHENTICATED_KEY, true);
 
-/** Set by `@AdminController`: routes without their own `@RequirePermission` get the default of their HTTP method. */
-export const UseDefaultPermissionByMethod = (): ClassDecorator => SetMetadata(DEFAULTS_KEY, true);
+/** The permission a controller's routes get by default: `read` for GET and HEAD, `write` for every other method. */
+export interface DefaultPermissions {
+  readonly read: AdminPermission;
+  readonly write: AdminPermission;
+}
+
+/** The default of every controller that does not name its own pair: the catalog permissions. */
+export const CATALOG_DEFAULT_PERMISSIONS: DefaultPermissions = Object.freeze({
+  read: "catalog.read",
+  write: "catalog.write",
+});
+
+/**
+ * Set by `@AdminController`: routes without their own `@RequirePermission` get the default of their HTTP method
+ * (the catalog pair unless the controller names another, for example `customers.read` and `customers.write`).
+ */
+export const UseDefaultPermissionByMethod = (
+  defaults: DefaultPermissions = CATALOG_DEFAULT_PERMISSIONS,
+): ClassDecorator => {
+  if (!isAdminPermission(defaults.read) || !isAdminPermission(defaults.write)) {
+    // A typo must fail at startup, not become a route nobody can call (or one anybody can).
+    throw new Error("The default permissions of an admin controller must be existing permissions");
+  }
+  return SetMetadata(DEFAULTS_KEY, { read: defaults.read, write: defaults.write });
+};
 
 const READ_METHODS = new Set(["GET", "HEAD"]);
 
-/** `catalog.read` for GET and HEAD, `catalog.write` for everything else (including `@All` routes and OPTIONS handlers). */
-export function defaultPermissionForMethod(httpMethod: string): AdminPermission {
-  return READ_METHODS.has(httpMethod.toUpperCase()) ? "catalog.read" : "catalog.write";
+/**
+ * `defaults.read` for GET and HEAD, `defaults.write` for everything else (including `@All` routes and OPTIONS
+ * handlers). Without a pair: `catalog.read` and `catalog.write`.
+ */
+export function defaultPermissionForMethod(
+  httpMethod: string,
+  defaults: DefaultPermissions = CATALOG_DEFAULT_PERMISSIONS,
+): AdminPermission {
+  return READ_METHODS.has(httpMethod.toUpperCase()) ? defaults.read : defaults.write;
 }
 
 export type RouteAccess =
@@ -80,10 +109,11 @@ export function resolveRouteAccess(
       };
     }
   }
-  if (reflector.get<boolean | undefined>(DEFAULTS_KEY, controller) === true) {
+  const defaults = reflector.get<DefaultPermissions | undefined>(DEFAULTS_KEY, controller);
+  if (defaults !== undefined) {
     return {
       kind: "permission",
-      permission: defaultPermissionForMethod(httpMethod),
+      permission: defaultPermissionForMethod(httpMethod, defaults),
       source: "default",
     };
   }

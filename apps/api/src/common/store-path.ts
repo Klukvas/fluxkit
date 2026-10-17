@@ -8,3 +8,25 @@ const STORE_PATH = /^\/store(?:\/|$)/i;
 export function isStorePath(path: string): boolean {
   return STORE_PATH.test(path);
 }
+
+const STORE_ACCOUNT_PATH = /^\/store\/account(?:\/|$)/i;
+
+/** `/store/account` and everything below it (customer accounts, later the customer's orders), matched like `isStorePath`. */
+export function isStoreAccountPath(path: string): boolean {
+  return STORE_ACCOUNT_PATH.test(path);
+}
+
+/**
+ * Responses under `/store/account` carry personal data and session state and must never be stored by a browser or a
+ * shared cache (errors included: 400, 401, 403, 409, 429), the public routes (register, login) too. A middleware
+ * calls this for every request; the problem filter calls it too, for failures that happen before any middleware
+ * runs (a body-parser 413).
+ */
+export function markStoreAccountResponseUncacheable(
+  request: { path: string },
+  response: { setHeader(name: string, value: string): unknown },
+): void {
+  if (isStoreAccountPath(request.path)) {
+    response.setHeader("Cache-Control", "no-store");
+  }
+}
