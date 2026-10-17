@@ -80,3 +80,34 @@ describe("assertCsrfSafe", () => {
     ).not.toThrow();
   });
 });
+
+describe("assertCsrfSafe messages by scope", () => {
+  function messageOf(call: () => void): string {
+    try {
+      call();
+    } catch (error) {
+      return (error as Error).message;
+    }
+    throw new Error("expected a throw");
+  }
+
+  it("names the admin by default (unchanged) and the store when asked", () => {
+    expect(messageOf(() => assertCsrfSafe(request("POST")))).toBe(
+      "State-changing admin requests must send the header X-Fluxkit-CSRF: 1.",
+    );
+    expect(messageOf(() => assertCsrfSafe(request("POST"), "store"))).toBe(
+      "State-changing store requests must send the header X-Fluxkit-CSRF: 1.",
+    );
+    expect(
+      messageOf(() => assertCsrfSafe(request("POST", { ...OK, "content-length": "2" }), "store")),
+    ).toBe("State-changing store requests with a body must use Content-Type: application/json.");
+  });
+
+  it("applies the same rules to the store: exempt safe methods, header and JSON required", () => {
+    expect(() => assertCsrfSafe(request("GET"), "store")).not.toThrow();
+    expect(() => assertCsrfSafe(request("DELETE", OK), "store")).not.toThrow();
+    expect(() => assertCsrfSafe(request("PATCH"), "store")).toThrowError(
+      expect.objectContaining({ code: "forbidden" }) as Error,
+    );
+  });
+});

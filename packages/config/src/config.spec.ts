@@ -127,6 +127,75 @@ describe("loadEnv admin auth", () => {
   );
 });
 
+describe("loadEnv customer auth", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to a secure cookie, 43 200 idle minutes (30 days) and 2 160 maximum hours (90 days)", () => {
+    const env = loadEnv(base);
+    expect(env.storeCookieSecure).toBe(true);
+    expect(env.customerSessionIdleMinutes).toBe(43_200);
+    expect(env.customerSessionMaxHours).toBe(2_160);
+  });
+
+  it("parses explicit values and keeps them separate from the admin ones", () => {
+    const env = loadEnv({
+      ...base,
+      STORE_COOKIE_SECURE: "false",
+      CUSTOMER_SESSION_IDLE_MINUTES: "60",
+      CUSTOMER_SESSION_MAX_HOURS: "12",
+    });
+    expect(env).toMatchObject({
+      storeCookieSecure: false,
+      customerSessionIdleMinutes: 60,
+      customerSessionMaxHours: 12,
+      adminCookieSecure: true,
+      adminSessionIdleMinutes: 720,
+      adminSessionMaxHours: 168,
+    });
+  });
+
+  it("accepts the upper bounds exactly (one year)", () => {
+    const env = loadEnv({
+      ...base,
+      CUSTOMER_SESSION_IDLE_MINUTES: "525600",
+      CUSTOMER_SESSION_MAX_HOURS: "8760",
+    });
+    expect(env.customerSessionIdleMinutes).toBe(525_600);
+    expect(env.customerSessionMaxHours).toBe(8_760);
+  });
+
+  it.each(["TRUE", "False", "1", "0", "yes", "", " true"])(
+    "rejects STORE_COOKIE_SECURE=%j loudly instead of guessing",
+    (value) => {
+      expect(() => loadEnv({ ...base, STORE_COOKIE_SECURE: value })).toThrow(/STORE_COOKIE_SECURE/);
+    },
+  );
+
+  it.each(["0", "-5", "1.5", "abc", "", "1e3", "0x10", " 12", "525601", "99999999"])(
+    "rejects CUSTOMER_SESSION_IDLE_MINUTES=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, CUSTOMER_SESSION_IDLE_MINUTES: value })).toThrow(
+        /CUSTOMER_SESSION_IDLE_MINUTES/,
+      );
+    },
+  );
+
+  it.each(["0", "-5", "1.5", "abc", "", "1e3", "0x10", " 12", "8761", "99999999"])(
+    "rejects CUSTOMER_SESSION_MAX_HOURS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, CUSTOMER_SESSION_MAX_HOURS: value })).toThrow(
+        /CUSTOMER_SESSION_MAX_HOURS/,
+      );
+    },
+  );
+
+  it("does not let the admin variables change the customer ones", () => {
+    const env = loadEnv({ ...base, ADMIN_COOKIE_SECURE: "false", ADMIN_SESSION_IDLE_MINUTES: "5" });
+    expect(env.storeCookieSecure).toBe(true);
+    expect(env.customerSessionIdleMinutes).toBe(43_200);
+  });
+});
+
 describe("loadEnv pricing", () => {
   const base = { DATABASE_URL: "postgres://x" };
 

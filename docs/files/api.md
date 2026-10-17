@@ -3,7 +3,7 @@
 - `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
 - `src/app.factory.ts` - `createApp` (loads features, passes the admin session settings, builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export.
-- `src/app.module.ts` - root module; composes database, auth, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
+- `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, common, health, catalog, inventory and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
 
@@ -36,12 +36,13 @@
 - `clock.ts` - `Clock` and `SystemClock`, injected so tests control time.
 - `auth-config.ts` - `AdminAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
 - `admin.guard.ts` - `AdminGuard`: CSRF check, public short circuit, authentication (401), permission (403), once per request; `AdminPathGuard`: the global guard for every path under `/admin`.
-- `csrf.ts` - `assertCsrfSafe`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods.
+- `csrf.ts` - `assertCsrfSafe(request, scope)`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods; the one rule behind `/admin` (`AdminGuard`, scope `admin`, the default) and `/store` (`StoreCsrfGuard`, scope `store`; only the message differs).
 - `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `@AuthenticatedAdminRoute` (any signed-in admin, no permission: logout, me, change-password), `UseDefaultPermissionByMethod` and `resolveRouteAccess` (route, then controller, then the default by HTTP method). Must not hold role tables: those are in `@fluxkit/core`.
 - `auth.controller.ts` - `/admin/auth/*`: login (public; sets the cookie), logout, me, change-password. Thin: validates, calls the service, sets or clears the cookie. No rules.
 - `auth.service.ts` - login (one scrypt per failure, identical 401, core lockout under a row lock, rehash, expired-session cleanup and the new session inside the same locked transaction), me, change-password; logs reason codes only. Must not log emails, passwords, hashes or tokens.
 - `auth.schemas.ts` - zod schemas of the auth bodies and responses (structural limits only; policy runs in core).
-- `login-throttle.ts` - per client address fixed-window login limit, in memory, bounded, clock injected; `throttleKeyOf` keys IPv6 by its /64 prefix and maps IPv4-mapped addresses to IPv4. Single process only (documented in the file).
+- `login-throttle.ts` - `LoginThrottle`: the ADMIN login limit (20 per 10 minutes), a thin subclass of `IpWindowLimiter` (`src/rate-limit/`); re-exports `throttleKeyOf`. Behaviour unchanged by the generalization.
+- `session-token.ts` - shared by admin and customer sessions: `generateSessionToken` (32 random bytes, base64url), `hashSessionToken` (SHA-256 hex), `isWellFormedSessionToken`, `SESSION_TOKEN_PATTERN` and `readTokenCookie` (exact cookie name, first well-formed occurrence, never throws). Must not know a cookie name or a table.
 - `admin-no-store.middleware.ts` - sets `Cache-Control: no-store` on every `/admin` response; registered by `AuthModule.configure`.
 - `admin-user.repository.ts` - Drizzle queries on `admin_user` (find, list, insert, update, row lock, active owners) and the key of the advisory lock that serializes owner changes. Queries only, no rules.
 - `admin-user.mapper.ts` - row to the user shape of the auth responses (an allow list: the hash cannot leak).
@@ -58,6 +59,29 @@
 - `create-admin-prompt.ts` - no-echo prompt on node `readline` (typed characters go to a sink stream); asks twice, rejects when the input ends.
 - `create-admin-command.spec.ts`, `create-admin-prompt.spec.ts`, `create-admin-entry.spec.ts` - arguments, password sources, real-Postgres creation and refusals, secrecy, and the built entry run as a real process (needs `pnpm build`, which `pnpm test` does).
 - `*.spec.ts` - hasher, cookie, CSRF, session service (real Postgres), guard unit tests, `login-throttle.spec.ts`, `auth-login.spec.ts` (identical failures, lockout, IP limit, logging), `auth-session-endpoints.spec.ts` (logout, me, change-password), `auth-secrecy.spec.ts` (no hash in any response or log); `admin-default-deny.spec.ts` (401 on every route, probe controllers), `admin-permissions.spec.ts` (route walk, role matrix), `admin-csrf.spec.ts` (CSRF and no-CORS), `session-authentication.spec.ts` (cookie end to end), `auth-consistency.spec.ts` (`ROLES` vs the database CHECK, config defaults vs core), `auth-login-race.spec.ts` (login racing a password reset), `session-cleanup.spec.ts` (bootstrap cleanup), `admin-no-store.spec.ts` (`Cache-Control`).
+
+## Rate limits (`src/rate-limit/`)
+
+- `ip-window-limiter.ts` - `IpWindowLimiter`: one per client address fixed-window limit, in memory, bounded (`maxClients`), clock injected; `throttleKeyOf` keys IPv6 by its /64 prefix and maps IPv4-mapped addresses to IPv4. Single process only (documented in the file). The code of the former admin login throttle, moved here unchanged.
+- `rate-limiter.ts` - `RATE_LIMITS` (named internal limits: `login`, `registration`, `checkout`, `orderLookup`, `guestCancel`, `cartWrite`) and `RateLimiter`, one `IpWindowLimiter` per name so limits never share counts.
+- `rate-limit.decorator.ts`, `rate-limit.guard.ts` - `@RateLimit(name)` on a route or controller and the guard behind it: `429 too_many_requests` with `Retry-After`. A route without the decorator is not limited.
+- `rate-limit.module.ts` - global `RateLimitModule.register(overrides?)` (the overrides are for tests). Needs `CLOCK` from `AuthModule`.
+- `*.spec.ts` - windows, per-key and per-name isolation, IPv6 /64 grouping, bounded memory, the guard unit and the real-app `429`; `ip-window-limiter.spec.ts` also asserts the admin throttle is the same limiter with its own limit.
+
+## Customer auth (`src/customers/auth/`)
+
+Infrastructure of plan step 3a (ADR 0016, `docs/api/customers.md`); no controller yet (register, login and the rest are step 3b).
+
+- `customer-auth-config.ts` - `CustomerAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
+- `customer-session.repository.ts` - Drizzle queries on `customer_session` joined to `customer`. Tables only, no rules.
+- `customer-session.service.ts` - `create` (always a new token; only its SHA-256 stored; optionally inside the caller's transaction), `resolve` (core `evaluateSession`, active customer, read from the database every call, `last_seen_at` touched at most once a minute, expired sessions deleted), `revoke`, `revokeSession`, `revokeAllForCustomer` (optionally keeping one session). Never logs tokens.
+- `customer-session-cookie.ts` - cookie name `fluxkit_customer_session`, `readCustomerSessionCookie` (that name only), `setCustomerSessionCookie` / `clearCustomerSessionCookie` (`HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure`). Must not hold session rules.
+- `customer-authenticator.ts`, `session-customer-authenticator.ts` - the `CustomerPrincipal` (`customerId`, `email`, `sessionId`; no role) and the production authenticator: cookie only, never a header, query or the admin cookie; internal failures are rethrown (500).
+- `current-customer.ts` - `@CurrentCustomer()`; the principal lives in a request-keyed `WeakMap`.
+- `customer.guard.ts`, `customer-authenticated.decorator.ts`, `customer-route.ts` - `@CustomerAuthenticated()` (method or controller) marks a store route as customer-authenticated; `CustomerGuard` answers the identical `401`, sets `Cache-Control: no-store` and checks a request once. The store stays public by default.
+- `store-csrf.guard.ts` - global `StoreCsrfGuard`: `X-Fluxkit-CSRF: 1` on every state-changing request under `/store`, whatever module serves it (reuses `assertCsrfSafe`).
+- `customer-auth.module.ts` - global `CustomerAuthModule.register({config})`: sessions, authenticator, guards and the `APP_GUARD` of the store CSRF rule.
+- `*.spec.ts` - session service (real Postgres), cookie flags (real Express), guard units, `customer-auth.spec.ts` (end to end through a test probe: identical 401s, expiry, deactivation, revoke, cookie-only, hash-only storage), `customer-admin-separation.spec.ts` (customer cookie on every `/admin` route, admin cookie on customer routes, both cookies, same email), `store-csrf.spec.ts`, `customer-routes.spec.ts` (route walk: marked routes reject anonymous callers, `/store/account` routes must be marked), `customer-auth-config.spec.ts` (config wiring and consistency with core).
 
 ## Catalog (`src/catalog/`)
 
@@ -159,12 +183,15 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 
 ## Test support (`src/test/`)
 
-- `app.ts` - `startApp` (listening test app): default test authenticator signs in as an owner (`adminPrincipal: { role }` for another role), `"production-default"` runs the real session authenticator, plus a controlled `clock`, `extraFeatures` (probe controllers) and cheap scrypt parameters.
+- `app.ts` - `startApp` (listening test app; `storeCookieSecure`, `customerSessionIdleMinutes` and `customerSessionMaxHours` configure customer sessions): default test authenticator signs in as an owner (`adminPrincipal: { role }` for another role), `"production-default"` runs the real session authenticator, plus a controlled `clock`, `extraFeatures` (probe controllers) and cheap scrypt parameters.
 - `allow-all-admin-authenticator.ts` - TEST ONLY: signs every admin request in as one fixed user (owner by default) and `testPrincipal`. Never import outside `src/test` or specs.
 - `fake-clock.ts` - TEST ONLY: a `Clock` the test moves by hand.
 - `admin-user-fixtures.ts` - TEST ONLY: inserts and deletes admin users directly; with `password` the hash is real, so the user can log in.
 - `auth-http.ts` - TEST ONLY: `login`, `loginCookie` and `sessionCookieOf` for specs that sign in through the real endpoint.
 - `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
+- `store-routes.ts` - TEST ONLY: `storeRoutes` lists the `/store` routes of the real router with whether each is marked `@CustomerAuthenticated()` (read from the controllers' metadata; an unmatched route fails loudly).
+- `customer-probe.ts` - TEST ONLY, excluded from the build: probe controllers (customer-authenticated, public, rate-limited, sign-in and sign-out stand-ins) registered through `extraFeatures`, and a route under `/store/account` that forgot the decorator, for the route-walk test.
+- `customer-fixtures.ts` - TEST ONLY: inserts and deletes customers directly (placeholder hash; sessions come from the session service).
 - `env.ts` - `requireEnv` and `requireTestDatabaseUrl` (fail, never skip, when a service variable or a non-`_test` database is used).
 - `scratch-database.ts` - TEST ONLY: `createScratchDatabase()` creates (and drops) an empty `fluxkit_mig_<random>_test` database beside the test database, for specs that need "nothing migrated" without wiping the shared one.
 - `migrate.ts` - `ensureMigrated()`: brings the test database to exactly the migrations in `drizzle/meta/_journal.json`.

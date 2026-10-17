@@ -52,7 +52,7 @@ Pure decisions only: no hashing, no cookies, no random numbers, no clock (`now` 
 - `src/auth/password-policy.ts` - `PASSWORD_LIMITS` (12 to 128 code points), `validatePassword`: `too_short`, `too_long`, `equals_email`, `not_a_string`, `contains_nul`. No composition rules. Must not hash.
 - `src/auth/email.ts` - `normalizeEmail` (trim, lower-case; the stored form), `validateEmail` (a small format check, not the RFC; returns the normalized email).
 - `src/auth/lockout.ts` - `LOCKOUT_DEFAULTS` (5 failures, 15 minutes), `isLocked`, `registerFailedLogin`, `registerSuccessfulLogin`. Returns the new counter and lock; does not write them.
-- `src/auth/session.ts` - `SESSION_DEFAULTS` (720 idle minutes, 168 hours), `evaluateSession` (`idle_timeout`, `max_lifetime`, `invalid_session`; a limit reached exactly is expired), `shouldTouchSession` (at most once a minute), `sessionExpiry`. Must not read the clock.
+- `src/auth/session.ts` - `SESSION_DEFAULTS` (720 idle minutes, 168 hours), `CUSTOMER_SESSION_DEFAULTS` (43 200 idle minutes = 30 days, 2 160 hours = 90 days; ADR 0016) and `SESSION_BOUNDS` (at most one year for either limit; `@fluxkit/config` repeats the numbers, a test in apps/api asserts they agree; customers reuse `evaluateSession`, `normalizeEmail`, the password policy and the lockout rules unchanged), `evaluateSession` (`idle_timeout`, `max_lifetime`, `invalid_session`; a limit reached exactly is expired), `shouldTouchSession` (at most once a minute), `sessionExpiry`. Must not read the clock.
 - `src/auth/user-rules.ts` - `decideUserChange`: the last active owner cannot be demoted or deactivated; unknown roles are rejected. The caller passes the active owner ids read in the same transaction.
 
 ## Money (ADR 0011)

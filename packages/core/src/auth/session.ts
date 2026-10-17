@@ -1,5 +1,18 @@
 export const SESSION_DEFAULTS = Object.freeze({ idleMinutes: 720, maxHours: 168 });
 
+/**
+ * Customer session limits (ADR 0016): 30 days idle, 90 days absolute. Customers are shoppers on their own devices, so
+ * they stay signed in much longer than back-office users. The same `evaluateSession` rules apply.
+ */
+export const CUSTOMER_SESSION_DEFAULTS = Object.freeze({ idleMinutes: 43_200, maxHours: 2_160 });
+
+/**
+ * Largest configurable limits, for admin and customer sessions alike: one year. A larger value is almost certainly a
+ * typo and would only postpone expiry to "never". `@fluxkit/config` repeats the numbers (it does not depend on core);
+ * a test in apps/api asserts they agree.
+ */
+export const SESSION_BOUNDS = Object.freeze({ maxIdleMinutes: 525_600, maxMaxHours: 8_760 });
+
 /** How far a stored timestamp may be ahead of `now` (clock skew between API instances and the database). */
 export const SESSION_CLOCK_SKEW_MS = 5 * 60_000;
 /** `last_seen_at` is refreshed at most this often. */

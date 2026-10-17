@@ -1,43 +1,16 @@
 import type { CookieOptions, Response } from "express";
+import { readTokenCookie, SESSION_TOKEN_PATTERN } from "./session-token.js";
 
 export const SESSION_COOKIE_NAME = "fluxkit_admin_session";
 
-/** 32 random bytes as unpadded base64url. Anything else cannot be a token we issued. */
-export const SESSION_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
+export { SESSION_TOKEN_PATTERN };
 
 /**
- * A Cookie header longer than this is ignored. Node already caps the whole header block (16 KiB by default), and
- * browsers send far less; the cap only bounds the work done on a hostile header.
- */
-const MAX_COOKIE_HEADER_LENGTH = 8192;
-
-/**
- * The session token from a `Cookie` header, or `undefined`. Never throws. When the cookie is repeated (for example
- * one set by a sibling path or subdomain) only the first occurrence with a well-formed value is used; the rest are
- * ignored. The value is not percent-decoded or unquoted: a token we issued never needs it.
+ * The session token from a `Cookie` header, or `undefined`. Never throws. See `readTokenCookie` for how repeated,
+ * malformed and look-alike cookies are treated.
  */
 export function readSessionCookie(header: string | undefined): string | undefined {
-  if (
-    typeof header !== "string" ||
-    header.length === 0 ||
-    header.length > MAX_COOKIE_HEADER_LENGTH
-  ) {
-    return undefined;
-  }
-  for (const pair of header.split(";")) {
-    const separator = pair.indexOf("=");
-    if (separator === -1) {
-      continue;
-    }
-    if (pair.slice(0, separator).trim() !== SESSION_COOKIE_NAME) {
-      continue;
-    }
-    const value = pair.slice(separator + 1).trim();
-    if (SESSION_TOKEN_PATTERN.test(value)) {
-      return value;
-    }
-  }
-  return undefined;
+  return readTokenCookie(header, SESSION_COOKIE_NAME);
 }
 
 export interface SessionCookieSettings {

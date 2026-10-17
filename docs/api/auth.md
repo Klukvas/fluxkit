@@ -1,6 +1,6 @@
 # API: admin auth and users
 
-Sign-in flow and user management of the admin API (`/admin/auth/*`, `/admin/users/*`). Model and decisions: `docs/adr/0009-admin-auth.md`. Conventions shared with the catalog (CSRF header, problem+json, pagination, session cookie): `docs/api/catalog.md`.
+Sign-in flow and user management of the admin API (`/admin/auth/*`, `/admin/users/*`). Model and decisions: `docs/adr/0009-admin-auth.md`. Customer accounts have their own page, `docs/api/customers.md`. Conventions shared with the catalog (CSRF header, problem+json, pagination, session cookie): `docs/api/catalog.md`.
 Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: auth is core.
 
 Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: application/json` with a body), also login. Auth levels used below: `public` (no session), `signed in` (any role, no particular permission), `users.manage` (owner only).
@@ -21,7 +21,7 @@ Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: appli
 - **Client IP limit** (memory, per process): 20 login attempts per 10 minutes per client address (`request.ip`), successful ones included. An IPv6 client is counted by its /64 prefix (the whole subnet shares one window); an IPv4-mapped IPv6 address counts as its IPv4 address. The 21st answers `429 too_many_requests` with `Retry-After` (seconds until the window ends) before any account lookup or hashing, so a throttled client learns nothing about accounts. The counter is lost on restart and not shared between API instances; behind a reverse proxy configure Express `trust proxy`, otherwise all clients share one window.
 - **Success** also stamps `last_login_at`, stores a fresh hash when the stored scrypt parameters are not the current ones, deletes that user's expired sessions and creates the new session, all in one transaction under the user's row lock (a concurrent password reset or change therefore ends the new session too).
 - **Locked out?** Wait 15 minutes, have another owner reset the password (`POST /admin/users/{id}/reset-password` clears the lock), or run `pnpm admin:unlock --email <address>` on the server (README, Admin sign-in; ADR 0010).
-- **No caching.** Every response under `/admin`, errors and `401`, `403`, `429` included, carries `Cache-Control: no-store`. `/store/*` and `/health` do not.
+- **No caching.** Every response under `/admin`, errors and `401`, `403`, `429` included, carries `Cache-Control: no-store`. `/store/*` and `/health` do not (customer-authenticated store routes do, `docs/api/customers.md`).
 
 ## Users
 

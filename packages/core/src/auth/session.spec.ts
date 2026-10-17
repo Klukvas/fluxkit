@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { deepFreeze } from "../catalog/test-support.js";
-import { SESSION_DEFAULTS, evaluateSession, sessionExpiry, shouldTouchSession } from "./session.js";
+import {
+  CUSTOMER_SESSION_DEFAULTS,
+  SESSION_BOUNDS,
+  SESSION_DEFAULTS,
+  evaluateSession,
+  sessionExpiry,
+  shouldTouchSession,
+} from "./session.js";
 
 const createdAt = new Date("2026-10-16T00:00:00.000Z");
 const config = { idleMinutes: 60, maxHours: 24 };
@@ -11,6 +18,50 @@ const HOUR = 60 * MIN;
 describe("SESSION_DEFAULTS", () => {
   it("is 720 idle minutes and 168 hours", () => {
     expect(SESSION_DEFAULTS).toEqual({ idleMinutes: 720, maxHours: 168 });
+  });
+});
+
+describe("CUSTOMER_SESSION_DEFAULTS (ADR 0016)", () => {
+  it("is 30 days idle (43 200 minutes) and 90 days absolute (2 160 hours)", () => {
+    expect(CUSTOMER_SESSION_DEFAULTS).toEqual({ idleMinutes: 43_200, maxHours: 2_160 });
+    expect(CUSTOMER_SESSION_DEFAULTS.idleMinutes).toBe(30 * 24 * 60);
+    expect(CUSTOMER_SESSION_DEFAULTS.maxHours).toBe(90 * 24);
+  });
+
+  it("is frozen, so no caller can loosen the default", () => {
+    expect(Object.isFrozen(CUSTOMER_SESSION_DEFAULTS)).toBe(true);
+  });
+
+  it("is longer than the admin limits and inside the configurable bounds", () => {
+    expect(CUSTOMER_SESSION_DEFAULTS.idleMinutes).toBeGreaterThan(SESSION_DEFAULTS.idleMinutes);
+    expect(CUSTOMER_SESSION_DEFAULTS.maxHours).toBeGreaterThan(SESSION_DEFAULTS.maxHours);
+    expect(CUSTOMER_SESSION_DEFAULTS.idleMinutes).toBeLessThanOrEqual(
+      SESSION_BOUNDS.maxIdleMinutes,
+    );
+    expect(CUSTOMER_SESSION_DEFAULTS.maxHours).toBeLessThanOrEqual(SESSION_BOUNDS.maxMaxHours);
+  });
+
+  it("SESSION_BOUNDS is one year for both limits (a larger value is a typo, not a policy)", () => {
+    expect(SESSION_BOUNDS).toEqual({ maxIdleMinutes: 525_600, maxMaxHours: 8_760 });
+    expect(Object.isFrozen(SESSION_BOUNDS)).toBe(true);
+  });
+
+  it("evaluateSession applies the customer limits: idle 30 days, absolute 90 days", () => {
+    const limits = CUSTOMER_SESSION_DEFAULTS;
+    const day = 24 * HOUR;
+    const lastSeenAt = at(createdAt, 40 * day);
+    const session = { createdAt, lastSeenAt };
+    expect(evaluateSession(session, at(lastSeenAt, 30 * day - 1), limits)).toEqual({ valid: true });
+    expect(evaluateSession(session, at(lastSeenAt, 30 * day), limits)).toEqual({
+      valid: false,
+      reason: "idle_timeout",
+    });
+    const recent = { createdAt, lastSeenAt: at(createdAt, 89 * day) };
+    expect(evaluateSession(recent, at(createdAt, 90 * day - 1), limits)).toEqual({ valid: true });
+    expect(evaluateSession(recent, at(createdAt, 90 * day), limits)).toEqual({
+      valid: false,
+      reason: "max_lifetime",
+    });
   });
 });
 
