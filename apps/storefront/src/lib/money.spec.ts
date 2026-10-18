@@ -137,6 +137,20 @@ describe("formatMoney", () => {
     );
   });
 
+  it.each([
+    [8047233836362285, "$80,472,338,363,622.85"],
+    [8804591093332515, "$88,045,910,933,325.15"],
+    [7957584862547021, "$79,575,848,625,470.21"],
+  ])(
+    "keeps the exact cents of %d, where amount / 100 in floating point is off by one cent",
+    (amount, expected) => {
+      // Above the API's 10^12 limit on purpose: only there do doubles and exact integers part, so only here can a test
+      // tell integer arithmetic from float arithmetic.
+      expect(plain(formatMoney({ amount, currency: "USD" }, 2, "en"))).toBe(expected);
+      expect(minorUnitsToDecimalString(amount, 2)).toBe(expected.replace(/[$,]/g, ""));
+    },
+  );
+
   it("refuses a non-integer amount instead of rounding it", () => {
     expect(() => formatMoney({ amount: 10.5, currency: "USD" }, 2, "en")).toThrow(RangeError);
   });
