@@ -38,6 +38,17 @@ Invalid values fail startup with a readable `Invalid environment: ...` error.
 
 `pnpm admin:create` reads the same file and `DATABASE_URL` (and the locale variables) through `loadEnv`, plus one variable that only that command reads: `ADMIN_PASSWORD`, the password of the user to create (12 to 128 characters). It is not a setting of the API and is deliberately absent from `.env.example`: pass it for one command (`ADMIN_PASSWORD=... pnpm admin:create --email ...`) or type the password at the prompt instead; do not store it in `.env`. Details: `README.md` (Admin sign-in).
 
+## Environment variables read by `apps/storefront` (validated by `@fluxkit/config` `loadStorefrontEnv`)
+The storefront reads only these (and `NODE_ENV`); it never needs the API's variables or secrets. `next dev` and `next start` also read the repository's root `.env` (the same file as the API; variables set in the shell win), `next build` reads none of them and does not call the API. Invalid values fail startup with a readable `Invalid storefront environment: ...` error that names the variable and never shows its value. Added by storefront plan step 3 (additive: new optional contract surface).
+
+| Variable | Required | Default | Meaning |
+|---|---|---|---|
+| `API_INTERNAL_URL` | yes, for `next dev` and `next start` | - | Where the Next server reaches the API: server-side catalog fetches and, in `next dev` only, the `/store/*` rewrite. An `http` or `https` origin without path, query, fragment or credentials (a trailing slash is dropped), for example `http://127.0.0.1:3000`. Not used by the browser, which calls `/store/*` on its own origin |
+| `STOREFRONT_PUBLIC_URL` | in production | `http://localhost:3001` when `NODE_ENV` is not `production` | The public origin of the storefront, for canonical URLs, hreflang, the sitemap and JSON-LD. Same format as `API_INTERNAL_URL`. A blank value counts as unset, so it is required (and rejected when missing) when `NODE_ENV` is `production` |
+| `STOREFRONT_IMAGE_HOSTS` | no | empty | Comma-separated host names allowed for image optimisation and `img-src` (for example `cdn.example.com,images.example.org`); trimmed, lower-cased, de-duplicated. Host names only: a scheme, port, path, wildcard, empty entry or invalid label fails startup |
+
+The `/store/*` rewrite in `apps/storefront/next.config.ts` exists for `next dev` only (the Next phase, not `NODE_ENV`); production builds and servers never emit it. A deployed environment routes `/store/*` to the API with an edge reverse proxy that sets `X-Forwarded-For` itself and runs the API with the exact `TRUST_PROXY` hop count (ADR 0026; runtime evidence in `docs/plans/2026-10-18-storefront.md`, "Runtime test of the dev rewrite").
+
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.
 - `main` (default `dist/index.js`) must export `featureModule`, a Nest module. It is imported dynamically and mounted only if `<name>` is in `FEATURES_ENABLED`.

@@ -3,6 +3,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Add the typed store API client `@fluxkit/api-client` (hand-written types checked against `docs/api/openapi.json` by a test; `openapi-typescript` is not used because its peer range excludes the pinned TypeScript 6.0.3), `loadStorefrontEnv` in `@fluxkit/config` with the new storefront variables `API_INTERNAL_URL`, `STOREFRONT_PUBLIC_URL` and `STOREFRONT_IMAGE_HOSTS` (additive config contract, `docs/contracts/config.md`), and a development-only `/store/*` rewrite in the storefront's `next.config.ts` (storefront plan step 3; no API, schema or migration change).
 - Add `requiresShipping` (boolean) to the store cart shape (`GET /store/cart`, the cart writes, `acknowledge` and the `cart` of `409 cart_changed`; storefront plan step 2, additive public contract): core `shippingAddressRequired` over the available lines, so the storefront knows whether checkout needs a shipping address; no schema, migration or variable change. OpenAPI changed: the field, the `403` problem and the required `X-Fluxkit-CSRF` header on every state-changing `/store` operation, and a typed `cart` in `ProblemDetailsDoc` (was an open object).
 - Add pnpm + Turborepo workspace skeleton with empty apps and packages (`build`, `typecheck`).
 - Add dependency license table and Redis 8 (AGPLv3, external service) approval.
