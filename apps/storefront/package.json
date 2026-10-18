@@ -4,10 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "dev": "NEXT_TELEMETRY_DISABLED=1 node --env-file-if-exists=../../.env node_modules/next/dist/bin/next dev",
     "build": "NEXT_TELEMETRY_DISABLED=1 next build",
-    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
-    "typecheck": "tsc --noEmit"
+    "start": "NEXT_TELEMETRY_DISABLED=1 node --env-file-if-exists=../../.env node_modules/next/dist/bin/next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "4.3.3",
@@ -15,9 +16,11 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "tailwindcss": "4.3.3",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "5.0.4"
   },
   "dependencies": {
+    "@fluxkit/config": "workspace:*",
     "@fluxkit/theme": "workspace:*",
     "@fluxkit/ui": "workspace:*",
     "next": "16.4.1",

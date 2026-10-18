@@ -1,0 +1,52 @@
+import {
+  PHASE_DEVELOPMENT_SERVER,
+  PHASE_PRODUCTION_BUILD,
+  PHASE_PRODUCTION_SERVER,
+} from "next/constants.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import config from "./next.config.js";
+
+afterEach(() => vi.unstubAllEnvs());
+
+async function rewritesFor(phase: string) {
+  const resolved = config(phase);
+  return resolved.rewrites === undefined ? [] : await resolved.rewrites();
+}
+
+describe("next.config store rewrite", () => {
+  it("proxies /store/* to the API in the development server only", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000/");
+    expect(await rewritesFor(PHASE_DEVELOPMENT_SERVER)).toEqual([
+      { source: "/store/:path*", destination: "http://127.0.0.1:3000/store/:path*" },
+    ]);
+  });
+
+  it("never rewrites in a production build or a production server, whatever the environment says", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
+    vi.stubEnv("NODE_ENV", "development");
+    expect(await rewritesFor(PHASE_PRODUCTION_BUILD)).toEqual([]);
+    expect(await rewritesFor(PHASE_PRODUCTION_SERVER)).toEqual([]);
+  });
+
+  it("does not need API_INTERNAL_URL to build", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "");
+    expect(await rewritesFor(PHASE_PRODUCTION_BUILD)).toEqual([]);
+  });
+
+  it("fails loudly in development without a valid API_INTERNAL_URL, without echoing it", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "");
+    await expect(rewritesFor(PHASE_DEVELOPMENT_SERVER)).rejects.toThrow(/API_INTERNAL_URL/);
+    vi.stubEnv("API_INTERNAL_URL", "http://user:hunter2@api:3000/path");
+    const error = await rewritesFor(PHASE_DEVELOPMENT_SERVER).then(
+      () => undefined,
+      (thrown: unknown) => thrown,
+    );
+    expect(String(error)).toMatch(/API_INTERNAL_URL/);
+    expect(String(error)).not.toContain("hunter2");
+  });
+
+  it("keeps the redirect from / to the default locale", async () => {
+    const redirects = (await config(PHASE_PRODUCTION_BUILD).redirects?.()) ?? [];
+    expect(redirects).toEqual([{ source: "/", destination: "/uk", permanent: false }]);
+  });
+});
