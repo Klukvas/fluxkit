@@ -416,7 +416,7 @@ export class CheckoutService {
       defaultLocale: this.localeConfig.defaultLocale,
       locales: this.localeConfig.locales,
     };
-    return this.pricing.orderLineFacts(context).map((facts) => {
+    return this.pricing.orderLineFacts(context).map((facts, index) => {
       let built = buildOrderLine(facts, options);
       if (!built.ok && built.reason === "invalid_image_url") {
         this.logger.warn(
@@ -424,8 +424,16 @@ export class CheckoutService {
         );
         built = buildOrderLine({ ...facts, imageUrl: null }, options);
       }
+      if (!built.ok && built.reason === "invalid_product_title") {
+        // A product with no title text in ANY locale (texts in removed locales still count, ADR 0025) can not be shown on
+        // an order. The shopper can not fix it: the line is refused by position, like an out-of-stock line.
+        this.logger.warn(
+          `The product of variant ${facts.sku} has no title text; its line was refused.`,
+        );
+        throw checkoutRefused([{ path: `lines.${String(index)}`, code: "product_title_missing" }]);
+      }
       if (!built.ok) {
-        // Damaged catalog data (a title without the default locale, a broken SKU): loud, never a half order.
+        // Damaged catalog data (a broken SKU, an option without text): loud, never a half order.
         throw new Error(`The snapshot of variant ${facts.sku} was refused: ${built.reason}`);
       }
       return built.line;

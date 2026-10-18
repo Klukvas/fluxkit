@@ -136,9 +136,50 @@ describe("buildOrderLine", () => {
     }
   });
 
-  it("keeps a locale only the default has, but requires the default locale", () => {
+  it("keeps a locale only the default has, and also a title that lacks the default locale", () => {
     expect(build({ productTitle: { uk: "Тільки укр" } }).ok).toBe(true);
-    expect(failure({ productTitle: { en: "English only" } }).reason).toBe("invalid_product_title");
+    const english = build({ productTitle: { en: "English only" } });
+    expect(english.ok && english.line.productTitle).toEqual({ en: "English only" });
+  });
+
+  describe("texts in locales that are no longer configured (review fix Medium 3)", () => {
+    // The snapshot is history: it keeps every real translation, and any reader resolves it with the store's fallback
+    // chain. LOCALES is uk,en here; a catalog written when de was configured must still be orderable.
+    it("keeps a title that exists in uk, en and de only, de included", () => {
+      const result = build({ productTitle: { uk: "Футболка", en: "T-shirt", de: "T-Shirt" } });
+      expect(result.ok && result.line.productTitle).toEqual({
+        uk: "Футболка",
+        en: "T-shirt",
+        de: "T-Shirt",
+      });
+    });
+
+    it("accepts a title that exists only in a locale that is no longer configured", () => {
+      const result = build({ productTitle: { de: "Nur Deutsch" } });
+      expect(result.ok && result.line.productTitle).toEqual({ de: "Nur Deutsch" });
+    });
+
+    it("drops an empty or whitespace-only entry and keeps the real ones", () => {
+      const result = build({ productTitle: { uk: "  ", en: "", de: "Titel" } });
+      expect(result.ok && result.line.productTitle).toEqual({ de: "Titel" });
+    });
+
+    it("applies the same rule to the variant title and the option names and values", () => {
+      const result = build({
+        variantTitle: { de: "Rot, M" },
+        optionValues: [{ option: { de: "Farbe" }, value: { en: "Red", de: "Rot" } }],
+      });
+      expect(result.ok && result.line.variantTitle).toEqual({ de: "Rot, M" });
+      expect(result.ok && result.line.optionValues[0]).toEqual({
+        option: { de: "Farbe" },
+        value: { en: "Red", de: "Rot" },
+      });
+    });
+
+    it("refuses only a truly empty text: no entry, or nothing but whitespace", () => {
+      expect(failure({ productTitle: {} }).reason).toBe("invalid_product_title");
+      expect(failure({ productTitle: { uk: " ", de: "" } }).reason).toBe("invalid_product_title");
+    });
   });
 
   it("refuses ids that are not non-empty text", () => {
@@ -169,7 +210,6 @@ describe("buildOrderLine", () => {
   it("refuses bad titles", () => {
     expect(failure({ productTitle: {} }).reason).toBe("invalid_product_title");
     expect(failure({ productTitle: { uk: "  " } }).reason).toBe("invalid_product_title");
-    expect(failure({ productTitle: { uk: "x", de: "y" } }).reason).toBe("invalid_product_title");
     expect(failure({ productTitle: { uk: "a".repeat(TEXT_LIMITS.title + 1) } }).reason).toBe(
       "invalid_product_title",
     );
@@ -178,7 +218,7 @@ describe("buildOrderLine", () => {
       "invalid_product_title",
     );
     expect(failure({ variantTitle: {} }).reason).toBe("invalid_variant_title");
-    expect(failure({ variantTitle: { en: "only en" } }).reason).toBe("invalid_variant_title");
+    expect(failure({ variantTitle: { de: "a\u0000b" } }).reason).toBe("invalid_variant_title");
     expect(build({ productTitle: { uk: "a".repeat(TEXT_LIMITS.title) } }).ok).toBe(true);
   });
 
@@ -190,7 +230,7 @@ describe("buildOrderLine", () => {
       "invalid_option_values",
     );
     expect(
-      failure({ optionValues: [{ option: { en: "Color" }, value: { uk: "x" } }] }).reason,
+      failure({ optionValues: [{ option: { en: "Color" }, value: { uk: " " } }] }).reason,
     ).toBe("invalid_option_values");
     const tooMany = Array.from({ length: CATALOG_LIMITS.maxOptionsPerProduct + 1 }, () => ({
       option: { uk: "o" },

@@ -1,5 +1,5 @@
 import { MAX_LINE_QUANTITY } from "../cart/limits.js";
-import { validateI18nText, codePointLength } from "../catalog/i18n.js";
+import { codePointLength } from "../catalog/i18n.js";
 import { CATALOG_LIMITS, TEXT_LIMITS } from "../catalog/limits.js";
 import { isValidSku } from "../catalog/sku.js";
 import { hasJsonbUnsafeCharacters } from "../catalog/text-safety.js";
@@ -38,6 +38,10 @@ export interface OrderLineFacts {
   readonly requiresShipping: boolean;
 }
 
+/**
+ * The configuration the snapshot was built under. It is checked (a bug if unusable) but does NOT restrict the texts:
+ * the snapshot keeps every real translation, also in locales that are no longer configured (see `snapshotText`).
+ */
 export interface SnapshotOptions {
   readonly defaultLocale: string;
   readonly locales: readonly string[];
@@ -88,18 +92,45 @@ function isNonEmptyText(value: unknown): value is string {
   return typeof value === "string" && value.length > 0;
 }
 
-/** A frozen copy holding only the entries of a map that `validateI18nText` accepted. */
-function freezeText(text: I18nText): I18nText {
-  return Object.freeze(Object.fromEntries(Object.entries(text)));
-}
+const LOCALE_KEY_MAX_LENGTH = 35;
 
-function validText(value: unknown, maxLength: number, options: SnapshotOptions): value is I18nText {
-  return validateI18nText(value, {
-    defaultLocale: options.defaultLocale,
-    locales: options.locales,
-    maxLength,
-    required: true,
-  }).ok;
+/**
+ * The snapshot of a translated text: a frozen copy of every real translation, or `undefined` when there is none.
+ * The snapshot is history, so (unlike the catalog write rules) it does NOT require the default locale and does NOT
+ * restrict the keys to the locales configured today: a catalog written when `de` was configured, or a title that only
+ * exists in a locale that was removed from `LOCALES`, must still be orderable, and any reader resolves the map with
+ * `resolveTextWithFallback`. Empty and whitespace-only entries are dropped; only a text with no real entry at all is
+ * refused. An entry that is not a string, is too long or has characters JSONB can not store is damaged data and refuses
+ * the whole text.
+ */
+function snapshotText(value: unknown, maxLength: number): I18nText | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return undefined;
+  }
+  const kept: [string, string][] = [];
+  for (const [locale, text] of Object.entries(value)) {
+    if (typeof text !== "string") {
+      return undefined;
+    }
+    if (text.trim().length === 0) {
+      continue;
+    }
+    if (
+      locale.length === 0 ||
+      locale.length > LOCALE_KEY_MAX_LENGTH ||
+      hasJsonbUnsafeCharacters(locale) ||
+      hasJsonbUnsafeCharacters(text) ||
+      codePointLength(text) > maxLength
+    ) {
+      return undefined;
+    }
+    kept.push([locale, text]);
+  }
+  return kept.length === 0 ? undefined : Object.freeze(Object.fromEntries(kept));
 }
 
 function hasControlCharacters(text: string): boolean {
@@ -132,24 +163,35 @@ export function buildOrderLine(facts: OrderLineFacts, options: SnapshotOptions):
   if (typeof facts.sku !== "string" || !isValidSku(facts.sku)) {
     return fail("invalid_sku");
   }
-  if (!validText(facts.productTitle, TEXT_LIMITS.title, options)) {
+  const productTitle = snapshotText(facts.productTitle, TEXT_LIMITS.title);
+  if (productTitle === undefined) {
     return fail("invalid_product_title");
   }
-  if (facts.variantTitle !== null && !validText(facts.variantTitle, TEXT_LIMITS.title, options)) {
+  const variantTitle =
+    facts.variantTitle === null ? null : snapshotText(facts.variantTitle, TEXT_LIMITS.title);
+  if (variantTitle === undefined) {
     return fail("invalid_variant_title");
   }
   if (
     !Array.isArray(facts.optionValues) ||
-    facts.optionValues.length > CATALOG_LIMITS.maxOptionsPerProduct ||
-    !facts.optionValues.every(
-      (entry: OrderLineOptionValue) =>
-        typeof entry === "object" &&
-        entry !== null &&
-        validText(entry.option, TEXT_LIMITS.name, options) &&
-        validText(entry.value, TEXT_LIMITS.name, options),
-    )
+    facts.optionValues.length > CATALOG_LIMITS.maxOptionsPerProduct
   ) {
     return fail("invalid_option_values");
+  }
+  const optionValues: OrderLineOptionValue[] = [];
+  for (const entry of facts.optionValues) {
+    const option =
+      typeof entry === "object" && entry !== null
+        ? snapshotText(entry.option, TEXT_LIMITS.name)
+        : undefined;
+    const value =
+      typeof entry === "object" && entry !== null
+        ? snapshotText(entry.value, TEXT_LIMITS.name)
+        : undefined;
+    if (option === undefined || value === undefined) {
+      return fail("invalid_option_values");
+    }
+    optionValues.push(Object.freeze({ option, value }));
   }
   if (facts.imageUrl !== null && !validImageUrl(facts.imageUrl)) {
     return fail("invalid_image_url");
@@ -185,13 +227,9 @@ export function buildOrderLine(facts: OrderLineFacts, options: SnapshotOptions):
       productId: facts.productId,
       variantId: facts.variantId,
       sku: facts.sku,
-      productTitle: freezeText(facts.productTitle),
-      variantTitle: facts.variantTitle === null ? null : freezeText(facts.variantTitle),
-      optionValues: Object.freeze(
-        facts.optionValues.map((entry) =>
-          Object.freeze({ option: freezeText(entry.option), value: freezeText(entry.value) }),
-        ),
-      ),
+      productTitle,
+      variantTitle,
+      optionValues: Object.freeze(optionValues),
       imageUrl: facts.imageUrl,
       unitPrice,
       compareAtAmount: price.price.compareAtAmount,

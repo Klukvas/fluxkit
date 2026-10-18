@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import {
   publicAttributeDefinitions,
   resolveText,
+  resolveTextWithFallback,
   selectPublicAttributes,
   type AttributeDefinition,
   type AttributeValues,
@@ -23,11 +24,15 @@ const logger = new Logger("StoreSerializer");
 
 const inputTypeSchema = z.enum(["text", "number", "boolean", "select", "multiselect", "date"]);
 
-/** A required text (title, name) that lacks both locales can only come from data written around the service; log it and degrade to "". */
+/**
+ * A required text (title, name): the requested locale, else the default locale, else the first available non-empty one
+ * (`resolveTextWithFallback`, the rule the order snapshot and the order views share). A text with no usable entry at all can
+ * only come from data written around the service; log it and degrade to "".
+ */
 export function requiredText(text: I18nText, locale: StoreLocale, what: string): string {
-  const resolved = resolveText(text, locale.locale, locale.defaultLocale);
+  const resolved = resolveTextWithFallback(text, locale.locale, locale.defaultLocale);
   if (resolved === undefined) {
-    logger.warn(`${what} has no text for locale "${locale.locale}" or "${locale.defaultLocale}".`);
+    logger.warn(`${what} has no text in any locale.`);
     return "";
   }
   return resolved;

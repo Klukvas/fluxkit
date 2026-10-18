@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveText, validateI18nText } from "./i18n.js";
+import { resolveText, resolveTextWithFallback, validateI18nText } from "./i18n.js";
 import { deepFreeze } from "./test-support.js";
 
 const base = { defaultLocale: "uk", locales: ["uk", "en"], maxLength: 10, required: true } as const;
@@ -140,5 +140,34 @@ describe("resolveText", () => {
 
   it("returns the default locale when it is the requested one", () => {
     expect(resolveText(map, "uk", "uk")).toBe("Футболка");
+  });
+});
+
+describe("resolveTextWithFallback (requested locale, default locale, first available non-empty)", () => {
+  it("prefers the requested locale, then the default locale", () => {
+    const map = deepFreeze({ uk: "Футболка", en: "T-shirt", de: "T-Shirt" });
+    expect(resolveTextWithFallback(map, "en", "uk")).toBe("T-shirt");
+    expect(resolveTextWithFallback(map, "fr", "uk")).toBe("Футболка");
+  });
+
+  it("falls back to the first available locale (in code order) when neither the requested nor the default one has a text", () => {
+    expect(resolveTextWithFallback({ en: "T-shirt", de: "T-Shirt" }, "fr", "uk")).toBe("T-Shirt");
+    expect(resolveTextWithFallback({ de: "Nur Deutsch" }, "uk", "uk")).toBe("Nur Deutsch");
+  });
+
+  it("skips empty and whitespace-only texts at every step", () => {
+    expect(resolveTextWithFallback({ uk: "  ", en: "", de: "Titel" }, "en", "uk")).toBe("Titel");
+    expect(resolveTextWithFallback({ uk: "Футболка", en: " " }, "en", "uk")).toBe("Футболка");
+  });
+
+  it("is undefined only when there is no usable text at all", () => {
+    expect(resolveTextWithFallback({}, "uk", "uk")).toBeUndefined();
+    expect(resolveTextWithFallback({ uk: " ", en: "" }, "uk", "uk")).toBeUndefined();
+    expect(resolveTextWithFallback(null, "uk", "uk")).toBeUndefined();
+    expect(resolveTextWithFallback(undefined, "uk", "uk")).toBeUndefined();
+  });
+
+  it("does not read inherited keys", () => {
+    expect(resolveTextWithFallback(Object.create({ uk: "inherited" }), "uk", "uk")).toBeUndefined();
   });
 });
