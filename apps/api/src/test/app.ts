@@ -49,6 +49,8 @@ export interface StartAppOptions {
   orderGuestAccessDays?: number;
   /** `ORDER_TOKEN_SECRET`; defaults to `TEST_ORDER_TOKEN_SECRET`. */
   orderTokenSecret?: string;
+  /** `TRUST_PROXY`, the number of trusted proxy hops; defaults to 0 (off). */
+  trustProxy?: number;
   /** `SCHEDULER_ENABLED`; defaults to FALSE here so a spec stays deterministic (jobs are called directly). */
   schedulerEnabled?: boolean;
   /** `SCHEDULER_INTERVAL_SECONDS`; defaults to 60. */
@@ -79,6 +81,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
+      trustProxy: options.trustProxy,
       schedulerEnabled: options.schedulerEnabled ?? false,
       schedulerIntervalSeconds: options.schedulerIntervalSeconds,
       shopCurrency: options.shopCurrency,

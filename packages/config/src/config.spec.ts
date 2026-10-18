@@ -382,3 +382,37 @@ describe("loadEnv pricing", () => {
     },
   );
 });
+
+describe("loadEnv TRUST_PROXY", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to 0: no proxy is trusted", () => {
+    expect(loadEnv(base).trustProxy).toBe(0);
+  });
+
+  it.each([
+    ["0", 0],
+    ["1", 1],
+    ["2", 2],
+    ["10", 10],
+  ])("accepts %j hops", (value, expected) => {
+    expect(loadEnv({ ...base, TRUST_PROXY: value }).trustProxy).toBe(expected);
+  });
+
+  it.each(["", "-1", "11", "100", "1.5", "01", "1e1", "0x1", " 1", "true", "loopback", "10.0.0.1"])(
+    "rejects %j and names the variable",
+    (value) => {
+      expect(() => loadEnv({ ...base, TRUST_PROXY: value })).toThrow(/TRUST_PROXY/);
+    },
+  );
+
+  it("does not echo the rejected value or the other variables in the error", () => {
+    try {
+      loadEnv({ ...base, DATABASE_URL: "postgres://user:hunter2@db/x", TRUST_PROXY: "secret-ish" });
+      expect.unreachable();
+    } catch (error) {
+      expect(String(error)).not.toContain("hunter2");
+      expect(String(error)).not.toContain("secret-ish");
+    }
+  });
+});

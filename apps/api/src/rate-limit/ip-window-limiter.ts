@@ -81,8 +81,9 @@ export function throttleKeyOf(address: string): string {
  * - Single process only. Each API instance counts alone and a restart forgets everything, so N instances allow N
  *   times the limit. The per-account lockout (database columns) is the limit that spans instances; a shared IP limit
  *   needs Redis and is a follow-up of the plan.
- * - Behind a reverse proxy `request.ip` is the proxy's address unless Express `trust proxy` is configured, in which
- *   case all clients share one window. Deployment is not built yet; configure the proxy setting with it.
+ * - Behind a reverse proxy `request.ip` is the proxy's address unless `TRUST_PROXY` (the number of trusted hops, which
+ *   `createApp` hands to Express `trust proxy`) is set, and then every client shares the proxy's window. Set the exact
+ *   hop count: too high lets a client choose its key with `X-Forwarded-For`, too low keeps the shop-wide window.
  * - The map holds at most `maxClients` entries. Expired windows are dropped first; when the map is still full the
  *   OLDEST window is evicted. An attacker with millions of addresses can therefore make the limit forget some
  *   clients, but can never make memory grow.
