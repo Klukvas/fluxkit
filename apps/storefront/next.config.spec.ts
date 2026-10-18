@@ -3,10 +3,23 @@ import {
   PHASE_PRODUCTION_BUILD,
   PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import config from "./next.config.js";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import config, { loadRootEnvFile } from "./next.config.js";
 
-afterEach(() => vi.unstubAllEnvs());
+// `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
+// real .env cannot change what these tests see.
+const emptyDirectory = mkdtempSync(join(tmpdir(), "storefront-cwd-"));
+beforeEach(() => {
+  vi.spyOn(process, "cwd").mockReturnValue(join(emptyDirectory, "apps", "storefront"));
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
+afterAll(() => rmSync(emptyDirectory, { recursive: true, force: true }));
 
 async function rewritesFor(phase: string) {
   const resolved = config(phase);
@@ -48,5 +61,37 @@ describe("next.config store rewrite", () => {
   it("keeps the redirect from / to the default locale", async () => {
     const redirects = (await config(PHASE_PRODUCTION_BUILD).redirects?.()) ?? [];
     expect(redirects).toEqual([{ source: "/", destination: "/uk", permanent: false }]);
+  });
+});
+
+describe("loadRootEnvFile", () => {
+  const directory = mkdtempSync(join(tmpdir(), "storefront-env-"));
+  const file = join(directory, ".env");
+  writeFileSync(file, "FLUXKIT_TEST_FROM_FILE=file\nFLUXKIT_TEST_SHELL=file\n");
+  afterAll(() => rmSync(directory, { recursive: true, force: true }));
+  afterEach(() => {
+    delete process.env.FLUXKIT_TEST_FROM_FILE;
+    delete process.env.FLUXKIT_TEST_SHELL;
+  });
+
+  it("loads the file for the development and production servers without overriding the shell", () => {
+    for (const phase of [PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_SERVER]) {
+      delete process.env.FLUXKIT_TEST_FROM_FILE;
+      process.env.FLUXKIT_TEST_SHELL = "shell";
+      loadRootEnvFile(phase, file);
+      expect(process.env.FLUXKIT_TEST_FROM_FILE).toBe("file");
+      expect(process.env.FLUXKIT_TEST_SHELL).toBe("shell");
+    }
+  });
+
+  it("does not read the file for a build", () => {
+    loadRootEnvFile(PHASE_PRODUCTION_BUILD, file);
+    expect(process.env.FLUXKIT_TEST_FROM_FILE).toBeUndefined();
+  });
+
+  it("accepts a missing file", () => {
+    expect(() =>
+      loadRootEnvFile(PHASE_DEVELOPMENT_SERVER, join(directory, "missing.env")),
+    ).not.toThrow();
   });
 });
