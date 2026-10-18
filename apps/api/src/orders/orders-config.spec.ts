@@ -12,6 +12,8 @@ describe("orders config", () => {
     expect(DEFAULT_ORDERS_CONFIG).toEqual({
       paymentTtlMinutes: ORDER_PAYMENT_TTL_MINUTES.default,
       guestAccessDays: GUEST_ACCESS_DAYS.default,
+      // Not a core rule: the owner's default (ADR 0024).
+      maxOpenOrders: 3,
     });
   });
 

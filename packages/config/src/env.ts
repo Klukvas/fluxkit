@@ -50,6 +50,21 @@ const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
  */
 export const ORDER_TOKEN_SECRET_MIN_LENGTH = 32;
 
+/**
+ * Defaults and bounds of `TRUST_PROXY`, the number of reverse-proxy hops in front of the API. 0 trusts none, so the
+ * client address is the socket address. More than 10 hops is a typo: every extra trusted hop lets a client choose more
+ * of its own address.
+ */
+export const DEFAULT_TRUST_PROXY = 0;
+const MAX_TRUST_PROXY = 10;
+
+/**
+ * Default and upper bound of `MAX_OPEN_ORDERS`: unpaid (`awaiting_payment`) orders one guest email or one customer may hold
+ * at a time (ADR 0024). A larger number is not a limit on stock hoarding any more.
+ */
+export const DEFAULT_MAX_OPEN_ORDERS = 3;
+const MAX_MAX_OPEN_ORDERS = 50;
+
 /** Defaults and bounds of the in-process scheduler (ADR 0018): a tick every 10 seconds to every hour. */
 export const DEFAULT_SCHEDULER_ENABLED = true;
 export const DEFAULT_SCHEDULER_INTERVAL_SECONDS = 60;
@@ -145,6 +160,8 @@ const envSchema = z
         `must be at least ${ORDER_TOKEN_SECRET_MIN_LENGTH} characters`,
       )
       .optional(),
+    MAX_OPEN_ORDERS: positiveInteger(MAX_MAX_OPEN_ORDERS).default(DEFAULT_MAX_OPEN_ORDERS),
+    TRUST_PROXY: nonNegativeInteger(MAX_TRUST_PROXY).default(DEFAULT_TRUST_PROXY),
     NODE_ENV: z.string().optional(),
     SCHEDULER_ENABLED: strictBoolean.default(DEFAULT_SCHEDULER_ENABLED),
     SCHEDULER_INTERVAL_SECONDS: positiveInteger(MAX_SCHEDULER_INTERVAL_SECONDS)
@@ -225,6 +242,14 @@ export interface AppEnv {
    * production; the API refuses to start without it in every environment. Never log it.
    */
   orderTokenSecret: string | undefined;
+  /** Unpaid (`awaiting_payment`) orders one guest email or one customer may hold at once (1 to 50); ADR 0024. */
+  maxOpenOrders: number;
+  /**
+   * Number of trusted reverse-proxy hops in front of the API (0 to 10), the value of Express `trust proxy`. 0 means the
+   * client address is the socket address. Set the exact hop count: too high lets clients spoof `X-Forwarded-For` and
+   * dodge the rate limits, too low keeps every shopper in the proxy's window.
+   */
+  trustProxy: number;
   /** Whether this API process runs the scheduler (order expiry, stock sweep, cleanup, event dispatch). */
   schedulerEnabled: boolean;
   /** Seconds between scheduler ticks (10 to 3600). */
@@ -265,6 +290,8 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
     orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
     orderTokenSecret: env.ORDER_TOKEN_SECRET,
+    maxOpenOrders: env.MAX_OPEN_ORDERS,
+    trustProxy: env.TRUST_PROXY,
     schedulerEnabled: env.SCHEDULER_ENABLED,
     schedulerIntervalSeconds: env.SCHEDULER_INTERVAL_SECONDS,
     shopCurrency: env.SHOP_CURRENCY,

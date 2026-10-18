@@ -23,7 +23,7 @@ Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog p
 - Admin authentication: cookie sessions, roles `owner`, `manager`, `viewer`, owner-only user management, first owner through `pnpm admin:create` (see Admin sign-in below). Endpoints: `docs/api/auth.md`; contract: `docs/contracts/api.md`.
 - Customer accounts (`/store/account/*`: register, login, logout, profile, change password; separate cookie session, CSRF header on every `/store` write, lockout, rate limits) and admin customer management (`/admin/customers`, permissions `customers.read` and `customers.write`); no password reset or email verification yet: `docs/api/customers.md`.
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
-- Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
+- Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token; at most `MAX_OPEN_ORDERS` unpaid orders per email or customer), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
 - Storefront (`/uk`, `/en`) and admin: placeholder pages built from the shared UI and tokens (light and dark themes).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
 
@@ -93,6 +93,17 @@ pnpm jobs:run-once     # = pnpm build && pnpm --filter @fluxkit/api jobs:run-onc
 - Exit code `0`: all jobs ran. `1`: a job failed (the full error is printed, the connection string removed) or the settings are wrong. `2`: a running scheduler holds the lock, so nothing was run (it is doing this work; try again later).
 - If the scheduler is off everywhere and no cron runs this command, unpaid orders keep their stock reserved. `GET /health` does not show the scheduler yet.
 - Jobs, retry rules and the handler contract: `docs/api/jobs.md`, `docs/contracts/events.md`.
+
+## Deployment notes: reverse proxy and rate limits
+
+The store rate limits (checkout, registration, login, order lookup, guest cancel) and the admin login limit count requests per client address (`request.ip`). The API trusts no proxy by default (`TRUST_PROXY=0`), so the address is the one that connects to it. Behind a reverse proxy, a CDN or the Next.js server calling the API from the server side, that address is the proxy's, and every shopper then shares ONE window: the whole shop would get, for example, 10 checkouts per 10 minutes.
+
+- Set `TRUST_PROXY` to the **exact number of proxies** between the internet and the API (`1` for one nginx or one Next.js server, `2` for a CDN plus nginx, and so on; 0 to 10). Each of them must append the address it saw to `X-Forwarded-For` (nginx `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`; a Next.js server must forward the visitor's address the same way).
+- **Too high is a security hole:** the extra hops are read from the part of `X-Forwarded-For` the client controls, so a client can invent its address and dodge every limit. **Too low** keeps the shop-wide window. Check it after a deployment: from two different networks, a request to a limited route must be counted separately.
+- Keep the API reachable only through the proxy when `TRUST_PROXY` is above 0; otherwise anyone who can reach it directly can send the header themselves.
+- IPv6 clients are counted per /64 prefix after this step too. The counters are in memory per API process (ADR 0009, ADR 0016).
+
+`MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 
 ## Admin sign-in
 
@@ -197,7 +208,7 @@ curl -s "${H[@]}" -X POST $API/store/orders/lookup -d "$BODY" | jq -c '{number, 
 curl -s "${H[@]}" -X POST $API/store/orders/cancel -d "$BODY" | jq -c '{number, status}'    # only while awaiting_payment
 ```
 
-Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) releases their stock after `ORDER_PAYMENT_TTL_MINUTES`. To run the jobs once by hand (also what a system cron does when `SCHEDULER_ENABLED=false`):
+Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) releases their stock after `ORDER_PAYMENT_TTL_MINUTES`. A customer or a guest email can hold at most `MAX_OPEN_ORDERS` (3) unpaid orders at once; the next checkout answers `409 too_many_open_orders` until one is paid, cancelled or expired. To run the jobs once by hand (also what a system cron does when `SCHEDULER_ENABLED=false`):
 
 ```bash
 pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock

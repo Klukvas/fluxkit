@@ -2,7 +2,7 @@ import type { LogLevel } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from "@nestjs/swagger";
-import { DEFAULT_LOCALE, DEFAULT_LOCALES, type AppEnv } from "@fluxkit/config";
+import { DEFAULT_LOCALE, DEFAULT_LOCALES, DEFAULT_TRUST_PROXY, type AppEnv } from "@fluxkit/config";
 import { AppModule } from "./app.module.js";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
@@ -36,6 +36,8 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "orderPaymentTtlMinutes"
       | "orderGuestAccessDays"
       | "orderTokenSecret"
+      | "maxOpenOrders"
+      | "trustProxy"
       | "schedulerEnabled"
       | "schedulerIntervalSeconds"
       | "shopCurrency"
@@ -96,6 +98,7 @@ export async function createApp(
       orders: {
         paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
         guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
+        maxOpenOrders: env.maxOpenOrders ?? DEFAULT_ORDERS_CONFIG.maxOpenOrders,
         tokenSecret: env.orderTokenSecret,
       },
       // An environment-less caller (tests, the OpenAPI export) gets no timer; the API passes `SCHEDULER_ENABLED`.
@@ -111,6 +114,9 @@ export async function createApp(
     }),
     { logger: options.logLevels ?? ["error", "warn", "log"] },
   );
+  // The one place Express is configured, so the API, the specs and the OpenAPI export all see the same `request.ip`.
+  // 0 (the default) trusts no proxy: the client is the socket address and `X-Forwarded-For` is ignored.
+  app.set("trust proxy", env.trustProxy ?? DEFAULT_TRUST_PROXY);
   app.enableShutdownHooks();
   return app;
 }

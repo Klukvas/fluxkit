@@ -29,6 +29,7 @@ import {
   checkoutRefused,
   idempotencyKeyReused,
   ruleViolation,
+  tooManyOpenOrders,
   validationFailed,
 } from "../common/problem.js";
 import { withTransaction, type Transaction } from "../common/transaction.js";
@@ -66,7 +67,7 @@ export interface CheckoutOutcome {
 
 /**
  * Places the order of a cart (ADR 0015, plan step 5b): ONE transaction, all or nothing, with the documented lock order
- * customer (customers only) -> cart `FOR UPDATE` -> product rows -> variant rows (`FOR SHARE`, sorted) -> level rows
+ * customer (customers only) -> cart `FOR UPDATE` -> guest email advisory lock (guests only, ADR 0024) -> product rows -> variant rows (`FOR SHARE`, sorted) -> level rows
  * (`FOR UPDATE`, sorted, inside `reserveMany`) -> inserts. The catalog facts are read AFTER the product and variant
  * locks, so a price write, an unpublish, a switch-off or a delete either finished before they are read or waits until
  * the order is committed. Totals come from core only (`buildOrderLine`, `computeOrderTotals`); the client's
@@ -165,6 +166,9 @@ export class CheckoutService {
     if (stored.length === 0) {
       throw cartEmpty();
     }
+
+    // After the replay check on purpose: the answer to a repeated request never depends on the limit.
+    await this.requireRoomForAnotherOrder(tx, owner, input.email);
 
     // Catalog locks first, THEN the facts: what is read below is what no one can change until this transaction ends.
     await this.reservations.lockVariantsForSale(
@@ -306,6 +310,33 @@ export class CheckoutService {
       response:
         guestToken === undefined ? { order: view } : { order: view, accessToken: guestToken.token },
     };
+  }
+
+  /**
+   * ADR 0024: a customer, or a guest email, may hold at most `MAX_OPEN_ORDERS` unpaid orders. The count and the insert
+   * that follows must not interleave with another checkout of the same owner:
+   * - a customer has one cart and every checkout holds its row `FOR UPDATE` (taken in `lockCart`), so they run one after
+   *   the other;
+   * - guests have one cart per browser, so a guest takes an advisory lock on the normalized email first (after the cart
+   *   row, before any catalog row: the documented lock order) and holds it until the commit that inserts the order.
+   * Orders leaving `awaiting_payment` (paid, cancelled, expired) only lower the count, so reading it without locking them
+   * can refuse a checkout one moment too early, never let one through too many.
+   */
+  private async requireRoomForAnotherOrder(
+    tx: Transaction,
+    owner: CartOwner,
+    email: string,
+  ): Promise<void> {
+    let open: number;
+    if (owner.kind === "customer") {
+      open = await this.orders.countOpenOfCustomer(tx, owner.customerId);
+    } else {
+      await this.orders.lockGuestEmail(tx, email);
+      open = await this.orders.countOpenOfGuestEmail(tx, email);
+    }
+    if (open >= this.config.maxOpenOrders) {
+      throw tooManyOpenOrders();
+    }
   }
 
   /**

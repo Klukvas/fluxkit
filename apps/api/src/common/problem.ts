@@ -17,6 +17,7 @@ export const PROBLEM_CODES = [
   "cart_changed",
   "checkout_refused",
   "idempotency_key_reused",
+  "too_many_open_orders",
   "service_unavailable",
 ] as const;
 
@@ -37,6 +38,7 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   cart_changed: 409,
   checkout_refused: 409,
   idempotency_key_reused: 409,
+  too_many_open_orders: 409,
   service_unavailable: 503,
 };
 
@@ -55,6 +57,7 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   cart_changed: "The cart changed",
   checkout_refused: "Checkout refused",
   idempotency_key_reused: "Idempotency key reused",
+  too_many_open_orders: "Too many unpaid orders",
   service_unavailable: "Service unavailable",
 };
 
@@ -180,6 +183,18 @@ export function idempotencyKeyReused(): ProblemException {
   return new ProblemException({
     code: "idempotency_key_reused",
     detail: "This Idempotency-Key was already used for a different request.",
+  });
+}
+
+/**
+ * The customer or the guest email already holds the most unpaid orders allowed (`MAX_OPEN_ORDERS`, ADR 0024). The text
+ * names no order, number or address: it is the answer to the shopper's own request and nothing more.
+ */
+export function tooManyOpenOrders(): ProblemException {
+  return new ProblemException({
+    code: "too_many_open_orders",
+    detail:
+      "There are too many unpaid orders already. Pay or cancel one of them, or wait until it expires, and try again.",
   });
 }
 

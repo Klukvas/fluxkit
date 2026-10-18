@@ -46,7 +46,7 @@ export class CheckoutController {
   @ApiOperation({
     summary: "Place the order of the cart",
     description:
-      "One transaction, all or nothing: the stock of every line is reserved (30 minutes by default), the prices are read again, the totals are computed on the server, the order is stored with an immutable snapshot and the cart is emptied. `expectedTotal` is the total the shopper saw; if it differs, or a line became unavailable, the answer is 409 `cart_changed` with the fresh cart and nothing is reserved. A guest gets an `accessToken` once. The same `Idempotency-Key` with the same request returns the same order with 200 (a guest gets a NEW token and the old one stops working); with another request it is 409 `idempotency_key_reused`.",
+      "One transaction, all or nothing: the stock of every line is reserved (30 minutes by default), the prices are read again, the totals are computed on the server, the order is stored with an immutable snapshot and the cart is emptied. `expectedTotal` is the total the shopper saw; if it differs, or a line became unavailable, the answer is 409 `cart_changed` with the fresh cart and nothing is reserved. A guest gets an `accessToken` once. The same `Idempotency-Key` with the same request returns the same order with 200 (a guest gets the SAME token as in the first answer); with another request it is 409 `idempotency_key_reused`. A customer or a guest email that already holds the most unpaid orders allowed (`MAX_OPEN_ORDERS`, 3 by default) gets 409 `too_many_open_orders` for a new order; a replay is answered even then.",
   })
   @ApiHeader({
     name: "Idempotency-Key",

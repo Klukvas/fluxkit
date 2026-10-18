@@ -25,6 +25,7 @@ import {
   notFound,
   ruleViolation,
   serviceUnavailable,
+  tooManyOpenOrders,
   tooManyRequests,
   unauthorized,
   validationFailed,
@@ -90,6 +91,7 @@ describe("ProblemDetailsFilter", () => {
       cart_changed: cartChanged({ lines: [] }),
       checkout_refused: checkoutRefused([{ path: "lines.0", code: "insufficient_stock" }]),
       idempotency_key_reused: idempotencyKeyReused(),
+      too_many_open_orders: tooManyOpenOrders(),
       service_unavailable: serviceUnavailable(),
     } as const;
     for (const [code, exception] of Object.entries(samples)) {
@@ -149,6 +151,7 @@ describe("ProblemDetailsFilter", () => {
         "not_found",
         "rule_violation",
         "service_unavailable",
+        "too_many_open_orders",
         "too_many_requests",
         "unauthorized",
         "validation_failed",
