@@ -19,6 +19,9 @@ export const TEST_SCRYPT_PARAMS = { N: 16, r: 8, p: 1 } as const;
 /** A throwaway order token secret for specs (32 characters or more, as `ORDER_TOKEN_SECRET` requires). */
 export const TEST_ORDER_TOKEN_SECRET = "test-order-token-secret-0123456789-abcdef";
 
+/** The open-order limit of specs that do not test it: out of reach, so they can place as many orders as they like. */
+export const TEST_MAX_OPEN_ORDERS = 1_000_000;
+
 export interface StartAppOptions {
   enabledFeatures?: string[];
   featuresDir?: string;
@@ -47,6 +50,11 @@ export interface StartAppOptions {
   orderPaymentTtlMinutes?: number;
   /** `ORDER_GUEST_ACCESS_DAYS`; defaults to 90. */
   orderGuestAccessDays?: number;
+  /**
+   * `MAX_OPEN_ORDERS`; defaults to a huge number here, NOT to 3: many specs place more than 3 orders for one email in one
+   * app. The specs of the limit itself (`checkout-open-orders.spec.ts`) pass the number they test.
+   */
+  maxOpenOrders?: number;
   /** `ORDER_TOKEN_SECRET`; defaults to `TEST_ORDER_TOKEN_SECRET`. */
   orderTokenSecret?: string;
   /** `TRUST_PROXY`, the number of trusted proxy hops; defaults to 0 (off). */
@@ -81,6 +89,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
+      maxOpenOrders: options.maxOpenOrders ?? TEST_MAX_OPEN_ORDERS,
       trustProxy: options.trustProxy,
       schedulerEnabled: options.schedulerEnabled ?? false,
       schedulerIntervalSeconds: options.schedulerIntervalSeconds,

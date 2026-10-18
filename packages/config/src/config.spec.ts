@@ -416,3 +416,26 @@ describe("loadEnv TRUST_PROXY", () => {
     }
   });
 });
+
+describe("loadEnv MAX_OPEN_ORDERS", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("defaults to 3", () => {
+    expect(loadEnv(base).maxOpenOrders).toBe(3);
+  });
+
+  it.each([
+    ["1", 1],
+    ["3", 3],
+    ["50", 50],
+  ])("accepts %j", (value, expected) => {
+    expect(loadEnv({ ...base, MAX_OPEN_ORDERS: value }).maxOpenOrders).toBe(expected);
+  });
+
+  it.each(["", "0", "-1", "51", "1000", "2.5", "03", "1e1", "0x3", " 3", "three"])(
+    "rejects %j and names the variable",
+    (value) => {
+      expect(() => loadEnv({ ...base, MAX_OPEN_ORDERS: value })).toThrow(/MAX_OPEN_ORDERS/);
+    },
+  );
+});

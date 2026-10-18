@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gte, inArray, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, or, sql, type SQL } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../common/transaction.js";
 import {
   domainEvent,
@@ -86,13 +86,17 @@ function adminOrderWhere(filter: AdminOrderFilter): SQL | undefined {
   return and(...conditions);
 }
 
+/** Prefix of the text hashed for the guest email lock, so no other advisory lock key of this database can equal it. */
+const GUEST_EMAIL_LOCK_NAMESPACE = "fluxkit:open-orders:guest-email:";
+
 /**
  * Queries on the order tables (Drizzle query builder, parameterized). Knows tables and locks, not rules: the status
  * machine, totals and the snapshot are core, the lifecycle is `OrdersService` and `CheckoutService`. Every read of
  * an order by a request value (number, key) is keyed by that value alone; ownership (customer id, access token) is
  * decided by the caller's WHERE clause or hash comparison, never after loading someone else's order into a response.
  *
- * Lock order of the order module (ADR 0015): cart -> product -> variant -> level for placement; `sales_order`
+ * Lock order of the order module (ADR 0015, 0024): cart -> guest email advisory lock (guests only) -> product -> variant
+ * -> level for placement; `sales_order`
  * (`FOR UPDATE`) -> level rows (sorted) -> reservation rows for every later change.
  */
 @Injectable()
@@ -175,6 +179,48 @@ export class OrdersRepository {
       .from(salesOrder)
       .where(eq(salesOrder.customerId, customerId));
     return row?.total ?? 0;
+  }
+
+  /**
+   * How many unpaid orders the customer holds (`MAX_OPEN_ORDERS`, ADR 0024). Served by
+   * `sales_order_customer_id_placed_at_idx` (its first key is `customer_id`); a customer has a handful of orders in
+   * practice and at most `MAX_OPEN_ORDERS` unpaid ones, so filtering the status on those rows is cheap.
+   */
+  async countOpenOfCustomer(tx: Transaction, customerId: string): Promise<number> {
+    const [row] = await tx
+      .select({ total: sql<number>`count(*)::int` })
+      .from(salesOrder)
+      .where(and(eq(salesOrder.customerId, customerId), eq(salesOrder.status, "awaiting_payment")));
+    return row?.total ?? 0;
+  }
+
+  /**
+   * How many unpaid GUEST orders (no customer) carry the normalized email. Served by `sales_order_email_idx`: the
+   * column is stored lower-cased and trimmed (CHECK), so an equality on the normalized address is an index lookup.
+   */
+  async countOpenOfGuestEmail(tx: Transaction, email: string): Promise<number> {
+    const [row] = await tx
+      .select({ total: sql<number>`count(*)::int` })
+      .from(salesOrder)
+      .where(
+        and(
+          eq(salesOrder.email, email),
+          isNull(salesOrder.customerId),
+          eq(salesOrder.status, "awaiting_payment"),
+        ),
+      );
+    return row?.total ?? 0;
+  }
+
+  /**
+   * Serializes the checkouts of one guest email until the transaction ends (`pg_advisory_xact_lock` on a 64-bit hash of
+   * the normalized address, in its own key space). A hash collision of two different emails only makes them wait for
+   * each other. Taken after the cart row and before the catalog rows (lock order, ADR 0024); no other code takes it.
+   */
+  async lockGuestEmail(tx: Transaction, email: string): Promise<void> {
+    await tx.execute(
+      sql`select pg_advisory_xact_lock(hashtextextended(${`${GUEST_EMAIL_LOCK_NAMESPACE}${email}`}, 0))`,
+    );
   }
 
   /**
