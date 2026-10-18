@@ -1,6 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type RunningApp } from "../test/app.js";
-import { login } from "../test/auth-http.js";
 import { customerProbeFeature } from "../test/customer-probe.js";
 import { FakeClock } from "../test/fake-clock.js";
 import { http, type HttpResult } from "../test/http.js";
