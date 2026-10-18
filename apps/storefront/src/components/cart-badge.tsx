@@ -26,7 +26,7 @@ export function CartBadgeView({
   return (
     <Link href={localizedHref(locale, sessionLinks.cart)} className={`${navLink} gap-2`}>
       <span>{t("nav.cart")}</span>
-      <span className="inline-flex min-w-8 justify-center" aria-live="polite">
+      <div className="inline-flex min-w-8 justify-center" aria-live="polite">
         {state.status === "loading" ? (
           <>
             <Skeleton className="h-6 w-8" />
@@ -39,7 +39,7 @@ export function CartBadgeView({
             <VisuallyHidden>{t.plural("nav.cart.items", state.count)}</VisuallyHidden>
           </>
         ) : null}
-      </span>
+      </div>
     </Link>
   );
 }

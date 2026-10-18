@@ -24,7 +24,7 @@ export function AccountLinkView({
   locale: Locale;
 }) {
   return (
-    <span className="inline-flex min-w-28 justify-end" aria-live="polite">
+    <div className="inline-flex min-w-28 justify-end" aria-live="polite">
       {state.status === "loading" ? (
         <>
           <Skeleton className="h-6 w-24" />
@@ -39,7 +39,7 @@ export function AccountLinkView({
           {t("nav.account.account")}
         </Link>
       )}
-    </span>
+    </div>
   );
 }
 
