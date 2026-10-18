@@ -71,7 +71,7 @@ describe("currencyExponent", () => {
 
 /** Intl output uses non-breaking and narrow spaces; compare with plain spaces. */
 function plain(text: string): string {
-  return text.replace(/[  ]/g, " ");
+  return text.replace(/[\u00a0\u202f]/g, " ");
 }
 
 describe("formatMoney", () => {

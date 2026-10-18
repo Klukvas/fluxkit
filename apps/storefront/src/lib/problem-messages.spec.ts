@@ -80,14 +80,12 @@ describe("problem message map", () => {
     const text = problemMessage(t, problem);
     expect(text).not.toContain("SECRET");
     expect(text).toBe(messagesByLocale.en["errors.checkout_refused"]);
-    expect(
-      fieldErrorMessage(t, { path: "lines.0", code: "insufficient_stock", message: "SECRET" }),
-    ).toBe(messagesByLocale.en["errors.field.insufficient_stock"]);
-    const unknown = problemMessage(
-      t,
-      { code: "brand_new_code", detail: "SECRET-DETAIL-FROM-API" },
-      { log: () => {} },
+    const fieldError = { path: "lines.0", code: "insufficient_stock", message: "SECRET" };
+    expect(fieldErrorMessage(t, fieldError)).toBe(
+      messagesByLocale.en["errors.field.insufficient_stock"],
     );
+    const unknownProblem = { code: "brand_new_code", detail: "SECRET-DETAIL-FROM-API" };
+    const unknown = problemMessage(t, unknownProblem, { log: () => {} });
     expect(unknown).toBe(messagesByLocale.en["errors.generic"]);
   });
 

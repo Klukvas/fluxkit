@@ -69,5 +69,6 @@ export function formatMoney(
 ): string {
   const digits = exponent ?? currencyExponent(money.currency);
   const decimal = minorUnitsToDecimalString(money.amount, digits);
-  return formatterFor(locale, money.currency, digits).format(decimal);
+  // Digits and at most one dot by construction, which is what the string-numeric type states.
+  return formatterFor(locale, money.currency, digits).format(decimal as `${number}`);
 }
