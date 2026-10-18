@@ -435,6 +435,29 @@ describe("checkout under concurrency (real app, real Postgres)", () => {
       expect(await ordersOf(keep)).toBe(0);
     });
 
+    it("a variant deleted while the checkout waits is a changed cart EVEN IF the shopper's expected total equals what is left (the guard is the missing line, not the total)", async () => {
+      // Without the `present.length !== stored.length` check the checkout would order the one remaining line at 500 and
+      // reserve the deleted variant too: the total the shopper agreed to would match by accident.
+      const product = await catalog.product({ withColors: true });
+      const keep = await catalog.variant(product.id, { color: "red", price: 500 });
+      const doomed = await catalog.variant(product.id, { color: "blue", price: 700 });
+      const who = new Shopper(running.baseUrl);
+      await add(who, keep, 1);
+      await add(who, doomed, 1);
+      const writer = await holdTransaction([
+        { text: "select 1 from product where id = $1 for update", values: [product.id] },
+        { text: "delete from variant where id = $1", values: [doomed] },
+      ]);
+      const checkout = checkoutAs(who, checkoutBody(500));
+      expect(await settledWithin(checkout, 500)).toBe(false);
+      await writer.commit();
+      const result = await checkout;
+      expect(result.status, JSON.stringify(result.body)).toBe(409);
+      expect(result.body).toMatchObject({ code: "cart_changed" });
+      expect((result.body as unknown as { cart: CartResult }).cart.lines).toHaveLength(1);
+      expect(await ordersOf(keep)).toBe(0);
+    });
+
     it("a variant delete that arrives after the order is refused (an order line refers to the variant)", async () => {
       // An untracked (digital) variant has no stock rows, so only the order line tells it was sold (ADR 0020).
       const product = await catalog.product({ withColors: true, digital: true });
