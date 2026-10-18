@@ -3,6 +3,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Add `requiresShipping` (boolean) to the store cart shape (`GET /store/cart`, the cart writes, `acknowledge` and the `cart` of `409 cart_changed`; storefront plan step 2, additive public contract): core `shippingAddressRequired` over the available lines, so the storefront knows whether checkout needs a shipping address; no schema, migration or variable change. OpenAPI changed: the field, the `403` problem and the required `X-Fluxkit-CSRF` header on every state-changing `/store` operation, and a typed `cart` in `ProblemDetailsDoc` (was an open object).
 - Add pnpm + Turborepo workspace skeleton with empty apps and packages (`build`, `typecheck`).
 - Add dependency license table and Redis 8 (AGPLv3, external service) approval.
 - Add Docker Compose stack (Postgres 17, Redis 8, Meilisearch v1.55.0) and `.env.example` variables.
