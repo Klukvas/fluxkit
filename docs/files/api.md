@@ -1,8 +1,8 @@
 # apps/api
 
-- `src/main.ts` - bootstrap: load env, create app, serve Swagger UI at `/docs`, listen.
+- `src/main.ts` - bootstrap: load env (refuses to start without `ORDER_TOKEN_SECRET`), create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
-- `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings, `CART_TTL_DAYS`, `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`, `SCHEDULER_ENABLED` and `SCHEDULER_INTERVAL_SECONDS` (off when the caller passes no environment), builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export, `pnpm jobs:run-once`.
+- `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings, `CART_TTL_DAYS`, `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`, `ORDER_TOKEN_SECRET`, `SCHEDULER_ENABLED` and `SCHEDULER_INTERVAL_SECONDS` (off when the caller passes no environment), builds Nest app, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export, `pnpm jobs:run-once`.
 - `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory, the cart, orders, the scheduler (`src/jobs/`) and dynamically loaded feature modules. Must not import features statically.
 - `src/openapi-export.ts` - writes `docs/api/openapi.json` (run via `pnpm openapi:export`); never contacts the database.
 - `src/openapi.spec.ts` - fails when the committed `openapi.json` is stale.
@@ -115,12 +115,12 @@ Plan step 4 (ADR 0015, `docs/api/cart.md`). Core, no feature flag. `cart.module.
 
 Plan step 5b (ADR 0015, 0017, 0018, 0020, `docs/api/orders.md`). Core, no feature flag. `orders.module.ts` is global (`OrdersModule.register({config})`; exports `OrdersService`, `OrdersRepository`, `OrderViewService`, `AdminOrderViewService` and the `ORDER_PAYMENTS_PORT` and `ORDER_READ_PORT` tokens) and sets `Cache-Control: no-store` on `/store/checkout` and `/store/orders/*`.
 
-- `orders-config.ts` - `OrdersConfig` (`paymentTtlMinutes`, `guestAccessDays` from `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`) and its default.
+- `orders-config.ts` - `OrdersConfig` (`paymentTtlMinutes`, `guestAccessDays`, optional `tokenSecret` from `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`, `ORDER_TOKEN_SECRET`) and its default (no secret: it must never have one).
 - `orders.repository.ts` - Drizzle queries on the order tables: lookups by key, number and owner, the admin list (`listForAdmin`, `countForAdmin`: equality filters only, total order `placed_at desc, id desc`) and the reservations of the lines (`listItemReservations`), the order row locks (`FOR UPDATE`, always the first lock of a status change), inserts, the batch reads of items, journal and adjustments, the reservations of an order, the token rotation. No rules.
 - `checkout-input.ts` - `parseCheckoutInput`: email, phone, names, addresses and the expected total judged by the core rules, all errors at once with their paths.
 - `checkout-fingerprint.ts` - `canonicalJson`, `requestFingerprint` (SHA-256 of the normalized request plus the cart id) and the constant-time `fingerprintsEqual`.
-- `access-token.ts` - `issueAccessToken` (32 random bytes, only the hash is stored) and `accessTokenMatches` (constant time on the hashes, a dummy hash for a missing order).
-- `checkout.service.ts` - `POST /store/checkout`: the one transaction (customer -> cart -> product -> variant -> level locks), the idempotent replay with token rotation, the order number retry, the cart emptying. Totals only through core; the repricing pass is `CartPricingService.price`.
+- `access-token.ts` - `deriveAccessToken` (the guest token: core `deriveGuestAccessToken` with `hmacSha256` from node:crypto; only the hash is stored; must NOT draw random tokens or log the token or the secret) and `accessTokenMatches` (constant time on the hashes, a dummy hash for a missing order).
+- `checkout.service.ts` - `POST /store/checkout`: the one transaction (customer -> cart -> product -> variant -> level locks), the idempotent replay (the same derived guest token, no rotation; ADR 0023), the order number retry, the cart emptying. Totals only through core; the repricing pass is `CartPricingService.price`.
 - `orders.service.ts` - `OrdersService` (implements the core `OrderPaymentsPort`): `transition` (state machine + stock effect in a savepoint + order row + journal + outbox event), `markPaid`, `markFulfilled`, `cancelAsGuest`, `cancelAsCustomer`, `cancelAsAdmin`, `expireOne`. The only place an order changes status.
 - `order-view.ts` - `toStoreOrder` / `toStoreOrderSummary` and `OrderViewService`: the store view built field by field (no ids of other rows, no hashes), locale resolution with fallback.
 - `admin/admin-orders.controller.ts`, `admin/admin-orders.service.ts`, `admin/admin-orders.schemas.ts` - `/admin/orders` (plan step 6): `@AdminController("orders", {read: "orders.read", write: "orders.write"})`; list with filters, detail, cancel, mark-paid, mark-fulfilled. The service only maps `OrdersService` results to problem codes and passes the admin from the session as the actor; it decides no rule. The schemas check structure and the free-text rules (reason, reference), money through core `createMoney`.
