@@ -44,6 +44,12 @@ const MAX_ORDER_PAYMENT_TTL_MINUTES = 1440;
 export const DEFAULT_ORDER_GUEST_ACCESS_DAYS = 90;
 const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
 
+/**
+ * Shortest `ORDER_TOKEN_SECRET`. Equals `GUEST_ACCESS_TOKEN_SECRET_MIN_LENGTH` of `@fluxkit/core` (a test in apps/api
+ * asserts it); this package does not depend on core, so the number is repeated here.
+ */
+export const ORDER_TOKEN_SECRET_MIN_LENGTH = 32;
+
 /** Defaults and bounds of the in-process scheduler (ADR 0018): a tick every 10 seconds to every hour. */
 export const DEFAULT_SCHEDULER_ENABLED = true;
 export const DEFAULT_SCHEDULER_INTERVAL_SECONDS = 60;
@@ -131,6 +137,15 @@ const envSchema = z
     ORDER_GUEST_ACCESS_DAYS: positiveInteger(MAX_ORDER_GUEST_ACCESS_DAYS).default(
       DEFAULT_ORDER_GUEST_ACCESS_DAYS,
     ),
+    // No default and no trimming: a secret that is silently weak or silently altered is worse than a refusal to start.
+    ORDER_TOKEN_SECRET: z
+      .string()
+      .min(
+        ORDER_TOKEN_SECRET_MIN_LENGTH,
+        `must be at least ${ORDER_TOKEN_SECRET_MIN_LENGTH} characters`,
+      )
+      .optional(),
+    NODE_ENV: z.string().optional(),
     SCHEDULER_ENABLED: strictBoolean.default(DEFAULT_SCHEDULER_ENABLED),
     SCHEDULER_INTERVAL_SECONDS: positiveInteger(MAX_SCHEDULER_INTERVAL_SECONDS)
       .pipe(
@@ -154,6 +169,13 @@ const envSchema = z
     ),
   })
   .superRefine((env, context) => {
+    if ((env.NODE_ENV ?? "").trim().toLowerCase() === "production" && !env.ORDER_TOKEN_SECRET) {
+      context.addIssue({
+        code: "custom",
+        path: ["ORDER_TOKEN_SECRET"],
+        message: `is required when NODE_ENV is production (at least ${ORDER_TOKEN_SECRET_MIN_LENGTH} characters)`,
+      });
+    }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
       context.addIssue({
         code: "custom",
@@ -198,6 +220,11 @@ export interface AppEnv {
   orderPaymentTtlMinutes: number;
   /** A guest can open their order with its access token for this many days (1 to 3650). */
   orderGuestAccessDays: number;
+  /**
+   * Secret of the derived guest access tokens (ADR 0023); at least 32 characters. Required when `NODE_ENV` is
+   * production; the API refuses to start without it in every environment. Never log it.
+   */
+  orderTokenSecret: string | undefined;
   /** Whether this API process runs the scheduler (order expiry, stock sweep, cleanup, event dispatch). */
   schedulerEnabled: boolean;
   /** Seconds between scheduler ticks (10 to 3600). */
@@ -237,6 +264,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     cartTtlDays: env.CART_TTL_DAYS,
     orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
     orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
+    orderTokenSecret: env.ORDER_TOKEN_SECRET,
     schedulerEnabled: env.SCHEDULER_ENABLED,
     schedulerIntervalSeconds: env.SCHEDULER_INTERVAL_SECONDS,
     shopCurrency: env.SHOP_CURRENCY,

@@ -253,6 +253,53 @@ describe("loadEnv orders", () => {
   );
 });
 
+describe("loadEnv ORDER_TOKEN_SECRET", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+  const SECRET = "o".repeat(32);
+
+  it("is optional outside production and then undefined (the API refuses to start without it)", () => {
+    expect(loadEnv(base).orderTokenSecret).toBeUndefined();
+    expect(loadEnv({ ...base, NODE_ENV: "development" }).orderTokenSecret).toBeUndefined();
+  });
+
+  it("is passed through exactly (never trimmed or altered) when it is at least 32 characters", () => {
+    expect(loadEnv({ ...base, ORDER_TOKEN_SECRET: SECRET }).orderTokenSecret).toBe(SECRET);
+    expect(loadEnv({ ...base, ORDER_TOKEN_SECRET: ` ${SECRET} ` }).orderTokenSecret).toBe(
+      ` ${SECRET} `,
+    );
+  });
+
+  it.each(["", "short", "o".repeat(31)])(
+    "rejects %j as too short, in every environment",
+    (value) => {
+      expect(() => loadEnv({ ...base, ORDER_TOKEN_SECRET: value })).toThrow(/ORDER_TOKEN_SECRET/);
+      expect(() => loadEnv({ ...base, NODE_ENV: "production", ORDER_TOKEN_SECRET: value })).toThrow(
+        /ORDER_TOKEN_SECRET/,
+      );
+    },
+  );
+
+  it.each(["production", "Production", " PRODUCTION "])(
+    "is required when NODE_ENV is %j",
+    (nodeEnv) => {
+      expect(() => loadEnv({ ...base, NODE_ENV: nodeEnv })).toThrow(/ORDER_TOKEN_SECRET/);
+      expect(
+        loadEnv({ ...base, NODE_ENV: nodeEnv, ORDER_TOKEN_SECRET: SECRET }).orderTokenSecret,
+      ).toBe(SECRET);
+    },
+  );
+
+  it("never appears in the error message", () => {
+    const secret = "short-secret-value";
+    try {
+      loadEnv({ ...base, ORDER_TOKEN_SECRET: secret });
+      expect.unreachable();
+    } catch (error) {
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+});
+
 describe("loadEnv scheduler", () => {
   const base = { DATABASE_URL: "postgres://x" };
 
