@@ -156,15 +156,6 @@ describe("next.config images", () => {
     expect(config(PHASE_PRODUCTION_BUILD).images?.remotePatterns ?? []).toEqual([]);
   });
 
-  it("hands the same build-time list to the app bundle, so the page and the optimizer cannot disagree", () => {
-    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com,images.example.org");
-    expect(config(PHASE_PRODUCTION_BUILD).env).toEqual({
-      STOREFRONT_IMAGE_HOSTS_AT_BUILD: "cdn.example.com,images.example.org",
-    });
-    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "");
-    expect(config(PHASE_PRODUCTION_BUILD).env).toEqual({ STOREFRONT_IMAGE_HOSTS_AT_BUILD: "" });
-  });
-
   it("uses the same hosts for the CSP img-src and the optimizer", async () => {
     vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com");
     const resolved = config(PHASE_PRODUCTION_BUILD);

@@ -1,8 +1,7 @@
 /**
- * Which image URLs the storefront may hand to `next/image` (owner answer 7). The allow-list is the host list that Next
- * itself was BUILT with (`next.config.ts` puts `STOREFRONT_IMAGE_HOSTS` into `images.remotePatterns` and into this app's
- * bundle as `STOREFRONT_IMAGE_HOSTS_AT_BUILD`), so this check and the optimizer can never disagree. Anything else gets the
- * token-styled placeholder: no broken image, no request to an unknown host, no optimizer error at run time.
+ * Which image URLs the storefront may hand to `next/image` (owner answer 7). The allow-list is `STOREFRONT_IMAGE_HOSTS` as
+ * the running server sees it (`lib/image-hosts.server.ts`), the same variable `next.config.ts` gives the image optimizer.
+ * Anything else gets the token-styled placeholder: no broken image, no request to an unknown host, no optimizer refusal.
  */
 
 export function parseImageHosts(value: string | undefined): string[] {

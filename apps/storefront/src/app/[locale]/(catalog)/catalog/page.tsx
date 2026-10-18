@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { CatalogView } from "../../../../components/catalog-view";
 import { getListing } from "../../../../lib/catalog-pages.server";
 import { parseCatalogQuery } from "../../../../lib/catalog-query";
-import { IMAGE_HOSTS } from "../../../../lib/image-hosts";
+import { imageHosts } from "../../../../lib/image-hosts.server";
 import { listingMetadata } from "../../../../lib/page-metadata";
 import { publicOrigin } from "../../../../lib/public-url.server";
 import { localizedHref } from "../../../../lib/locale-path";
@@ -59,7 +59,7 @@ export default async function CatalogPage(props: CatalogProps) {
       page={listing.page}
       pageCount={listing.pageCount}
       exponent={listing.exponent}
-      imageHosts={IMAGE_HOSTS}
+      imageHosts={imageHosts()}
       basePath={BASE_PATH}
       subcategories={[]}
       brand={

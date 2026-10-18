@@ -7,7 +7,7 @@ import { ProductPurchase } from "../../../../../components/product-purchase";
 import { attributeRows } from "../../../../../lib/attributes";
 import { getProductPage } from "../../../../../lib/catalog-pages.server";
 import { catalogPath } from "../../../../../lib/catalog-query";
-import { IMAGE_HOSTS } from "../../../../../lib/image-hosts";
+import { imageHosts } from "../../../../../lib/image-hosts.server";
 import { localizedHref } from "../../../../../lib/locale-path";
 import { productMetadata } from "../../../../../lib/page-metadata";
 import { prepareMedia } from "../../../../../lib/product-media";
@@ -79,7 +79,7 @@ export default async function ProductPage(props: ProductProps) {
           price: product.price,
           availability: product.availability,
         }}
-        gallery={prepareMedia(product.media, IMAGE_HOSTS)}
+        gallery={prepareMedia(product.media, imageHosts())}
         exponent={exponent}
         brand={
           product.brand === null

@@ -5,7 +5,7 @@ import { CatalogView } from "../../../../../components/catalog-view";
 import { JsonLd } from "../../../../../components/json-ld";
 import { getListing } from "../../../../../lib/catalog-pages.server";
 import { parseCatalogQuery } from "../../../../../lib/catalog-query";
-import { IMAGE_HOSTS } from "../../../../../lib/image-hosts";
+import { imageHosts } from "../../../../../lib/image-hosts.server";
 import { localizedHref } from "../../../../../lib/locale-path";
 import { listingMetadata } from "../../../../../lib/page-metadata";
 import { publicOrigin } from "../../../../../lib/public-url.server";
@@ -69,7 +69,7 @@ export default async function CategoryPage(props: CategoryProps) {
         page={listing.page}
         pageCount={listing.pageCount}
         exponent={listing.exponent}
-        imageHosts={IMAGE_HOSTS}
+        imageHosts={imageHosts()}
         basePath={`/c/${encodeURIComponent(slug)}`}
         subcategories={category.children}
         brand={

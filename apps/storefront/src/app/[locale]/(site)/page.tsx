@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { HomeSections } from "../../../components/home-sections";
 import { homeSections } from "../../../layout/home";
 import { getHomeData } from "../../../lib/catalog-pages.server";
-import { IMAGE_HOSTS } from "../../../lib/image-hosts";
+import { imageHosts } from "../../../lib/image-hosts.server";
 import { homeMetadata } from "../../../lib/page-metadata";
 import { publicOrigin } from "../../../lib/public-url.server";
 import { messagesByLocale } from "../../../messages";
@@ -33,7 +33,7 @@ export default async function HomePage({ params }: HomeProps) {
         locale={locale}
         t={t}
         data={data}
-        imageHosts={IMAGE_HOSTS}
+        imageHosts={imageHosts()}
       />
     </Container>
   );
