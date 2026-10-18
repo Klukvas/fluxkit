@@ -16,6 +16,9 @@ export interface RunningApp {
 /** Cheap scrypt parameters: the suite hashes many passwords. The default ones are exercised in password-hasher.spec. */
 export const TEST_SCRYPT_PARAMS = { N: 16, r: 8, p: 1 } as const;
 
+/** A throwaway order token secret for specs (32 characters or more, as `ORDER_TOKEN_SECRET` requires). */
+export const TEST_ORDER_TOKEN_SECRET = "test-order-token-secret-0123456789-abcdef";
+
 export interface StartAppOptions {
   enabledFeatures?: string[];
   featuresDir?: string;
@@ -44,6 +47,8 @@ export interface StartAppOptions {
   orderPaymentTtlMinutes?: number;
   /** `ORDER_GUEST_ACCESS_DAYS`; defaults to 90. */
   orderGuestAccessDays?: number;
+  /** `ORDER_TOKEN_SECRET`; defaults to `TEST_ORDER_TOKEN_SECRET`. */
+  orderTokenSecret?: string;
   /** `SCHEDULER_ENABLED`; defaults to FALSE here so a spec stays deterministic (jobs are called directly). */
   schedulerEnabled?: boolean;
   /** `SCHEDULER_INTERVAL_SECONDS`; defaults to 60. */
@@ -73,6 +78,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       cartTtlDays: options.cartTtlDays,
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
+      orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
       schedulerEnabled: options.schedulerEnabled ?? false,
       schedulerIntervalSeconds: options.schedulerIntervalSeconds,
       shopCurrency: options.shopCurrency,

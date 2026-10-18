@@ -1,21 +1,34 @@
-import { timingSafeEqual } from "node:crypto";
-import { generateSessionToken, hashSessionToken } from "../auth/session-token.js";
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { deriveGuestAccessToken } from "@fluxkit/core";
+import { hashSessionToken } from "../auth/session-token.js";
 
 /*
- * Guest access tokens of orders (ADR 0017): 32 random bytes in base64url, shown to the guest once, only the SHA-256 is
- * stored on the order. The same primitives as session tokens. A match is decided on the HASHES in constant time, so the
- * comparison leaks nothing about a stored hash.
+ * Guest access tokens of orders (ADR 0023): derived, not random. The token is the HMAC-SHA256 of the order id and the
+ * idempotency key under `ORDER_TOKEN_SECRET` (the rule lives in core, this file supplies node:crypto), shown to the
+ * guest in the checkout answer and again, identically, in the answer of a replay. Only its SHA-256 is stored on the
+ * order (the same primitive as session tokens). A match is decided on the HASHES in constant time, so the comparison
+ * leaks nothing about a stored hash.
  */
 
 export interface IssuedAccessToken {
-  /** Goes to the guest, once. Never stored, never logged. */
+  /** Goes to the guest in the checkout answer. Never stored, never logged. */
   readonly token: string;
   /** What the order row keeps. */
   readonly hash: string;
 }
 
-export function issueAccessToken(): IssuedAccessToken {
-  const token = generateSessionToken();
+/** The HMAC port of core's derivation. */
+export function hmacSha256(key: string, message: string): Uint8Array {
+  return createHmac("sha256", key).update(message).digest();
+}
+
+/** The token of an order and its hash. Throws a RangeError when the secret is shorter than core's minimum. */
+export function deriveAccessToken(
+  secret: string,
+  orderId: string,
+  idempotencyKey: string,
+): IssuedAccessToken {
+  const token = deriveGuestAccessToken({ secret, orderId, idempotencyKey }, hmacSha256);
   return { token, hash: hashSessionToken(token) };
 }
 

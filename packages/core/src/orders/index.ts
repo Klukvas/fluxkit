@@ -1,3 +1,4 @@
+export * from "./access-token.js";
 export * from "./contact.js";
 export * from "./events.js";
 export * from "./expiry.js";

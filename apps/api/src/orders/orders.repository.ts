@@ -354,8 +354,12 @@ export class OrdersRepository {
     return row;
   }
 
-  /** The replay of a checkout hands out a new guest token: the old hash is replaced, never kept next to the new one. */
-  async rotateAccessToken(
+  /**
+   * The replay of a checkout renews the guest access window and writes the hash of the DERIVED token (ADR 0023). The hash
+   * is the one already stored unless `ORDER_TOKEN_SECRET` changed since the order was placed; the old hash is replaced,
+   * never kept next to the new one.
+   */
+  async renewGuestAccess(
     tx: Transaction,
     orderId: string,
     hash: string,
@@ -367,7 +371,7 @@ export class OrdersRepository {
       .where(eq(salesOrder.id, orderId))
       .returning();
     if (row === undefined) {
-      throw new Error("A rotated order was not returned.");
+      throw new Error("A renewed order was not returned.");
     }
     return row;
   }

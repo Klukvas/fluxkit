@@ -8,6 +8,8 @@ set -euo pipefail
 mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
+# The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
+export ORDER_TOKEN_SECRET="${ORDER_TOKEN_SECRET:-feature-matrix-throwaway-secret-0123456789}"
 
 run_api() {
   local features="$1"

@@ -4,6 +4,12 @@ import { buildOpenApiDocument, createApp } from "./app.factory.js";
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv(process.env);
+  if (env.orderTokenSecret === undefined) {
+    // loadEnv only demands it in production; the server needs it everywhere, or a guest could not be given a token.
+    throw new Error(
+      "ORDER_TOKEN_SECRET is required to start the API (at least 32 characters; see .env.example).",
+    );
+  }
   const app = await createApp(env);
   SwaggerModule.setup("docs", app, buildOpenApiDocument(app));
   await app.listen(env.port);

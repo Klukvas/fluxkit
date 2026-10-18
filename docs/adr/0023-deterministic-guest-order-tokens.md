@@ -1,0 +1,26 @@
+# 0023. Deterministic guest order tokens
+
+Status: accepted 2026-10-18 (owner decision in the quiz of `docs/plans/2026-10-18-cart-orders-review-fixes.md`, review finding High 1). Supersedes in part the statements about a random token and about rotation on a replay in ADR 0017 (guest access; ADR 0020 does not repeat them) and in the approved plan `2026-10-17-cart-and-orders.md` ("a replay rotates it"). The old ADR and plan text stays as written. Nothing else in those ADRs changes: the token is still shown by the checkout, only its SHA-256 is stored, the lookup and the guest cancel are unchanged, expiry is unchanged.
+
+## Context
+
+ADR 0017 hands a guest a random 32-byte `accessToken` in the answer of `POST /store/checkout` and stores only its hash. A replay of the same `Idempotency-Key` (a double click, a client retry, two tabs) replaced the stored hash with the hash of a NEW random token and returned that. In a double submit the storefront normally keeps the first answer, the `201`, and puts its token in the confirmation link; that token was already dead, because the second request had rotated it. The independent review reproduced it in 10 of 10 rounds. A guest has no account and no email link to get back to the order.
+
+## Decision
+
+- The token is **derived**: `base64url(HMAC-SHA256(ORDER_TOKEN_SECRET, "fluxkit:order-access-token:v1\n" + orderId + "\n" + idempotencyKey))`, 32 bytes, 43 characters. The rule (input checks, message layout, encoding) is in core (`deriveGuestAccessToken`, `packages/core/src/orders/access-token.ts`). Core has no crypto, so the HMAC is a port that `apps/api` supplies with `node:crypto`; the secret is a parameter. No new dependency.
+- The order id is drawn by the API (`randomUUID()`) before the insert, so the token exists when the row is written; the column keeps the same default for every other writer.
+- Placement stores `SHA-256(token)` in `access_token_hash`, as before. The raw token and the secret are never stored or logged.
+- A **replay does not rotate**: it derives the token again from the stored order id and key and returns it. It still requires the same cart, principal and normalized request (otherwise `409 idempotency_key_reused`, unchanged). Both answers of a double submit therefore carry the same, working token.
+- Expiry rules are unchanged: a replay still sets `access_expires_at` to now plus `ORDER_GUEST_ACCESS_DAYS` (the same renewal as before, only the hash it writes is the same one).
+- `ORDER_TOKEN_SECRET`: at least 32 characters, no default. `loadEnv` requires it when `NODE_ENV` is `production` (so also for `pnpm db:migrate`, `pnpm seed`, `pnpm admin:*` and `pnpm jobs:run-once` that read the same environment) and validates the length whenever it is set. The API process refuses to start without it in every environment. `.env.example` has a placeholder to copy; the test suite supplies its own throwaway secret.
+- A `createApp` caller that never places an order (the OpenAPI export, `jobs:run-once`) may omit it. A guest checkout without a secret throws a loud error (a `500`), never a fallback key.
+
+## Consequences
+
+- Exactly one token per guest order, derivable only with the secret. The attacker model is unchanged from ADR 0017 (a bearer secret in the URL fragment): without the secret the token is 256 bits of HMAC output; the order id is not secret and the idempotency key is a client-chosen UUID.
+- **Operational note, rotating the secret.** Lookup and cancel compare the stored hash and never use the secret, so tokens already handed out keep working after the secret changed. The secret only matters when a token is derived: after a change, a replay of an old checkout by someone who still reaches the same cart derives a token under the NEW secret, writes its hash and returns it; the token of the first answer is then dead (the same effect the old rotation had on every replay, now limited to a replay after a rotation). So rotation does not lock guests out by itself; it only makes the next replay of an old key hand out a different token. Rotate when the secret leaked: any token an attacker derived with the old secret keeps working until that order is replayed, expires (`ORDER_GUEST_ACCESS_DAYS`), or is paid or cancelled, so a leak is also a reason to delete or shorten the access of unpaid orders by hand. There is no multi-secret overlap period; deploy the change at a quiet time.
+- **Why not keep rotating.** The defect is the rotation itself: any scheme that replaces the token on a replay kills the token of the first answer, and only the first answer is guaranteed to reach the browser.
+- **Why not store several hashes.** Keeping every issued hash (a list or a second table) would keep old tokens alive, needs a schema change and a migration, makes every issued token a separate bearer secret to expire and clean up, and still hands the guest a different token in each answer. The derived token needs no schema change and gives one token.
+- A change of the message layout or of the HMAC would change every token; the `v1` in the message is the version for that.
+- No schema change, no migration. The public surface changes in one documented way: the replay answer's `accessToken` is the same as the first answer's (`docs/api/orders.md`, `docs/contracts/api.md`), and a new required variable appears (`docs/contracts/config.md`).

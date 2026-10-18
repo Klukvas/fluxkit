@@ -35,6 +35,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "cartTtlDays"
       | "orderPaymentTtlMinutes"
       | "orderGuestAccessDays"
+      | "orderTokenSecret"
       | "schedulerEnabled"
       | "schedulerIntervalSeconds"
       | "shopCurrency"
@@ -95,6 +96,7 @@ export async function createApp(
       orders: {
         paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
         guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
+        tokenSecret: env.orderTokenSecret,
       },
       // An environment-less caller (tests, the OpenAPI export) gets no timer; the API passes `SCHEDULER_ENABLED`.
       scheduler: {

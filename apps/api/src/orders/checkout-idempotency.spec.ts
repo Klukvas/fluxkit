@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import pg from "pg";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
-import { startApp, type RunningApp } from "../test/app.js";
+import { hashSessionToken } from "../auth/session-token.js";
+import { startApp, TEST_ORDER_TOKEN_SECRET, type RunningApp } from "../test/app.js";
 import { CartCatalog } from "../test/cart-fixtures.js";
 import { type CartResult } from "../test/cart-helpers.js";
 import { createTestCustomer, deleteTestCustomers } from "../test/customer-fixtures.js";
@@ -19,6 +20,7 @@ import {
 } from "../test/order-http.js";
 import { PlacedOrders } from "../test/order-fixtures.js";
 import { Shopper } from "../test/shopper.js";
+import { deriveAccessToken } from "./access-token.js";
 
 const START = new Date("2035-03-01T08:00:00.000Z");
 const PASSWORD = "correct horse battery staple";
@@ -100,19 +102,17 @@ describe("checkout idempotency (real app, real Postgres)", () => {
   }
 
   describe("the same key and the same request", () => {
-    it("answers 200 with the same order, a NEW access token, and the old token stops working", async () => {
+    it("answers 200 with the same order and the SAME access token, which keeps working; nothing is rotated", async () => {
       const { key, body, first, variantId } = await firstOrder();
       const number = first.body.order?.number ?? "";
-      const oldToken = first.body.accessToken ?? "";
-      expect(oldToken).toMatch(TOKEN);
+      const token = first.body.accessToken ?? "";
+      expect(token).toMatch(TOKEN);
 
       const hashBefore = (await orderRow(pool, number)).access_token_hash;
       const again = await checkoutAs(shopper, body, key);
       expect(again.status, JSON.stringify(again.body)).toBe(200);
       expect(again.body.order).toEqual(first.body.order);
-      const newToken = again.body.accessToken ?? "";
-      expect(newToken).toMatch(TOKEN);
-      expect(newToken).not.toBe(oldToken);
+      expect(again.body.accessToken).toBe(token);
 
       // One order, one hold: a replay never reserves or inserts anything.
       expect(await orderCount(key)).toBe(1);
@@ -124,17 +124,15 @@ describe("checkout idempotency (real app, real Postgres)", () => {
       expect(level.rows).toEqual([{ reserved: 2 }]);
       expect(await changesOf(pool, row.id)).toHaveLength(1);
 
-      // The old token is dead, the new one opens the order.
-      const gone = await lookup(shopper, number, oldToken);
-      expect(gone.status).toBe(404);
-      const open = await lookup(shopper, number, newToken);
+      // The token of the first answer still opens the order, and the stored hash is the one written at placement.
+      const open = await lookup(shopper, number, token);
       expect(open.status).toBe(200);
       expect(open.body).toEqual(first.body.order);
       expect(hashBefore).not.toBeNull();
-      expect(row.access_token_hash).not.toBe(hashBefore);
+      expect(row.access_token_hash).toBe(hashBefore);
     });
 
-    it("rotates again on every replay, and each replay invalidates the one before", async () => {
+    it("never rotates: every replay returns the token of the first answer", async () => {
       const { key, body, first } = await firstOrder();
       const number = first.body.order?.number ?? "";
       const tokens = [first.body.accessToken ?? ""];
@@ -143,12 +141,101 @@ describe("checkout idempotency (real app, real Postgres)", () => {
         expect(again.status).toBe(200);
         tokens.push(again.body.accessToken ?? "");
       }
-      expect(new Set(tokens).size).toBe(4);
-      for (const [index, token] of tokens.entries()) {
-        const result = await lookup(shopper, number, token);
-        expect(result.status, `token ${String(index)}`).toBe(
-          index === tokens.length - 1 ? 200 : 404,
+      expect(new Set(tokens).size).toBe(1);
+      const result = await lookup(shopper, number, tokens[0] ?? "");
+      expect(result.status).toBe(200);
+    });
+
+    it("the token is the HMAC of the order id and the key under the secret, and differs per key and per order", async () => {
+      const one = await firstOrder();
+      const two = await firstOrder(1_000, 1);
+      const rowOne = await orderRow(pool, one.first.body.order?.number ?? "");
+      const rowTwo = await orderRow(pool, two.first.body.order?.number ?? "");
+      const tokenOne = one.first.body.accessToken ?? "";
+      const tokenTwo = two.first.body.accessToken ?? "";
+      expect(tokenOne).toBe(deriveAccessToken(TEST_ORDER_TOKEN_SECRET, rowOne.id, one.key).token);
+      expect(tokenTwo).toBe(deriveAccessToken(TEST_ORDER_TOKEN_SECRET, rowTwo.id, two.key).token);
+      expect(tokenOne).not.toBe(tokenTwo);
+      // Neither token opens the other order.
+      const crossed = await lookup(shopper, rowTwo.number, tokenOne);
+      expect(crossed.status).toBe(404);
+    });
+
+    it("never stores or logs the raw token or the secret", async () => {
+      const writes: string[] = [];
+      const capture = (chunk: unknown): boolean => {
+        writes.push(
+          typeof chunk === "string" ? chunk : Buffer.from(chunk as Uint8Array).toString(),
         );
+        return true;
+      };
+      const stdout = vi.spyOn(process.stdout, "write").mockImplementation(capture);
+      const stderr = vi.spyOn(process.stderr, "write").mockImplementation(capture);
+      let token: string;
+      let number: string;
+      try {
+        const { key, body, first } = await firstOrder();
+        token = first.body.accessToken ?? "";
+        number = first.body.order?.number ?? "";
+        const again = await checkoutAs(shopper, body, key);
+        expect(again.status).toBe(200);
+        const reused = await checkoutAs(shopper, { ...body, phone: "+380509999999" }, key);
+        expect(reused.status).toBe(409);
+      } finally {
+        stdout.mockRestore();
+        stderr.mockRestore();
+      }
+      expect(token).toMatch(TOKEN);
+      const log = writes.join("");
+      expect(log).not.toContain(token);
+      expect(log).not.toContain(TEST_ORDER_TOKEN_SECRET);
+
+      const row = await orderRow(pool, number);
+      expect(row.access_token_hash).toBe(hashSessionToken(token));
+      const stored = await pool.query<{ text: string }>(
+        `select row_to_json(o)::text as text from sales_order o where o.id = $1
+         union all select row_to_json(c)::text from order_status_change c where c.order_id = $1
+         union all select row_to_json(i)::text from order_item i where i.order_id = $1
+         union all select row_to_json(e)::text from domain_event e where e::text like '%' || $2 || '%'`,
+        [row.id, row.number],
+      );
+      expect(stored.rows.length).toBeGreaterThan(0);
+      for (const entry of stored.rows) {
+        expect(entry.text).not.toContain(token);
+        expect(entry.text).not.toContain(TEST_ORDER_TOKEN_SECRET);
+      }
+    });
+
+    it("after the secret changed, tokens already handed out keep working, and a replay by the owner of the cart re-derives the token (the old one is then dead)", async () => {
+      const { key, body, first } = await firstOrder();
+      const number = first.body.order?.number ?? "";
+      const oldToken = first.body.accessToken ?? "";
+      const rotated = await startApp({
+        adminAuthenticator: "production-default",
+        clock,
+        orderTokenSecret: "another-order-token-secret-0123456789-xyz",
+        rateLimits: {
+          checkout: { maxAttempts: 10_000, windowMinutes: 10 },
+          orderLookup: { maxAttempts: 10_000, windowMinutes: 10 },
+        },
+      });
+      try {
+        const same = new Shopper(rotated.baseUrl);
+        same.setCookie("fluxkit_cart", shopper.cookie("fluxkit_cart") ?? "");
+        // Lookup compares hashes and never uses the secret: a token already handed out keeps working until a replay.
+        expect((await lookup(same, number, oldToken)).status).toBe(200);
+        const again = await checkoutAs(same, body, key);
+        expect(again.status, JSON.stringify(again.body)).toBe(200);
+        const newToken = again.body.accessToken ?? "";
+        expect(newToken).toMatch(TOKEN);
+        expect(newToken).not.toBe(oldToken);
+        expect((await lookup(same, number, newToken)).status).toBe(200);
+        expect((await lookup(same, number, oldToken)).status).toBe(404);
+        // From now on it is stable again.
+        const third = await checkoutAs(same, body, key);
+        expect(third.body.accessToken).toBe(newToken);
+      } finally {
+        await rotated.app.close();
       }
     });
 
@@ -365,12 +452,45 @@ describe("checkout idempotency (real app, real Postgres)", () => {
       const row = await orderRow(pool, [...numbers][0] ?? "");
       expect(await reservationsOfOrder(pool, row.id)).toHaveLength(1);
       expect(await changesOf(pool, row.id)).toHaveLength(1);
-      // Exactly one of the tokens that were handed out opens the order: the last rotation.
+      // Every answer carries the same token, and it opens the order.
       const tokens = results.map((result) => result.body.accessToken ?? "");
+      expect(new Set(tokens).size).toBe(1);
       const opened = await Promise.all(
         tokens.map((token) => lookup(shopper, [...numbers][0] ?? "", token)),
       );
-      expect(opened.filter((result) => result.status === 200)).toHaveLength(1);
+      expect(opened.every((result) => result.status === 200)).toBe(true);
+    });
+
+    it("a double submit gives both answers the same working token (20 rounds): lookup and cancel open with the 201 answer", async () => {
+      for (let round = 0; round < 20; round += 1) {
+        const roundShopper = new Shopper(running.baseUrl);
+        const { variantId } = await stocked(10, 1_000);
+        await add(roundShopper, variantId, 1);
+        const key = randomUUID();
+        const body = checkoutBody(1_000);
+        const results = await Promise.all([
+          checkoutAs(twinOf(roundShopper), body, key),
+          checkoutAs(twinOf(roundShopper), body, key),
+        ]);
+        const statuses = results.map((result) => result.status).sort();
+        expect(statuses, `round ${String(round)}`).toEqual([200, 201]);
+        const created = results.find((result) => result.status === 201);
+        const replayed = results.find((result) => result.status === 200);
+        const number = created?.body.order?.number ?? "";
+        placedOrders.track(number);
+        const token = created?.body.accessToken ?? "";
+        expect(token, `round ${String(round)}`).toMatch(TOKEN);
+        expect(replayed?.body.accessToken, `round ${String(round)}`).toBe(token);
+        const opened = await lookup(roundShopper, number, token);
+        expect(opened.status, `round ${String(round)}`).toBe(200);
+        const cancelled = await roundShopper.post<CheckoutResult>("/store/orders/cancel", {
+          number,
+          accessToken: token,
+        });
+        expect(cancelled.status, `round ${String(round)} ${JSON.stringify(cancelled.body)}`).toBe(
+          200,
+        );
+      }
     });
 
     it("two different keys for one cart make one order; the second sees an empty cart", async () => {

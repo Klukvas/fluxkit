@@ -20,6 +20,8 @@ env:
   REDIS_URL: redis://localhost:6379
   MEILI_URL: http://localhost:7700
   MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+  # Throwaway secret for the API processes that CI starts (feature matrix); the test suite supplies its own.
+  ORDER_TOKEN_SECRET: ci-order-token-secret-0123456789-abcdef
 
 jobs:
   verify:

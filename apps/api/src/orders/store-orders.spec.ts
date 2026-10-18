@@ -521,7 +521,7 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
       expect(await reservedOf(mine.variantId)).toBe(2);
     });
 
-    it("the old token of a replayed checkout can not cancel", async () => {
+    it("the token of a replayed checkout is the one of the first answer, and it cancels", async () => {
       const who = new Shopper(running.baseUrl);
       const { variantId } = await catalog.simple({ trackInventory: true, onHand: 5, price: 100 });
       await add(who, variantId, 1);
@@ -532,9 +532,10 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
       const again = await checkoutAs(who, body, key);
       expect(again.status).toBe(200);
       const number = first.body.order?.number ?? "";
-      expect((await cancel(visitor, number, first.body.accessToken ?? "")).status).toBe(404);
+      expect(again.body.accessToken).toBe(first.body.accessToken);
       expect((await orderRow(pool, number)).status).toBe("awaiting_payment");
-      expect((await cancel(visitor, number, again.body.accessToken ?? "")).status).toBe(200);
+      expect((await cancel(visitor, number, first.body.accessToken ?? "")).status).toBe(200);
+      expect((await orderRow(pool, number)).status).toBe("cancelled");
     });
 
     it("needs the CSRF header", async () => {
