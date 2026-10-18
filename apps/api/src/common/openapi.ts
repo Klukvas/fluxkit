@@ -11,6 +11,7 @@ import {
   type OpenAPIObject,
 } from "@nestjs/swagger";
 import { z } from "zod";
+import { cartSchema, type CartResponse } from "../cart/cart.schemas.js";
 import { PROBLEM_CODES, PROBLEM_TITLE, type ProblemCode } from "./problem.js";
 
 type JsonSchemaIo = "input" | "output";
@@ -96,12 +97,13 @@ export class ProblemDetailsDoc {
   constraint?: string;
   @ApiPropertyOptional({ description: "Core rule code of a rule_violation or invalid_transition." })
   rule?: string;
+  // Placeholder: `documentStoreContract` replaces it with the full cart schema (a decorator cannot carry `required`).
   @ApiPropertyOptional({
-    description: "Only on `cart_changed`: the fresh cart, as `GET /store/cart` returns it.",
+    description: "Only on `cart_changed`: the fresh cart, exactly as `GET /store/cart` returns it.",
     type: "object",
-    additionalProperties: true,
+    properties: {},
   })
-  cart?: Record<string, unknown>;
+  cart?: CartResponse;
 }
 
 const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
@@ -128,4 +130,73 @@ export function ApiProblemResponses(
     ApiExtraModels(ProblemDetailsDoc, FieldErrorDoc),
     ...statuses.map((status) => ApiResponse(options(status))),
   );
+}
+
+/** Where the store CSRF guard (`StoreCsrfGuard`, registered globally) applies: every state-changing method. */
+const STORE_WRITE_METHODS = new Set(["post", "put", "patch", "delete"]);
+
+/**
+ * Documents the global store CSRF guard on every state-changing `/store` operation: the required `X-Fluxkit-CSRF: 1`
+ * header and the `403` problem it answers with. Done on the finished document, like the guard itself, so a route added
+ * later by any module (a feature included) is covered without repeating decorators on it.
+ */
+function documentStoreCsrf(document: OpenAPIObject): void {
+  const problem = {
+    "application/problem+json": { schema: { $ref: getSchemaPath(ProblemDetailsDoc) } },
+  };
+  for (const [path, item] of Object.entries(document.paths)) {
+    if (!path.startsWith("/store/")) {
+      continue;
+    }
+    for (const [method, operation] of Object.entries(item)) {
+      if (!STORE_WRITE_METHODS.has(method) || typeof operation !== "object" || operation === null) {
+        continue;
+      }
+      const target = operation as {
+        parameters?: unknown[];
+        responses: Record<string, unknown>;
+      };
+      target.parameters = [
+        ...(target.parameters ?? []),
+        {
+          name: "X-Fluxkit-CSRF",
+          in: "header",
+          required: true,
+          description:
+            "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+          schema: { type: "string", enum: ["1"] },
+        },
+      ];
+      target.responses = {
+        ...target.responses,
+        "403": { description: STORE_CSRF_DESCRIPTION, content: problem },
+      };
+    }
+  }
+}
+
+const STORE_CSRF_DESCRIPTION =
+  "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.";
+
+/**
+ * The cart of a `cart_changed` problem is the cart of `GET /store/cart`: the same zod schema, so a generated client types
+ * it (lines, notices, `requiresShipping`) instead of an open object, and the two cannot drift apart.
+ */
+function documentCartProblem(document: OpenAPIObject): void {
+  const problem = document.components?.schemas?.["ProblemDetailsDoc"];
+  if (problem === undefined || "$ref" in problem || problem.properties?.["cart"] === undefined) {
+    throw new Error("ProblemDetailsDoc.cart is missing from the OpenAPI document");
+  }
+  const placeholder = problem.properties["cart"];
+  problem.properties["cart"] = {
+    ...zodToOpenApiSchema(cartSchema, "output"),
+    ...("description" in placeholder ? { description: placeholder.description } : {}),
+  };
+}
+
+/** Finishes the generated document with what decorators cannot say: the store contract (`docs/contracts/api.md`). */
+export function documentStoreContract(document: OpenAPIObject): OpenAPIObject {
+  documentStoreCsrf(document);
+  documentCartProblem(document);
+  return document;
 }

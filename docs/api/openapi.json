@@ -1012,7 +1012,18 @@
       "post": {
         "description": "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked. The guest cart of the `fluxkit_cart` cookie is merged into the new account's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
         "operationId": "AccountController_register",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1115,6 +1126,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
             "content": {
@@ -1154,7 +1175,18 @@
       "post": {
         "description": "Every failure (unknown email, wrong password, locked or inactive account) is the same 401 and leaves the guest cart alone. 5 failures lock the account for 15 minutes. A session cookie the request carried is revoked and a new token is issued. On success the guest cart of the `fluxkit_cart` cookie is merged into the customer's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
         "operationId": "AccountController_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1255,6 +1287,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
@@ -1283,7 +1325,18 @@
     "/store/account/logout": {
       "post": {
         "operationId": "AccountController_logout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "The session is deleted; the old cookie no longer works."
@@ -1300,6 +1353,16 @@
           },
           "401": {
             "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1408,7 +1471,18 @@
       "patch": {
         "description": "The email is not editable. `phone: null` removes the phone.",
         "operationId": "AccountController_updateMe",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1499,6 +1573,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error. Details are only in the server log.",
             "content": {
@@ -1517,7 +1601,18 @@
     "/store/account/change-password": {
       "post": {
         "operationId": "AccountController_changePassword",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1556,6 +1651,16 @@
           },
           "401": {
             "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3052,6 +3157,10 @@
                       "type": "boolean",
                       "description": "At least one line and no unavailable line."
                     },
+                    "requiresShipping": {
+                      "type": "boolean",
+                      "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -3067,7 +3176,15 @@
                       }
                     }
                   },
-                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "required": [
+                    "lines",
+                    "subtotal",
+                    "total",
+                    "itemCount",
+                    "purchasable",
+                    "requiresShipping",
+                    "notices"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3110,13 +3227,34 @@
       "delete": {
         "description": "Deletes the cart and clears the `fluxkit_cart` cookie. The next add starts a new cart. Creates nothing.",
         "operationId": "CartController_clear",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "The cart is gone (or there was none)."
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3161,6 +3299,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -3436,6 +3584,10 @@
                       "type": "boolean",
                       "description": "At least one line and no unavailable line."
                     },
+                    "requiresShipping": {
+                      "type": "boolean",
+                      "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -3451,7 +3603,15 @@
                       }
                     }
                   },
-                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "required": [
+                    "lines",
+                    "subtotal",
+                    "total",
+                    "itemCount",
+                    "purchasable",
+                    "requiresShipping",
+                    "notices"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3459,6 +3619,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3531,6 +3701,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -3800,6 +3980,10 @@
                       "type": "boolean",
                       "description": "At least one line and no unavailable line."
                     },
+                    "requiresShipping": {
+                      "type": "boolean",
+                      "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -3815,7 +3999,15 @@
                       }
                     }
                   },
-                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "required": [
+                    "lines",
+                    "subtotal",
+                    "total",
+                    "itemCount",
+                    "purchasable",
+                    "requiresShipping",
+                    "notices"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3823,6 +4015,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3894,6 +4096,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
           }
         ],
         "responses": {
@@ -4142,6 +4354,10 @@
                       "type": "boolean",
                       "description": "At least one line and no unavailable line."
                     },
+                    "requiresShipping": {
+                      "type": "boolean",
+                      "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -4157,7 +4373,15 @@
                       }
                     }
                   },
-                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "required": [
+                    "lines",
+                    "subtotal",
+                    "total",
+                    "itemCount",
+                    "purchasable",
+                    "requiresShipping",
+                    "notices"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -4165,6 +4389,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4230,6 +4464,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
           }
         ],
         "responses": {
@@ -4478,6 +4722,10 @@
                       "type": "boolean",
                       "description": "At least one line and no unavailable line."
                     },
+                    "requiresShipping": {
+                      "type": "boolean",
+                      "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -4493,7 +4741,15 @@
                       }
                     }
                   },
-                  "required": ["lines", "subtotal", "total", "itemCount", "purchasable", "notices"],
+                  "required": [
+                    "lines",
+                    "subtotal",
+                    "total",
+                    "itemCount",
+                    "purchasable",
+                    "requiresShipping",
+                    "notices"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -4501,6 +4757,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4556,6 +4822,16 @@
             "required": true,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -5466,6 +5742,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "409": {
             "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
             "content": {
@@ -5522,6 +5808,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -5934,6 +6230,16 @@
               }
             }
           },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Not found.",
             "content": {
@@ -5980,6 +6286,16 @@
             "in": "query",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -6384,6 +6700,16 @@
           },
           "400": {
             "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7064,6 +7390,16 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
           }
         ],
         "responses": {
@@ -7455,6 +7791,16 @@
           },
           "401": {
             "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -23192,8 +23538,275 @@
           },
           "cart": {
             "type": "object",
-            "description": "Only on `cart_changed`: the fresh cart, as `GET /store/cart` returns it.",
-            "additionalProperties": true
+            "properties": {
+              "lines": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "variantId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "productSlug": {
+                      "type": "string"
+                    },
+                    "sku": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "variantTitle": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "optionValues": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "option": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["option", "value"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "image": {
+                      "nullable": true,
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        },
+                        "alt": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": ["url", "alt"],
+                      "additionalProperties": false
+                    },
+                    "quantity": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 999
+                    },
+                    "unitPrice": {
+                      "nullable": true,
+                      "description": "`null` on an unavailable line.",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "compareAtAmount": {
+                      "nullable": true,
+                      "description": "Regular price per unit in the unit price currency, when the variant is on sale.",
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
+                    },
+                    "lineTotal": {
+                      "nullable": true,
+                      "description": "`null` on an unavailable line.",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the shop currency (for example kopiykas)."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "availability": {
+                      "type": "string",
+                      "enum": ["in_stock", "low_stock", "out_of_stock"],
+                      "description": "`out_of_stock` on an unavailable line. Never a quantity."
+                    },
+                    "notices": {
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": ["price_changed"]
+                              },
+                              "previousAmount": {
+                                "type": "object",
+                                "properties": {
+                                  "amount": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 1000000000000,
+                                    "description": "Minor units of the shop currency (for example kopiykas)."
+                                  },
+                                  "currency": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false,
+                                "description": "The unit price the shopper last saw (`POST /store/cart/acknowledge` accepts the current one)."
+                              }
+                            },
+                            "required": ["code", "previousAmount"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": ["unavailable"]
+                              }
+                            },
+                            "required": ["code"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": ["line_total_out_of_range"],
+                                "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
+                              }
+                            },
+                            "required": ["code"],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "enum": ["out_of_stock"]
+                              }
+                            },
+                            "required": ["code"],
+                            "additionalProperties": false
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "variantId",
+                    "productSlug",
+                    "sku",
+                    "title",
+                    "variantTitle",
+                    "optionValues",
+                    "image",
+                    "quantity",
+                    "unitPrice",
+                    "compareAtAmount",
+                    "lineTotal",
+                    "availability",
+                    "notices"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "subtotal": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000000,
+                    "description": "Minor units of the shop currency (for example kopiykas)."
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "Sum of the line totals of the available lines (unavailable lines are left out)."
+              },
+              "total": {
+                "type": "object",
+                "properties": {
+                  "amount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000000000,
+                    "description": "Minor units of the shop currency (for example kopiykas)."
+                  },
+                  "currency": {
+                    "type": "string"
+                  }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "Equal to `subtotal` until shipping, discount or tax adjustments exist."
+              },
+              "itemCount": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "purchasable": {
+                "type": "boolean",
+                "description": "At least one line and no unavailable line."
+              },
+              "requiresShipping": {
+                "type": "boolean",
+                "description": "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable."
+              },
+              "notices": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["quantity_capped", "lines_dropped"]
+                    }
+                  },
+                  "required": ["code"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "lines",
+              "subtotal",
+              "total",
+              "itemCount",
+              "purchasable",
+              "requiresShipping",
+              "notices"
+            ],
+            "additionalProperties": false,
+            "description": "Only on `cart_changed`: the fresh cart, exactly as `GET /store/cart` returns it."
           }
         },
         "required": ["type", "title", "status", "code", "detail"]

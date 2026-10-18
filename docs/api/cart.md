@@ -2,7 +2,7 @@
 
 The shopper's cart (`/store/cart/*`), plan step 4 of `docs/plans/2026-10-17-cart-and-orders.md`. Decisions: `docs/adr/0015-cart-and-checkout.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: the cart is core. A cart reserves nothing; `POST /store/checkout` turns it into an order (`docs/api/orders.md`) and then empties it (the lines go, the cart row and the cookie stay). The scheduler deletes expired carts (`docs/api/jobs.md`).
 
-Every route is public (no login needed), sends `Cache-Control: no-store` (errors included), and every write needs `X-Fluxkit-CSRF: 1` and, with a body, `Content-Type: application/json` (otherwise `403 forbidden`, before anything else). Writes are limited per client address (`cartWrite`, 120 per minute, internal number): over the limit `429 too_many_requests` with `Retry-After`. All routes accept `?locale` (one of `LOCALES`, default `DEFAULT_LOCALE`, unknown is `400`); texts fall back to the default locale per field.
+Every route is public (no login needed), sends `Cache-Control: no-store` (errors included), and every write needs `X-Fluxkit-CSRF: 1` and, with a body, `Content-Type: application/json` (otherwise `403 forbidden`, before anything else; every write route documents this `403` and the required header in `openapi.json`). Writes are limited per client address (`cartWrite`, 120 per minute, internal number): over the limit `429 too_many_requests` with `Retry-After`. All routes accept `?locale` (one of `LOCALES`, default `DEFAULT_LOCALE`, unknown is `400`); texts fall back to the default locale per field.
 
 ## Who owns a cart
 
@@ -40,7 +40,7 @@ A write is one transaction that locks the cart row first, so parallel writes of 
     notices: [{code: "price_changed", previousAmount: {amount, currency}} | {code: "unavailable"} | {code: "line_total_out_of_range"} | {code: "out_of_stock"}]
   }],
   subtotal: {amount, currency}, total: {amount, currency},
-  itemCount, purchasable, notices: []
+  itemCount, purchasable, requiresShipping, notices: []
 }
 ```
 
@@ -52,7 +52,8 @@ A write is one transaction that locks the cart row first, so parallel writes of 
 - **`line_total_out_of_range`**: a price rose so that this quantity no longer fits the money limit (`MAX_AMOUNT`). Shown only by `GET /store/cart`: the line is unavailable (`unitPrice` and `lineTotal` are `null`, it is left out of `subtotal`, `itemCount` still counts it, the cart is not `purchasable`) and this is its only notice. Lower the quantity or remove the line; the checkout refuses it (`checkout_refused`, `line_total_out_of_range`).
 - **`out_of_stock`**: the availability status of a sellable line; it can still be added and kept (backorder and untracked variants are `in_stock`).
 - **`purchasable`**: at least one line and no unavailable line. `total` equals `subtotal` until shipping, discount and tax adjustments exist (they do not yet). `notices` (cart level, `quantity_capped` and `lines_dropped`) is part of the shape but is always `[]` here: those notices are returned once, as `cartNotices` of login and registration, where the merge happens.
-- An empty cart is `{lines: [], subtotal/total: {amount: 0, currency}, itemCount: 0, purchasable: false, notices: []}`.
+- **`requiresShipping`** (boolean, additive field, storefront plan step 2): whether the checkout will ask for a shipping address. It is core `shippingAddressRequired`, the very rule `POST /store/checkout` enforces, applied to the AVAILABLE lines (a line with a `lineTotal`) using the `requires_shipping` flag of each variant's product type, read from the catalog on every request (nothing is stored on the line; changing the flag of a product type changes the next read). `false` for an empty cart and for digital goods only; `true` as soon as one available line is a physical product, whatever else is in the cart. Unavailable lines (`unavailable`, `line_total_out_of_range`) are NOT counted: the checkout answers `409 cart_changed` for them before it looks at the address, so the flag describes the cart as it will be after the shopper fixes it (a cart with only an unavailable physical line and a digital line is `false`; removing the unavailable line does not change it). A line that is only out of stock IS counted: it is priced and stays in the order. For a purchasable cart, `POST /store/checkout` without `shippingAddress` is refused with `400 shipping_address_required` exactly when `requiresShipping` is `true` (a test checks both against the same carts); with an address it is always accepted, also when the flag is `false`. The flag is in every response that returns the cart shape (the five routes above and the `cart` of a `409 cart_changed`); `DELETE /store/cart` answers `204`.
+- An empty cart is `{lines: [], subtotal/total: {amount: 0, currency}, itemCount: 0, purchasable: false, requiresShipping: false, notices: []}`.
 
 ## Limits (core constants, not contract)
 
