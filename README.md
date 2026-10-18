@@ -52,7 +52,7 @@ pnpm db:migrate                         # applies the pending migrations to DATA
 pnpm seed                               # optional: demo catalog (needs a migrated database, see seeds/README.md)
 pnpm admin:create --email you@example.com   # first owner (needs a migrated database); asks for the password, see Admin sign-in
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
-pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000)
+pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000); reads API_INTERNAL_URL from .env and proxies /store/* to the API (development only)
 pnpm --filter @fluxkit/admin dev                # Vite prints the URL (default http://localhost:5173)
 ```
 

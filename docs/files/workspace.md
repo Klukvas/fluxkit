@@ -17,7 +17,7 @@
 
 ## Packages
 - `packages/core` - catalog domain rules (not a scaffold any more; see `core.md`). `packages/ui` - token-based components. `packages/theme` - design tokens and presets.
-- `packages/config` - feature flags and settings schema. `packages/api-client` - client generated from OpenAPI.
+- `packages/config` - feature flags and settings schema. `packages/api-client` - typed client for the store API (hand-written types checked against `docs/api/openapi.json`, `docs/files/api-client.md`).
 - `packages/features/` - one package per optional feature (none yet). `packages/providers/` - one package per payment/shipping provider (none yet).
 
 ## Per package
