@@ -29,3 +29,4 @@
 | [0023](0023-deterministic-guest-order-tokens.md) | Deterministic guest order tokens | accepted (2026-10-18, owner decision); supersedes in part the random, rotating guest token of ADR 0017  |
 | [0024](0024-open-order-limit-and-trusted-proxy.md) | Open-order limit per email and customer, and trusted proxy hops | accepted (2026-10-18, owner decision); extends the checkout lock order of ADR 0015 and the rate limits of ADR 0016 |
 | [0025](0025-outbox-claim-lease-and-bounded-jobs.md) | Outbox dispatcher: claim, lease and bounded scheduler jobs | accepted (2026-10-18, review fixes PR C); supersedes in part ADR 0021 (event delivery locks, attempt counting), refines ADR 0004 decision 4 for snapshot texts |
+| [0026](0026-storefront-architecture.md) | Storefront architecture: one origin, rendering split and the typed client | accepted (2026-10-18, owner approval of the storefront plan); builds on ADR 0015, 0016, 0023 and 0024, changes none of them |
