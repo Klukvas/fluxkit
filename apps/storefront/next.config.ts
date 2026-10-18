@@ -34,6 +34,21 @@ export default function config(phase: string): NextConfig {
     async redirects() {
       return [{ source: "/", destination: `/${DEFAULT_LOCALE}`, permanent: false }];
     },
+    async headers() {
+      // Next evaluates this once at `next build` and stores the result in the routes manifest, so a change of
+      // STOREFRONT_IMAGE_HOSTS needs a rebuild (README, "Content-Security-Policy"). No API_INTERNAL_URL exists at build
+      // time; it is a placeholder that satisfies the shared parser, only `imageHosts` is read.
+      const { imageHosts } = loadStorefrontEnv({
+        API_INTERNAL_URL: "http://127.0.0.1",
+        STOREFRONT_IMAGE_HOSTS: process.env.STOREFRONT_IMAGE_HOSTS,
+      });
+      return [
+        {
+          source: "/:path*",
+          headers: securityHeaders({ development: phase === PHASE_DEVELOPMENT_SERVER, imageHosts }),
+        },
+      ];
+    },
     async rewrites() {
       if (phase !== PHASE_DEVELOPMENT_SERVER) return [];
       // Throws (no fallback) when API_INTERNAL_URL is missing or malformed, so `next dev` stops instead of proxying nowhere.
@@ -41,4 +56,70 @@ export default function config(phase: string): NextConfig {
       return [{ source: "/store/:path*", destination: `${apiInternalUrl}/store/:path*` }];
     },
   };
+}
+
+/**
+ * Security headers of the storefront (plan 2026-10-18-storefront.md, "Security", owner answer 13). This file runs in plain
+ * Node from `next.config.ts`, so it imports nothing from the bundler-built workspace packages.
+ *
+ * The policy has no nonces: nonces would make every page dynamic and uncacheable, so Next's inline bootstrap scripts are
+ * allowed with `'unsafe-inline'`. That is acceptable only because the storefront loads no third-party script and renders no
+ * HTML from the API; the CSP is the second line behind that rule, not the first.
+ */
+
+export interface SecurityHeadersOptions {
+  /** `next dev`: adds `'unsafe-eval'` (React's development call stacks) and the hot-reload websocket. */
+  development: boolean;
+  /** Host names from `STOREFRONT_IMAGE_HOSTS`, already validated by `loadStorefrontEnv`. */
+  imageHosts: readonly string[];
+}
+
+export interface HeaderEntry {
+  key: string;
+  value: string;
+}
+
+const HOSTNAME = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/;
+
+export function buildContentSecurityPolicy(options: SecurityHeadersOptions): string {
+  for (const host of options.imageHosts) {
+    // A defence in depth: a host is spliced into a header, so it must be a bare DNS name.
+    if (!HOSTNAME.test(host)) {
+      throw new RangeError(
+        "An image host must be a bare host name (no scheme, port, path or wildcard).",
+      );
+    }
+  }
+  const scriptSources = [
+    "'self'",
+    "'unsafe-inline'",
+    ...(options.development ? ["'unsafe-eval'"] : []),
+  ];
+  const connectSources = ["'self'", ...(options.development ? ["ws:", "wss:"] : [])];
+  const imageSources = ["'self'", "data:", ...options.imageHosts.map((host) => `https://${host}`)];
+  const directives: [string, string[]][] = [
+    ["default-src", ["'self'"]],
+    ["script-src", scriptSources],
+    ["style-src", ["'self'", "'unsafe-inline'"]],
+    ["img-src", imageSources],
+    ["connect-src", connectSources],
+    ["frame-ancestors", ["'none'"]],
+    ["base-uri", ["'self'"]],
+    ["form-action", ["'self'"]],
+  ];
+  return directives.map(([name, sources]) => `${name} ${sources.join(" ")}`).join("; ");
+}
+
+export function securityHeaders(options: SecurityHeadersOptions): HeaderEntry[] {
+  return [
+    { key: "Content-Security-Policy", value: buildContentSecurityPolicy(options) },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    // The guest order page overrides this with `no-referrer` (its URL fragment never leaves the browser, but be strict).
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    // Only where HTTPS is certain: a browser would otherwise pin http://localhost for a year. Browsers ignore it over HTTP.
+    ...(options.development
+      ? []
+      : [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]),
+  ];
 }

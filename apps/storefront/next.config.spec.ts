@@ -95,3 +95,49 @@ describe("loadRootEnvFile", () => {
     ).not.toThrow();
   });
 });
+
+describe("next.config headers", () => {
+  async function headersFor(phase: string) {
+    const resolved = config(phase);
+    return resolved.headers === undefined ? [] : await resolved.headers();
+  }
+
+  it("applies the security headers to every path", async () => {
+    const rules = await headersFor(PHASE_PRODUCTION_BUILD);
+    expect(rules).toHaveLength(1);
+    expect(rules[0]?.source).toBe("/:path*");
+    const names = rules[0]?.headers.map((header) => header.key) ?? [];
+    expect(names).toEqual(
+      expect.arrayContaining([
+        "Content-Security-Policy",
+        "X-Content-Type-Options",
+        "Referrer-Policy",
+        "Permissions-Policy",
+        "Strict-Transport-Security",
+      ]),
+    );
+  });
+
+  it("reads STOREFRONT_IMAGE_HOSTS without needing API_INTERNAL_URL (a build has no runtime settings)", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "");
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com");
+    const rules = await headersFor(PHASE_PRODUCTION_BUILD);
+    const csp = rules[0]?.headers.find((header) => header.key === "Content-Security-Policy");
+    expect(csp?.value).toContain("img-src 'self' data: https://cdn.example.com");
+  });
+
+  it("fails loudly on a malformed STOREFRONT_IMAGE_HOSTS", async () => {
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "https://cdn.example.com/path");
+    await expect(headersFor(PHASE_PRODUCTION_BUILD)).rejects.toThrow(/STOREFRONT_IMAGE_HOSTS/);
+  });
+
+  it("relaxes the policy for the development server only", async () => {
+    const development = await headersFor(PHASE_DEVELOPMENT_SERVER);
+    const production = await headersFor(PHASE_PRODUCTION_SERVER);
+    const cspOf = (rules: typeof development) =>
+      rules[0]?.headers.find((header) => header.key === "Content-Security-Policy")?.value ?? "";
+    expect(cspOf(development)).toContain("'unsafe-eval'");
+    expect(cspOf(production)).not.toContain("'unsafe-eval'");
+    expect(development[0]?.headers.some((h) => h.key === "Strict-Transport-Security")).toBe(false);
+  });
+});

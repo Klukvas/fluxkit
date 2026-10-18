@@ -148,6 +148,9 @@ importers:
 
   apps/storefront:
     dependencies:
+      '@fluxkit/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
       '@fluxkit/config':
         specifier: workspace:*
         version: link:../../packages/config
