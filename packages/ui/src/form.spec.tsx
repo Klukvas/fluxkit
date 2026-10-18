@@ -24,7 +24,7 @@ describe("Input, Textarea, Select", () => {
       render(<Input name="email" type="email" autoComplete="email" required disabled />),
       "input",
     );
-    expect(input.attributes).toMatchObject({ name: "email", type: "email", autocomplete: "email" });
+    expect(input.attributes).toMatchObject({ name: "email", type: "email", autoComplete: "email" });
     expect(input.attributes.required).toBe(true);
     expect(input.attributes.disabled).toBe(true);
     expect(first(render(<Input />), "input").attributes.type).toBe("text");

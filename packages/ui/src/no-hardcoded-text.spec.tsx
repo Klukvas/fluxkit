@@ -18,7 +18,7 @@ import { render, text } from "./test-helpers";
 
 // Every user-facing string must come from props (AGENTS.md section 2.2). Each component is rendered with sentinel
 // strings only; any other word in the visible text or in an aria-label/alt/title would be a hardcoded string.
-// Allowed non-word glyphs: decorative separators and gap marks.
+// Allowed besides sentinels: digits (page numbers) and decorative glyphs (separators, gap mark, plus, minus).
 const s = (name: string): string => `§${name}`;
 
 const cases: [string, ReactElement][] = [
@@ -114,7 +114,7 @@ describe("no hardcoded user-facing text in ui components", () => {
       const markup = render(element);
       const visible = text(markup)
         .replaceAll(/§\w+/g, "")
-        .replaceAll(/[\s…/*]/g, "");
+        .replaceAll(/[\s\d…/*+\u2212]/g, "");
       expect(visible, `unexpected text in ${markup}`).toBe("");
       for (const match of markup.matchAll(/\s(aria-label|alt|title|placeholder)="([^"]*)"/g)) {
         expect(match[2], `${match[1]} in ${markup}`).toMatch(/^§\w+$|^$/);

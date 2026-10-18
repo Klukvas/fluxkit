@@ -36,7 +36,7 @@ describe("QuantityInput", () => {
     const input = first(markup, "input");
     expect(input.attributes).toMatchObject({
       type: "number",
-      inputmode: "numeric",
+      inputMode: "numeric",
       value: "2",
       min: "1",
       max: "5",

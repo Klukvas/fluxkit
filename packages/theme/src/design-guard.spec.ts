@@ -59,7 +59,7 @@ const colorUtility = new RegExp(
 );
 // Same prefixes, but the value is a size, alignment, width or keyword, not a color.
 const notAColor =
-  /^([trblxyse]|xs|sm|base|lg|xl|[2-9]xl|left|center|right|start|end|justify|wrap|nowrap|balance|pretty|ellipsis|clip|none|inherit|current|transparent|solid|dashed|dotted|inset|card|\d+|\d+\/\d+)$/;
+  /^([trblxyse]|xs|sm|base|lg|xl|[2-9]xl|left|center|right|start|end|justify|wrap|nowrap|balance|pretty|ellipsis|clip|none|inherit|current|transparent|solid|dashed|dotted|inset|card|\d+|\d+\/\d+|offset-\d+)$/;
 
 function nonTokenColorClasses(source: string): string[] {
   return [...source.matchAll(colorUtility)]

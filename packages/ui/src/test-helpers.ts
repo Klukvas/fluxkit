@@ -1,6 +1,15 @@
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
+const booleanAttributes = new Set([
+  "disabled",
+  "required",
+  "checked",
+  "readonly",
+  "multiple",
+  "selected",
+]);
+
 export type Tag = { name: string; attributes: Record<string, string | true>; raw: string };
 
 export function render(element: ReactElement): string {
@@ -12,7 +21,12 @@ export function tags(markup: string, name: string): Tag[] {
   return [...markup.matchAll(new RegExp(`<${name}(?=[\\s>/])([^>]*)>`, "g"))].map((match) => {
     const attributes: Record<string, string | true> = {};
     for (const attribute of (match[1] as string).matchAll(/([^\s=/"]+)(?:="([^"]*)")?/g)) {
-      attributes[attribute[1] as string] = attribute[2] === undefined ? true : decode(attribute[2]);
+      const name = attribute[1] as string;
+      // React renders boolean attributes as `disabled=""`; an empty `alt=""` must stay a string.
+      attributes[name] =
+        attribute[2] === undefined || (attribute[2] === "" && booleanAttributes.has(name))
+          ? true
+          : decode(attribute[2]);
     }
     return { name, attributes, raw: match[0] };
   });
