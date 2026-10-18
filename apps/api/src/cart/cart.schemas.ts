@@ -103,6 +103,10 @@ export const cartSchema = z.object({
   purchasable: z.boolean().meta({
     description: "At least one line and no unavailable line.",
   }),
+  requiresShipping: z.boolean().meta({
+    description:
+      "Whether the checkout will ask for a shipping address: at least one AVAILABLE line is a physical product (its product type ships goods). Unavailable lines are not counted, because the checkout refuses them before it asks for an address; an empty cart is `false`. Equal to what `POST /store/checkout` enforces (`400 shipping_address_required`) once the cart is purchasable.",
+  }),
   notices: z.array(cartNoticeSchema),
 });
 

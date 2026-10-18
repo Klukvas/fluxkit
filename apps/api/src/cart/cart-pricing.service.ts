@@ -8,6 +8,7 @@ import {
   type OrderLineFacts,
   type PriceCartResult,
   type PricedLineInput,
+  shippingAddressRequired,
   type StoreLocale,
 } from "@fluxkit/core";
 import { productStatusSchema } from "../catalog/admin/products/products.schemas.js";
@@ -60,6 +61,7 @@ export function emptyCart(shopCurrency: PricingConfig["shopCurrency"]): CartResp
     total: zero,
     itemCount: 0,
     purchasable: false,
+    requiresShipping: false,
     notices: [],
   };
 }
@@ -308,6 +310,18 @@ export class CartPricingService {
       total: result.subtotal,
       itemCount: result.itemCount,
       purchasable: result.purchasable,
+      requiresShipping: shippingAddressRequired(
+        // The same core rule as the checkout, over the lines that can be bought (an unavailable line has no total and
+        // makes the checkout answer cart_changed before it looks at the address). The flag comes from the variant row
+        // this pass already read, so it costs no statement.
+        result.lines.flatMap((line) => {
+          const row = rowsById.get(line.variantId);
+          if (row === undefined) {
+            throw new Error(`Priced line ${line.variantId} has no variant row`);
+          }
+          return line.lineTotal === null ? [] : [{ requiresShipping: row.requiresShipping }];
+        }),
+      ),
       notices: [],
     };
   }
