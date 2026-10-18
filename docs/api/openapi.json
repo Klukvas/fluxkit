@@ -2969,6 +2969,18 @@
                                   "properties": {
                                     "code": {
                                       "type": "string",
+                                      "enum": ["line_total_out_of_range"],
+                                      "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
                                       "enum": ["out_of_stock"]
                                     }
                                   },
@@ -3341,6 +3353,18 @@
                                   "properties": {
                                     "code": {
                                       "type": "string",
+                                      "enum": ["line_total_out_of_range"],
+                                      "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
                                       "enum": ["out_of_stock"]
                                     }
                                   },
@@ -3693,6 +3717,18 @@
                                   "properties": {
                                     "code": {
                                       "type": "string",
+                                      "enum": ["line_total_out_of_range"],
+                                      "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
                                       "enum": ["out_of_stock"]
                                     }
                                   },
@@ -4023,6 +4059,18 @@
                                   "properties": {
                                     "code": {
                                       "type": "string",
+                                      "enum": ["line_total_out_of_range"],
+                                      "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
                                       "enum": ["out_of_stock"]
                                     }
                                   },
@@ -4337,6 +4385,18 @@
                                     "code": {
                                       "type": "string",
                                       "enum": ["unavailable"]
+                                    }
+                                  },
+                                  "required": ["code"],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "code": {
+                                      "type": "string",
+                                      "enum": ["line_total_out_of_range"],
+                                      "description": "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it."
                                     }
                                   },
                                   "required": ["code"],

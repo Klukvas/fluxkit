@@ -43,6 +43,8 @@ export interface PricedCart {
   readonly priced: ReadonlyMap<string, StoreVariantPricing>;
   readonly labelsByVariant: ReadonlyMap<string, readonly VariantOptionLabelRow[]>;
   readonly media: readonly ProductMediaRow[];
+  /** What core was given, in `present` order (the cart read prices it again without an overflowing line). */
+  readonly inputs: readonly PricedLineInput[];
   readonly result: PriceCartResult;
 }
 
@@ -210,11 +212,51 @@ export class CartPricingService {
         label,
       ]);
     }
-    return { stored: lines, present, rowsById, priced, labelsByVariant, media, result };
+    return { stored: lines, present, rowsById, priced, labelsByVariant, media, inputs, result };
   }
 
-  /** The cart response of a pricing pass. Throws the `409 rule_violation` of `view` when core refused to price it. */
-  toResponse(context: PricedCart, locale: StoreLocale): CartResponse {
+  /**
+   * The cart as `GET /store/cart` shows it. Like `view`, except that a line whose total no longer fits the money limit (a
+   * price rose after it was added) does not make the whole read a 409: that line is shown as unavailable (no price, no
+   * total, left out of the subtotal) with the notice `line_total_out_of_range`, so the shopper can still read the cart and
+   * lower the quantity or remove the line. Writes keep refusing (`view`), and the checkout refuses the line (`price`). A
+   * subtotal that overflows with every line within the limit is still the 409 of `view`: no single line is to blame.
+   */
+  async readView(
+    lines: readonly CartLine[],
+    locale: StoreLocale,
+    executor: DbExecutor,
+  ): Promise<CartResponse> {
+    if (lines.length === 0) {
+      return this.emptyCart();
+    }
+    const context = await this.price(lines, executor);
+    const { result } = context;
+    if (result.ok || result.reason !== "line_total_out_of_range") {
+      return this.toResponse(context, locale);
+    }
+    const overflowing = new Set(result.lineIndexes);
+    const repriced = priceCart(
+      this.pricing.shopCurrency,
+      context.inputs.map((input, index) =>
+        overflowing.has(index) ? { ...input, facts: { ...input.facts, sellable: false } } : input,
+      ),
+    );
+    const marked = new Set(
+      context.present.flatMap((line, index) => (overflowing.has(index) ? [line.variantId] : [])),
+    );
+    return this.toResponse({ ...context, result: repriced }, locale, marked);
+  }
+
+  /**
+   * The cart response of a pricing pass. Throws the `409 rule_violation` of `view` when core refused to price it.
+   * `overflowing` names lines already taken out of the pricing because their total does not fit (`readView`).
+   */
+  toResponse(
+    context: PricedCart,
+    locale: StoreLocale,
+    overflowing: ReadonlySet<string> = new Set(),
+  ): CartResponse {
     const { present, rowsById, labelsByVariant, media, result } = context;
     if (!result.ok) {
       throw this.unpriceable(result, present);
@@ -246,17 +288,19 @@ export class CartPricingService {
           compareAtAmount: line.compareAtAmount,
           lineTotal: line.lineTotal,
           availability: line.availability,
-          notices: line.notices.map((notice) =>
-            notice.code === "price_changed"
-              ? {
-                  code: notice.code,
-                  previousAmount: {
-                    amount: notice.previousAmount.amount,
-                    currency: notice.previousAmount.currency,
-                  },
-                }
-              : { code: notice.code },
-          ),
+          notices: overflowing.has(line.variantId)
+            ? [{ code: "line_total_out_of_range" as const }]
+            : line.notices.map((notice) =>
+                notice.code === "price_changed"
+                  ? {
+                      code: notice.code,
+                      previousAmount: {
+                        amount: notice.previousAmount.amount,
+                        currency: notice.previousAmount.currency,
+                      },
+                    }
+                  : { code: notice.code },
+              ),
         };
       }),
       subtotal: result.subtotal,

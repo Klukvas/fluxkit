@@ -433,20 +433,43 @@ describe("cart API: repricing, notices and amounts", () => {
       expect(cart.subtotal.amount).toBe(700_000_000_000);
     });
 
-    it("a cart that became unpriceable (a price rose) answers 409 on read, can be repaired by lowering or removing, and always be emptied", async () => {
+    it("a subtotal that overflows while every line fits stays a 409 on read: no single line is to blame", async () => {
+      const a = await catalog.simple({ price: 1_000 });
+      const b = await catalog.simple({ price: 1_000 });
+      await add(shopper, a.variantId, 1);
+      await add(shopper, b.variantId, 1);
+      await catalog.setPrice(a.variantId, 700_000_000_000);
+      await catalog.setPrice(b.variantId, 700_000_000_000);
+      const stuck = await shopper.get<CartResult>("/store/cart");
+      expect(stuck.status).toBe(409);
+      expect(stuck.body).toMatchObject({ code: "rule_violation", rule: "subtotal_out_of_range" });
+      expect((await shopper.delete(`/store/cart/items/${b.variantId}`)).status).toBe(200);
+    });
+
+    it("a cart that became unpriceable (a price rose) is READ with the overflowing line marked unavailable, can be repaired by lowering or removing, and always be emptied", async () => {
       const a = await catalog.simple({ price: 1_000 });
       const b = await catalog.simple({ price: 1_000 });
       await add(shopper, a.variantId, 100);
       await add(shopper, b.variantId, 1);
       await catalog.setPrice(a.variantId, 100_000_000_000);
 
+      // Review fix (Low): the shopper can still READ the cart. The line that no longer fits is unavailable (no price, no
+      // total), left out of the subtotal, carries its own notice, and the cart can not be ordered as it is.
       const stuck = await shopper.get<CartResult>("/store/cart");
-      expect(stuck.status).toBe(409);
-      expect(stuck.body).toMatchObject({ code: "rule_violation", rule: "line_total_out_of_range" });
-      expect(stuck.body.errors).toEqual([
-        { path: `lines.${a.variantId}`, code: "line_total_out_of_range" },
-      ]);
+      expect(stuck.status, JSON.stringify(stuck.body)).toBe(200);
       expect(stuck.headers.get("cache-control")).toBe("no-store");
+      const [stuckA, stuckB] = stuck.body.lines;
+      expect(stuckA).toMatchObject({
+        variantId: a.variantId,
+        quantity: 100,
+        unitPrice: null,
+        lineTotal: null,
+        notices: [{ code: "line_total_out_of_range" }],
+      });
+      expect(stuckB).toMatchObject({ variantId: b.variantId, lineTotal: { amount: 1_000 } });
+      expect(stuck.body.subtotal.amount).toBe(1_000);
+      expect(stuck.body.itemCount).toBe(101);
+      expect(stuck.body.purchasable).toBe(false);
       // A change that leaves the cart unpriceable is refused and rolled back ...
       const stillStuck = await shopper.patch<CartResult>(`/store/cart/items/${b.variantId}`, {
         quantity: 3,
@@ -460,15 +483,17 @@ describe("cart API: repricing, notices and amounts", () => {
       expect(lowered.body.lines[0]?.lineTotal?.amount).toBe(500_000_000_000);
       expect(lowered.body.lines[1]?.quantity).toBe(1);
 
-      await catalog.setPrice(a.variantId, 200_000_000_000);
-      expect((await shopper.get("/store/cart")).status).toBe(409);
+      await catalog.setPrice(a.variantId, 300_000_000_000);
+      const again = await shopper.get<CartResult>("/store/cart");
+      expect(again.status, JSON.stringify(again.body)).toBe(200);
+      expect(again.body.lines[0]?.notices).toEqual([{ code: "line_total_out_of_range" }]);
       const removed = await shopper.delete<CartResult>(`/store/cart/items/${a.variantId}`);
       expect(removed.status).toBe(200);
       expect(removed.body.lines.map((line) => line.variantId)).toEqual([b.variantId]);
 
       await shopper.patch(`/store/cart/items/${b.variantId}`, { quantity: 999 });
       await catalog.setPrice(b.variantId, 100_000_000_000);
-      expect((await shopper.get("/store/cart")).status).toBe(409);
+      expect((await shopper.get("/store/cart")).status).toBe(200);
       expect((await shopper.delete("/store/cart")).status).toBe(204);
       expect((await shopper.get<CartResult>("/store/cart")).body.lines).toEqual([]);
     });

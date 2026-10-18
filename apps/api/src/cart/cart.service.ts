@@ -111,7 +111,7 @@ export class CartService {
       return { cart: this.pricing.emptyCart(), cookie: NO_COOKIE };
     }
     const lines = await this.carts.listLines(stored.id);
-    return { cart: await this.pricing.view(lines, locale, this.db), cookie: NO_COOKIE };
+    return { cart: await this.pricing.readView(lines, locale, this.db), cookie: NO_COOKIE };
   }
 
   async addItem(
