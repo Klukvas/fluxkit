@@ -35,4 +35,4 @@ The test parses `tokens.css` (6-digit hex values only; another color format fail
 | `warning` on `background` | 4.5:1 |
 | `ring` on `background` | 3:1 (non-text, WCAG 1.4.11) |
 
-Status colors (`danger`, `success`, `warning`) are documented for text on `background`. Known gap: in the light theme `danger` reaches only 4.41:1 on `muted` (below 4.5:1; `success` and `warning` reach 4.58:1), so error text must not sit on `muted` surfaces (for example `Card`) until the light `danger` value is darkened, which is a contract-visible change left to the owner. The `Alert` uses the status colors for borders only.
+Status colors (`danger`, `success`, `warning`) are documented and tested for text on `background` and on `muted` (4.5:1 in both themes). The light `danger` was darkened from `#dc2626` to `#b91c1c` (4.41:1 on `muted` before). The `Alert` uses the status colors for borders only.
