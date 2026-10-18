@@ -27,3 +27,4 @@
 | [0021](0021-scheduler-jobs-lock-retry-and-handler-completion.md) | Scheduler jobs: lock, retry and handler completion | accepted (2026-10-17, plan step 5c); fills in what ADR 0018 left open, changes nothing in it |
 | [0022](0022-paid-order-cancel-releases-unsold-reservations.md) | Cancelling a paid order releases unsold reservations | accepted (2026-10-17); refines the stock effect "none" of `paid -> cancelled` in ADR 0017 |
 | [0023](0023-deterministic-guest-order-tokens.md) | Deterministic guest order tokens | accepted (2026-10-18, owner decision); supersedes in part the random, rotating guest token of ADR 0017  |
+| [0024](0024-open-order-limit-and-trusted-proxy.md) | Open-order limit per email and customer, and trusted proxy hops | accepted (2026-10-18, owner decision); extends the checkout lock order of ADR 0015 and the rate limits of ADR 0016 |

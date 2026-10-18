@@ -214,7 +214,7 @@ export class OrdersRepository {
 
   /**
    * Serializes the checkouts of one guest email until the transaction ends (`pg_advisory_xact_lock` on a 64-bit hash of
-   * the normalized address, in its own key space). A hash collision of two different emails only makes them wait for
+   * the normalized address with a fixed prefix, so it cannot meet the constant keys of the other advisory locks). A hash collision of two different emails only makes them wait for
    * each other. Taken after the cart row and before the catalog rows (lock order, ADR 0024); no other code takes it.
    */
   async lockGuestEmail(tx: Transaction, email: string): Promise<void> {
