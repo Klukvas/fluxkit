@@ -656,6 +656,11 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
       const { variantId } = await stocked(5, 1_000_000_000);
       await add(shopper, variantId, 999);
       await catalog.setPrice(variantId, 1_000_000_000_000);
+      // The shopper can still read the cart (the line is marked, not a 409), and the checkout still refuses it.
+      const read = await shopper.get<CartResult>("/store/cart");
+      expect(read.status, JSON.stringify(read.body)).toBe(200);
+      expect(read.body.lines[0]?.notices).toEqual([{ code: "line_total_out_of_range" }]);
+      expect(read.body.purchasable).toBe(false);
       const result = await checkoutAs(shopper, checkoutBody(1));
       expect(result.status, JSON.stringify(result.body)).toBe(409);
       expect(result.body).toMatchObject({

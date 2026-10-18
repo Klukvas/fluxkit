@@ -7,9 +7,13 @@ import { deleteDispatchedEvents } from "./delete-dispatched-events.job.js";
 import { deleteExpiredCarts } from "./delete-expired-carts.job.js";
 import { deleteExpiredCustomerSessions } from "./delete-expired-customer-sessions.job.js";
 import { dispatchDomainEvents } from "./dispatch-domain-events.job.js";
+import { pgEventLeaseSource, type EventLeaseSource } from "./event-leases.js";
+import { DEFAULT_JOB_BUDGET_MS, JobBudget } from "./job-budget.js";
 import { DomainEventHandlerRegistry } from "./domain-event-handlers.js";
 import { expireDueOrders } from "./expire-due-orders.job.js";
 import { JobsRepository } from "./jobs.repository.js";
+import { DEFAULT_CLEANUP_LIMITS } from "./batches.js";
+import { SCHEDULER_DATABASE_URL } from "./scheduler-config.js";
 import { sweepReservations } from "./sweep-reservations.job.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
@@ -36,25 +40,37 @@ export type JobReport =
 export class JobsRunner {
   private readonly logger = new Logger("Jobs");
 
+  private readonly leases: EventLeaseSource;
+
   constructor(
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(JobsRepository) private readonly repository: JobsRepository,
     @Inject(OrdersService) private readonly orders: OrdersService,
     @Inject(ReservationsService) private readonly reservations: ReservationsService,
     @Inject(DomainEventHandlerRegistry) private readonly handlers: DomainEventHandlerRegistry,
-  ) {}
+    @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
+  ) {
+    this.leases = pgEventLeaseSource(databaseUrl);
+  }
 
   /**
-   * Order, on purpose: orders first (their expiry releases the reservations and writes `order.expired`), then the generic
-   * reservation sweep (which now only finds orphans), then the events (including the ones just written), then the three
-   * cleanups. One failing job never stops the next and never throws out of here: its error is logged and returned.
+   * Order, on purpose: the time-critical jobs first, so that nothing slow after them can delay them (ADR 0025): orders
+   * (their expiry releases the reservations and writes `order.expired`), then the generic reservation sweep (which now
+   * only finds orphans), then the events (including the ones just written), then the three cleanups. Every job gets its
+   * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
+   * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
+   * stops the next and never throws out of here: its error is logged and returned.
    */
-  async runAll(now: Date): Promise<JobReport[]> {
+  async runAll(now: Date, options: { budgetMs?: number } = {}): Promise<JobReport[]> {
     const { database, repository } = this;
+    const budgetMs = options.budgetMs ?? DEFAULT_JOB_BUDGET_MS;
     const reports: JobReport[] = [];
-    const run = async (name: JobName, job: () => Promise<object>): Promise<void> => {
+    const run = async (
+      name: JobName,
+      job: (budget: JobBudget) => Promise<object>,
+    ): Promise<void> => {
       try {
-        const result = await job();
+        const result = await job(new JobBudget(budgetMs));
         reports.push({ name, ok: true, result });
         this.logResult(name, result);
       } catch (error) {
@@ -63,21 +79,29 @@ export class JobsRunner {
         this.logger.error(`Job ${name} failed: ${summarizeError(error)}`);
       }
     };
-    await run("expire-orders", () =>
-      expireDueOrders({ database, repository, orders: this.orders }, now),
+    await run("expire-orders", (budget) =>
+      expireDueOrders({ database, repository, orders: this.orders }, now, { budget }),
     );
-    await run("sweep-reservations", () =>
-      sweepReservations({ reservations: this.reservations }, now),
+    await run("sweep-reservations", (budget) =>
+      sweepReservations({ reservations: this.reservations }, now, { budget }),
     );
-    await run("dispatch-events", () =>
-      dispatchDomainEvents({ database, repository, handlers: this.handlers }, now),
+    await run("dispatch-events", (budget) =>
+      dispatchDomainEvents(
+        { database, repository, handlers: this.handlers, leases: this.leases },
+        now,
+        {
+          budget,
+        },
+      ),
     );
-    await run("delete-dispatched-events", () =>
-      deleteDispatchedEvents({ database, repository }, now),
+    await run("delete-dispatched-events", (budget) =>
+      deleteDispatchedEvents({ database, repository }, now, DEFAULT_CLEANUP_LIMITS, budget),
     );
-    await run("delete-carts", () => deleteExpiredCarts({ database, repository }, now));
-    await run("delete-customer-sessions", () =>
-      deleteExpiredCustomerSessions({ database, repository }, now),
+    await run("delete-carts", (budget) =>
+      deleteExpiredCarts({ database, repository }, now, DEFAULT_CLEANUP_LIMITS, budget),
+    );
+    await run("delete-customer-sessions", (budget) =>
+      deleteExpiredCustomerSessions({ database, repository }, now, DEFAULT_CLEANUP_LIMITS, budget),
     );
     return reports;
   }
@@ -100,7 +124,9 @@ export class JobsRunner {
       }
     }
     if (fields["truncated"] === true) {
-      this.logger.warn(`Job ${name} stopped at its batch limit; the rest is left for the next run`);
+      this.logger.warn(
+        `Job ${name} stopped at its batch limit or time budget; the rest is left for the next run`,
+      );
     }
     const summary = describeCounts(result);
     if (summary !== "") {

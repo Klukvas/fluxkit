@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertBatchLimits, drainInBatches } from "./batches.js";
+import { JobBudget } from "./job-budget.js";
 
 describe("drainInBatches", () => {
   /** A table with `rows` rows that a step deletes `batchSize` at a time. */
@@ -63,6 +64,19 @@ describe("drainInBatches", () => {
     );
     expect(result).toEqual({ total: 20, truncated: true });
     expect(calls).toBe(4);
+  });
+
+  it("stops between statements when the time budget is used up and reports a truncation", async () => {
+    const { state, step } = table(1_000);
+    let ticks = 0;
+    const budget = new JobBudget(2_500, () => {
+      ticks += 1;
+      return ticks * 1_000;
+    });
+    const result = await drainInBatches(step, { batchSize: 2, maxBatches: 100 }, budget);
+    expect(result.truncated).toBe(true);
+    expect(result.total).toBeGreaterThan(0);
+    expect(state.calls).toBeLessThan(5);
   });
 
   it("refuses nonsensical limits", () => {

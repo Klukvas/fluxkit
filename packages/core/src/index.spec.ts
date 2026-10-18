@@ -12,6 +12,7 @@ describe("public entry point", () => {
     const functions = [
       "validateI18nText",
       "resolveText",
+      "resolveTextWithFallback",
       "validateAttributeValues",
       "parseAttributeValidation",
       "computeOptionSignature",

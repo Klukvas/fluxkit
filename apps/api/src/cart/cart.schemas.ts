@@ -57,6 +57,12 @@ export const cartLineNoticeSchema = z.discriminatedUnion("code", [
     }),
   }),
   z.object({ code: z.literal("unavailable") }),
+  z.object({
+    code: z.literal("line_total_out_of_range").meta({
+      description:
+        "The price rose so that this quantity no longer fits the money limit. The line is unavailable (no price or total, left out of the subtotal); lower the quantity or remove it.",
+    }),
+  }),
   z.object({ code: z.literal("out_of_stock") }),
 ]);
 

@@ -17,7 +17,7 @@ Every route is public (no login needed), sends `Cache-Control: no-store` (errors
 
 | Endpoint | Purpose | Request | Response | Errors |
 |---|---|---|---|---|
-| `GET /store/cart` | The cart, repriced with the current catalog | `?locale` | `200` cart (the empty cart when there is none) | `400` locale or an unknown query field; `409` unpriceable (see Amounts) |
+| `GET /store/cart` | The cart, repriced with the current catalog | `?locale` | `200` cart (the empty cart when there is none; a line that no longer fits the money limit is marked, see Amounts) | `400` locale or an unknown query field; `409` only when the SUBTOTAL does not fit (see Amounts) |
 | `POST /store/cart/items` | Add a variant, or add to the quantity of its line (a new line goes last); creates the cart and the cookie on the first write | `{variantId, quantity}` (strict). `variantId` is a variant id (a product id is `404`), `quantity` a whole number from 1 to 999 | `200` cart | `400` structure, `unknown_field`, or `errors[0] = {path: "quantity", code: "invalid_quantity"}` for 0, negatives, fractions and anything that is not a JSON number (a missing `quantity` is `required`); `404` unknown variant; `409 rule_violation` with `rule` `variant_not_sellable`, `quantity_limit` (line would exceed 999, also for a first add of 1000), `too_many_lines`, or an amount rule; `429` |
 | `PATCH /store/cart/items/{variantId}` | Set the quantity of a line (1 to 999) | `{quantity}` (strict) | `200` cart | `400` as above; `404` the cart has no such line (also: no cart, malformed id); `409 quantity_limit`; `429` |
 | `DELETE /store/cart/items/{variantId}` | Remove a line (the cart stays, possibly empty) | none | `200` cart | `404` no such line; `409` unpriceable (see Amounts); `429` |
@@ -37,7 +37,7 @@ A write is one transaction that locks the cart row first, so parallel writes of 
     quantity,
     unitPrice: {amount, currency} | null, compareAtAmount | null, lineTotal: {amount, currency} | null,
     availability: "in_stock" | "low_stock" | "out_of_stock",
-    notices: [{code: "price_changed", previousAmount: {amount, currency}} | {code: "unavailable"} | {code: "out_of_stock"}]
+    notices: [{code: "price_changed", previousAmount: {amount, currency}} | {code: "unavailable"} | {code: "line_total_out_of_range"} | {code: "out_of_stock"}]
   }],
   subtotal: {amount, currency}, total: {amount, currency},
   itemCount, purchasable, notices: []
@@ -49,6 +49,7 @@ A write is one transaction that locks the cart row first, so parallel writes of 
 - **Lines** keep the order they were added in. `title` is the product title, `variantTitle` the variant's own title when it has one, `optionValues` the chosen options in the product's option order (names and labels in the locale). `image` is the product image tied to one of the variant's option values if there is one, else the first gallery image, else `null`.
 - **`price_changed {previousAmount}`**: each line stores the unit price the shopper last saw (set by an add, a quantity change and `acknowledge`). The cart compares it with the current price on every read. The notice stays until the shopper acknowledges or changes the line (a price that returns to the seen value ends it by itself). A line seen in another currency (after `SHOP_CURRENCY` changed) shows it too, with the old currency in `previousAmount`.
 - **`unavailable`**: the variant is no longer sellable, by the rule of the store (`isVariantSellable`: product `active`, variant active, price in the shop currency). The line stays (the shopper decides), `unitPrice` and `lineTotal` are `null`, `availability` is `out_of_stock` (never advertised as buyable), and it is left out of `subtotal`. `itemCount` still counts its quantity. A quantity change keeps its seen price; removing it works.
+- **`line_total_out_of_range`**: a price rose so that this quantity no longer fits the money limit (`MAX_AMOUNT`). Shown only by `GET /store/cart`: the line is unavailable (`unitPrice` and `lineTotal` are `null`, it is left out of `subtotal`, `itemCount` still counts it, the cart is not `purchasable`) and this is its only notice. Lower the quantity or remove the line; the checkout refuses it (`checkout_refused`, `line_total_out_of_range`).
 - **`out_of_stock`**: the availability status of a sellable line; it can still be added and kept (backorder and untracked variants are `in_stock`).
 - **`purchasable`**: at least one line and no unavailable line. `total` equals `subtotal` until shipping, discount and tax adjustments exist (they do not yet). `notices` (cart level, `quantity_capped` and `lines_dropped`) is part of the shape but is always `[]` here: those notices are returned once, as `cartNotices` of login and registration, where the merge happens.
 - An empty cart is `{lines: [], subtotal/total: {amount: 0, currency}, itemCount: 0, purchasable: false, notices: []}`.
@@ -62,7 +63,8 @@ At most 100 lines per cart (the 101st different variant is `409 too_many_lines`;
 Core refuses to price a cart whose line total or subtotal exceeds the money limit (`MAX_AMOUNT`, 10^12 minor units); it never clamps. The API surfaces it as a problem, not as a partial cart:
 
 - a write whose result cannot be priced is **rolled back** and answers `409 rule_violation` with `rule` `line_total_out_of_range` (with `errors[] = [{path: "lines.<variantId>", code: "line_total_out_of_range"}]` for every offending line) or `subtotal_out_of_range`. A refused first write creates no cart.
-- a cart that became unpriceable after it was filled (a price rose) answers `409` with the same body on `GET`. The shopper repairs it with writes that lead to a priceable cart (a lower quantity, `DELETE` of a line) or empties it with `DELETE /store/cart`, which always works. A change that leaves the cart unpriceable is refused the same way.
+- a cart whose line became too large after it was filled (a price rose) is still READ: `GET /store/cart` answers `200` and marks that line `line_total_out_of_range` (above), so the shopper can see it and act. The shopper repairs it with writes that lead to a priceable cart (a lower quantity, `DELETE` of a line) or empties it with `DELETE /store/cart`, which always works. A write that leaves the cart unpriceable is refused with the `409` above, and the checkout refuses the line.
+- a SUBTOTAL that does not fit while every line fits is still `409 subtotal_out_of_range` on `GET` (no single line is to blame); `DELETE` of a line repairs it.
 
 This needs prices above about 10^9 minor units (10 million of the major unit) per unit at 999 units, so it is an edge case, not a normal flow.
 

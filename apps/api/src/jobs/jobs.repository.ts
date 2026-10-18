@@ -21,13 +21,17 @@ export interface PendingEvent {
   aggregateId: string;
   payload: Record<string, unknown>;
   createdAt: Date;
+  /** Attempts counted so far; after `claimEvent` this includes the attempt that just started. */
   attempts: number;
   cursor: TimeCursor;
 }
 
-/** A failed delivery is retried at `created_at + (2^failures - 1) * BACKOFF_UNIT_MS` (see `docs/adr/0021-...`). */
+/** An event whose attempt has started (`JobsRepository.claimEvent`): `attempts` includes this attempt. */
+export type ClaimedEvent = Omit<PendingEvent, "cursor">;
+
+/** An event whose n-th attempt did not finish is tried again at `created_at + (2^n - 1) * BACKOFF_UNIT_MS` (ADR 0021, 0025). */
 export const BACKOFF_UNIT_MS = 60_000;
-/** After this many failed deliveries an event is no longer picked; an operator looks at it. */
+/** After this many attempts (each counted when it starts) an event is no longer picked; an operator looks at it. */
 export const MAX_DISPATCH_ATTEMPTS = 10;
 
 /**
@@ -111,18 +115,18 @@ export class JobsRepository {
   }
 
   /**
-   * Locks (`FOR UPDATE SKIP LOCKED`) up to `limit` events that are due for a delivery attempt, oldest first, strictly
-   * after `after`: undispatched, fewer than `MAX_DISPATCH_ATTEMPTS` failures, and `created_at + (2^attempts - 1) *
-   * BACKOFF_UNIT_MS <= now`. The locks last until the caller's transaction ends, so two dispatchers never hold the same
-   * row. Uses `domain_event_dispatched_at_created_at_idx`.
+   * Up to `limit` events that look due for a delivery attempt, oldest first, strictly after `after`: undispatched, fewer
+   * than `MAX_DISPATCH_ATTEMPTS` attempts, and `created_at + (2^attempts - 1) * BACKOFF_UNIT_MS <= now`. A snapshot, no
+   * lock: the dispatcher takes the lease of each event, then `claimEvent` re-checks all of this. Uses
+   * `domain_event_dispatched_at_created_at_idx`.
    */
-  async lockDueEvents(
-    tx: Transaction,
+  async listDueEvents(
+    db: DbExecutor,
     now: Date,
     limit: number,
     after: TimeCursor | undefined,
   ): Promise<PendingEvent[]> {
-    const rows = await tx
+    const rows = await db
       .select({
         id: domainEvent.id,
         type: domainEvent.type,
@@ -144,8 +148,7 @@ export class JobsRepository {
         ),
       )
       .orderBy(asc(domainEvent.createdAt), asc(domainEvent.id))
-      .limit(limit)
-      .for("update", { skipLocked: true });
+      .limit(limit);
     return rows.map((row) => ({
       id: row.id,
       type: row.type,
@@ -157,19 +160,71 @@ export class JobsRepository {
     }));
   }
 
-  async markEventDispatched(tx: Transaction, id: string, now: Date): Promise<void> {
-    await tx.update(domainEvent).set({ dispatchedAt: now }).where(eq(domainEvent.id, id));
+  /**
+   * Starts an attempt: if the event is still due (the conditions of `listDueEvents`, checked again under the row lock) it
+   * gets `attempts + 1` and the row is returned with the NEW count, else `undefined` (delivered, given up or not due
+   * any more since it was listed, or a row lock is held by someone else right now: `SKIP LOCKED`). The caller COMMITS
+   * this before any handler runs: the attempt is on record even if the process dies in the handler (ADR 0025).
+   */
+  async claimEvent(tx: Transaction, id: string, now: Date): Promise<ClaimedEvent | undefined> {
+    const result = await tx.execute<{
+      id: string;
+      type: string;
+      aggregate_id: string;
+      payload: Record<string, unknown>;
+      created_at: string;
+      attempts: number;
+    }>(sql`
+      with candidate as (
+        select id from domain_event
+        where id = ${id}::uuid
+          and dispatched_at is null
+          and attempts < ${MAX_DISPATCH_ATTEMPTS}
+          and created_at + ((power(2, attempts) - 1) * ${BACKOFF_UNIT_MS}) * interval '1 millisecond' <= ${now}
+        for update skip locked
+      )
+      update domain_event as event
+      set attempts = event.attempts + 1
+      from candidate
+      where event.id = candidate.id
+      returning event.id, event.type, event.aggregate_id, event.payload, event.attempts,
+        to_char(event.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+    `);
+    const row = result.rows[0];
+    if (row === undefined) {
+      return undefined;
+    }
+    return {
+      id: row.id,
+      type: row.type,
+      aggregateId: row.aggregate_id,
+      payload: row.payload,
+      // Text, not a Date: a raw statement bypasses the column parser of Drizzle.
+      createdAt: new Date(row.created_at),
+      attempts: row.attempts,
+    };
   }
 
-  /** One more failed delivery; `code` is a class or error code, never a message (the CHECK of the column allows no more). */
+  /** Every handler succeeded (or there was none): the event is delivered. Only an undispatched row changes. */
+  async markEventDispatched(tx: Transaction, id: string, now: Date): Promise<void> {
+    await tx
+      .update(domainEvent)
+      .set({ dispatchedAt: now })
+      .where(and(eq(domainEvent.id, id), sql`${domainEvent.dispatchedAt} is null`));
+  }
+
+  /**
+   * A handler failed: stores the code and returns the attempts, which `claimEvent` already counted. `code` is a class or
+   * error code, never a message (the CHECK of the column allows no more).
+   */
   async recordEventFailure(tx: Transaction, id: string, code: string): Promise<number> {
     const [row] = await tx
       .update(domainEvent)
-      .set({ attempts: sql`${domainEvent.attempts} + 1`, lastErrorCode: code })
-      .where(eq(domainEvent.id, id))
+      .set({ lastErrorCode: code })
+      .where(and(eq(domainEvent.id, id), sql`${domainEvent.dispatchedAt} is null`))
       .returning({ attempts: domainEvent.attempts });
     if (row === undefined) {
-      throw new Error("A failed event row disappeared while it was locked.");
+      throw new Error("A failed event row disappeared while it was being delivered.");
     }
     return row.attempts;
   }

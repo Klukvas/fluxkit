@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { resolveText, type StoreLocale } from "@fluxkit/core";
+import { resolveTextWithFallback, type StoreLocale } from "@fluxkit/core";
 import { z } from "zod";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import type { DbExecutor } from "../common/transaction.js";
@@ -39,7 +39,7 @@ function text(map: Readonly<Record<string, string>> | null, locale: StoreLocale)
   if (map === null) {
     return "";
   }
-  return resolveText(map, locale.locale, locale.defaultLocale) ?? Object.values(map)[0] ?? "";
+  return resolveTextWithFallback(map, locale.locale, locale.defaultLocale) ?? "";
 }
 
 export function parseAddress(value: unknown): z.output<typeof address> | null {

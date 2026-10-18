@@ -1,14 +1,16 @@
-import type { DbExecutor } from "../common/transaction.js";
+import type { Database } from "../database/database.module.js";
 import {
   DEFAULT_CLEANUP_LIMITS,
   drainInBatches,
   type BatchLimits,
   type CleanupResult,
 } from "./batches.js";
+import type { JobBudget } from "./job-budget.js";
+import { withJobTransaction } from "../common/job-limits.js";
 import type { JobsRepository } from "./jobs.repository.js";
 
 export interface CartCleanupDeps {
-  database: DbExecutor;
+  database: Database;
   repository: Pick<JobsRepository, "deleteExpiredCarts">;
 }
 
@@ -20,10 +22,15 @@ export async function deleteExpiredCarts(
   deps: CartCleanupDeps,
   now: Date,
   limits: BatchLimits = DEFAULT_CLEANUP_LIMITS,
+  budget?: JobBudget,
 ): Promise<CleanupResult> {
   const drained = await drainInBatches(
-    (batchSize) => deps.repository.deleteExpiredCarts(deps.database, now, batchSize),
+    (batchSize) =>
+      withJobTransaction(deps.database, (tx) =>
+        deps.repository.deleteExpiredCarts(tx, now, batchSize),
+      ),
     limits,
+    budget,
   );
   return { deleted: drained.total, truncated: drained.truncated };
 }

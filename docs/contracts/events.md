@@ -46,13 +46,13 @@ export class SendReceipt implements DomainEventHandler {
 | Metadata key | `DOMAIN_EVENT_HANDLER_METADATA` = `"fluxkit:domain-event-handler"` |
 | Metadata value | `{eventTypes: string[]}`, built with `domainEventHandlerMetadata(types)` (checks the names, removes duplicates, throws `RangeError` for an empty list or a malformed name) |
 | Handler | `handle(event: DomainEventEnvelope): Promise<void>` on a STATIC provider (a request-scoped provider is refused). A marked provider without `handle`, with an invalid event type or not static stops the startup |
-| Envelope | `{id, type, aggregateId, payload, occurredAt: Date, previousFailures}`: `id` is the event id (the idempotency key), `payload` the stored payload, `occurredAt` the time the change committed, `previousFailures` the failed deliveries so far (0 on the first) |
+| Envelope | `{id, type, aggregateId, payload, occurredAt: Date, previousFailures}`: `id` is the event id (the idempotency key), `payload` the stored payload, `occurredAt` the time the outbox row was inserted, which is the START of the transaction that wrote it (`DEFAULT now()`), so it can precede the commit by the length of that transaction, `previousFailures` the number of earlier attempts (0 on the first; an attempt that died without finishing counts) |
 | Types | An event is delivered only to handlers that declared its exact type |
 
 Delivery rules a handler can rely on, and must respect:
-- **At least once.** The same event can arrive again (after a failure, after a crash, after a retry of another handler of the same event): be idempotent by `event.id`.
+- **At least once.** The same event can arrive again (after a failure, after a crash of the dispatcher, after a retry of another handler of the same event): be idempotent by `event.id`. Two dispatchers never run the same event at the same time, and no transaction is open while a handler runs.
 - **Success is returning, failure is throwing.** An event is marked dispatched only when EVERY handler of its type succeeded (no handler at all counts as success). When one throws, the others are still called for that attempt, and the retry calls ALL handlers of the event again.
-- **Retry with backoff.** After n failed deliveries the event is picked again at `created_at + (2^n - 1) minutes` (1, 3, 7, 15, ... minutes after the event was written). After 10 failures it is logged as an error, stays undispatched and is no longer picked until an operator resets `attempts`.
+- **Retry with backoff.** After n attempts that did not finish (a failure, or a dispatcher that died) the event is picked again at `created_at + (2^n - 1) minutes` (1, 3, 7, 15, ... minutes after the event was written). After 10 attempts it stays undispatched and is no longer picked until an operator resets `attempts`; a failed 10th attempt is logged as an error.
 - **Bound your own I/O.** A handler that has not answered after 30 seconds counts as failed (`HandlerTimeout`); it may still finish later.
 - **No ordering guarantee** between events beyond "oldest due first"; do not rely on `order.paid` arriving after `order.placed` has been handled.
 - **Only a code is stored** when a handler fails (the error class and its cause's code), never the message. Do not put personal data in an error class name.

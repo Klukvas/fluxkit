@@ -103,3 +103,37 @@ export function resolveText(
     Object.hasOwn(text, key) ? text[key] : undefined;
   return own(locale) ?? own(defaultLocale);
 }
+
+function isUsableText(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+/**
+ * The text a reader shows for a translated field: the requested locale, else the default locale, else the first
+ * available locale (in code order) that has a non-empty text. `undefined` only when no locale has one. Unlike
+ * `resolveText` it also skips empty texts and does not depend on which locales are configured today: data written
+ * when another locale was configured (or by a path that bypasses the service rules) still shows something instead of
+ * nothing. The store read, the cart and the order views share this one rule.
+ */
+export function resolveTextWithFallback(
+  text: I18nText | null | undefined,
+  locale: string,
+  defaultLocale: string,
+): string | undefined {
+  if (text === null || text === undefined) {
+    return undefined;
+  }
+  for (const key of [locale, defaultLocale]) {
+    const own = Object.hasOwn(text, key) ? text[key] : undefined;
+    if (isUsableText(own)) {
+      return own;
+    }
+  }
+  for (const key of Object.keys(text).sort()) {
+    const own = text[key];
+    if (isUsableText(own)) {
+      return own;
+    }
+  }
+  return undefined;
+}

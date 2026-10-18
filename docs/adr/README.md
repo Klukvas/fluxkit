@@ -28,3 +28,4 @@
 | [0022](0022-paid-order-cancel-releases-unsold-reservations.md) | Cancelling a paid order releases unsold reservations | accepted (2026-10-17); refines the stock effect "none" of `paid -> cancelled` in ADR 0017 |
 | [0023](0023-deterministic-guest-order-tokens.md) | Deterministic guest order tokens | accepted (2026-10-18, owner decision); supersedes in part the random, rotating guest token of ADR 0017  |
 | [0024](0024-open-order-limit-and-trusted-proxy.md) | Open-order limit per email and customer, and trusted proxy hops | accepted (2026-10-18, owner decision); extends the checkout lock order of ADR 0015 and the rate limits of ADR 0016 |
+| [0025](0025-outbox-claim-lease-and-bounded-jobs.md) | Outbox dispatcher: claim, lease and bounded scheduler jobs | accepted (2026-10-18, review fixes PR C); supersedes in part ADR 0021 (event delivery locks, attempt counting), refines ADR 0004 decision 4 for snapshot texts |

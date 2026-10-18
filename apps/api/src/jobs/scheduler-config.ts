@@ -2,6 +2,9 @@ import { DEFAULT_SCHEDULER_INTERVAL_SECONDS } from "@fluxkit/config";
 
 export const SCHEDULER_CONFIG = Symbol("SCHEDULER_CONFIG");
 
+/** The scheduler lock and the event leases live on their own connections (never the pool's), so they need the URL. */
+export const SCHEDULER_DATABASE_URL = Symbol("SCHEDULER_DATABASE_URL");
+
 /** From `SCHEDULER_ENABLED` and `SCHEDULER_INTERVAL_SECONDS` (docs/contracts/config.md). */
 export interface SchedulerConfig {
   /** Whether this process starts the timer. The jobs themselves can always be run by hand (`pnpm jobs:run-once`). */

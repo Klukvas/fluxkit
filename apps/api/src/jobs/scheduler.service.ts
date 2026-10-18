@@ -9,10 +9,28 @@ import { CLOCK, type Clock } from "../auth/clock.js";
 import { summarizeError } from "../common/error-summary.js";
 import { DomainEventHandlerRegistry } from "./domain-event-handlers.js";
 import { JobsRunner, type JobReport } from "./jobs-runner.js";
-import { SCHEDULER_CONFIG, type SchedulerConfig } from "./scheduler-config.js";
+import {
+  SCHEDULER_CONFIG,
+  SCHEDULER_DATABASE_URL,
+  type SchedulerConfig,
+} from "./scheduler-config.js";
 import { withSchedulerLock } from "./scheduler-lock.js";
 
-export const SCHEDULER_DATABASE_URL = Symbol("SCHEDULER_DATABASE_URL");
+/**
+ * The same reason this many ticks in a row is worth a warning (the first skip of a kind is normal: another instance
+ * holds the lock, or a tick ran a little long). After that it repeats every `SKIPPED_TICKS_WARN_EVERY` skips, so a
+ * permanently idle instance of a multi-instance deployment (always `lock_held`) says so about once every half hour, not
+ * every minute.
+ */
+export const SKIPPED_TICKS_WARN_AFTER = 3;
+export const SKIPPED_TICKS_WARN_EVERY = 30;
+
+const SKIP_REASONS = {
+  lock_held: "another process holds the scheduler lock",
+  overlap: "the previous tick of this process is still running",
+} as const;
+
+export type SkipReason = keyof typeof SKIP_REASONS;
 
 export type TickOutcome =
   /** The jobs ran (each report says whether that job succeeded). */
@@ -37,6 +55,8 @@ export class SchedulerService implements OnApplicationBootstrap, BeforeApplicati
   private timer: NodeJS.Timeout | undefined;
   private running: Promise<TickOutcome> | undefined;
   private stopped = false;
+  private readonly skipped: Record<SkipReason, number> = { lock_held: 0, overlap: 0 };
+  private skipRun: { reason: SkipReason; length: number } | undefined;
 
   constructor(
     @Inject(JobsRunner) private readonly runner: JobsRunner,
@@ -78,11 +98,20 @@ export class SchedulerService implements OnApplicationBootstrap, BeforeApplicati
       return Promise.resolve({ status: "stopped" });
     }
     if (this.running !== undefined) {
+      this.noteSkip("overlap");
       return Promise.resolve({ status: "overlap" });
     }
     const current = this.runOnce().then(
-      (outcome) => outcome,
+      (outcome) => {
+        if (outcome.status === "lock_held") {
+          this.noteSkip("lock_held");
+        } else {
+          this.skipRun = undefined;
+        }
+        return outcome;
+      },
       (error: unknown): TickOutcome => {
+        this.skipRun = undefined;
         this.logger.error(`Scheduler tick failed: ${summarizeError(error)}`);
         return { status: "failed" };
       },
@@ -92,6 +121,35 @@ export class SchedulerService implements OnApplicationBootstrap, BeforeApplicati
       this.running = undefined;
     });
     return current;
+  }
+
+  /** How many ticks of this process were skipped, by reason, since it started. */
+  skippedTicks(): Readonly<Record<SkipReason, number>> {
+    return { ...this.skipped };
+  }
+
+  /**
+   * A skipped tick is logged at debug every time; when the same reason repeats `SKIPPED_TICKS_WARN_AFTER` times in a row
+   * it is a warning, and again every `SKIPPED_TICKS_WARN_EVERY` skips after that. A tick that runs, or a different
+   * reason, starts the count again. Without this a tick that never finishes would show only as jobs that never run.
+   */
+  private noteSkip(reason: SkipReason): void {
+    this.skipped[reason] += 1;
+    const length = this.skipRun?.reason === reason ? this.skipRun.length + 1 : 1;
+    this.skipRun = { reason, length };
+    this.logger.debug(`Scheduler tick skipped (${reason}): ${SKIP_REASONS[reason]}`);
+    if (
+      length === SKIPPED_TICKS_WARN_AFTER ||
+      (length > SKIPPED_TICKS_WARN_AFTER &&
+        (length - SKIPPED_TICKS_WARN_AFTER) % SKIPPED_TICKS_WARN_EVERY === 0)
+    ) {
+      this.logger.warn(
+        `Scheduler: ${String(length)} ticks in a row skipped (${reason}): ${SKIP_REASONS[reason]}. ` +
+          (reason === "overlap"
+            ? "A tick takes longer than the interval; look at the job logs."
+            : "Expected on all but one instance when several run; otherwise another process holds the lock for too long."),
+      );
+    }
   }
 
   /**

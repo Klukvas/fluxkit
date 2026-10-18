@@ -12,6 +12,7 @@ import { PlacedOrders } from "../test/order-fixtures.js";
 import { changesOf, eventsOf, orderRow, reservationsOfOrder } from "../test/order-http.js";
 import { OrdersService } from "../orders/orders.service.js";
 import { expireDueOrders, type ExpireOrdersDeps } from "./expire-due-orders.job.js";
+import { JobBudget } from "./job-budget.js";
 import { JobsRepository } from "./jobs.repository.js";
 
 // 2025 is before every timestamp other specs leave behind, so this spec's jobs only ever see its own rows.
@@ -222,6 +223,50 @@ describe("expireDueOrders (real Postgres, injected time)", () => {
     const result = await expireDueOrders(racing, await dueAt([order]));
     expect(result).toMatchObject({ scanned: 1, expired: 0, notDue: 1, failures: [] });
     expect((await orderRow(pool, order.number)).status).toBe("cancelled");
+  });
+
+  it("stops starting orders when the time budget is used up, says so, and the next run finishes (one slow job cannot hold the tick)", async () => {
+    const three: MadeOrder[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      clock.advanceMinutes(1);
+      three.push(await maker.place([{ quantity: 1 }]));
+    }
+    const due = await dueAt(three);
+    let ticks = 0;
+    // The first question (at construction) is the start; the next answers are 1 s later each, the budget is 1.5 s.
+    const budget = new JobBudget(1_500, () => {
+      ticks += 1;
+      return ticks * 1_000;
+    });
+    const first = await expireDueOrders(deps, due, { budget });
+    expect(first).toMatchObject({ scanned: 1, expired: 1, truncated: true });
+    expect((await orderRow(pool, three[0]?.number ?? "")).status).toBe("expired");
+    expect((await orderRow(pool, three[1]?.number ?? "")).status).toBe("awaiting_payment");
+    expect(await expireDueOrders(deps, due)).toMatchObject({ expired: 2, truncated: false });
+  });
+
+  it("an order whose row a stuck writer holds fails within lock_timeout, is reported, and the others still expire", async () => {
+    const stuck = await maker.place([{ quantity: 1 }]);
+    clock.advanceMinutes(1);
+    const free = await maker.place([{ quantity: 1 }]);
+    const holder = await pool.connect();
+    await holder.query("begin");
+    await holder.query("select 1 from sales_order where id = $1 for update", [stuck.id]);
+    const startedAt = Date.now();
+    try {
+      const result = await expireDueOrders(deps, await dueAt([stuck, free]), {
+        limits: { statementTimeoutMs: 10_000, lockTimeoutMs: 300 },
+      });
+      expect(Date.now() - startedAt).toBeLessThan(5_000);
+      expect(result).toMatchObject({ scanned: 2, expired: 1, truncated: false });
+      expect(result.failures).toHaveLength(1);
+      expect(result.failures[0]?.orderNumber).toBe(stuck.number);
+    } finally {
+      await holder.query("rollback");
+      holder.release();
+    }
+    expect((await orderRow(pool, free.number)).status).toBe("expired");
+    expect((await orderRow(pool, stuck.number)).status).toBe("awaiting_payment");
   });
 
   it("refuses a nonsensical limit", async () => {
