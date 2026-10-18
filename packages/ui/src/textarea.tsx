@@ -1,0 +1,12 @@
+import { forwardRef, type TextareaHTMLAttributes } from "react";
+import { cn } from "./cn";
+import { controlBase, focusRing } from "./styles";
+
+export type TextareaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
+
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function Textarea(
+  { className, ...props },
+  ref,
+) {
+  return <textarea ref={ref} className={cn(controlBase, focusRing, className)} {...props} />;
+});

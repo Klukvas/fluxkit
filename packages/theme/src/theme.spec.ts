@@ -32,4 +32,21 @@ describe("design tokens", () => {
       ).toBe(true);
     }
   });
+
+  it("maps every color token to a Tailwind utility color of the same name", () => {
+    const colorTokens = definedTokens(lightBlock).filter((name) => name.startsWith("--fk-color-"));
+    for (const name of colorTokens) {
+      const utility = name.replace("--fk-color-", "--color-");
+      expect(tailwindCss, `${name} has no ${utility} mapping`).toContain(
+        `${utility}: var(${name});`,
+      );
+    }
+  });
+
+  it("defines the status and focus tokens added for the storefront", () => {
+    const defined = definedTokens(lightBlock);
+    for (const name of ["--fk-color-success", "--fk-color-warning", "--fk-color-ring"]) {
+      expect(defined).toContain(name);
+    }
+  });
 });
