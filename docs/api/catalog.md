@@ -51,7 +51,7 @@ No feature flag: the catalog is core.
 ### Store (`/store/*`)
 
 - **Locale**: `?locale=` must be one of the configured `LOCALES` (default `uk` or `en`). Missing means `DEFAULT_LOCALE`. Anything else answers `400 validation_failed` at `locale` (`invalid_value`).
-- **Per-field fallback**: each text is resolved to one string: the requested locale, else the default locale. Fallback is per field, never per entity. If neither locale has a required text (product title, category or option name, brand name), the value is an empty string and a warning is logged.
+- **Per-field fallback**: each text is resolved to one string: the requested locale, else the default locale, else the first available non-empty locale in code order (a text written when another locale was configured still shows; the cart and the orders use the same rule, ADR 0025). Fallback is per field, never per entity. If no locale has a required text (product title, category or option name, brand name), the value is an empty string and a warning is logged.
 - **Hard rules** (tested):
   - Only products with status `active` appear, in lists and in detail. Draft, archived, and unknown slugs answer `404 not_found` in detail.
   - Only sellable variants appear: `isActive = true` and a price in the shop currency (`SHOP_CURRENCY`). A product with no sellable variant is not listed and its detail answers `404 not_found`, like an unpublished product. Prices, availability and the rules are in `docs/api/pricing.md`, Store.
