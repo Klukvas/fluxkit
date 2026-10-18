@@ -52,6 +52,9 @@ const pairs: [string, string, number][] = [
   ["success", "background", textMinimum],
   ["warning", "background", textMinimum],
   ["ring", "background", nonTextMinimum],
+  ["danger", "muted", textMinimum],
+  ["success", "muted", textMinimum],
+  ["warning", "muted", textMinimum],
 ];
 
 describe("contrast helper", () => {
