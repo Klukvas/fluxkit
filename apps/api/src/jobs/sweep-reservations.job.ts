@@ -3,12 +3,18 @@ import type {
   ExpireDueResult,
   ReservationsService,
 } from "../inventory/reservations/reservations.service.js";
+import type { JobBudget } from "./job-budget.js";
+import { DEFAULT_JOB_LIMITS, type JobLimits } from "../common/job-limits.js";
 
 export interface SweepReservationsOptions {
   /** Reservations per `expireDue` call (default: the service default, 500). */
   limit?: number;
   /** Calls per run (default 100). A guard against a cursor that never ends. */
   maxIterations?: number;
+  /** When the budget is used up the sweep starts no further call and reports `truncated` (default: none; the scheduler passes one). */
+  budget?: JobBudget;
+  /** Postgres `statement_timeout` and `lock_timeout` for the statements of the sweep (default: `DEFAULT_JOB_LIMITS`). */
+  limits?: JobLimits;
 }
 
 export interface SweepReservationsResult {
@@ -18,7 +24,7 @@ export interface SweepReservationsResult {
   /** Reservations that could not be expired (damaged data). Never ignored: the runner logs each as an error. */
   failures: { reservationId: string; reason: string }[];
   iterations: number;
-  /** Stopped at `maxIterations` with the cursor still open: more may be left for the next run. */
+  /** Stopped at `maxIterations` with the cursor still open, or because the time budget ran out: more may be left for the next run. */
   truncated: boolean;
 }
 
@@ -48,9 +54,13 @@ export async function sweepReservations(
   };
   let after: ExpireDueCursor | undefined;
   while (result.iterations < maxIterations) {
+    if (options.budget?.exhausted() === true) {
+      break;
+    }
     const page: ExpireDueResult = await deps.reservations.expireDue(now, {
       limit: options.limit,
       after,
+      limits: options.limits ?? DEFAULT_JOB_LIMITS,
     });
     result.iterations += 1;
     result.scanned += page.scanned;

@@ -17,6 +17,7 @@ import {
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../auth/clock.js";
 import { retryOnDeadlock } from "../common/deadlock-retry.js";
+import { applyJobLimits, type JobLimits } from "../common/job-limits.js";
 import { withTransaction, type Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
@@ -310,8 +311,11 @@ export class OrdersService implements OrderPaymentsPort {
    * this per due order). Under the order lock the status and the time are checked again, so a payment or a
    * cancellation that got there first wins and this answers `not_due`.
    */
-  async expireOne(orderId: string, now: Date): Promise<ExpireOutcome> {
+  async expireOne(orderId: string, now: Date, limits?: JobLimits): Promise<ExpireOutcome> {
     return this.inTransaction(async (tx) => {
+      if (limits !== undefined) {
+        await applyJobLimits(tx, limits);
+      }
       const order = await this.orders.lockById(tx, orderId);
       if (order === undefined) {
         return "not_found";

@@ -234,6 +234,66 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
       expect(await schedulerOf(first).tick()).toMatchObject({ status: "ran" });
     });
 
+    describe("skipped ticks are not silent (review fix Medium 2, ADR 0025)", () => {
+      let release = gate();
+
+      /** Holds a tick of `holder` open, runs `skipper.tick()` `times` times, then lets the holder finish. */
+      async function skipTicks(holder: RunningApp, skipper: RunningApp, times: number) {
+        const reached = gate();
+        release = gate();
+        vi.spyOn(runnerOf(holder), "runAll").mockImplementationOnce(async () => {
+          reached.open();
+          await release.promise;
+          return [];
+        });
+        const running = schedulerOf(holder).tick();
+        await reached.promise;
+        const outcomes: string[] = [];
+        for (let index = 0; index < times; index += 1) {
+          outcomes.push((await schedulerOf(skipper).tick()).status);
+        }
+        release.open();
+        await running;
+        return outcomes;
+      }
+
+      it("logs every skipped tick at debug, warns once the same reason repeats 3 times in a row and then every 30th, and counts them", async () => {
+        const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+        const debug = vi.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+        const before = schedulerOf(first).skippedTicks();
+        const outcomes = await skipTicks(first, first, 40);
+        expect(outcomes.every((status) => status === "overlap")).toBe(true);
+        expect(debug.mock.calls.filter((call) => String(call[0]).includes("skipped"))).toHaveLength(
+          40,
+        );
+        const warnings = warn.mock.calls.map((call) => String(call[0]));
+        expect(warnings.filter((line) => line.includes("overlap"))).toHaveLength(2);
+        expect(warnings[0]).toContain("3 ticks in a row");
+        expect(warnings[1]).toContain("33 ticks in a row");
+        expect(schedulerOf(first).skippedTicks().overlap - before.overlap).toBe(40);
+      });
+
+      it("treats a lock held by another instance the same way", async () => {
+        const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+        vi.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+        const outcomes = await skipTicks(first, second, 4);
+        expect(outcomes.every((status) => status === "lock_held")).toBe(true);
+        expect(
+          warn.mock.calls.filter((call) => String(call[0]).includes("lock_held")),
+        ).toHaveLength(1);
+      });
+
+      it("a tick that runs starts the count of skips again (2 skips, a run, 2 skips never reach 3)", async () => {
+        const warn = vi.spyOn(Logger.prototype, "warn").mockImplementation(() => undefined);
+        vi.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined);
+        await skipTicks(first, second, 2);
+        vi.spyOn(runnerOf(second), "runAll").mockResolvedValue([]);
+        expect(await schedulerOf(second).tick()).toMatchObject({ status: "ran" });
+        await skipTicks(first, second, 2);
+        expect(warn.mock.calls.filter((call) => String(call[0]).includes("lock_held"))).toEqual([]);
+      });
+    });
+
     it("runs every job with now = the injected clock, never the wall clock", async () => {
       const runner = vi.spyOn(runnerOf(first), "runAll").mockResolvedValue([]);
       clock.set(new Date("2025-10-02T03:04:05.678Z"));

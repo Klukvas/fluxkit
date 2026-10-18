@@ -1,3 +1,5 @@
+import type { JobBudget } from "./job-budget.js";
+
 /** How many rows one statement of a cleanup job touches, and how many statements one run may issue. */
 export interface BatchLimits {
   batchSize: number;
@@ -34,16 +36,20 @@ export interface DrainResult {
 
 /**
  * Repeats `step` (one bounded statement that returns how many rows it deleted) until a batch comes back short, which
- * means nothing is left, or until `maxBatches` statements ran. A full last batch at the limit is reported as
- * `truncated`, never silently dropped.
+ * means nothing is left, until `maxBatches` statements ran, or until the time `budget` is used up (checked between
+ * statements). A stop with rows possibly left is reported as `truncated`, never silently dropped.
  */
 export async function drainInBatches(
   step: (batchSize: number) => Promise<number>,
   limits: BatchLimits,
+  budget?: JobBudget,
 ): Promise<DrainResult> {
   assertBatchLimits(limits);
   let total = 0;
   for (let batch = 1; batch <= limits.maxBatches; batch += 1) {
+    if (budget?.exhausted() === true) {
+      return { total, truncated: true };
+    }
     const deleted = await step(limits.batchSize);
     total += deleted;
     if (deleted < limits.batchSize) {

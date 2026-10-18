@@ -14,6 +14,7 @@ import {
 } from "@fluxkit/core";
 import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
+import { applyJobLimits, type JobLimits } from "../../common/job-limits.js";
 import { withTransaction, type DbExecutor, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { InventoryRepository, type LevelRow, type LocationRow } from "../inventory.repository.js";
@@ -155,6 +156,8 @@ export interface ExpireDueOptions {
    * the oldest due reservation, where a reservation that could not be expired (see `failures`) comes first again.
    */
   after?: ExpireDueCursor;
+  /** `statement_timeout` and `lock_timeout` for the statements of each reservation's transaction (the scheduler sets them, ADR 0025). */
+  limits?: JobLimits;
 }
 
 /** Where the previous `expireDue` call stopped. Opaque: copy it from `nextCursor`, do not build it. */
@@ -531,7 +534,7 @@ export class ReservationsService {
       nextCursor: due.length === limit && last !== undefined ? last : null,
     };
     for (const { id: reservationId } of due) {
-      const outcome = await this.expireOne(reservationId, now);
+      const outcome = await this.expireOne(reservationId, now, options.limits);
       if (outcome === "expired") {
         result.expired += 1;
       } else if (outcome === "skipped") {
@@ -546,8 +549,12 @@ export class ReservationsService {
   private async expireOne(
     reservationId: string,
     now: Date,
+    limits: JobLimits | undefined,
   ): Promise<"expired" | "skipped" | ReservationRefusal> {
     return withTransaction(this.database, async (tx) => {
+      if (limits !== undefined) {
+        await applyJobLimits(tx, limits);
+      }
       const locked = await this.lockPair(tx, reservationId);
       // Re-checked under the locks: a commit or a release may have finished since the list was read.
       if (

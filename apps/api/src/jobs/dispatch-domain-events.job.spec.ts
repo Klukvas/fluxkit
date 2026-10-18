@@ -14,8 +14,10 @@ import {
   FixtureHandlerB,
 } from "../test/event-handler-fixture.js";
 import { ensureMigrated } from "../test/migrate.js";
+import { pgEventLeaseSource } from "./event-leases.js";
 import { dispatchDomainEvents, type DispatchEventsDeps } from "./dispatch-domain-events.job.js";
 import { DomainEventHandlerRegistry } from "./domain-event-handlers.js";
+import { JobsRunner } from "./jobs-runner.js";
 import { BACKOFF_UNIT_MS, JobsRepository, MAX_DISPATCH_ATTEMPTS } from "./jobs.repository.js";
 
 // Outbox rows are stamped by the test with explicit times; 2025-02 is before anything another spec leaves undispatched.
@@ -83,6 +85,7 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       database: running.app.get<Database>(DRIZZLE),
       repository: running.app.get(JobsRepository),
       handlers: running.app.get(DomainEventHandlerRegistry),
+      leases: pgEventLeaseSource(requireTestDatabaseUrl()),
     };
     handlerA = running.app.get(FixtureHandlerA, { strict: false });
     handlerB = running.app.get(FixtureHandlerB, { strict: false });
@@ -160,6 +163,7 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
         scanned: 3,
         dispatched: 3,
         failed: 0,
+        skipped: 0,
         failures: [],
         abandoned: [],
         truncated: false,
@@ -175,7 +179,8 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       });
       for (const row of await rows([first, second, third])) {
         expect(row.dispatched_at?.toISOString()).toBe(at(10).toISOString());
-        expect(row.attempts).toBe(0);
+        // The attempt is counted when it starts (ADR 0025), so a delivered event shows the one attempt it took.
+        expect(row.attempts).toBe(1);
         expect(row.last_error_code).toBeNull();
       }
     });
@@ -352,14 +357,33 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
     });
   });
 
+  describe("the scheduler's time budget", () => {
+    it("the runner gives the dispatcher a time budget: a slow handler can not make one run deliver every due event", async () => {
+      for (let index = 0; index < 3; index += 1) {
+        await insertEvent({ createdAt: at(index) });
+      }
+      handlerA.behaviour = () => new Promise((resolve) => setTimeout(resolve, 120));
+      const reports = await running.app.get(JobsRunner).runAll(at(10), { budgetMs: 50 });
+      const report = reports.find((entry) => entry.name === "dispatch-events");
+      expect(report?.ok).toBe(true);
+      expect(report?.ok && report.result).toMatchObject({
+        scanned: 1,
+        dispatched: 1,
+        truncated: true,
+      });
+      // The rest waits for the next tick; nothing was attempted twice.
+      expect(handlerA.calls).toHaveLength(1);
+    });
+  });
+
   describe("two dispatchers at once", () => {
-    it("never deliver the same event twice, and neither waits for the rows of the other (SKIP LOCKED)", async () => {
+    it("never deliver the same event twice, and neither waits for the other (each takes the events the other does not hold)", async () => {
       const ids: string[] = [];
       for (let index = 0; index < 4; index += 1) {
         ids.push(await insertEvent({ createdAt: at(index), type: "order.paid" }));
       }
       // Both dispatchers must be inside a handler at the same moment, or the barrier fails the delivery. A dispatcher that
-      // waited for the other's row locks could never get there.
+      // waited for the other's lease could never get there.
       let inside = 0;
       let release: () => void = () => undefined;
       const together = new Promise<void>((resolve) => {
@@ -387,7 +411,7 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
       const delivered = handlerA.calls.map((call) => call.id).sort();
       expect(delivered).toEqual([...ids].sort());
       expect(
-        (await rows(ids)).every((row) => row.dispatched_at !== null && row.attempts === 0),
+        (await rows(ids)).every((row) => row.dispatched_at !== null && row.attempts === 1),
       ).toBe(true);
     });
   });

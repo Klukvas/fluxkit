@@ -6,6 +6,7 @@ import { requireTestDatabaseUrl } from "../test/env.js";
 import { defaultLocationId, levelOf } from "../test/inventory-fixtures.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
+import { JobBudget } from "./job-budget.js";
 import { sweepReservations } from "./sweep-reservations.job.js";
 
 const START = new Date("2025-06-01T08:00:00.000Z");
@@ -120,6 +121,25 @@ describe("sweepReservations (real Postgres, injected time)", () => {
     expect(first).toMatchObject({ scanned: 2, expired: 2, iterations: 2, truncated: true });
     const second = await sweepReservations({ reservations }, now, { limit: 1, maxIterations: 5 });
     expect(second).toMatchObject({ scanned: 1, expired: 1, truncated: false });
+  });
+
+  it("stops between pages when the time budget is used up and says so", async () => {
+    const variantId = await variant();
+    for (let index = 0; index < 4; index += 1) {
+      await hold(variantId, 1, new Date(START.getTime() + (index + 1) * MINUTE));
+    }
+    let ticks = 0;
+    const budget = new JobBudget(1_500, () => {
+      ticks += 1;
+      return ticks * 1_000;
+    });
+    const now = new Date(START.getTime() + HOUR);
+    const first = await sweepReservations({ reservations }, now, { limit: 1, budget });
+    expect(first).toMatchObject({ scanned: 1, expired: 1, iterations: 1, truncated: true });
+    expect(await sweepReservations({ reservations }, now, { limit: 1 })).toMatchObject({
+      expired: 3,
+      truncated: false,
+    });
   });
 
   it("reports a reservation it cannot expire, still expires the others and does not spin on it", async () => {

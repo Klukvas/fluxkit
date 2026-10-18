@@ -4,8 +4,12 @@ import { InventoryModule } from "../inventory/inventory.module.js";
 import { DomainEventHandlerRegistry } from "./domain-event-handlers.js";
 import { JobsRepository } from "./jobs.repository.js";
 import { JobsRunner } from "./jobs-runner.js";
-import { SCHEDULER_CONFIG, type SchedulerConfig } from "./scheduler-config.js";
-import { SCHEDULER_DATABASE_URL, SchedulerService } from "./scheduler.service.js";
+import {
+  SCHEDULER_CONFIG,
+  SCHEDULER_DATABASE_URL,
+  type SchedulerConfig,
+} from "./scheduler-config.js";
+import { SchedulerService } from "./scheduler.service.js";
 
 export interface JobsModuleOptions {
   config: SchedulerConfig;
