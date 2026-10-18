@@ -156,3 +156,14 @@ export function productJsonLd(input: ProductJsonLdInput): object {
     offers,
   };
 }
+
+/** An image URL for Open Graph: the crawler fetches it directly, so any http(s) URL will do; anything else is left out. */
+export function socialImageUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}

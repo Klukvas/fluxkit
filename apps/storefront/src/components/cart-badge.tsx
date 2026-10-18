@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { sessionLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
-import { loadCartBadgeState, type CartBadgeState } from "../lib/session-state";
+import { watchCartBadge, type CartBadgeState } from "../lib/session-state";
 import { useI18n } from "./i18n-provider";
 import { navLink } from "./styles";
 
@@ -44,21 +44,25 @@ export function CartBadgeView({
   );
 }
 
-/** Reads the cart once per page load, from the browser: the cart cookie has `Path=/store` and never reaches the server. */
+/**
+ * Reads the cart once per page load, from the browser (the cart cookie has `Path=/store` and never reaches the server), and
+ * follows the cart-changed events other islands publish (`lib/cart-events.ts`).
+ */
 export function CartBadge() {
   const { locale, t } = useI18n();
   const [state, setState] = useState<CartBadgeState>({ status: "loading" });
 
   useEffect(() => {
     const controller = new AbortController();
-    loadCartBadgeState(createStoreClient({ baseUrl: "" }), controller.signal).then(
-      setState,
-      (error: unknown) => {
-        // Only an abort (unmount, strict-mode remount) is expected to reject; anything else is a bug and stays loud.
-        if (!controller.signal.aborted) throw error;
-      },
-    );
-    return () => controller.abort();
+    const stop = watchCartBadge({
+      client: createStoreClient({ baseUrl: "" }),
+      onState: setState,
+      signal: controller.signal,
+    });
+    return () => {
+      stop();
+      controller.abort();
+    };
   }, []);
 
   return <CartBadgeView state={state} t={t} locale={locale} />;

@@ -142,7 +142,10 @@ describe("header islands", () => {
 });
 
 describe("home sections", () => {
-  const home = renderToStaticMarkup(<HomeSections sections={homeSections} locale="uk" t={t} />);
+  // No data: every data section shows its empty state (the filled sections are tested in catalog.spec.tsx).
+  const home = renderToStaticMarkup(
+    <HomeSections sections={homeSections} locale="uk" t={t} data={{}} imageHosts={[]} />,
+  );
 
   it("renders the configured sections in order with a sound heading outline", () => {
     expect(home.match(/<h1[ >]/g)).toHaveLength(1);
@@ -163,7 +166,7 @@ describe("home sections", () => {
     if (hero === undefined || products === undefined)
       throw new Error("The home config lost a section.");
     const reordered = renderToStaticMarkup(
-      <HomeSections sections={[products, hero]} locale="uk" t={t} />,
+      <HomeSections sections={[products, hero]} locale="uk" t={t} data={{}} imageHosts={[]} />,
     );
     expect(reordered).not.toContain("§home.categoryTiles.title");
     expect(reordered.indexOf("§home.newProducts.title")).toBeLessThan(
@@ -177,7 +180,9 @@ describe("home sections", () => {
     }
     const unknown = { type: "carousel", props: {} } as never;
     expect(() =>
-      renderToStaticMarkup(<HomeSections sections={[unknown]} locale="uk" t={t} />),
+      renderToStaticMarkup(
+        <HomeSections sections={[unknown]} locale="uk" t={t} data={{}} imageHosts={[]} />,
+      ),
     ).toThrow(/carousel/);
   });
 

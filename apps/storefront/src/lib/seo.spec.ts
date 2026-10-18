@@ -208,7 +208,7 @@ describe("productJsonLd", () => {
       description: "Short text",
       image: ["https://cdn.example/a.jpg"],
       sku: "SKU-1",
-      brand: { "@type": "Brand", name: "Demo brand" },
+      brand: { "@type": "Brand", name: "§brand" },
       url,
     });
   });

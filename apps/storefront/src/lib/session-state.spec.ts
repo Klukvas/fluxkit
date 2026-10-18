@@ -1,6 +1,7 @@
 import { createStoreClient } from "@fluxkit/api-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { loadAccountLinkState, loadCartBadgeState } from "./session-state";
+import { publishCartChange } from "./cart-events";
+import { loadAccountLinkState, loadCartBadgeState, watchCartBadge } from "./session-state";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -87,5 +88,69 @@ describe("loadAccountLinkState", () => {
     const html = clientWith(() => new Response("<html>", { status: 502 }));
     expect(await loadAccountLinkState(html.client)).toEqual({ status: "error" });
     expect(error).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("watchCartBadge", () => {
+  function deferredClient() {
+    let resolve: (response: Response) => void = () => {};
+    const response = new Promise<Response>((done) => (resolve = done));
+    const client = createStoreClient({ baseUrl: "", fetch: () => response });
+    return { client, answer: (cart: unknown) => resolve(json(cart)) };
+  }
+
+  it("shows the loaded count, then every cart change the page publishes", async () => {
+    const target = new EventTarget();
+    const states: unknown[] = [];
+    const { client, calls } = clientWith(() => json({ itemCount: 2, lines: [] }));
+    const stop = watchCartBadge({ client, onState: (state) => states.push(state), target });
+    await vi.waitFor(() => expect(states).toEqual([{ status: "ready", count: 2 }]));
+    publishCartChange({ itemCount: 5 }, target);
+    expect(states.at(-1)).toEqual({ status: "ready", count: 5 });
+    expect(calls).toHaveLength(1);
+    stop();
+  });
+
+  it("lets a change that arrives while the first read is in flight win over the older read", async () => {
+    const target = new EventTarget();
+    const states: unknown[] = [];
+    const { client, answer } = deferredClient();
+    const stop = watchCartBadge({ client, onState: (state) => states.push(state), target });
+    publishCartChange({ itemCount: 7 }, target);
+    answer({ itemCount: 1, lines: [] });
+    await new Promise((done) => setTimeout(done, 0));
+    expect(states).toEqual([{ status: "ready", count: 7 }]);
+    stop();
+  });
+
+  it("stops listening and drops a late answer after stop", async () => {
+    const target = new EventTarget();
+    const states: unknown[] = [];
+    const controller = new AbortController();
+    const { client, answer } = deferredClient();
+    const stop = watchCartBadge({
+      client,
+      onState: (state) => states.push(state),
+      target,
+      signal: controller.signal,
+    });
+    stop();
+    controller.abort();
+    publishCartChange({ itemCount: 3 }, target);
+    answer({ itemCount: 1, lines: [] });
+    await new Promise((done) => setTimeout(done, 0));
+    expect(states).toEqual([]);
+  });
+
+  it("reports an unreadable cart as the error state, and a later change still recovers it", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const target = new EventTarget();
+    const states: unknown[] = [];
+    const { client } = clientWith(() => problem(503, "service_unavailable"));
+    const stop = watchCartBadge({ client, onState: (state) => states.push(state), target });
+    await vi.waitFor(() => expect(states).toEqual([{ status: "error" }]));
+    publishCartChange({ itemCount: 1 }, target);
+    expect(states.at(-1)).toEqual({ status: "ready", count: 1 });
+    stop();
   });
 });

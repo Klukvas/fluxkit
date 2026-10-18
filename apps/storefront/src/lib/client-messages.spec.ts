@@ -30,6 +30,10 @@ describe("pickClientMessages", () => {
         "errors.network",
         "notFound.title",
         "loading.page",
+        "product.addToCart",
+        "product.added",
+        "availability.in_stock",
+        "errors.rule.quantity_limit",
       ]) {
         expect(picked[key], key).toBeDefined();
       }

@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
+import en from "./messages/en.json";
+import { CLIENT_MESSAGE_PREFIXES } from "./lib/client-messages";
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
@@ -55,5 +57,23 @@ describe("client bundle boundary", () => {
     const importers = files.filter((file) => /store-data\.server["']/.test(file.text));
     expect(importers.length).toBeGreaterThan(0);
     for (const file of importers) expect(clientFiles).not.toContain(file);
+  });
+
+  it("serializes the namespace of every message key a 'use client' file writes out", () => {
+    const namespaces = [...new Set(Object.keys(en).map((key) => key.split(".")[0]))];
+    const quote = "[\"'`]";
+    const literal = new RegExp(
+      `${quote}((?:${namespaces.join("|")})\\.[A-Za-z0-9_.]*[A-Za-z0-9_])${quote}`,
+      "g",
+    );
+    for (const file of clientFiles) {
+      for (const match of file.text.matchAll(literal)) {
+        const key = match[1] as string;
+        const serialized = CLIENT_MESSAGE_PREFIXES.some((prefix) => key.startsWith(prefix));
+        expect(serialized, `${file.path} uses "${key}", which the browser does not receive`).toBe(
+          true,
+        );
+      }
+    }
   });
 });

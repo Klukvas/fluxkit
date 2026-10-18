@@ -2,7 +2,7 @@ import type { ProductDetail, ProductVariant } from "@fluxkit/api-client";
 
 /**
  * Variant selection for the product page. Pure, and niche-neutral: option and value CODES are data from the API
- * (`ProductDetail.options`, `ProductVariant.optionValues`); nothing here knows what a "size" or a "color" is (AGENTS.md
+ * (`ProductDetail.options`, `ProductVariant.optionValues`); nothing here knows what any option is called (AGENTS.md
  * section 2.3). A product with no options has one default variant and no picker.
  *
  * A selection maps an option code to a value code. The rule that keeps the picker from ever dead-ending: a value of
@@ -110,8 +110,9 @@ export function selectValue(
     const replacement = option.values.find((value) =>
       existsWithPrefix(product, next, later, value.code),
     );
-    if (replacement === undefined) delete next[option.code];
-    else next[option.code] = replacement.code;
+    // Always found: the earlier values exist in some variant, and every variant has a value for this option. If the data
+    // ever breaks that, the stale value stays and `findVariant` answers null, which the page shows as "no such variant".
+    if (replacement !== undefined) next[option.code] = replacement.code;
   }
   return next;
 }
