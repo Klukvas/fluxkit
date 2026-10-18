@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   buildOrderLine,
@@ -34,7 +34,7 @@ import {
 import { withTransaction, type Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
-import { issueAccessToken } from "./access-token.js";
+import { deriveAccessToken, type IssuedAccessToken } from "./access-token.js";
 import { fingerprintsEqual, requestFingerprint } from "./checkout-fingerprint.js";
 import { parseCheckoutInput, type CheckoutInput } from "./checkout-input.js";
 import { OrderViewService } from "./order-view.js";
@@ -211,8 +211,12 @@ export class CheckoutService {
 
     const placedAt = now;
     const expiresAt = orderExpiresAt(placedAt, this.config.paymentTtlMinutes);
-    const guestToken = owner.kind === "guest" ? issueAccessToken() : undefined;
+    // The id is drawn here, not by the database, because the guest token is derived from it (ADR 0023).
+    const orderId = randomUUID();
+    const guestToken =
+      owner.kind === "guest" ? this.guestToken(orderId, idempotencyKey) : undefined;
     const order = await this.insertOrder(tx, {
+      id: orderId,
       status: "awaiting_payment",
       customerId: owner.kind === "customer" ? owner.customerId : null,
       email: input.email,
@@ -307,8 +311,10 @@ export class CheckoutService {
   /**
    * The same key again. Only whoever can still reach the cart this checkout was made from, with the same normalized
    * request, gets the order back; every other combination (another body, another cart, a lost cookie, another
-   * principal) is the same `idempotency_key_reused` that does not say which part differed. A guest gets a NEW access
-   * token (the raw one is never stored) and the old one stops working.
+   * principal) is the same `idempotency_key_reused` that does not say which part differed. A guest gets the SAME access
+   * token as in the first answer: it is derived from the order id and the key (ADR 0023), so nothing rotates and every
+   * answer of a double submit works. Only if `ORDER_TOKEN_SECRET` changed since the placement is the derived token a new
+   * one; its hash then replaces the stored one, and the tokens of the old secret are dead.
    */
   private async replay(
     tx: Transaction,
@@ -331,20 +337,31 @@ export class CheckoutService {
     let order = existing;
     let accessToken: string | undefined;
     if (existing.customerId === null) {
-      const issued = issueAccessToken();
-      order = await this.orders.rotateAccessToken(
+      const derived = this.guestToken(existing.id, existing.idempotencyKey);
+      order = await this.orders.renewGuestAccess(
         tx,
         existing.id,
-        issued.hash,
+        derived.hash,
         guestAccessExpiresAt(now, this.config.guestAccessDays),
       );
-      accessToken = issued.token;
+      accessToken = derived.token;
     }
     const view = await this.views.view(tx, order, locale);
     return {
       status: 200,
       response: accessToken === undefined ? { order: view } : { order: view, accessToken },
     };
+  }
+
+  /** The derived token of a guest order. A missing secret is a misconfiguration: loud, never a fallback key. */
+  private guestToken(orderId: string, idempotencyKey: string): IssuedAccessToken {
+    const secret = this.config.tokenSecret;
+    if (secret === undefined) {
+      throw new Error(
+        "ORDER_TOKEN_SECRET is not configured, so a guest order cannot be given an access token.",
+      );
+    }
+    return deriveAccessToken(secret, orderId, idempotencyKey);
   }
 
   /** The cart row of the owner, locked, expired or not (an expired cart only has no lines for ordering). */
