@@ -229,6 +229,16 @@ describe("open orders per guest email and per customer (real app, real Postgres)
       expect(own.status).toBe(201);
     });
 
+    it("ignores the orders of a signed-in customer who used the same address", async () => {
+      const customer = await signedIn();
+      for (let placed = 1; placed <= LIMIT; placed += 1) {
+        expect((await customerOrder(customer.browser)).status).toBe(201);
+      }
+      expect(await openOrdersOfCustomer(customer.id)).toBe(LIMIT);
+      // Three customer orders carry this address, yet a guest with it is not at the guest limit.
+      expect((await guestOrder(customer.email)).status).toBe(201);
+    });
+
     it("answers a replay of an existing checkout with that order even at the limit", async () => {
       const email = emailAddress();
       await guestOrder(email);
