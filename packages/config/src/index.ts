@@ -21,3 +21,8 @@ export {
   type AppEnv,
 } from "./env.js";
 export { parseEnabledFeatures } from "./features.js";
+export {
+  DEFAULT_STOREFRONT_PUBLIC_URL,
+  loadStorefrontEnv,
+  type StorefrontEnv,
+} from "./storefront-env.js";
