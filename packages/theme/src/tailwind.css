@@ -1,4 +1,4 @@
-/* Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, rounded-md, ... */
+/* Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, text-success, text-warning, ring-ring, outline-ring, rounded-md, ... */
 @theme inline {
   --color-background: var(--fk-color-background);
   --color-foreground: var(--fk-color-foreground);
@@ -8,6 +8,9 @@
   --color-primary: var(--fk-color-primary);
   --color-primary-foreground: var(--fk-color-primary-foreground);
   --color-danger: var(--fk-color-danger);
+  --color-success: var(--fk-color-success);
+  --color-warning: var(--fk-color-warning);
+  --color-ring: var(--fk-color-ring);
   --radius-sm: var(--fk-radius-sm);
   --radius-md: var(--fk-radius-md);
   --radius-lg: var(--fk-radius-lg);

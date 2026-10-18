@@ -13,6 +13,9 @@
   --fk-color-primary: #4f46e5;
   --fk-color-primary-foreground: #ffffff;
   --fk-color-danger: #dc2626;
+  --fk-color-success: #15803d;
+  --fk-color-warning: #b45309;
+  --fk-color-ring: #4f46e5;
   --fk-radius-sm: 0.25rem;
   --fk-radius-md: 0.5rem;
   --fk-radius-lg: 1rem;
@@ -30,6 +33,9 @@
   --fk-color-primary: #818cf8;
   --fk-color-primary-foreground: #0b1020;
   --fk-color-danger: #f87171;
+  --fk-color-success: #4ade80;
+  --fk-color-warning: #fbbf24;
+  --fk-color-ring: #818cf8;
   --fk-radius-sm: 0.25rem;
   --fk-radius-md: 0.5rem;
   --fk-radius-lg: 1rem;
