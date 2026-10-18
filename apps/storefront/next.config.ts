@@ -29,19 +29,26 @@ export function loadRootEnvFile(phase: string, file = resolve(process.cwd(), "..
  */
 export default function config(phase: string): NextConfig {
   loadRootEnvFile(phase);
+  // Read once, here: Next evaluates `headers()` and the `images` section during `next build` and stores them in the build
+  // output, so a change of STOREFRONT_IMAGE_HOSTS needs a rebuild (README, "Images"). No API_INTERNAL_URL exists at build
+  // time; a placeholder satisfies the shared parser, only `imageHosts` is read. A malformed list stops the build or the
+  // server here, loudly.
+  const { imageHosts } = loadStorefrontEnv({
+    API_INTERNAL_URL: "http://127.0.0.1",
+    STOREFRONT_IMAGE_HOSTS: process.env.STOREFRONT_IMAGE_HOSTS,
+  });
   return {
     reactStrictMode: true,
+    // The same list, inlined into the app bundle (`process.env.STOREFRONT_IMAGE_HOSTS_AT_BUILD`), so the page decides
+    // "optimize or placeholder" with exactly the hosts the optimizer was built to accept (`lib/image-source.ts`).
+    env: { STOREFRONT_IMAGE_HOSTS_AT_BUILD: imageHosts.join(",") },
+    images: {
+      remotePatterns: imageHosts.map((hostname) => ({ protocol: "https" as const, hostname })),
+    },
     async redirects() {
       return [{ source: "/", destination: `/${DEFAULT_LOCALE}`, permanent: false }];
     },
     async headers() {
-      // Next evaluates this once at `next build` and stores the result in the routes manifest, so a change of
-      // STOREFRONT_IMAGE_HOSTS needs a rebuild (README, "Content-Security-Policy"). No API_INTERNAL_URL exists at build
-      // time; it is a placeholder that satisfies the shared parser, only `imageHosts` is read.
-      const { imageHosts } = loadStorefrontEnv({
-        API_INTERNAL_URL: "http://127.0.0.1",
-        STOREFRONT_IMAGE_HOSTS: process.env.STOREFRONT_IMAGE_HOSTS,
-      });
       return [
         {
           source: "/:path*",
