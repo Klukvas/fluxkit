@@ -1,6 +1,6 @@
 # Plan: fixes from the independent review of cart, customers and orders (step 8)
 
-Status: approved by the owner 2026-10-18 (quiz answers below; "чини ревью"); PR A merged (#61), PR B implemented in `fix/review-open-orders-trust-proxy` (PR pending), PR C implemented in `fix/review-reliability` (PR pending; ADR 0025). Source: the Opus review of main @ 698691d (saved by the orchestrator; findings are restated here, evidence lives in the PRs).
+Status: approved by the owner 2026-10-18 (quiz answers below; "чини ревью"); PR A merged (#61), PR B merged (#62), PR C merged (#63; ADR 0025). Complete. Source: the Opus review of main @ 698691d (saved by the orchestrator; findings are restated here, evidence lives in the PRs).
 Roles: Orchestrator verifies and mutation-checks each PR; Developer (Sonnet) implements one PR at a time, no parallel runs; tests first for every behavior change; no old ADR is edited.
 
 ## Owner decisions (quiz 2026-10-18)
