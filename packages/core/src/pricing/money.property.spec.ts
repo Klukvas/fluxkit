@@ -202,7 +202,9 @@ describe("percentageOf against an independent BigInt reference", () => {
     expect(inRange).toBeGreaterThan(40_000);
     expect(outOfRange).toBeGreaterThan(1000);
     expect(exactHalves).toBeGreaterThan(5000);
-  });
+    // 160 000 BigInt comparisons take about 5 s on a slow CI runner, which is the default Vitest timeout: the case count
+    // stays, the limit is explicit.
+  }, 60_000);
 
   it("the default mode is half away from zero", () => {
     const random = new Random(7);
