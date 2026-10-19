@@ -137,6 +137,7 @@
   "errors.field.variant_not_sellable": "Цей варіант товару недоступний для замовлення.",
   "errors.field.reserved_out_of_range": "Цю кількість не вдалося зарезервувати. Зменште її.",
   "errors.field.line_total_out_of_range": "Сума за цей товар надто велика. Зменште кількість.",
+  "errors.field.product_title_missing": "Цей товар більше не можна замовити. Видаліть його з кошика.",
   "errors.field.equals_email": "Пароль не має збігатися з електронною поштою.",
   "errors.field.contains_nul": "Пароль містить недопустимий символ.",
   "errors.field.same_as_current": "Новий пароль має відрізнятися від поточного.",

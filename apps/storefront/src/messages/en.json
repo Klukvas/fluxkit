@@ -133,6 +133,7 @@
   "errors.field.variant_not_sellable": "This product variant cannot be ordered.",
   "errors.field.reserved_out_of_range": "This quantity could not be reserved. Lower it.",
   "errors.field.line_total_out_of_range": "The amount for this item is too large. Lower the quantity.",
+  "errors.field.product_title_missing": "This item can no longer be ordered. Remove it from the cart.",
   "errors.field.equals_email": "The password must not be the same as the email.",
   "errors.field.contains_nul": "The password contains a character that is not allowed.",
   "errors.field.same_as_current": "The new password must differ from the current one.",
