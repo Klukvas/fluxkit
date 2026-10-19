@@ -92,12 +92,19 @@ describe("FilterBar", () => {
     expect(tags(markup, "input")).toHaveLength(1);
   });
 
-  it("passes native form attributes through", () => {
+  it("always posts, so a submit before the script runs never puts the values into the URL", () => {
+    expect(first(render(<FilterBar label="Filter">x</FilterBar>), "form").attributes.method).toBe(
+      "post",
+    );
+  });
+
+  it("passes other native form attributes through", () => {
     const markup = render(
-      <FilterBar label="Filter" method="post" action="/x">
+      <FilterBar label="Filter" action="/x" className="extra">
         x
       </FilterBar>,
     );
-    expect(first(markup, "form").attributes).toMatchObject({ method: "post", action: "/x" });
+    expect(first(markup, "form").attributes).toMatchObject({ action: "/x" });
+    expect(first(markup, "form").attributes.class).toContain("extra");
   });
 });

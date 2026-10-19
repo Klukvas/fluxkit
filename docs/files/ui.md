@@ -24,7 +24,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
   - `src/tabs.tsx` - `Tabs`: WAI-ARIA tabs (`tablist`, `tab`, one `tabpanel`), controlled, roving tabindex, arrows/Home/End select (client component). Only the selected panel is rendered, so only the selected tab has `aria-controls`.
   - `src/tab-navigation.ts` - pure `nextTabIndex(current, key, disabled)` (wrap-around, disabled tabs skipped, `null` for other keys).
   - `src/description-list.tsx` - `DescriptionList` (`dl`/`dt`/`dd` pairs from `items`).
-  - `src/filter-bar.tsx` - `FilterBar`: a labelled `form` region (not `role="toolbar"`, which promises arrow-key navigation); native form attributes pass through, `method` defaults to `get`.
+  - `src/filter-bar.tsx` - `FilterBar`: a labelled `form` region (not `role="toolbar"`, which promises arrow-key navigation); native form attributes pass through except `method`, which is always `post` (the storefront source guard requires it for every `<form>` in the repository).
   - `src/side-nav.tsx` - `SideNav`: labelled `nav`, groups with optional headings (`ul` labelled by the heading), `aria-current="page"` on the current item, links through `renderLink` (the app passes its router's link; no router dependency).
   - `src/locale-text-field.tsx` - `LocaleTextField`: one `Field` + `Input` or `Textarea` per content locale in a `fieldset`/`legend`, `lang` per control, per-locale hint and error through `aria-describedby`, `required` only where the props say (the default locale), `readOnly`.
   - `src/status-badge.tsx` - `StatusBadge` (tone + visible text, on `Badge`); `src/live-region.tsx` - `LiveRegion` (`role="status"`, `aria-live="polite"`, `aria-atomic`, optional visually hidden; render it before its content changes).
