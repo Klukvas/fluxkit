@@ -25,6 +25,7 @@ import {
 } from "../lib/order-store";
 import { useI18n } from "./i18n-provider";
 import { OrderDetailsView } from "./order-details";
+import { useCancelFocus } from "./use-cancel-focus";
 import { useStoreClient } from "./session-provider";
 import { linkButton } from "./styles";
 
@@ -161,6 +162,7 @@ export function GuestOrderPage({ number, shop }: { number: string; shop: ShopMon
   const [missing, setMissing] = useState(false);
   const [copy, setCopy] = useState<CopyState>("idle");
   const state = useOrderState(store);
+  useCancelFocus(state.cancel);
 
   useEffect(() => {
     const token = tokenFromFragment(window.location.hash);

@@ -52,12 +52,23 @@ test("the whole purchase works with the keyboard alone (Tab, Enter, Space and ty
   await expect(submit).toBeFocused();
   await page.keyboard.press("Space");
 
-  // The order page, and the cancel with its confirmation, also by keyboard.
+  // The order page, and the cancel with its confirmation, also by keyboard. Focus must follow the shopper: the button that
+  // was pressed disappears, and a keyboard user must not be dropped back at the top of the page.
   await expect(page).toHaveURL(/\/en\/order\/[^#?]+#t=/);
   await orderNumberOnPage(page);
-  await tabTo(page, page.getByRole("button", { name: "Cancel the order" }));
+  const ask = page.getByRole("button", { name: "Cancel the order" });
+  const keep = page.getByRole("button", { name: "Keep the order" });
+  await tabTo(page, ask);
   await page.keyboard.press("Enter");
+  await expect(page.getByText("Cancel this order? This cannot be undone.")).toBeVisible();
+  await expect(keep, "after asking, the focus is on the safe answer").toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(ask, "after keeping the order, the focus is back on the ask button").toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(keep).toBeFocused();
   await tabTo(page, page.getByRole("button", { name: "Yes, cancel the order" }));
   await page.keyboard.press("Space");
-  await expect(page.getByText("The order is cancelled.")).toBeVisible();
+  const done = page.getByText("The order is cancelled.");
+  await expect(done).toBeVisible();
+  await expect(done, "after cancelling, the focus is on the message").toBeFocused();
 });

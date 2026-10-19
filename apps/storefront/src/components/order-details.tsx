@@ -8,6 +8,7 @@ import {
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
+import { CANCEL_FOCUS_IDS } from "../lib/cancel-focus";
 import { formatDateTime } from "../lib/date";
 import { failureText } from "../lib/failure";
 import { canCancel, orderMoney, orderStatusKey, type ShopMoney } from "../lib/order-model";
@@ -94,7 +95,9 @@ export function OrderDetailsView({
         role="status"
         aria-live="polite"
         aria-atomic="true"
-        className="min-h-6 text-muted-foreground"
+        id={CANCEL_FOCUS_IDS.status}
+        tabIndex={-1}
+        className="min-h-6 rounded-md text-muted-foreground outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         {cancel.done ? t("order.cancel.done") : ""}
       </div>
@@ -135,13 +138,24 @@ export function OrderDetailsView({
                 >
                   {cancel.pending ? t("order.cancel.pending") : t("order.cancel.yes")}
                 </Button>
-                <Button variant="secondary" onClick={onKeepOrder} disabled={cancel.pending}>
+                <Button
+                  id={CANCEL_FOCUS_IDS.keep}
+                  variant="secondary"
+                  onClick={onKeepOrder}
+                  disabled={cancel.pending}
+                  aria-describedby="order-cancel-question"
+                >
                   {t("order.cancel.no")}
                 </Button>
               </div>
             </div>
           ) : (
-            <Button variant="secondary" className="self-start" onClick={onAskCancel}>
+            <Button
+              id={CANCEL_FOCUS_IDS.ask}
+              variant="secondary"
+              className="self-start"
+              onClick={onAskCancel}
+            >
               {t("order.cancel")}
             </Button>
           )}
