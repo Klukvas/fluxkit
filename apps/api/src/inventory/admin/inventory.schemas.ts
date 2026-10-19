@@ -64,6 +64,14 @@ export const adjustmentSchema = z
 
 export const listMovementsQuerySchema = paginationQuerySchema;
 
+/** The states of a reservation (`reservation_status_check`). */
+export const RESERVATION_STATUSES = ["active", "committed", "released", "expired"] as const;
+
+/** `?status` of the reservations list; `active` (the units currently held) unless another is asked for. */
+export const listReservationsQuerySchema = paginationQuerySchema.extend({
+  status: z.enum(RESERVATION_STATUSES).default("active"),
+});
+
 export const levelResponseSchema = z.object({
   locationId: uuidSchema,
   locationCode: z.string(),
@@ -85,6 +93,25 @@ export const inventoryResponseSchema = z.object({
     .min(0)
     .meta({ description: "Sum of available over the levels, whatever the flags say." }),
 });
+
+/** `GET /admin/products/:id/inventory`: one entry per variant, each exactly the shape of the per-variant read. */
+export const productInventoryResponseSchema = z.object({ items: z.array(inventoryResponseSchema) });
+
+/**
+ * One reservation of a variant. Nothing about the buyer: `reference` is the order number of an order's hold (null for a
+ * hold made by something else) and `orderId` links the order (null when no order owns the hold).
+ */
+export const reservationListItemSchema = z.object({
+  status: z.enum(RESERVATION_STATUSES),
+  quantity: z.number().int().min(1),
+  expiresAt: timestampSchema,
+  reference: z.string().nullable(),
+  orderId: uuidSchema.nullable(),
+  locationCode: z.string(),
+  createdAt: timestampSchema,
+});
+
+export const reservationPageSchema = pageSchema(reservationListItemSchema);
 
 export const movementResponseSchema = z.object({
   id: uuidSchema,
@@ -113,5 +140,8 @@ export type AdjustmentBody = z.output<typeof adjustmentSchema>;
 export type ListMovementsQuery = z.output<typeof listMovementsQuerySchema>;
 export type LevelResponse = z.output<typeof levelResponseSchema>;
 export type InventoryResponse = z.output<typeof inventoryResponseSchema>;
+export type ProductInventoryResponse = z.output<typeof productInventoryResponseSchema>;
+export type ListReservationsQuery = z.output<typeof listReservationsQuerySchema>;
+export type ReservationListItem = z.output<typeof reservationListItemSchema>;
 export type MovementResponse = z.output<typeof movementResponseSchema>;
 export type AdjustmentResponse = z.output<typeof adjustmentResponseSchema>;

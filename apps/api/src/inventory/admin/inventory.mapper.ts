@@ -3,9 +3,15 @@ import type {
   LevelWithLocation,
   LocationRow,
   MovementWithLocation,
+  ReservationListRow,
 } from "../inventory.repository.js";
 import type { LocationResponse } from "./locations.schemas.js";
-import type { LevelResponse, MovementResponse } from "./inventory.schemas.js";
+import {
+  RESERVATION_STATUSES,
+  type LevelResponse,
+  type MovementResponse,
+  type ReservationListItem,
+} from "./inventory.schemas.js";
 
 /** A level row that broke its CHECK constraints is a damaged database: fail loudly instead of showing it. */
 function assertStoredQuantity(value: number, what: string): number {
@@ -54,4 +60,20 @@ export function toMovementResponse(row: MovementWithLocation): MovementResponse 
 
 export function toLocationResponse(row: LocationRow): LocationResponse {
   return { id: row.id, code: row.code, name: row.name, isDefault: row.isDefault };
+}
+
+export function toReservationListItem(row: ReservationListRow): ReservationListItem {
+  const status = RESERVATION_STATUSES.find((candidate) => candidate === row.status);
+  if (status === undefined) {
+    throw new RangeError(`Unknown reservation status in the database: ${row.status}`);
+  }
+  return {
+    status,
+    quantity: row.quantity,
+    expiresAt: row.expiresAt.toISOString(),
+    reference: row.reference,
+    orderId: row.orderId,
+    locationCode: row.locationCode,
+    createdAt: row.createdAt.toISOString(),
+  };
 }

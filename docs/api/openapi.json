@@ -4,7 +4,18 @@
     "/admin/auth/login": {
       "post": {
         "operationId": "AuthController_login",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -121,13 +132,25 @@
           }
         },
         "summary": "Sign in with email and password; sets the session cookie",
-        "tags": ["admin-auth"]
+        "tags": ["admin-auth"],
+        "x-fluxkit-permission": "public"
       }
     },
     "/admin/auth/logout": {
       "post": {
         "operationId": "AuthController_logout",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "responses": {
           "204": {
             "description": "The session is deleted; the old cookie no longer works."
@@ -164,7 +187,8 @@
           }
         },
         "summary": "End the current session and clear the cookie",
-        "tags": ["admin-auth"]
+        "tags": ["admin-auth"],
+        "x-fluxkit-permission": "authenticated"
       }
     },
     "/admin/auth/me": {
@@ -261,13 +285,25 @@
           }
         },
         "summary": "The signed-in user and the permissions of their role",
-        "tags": ["admin-auth"]
+        "tags": ["admin-auth"],
+        "x-fluxkit-permission": "authenticated"
       }
     },
     "/admin/auth/change-password": {
       "post": {
         "operationId": "AuthController_changePassword",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -336,7 +372,8 @@
           }
         },
         "summary": "Change the own password; all other sessions end",
-        "tags": ["admin-auth"]
+        "tags": ["admin-auth"],
+        "x-fluxkit-permission": "authenticated"
       }
     },
     "/admin/users": {
@@ -486,11 +523,23 @@
           }
         },
         "summary": "List admin users, ordered by email",
-        "tags": ["admin-users"]
+        "tags": ["admin-users"],
+        "x-fluxkit-permission": "users.manage"
       },
       "post": {
         "operationId": "UsersController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -622,7 +671,8 @@
           }
         },
         "summary": "Create an admin user",
-        "tags": ["admin-users"]
+        "tags": ["admin-users"],
+        "x-fluxkit-permission": "users.manage"
       }
     },
     "/admin/users/{id}": {
@@ -745,7 +795,8 @@
           }
         },
         "summary": "Get one admin user",
-        "tags": ["admin-users"]
+        "tags": ["admin-users"],
+        "x-fluxkit-permission": "users.manage"
       },
       "patch": {
         "description": "Deactivating ends all sessions of the user. The last active owner cannot be demoted or deactivated (409 `rule_violation`).",
@@ -759,6 +810,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -897,7 +958,8 @@
           }
         },
         "summary": "Change the role or activity of a user",
-        "tags": ["admin-users"]
+        "tags": ["admin-users"],
+        "x-fluxkit-permission": "users.manage"
       }
     },
     "/admin/users/{id}/reset-password": {
@@ -913,6 +975,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -990,7 +1062,8 @@
           }
         },
         "summary": "Set a new password for a user",
-        "tags": ["admin-users"]
+        "tags": ["admin-users"],
+        "x-fluxkit-permission": "users.manage"
       }
     },
     "/health": {
@@ -1006,6 +1079,119 @@
           }
         },
         "tags": ["health"]
+      }
+    },
+    "/admin/config": {
+      "get": {
+        "operationId": "AdminConfigController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The shop settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "defaultLocale": {
+                      "type": "string",
+                      "description": "`DEFAULT_LOCALE`: the locale every required text must contain."
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "`LOCALES`: the locales accepted in translated texts."
+                    },
+                    "shopCurrency": {
+                      "type": "string",
+                      "description": "`SHOP_CURRENCY`: the one currency the shop sells in."
+                    },
+                    "currencyExponent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Digits after the decimal point of the shop currency (minor-unit exponent)."
+                    },
+                    "supportedCurrencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "exponent": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["code", "exponent"],
+                        "additionalProperties": false
+                      },
+                      "description": "Every currency a price can be stored in, with its minor-unit exponent."
+                    },
+                    "pricesIncludeTax": {
+                      "type": "boolean",
+                      "description": "`PRICES_INCLUDE_TAX`."
+                    },
+                    "lowStockThreshold": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "`LOW_STOCK_THRESHOLD`."
+                    }
+                  },
+                  "required": [
+                    "defaultLocale",
+                    "locales",
+                    "shopCurrency",
+                    "currencyExponent",
+                    "supportedCurrencies",
+                    "pricesIncludeTax",
+                    "lowStockThreshold"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Locales, shop currency, supported currencies and stock threshold, for the admin UI",
+        "tags": ["admin-config"],
+        "x-fluxkit-permission": "authenticated"
       }
     },
     "/store/account/register": {
@@ -1838,7 +2024,8 @@
           }
         },
         "summary": "List customers, ordered by email",
-        "tags": ["admin-customers"]
+        "tags": ["admin-customers"],
+        "x-fluxkit-permission": "customers.read"
       }
     },
     "/admin/customers/{id}": {
@@ -1979,7 +2166,8 @@
           }
         },
         "summary": "Get one customer with the number of their orders",
-        "tags": ["admin-customers"]
+        "tags": ["admin-customers"],
+        "x-fluxkit-permission": "customers.read"
       },
       "patch": {
         "description": "Deactivating ends all sessions of the customer and refuses their sign-in. Nothing else can be changed.",
@@ -1993,6 +2181,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -2136,7 +2334,8 @@
           }
         },
         "summary": "Activate or deactivate a customer",
-        "tags": ["admin-customers"]
+        "tags": ["admin-customers"],
+        "x-fluxkit-permission": "customers.write"
       }
     },
     "/admin/customers/{id}/unlock": {
@@ -2151,6 +2350,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -2210,7 +2419,167 @@
           }
         },
         "summary": "Clear the lockout of a customer after too many failed sign-ins",
-        "tags": ["admin-customers"]
+        "tags": ["admin-customers"],
+        "x-fluxkit-permission": "customers.write"
+      }
+    },
+    "/admin/products/{id}/inventory": {
+      "get": {
+        "description": "One entry per variant in variant order, each exactly the shape of the per-variant read (`levels` per location, `totalAvailable`). Not paged: a product has at most 250 variants. Reads create nothing.",
+        "operationId": "InventoryController_getOfProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The inventory of every variant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
+                          "levels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "locationId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "locationCode": {
+                                  "type": "string"
+                                },
+                                "onHand": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "reserved": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "available": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991,
+                                  "description": "max(0, onHand - reserved)."
+                                }
+                              },
+                              "required": [
+                                "locationId",
+                                "locationCode",
+                                "onHand",
+                                "reserved",
+                                "available"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Only locations that hold a level row; none for a variant that never had stock."
+                          },
+                          "totalAvailable": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Sum of available over the levels, whatever the flags say."
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "trackInventory",
+                          "allowBackorder",
+                          "levels",
+                          "totalAvailable"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the stock flags and levels of every variant of a product (admin only)",
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/products/{id}/variants/{variantId}/inventory": {
@@ -2368,7 +2737,8 @@
           }
         },
         "summary": "Get the stock flags and the levels of a variant per location (admin only)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/products/{id}/variants/{variantId}/inventory/adjustments": {
@@ -2394,6 +2764,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -2615,7 +2995,8 @@
           }
         },
         "summary": "Receive, count or return stock: change on hand by a delta or set it, with a journal row",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants/{variantId}/inventory/movements": {
@@ -2817,7 +3198,201 @@
           }
         },
         "summary": "List the stock journal of a variant, newest first",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
+      }
+    },
+    "/admin/products/{id}/variants/{variantId}/inventory/reservations": {
+      "get": {
+        "description": "`status` defaults to `active`, the units held now. Each item links the order that holds it (`orderId`, `reference` = the order number); both are null for a hold no order owns. Needs `orders.read`, not `catalog.read`, because it links orders. Nothing about the buyer is returned.",
+        "operationId": "InventoryController_listReservations",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "variantId",
+            "required": true,
+            "in": "path",
+            "description": "Variant id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["active", "committed", "released", "expired"],
+              "default": "active"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of reservations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "status": {
+                            "type": "string",
+                            "enum": ["active", "committed", "released", "expired"]
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "expiresAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "reference": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "orderId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "locationCode": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "status",
+                          "quantity",
+                          "expiresAt",
+                          "reference",
+                          "orderId",
+                          "locationCode",
+                          "createdAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the reservations of a variant in one status, newest first (needs orders.read)",
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "orders.read"
       }
     },
     "/admin/locations": {
@@ -2894,7 +3469,8 @@
           }
         },
         "summary": "List the stock locations, ordered by code",
-        "tags": ["admin-locations"]
+        "tags": ["admin-locations"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/store/cart": {
@@ -7846,9 +8422,19 @@
     },
     "/admin/orders": {
       "get": {
-        "description": "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix.",
+        "description": "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix. `customerId` is the exact id of the customer account that placed the order; every filter combines (AND).",
         "operationId": "AdminOrdersController_list",
         "parameters": [
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders placed by this customer account (guest orders never match).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "q",
             "required": false,
@@ -8065,7 +8651,8 @@
           }
         },
         "summary": "List orders, newest first",
-        "tags": ["admin-orders"]
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.read"
       }
     },
     "/admin/orders/{id}": {
@@ -8669,7 +9256,8 @@
           }
         },
         "summary": "Get one order in full",
-        "tags": ["admin-orders"]
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.read"
       }
     },
     "/admin/orders/{id}/cancel": {
@@ -8685,6 +9273,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -9301,7 +9899,8 @@
           }
         },
         "summary": "Cancel an order that awaits payment or is paid",
-        "tags": ["admin-orders"]
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
       }
     },
     "/admin/orders/{id}/mark-paid": {
@@ -9317,6 +9916,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -9949,7 +10558,8 @@
           }
         },
         "summary": "Record a payment received outside the system",
-        "tags": ["admin-orders"]
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
       }
     },
     "/admin/orders/{id}/mark-fulfilled": {
@@ -9965,6 +10575,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -10563,7 +11183,8 @@
           }
         },
         "summary": "Mark a paid order fulfilled",
-        "tags": ["admin-orders"]
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
       }
     },
     "/store/categories": {
@@ -11499,7 +12120,18 @@
     "/admin/attributes": {
       "post": {
         "operationId": "AttributesController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -11717,7 +12349,8 @@
           }
         },
         "summary": "Create an attribute",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
         "operationId": "AttributesController_list",
@@ -11910,7 +12543,8 @@
           }
         },
         "summary": "List attributes, ordered by code",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/attributes/{id}": {
@@ -12130,7 +12764,8 @@
           }
         },
         "summary": "Get an attribute with its options",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "description": "The code never changes. A different `inputType` or `isLocalized` answers 409 rule_violation; a different `unit` is refused while values exist.",
@@ -12144,6 +12779,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -12369,7 +13014,8 @@
           }
         },
         "summary": "Change an attribute (only the listed fields)",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "AttributesController_delete",
@@ -12382,6 +13028,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -12451,7 +13107,8 @@
           }
         },
         "summary": "Delete an attribute that no product type assigns",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/attributes/{id}/options": {
@@ -12466,6 +13123,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -12618,7 +13285,8 @@
           }
         },
         "summary": "Add an option to a select or multiselect attribute",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/attributes/{id}/options/{optionId}": {
@@ -12643,6 +13311,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -12779,7 +13457,8 @@
           }
         },
         "summary": "Change an attribute option (label, position)",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "AttributesController_deleteOption",
@@ -12802,6 +13481,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -12871,13 +13560,25 @@
           }
         },
         "summary": "Delete an attribute option that no value uses",
-        "tags": ["admin-attributes"]
+        "tags": ["admin-attributes"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/brands": {
       "post": {
         "operationId": "BrandsController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -13028,7 +13729,8 @@
           }
         },
         "summary": "Create a brand",
-        "tags": ["admin-brands"]
+        "tags": ["admin-brands"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
         "operationId": "BrandsController_list",
@@ -13182,7 +13884,8 @@
           }
         },
         "summary": "List brands, ordered by slug",
-        "tags": ["admin-brands"]
+        "tags": ["admin-brands"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/brands/{id}": {
@@ -13311,7 +14014,8 @@
           }
         },
         "summary": "Get a brand",
-        "tags": ["admin-brands"]
+        "tags": ["admin-brands"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "BrandsController_update",
@@ -13324,6 +14028,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -13488,7 +14202,8 @@
           }
         },
         "summary": "Change a brand (only the listed fields)",
-        "tags": ["admin-brands"]
+        "tags": ["admin-brands"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "BrandsController_delete",
@@ -13501,6 +14216,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -13570,13 +14295,25 @@
           }
         },
         "summary": "Delete a brand that no product uses",
-        "tags": ["admin-brands"]
+        "tags": ["admin-brands"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/categories": {
       "post": {
         "operationId": "CategoriesController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -13746,11 +14483,22 @@
           }
         },
         "summary": "Create a category (optionally under a parent)",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
         "operationId": "CategoriesController_list",
         "parameters": [
+          {
+            "name": "parentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the direct children of this category. Without it every category of every level is listed (there is no value that selects the root level only).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "limit",
             "required": false,
@@ -13911,7 +14659,8 @@
           }
         },
         "summary": "List categories (flat), ordered by position, slug, id; `parentId` lists direct children",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/categories/{id}": {
@@ -14051,7 +14800,8 @@
           }
         },
         "summary": "Get a category",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "CategoriesController_update",
@@ -14064,6 +14814,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -14235,7 +14995,8 @@
           }
         },
         "summary": "Change a category (only the listed fields; the tree position changes via move)",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "CategoriesController_delete",
@@ -14248,6 +15009,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -14317,7 +15088,8 @@
           }
         },
         "summary": "Delete a category that has no children and no products",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/categories/{id}/move": {
@@ -14332,6 +15104,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -14492,13 +15274,25 @@
           }
         },
         "summary": "Move a category under another parent (null = root) at a position among its siblings",
-        "tags": ["admin-categories"]
+        "tags": ["admin-categories"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/options": {
       "post": {
         "operationId": "OptionsController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -14616,7 +15410,8 @@
           }
         },
         "summary": "Create an option (a variant axis such as color or size)",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
         "operationId": "OptionsController_list",
@@ -14750,7 +15545,8 @@
           }
         },
         "summary": "List options, ordered by code",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/options/{id}": {
@@ -14910,7 +15706,8 @@
           }
         },
         "summary": "Get an option with its values",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "OptionsController_update",
@@ -14923,6 +15720,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -15037,7 +15844,8 @@
           }
         },
         "summary": "Change an option's name (the code never changes)",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "OptionsController_delete",
@@ -15050,6 +15858,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -15119,7 +15937,8 @@
           }
         },
         "summary": "Delete an option that no product type assigns and no product uses",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/options/{id}/values": {
@@ -15134,6 +15953,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -15286,7 +16115,8 @@
           }
         },
         "summary": "Add a value to an option",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/options/{id}/values/{valueId}": {
@@ -15311,6 +16141,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -15447,7 +16287,8 @@
           }
         },
         "summary": "Change an option value (label, position)",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "OptionsController_deleteValue",
@@ -15470,6 +16311,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -15539,13 +16390,25 @@
           }
         },
         "summary": "Delete an option value that no product uses",
-        "tags": ["admin-options"]
+        "tags": ["admin-options"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/product-types": {
       "post": {
         "operationId": "ProductTypesController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -15669,7 +16532,8 @@
           }
         },
         "summary": "Create a product type",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
         "operationId": "ProductTypesController_list",
@@ -15813,7 +16677,8 @@
           }
         },
         "summary": "List product types, ordered by code",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/product-types/{id}": {
@@ -15898,6 +16763,155 @@
                             "type": "string",
                             "format": "date-time",
                             "description": "ISO 8601, UTC."
+                          },
+                          "attribute": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "Translated text: locale code to text. The default locale is required for required texts."
+                              },
+                              "description": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "Translated text: locale code to text. The default locale is required for required texts."
+                              },
+                              "inputType": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "number",
+                                  "boolean",
+                                  "select",
+                                  "multiselect",
+                                  "date"
+                                ]
+                              },
+                              "isLocalized": {
+                                "type": "boolean"
+                              },
+                              "unit": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "validation": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Validation keys of the input type (ADR 0006 section 4), e.g. `min_length` for text, `min`/`max` for number. Unknown keys are rejected."
+                              },
+                              "isFilterable": {
+                                "type": "boolean"
+                              },
+                              "isSearchable": {
+                                "type": "boolean"
+                              },
+                              "isVisibleOnStorefront": {
+                                "type": "boolean"
+                              },
+                              "isComparable": {
+                                "type": "boolean"
+                              },
+                              "isSortable": {
+                                "type": "boolean"
+                              },
+                              "isInternal": {
+                                "type": "boolean"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "attributeId": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "code": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      },
+                                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                                    },
+                                    "position": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "createdAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "description": "ISO 8601, UTC."
+                                    },
+                                    "updatedAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "description": "ISO 8601, UTC."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "attributeId",
+                                    "code",
+                                    "label",
+                                    "position",
+                                    "createdAt",
+                                    "updatedAt"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name",
+                              "description",
+                              "inputType",
+                              "isLocalized",
+                              "unit",
+                              "validation",
+                              "isFilterable",
+                              "isSearchable",
+                              "isVisibleOnStorefront",
+                              "isComparable",
+                              "isSortable",
+                              "isInternal",
+                              "createdAt",
+                              "updatedAt",
+                              "options"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -15907,7 +16921,8 @@
                           "level",
                           "isRequired",
                           "position",
-                          "createdAt"
+                          "createdAt",
+                          "attribute"
                         ],
                         "additionalProperties": false
                       }
@@ -16017,7 +17032,8 @@
           }
         },
         "summary": "Get a product type with its attribute and option assignments",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "ProductTypesController_update",
@@ -16030,6 +17046,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16150,7 +17176,8 @@
           }
         },
         "summary": "Change a product type (name, requiresShipping; the code never changes)",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "ProductTypesController_delete",
@@ -16163,6 +17190,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16232,7 +17269,8 @@
           }
         },
         "summary": "Delete a product type that no product uses",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/product-types/{id}/attributes/{attributeId}": {
@@ -16258,6 +17296,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16450,7 +17498,8 @@
           }
         },
         "summary": "Assign an attribute to a product type, or replace the assignment",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "ProductTypesController_removeAttribute",
@@ -16473,6 +17522,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16542,7 +17601,8 @@
           }
         },
         "summary": "Remove an attribute from a product type that holds no values of it",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/product-types/{id}/options/{optionId}": {
@@ -16568,6 +17628,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16712,7 +17782,8 @@
           }
         },
         "summary": "Allow an option on a product type, or change its position",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "ProductTypesController_removeOption",
@@ -16735,6 +17806,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -16804,7 +17885,8 @@
           }
         },
         "summary": "Remove an option from a product type that no product of it uses",
-        "tags": ["admin-product-types"]
+        "tags": ["admin-product-types"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants/{variantId}/prices": {
@@ -16949,7 +18031,334 @@
           }
         },
         "summary": "List the prices of a variant, ordered by currency",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
+      }
+    },
+    "/admin/products/{id}/prices": {
+      "get": {
+        "description": "Variant order (position, then id), then currency; each item is the shape of the per-variant list, `variantId` included. Not paged: a product has at most 250 variants.",
+        "operationId": "PricesController_listOfProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The prices (possibly none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the prices of every variant of a product, in every currency",
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
+      },
+      "put": {
+        "description": "At most 500 items. Every item is validated; errors carry indexed paths (`items.3.amount`). A variant of another product, or the same variant and currency twice, is rejected.",
+        "operationId": "PricesController_putMany",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "variantId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Upper-case ISO 4217 code, exactly as listed: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD."
+                        },
+                        "amount": {
+                          "type": "number",
+                          "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
+                        },
+                        "compareAtAmount": {
+                          "nullable": true,
+                          "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
+                          "type": "number"
+                        }
+                      },
+                      "required": ["variantId", "currency", "amount"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["items"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The written prices, in request order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set many prices of one product's variants in one transaction (all or nothing)",
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants/{variantId}/prices/{currency}": {
@@ -16984,6 +18393,16 @@
             "description": "Upper-case ISO 4217 code of a supported currency, for example UAH.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -17171,7 +18590,8 @@
           }
         },
         "summary": "Set the price of a variant in one currency (creates it or replaces it entirely)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "description": "Refused with 409 `rule_violation` (rule `last_shop_price`) for the shop-currency price of an active variant of a published product.",
@@ -17204,6 +18624,16 @@
             "description": "Upper-case ISO 4217 code of a supported currency, for example UAH.",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -17273,193 +18703,25 @@
           }
         },
         "summary": "Delete the price of a variant in one currency",
-        "tags": ["admin-products"]
-      }
-    },
-    "/admin/products/{id}/prices": {
-      "put": {
-        "description": "At most 500 items. Every item is validated; errors carry indexed paths (`items.3.amount`). A variant of another product, or the same variant and currency twice, is rejected.",
-        "operationId": "PricesController_putMany",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Product id.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "items": {
-                    "minItems": 1,
-                    "maxItems": 500,
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "variantId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
-                        },
-                        "currency": {
-                          "type": "string",
-                          "description": "Upper-case ISO 4217 code, exactly as listed: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD."
-                        },
-                        "amount": {
-                          "type": "number",
-                          "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
-                        },
-                        "compareAtAmount": {
-                          "nullable": true,
-                          "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
-                          "type": "number"
-                        }
-                      },
-                      "required": ["variantId", "currency", "amount"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["items"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The written prices, in request order.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "variantId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "currency": {
-                            "type": "string"
-                          },
-                          "amount": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 1000000000000
-                          },
-                          "compareAtAmount": {
-                            "nullable": true,
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "variantId",
-                          "currency",
-                          "amount",
-                          "compareAtAmount",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": ["items"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Set many prices of one product's variants in one transaction (all or nothing)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products": {
       "post": {
         "operationId": "ProductsController_create",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -17874,11 +19136,25 @@
           }
         },
         "summary": "Create a draft product of a product type, with its single default variant",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "get": {
+        "description": "`q` is the start of a slug or an exact SKU of any variant (case and surrounding spaces do not matter); never a title or a substring. It combines (AND) with the other filters. 1 to 160 characters of letters, digits, dots, underscores and hyphens, otherwise 400.",
         "operationId": "ProductsController_list",
         "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Start of a slug, or an exact SKU of any variant of the product.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            }
+          },
           {
             "name": "brandId",
             "required": false,
@@ -18077,8 +19353,9 @@
             }
           }
         },
-        "summary": "List products, ordered by slug; filter by status, category or brand",
-        "tags": ["admin-products"]
+        "summary": "List products, ordered by slug; filter by status, category, brand or search text",
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       }
     },
     "/admin/products/{id}": {
@@ -18461,7 +19738,8 @@
           }
         },
         "summary": "Get a product with its categories, media, variants and options",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "ProductsController_update",
@@ -18474,6 +19752,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -18901,7 +20189,8 @@
           }
         },
         "summary": "Change a product (only the listed fields; the status changes via the lifecycle routes)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "ProductsController_delete",
@@ -18914,6 +20203,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -18983,7 +20282,8 @@
           }
         },
         "summary": "Delete a product that was never published (archive the others)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/publish": {
@@ -18998,6 +20298,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -19376,7 +20686,8 @@
           }
         },
         "summary": "Publish a draft product (draft to active); every publish precondition is checked",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.publish"
       }
     },
     "/admin/products/{id}/unpublish": {
@@ -19391,6 +20702,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -19769,7 +21090,8 @@
           }
         },
         "summary": "Take an active product back to draft",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.publish"
       }
     },
     "/admin/products/{id}/archive": {
@@ -19784,6 +21106,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -20162,7 +21494,8 @@
           }
         },
         "summary": "Archive a draft or active product (soft delete)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.publish"
       }
     },
     "/admin/products/{id}/restore": {
@@ -20177,6 +21510,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -20555,7 +21898,8 @@
           }
         },
         "summary": "Restore an archived product as a draft (publish again to go live)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.publish"
       }
     },
     "/admin/products/{id}/categories": {
@@ -20570,6 +21914,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -20979,7 +22333,8 @@
           }
         },
         "summary": "Replace the categories of a product; exactly one assignment is primary",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/media": {
@@ -20994,6 +22349,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -21418,7 +22783,8 @@
           }
         },
         "summary": "Replace the media list of a product",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/options": {
@@ -21433,6 +22799,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -21850,7 +23226,8 @@
           }
         },
         "summary": "Replace the options and chosen values of a draft product; the variants are regenerated",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/options/{optionId}/values": {
@@ -21875,6 +23252,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -22272,7 +23659,8 @@
           }
         },
         "summary": "Add a value to an option of the product (any status) and generate the variants of the new combinations",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants": {
@@ -22496,7 +23884,8 @@
           }
         },
         "summary": "List the variants of a product, ordered by position",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "post": {
         "operationId": "VariantsController_create",
@@ -22509,6 +23898,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -22731,7 +24130,8 @@
           }
         },
         "summary": "Create one variant of a draft product from one value of every product option (usually generate is easier)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants/generate": {
@@ -22746,6 +24146,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -22928,7 +24338,8 @@
           }
         },
         "summary": "Create the variants missing for the product's current options (idempotent); the first one of a product without variants becomes the default",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     },
     "/admin/products/{id}/variants/{variantId}": {
@@ -23115,7 +24526,8 @@
           }
         },
         "summary": "Get one variant with its option values",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.read"
       },
       "patch": {
         "operationId": "VariantsController_update",
@@ -23138,6 +24550,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -23358,7 +24780,8 @@
           }
         },
         "summary": "Change a variant (only the listed fields; option values are immutable); isDefault true moves the default flag",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       },
       "delete": {
         "operationId": "VariantsController_delete",
@@ -23381,6 +24804,16 @@
             "schema": {
               "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
             }
           }
         ],
@@ -23450,7 +24883,8 @@
           }
         },
         "summary": "Delete a variant of a draft product (never the last or the default one)",
-        "tags": ["admin-products"]
+        "tags": ["admin-products"],
+        "x-fluxkit-permission": "catalog.write"
       }
     }
   },

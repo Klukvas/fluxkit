@@ -1,5 +1,5 @@
 import { Body, Delete, Get, HttpCode, Param, Patch, Post, Query, Res } from "@nestjs/common";
-import { ApiNoContentResponse, ApiOperation, ApiParam } from "@nestjs/swagger";
+import { ApiNoContentResponse, ApiOperation, ApiParam, ApiQuery } from "@nestjs/swagger";
 import type { Response } from "express";
 import { AdminController } from "../../../auth/admin-controller.decorator.js";
 import {
@@ -51,6 +51,13 @@ export class CategoriesController {
       "List categories (flat), ordered by position, slug, id; `parentId` lists direct children",
   })
   @ApiPaginationQuery()
+  @ApiQuery({
+    name: "parentId",
+    required: false,
+    description:
+      "Only the direct children of this category. Without it every category of every level is listed (there is no value that selects the root level only).",
+    schema: { type: "string", format: "uuid" },
+  })
   @ApiZodResponse(200, pageSchema(categoryResponseSchema), "A page of categories.")
   @ApiProblemResponses(400)
   list(

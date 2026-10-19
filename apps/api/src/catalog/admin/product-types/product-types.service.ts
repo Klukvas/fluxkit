@@ -68,7 +68,13 @@ export class ProductTypesService {
       this.productTypes.listAttributeAssignments(this.database, id),
       this.productTypes.listOptionAssignments(this.database, id),
     ]);
-    return toProductTypeDetailResponse(row, attributes, options);
+    // Two more statements for the definitions of every assigned attribute, however many there are (no N+1).
+    const attributeIds = attributes.map((assignment) => assignment.attributeId);
+    const [definitions, definitionOptions] = await Promise.all([
+      this.productTypes.listAttributesByIds(this.database, attributeIds),
+      this.productTypes.listAttributeOptionsOf(this.database, attributeIds),
+    ]);
+    return toProductTypeDetailResponse(row, attributes, options, definitions, definitionOptions);
   }
 
   async list(page: PaginationQuery): Promise<Page<ProductTypeResponse>> {

@@ -84,6 +84,7 @@ export class AdminOrdersService {
       status: query.status,
       placedFrom: query.placedFrom,
       placedTo: query.placedTo,
+      customerId: query.customerId,
       number: parsedNumber?.ok === true ? parsedNumber.number : undefined,
       email: text === "" ? undefined : normalizeEmail(text),
     };

@@ -240,7 +240,6 @@ describe("admin orders: access and input validation (real Postgres)", () => {
         ["?offset=-1", "offset"],
         ["?offset=10001", "offset"],
         ["?stauts=paid", "stauts"],
-        ["?customerId=" + SOME_ID, "customerId"],
         [`?q=${"a".repeat(255)}`, "q"],
         ["?q=a&q=b", "q"],
       ];

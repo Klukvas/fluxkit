@@ -132,24 +132,33 @@ export function ApiProblemResponses(
   );
 }
 
-/** Where the store CSRF guard (`StoreCsrfGuard`, registered globally) applies: every state-changing method. */
-const STORE_WRITE_METHODS = new Set(["post", "put", "patch", "delete"]);
+/** Where the CSRF guards (store and admin) apply: every state-changing method. */
+const CSRF_WRITE_METHODS = new Set(["post", "put", "patch", "delete"]);
+
+interface CsrfDocumentation {
+  /** Operations whose path starts with this prefix are documented. */
+  readonly pathPrefix: string;
+  readonly headerDescription: string;
+  /** Replaces the `403` response of the operation; without it an existing `403` stays and a missing one gets `fallback403`. */
+  readonly replace403?: string;
+  readonly fallback403: string;
+}
 
 /**
- * Documents the global store CSRF guard on every state-changing `/store` operation: the required `X-Fluxkit-CSRF: 1`
+ * Documents a global CSRF guard on every state-changing operation under a path prefix: the required `X-Fluxkit-CSRF: 1`
  * header and the `403` problem it answers with. Done on the finished document, like the guard itself, so a route added
  * later by any module (a feature included) is covered without repeating decorators on it.
  */
-function documentStoreCsrf(document: OpenAPIObject): void {
+function documentCsrf(document: OpenAPIObject, config: CsrfDocumentation): void {
   const problem = {
     "application/problem+json": { schema: { $ref: getSchemaPath(ProblemDetailsDoc) } },
   };
   for (const [path, item] of Object.entries(document.paths)) {
-    if (!path.startsWith("/store/")) {
+    if (!path.startsWith(config.pathPrefix)) {
       continue;
     }
     for (const [method, operation] of Object.entries(item)) {
-      if (!STORE_WRITE_METHODS.has(method) || typeof operation !== "object" || operation === null) {
+      if (!CSRF_WRITE_METHODS.has(method) || typeof operation !== "object" || operation === null) {
         continue;
       }
       const target = operation as {
@@ -162,21 +171,52 @@ function documentStoreCsrf(document: OpenAPIObject): void {
           name: "X-Fluxkit-CSRF",
           in: "header",
           required: true,
-          description:
-            "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+          description: config.headerDescription,
           schema: { type: "string", enum: ["1"] },
         },
       ];
-      target.responses = {
-        ...target.responses,
-        "403": { description: STORE_CSRF_DESCRIPTION, content: problem },
-      };
+      if (config.replace403 !== undefined) {
+        target.responses = {
+          ...target.responses,
+          "403": { description: config.replace403, content: problem },
+        };
+      } else if (target.responses["403"] === undefined) {
+        target.responses = {
+          ...target.responses,
+          "403": { description: config.fallback403, content: problem },
+        };
+      }
     }
   }
 }
 
 const STORE_CSRF_DESCRIPTION =
   "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.";
+
+function documentStoreCsrf(document: OpenAPIObject): void {
+  documentCsrf(document, {
+    pathPrefix: "/store/",
+    headerDescription:
+      "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+    replace403: STORE_CSRF_DESCRIPTION,
+    fallback403: STORE_CSRF_DESCRIPTION,
+  });
+}
+
+/**
+ * Documents the admin CSRF guard (`AdminGuard`, ADR 0009) on every state-changing `/admin` operation, the sign-in
+ * included: the required `X-Fluxkit-CSRF: 1` header. The `403` every admin route already documents (permission or CSRF)
+ * stays as it is. Documentation only: the guard itself is unchanged.
+ */
+export function documentAdminCsrf(document: OpenAPIObject): OpenAPIObject {
+  documentCsrf(document, {
+    pathPrefix: "/admin/",
+    headerDescription:
+      "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+    fallback403: PROBLEM_DESCRIPTION[403] ?? "Forbidden.",
+  });
+  return document;
+}
 
 /**
  * The cart of a `cart_changed` problem is the cart of `GET /store/cart`: the same zod schema, so a generated client types

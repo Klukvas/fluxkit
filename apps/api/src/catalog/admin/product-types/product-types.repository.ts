@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { PaginationQuery } from "../../../common/pagination.js";
 import type { DbExecutor } from "../../../common/transaction.js";
 import {
   attribute,
+  attributeOption,
   option,
   product,
   productOption,
@@ -17,6 +18,7 @@ type ProductTypeRow = typeof productType.$inferSelect;
 type NewProductType = typeof productType.$inferInsert;
 type ProductTypeChanges = Partial<Pick<NewProductType, "name" | "requiresShipping">>;
 type AttributeRow = typeof attribute.$inferSelect;
+type AttributeOptionRow = typeof attributeOption.$inferSelect;
 type OptionRow = typeof option.$inferSelect;
 
 /** An attribute assignment joined with the attribute code. */
@@ -142,6 +144,35 @@ export class ProductTypesRepository {
       .innerJoin(attribute, eq(attribute.id, productTypeAttribute.attributeId))
       .where(eq(productTypeAttribute.productTypeId, productTypeId))
       .orderBy(asc(productTypeAttribute.position), asc(attribute.code));
+  }
+
+  /** The attributes with these ids, in one statement (an empty list reads nothing). */
+  async listAttributesByIds(
+    db: DbExecutor,
+    attributeIds: readonly string[],
+  ): Promise<AttributeRow[]> {
+    if (attributeIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(attribute)
+      .where(inArray(attribute.id, [...attributeIds]));
+  }
+
+  /** The options of these attributes in one statement, in the order `GET /admin/attributes/:id` gives them. */
+  async listAttributeOptionsOf(
+    db: DbExecutor,
+    attributeIds: readonly string[],
+  ): Promise<AttributeOptionRow[]> {
+    if (attributeIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(attributeOption)
+      .where(inArray(attributeOption.attributeId, [...attributeIds]))
+      .orderBy(asc(attributeOption.position), asc(attributeOption.code), asc(attributeOption.id));
   }
 
   countAttributeAssignments(db: DbExecutor, productTypeId: string): Promise<number> {

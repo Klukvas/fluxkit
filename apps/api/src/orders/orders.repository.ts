@@ -49,6 +49,8 @@ export interface AdminOrderFilter {
   readonly number?: string;
   /** Normalized (trimmed, lower case) email. */
   readonly email?: string;
+  /** Exactly this customer account (`sales_order_customer_id_placed_at_idx`); guest orders never match. */
+  readonly customerId?: string;
 }
 
 /** The columns a status change may write (everything else on the order never changes after placement). */
@@ -72,6 +74,9 @@ function adminOrderWhere(filter: AdminOrderFilter): SQL | undefined {
   }
   if (filter.placedTo !== undefined) {
     conditions.push(lt(salesOrder.placedAt, filter.placedTo));
+  }
+  if (filter.customerId !== undefined) {
+    conditions.push(eq(salesOrder.customerId, filter.customerId));
   }
   const search: SQL[] = [];
   if (filter.number !== undefined) {

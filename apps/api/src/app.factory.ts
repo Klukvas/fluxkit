@@ -14,7 +14,8 @@ import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-con
 import type { ScryptParams } from "./auth/password-hasher.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
-import { documentStoreContract } from "./common/openapi.js";
+import { documentAdminPermissions } from "./auth/admin-permission-docs.js";
+import { documentAdminCsrf, documentStoreContract } from "./common/openapi.js";
 import {
   DEFAULT_FEATURES_DIR,
   loadFeatures,
@@ -124,5 +125,7 @@ export async function createApp(
 
 export function buildOpenApiDocument(app: NestExpressApplication): OpenAPIObject {
   const config = new DocumentBuilder().setTitle("Fluxkit API").setVersion("0.0.0").build();
-  return documentStoreContract(SwaggerModule.createDocument(app, config));
+  const document = documentStoreContract(SwaggerModule.createDocument(app, config));
+  documentAdminCsrf(document);
+  return documentAdminPermissions(app, document);
 }

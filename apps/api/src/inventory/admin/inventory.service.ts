@@ -19,13 +19,22 @@ import {
   type LocationRow,
   type VariantStockRow,
 } from "../inventory.repository.js";
-import { toLevelResponse, toLocationResponse, toMovementResponse } from "./inventory.mapper.js";
+import {
+  toLevelResponse,
+  toLocationResponse,
+  toMovementResponse,
+  toReservationListItem,
+} from "./inventory.mapper.js";
 import type {
   AdjustmentBody,
   AdjustmentResponse,
   InventoryResponse,
+  LevelResponse,
   ListMovementsQuery,
+  ListReservationsQuery,
   MovementResponse,
+  ProductInventoryResponse,
+  ReservationListItem,
 } from "./inventory.schemas.js";
 import type { LocationListResponse } from "./locations.schemas.js";
 
@@ -71,6 +80,36 @@ export class InventoryService {
     };
   }
 
+  /**
+   * Every variant of the product with its levels, in three statements however many variants and locations there are.
+   * Reads only: a variant without level rows is listed with no levels and nothing is created.
+   */
+  async getOfProduct(productId: string): Promise<ProductInventoryResponse> {
+    await this.requireProduct(this.database, productId);
+    const [variants, levelRows] = await Promise.all([
+      this.inventory.listVariantsOfProduct(this.database, productId),
+      this.inventory.listLevelsOfProduct(this.database, productId),
+    ]);
+    const levelsByVariant = new Map<string, LevelResponse[]>();
+    for (const row of levelRows) {
+      const list = levelsByVariant.get(row.variantId) ?? [];
+      list.push(toLevelResponse(row));
+      levelsByVariant.set(row.variantId, list);
+    }
+    return {
+      items: variants.map((variant) => {
+        const levels = levelsByVariant.get(variant.id) ?? [];
+        return {
+          variantId: variant.id,
+          trackInventory: variant.trackInventory,
+          allowBackorder: variant.allowBackorder,
+          levels,
+          totalAvailable: levels.reduce((sum, level) => sum + level.available, 0),
+        };
+      }),
+    };
+  }
+
   async listMovements(
     productId: string,
     variantId: string,
@@ -80,6 +119,23 @@ export class InventoryService {
     await this.requireVariant(this.database, productId, variantId);
     const { rows, total } = await this.inventory.listMovementsPage(this.database, variantId, query);
     return toPage(rows.map(toMovementResponse), total, query);
+  }
+
+  /** The reservations of a variant in one status (default `active`), newest first, four statements in all. */
+  async listReservations(
+    productId: string,
+    variantId: string,
+    query: ListReservationsQuery,
+  ): Promise<Page<ReservationListItem>> {
+    await this.requireProduct(this.database, productId);
+    await this.requireVariant(this.database, productId, variantId);
+    const { rows, total } = await this.inventory.listReservationsPage(
+      this.database,
+      variantId,
+      query.status,
+      query,
+    );
+    return toPage(rows.map(toReservationListItem), total, query);
   }
 
   /**

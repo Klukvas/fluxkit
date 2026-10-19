@@ -2,7 +2,15 @@ import { Injectable } from "@nestjs/common";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
 import type { PaginationQuery } from "../common/pagination.js";
 import type { DbExecutor } from "../common/transaction.js";
-import { inventoryLevel, location, stockMovement, variant } from "../database/schema/index.js";
+import {
+  inventoryLevel,
+  location,
+  orderItem,
+  orderItemReservation,
+  reservation,
+  stockMovement,
+  variant,
+} from "../database/schema/index.js";
 
 export type LocationRow = typeof location.$inferSelect;
 export type LevelRow = typeof inventoryLevel.$inferSelect;
@@ -21,6 +29,21 @@ export interface LevelWithLocation {
 
 export interface MovementWithLocation extends MovementRow {
   locationCode: string;
+}
+
+export interface LevelOfVariantRow extends LevelWithLocation {
+  variantId: string;
+}
+
+/** A reservation of one variant as the admin list shows it; `orderId` is null for a hold no order owns. */
+export interface ReservationListRow {
+  status: string;
+  quantity: number;
+  expiresAt: Date;
+  reference: string | null;
+  orderId: string | null;
+  locationCode: string;
+  createdAt: Date;
 }
 
 export interface VariantStockRow {
@@ -65,6 +88,36 @@ export class InventoryRepository {
       .from(variant)
       .where(and(eq(variant.id, variantId), eq(variant.productId, productId)));
     return row;
+  }
+
+  /** The variants of the product in variant order (position, then id), one statement. */
+  listVariantsOfProduct(db: DbExecutor, productId: string): Promise<VariantStockRow[]> {
+    return db
+      .select({
+        id: variant.id,
+        trackInventory: variant.trackInventory,
+        allowBackorder: variant.allowBackorder,
+      })
+      .from(variant)
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(variant.position), asc(variant.id));
+  }
+
+  /** Every level row of every variant of the product, location code order within a variant, one statement. */
+  listLevelsOfProduct(db: DbExecutor, productId: string): Promise<LevelOfVariantRow[]> {
+    return db
+      .select({
+        variantId: inventoryLevel.variantId,
+        locationId: inventoryLevel.locationId,
+        locationCode: location.code,
+        onHand: inventoryLevel.onHand,
+        reserved: inventoryLevel.reserved,
+      })
+      .from(inventoryLevel)
+      .innerJoin(variant, eq(variant.id, inventoryLevel.variantId))
+      .innerJoin(location, eq(location.id, inventoryLevel.locationId))
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(location.code));
   }
 
   listLevelsOfVariant(db: DbExecutor, variantId: string): Promise<LevelWithLocation[]> {
@@ -160,5 +213,41 @@ export class InventoryRepository {
       rows: rows.map(({ movement, locationCode }) => ({ ...movement, locationCode })),
       total,
     };
+  }
+
+  /**
+   * One page of the reservations of a variant in one status, newest first (id breaks ties), with the order that holds
+   * each one (left joins through `order_item_reservation`, unique per reservation, so a row never doubles) and the
+   * location code. Served by `reservation_variant_id_idx`. Selects nothing about the order but its id.
+   */
+  async listReservationsPage(
+    db: DbExecutor,
+    variantId: string,
+    status: string,
+    page: PaginationQuery,
+  ): Promise<{ rows: ReservationListRow[]; total: number }> {
+    const where = and(eq(reservation.variantId, variantId), eq(reservation.status, status));
+    const [rows, total] = await Promise.all([
+      db
+        .select({
+          status: reservation.status,
+          quantity: reservation.quantity,
+          expiresAt: reservation.expiresAt,
+          reference: reservation.reference,
+          orderId: orderItem.orderId,
+          locationCode: location.code,
+          createdAt: reservation.createdAt,
+        })
+        .from(reservation)
+        .innerJoin(location, eq(location.id, reservation.locationId))
+        .leftJoin(orderItemReservation, eq(orderItemReservation.reservationId, reservation.id))
+        .leftJoin(orderItem, eq(orderItem.id, orderItemReservation.orderItemId))
+        .where(where)
+        .orderBy(desc(reservation.createdAt), desc(reservation.id))
+        .limit(page.limit)
+        .offset(page.offset),
+      db.$count(reservation, where),
+    ]);
+    return { rows, total };
   }
 }

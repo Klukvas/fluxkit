@@ -1,6 +1,7 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth/auth-config.js";
+import { AdminConfigModule } from "./admin-config/admin-config.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import type { Clock } from "./auth/clock.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
@@ -75,6 +76,7 @@ export class AppModule {
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
         HealthModule,
+        AdminConfigModule,
         CustomersModule,
         CatalogModule,
         InventoryModule,

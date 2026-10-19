@@ -37,7 +37,7 @@ export class AdminOrdersController {
   @ApiOperation({
     summary: "List orders, newest first",
     description:
-      "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix.",
+      "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix. `customerId` is the exact id of the customer account that placed the order; every filter combines (AND).",
   })
   @ApiQuery({
     name: "limit",
@@ -71,6 +71,12 @@ export class AdminOrdersController {
     required: false,
     description: "An order number (case, dash and look-alike letters forgiven) or an exact email.",
     schema: { type: "string", maxLength: 254 },
+  })
+  @ApiQuery({
+    name: "customerId",
+    required: false,
+    description: "Only the orders placed by this customer account (guest orders never match).",
+    schema: { type: "string", format: "uuid" },
   })
   @ApiZodResponse(200, pageSchema(adminOrderSummarySchema), "A page of order summaries.")
   @ApiProblemResponses(400)

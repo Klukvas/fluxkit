@@ -69,6 +69,10 @@ export interface StartAppOptions {
   lowStockThreshold?: number;
   /** `PRICES_INCLUDE_TAX`; defaults to true. */
   pricesIncludeTax?: boolean;
+  /** `DEFAULT_LOCALE`; defaults to `uk`. Must be one of `locales`. */
+  defaultLocale?: string;
+  /** `LOCALES`; defaults to `uk`, `en`. */
+  locales?: string[];
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -96,6 +100,8 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       shopCurrency: options.shopCurrency,
       lowStockThreshold: options.lowStockThreshold,
       pricesIncludeTax: options.pricesIncludeTax,
+      defaultLocale: options.defaultLocale,
+      locales: options.locales,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,

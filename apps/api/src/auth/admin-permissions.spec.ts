@@ -39,12 +39,13 @@ const PUBLISH_ROUTES = new Set([
   "POST /admin/products/:id/restore",
 ]);
 
-/** The sign-in flow: login is public, the other three serve any signed-in admin whatever the role. */
+/** The sign-in flow: login is public, the other three serve any signed-in admin whatever the role; so does the config read. */
 const PUBLIC_ROUTES = ["POST /admin/auth/login"];
 const AUTHENTICATED_ROUTES = [
   "GET /admin/auth/me",
   "POST /admin/auth/change-password",
   "POST /admin/auth/logout",
+  "GET /admin/config",
 ];
 const USERS_ROUTES = [
   "GET /admin/users",
@@ -71,7 +72,11 @@ const ORDERS_ROUTES = [
   "POST /admin/orders/:id/mark-fulfilled",
 ];
 
+/** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */
+const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventory/reservations";
+
 function expectedPermission(method: string, pattern: string): AdminPermission {
+  if (`${method} ${pattern}` === RESERVATIONS_ROUTE) return "orders.read";
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
   if (ORDERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";
@@ -172,7 +177,7 @@ describe("admin route permissions", () => {
       }
     });
 
-    it("has exactly one public admin route (login) and exactly three any-signed-in-admin routes", () => {
+    it("has exactly one public admin route (login) and exactly four any-signed-in-admin routes", () => {
       const named = (kind: "public" | "authenticated") =>
         declaredAdminRoutes(manager.app)
           .filter(({ access }) => access.kind === kind)

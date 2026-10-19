@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, exists, inArray, like, type SQL } from "drizzle-orm";
+import { and, asc, eq, exists, inArray, like, sql, type SQL } from "drizzle-orm";
 import type { PaginationQuery } from "../../../common/pagination.js";
 import type { DbExecutor } from "../../../common/transaction.js";
 import {
@@ -74,10 +74,41 @@ export interface ProductOptionValueRow {
   position: number;
 }
 
+/** The two readings of the admin search text (`q`): the start of a slug, or an exact SKU. Both already normalized. */
+export interface ProductSearch {
+  /** Lower case, only slug characters. */
+  slugPrefix: string;
+  /** Trimmed, upper case. */
+  sku: string;
+}
+
 export interface ProductListFilter {
   status?: string | undefined;
   categoryId?: string | undefined;
   brandId?: string | undefined;
+  search?: ProductSearch | undefined;
+}
+
+/** Makes `%`, `_` and `\` plain characters in a LIKE pattern (used with `ESCAPE '\'`). */
+export function escapeLikePattern(text: string): string {
+  return text.replace(/[\\%_]/g, "\\$&");
+}
+
+/**
+ * Products whose slug starts with the text, or that have a variant with exactly this SKU; a product that matches both
+ * ways is one row. The SKU arm is an index lookup (`variant_sku_key`). The slug arm is NOT index-served today: a
+ * `LIKE 'prefix%'` can use a btree only on a `C` collation database or an index with `text_pattern_ops`, and
+ * `product_slug_key` is neither (checked with EXPLAIN on a `C.UTF-8` database), so Postgres scans the product table for
+ * it. That is bounded by the catalog size; serving it from an index needs a migration (an index
+ * `ON product (slug text_pattern_ops)`), which is a red zone and was not part of this change (plan step 2).
+ */
+export function productSearchCondition(search: ProductSearch): SQL {
+  const pattern = `${escapeLikePattern(search.slugPrefix)}%`;
+  return sql`${product.id} in (
+    select ${product.id} from ${product} where ${product.slug} like ${pattern} escape '\\'
+    union
+    select ${variant.productId} from ${variant} where ${variant.sku} = ${search.sku}
+  )`;
 }
 
 /** Queries only (Drizzle query builder, parameterized). Every method runs on the executor it is given. */
@@ -113,6 +144,7 @@ export class ProductsRepository {
     const conditions: (SQL | undefined)[] = [
       filter.status === undefined ? undefined : eq(product.status, filter.status),
       filter.brandId === undefined ? undefined : eq(product.brandId, filter.brandId),
+      filter.search === undefined ? undefined : productSearchCondition(filter.search),
       filter.categoryId === undefined
         ? undefined
         : exists(
