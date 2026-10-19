@@ -197,7 +197,7 @@ export function ProductPurchaseView({
             )}
           </div>
 
-          <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+          <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
             {hasOptionPicker(product)
               ? product.options.map((option) => (
                   <OptionPicker

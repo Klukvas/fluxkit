@@ -66,7 +66,13 @@ export function RegisterFormView({
     onValueChange: (value: string) => onValueChange(name, value),
   });
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={pending} className="flex flex-col gap-4">
+    <form
+      method="post"
+      onSubmit={onSubmit}
+      noValidate
+      aria-busy={pending}
+      className="flex flex-col gap-4"
+    >
       <h1 className="text-3xl font-bold text-foreground">{t("account.register.title")}</h1>
       <FormErrorSummary
         failure={failure}

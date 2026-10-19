@@ -21,6 +21,24 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(sources.length).toBeGreaterThan(30);
   });
 
+  it("gives every <form> method=\"post\", so a submit before hydration never puts a password or personal data into a URL", () => {
+    // Until React hydrates, the browser submits natively; a form without a method uses GET and the values land in the address
+    // bar, the history, access logs and the Referer of later requests. Allow-list: none (every form holds personal data or a quantity).
+    const uiRoot = join(root, "..", "..", "..", "packages", "ui", "src");
+    const uiSources = sourceFiles(uiRoot).map((path) => ({
+      path: relative(join(root, "..", "..", ".."), path),
+      text: readFileSync(path, "utf8"),
+    }));
+    const forms = [...sources, ...uiSources].flatMap((file) =>
+      [...file.text.matchAll(/<form\b(?:[^>]|=>)*>/g)].map((match) => ({ path: file.path, tag: match[0] })),
+    );
+    expect(forms.length).toBeGreaterThanOrEqual(6);
+    for (const form of forms) {
+      expect(form.tag, `${form.path}: a form without method="post"`).toMatch(/\bmethod="post"/);
+      expect(form.tag, `${form.path}: a form must not name an action`).not.toMatch(/\baction=/);
+    }
+  });
+
   it("sets raw HTML only in the JSON-LD component, which escapes it", () => {
     const users = sources.filter((file) => file.text.includes("dangerouslySetInnerHTML"));
     expect(users.map((file) => file.path)).toEqual(["components/json-ld.tsx"]);

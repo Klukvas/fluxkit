@@ -67,6 +67,7 @@ export function ProfileFormView({
   });
   return (
     <form
+      method="post"
       onSubmit={onSubmit}
       noValidate
       aria-busy={pending}
@@ -118,6 +119,7 @@ export function PasswordFormView({
   };
   return (
     <form
+      method="post"
       onSubmit={onSubmit}
       noValidate
       aria-busy={pending}
