@@ -1,6 +1,6 @@
 # Plan: monorepo scaffold and stack spike
 
-Status: steps 1 to 8 merged to `main` (PRs #1 to #5); step 9 (documentation) in PR #10. See Outcome at the end.
+Status: complete. Steps 1 to 8 merged to `main` (PRs #1 to #5); step 9 (documentation) merged (PR #10). See Outcome at the end.
 Role: orchestrator plan; implementation by Developer agents, review by a different agent.
 
 ## Goal

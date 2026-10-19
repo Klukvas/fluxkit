@@ -1,6 +1,6 @@
 # Plan: admin authentication and roles
 
-Status: steps 1 to 4 done (step 4 in PR, pending merge); step 5 (independent review) pending. Proposed 2026-10-16; the three main decisions were taken by the owner (see "Decisions") and the plan was approved (red zones: auth, schema and migration, public contract).
+Status: complete. The plan is merged (PR #31); steps 1 to 4 merged (PRs #32 to #36); step 5 (independent review) done and its findings fixed in PR #37 (`fix/auth-review-hardening`, ADR 0010). Proposed 2026-10-16; the three main decisions were taken by the owner (see "Decisions") and the plan was approved (red zones: auth, schema and migration, public contract).
 Roles: Architect step is covered by this plan and a short ADR 0009 written in step 1; Developers (Sonnet); independent Reviewer (Opus, a different model than the authors); Docs inside each step.
 Follows: `docs/plans/2026-10-14-catalog.md` (completed). Replaces the temporary default-deny authenticator promised there ("a separate small auth and roles plan follows right after").
 

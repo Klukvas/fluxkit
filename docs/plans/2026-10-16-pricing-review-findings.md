@@ -1,6 +1,6 @@
 # Pricing and inventory independent review: findings (plan step 7)
 
-Status: review done 2026-10-16 on `main` at f7021ee. All findings are fixed or documented in the branch `fix/pricing-review-findings` (PR pending); the owner approved fixing all of them with the choices recorded below. ADR 0013 records the one rule decision (variants with stock history are not deleted).
+Status: review done 2026-10-16 on `main` at f7021ee. All findings are fixed or documented in PR #47 (`fix/pricing-review-findings`, merged); the owner approved fixing all of them with the choices recorded below. ADR 0013 records the one rule decision (variants with stock history are not deleted).
 Reviewer: Opus (rounding and overflow, oversell races, journal integrity, leaks, publish-rule regressions, migration reversibility, tests that cannot fail). Authors were Sonnet agents; the reviewer did not see the orchestrator's conclusions.
 "Confirmed" = the orchestrator reproduced it or re-derived it from the code. "Reported" = reproduced by the reviewer only.
 
