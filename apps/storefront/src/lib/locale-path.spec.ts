@@ -21,6 +21,19 @@ describe("switchLocalePath", () => {
     expect(switchLocalePath("/uk/catalog", "en", "?")).toBe("/en/catalog");
   });
 
+  it("keeps the URL fragment (the guest order page's token) after the query", () => {
+    expect(switchLocalePath("/uk/order/7K3M-9QX2", "en", "", "#t=abc_DEF-123")).toBe(
+      "/en/order/7K3M-9QX2#t=abc_DEF-123",
+    );
+    expect(switchLocalePath("/uk/catalog", "en", "?page=2", "#main-content")).toBe(
+      "/en/catalog?page=2#main-content",
+    );
+    expect(switchLocalePath("/uk/catalog", "en", "", "#")).toBe("/en/catalog");
+    expect(switchLocalePath("/uk/catalog", "en", "", "")).toBe("/en/catalog");
+    // A value that is not a fragment is never appended.
+    expect(switchLocalePath("/uk/catalog", "en", "", "t=abc")).toBe("/en/catalog");
+  });
+
   it("falls back to the locale's home for a path without a known locale", () => {
     expect(switchLocalePath("/", "en")).toBe("/en");
     expect(switchLocalePath("/fr/catalog", "en")).toBe("/en");

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -161,6 +163,29 @@ describe("header islands", () => {
     expect(html).toContain("§locale.name.uk");
     expect(html).toContain("§locale.name.en");
     expect(locales).toEqual(["uk", "en"]);
+  });
+
+  it("keeps the fragment of the page (the guest order token) in the other locale's link, after the query", () => {
+    const html = renderToStaticMarkup(
+      <LocaleSwitcherView
+        locale="uk"
+        t={t}
+        pathname="/uk/order/7K3M-9QX2"
+        search=""
+        hash="#t=AbCdEfGhIjKlMnOpQrSt"
+      />,
+    );
+    expect(html).toContain('href="/en/order/7K3M-9QX2#t=AbCdEfGhIjKlMnOpQrSt"');
+  });
+
+  it("renders no fragment on the server: the island reads location.hash only in the browser", () => {
+    const island = readFileSync(join(import.meta.dirname, "locale-switcher.tsx"), "utf8");
+    // The hash starts empty (server render and hydration) and is read inside an effect only.
+    expect(island).toMatch(/useState\(""\)/);
+    expect(island).toMatch(
+      /useEffect\(\(\) => \{\s*const read = \(\) => setHash\(window\.location\.hash\)/,
+    );
+    expect(island.match(/window\.location\.hash/g)).toHaveLength(1);
   });
 });
 
