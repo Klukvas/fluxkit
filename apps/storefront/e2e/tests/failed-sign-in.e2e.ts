@@ -1,9 +1,11 @@
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
+import { waitForHydration } from "../support/flows.ts";
 
 test("a failed sign-in shows one message, marks no field and moves the focus to it", async ({
   page,
 }, testInfo) => {
   await page.goto("/en/account/login");
+  await waitForHydration(page);
   await page.getByLabel("Email", { exact: true }).fill(uniqueEmail(testInfo, "nobody"));
   await page.getByLabel("Password", { exact: true }).fill("not the right password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();

@@ -83,3 +83,24 @@ export async function tabTo(page: Page, target: Locator, limit = 80): Promise<st
     `Tab never reached the target within ${String(limit)} presses; passed: ${path.join(" > ")}`,
   );
 }
+
+/** The text the storefront shows for an amount of UAH minor units in the `en` locale (for example `UAH 1,199.00`). */
+export function uah(minorUnits: number): string {
+  return new Intl.NumberFormat("en", { style: "currency", currency: "UAH" }).format(
+    minorUnits / 100,
+  );
+}
+
+/** What a checkout page keeps in `sessionStorage` between attempts: an idempotency key and a hash, nothing personal. */
+export async function storedAttempt(page: Page): Promise<string | null> {
+  return page.evaluate(() => window.sessionStorage.getItem("fluxkit.checkoutAttempt"));
+}
+
+/**
+ * Waits until the page's islands are interactive. The header's cart badge shows a count only after the browser has hydrated
+ * and read the cart, so it doubles as the signal: a form filled or submitted before it would be handled by the browser
+ * instead of by the page's own code.
+ */
+export async function waitForHydration(page: Page): Promise<void> {
+  await expect(page.getByRole("link", { name: /Cart.*\d+ items? in the cart/ })).toBeVisible();
+}

@@ -161,6 +161,19 @@ export class AdminApi {
     );
   }
 
+  /**
+   * Leaves exactly one unit for sale: the counted quantity becomes `reserved + 1`, so the result does not depend on orders
+   * (and their reservations) an earlier attempt of the same test left behind.
+   */
+  async leaveOneUnit(productId: string, variantId: string): Promise<void> {
+    const stock = await json<{ levels: { reserved: number }[] }>(
+      await this.context.get(`/admin/products/${productId}/variants/${variantId}/inventory`),
+      200,
+    );
+    const reserved = stock.levels.reduce((sum, level) => sum + level.reserved, 0);
+    await this.setOnHand(productId, variantId, reserved + 1);
+  }
+
   /** The numbers of the orders whose contact email matches `email` (`?q`, docs/api/orders.md). */
   async orderNumbersOf(email: string): Promise<string[]> {
     const page = await json<{ items: { number: string; email: string | null }[] }>(

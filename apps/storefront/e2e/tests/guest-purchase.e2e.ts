@@ -1,5 +1,11 @@
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { chooseOptions, fillCheckoutForm, orderNumberOnPage, tokenOf } from "../support/flows.ts";
+import {
+  chooseOptions,
+  fillCheckoutForm,
+  orderNumberOnPage,
+  tokenOf,
+  waitForHydration,
+} from "../support/flows.ts";
 
 test("a guest buys a T-shirt from the home page and manages the order through its private link", async ({
   page,
@@ -8,6 +14,7 @@ test("a guest buys a T-shirt from the home page and manages the order through it
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 
   await page.goto("/en");
+  await waitForHydration(page);
   await page
     .getByRole("link", { name: /Demo T-shirt/ })
     .first()

@@ -1,6 +1,11 @@
 import type { ConsoleMessage, Request, Response } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { fillCheckoutForm, orderNumberOnPage, tokenOf } from "../support/flows.ts";
+import {
+  fillCheckoutForm,
+  orderNumberOnPage,
+  tokenOf,
+  waitForHydration,
+} from "../support/flows.ts";
 
 const pathOf = (url: string): string => new URL(url).pathname;
 
@@ -55,6 +60,7 @@ test("the guest order token never appears in a URL, a header, the page source, t
 
   // The whole guest flow, from the product page (a digital product: no address to fill).
   await page.goto("/en/p/demo-e-book");
+  await waitForHydration(page);
   await page.getByRole("button", { name: "Add to cart" }).click();
   await page.getByRole("link", { name: "Go to the cart" }).click();
   await page.getByRole("link", { name: "Checkout" }).click();
