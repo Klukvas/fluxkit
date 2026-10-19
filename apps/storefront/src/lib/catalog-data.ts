@@ -32,6 +32,11 @@ function unwrap<T>(operation: string, outcome: CatalogOutcome<T>): T {
   throw error;
 }
 
+/** `currencyExponent` of the shop for the client-rendered cart (`GET /store/config`, read through the same data cache). */
+export async function loadShopExponent(data: StoreData): Promise<number> {
+  return unwrap("GET /store/config", await data.getConfig()).currencyExponent;
+}
+
 export interface HomeData {
   newProducts?: ProductSummary[];
   categories?: CategoryNode[];

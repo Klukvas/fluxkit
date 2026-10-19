@@ -6,6 +6,7 @@ import {
   loadCatalogListing,
   loadHomeData,
   loadProductPage,
+  loadShopExponent,
 } from "./catalog-data";
 import type { CatalogOutcome, StoreData } from "./store-data";
 import { category, product, summary } from "./test-fixtures";
@@ -211,5 +212,23 @@ describe("loadProductPage", () => {
     await expect(loadProductPage(data, "uk", "demo")).rejects.toBeInstanceOf(
       UnexpectedStoreResponseError,
     );
+  });
+});
+
+describe("loadShopExponent", () => {
+  it("reads the currency digits from the cached shop config", async () => {
+    expect(await loadShopExponent(fakeData())).toBe(2);
+    expect(
+      await loadShopExponent(
+        fakeData({ getConfig: async () => ok({ ...config, currencyExponent: 0 }) }),
+      ),
+    ).toBe(0);
+  });
+
+  it("fails loudly (error.tsx) when the config is refused, instead of guessing digits", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(
+      loadShopExponent(fakeData({ getConfig: async () => problem(500, "internal_error") })),
+    ).rejects.toThrow(UnexpectedStoreResponseError);
   });
 });
