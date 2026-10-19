@@ -1,7 +1,7 @@
-import { InvalidRequestError, NetworkError } from "./errors.js";
+import { InvalidRequestError } from "./errors.js";
 import { OPERATIONS, type OperationName } from "./operations.js";
-import { buildRequest, normalizeBaseUrl, type QueryValue } from "./request.js";
-import { parseResponse, type StoreResult } from "./response.js";
+import type { StoreResult } from "./response.js";
+import { createTransport, type CallOptions, type CallParts, type FetchLike } from "./transport.js";
 import type {
   AccountResult,
   AddCartItemBody,
@@ -23,20 +23,11 @@ import type {
   UpdateAccountBody,
 } from "./types.js";
 
-/** The part of `fetch` the client uses; tests inject a fake. */
-export type FetchLike = (url: string, init: RequestInit) => Promise<Response>;
-
 export interface StoreClientOptions {
   /** `""` in the browser (one origin, the reverse proxy or the dev rewrite routes `/store/*`); `API_INTERNAL_URL` on the server. */
   baseUrl: string;
   /** Defaults to the global `fetch`. */
   fetch?: FetchLike;
-}
-
-export interface CallOptions {
-  signal?: AbortSignal;
-  /** Extra `fetch` options such as Next's `{ next: { revalidate: 60 } }`. Cannot change method, headers, body or credentials. */
-  fetchOptions?: Readonly<Record<string, unknown>>;
 }
 
 export interface LocaleOptions extends CallOptions {
@@ -98,61 +89,11 @@ export interface StoreClient {
 /** Header-safe: visible ASCII only, so a key can never inject a header or be silently altered. */
 const IDEMPOTENCY_KEY = /^[\x21-\x7e]{1,255}$/;
 
-function isAbort(cause: unknown, signal: AbortSignal | undefined): boolean {
-  return (
-    signal?.aborted === true ||
-    (typeof cause === "object" &&
-      cause !== null &&
-      (cause as { name?: unknown }).name === "AbortError")
-  );
-}
-
 export function createStoreClient(options: StoreClientOptions): StoreClient {
-  const baseUrl = normalizeBaseUrl(options.baseUrl);
-  const fetchImpl: FetchLike = options.fetch ?? ((url, init) => globalThis.fetch(url, init));
+  const send = createTransport(options);
 
-  async function call<T>(
-    name: OperationName,
-    parts: {
-      pathParams?: Record<string, string>;
-      body?: unknown;
-      headers?: Record<string, string>;
-      options?: CallOptions;
-    },
-  ): Result<T> {
-    const operation = OPERATIONS[name];
-    const context = `${operation.method} ${operation.path}`;
-    const given: Readonly<Record<string, unknown>> = { ...parts.options };
-    const query: Record<string, QueryValue> = {};
-    for (const key of operation.query) {
-      const value = given[key];
-      if (typeof value === "string" || typeof value === "number") query[key] = value;
-    }
-
-    const request = buildRequest({
-      baseUrl,
-      method: operation.method,
-      path: operation.path,
-      ...(parts.pathParams === undefined ? {} : { pathParams: parts.pathParams }),
-      query,
-      ...(parts.body === undefined ? {} : { body: parts.body }),
-      ...(parts.headers === undefined ? {} : { headers: parts.headers }),
-      ...(parts.options?.signal === undefined ? {} : { signal: parts.options.signal }),
-      ...(parts.options?.fetchOptions === undefined
-        ? {}
-        : { fetchOptions: parts.options.fetchOptions }),
-    });
-
-    let response: Response;
-    try {
-      response = await fetchImpl(request.url, request.init);
-    } catch (cause) {
-      throw new NetworkError(`${context}: the request failed before an answer arrived.`, {
-        cause,
-        aborted: isAbort(cause, parts.options?.signal),
-      });
-    }
-    return parseResponse<T>({ successStatuses: operation.successStatuses, context }, response);
+  function call<T>(name: OperationName, parts: CallParts): Result<T> {
+    return send<T>(OPERATIONS[name], parts);
   }
 
   return {
