@@ -110,10 +110,11 @@ describe("token contrast (WCAG 2.x)", () => {
 });
 
 // Every foreground/background pair the components use must be listed above (or be decorative with a reason). Found by reading
-// the class strings of packages/ui and apps/storefront: in a string with a `bg-<token>` the pair is (text/border/outline/ring
+// the class strings of packages/ui, apps/storefront and apps/admin: in a string with a `bg-<token>` the pair is (text/border/outline/ring
 // token, that background); without one it is the page `background`. A pair of a token with itself (a selected option's
 // primary border on a primary fill) has no contrast to measure.
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const scannedRoots = ["packages/ui/src", "apps/storefront/src", "apps/admin/src"];
 const colorTokens = [...tokenValues(lightBlock).keys()].map((name) =>
   name.replace("--fk-color-", ""),
 );
@@ -177,9 +178,15 @@ describe("pairs the components use", () => {
     expect([...usedPairs(`"bg-primary border-primary"`, colorTokens)]).toEqual([]);
   });
 
+  it("scans every root with at least one source file (a renamed folder must not drop out silently)", () => {
+    for (const root of scannedRoots) {
+      expect(sourceFiles(join(repoRoot, root)).length, root).toBeGreaterThan(0);
+    }
+  });
+
   it("finds the pairs of the real components", () => {
     const found = new Set(
-      ["packages/ui/src", "apps/storefront/src"].flatMap((root) =>
+      scannedRoots.flatMap((root) =>
         sourceFiles(join(repoRoot, root)).flatMap((file) => [
           ...usedPairs(readFileSync(file, "utf8"), colorTokens),
         ]),
