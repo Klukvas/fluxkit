@@ -1,6 +1,6 @@
 # Plan: storefront v1 (purchase flow without online payment and without full-text search)
 
-Status: approved by the owner 2026-10-18: scope by quiz, and for every open question below the owner chose the recommended answer ("all recommended"). The plan is merged (PR #65). Progress: step 1 (ADR 0026) done on branch `chore/storefront-step-1-adr`, merged (PR #66); step 2 (cart `requiresShipping`, OpenAPI store `403` and typed `cart_changed`) done on branch `chore/storefront-step-2-cart-api`, merged (PR #67); step 3 (typed client, storefront configuration, dev rewrite, runtime test) done on branch `chore/storefront-step-3-client`, merged (PR #68); step 4a (tokens, contrast test, `packages/ui` i18n and components) done on branch `chore/storefront-step-4a-ui`, merged (PR #69); step 4b (storefront shell, server data layer, security headers; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-4b-shell`, merged (PR #72); step 5 (catalog: home sections, catalog, category and product pages, SEO, sitemap and robots; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-5-catalog`, merged (PR #73); step 6 (cart context, cart page with notices, accounts, safe `next`; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-6-cart-accounts`, merged (PR #74); step 7 (checkout attempt manager and outcome table, checkout page, guest order page with the token in the fragment, account order history, locale switcher keeps the fragment, `no-referrer` on the order page; findings in `apps/storefront/README.md`, "Checkout and orders (step 7)") done on branch `chore/storefront-step-7-checkout`, merged (PR #76); step 8 (Playwright e2e: `@playwright/test` 1.56.1, `pnpm test:e2e`, CI job `e2e`; findings in `apps/storefront/README.md`, "End-to-end tests (step 8)") done on branch `chore/storefront-step-8-e2e`, PR pending; steps 9 and 10 next. The scope below is the owner's (quiz of 2026-10-18, see "Decisions"); everything under "Assumptions to confirm" and "Open questions" is the architect's default and is accepted with the plan unless the owner answers otherwise.
+Status: approved by the owner 2026-10-18: scope by quiz, and for every open question below the owner chose the recommended answer ("all recommended"). The plan is merged (PR #65). Progress: step 1 (ADR 0026) done on branch `chore/storefront-step-1-adr`, merged (PR #66); step 2 (cart `requiresShipping`, OpenAPI store `403` and typed `cart_changed`) done on branch `chore/storefront-step-2-cart-api`, merged (PR #67); step 3 (typed client, storefront configuration, dev rewrite, runtime test) done on branch `chore/storefront-step-3-client`, merged (PR #68); step 4a (tokens, contrast test, `packages/ui` i18n and components) done on branch `chore/storefront-step-4a-ui`, merged (PR #69); step 4b (storefront shell, server data layer, security headers; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-4b-shell`, merged (PR #72); step 5 (catalog: home sections, catalog, category and product pages, SEO, sitemap and robots; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-5-catalog`, merged (PR #73); step 6 (cart context, cart page with notices, accounts, safe `next`; findings in `apps/storefront/README.md`) done on branch `chore/storefront-step-6-cart-accounts`, merged (PR #74); step 7 (checkout attempt manager and outcome table, checkout page, guest order page with the token in the fragment, account order history, locale switcher keeps the fragment, `no-referrer` on the order page; findings in `apps/storefront/README.md`, "Checkout and orders (step 7)") done on branch `chore/storefront-step-7-checkout`, merged (PR #76); step 8 (Playwright e2e: `@playwright/test` 1.56.1, `pnpm test:e2e`, CI job `e2e`; findings in `apps/storefront/README.md`, "End-to-end tests (step 8)") done on branch `chore/storefront-step-8-e2e`, merged (PR #77); step 9 (docs sweep) done on branch `chore/storefront-step-9-docs`, PR pending; step 10 (independent review) pending. Outcome of steps 1 to 9: see the end of this file. The scope below is the owner's (quiz of 2026-10-18, see "Decisions"); everything under "Assumptions to confirm" and "Open questions" is the architect's default and is accepted with the plan unless the owner answers otherwise.
 Roles: Architect (this plan, ADR 0026 of step 1), Orchestrator (task split, path ownership, verification, mutation checks), Developers (Sonnet; Codex allowed for the isolated UI-component step), independent Reviewer (Opus or Codex, never the author's model), Docs inside each step.
 Follows: `docs/plans/2026-10-17-cart-and-orders.md` and `docs/plans/2026-10-18-cart-orders-review-fixes.md` (both complete). Design basis: ADR 0002 (Next.js App Router + Tailwind, CSS-variable tokens), ADR 0015 to 0017 and 0023 (cart, customers, orders, guest tokens), ADR 0024 (`TRUST_PROXY`), ADR 0005 (search is blocked), AGENTS.md section 2.2 (theming, i18n, layout composition).
 
@@ -255,3 +255,67 @@ No migration. One additive API field and OpenAPI documentation (step 2, if appro
 - CI: a new `e2e` job and the root script `pnpm test:e2e` (AGENTS.md sections 1 and 18 are the owner's file).
 - Deployment guidance that requires a reverse proxy for any non-development environment.
 - No migration, no payment, auth or pricing logic change, no new feature flag, no runtime dependency.
+
+## Outcome (steps 1 to 9)
+
+State on 2026-10-19: steps 1 to 8 are merged to `main` (PRs #66 to #77); step 9 (this docs sweep) is on branch `chore/storefront-step-9-docs`, PR pending; step 10 (independent review) is pending and not described here. Nothing in this outcome is a review.
+
+### What was built, per step
+| Step | PR | Built |
+|---|---|---|
+| plan | #65 | the plan (this file) |
+| 1 | #66 | ADR 0026: one origin, rendering split, typed client |
+| 2 | #67 | `requiresShipping` on the cart shape (additive); OpenAPI documents the store `403` and the `X-Fluxkit-CSRF` header; the `cart` of `409 cart_changed` is typed |
+| 3 | #68 | `@fluxkit/api-client` (hand-written types, operations, request, response and error modules, contract test against `openapi.json`); `loadStorefrontEnv` in `@fluxkit/config`; development-only `/store/*` rewrite; runtime test of the rewrite |
+| 4a | #69, #70 | tokens `success`, `warning`, `ring` with a contrast test; `{name}` interpolation and plural forms in `packages/ui`; 18 token-styled components; #70 darkens the light danger colour to pass 4.5:1 on muted |
+| 4b | #72 | shell (header with category navigation, footer, skip link, locale switcher), loading, error and not-found views, layout configuration, `formatMoney` (integer arithmetic), translated problem codes, locale check, server data layer (60 s cache, last-good fallback), security headers |
+| 5 | #73 | home sections, catalog and category pages (brand links, paging, real 404s), product page with variant picker and add to cart, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt` |
+| 6 | #74 | one cart store and one account store (one `GET /store/cart` and one `GET /store/account/me` per page load); cart page with notices and acknowledge; register, login, logout, account overview, profile, change password; safe `next` paths |
+| 7 | #76 | checkout page; checkout attempt manager in `sessionStorage` and the outcome table; guest order page with the token in the URL fragment; customer order list and detail with cancel; `Referrer-Policy: no-referrer` on the order route |
+| 8 | #77 | Playwright suite (`pnpm test:e2e`, 17 tests in 9 files), CI job `e2e`; fix: focus after the order's cancel steps (`lib/cancel-focus.ts`) |
+| 9 | branch | docs sweep; no code, schema, dependency, OpenAPI or workflow change |
+
+PRs #71 and #75 (explicit timeouts for heavy tests) are not storefront work.
+
+### Decisions taken where this plan was silent
+- Step 3: the generator `openapi-typescript` is not used, its peer range (`typescript ^5.x`) excludes the pinned TypeScript 6.0.3; the fallback (hand-written types plus a contract test) is in place.
+- Step 3, runtime evidence (plan section "Runtime test of the dev rewrite"): through the Next rewrite the API receives a client's own `X-Forwarded-For` unchanged and none when the client sends none. With `TRUST_PROXY=0` all shoppers share one window; with `TRUST_PROXY=1` a shopper can choose or evade the window. Hence every deployed environment needs an edge proxy that sets the header (ADR 0026).
+- Step 6: no optimistic money; a failed write keeps the cart; no "empty the cart" button (the store method exists).
+- Step 7: no billing address and no recipient fields; without `sessionStorage` the attempt lives in memory with a visible warning; without `crypto.subtle` the checkout refuses; the fragment stays in the address bar; the order history is reached from the account overview only; a changed total after `cart_changed` needs confirmation unless the price notice's OK was given.
+- Step 8: `@playwright/test` pinned to 1.56.1 (its Chromium revision is the one installed in the sandbox); the suite runs a same-origin proxy that sets `X-Forwarded-For` with `TRUST_PROXY=1`, and a test-only header gives each test its own client address; the database name must end in `_e2e_test` and is wiped; one worker; the price change goes through the admin API; `@axe-core/playwright` not approved and not added.
+- Owner answers (section "Owner answers"): answer 3 (`requiresShipping`) is step 2; answer 4 (generator) is step 3, where the generator was not used (see above); answer 5 (Playwright) is step 8; answer 6 (no DOM library in component tests) is steps 4a and 4b; the other answers are in the steps named in their sections.
+
+### API gaps (the 16 rows of "API gaps found") at step 9
+| # | Status |
+|---|---|
+| 1 | done in step 2 (`requiresShipping`) |
+| 2 | open: no brands endpoint; the brand filter is links only (owner answer 11) |
+| 3 | open: sorting is newest first only (owner answer 10; search plan) |
+| 4 | open: no attribute, price, stock filters, facets or search (search plan, ADR 0005) |
+| 5 | open: no SEO fields on products or categories; metadata comes from title and description |
+| 6 | open: no slug redirects (a renamed slug is `404`) |
+| 7 | open: no update time on products; sitemap `lastmod` is `publishedAt` |
+| 8 | documented limit: `offset` at most 10 000; catalog and sitemap stop there (page 417 at 24 per page; 10 100 products in the sitemap) |
+| 9 | open: no catalog change events; 60 s time-based revalidation only |
+| 10 | open: list items have no compare-at price (sale badge on the product page only) |
+| 11 | done in step 2: the store `403` and the header are documented; `cart_changed.cart` is typed |
+| 12 | handled in the e2e suite (a per-test client address through the proxy); the API limits are unchanged |
+| 13 | open: no way to find a guest order without its link; no password reset (email plan) |
+| 14 | handled in the storefront (`src/config/checkout.ts`); no API change |
+| 15 | open, optional: the header still needs two requests (cart and account) per page load |
+| 16 | handled in the storefront: runtime check of the locales against `GET /store/config` (`lib/locale-check.ts`) |
+
+### Known gaps (copied from `docs/HANDOFF.md`, not fixed)
+- Findings of step 8 (`apps/storefront/e2e/README.md`, "Findings of step 8"; that text gives no severity):
+  - `Referrer-Policy` belongs to the document: after the client-side navigation from checkout to the order page, the lookup request carries the checkout document's policy (the `Referer` is the order URL without its fragment, so no token). A `<meta name="referrer">` on the order route would close it; not done.
+  - Before hydration the locale switcher's links have neither the query string nor the fragment; a click in that moment loses them.
+  - A failed sign-in clears the password field (the email stays); a second submit without retyping reports "Fill in this field".
+  - The 60 s data cache is kept on disk (`.next/cache/fetch-cache`): a storefront restarted within a minute of a re-seed shows the old variant ids.
+- Not verified in a browser (`apps/storefront/e2e/README.md`): screen readers, private browsing and blocked storage, the insecure-context refusal, the +/-, Update and remove buttons of a cart line, the account gate's redirect, sign-out, profile and password forms, order-history paging, other browsers and viewports, `next dev`, strict-mode double effects.
+- Storefront TODOs (`apps/storefront/README.md`, "Known limits and TODOs"): no link to the order history in the header (step 7); the cart is read once per page load, so a cart changed in another tab shows at the next write or navigation; no "empty the cart" button; the checkout form is not kept across reloads (on purpose); the product page does not show the selected variant's attributes; no `global-error.tsx`; no billing or recipient fields (decision); images are square crops.
+- Not built (out of scope of this plan): payment, shipping, email, search, the admin UI, a storefront image and a production deployment. The example reverse proxy configurations in `README.md` (Deployment notes) are not tested in this repository.
+
+### Verified and not verified
+- Step 9, on the branch (2026-10-19): `pnpm install --frozen-lockfile`, `pnpm format:check`, `pnpm lint` and `pnpm check:docs` (against `origin/main`) are run with their exit codes in the step 9 report; `playwright test --list` shows 17 tests in 9 files (listing only, nothing run); the README, HANDOFF and file-map claims were checked against the code and config (`next.config.ts`, `packages/config/src/storefront-env.ts`, `apps/storefront/e2e/proxy.ts`, `.env.example`, `docs/contracts/api.md`, `docs/api/cart.md`, `docs/api/orders.md`, the seeds).
+- Not verified in step 9: no service was started, no browser was run, `pnpm build` and `pnpm test` were not re-run, the Caddy and nginx examples were not run (neither is installed and the Docker daemon is not running), and the GitHub CI results (`e2e` job included) were not checked.
+- The verification of each step is in its own report and its PR; this file does not repeat it.

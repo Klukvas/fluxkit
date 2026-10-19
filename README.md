@@ -14,8 +14,10 @@ Sold as a template plus a team that adapts design and features for each client.
 
 ## Status
 
-Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog plan (`docs/plans/2026-10-14-catalog.md`): complete. Admin auth plan (`docs/plans/2026-10-16-auth-and-roles.md`): complete. Pricing and inventory plan (`docs/plans/2026-10-16-pricing-and-inventory.md`): complete. Cart, customers and orders plan (`docs/plans/2026-10-17-cart-and-orders.md`): steps 1 to 7 done (the API, the scheduler and the docs), step 8 (independent review) pending.
-**Not built yet**: payment and shipping providers (an admin marks an order paid by hand), email delivery (no password reset or email verification), search indexing, and the admin screens for orders and customers (the placeholder pages only). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
+Complete: the scaffold (`docs/plans/2026-10-14-monorepo-scaffold.md`), the catalog (`docs/plans/2026-10-14-catalog.md`), admin authentication (`docs/plans/2026-10-16-auth-and-roles.md`), pricing and inventory (`docs/plans/2026-10-16-pricing-and-inventory.md`), and the cart, customers and orders (`docs/plans/2026-10-17-cart-and-orders.md`, with its review fixes in `docs/plans/2026-10-18-cart-orders-review-fixes.md`, PRs #61 to #63).
+Storefront v1 (`docs/plans/2026-10-18-storefront.md`): steps 1 to 8 merged (PRs #66 to #77); step 9 (this docs sweep) is on its branch, PR pending; step 10 (independent review) is pending.
+
+**Not built yet**: payment and shipping providers (an admin marks an order paid by hand), email delivery (no password reset or email verification), search (no search index; the storefront has no search and no sort), the admin screens (the admin app shows placeholder pages only: no product, order or customer screens), and a production deployment (no API, storefront or admin image; see the example reverse proxy in Deployment notes). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
 
 - API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`, `0003_pricing_inventory`, `0004_cart_customers_orders`), BullMQ and Meilisearch spikes.
 - Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
@@ -24,8 +26,9 @@ Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog p
 - Customer accounts (`/store/account/*`: register, login, logout, profile, change password; separate cookie session, CSRF header on every `/store` write, lockout, rate limits) and admin customer management (`/admin/customers`, permissions `customers.read` and `customers.write`); no password reset or email verification yet: `docs/api/customers.md`.
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
 - Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token; at most `MAX_OPEN_ORDERS` unpaid orders per email or customer), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
-- Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 8): home, catalog and category pages, product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile; see `apps/storefront/README.md` and the Storefront walkthrough below; Playwright end-to-end tests of the purchase flow (`pnpm test:e2e`, `apps/storefront/e2e/README.md`). Admin: placeholder pages built from the shared UI and tokens (light and dark themes).
-- CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
+- Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 8 merged): home, catalog and category pages (brand filter, paging), product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile. Rendering and the same-origin rule: ADR 0026 and `apps/storefront/README.md`; the walkthrough is below. Playwright tests of the purchase flow (`pnpm test:e2e`, 17 tests in 9 files; `apps/storefront/e2e/README.md`).
+- Admin: placeholder pages built from the shared UI and tokens (light and dark themes).
+- CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test, and the Playwright `e2e` job of the storefront (step 8).
 
 Open decisions and next steps are listed at the end.
 
@@ -98,12 +101,61 @@ pnpm jobs:run-once     # = pnpm build && pnpm --filter @fluxkit/api jobs:run-onc
 
 ## Deployment notes: reverse proxy and rate limits
 
-The store rate limits (checkout, registration, login, order lookup, guest cancel) and the admin login limit count requests per client address (`request.ip`). The API trusts no proxy by default (`TRUST_PROXY=0`), so the address is the one that connects to it. Behind a reverse proxy, a CDN or the Next.js server calling the API from the server side, that address is the proxy's, and every shopper then shares ONE window: the whole shop would get, for example, 10 checkouts per 10 minutes.
+The store rate limits (checkout, registration, login, order lookup, guest cancel, cart writes) and the admin login limit count requests per client address (`request.ip`). The API trusts no proxy by default (`TRUST_PROXY=0`), so the address is the one that connects to it. Behind a reverse proxy or a CDN that address is the proxy's, and every shopper then shares ONE window: the whole shop would get, for example, 10 checkouts per 10 minutes. The catalog reads (`GET /store/products`, categories, config) are not rate limited, so the Next.js server's own catalog reads (through `API_INTERNAL_URL`) do not count against any window.
 
-- Set `TRUST_PROXY` to the **exact number of proxies** between the internet and the API (`1` for one nginx or one Next.js server, `2` for a CDN plus nginx, and so on; 0 to 10). Each of them must append the address it saw to `X-Forwarded-For` (nginx `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`; a Next.js server must forward the visitor's address the same way).
+- Set `TRUST_PROXY` to the **exact number of proxies** between the internet and the API (`1` for one edge proxy such as Caddy or nginx, `2` for a CDN plus nginx, and so on; 0 to 10). Each of them must set `X-Forwarded-For` to the address it saw, or append that address to the value it received (the examples below set it, which is the stricter choice). The Next.js server is not one of these hops for `/store/*`: in a deployment the edge proxy routes `/store/*` straight to the API, and the Next.js rewrite of development forwards the browser's own header unchanged (ADR 0026).
 - **Too high is a security hole:** the extra hops are read from the part of `X-Forwarded-For` the client controls, so a client can invent its address and dodge every limit. **Too low** keeps the shop-wide window. Check it after a deployment: from two different networks, a request to a limited route must be counted separately.
 - Keep the API reachable only through the proxy when `TRUST_PROXY` is above 0; otherwise anyone who can reach it directly can send the header themselves.
 - IPv6 clients are counted per /64 prefix after this step too. The counters are in memory per API process (ADR 0009, ADR 0016).
+
+### Example edge proxy: `/store/*` and `/admin/*` to the API, the rest to the storefront
+
+These examples are **not tested in this repository**: neither Caddy nor nginx is installed in the build sandbox, and no Docker daemon was running. The routing rule is the one of `apps/storefront/e2e/proxy.ts`, the tested reference: the Playwright suite runs that proxy with the same routes, sets `X-Forwarded-For` the same way and runs the API with `TRUST_PROXY=1`. Check the directives against your proxy's version.
+
+Matching settings: the API runs with `TRUST_PROXY=1`; `ADMIN_COOKIE_SECURE` and `STORE_COOKIE_SECURE` stay `true` (HTTPS); the storefront has `API_INTERNAL_URL=http://127.0.0.1:3000` and `STOREFRONT_PUBLIC_URL=https://shop.example.com`; `STOREFRONT_IMAGE_HOSTS` has the same value for `next build` and `next start`. The API (port 3000) and the storefront (port 3001) listen on loopback or a private network, so only the proxy is public. The admin UI is not built: `/admin/*` is the admin API.
+
+Caddy 2 (`Caddyfile`):
+
+```
+shop.example.com {
+	@api path /store/* /admin/*
+	handle @api {
+		# Caddy sets X-Forwarded-For to the address it saw. Since Caddy 2.5 a value sent by an untrusted client is replaced,
+		# not extended. Do NOT configure `trusted_proxies` for this site and do NOT delete the header with `header_up`:
+		# removing it would leave the API with no client address and bring back the shop-wide window.
+		reverse_proxy 127.0.0.1:3000
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+}
+```
+
+nginx (`server` block; the TLS directives are not shown):
+
+```
+server {
+    listen 443 ssl;
+    server_name shop.example.com;
+    # ssl_certificate and ssl_certificate_key: your certificate
+
+    # The API: /store/* (shop) and /admin/* (admin API). proxy_set_header replaces any value the client sent.
+    location ~ ^/(store|admin)/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Everything else: the storefront (next start).
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 
@@ -223,7 +275,7 @@ Click through cart -> checkout -> order page in a browser against a local API (d
 1. Quick start done (Compose services, `pnpm db:migrate`, `pnpm seed`), then `pnpm build` once.
 2. Root `.env`: `STORE_COOKIE_SECURE=false` (plain HTTP on localhost), `ORDER_TOKEN_SECRET` (32+ characters), `TRUST_PROXY=0`, `API_INTERNAL_URL=http://127.0.0.1:3000`, `STOREFRONT_PUBLIC_URL=http://localhost:3001`.
 3. Start the API: `pnpm --filter @fluxkit/api start` (port 3000).
-4. Start the storefront in development: `pnpm --filter @fluxkit/storefront dev -p 3001`. Its `next.config.ts` rewrites `/store/*` to `API_INTERNAL_URL` in `next dev` only, so the browser talks to ONE origin (the cookies have `Path=/store`, writes need `X-Fluxkit-CSRF`, the API sends no CORS headers). For `next start` (`pnpm --filter @fluxkit/storefront start -p 3001` after `pnpm build`) there is no rewrite: put a reverse proxy in front that sends `/store/*` to the API and everything else to Next, and that SETS `X-Forwarded-For` (Deployment notes).
+4. Start the storefront in development: `pnpm --filter @fluxkit/storefront dev -p 3001`. Its `next.config.ts` rewrites `/store/*` to `API_INTERNAL_URL` in `next dev` only, so the browser talks to ONE origin (the cookies have `Path=/store`, writes need `X-Fluxkit-CSRF`, the API sends no CORS headers). For `next start` (`pnpm --filter @fluxkit/storefront start -p 3001` after `pnpm build`) there is no rewrite: put a reverse proxy in front that sends `/store/*` to the API and everything else to Next, and that SETS `X-Forwarded-For` (Deployment notes, with example configurations). `next start` needs `API_INTERNAL_URL` and `STOREFRONT_PUBLIC_URL` (it runs with `NODE_ENV=production` unless that is set).
 5. Open `http://localhost:3001/uk`, open a product, add it to the cart, open the cart, then "Checkout". Fill in the contact fields (and the address: the demo hand tools and clothes need shipping, the demo e-book does not), then "Place the order".
 6. A guest lands on `/uk/order/<number>#t=<token>`: the token is in the URL fragment, which the browser never sends to a server. Save that link (it is the only way back; the page has a copy button); the order can be cancelled there while it awaits payment. A signed-in customer lands on `/uk/account/orders/<number>`; the history is under "My orders" on the account page.
 7. Nothing is paid online: the order waits as `awaiting_payment` until an admin marks it paid (`POST /admin/orders/{id}/mark-paid`, Checkout walkthrough above) or it expires.
@@ -244,6 +296,7 @@ Notes:
 | `pnpm check:boundaries` | module boundary rules (core must not import features, etc.); fails if nothing was checked |
 | `pnpm test` | builds, then runs Vitest in every package (needs the services above) |
 | `pnpm test:e2e` | builds, then runs the Playwright browser tests of the storefront (Chromium; needs the services above, a `*_e2e_test` database in `E2E_DATABASE_URL` that is wiped at every run, and `playwright install chromium` once); not part of `pnpm test`, see `apps/storefront/e2e/README.md` |
+| `pnpm db:migrate` | builds, then applies the pending migrations to `DATABASE_URL` (forward only, safe to repeat); see Database migrations |
 | `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
 | `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm admin:unlock --email <address>` | builds, then clears the failed-login counter and the lock of one admin user (nothing else changes); see Admin sign-in |
@@ -258,14 +311,14 @@ Notes:
 ```
 apps/api            NestJS API (REST + OpenAPI)
 apps/storefront     Next.js storefront (App Router, Tailwind, tokens, uk/en)
-apps/admin          React + Vite admin
+apps/admin          React + Vite admin (placeholder screens)
 packages/core       domain rules, pure TypeScript: catalog, money, pricing, stock, auth, cart and orders (shipping, discounts and tax not yet)
 packages/features   optional feature modules (sample: _example)
 packages/providers  payment and shipping provider plugins (none yet)
 packages/ui         token-based components and i18n helpers
 packages/theme      design tokens and their guard tests
-packages/config     env and feature flag parsing
-packages/api-client typed API client (empty scaffold)
+packages/config     env parsing (API and storefront) and feature flags
+packages/api-client typed store API client (hand-written types, checked against docs/api/openapi.json)
 seeds/              demo data and ProductType presets (pure data)
 infra/              Docker Compose for Postgres, Redis, Meilisearch
 scripts/            CI and policy scripts
@@ -276,9 +329,10 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0022 cart, customers, orders, the scheduler and the order schema (index with status in `docs/adr/README.md`).
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0026: cart, customers, orders, the scheduler, the order schema, guest order tokens, the open-order limit and `TRUST_PROXY`, the outbox and bounded jobs, the storefront architecture (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API, domain events and order ports).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
+- `apps/storefront/README.md` (rendering, configuration, checks) and `apps/storefront/e2e/README.md` (browser tests): the storefront.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
 
 ## Working with AI agents
@@ -294,6 +348,7 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Independent review of the cart, customers and orders plan (step 8 of `docs/plans/2026-10-17-cart-and-orders.md`, by a different agent than the author), then its follow-ups (listed in the plan Outcome and `docs/HANDOFF.md`).
-3. Next domain plans, each with its own plan file and approval: payment and shipping provider interfaces and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), email delivery (password reset, email verification, order mails), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), the storefront and admin screens for cart, checkout, accounts and orders. Known follow-ups: rate limiting for the catalog routes of `/store/*` (needs a dependency), auth follow-ups (audit log, two-factor, shared login throttle, `trust proxy`) listed in the auth plan outcome.
-4. Production: API/worker images, gate Swagger UI, Playwright e2e, branch protection on `main` with the CI checks required, pin GitHub Actions by commit SHA.
+2. Storefront step 10: an independent review by a different agent than the authors (XSS and token leakage, CSRF and same-origin assumptions, open redirect, idempotency, money formatting, i18n, accessibility, no API call at build). Its findings are fixed before the storefront plan closes (`docs/plans/2026-10-18-storefront.md`). The storefront's known gaps are in `docs/HANDOFF.md`.
+3. Next plans, each with its own plan file and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by item 1), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), the admin UI (products, orders, customers), and a privacy plan before the EU launch. Known follow-ups without a plan yet: rate limiting for the catalog routes of `/store/*` (needs a dependency), the auth follow-ups in the auth plan outcome, and the cart, customers and orders follow-ups in `docs/HANDOFF.md`.
+4. Production: API, storefront and admin images; the reverse proxy in front of the API and the storefront (the example in Deployment notes is not tested here); gate Swagger UI; branch protection on `main` with the CI checks required; pin GitHub Actions by commit SHA. The browser tests exist (`pnpm test:e2e`, CI job `e2e`); `@axe-core/playwright` is not approved.
+5. `AGENTS.md` (the owner's file) does not yet list `pnpm test:e2e`, `pnpm jobs:run-once`, the CI job `e2e` or the scheduler variables; the owner adds them (`docs/HANDOFF.md`).
