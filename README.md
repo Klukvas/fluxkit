@@ -120,10 +120,10 @@ Caddy 2 (`Caddyfile`):
 shop.example.com {
 	@api path /store/* /admin/*
 	handle @api {
-		reverse_proxy 127.0.0.1:3000 {
-			# Remove what the client sent; Caddy then sets X-Forwarded-For to the address it saw.
-			header_up -X-Forwarded-For
-		}
+		# Caddy sets X-Forwarded-For to the address it saw. Since Caddy 2.5 a value sent by an untrusted client is replaced,
+		# not extended. Do NOT configure `trusted_proxies` for this site and do NOT delete the header with `header_up`:
+		# removing it would leave the API with no client address and bring back the shop-wide window.
+		reverse_proxy 127.0.0.1:3000
 	}
 	handle {
 		reverse_proxy 127.0.0.1:3001
