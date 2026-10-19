@@ -29,6 +29,9 @@ describe("pickClientMessages", () => {
         "error.title",
         "errors.network",
         "notFound.title",
+        // The not-found view names its own page title in the browser (review L9).
+        "site.name",
+        "seo.pageTitle",
         "loading.page",
         "product.addToCart",
         "product.added",
