@@ -94,8 +94,10 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     );
     expect(calls.length).toBeGreaterThan(3);
     for (const call of calls) {
+      // `result.href` is the checkout outcome's link, built only by `guestOrderHref`, `accountOrderHref` or the cart path
+      // (`lib/checkout-attempt.ts`, tested there).
       expect(call.argument, `${call.path}: router.replace(${call.argument})`).toMatch(
-        /^(safeNextPath\(|localizedHref\(|signInHref$)/,
+        /^(safeNextPath\(|localizedHref\(|signInHref$|result\.href$)/,
       );
     }
     for (const file of sources) {
@@ -112,5 +114,68 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
         file.path !== join("lib", "cart-model.ts") && /cartNoticeMessageKey\(/.test(file.text),
     );
     expect(words.map((file) => file.path)).toEqual([join("components", "session-notices.tsx")]);
+  });
+
+  // Step 7: the checkout attempt and the guest order token (plan, "Guest order token", "Checkout idempotency").
+  const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
+
+  it("uses browser storage only for the checkout attempt (sessionStorage, a key and a hash), never localStorage or cookies", () => {
+    const storage = sources.filter((file) => /\bsessionStorage\b/.test(code(file.text)));
+    expect(storage.map((file) => file.path)).toEqual([join("components", "checkout-page.tsx")]);
+    expect(code(storage[0]?.text ?? "")).toMatch(
+      /sessionAttemptStorage\(\(\) => window\.sessionStorage\)/,
+    );
+    for (const file of sources) {
+      expect(code(file.text), file.path).not.toMatch(
+        /\b(localStorage|indexedDB)\b|document\.cookie/,
+      );
+    }
+  });
+
+  it("never sets the document title from the browser (the order page's title is fixed metadata)", () => {
+    for (const file of sources) expect(code(file.text), file.path).not.toMatch(/document\.title/);
+  });
+
+  it("reads the fragment only in the guest order page and the locale switcher, inside effects", () => {
+    const readers = sources.filter((file) => /location\.hash/.test(code(file.text)));
+    expect(readers.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "guest-order-page.tsx"),
+        join("components", "locale-switcher.tsx"),
+      ].sort(),
+    );
+    const page = sources.find((file) => file.path === join("components", "guest-order-page.tsx"));
+    expect(code(page?.text ?? "")).toMatch(
+      /useEffect\(\(\) => \{\s*const token = tokenFromFragment\(window\.location\.hash\);/,
+    );
+  });
+
+  it("sends the guest token only through the lookup and cancel bodies of one module", () => {
+    const callers = sources.filter((file) => /\.(lookupOrder|cancelOrder)\(/.test(code(file.text)));
+    expect(callers.map((file) => file.path)).toEqual([join("lib", "order-store.ts")]);
+    const routes = sources.filter((file) => file.path.includes(join("order", "[number]")));
+    expect(routes.length).toBeGreaterThan(0);
+    for (const route of routes) {
+      // The server shell never reads anything that could carry the token.
+      expect(code(route.text), route.path).not.toMatch(
+        /searchParams|headers\(|cookies\(|accessToken|token/i,
+      );
+    }
+  });
+
+  it("never logs a token, a link, a body or form values in the checkout and order code", () => {
+    const files = sources.filter((file) =>
+      /(^|\/)(checkout|order|guest-order|account-orders|locale-switcher)[^/]*\.tsx?$/.test(
+        file.path,
+      ),
+    );
+    expect(files.length).toBeGreaterThanOrEqual(8);
+    for (const file of files) {
+      for (const call of code(file.text).matchAll(/console\.\w+\([^;]*\)/gs)) {
+        expect(call[0], `${file.path} logs ${call[0]}`).not.toMatch(
+          /token|hash|href|link|body|values|email|phone/i,
+        );
+      }
+    }
   });
 });

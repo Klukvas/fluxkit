@@ -9,6 +9,7 @@ import {
   maxPage,
 } from "./catalog-query";
 import { categoryTrail, deepestTrail } from "./category-trail";
+import type { ShopMoney } from "./order-model";
 import type { CatalogOutcome, StoreData } from "./store-data";
 
 /**
@@ -35,6 +36,12 @@ function unwrap<T>(operation: string, outcome: CatalogOutcome<T>): T {
 /** `currencyExponent` of the shop for the client-rendered cart (`GET /store/config`, read through the same data cache). */
 export async function loadShopExponent(data: StoreData): Promise<number> {
   return unwrap("GET /store/config", await data.getConfig()).currencyExponent;
+}
+
+/** The shop currency with its digits: an order in another (older) currency is formatted with Intl's digits instead. */
+export async function loadShopMoney(data: StoreData): Promise<ShopMoney> {
+  const config = unwrap("GET /store/config", await data.getConfig());
+  return { currency: config.currency, exponent: config.currencyExponent };
 }
 
 export interface HomeData {

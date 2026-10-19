@@ -343,6 +343,8 @@ describe("AccountOverviewView", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
     const html = renderToStaticMarkup(view);
     expect(html).toContain('href="/uk/account/profile"');
+    expect(html).toContain('href="/uk/account/orders"');
+    expect(html).toContain("§account.overview.orders");
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 

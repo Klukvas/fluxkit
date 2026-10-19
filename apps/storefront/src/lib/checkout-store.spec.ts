@@ -302,6 +302,16 @@ describe("checkout store: the other outcomes", () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 
+  it("prepare() finds a missing secure context when the page opens, before any submit", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const insecure = await setup({ insecure: true });
+    insecure.checkout.prepare();
+    expect(insecure.checkout.getState().insecure).toBe(true);
+    const secure = await setup();
+    secure.checkout.prepare();
+    expect(secure.checkout.getState()).toEqual(initialCheckoutState);
+  });
+
   it("reports when the attempt could not be kept in sessionStorage (private mode): the page warns, the key still works", async () => {
     const { calls, checkout } = await setup({ storage: null });
     const first = checkout.submit(values(), { signedIn: false });

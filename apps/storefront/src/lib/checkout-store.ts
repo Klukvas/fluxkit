@@ -75,6 +75,8 @@ export interface CheckoutStoreOptions {
 export interface CheckoutStore {
   getState(): CheckoutState;
   subscribe(listener: () => void): () => void;
+  /** Creates the attempt manager when the page opens (browser only), so a missing secure context is shown before a submit. */
+  prepare(): void;
   submit(values: CheckoutValues, context: { signedIn: boolean }): Promise<SubmitResult>;
   /** The shopper accepts the cart and total shown after a `cart_changed`. */
   confirmTotal(): void;
@@ -189,6 +191,10 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
       return () => {
         listeners.delete(listener);
       };
+    },
+    prepare() {
+      const attempt = attempts();
+      if (attempt !== null && !attempt.isPersistent()) set({ attemptPersistent: false });
     },
     submit(values, context) {
       if (inFlight !== null) return inFlight;
