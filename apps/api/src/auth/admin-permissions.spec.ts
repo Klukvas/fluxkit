@@ -72,7 +72,11 @@ const ORDERS_ROUTES = [
   "POST /admin/orders/:id/mark-fulfilled",
 ];
 
+/** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */
+const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventory/reservations";
+
 function expectedPermission(method: string, pattern: string): AdminPermission {
+  if (`${method} ${pattern}` === RESERVATIONS_ROUTE) return "orders.read";
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
   if (ORDERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";

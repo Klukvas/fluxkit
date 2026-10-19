@@ -19,15 +19,22 @@ import {
   type LocationRow,
   type VariantStockRow,
 } from "../inventory.repository.js";
-import { toLevelResponse, toLocationResponse, toMovementResponse } from "./inventory.mapper.js";
+import {
+  toLevelResponse,
+  toLocationResponse,
+  toMovementResponse,
+  toReservationListItem,
+} from "./inventory.mapper.js";
 import type {
   AdjustmentBody,
   AdjustmentResponse,
   InventoryResponse,
   LevelResponse,
   ListMovementsQuery,
+  ListReservationsQuery,
   MovementResponse,
   ProductInventoryResponse,
+  ReservationListItem,
 } from "./inventory.schemas.js";
 import type { LocationListResponse } from "./locations.schemas.js";
 
@@ -112,6 +119,23 @@ export class InventoryService {
     await this.requireVariant(this.database, productId, variantId);
     const { rows, total } = await this.inventory.listMovementsPage(this.database, variantId, query);
     return toPage(rows.map(toMovementResponse), total, query);
+  }
+
+  /** The reservations of a variant in one status (default `active`), newest first, four statements in all. */
+  async listReservations(
+    productId: string,
+    variantId: string,
+    query: ListReservationsQuery,
+  ): Promise<Page<ReservationListItem>> {
+    await this.requireProduct(this.database, productId);
+    await this.requireVariant(this.database, productId, variantId);
+    const { rows, total } = await this.inventory.listReservationsPage(
+      this.database,
+      variantId,
+      query.status,
+      query,
+    );
+    return toPage(rows.map(toReservationListItem), total, query);
   }
 
   /**

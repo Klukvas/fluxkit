@@ -1,6 +1,7 @@
 import { Body, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiOperation, ApiParam } from "@nestjs/swagger";
+import { ApiOperation, ApiParam, ApiQuery } from "@nestjs/swagger";
 import { AdminController } from "../../auth/admin-controller.decorator.js";
+import { RequirePermission } from "../../auth/route-access.js";
 import type { AdminPrincipal } from "../../auth/admin-authenticator.js";
 import { CurrentAdmin } from "../../auth/current-admin.js";
 import {
@@ -17,14 +18,19 @@ import {
   adjustmentSchema,
   inventoryResponseSchema,
   listMovementsQuerySchema,
+  listReservationsQuerySchema,
   movementPageSchema,
   productInventoryResponseSchema,
+  RESERVATION_STATUSES,
+  reservationPageSchema,
   type AdjustmentBody,
   type AdjustmentResponse,
   type InventoryResponse,
   type ListMovementsQuery,
+  type ListReservationsQuery,
   type MovementResponse,
   type ProductInventoryResponse,
+  type ReservationListItem,
 } from "./inventory.schemas.js";
 
 const PRODUCT_PARAM = { name: "id", format: "uuid", description: "Product id." };
@@ -99,5 +105,30 @@ export class InventoryController {
     @Query(new ZodValidationPipe(listMovementsQuerySchema)) query: ListMovementsQuery,
   ): Promise<Page<MovementResponse>> {
     return this.inventory.listMovements(id, variantId, query);
+  }
+
+  @Get(":id/variants/:variantId/inventory/reservations")
+  @RequirePermission("orders.read")
+  @ApiOperation({
+    summary: "List the reservations of a variant in one status, newest first (needs orders.read)",
+    description:
+      "`status` defaults to `active`, the units held now. Each item links the order that holds it (`orderId`, `reference` = the order number); both are null for a hold no order owns. Needs `orders.read`, not `catalog.read`, because it links orders. Nothing about the buyer is returned.",
+  })
+  @ApiParam(PRODUCT_PARAM)
+  @ApiParam(VARIANT_PARAM)
+  @ApiPaginationQuery()
+  @ApiQuery({
+    name: "status",
+    required: false,
+    schema: { type: "string", enum: [...RESERVATION_STATUSES], default: "active" },
+  })
+  @ApiZodResponse(200, reservationPageSchema, "A page of reservations.")
+  @ApiProblemResponses(400, 404)
+  listReservations(
+    @Param("id", uuidParam("id")) id: string,
+    @Param("variantId", uuidParam("variantId")) variantId: string,
+    @Query(new ZodValidationPipe(listReservationsQuerySchema)) query: ListReservationsQuery,
+  ): Promise<Page<ReservationListItem>> {
+    return this.inventory.listReservations(id, variantId, query);
   }
 }
