@@ -76,4 +76,20 @@ describe("client bundle boundary", () => {
       }
     }
   });
+
+  it("makes the one cart read and the one session read of a page load in the session provider only", () => {
+    const clients = clientFiles.filter((file) => /createStoreClient\(/.test(file.text));
+    expect(clients.map((file) => file.path)).toEqual([join("components", "session-provider.tsx")]);
+  });
+
+  it("keeps the header islands from reading anything of their own (the badge shares the store's read)", () => {
+    for (const name of ["cart-badge.tsx", "account-link.tsx"]) {
+      const file = files.find((candidate) => candidate.path === join("components", name));
+      expect(file, name).toBeDefined();
+      expect(file?.text, name).not.toMatch(
+        /\.(refresh|start|add|setQuantity|remove|clear|acknowledge)\(/,
+      );
+      expect(file?.text, name).not.toMatch(/\bfetch\(|useEffect/);
+    }
+  });
 });

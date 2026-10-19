@@ -102,4 +102,15 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       expect(file.text, file.path).not.toMatch(/window\.location\s*(=|\.(href|assign|replace))/);
     }
   });
+
+  it("renders the cart notices of a sign-in in exactly one place, so they are shown once", () => {
+    const shell = sources.filter((file) => /<SessionNotices\b/.test(file.text));
+    expect(shell.map((file) => file.path)).toEqual([join("components", "site-shell.tsx")]);
+    expect(shell[0]?.text.match(/<SessionNotices\b/g)).toHaveLength(1);
+    const words = sources.filter(
+      (file) =>
+        file.path !== join("lib", "cart-model.ts") && /cartNoticeMessageKey\(/.test(file.text),
+    );
+    expect(words.map((file) => file.path)).toEqual([join("components", "session-notices.tsx")]);
+  });
 });
