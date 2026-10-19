@@ -21,7 +21,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(sources.length).toBeGreaterThan(30);
   });
 
-  it("gives every <form> method=\"post\", so a submit before hydration never puts a password or personal data into a URL", () => {
+  it('gives every <form> method="post", so a submit before hydration never puts a password or personal data into a URL', () => {
     // Until React hydrates, the browser submits natively; a form without a method uses GET and the values land in the address
     // bar, the history, access logs and the Referer of later requests. Allow-list: none (every form holds personal data or a quantity).
     const uiRoot = join(root, "..", "..", "..", "packages", "ui", "src");
@@ -30,7 +30,10 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       text: readFileSync(path, "utf8"),
     }));
     const forms = [...sources, ...uiSources].flatMap((file) =>
-      [...file.text.matchAll(/<form\b(?:[^>]|=>)*>/g)].map((match) => ({ path: file.path, tag: match[0] })),
+      [...file.text.matchAll(/<form\b(?:[^>]|=>)*>/g)].map((match) => ({
+        path: file.path,
+        tag: match[0],
+      })),
     );
     expect(forms.length).toBeGreaterThanOrEqual(6);
     for (const form of forms) {
