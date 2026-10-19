@@ -167,6 +167,26 @@ describe("checkout store: one attempt per body", () => {
     expect(checkout.getState().pending).toBe(true);
   });
 
+  it("a request that hits the time limit frees the form, says so, and the retry sends the SAME key (review M1)", async () => {
+    const { calls, checkout, map } = await setup();
+    const first = checkout.submit(values(), { signedIn: false });
+    const [hung] = await sentCheckouts(calls, 1);
+    const key = keyOf(hung);
+    // What `fetch` rejects with when `AbortSignal.timeout` fires.
+    hung?.fail(new DOMException("The operation timed out.", "TimeoutError"));
+    expect(await first).toMatchObject({
+      kind: "retry",
+      attempt: "keep",
+      failure: { messageKey: "errors.timeout" },
+    });
+    expect(checkout.getState().pending).toBe(false);
+    expect(map.has(ATTEMPT_STORAGE_KEY)).toBe(true);
+
+    void checkout.submit(values(), { signedIn: false });
+    const sent = await sentCheckouts(calls, 2);
+    expect(keyOf(sent[1])).toBe(key);
+  });
+
   it("rethrows an aborted request or a bug, and frees the form (never a silent failure)", async () => {
     const { calls, checkout } = await setup();
     const first = checkout.submit(values(), { signedIn: false });

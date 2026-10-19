@@ -41,6 +41,7 @@ describe("problem message map", () => {
       ...FIELD_ERROR_CODES.map((code) => `errors.field.${code}`),
       "errors.generic",
       "errors.network",
+      "errors.timeout",
       "errors.invalidResponse",
     ];
     for (const locale of locales) {
@@ -60,6 +61,7 @@ describe("problem message map", () => {
       "errors.field.shipping_address_required",
     );
     expect(transportErrorMessageKey("network")).toBe("errors.network");
+    expect(transportErrorMessageKey("timeout")).toBe("errors.timeout");
   });
 
   it("falls back to the code's own message for an unknown rule, and to the generic message for an unknown code", () => {

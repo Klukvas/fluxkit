@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -55,6 +56,25 @@ const pairs: [string, string, number][] = [
   ["danger", "muted", textMinimum],
   ["success", "muted", textMinimum],
   ["warning", "muted", textMinimum],
+  // Used by components, once missing from this list (review M3): a rebrand could break them unnoticed.
+  ["muted-foreground", "background", textMinimum],
+  ["foreground", "muted", textMinimum],
+  ["ring", "muted", nonTextMinimum],
+  ["primary", "background", nonTextMinimum],
+  ["primary", "muted", nonTextMinimum],
+  // WCAG 1.4.11: the border that identifies an input, textarea, select or checkbox. `border` stays decorative.
+  ["border-input", "background", nonTextMinimum],
+  ["border-input", "muted", nonTextMinimum],
+];
+
+// Pairs components use on purpose WITHOUT a contrast requirement, each with its reason.
+const decorative: [string, string, string][] = [
+  [
+    "border",
+    "background",
+    "outline of cards, badges, buttons and dividers: the content is identified by its text, not by the line",
+  ],
+  ["border", "muted", "outline of cards and alerts"],
 ];
 
 describe("contrast helper", () => {
@@ -87,4 +107,91 @@ describe("token contrast (WCAG 2.x)", () => {
       });
     }
   }
+});
+
+// Every foreground/background pair the components use must be listed above (or be decorative with a reason). Found by reading
+// the class strings of packages/ui and apps/storefront: in a string with a `bg-<token>` the pair is (text/border/outline/ring
+// token, that background); without one it is the page `background`. A pair of a token with itself (a selected option's
+// primary border on a primary fill) has no contrast to measure.
+const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+const colorTokens = [...tokenValues(lightBlock).keys()].map((name) =>
+  name.replace("--fk-color-", ""),
+);
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    return /\.tsx?$/.test(entry) && !/\.spec\.tsx?$/.test(entry) ? [full] : [];
+  });
+}
+
+/** Exported for its own test below. */
+export function usedPairs(source: string, tokens: readonly string[]): Set<string> {
+  const used = new Set<string>();
+  // Longest names first, so `muted-foreground` is not read as `muted`.
+  const ordered = [...tokens].sort((a, b) => b.length - a.length);
+  const read = (classes: string[], prefix: string): string[] =>
+    classes.flatMap((name) => {
+      const bare = name.split(":").pop() as string;
+      for (const token of ordered) {
+        if (bare === `${prefix}-${token}` || bare.startsWith(`${prefix}-${token}/`)) return [token];
+      }
+      return [];
+    });
+  for (const match of source.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.)*)\1/g)) {
+    const classes = (match[2] as string).split(/\s+/);
+    const foregrounds = ["text", "border", "outline", "ring"].flatMap((prefix) =>
+      read(classes, prefix),
+    );
+    if (foregrounds.length === 0) continue;
+    const backgrounds = read(classes, "bg");
+    for (const foreground of foregrounds) {
+      for (const background of backgrounds.length === 0 ? ["background"] : backgrounds) {
+        if (foreground !== background) used.add(`${foreground} on ${background}`);
+      }
+    }
+  }
+  return used;
+}
+
+describe("pairs the components use", () => {
+  const covered = new Set([
+    ...pairs.map(([foreground, background]) => `${foreground} on ${background}`),
+    ...decorative.map(([foreground, background]) => `${foreground} on ${background}`),
+  ]);
+
+  it("reads class strings (the scanner itself)", () => {
+    expect(
+      [
+        ...usedPairs(
+          `"bg-muted text-muted-foreground hover:border-danger/50 text-sm"`,
+          colorTokens,
+        ),
+      ].sort(),
+    ).toEqual(["danger on muted", "muted-foreground on muted"].sort());
+    expect([...usedPairs(`"text-foreground outline-ring"`, colorTokens)].sort()).toEqual([
+      "foreground on background",
+      "ring on background",
+    ]);
+    expect([...usedPairs(`"bg-primary border-primary"`, colorTokens)]).toEqual([]);
+  });
+
+  it("finds the pairs of the real components", () => {
+    const found = new Set(
+      ["packages/ui/src", "apps/storefront/src"].flatMap((root) =>
+        sourceFiles(join(repoRoot, root)).flatMap((file) => [
+          ...usedPairs(readFileSync(file, "utf8"), colorTokens),
+        ]),
+      ),
+    );
+    expect(found.has("foreground on background")).toBe(true);
+    expect(found.has("muted-foreground on background")).toBe(true);
+    expect(found.has("border-input on background")).toBe(true);
+    const uncovered = [...found].filter((pair) => !covered.has(pair));
+    expect(
+      uncovered,
+      "add these pairs to `pairs` (with a minimum) or to `decorative` (with a reason)",
+    ).toEqual([]);
+  });
 });

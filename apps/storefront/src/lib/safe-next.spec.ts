@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authHref, loginHref, safeNextPath } from "./safe-next";
+import { authHref, currentPath, loginHref, safeNextPath } from "./safe-next";
 
 describe("safeNextPath", () => {
   it.each([
@@ -53,6 +53,13 @@ describe("safeNextPath", () => {
     ["/uk/account/login", "the login page itself (a redirect loop)"],
     ["/uk/account/login?next=/uk/cart", "the login page with a query"],
     ["/uk/account/register", "the register page"],
+    ["/uk/account/login/", "the login page with a trailing slash (Next serves it too)"],
+    ["/uk/account/register/", "the register page with a trailing slash"],
+    ["/uk/account/login/?next=/uk/cart", "the login page with a trailing slash and a query"],
+    ["/uk/account/%6Cogin", "the login page with an encoded letter"],
+    ["/uk/account/%6cogin/", "the login page with an encoded letter and a trailing slash"],
+    ["/uk/account/./login", "the login page behind a dot segment"],
+    ["/uk/account/%2e/register", "the register page behind an encoded dot segment"],
   ])("falls back to the account page for %s (%s)", (value) => {
     expect(safeNextPath(value, "uk")).toBe("/uk/account");
   });
@@ -70,6 +77,85 @@ describe("safeNextPath", () => {
   it("accepts the other locale's paths only on that locale's pages", () => {
     expect(safeNextPath("/en/cart", "en")).toBe("/en/cart");
     expect(safeNextPath("/uk/cart", "en")).toBe("/en/account");
+  });
+});
+
+describe("safeNextPath keeps paths that only look like an auth page", () => {
+  it.each([
+    "/uk/account/login-help",
+    "/uk/account/loginx",
+    "/uk/account/orders/login",
+    "/uk/account/login/x",
+    "/uk/account/orders/?page=2",
+    "/uk/account/",
+  ])("keeps %s", (path) => {
+    expect(safeNextPath(path, "uk")).toBe(path);
+  });
+});
+
+describe("safeNextPath, whatever it returns stays on the storefront (property)", () => {
+  // The URL parser is the judge of the final answer: parse what comes back and check origin, locale and the auth pages. A
+  // deterministic generator over the characters that matter to URL parsing, so a check removed from the string rules fails here.
+  const alphabet = [
+    "/",
+    "/",
+    ".",
+    "..",
+    "%",
+    "2",
+    "e",
+    "5",
+    "c",
+    "f",
+    "\\",
+    "#",
+    "?",
+    "\t",
+    " ",
+    "a",
+    "login",
+    "account",
+  ];
+  function next(seed: number): number {
+    return (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+  }
+
+  it("never returns an off-site, off-locale or auth-page URL for 20000 generated values", () => {
+    let seed = 20_251_018;
+    for (let round = 0; round < 20_000; round += 1) {
+      let value = round % 2 === 0 ? "/uk/" : "/";
+      const length = 1 + (round % 9);
+      for (let index = 0; index < length; index += 1) {
+        seed = next(seed);
+        value += alphabet[seed % alphabet.length] as string;
+      }
+      const result = safeNextPath(value, "uk");
+      const parsed = new URL(result, "http://storefront.invalid");
+      expect(parsed.origin, value).toBe("http://storefront.invalid");
+      expect(parsed.pathname.startsWith("/uk/"), value).toBe(true);
+      expect(parsed.pathname.replace(/\/+$/, ""), value).not.toMatch(
+        /^\/uk\/account\/(login|register)$/,
+      );
+      expect(result.includes("\\"), value).toBe(false);
+    }
+  });
+});
+
+describe("currentPath", () => {
+  it("joins the path and its query string, so the page the visitor was on is restored", () => {
+    expect(currentPath("/uk/account/orders", "?page=3")).toBe("/uk/account/orders?page=3");
+    expect(currentPath("/uk/account/orders", "")).toBe("/uk/account/orders");
+    expect(currentPath("/uk/account/orders", "?")).toBe("/uk/account/orders");
+  });
+
+  it("goes through the same safe rules: the gate's link keeps a safe query and drops an unsafe one", () => {
+    expect(loginHref("uk", currentPath("/uk/account/orders", "?page=3"))).toBe(
+      "/uk/account/login?next=%2Fuk%2Faccount%2Forders%3Fpage%3D3",
+    );
+    expect(loginHref("uk", currentPath("/uk/account/orders", "?x=//evil.com"))).toBe(
+      "/uk/account/login",
+    );
+    expect(loginHref("uk", currentPath("/uk/account/orders", "?p=a#b"))).toBe("/uk/account/login");
   });
 });
 

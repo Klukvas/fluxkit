@@ -4,5 +4,5 @@
 - `src/tailwind.css` - maps tokens to Tailwind semantic utilities (`success`, `warning` and `ring` included).
 - `src/index.ts` - theme names and default.
 - `src/theme.spec.ts` - tokens are identical across themes, every mapped token exists, every color token is mapped.
-- `src/contrast.spec.ts` - WCAG 2.x contrast of the documented token pairs in both themes (`docs/contracts/theme-tokens.md`).
+- `src/contrast.spec.ts` - WCAG 2.x contrast of the documented token pairs in both themes (`docs/contracts/theme-tokens.md`), including `border-input` (3:1), and a scan of the class strings of `packages/ui` and `apps/storefront` that fails when a component uses a color pair that is neither listed nor declared decorative.
 - `src/design-guard.spec.ts` - fails if `packages/ui`, `apps/storefront` or `apps/admin` contain hex/rgb colors, Tailwind palette colors, color utilities that are not token names, arbitrary values or inline styles; also checks that its own patterns catch known violations.

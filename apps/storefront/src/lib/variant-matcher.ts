@@ -14,6 +14,14 @@ export type Selection = Readonly<Record<string, string>>;
 
 type MatcherProduct = Pick<ProductDetail, "options" | "variants">;
 
+/**
+ * The value chosen for an option, or `undefined`. Option codes are data (`constructor`, `__proto__` and `toString` are valid
+ * codes), so only OWN properties count: a plain lookup would find the inherited member of `Object.prototype`.
+ */
+export function chosenValue(selection: Selection, optionCode: string): string | undefined {
+  return Object.hasOwn(selection, optionCode) ? selection[optionCode] : undefined;
+}
+
 function valueOf(variant: ProductVariant, optionCode: string): string | undefined {
   return variant.optionValues.find((entry) => entry.optionCode === optionCode)?.valueCode;
 }
@@ -31,7 +39,7 @@ export function findVariant(product: MatcherProduct, selection: Selection): Prod
   if (product.options.length === 0) {
     return product.variants.length === 1 ? (product.variants[0] ?? null) : null;
   }
-  const chosen = product.options.map((option) => selection[option.code]);
+  const chosen = product.options.map((option) => chosenValue(selection, option.code));
   if (chosen.some((value) => value === undefined)) return null;
   return (
     product.variants.find((variant) =>
@@ -50,7 +58,7 @@ function existsWithPrefix(
   return product.variants.some((variant) => {
     for (let earlier = 0; earlier < index; earlier += 1) {
       const code = (product.options[earlier] as { code: string }).code;
-      const wanted = selection[code];
+      const wanted = chosenValue(selection, code);
       if (wanted !== undefined && valueOf(variant, code) !== wanted) return false;
     }
     return valueOf(variant, (product.options[index] as { code: string }).code) === valueCode;
@@ -82,12 +90,13 @@ export function initialSelection(product: MatcherProduct): Selection {
     product.variants.find((variant) => variant.availability !== "out_of_stock") ??
     product.variants[0];
   if (chosen === undefined) return {};
-  const selection: Record<string, string> = {};
-  for (const option of product.options) {
-    const value = valueOf(chosen, option.code);
-    if (value !== undefined) selection[option.code] = value;
-  }
-  return selection;
+  // `fromEntries` defines own properties; `selection[code] = value` with the code `__proto__` would set the prototype instead.
+  return Object.fromEntries(
+    product.options.flatMap((option) => {
+      const value = valueOf(chosen, option.code);
+      return value === undefined ? [] : [[option.code, value] as const];
+    }),
+  );
 }
 
 /**
@@ -102,26 +111,33 @@ export function selectValue(
 ): Selection {
   const index = product.options.findIndex((option) => option.code === optionCode);
   if (index < 0 || !isValueAvailable(product, selection, optionCode, valueCode)) return selection;
-  const next: Record<string, string> = { ...selection, [optionCode]: valueCode };
+  const next = new Map<string, string>(Object.entries({ ...selection, [optionCode]: valueCode }));
   for (let later = index + 1; later < product.options.length; later += 1) {
     const option = product.options[later] as { code: string; values: { code: string }[] };
-    const current = next[option.code];
-    if (current !== undefined && existsWithPrefix(product, next, later, current)) continue;
+    const current = next.get(option.code);
+    if (current !== undefined && existsWithPrefix(product, asSelection(next), later, current)) {
+      continue;
+    }
     const replacement = option.values.find((value) =>
-      existsWithPrefix(product, next, later, value.code),
+      existsWithPrefix(product, asSelection(next), later, value.code),
     );
     // Always found: the earlier values exist in some variant, and every variant has a value for this option. If the data
     // ever breaks that, the stale value stays and `findVariant` answers null, which the page shows as "no such variant".
-    if (replacement !== undefined) next[option.code] = replacement.code;
+    if (replacement !== undefined) next.set(option.code, replacement.code);
   }
-  return next;
+  return asSelection(next);
+}
+
+/** A selection with the entries of `map` as own properties (also for the code `__proto__`). */
+function asSelection(map: ReadonlyMap<string, string>): Selection {
+  return Object.fromEntries(map);
 }
 
 /** Ids of the selected option values, in option order (media can belong to one: `ProductMedia.optionValueId`). */
 export function selectedValueIds(product: MatcherProduct, selection: Selection): string[] {
   const ids: string[] = [];
   for (const option of product.options) {
-    const code = selection[option.code];
+    const code = chosenValue(selection, option.code);
     const value = option.values.find((candidate) => candidate.code === code);
     if (value !== undefined) ids.push(value.id);
   }

@@ -7,6 +7,8 @@ import type { Messages } from "@fluxkit/ui";
  */
 export const CLIENT_MESSAGE_PREFIXES = [
   "nav.",
+  "site.",
+  "seo.",
   "locale.",
   "error.",
   "errors.",

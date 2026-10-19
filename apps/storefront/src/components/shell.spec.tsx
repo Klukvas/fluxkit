@@ -264,6 +264,8 @@ describe("status views", () => {
   it("renders the not-found and loading states from messages", () => {
     const notFound = renderToStaticMarkup(<NotFoundView t={t} homeHref="/en" />);
     expect(notFound).toContain("§notFound.title");
+    // Its own page title (the layout's generateMetadata title is the generic site title): React hoists <title> to the head.
+    expect(notFound).toMatch(/<title>[^<]*§seo\.pageTitle[^<]*<\/title>/);
     expect(notFound).toContain('href="/en"');
     expect(leftoverText(notFound)).toBe("");
     const loading = renderToStaticMarkup(<LoadingView t={t} />);

@@ -88,6 +88,7 @@
   "product.variantUnavailable": "This combination does not exist. Choose other values.",
   "errors.generic": "The action could not be completed. Please try again.",
   "errors.network": "Cannot reach the server. Check your connection and try again.",
+  "errors.timeout": "The server took too long to answer. Please try again.",
   "errors.invalidResponse": "The server answered unexpectedly. Please try again later.",
   "errors.validation_failed": "Please check the data you entered.",
   "errors.unauthorized": "Sign in to continue.",

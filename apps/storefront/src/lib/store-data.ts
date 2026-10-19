@@ -12,6 +12,7 @@ import {
   type StoreResult,
 } from "@fluxkit/api-client";
 import { assertLocalesSupported } from "./locale-check";
+import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 
 /**
  * Server-side reads of the public catalog (ADR 0026): the Next server calls the API directly at `API_INTERNAL_URL`, never
@@ -53,11 +54,27 @@ export interface StoreDataDependencies {
   /** The Next `connection()`: a catalog fetch never runs while Next prerenders (the build must not need the API). */
   beforeRequest?: () => Promise<unknown>;
   fetch?: FetchLike;
+  /** Longest a catalog read may take; `SERVER_READ_TIMEOUT_MS` by default. */
+  readTimeoutMs?: number;
 }
 
 export interface ReadOptions {
   /** Data cache lifetime of this read; the default is `CATALOG_REVALIDATE_SECONDS`. */
   revalidateSeconds?: number;
+  /** Keep this read out of the Next data cache (`cache: "no-store"`). Set for reads whose URL holds a free value. */
+  noStore?: boolean;
+}
+
+type ProductListQuery = Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">;
+
+/**
+ * Whether a product list may enter the Next data cache. `next start` writes every cached answer to `.next/cache/fetch-cache`
+ * and never deletes one, so the cache key space must be bounded: the brand filter is a free slug the visitor chooses (there
+ * is no brand list to validate it against), so every distinct value would add a file. Everything else in a list URL is
+ * bounded: the locale, a category that exists (the page checks it first), the page size and an offset below the API's cap.
+ */
+export function isCacheableProductQuery(query: ProductListQuery): boolean {
+  return query.brand === undefined;
 }
 
 export interface StoreData {
@@ -65,7 +82,7 @@ export interface StoreData {
   listCategories(locale: string, read?: ReadOptions): Promise<CatalogOutcome<CategoryList>>;
   listProducts(
     locale: string,
-    options?: Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">,
+    options?: ProductListQuery,
     read?: ReadOptions,
   ): Promise<CatalogOutcome<ProductList>>;
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
@@ -97,12 +114,18 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     });
     const options: CallOptions = {
-      fetchOptions: {
-        next: {
-          revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,
-          tags: [STORE_TAGS.all, tag],
-        },
-      },
+      // A hung API ends here (review M1) and the last good copy or error.tsx takes over, instead of after undici's 300 s.
+      signal: AbortSignal.timeout(dependencies.readTimeoutMs ?? SERVER_READ_TIMEOUT_MS),
+      // Next warns when both `cache: "no-store"` and `next.revalidate` are given, so a no-store read carries only the first.
+      fetchOptions:
+        read.noStore === true
+          ? { cache: "no-store" }
+          : {
+              next: {
+                revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,
+                tags: [STORE_TAGS.all, tag],
+              },
+            },
     };
 
     let failure: unknown;
@@ -148,7 +171,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         "GET /store/products",
         `products:${locale}:${JSON.stringify(query)}`,
         STORE_TAGS.products,
-        read,
+        isCacheableProductQuery(query) ? read : { ...read, noStore: true },
         (client, options) => client.listProducts({ ...query, ...options, locale }),
       ),
     getProduct: (locale, slug) =>
@@ -162,8 +185,35 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
   };
 }
 
+/** Longest cause chain written to a log line (also stops a cycle). */
+const MAX_CAUSE_DEPTH = 5;
+
+/**
+ * The failure for a log line: its message (the client's messages name the operation only) and the NAME and CODE of every
+ * cause, so a timeout (`TimeoutError`) and a refused connection (`ECONNREFUSED`) read differently. Causes' messages are
+ * left out on purpose: undici puts addresses and URLs in them (AGENTS.md section 11).
+ */
 function describe(failure: unknown): string {
-  return failure instanceof Error ? failure.message : String(failure);
+  const head = failure instanceof Error ? failure.message : String(failure);
+  const causes: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = failure instanceof Error ? failure.cause : undefined;
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    if (causes.length >= MAX_CAUSE_DEPTH) break;
+    seen.add(current);
+    if (typeof current !== "object") {
+      causes.push(typeof current);
+      break;
+    }
+    const { name, code } = current as { name?: unknown; code?: unknown };
+    causes.push(
+      [typeof name === "string" ? name : "unknown", typeof code === "string" ? code : null]
+        .filter((part) => part !== null)
+        .join(" "),
+    );
+    current = (current as { cause?: unknown }).cause;
+  }
+  return causes.length === 0 ? head : `${head} [cause: ${causes.join(" <- ")}]`;
 }
 
 /**

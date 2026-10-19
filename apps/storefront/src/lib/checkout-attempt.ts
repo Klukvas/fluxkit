@@ -13,11 +13,14 @@ import { fieldErrorMessageKey } from "./problem-messages";
 /**
  * The checkout attempt (plan, "Checkout idempotency and retries"; ADR 0026 point 5, ADR 0023).
  *
- * One attempt `{key, requestHash}` lives in `sessionStorage`: the `Idempotency-Key` of `POST /store/checkout` and the
- * SHA-256 of the canonical request body (which holds the expected total). The same body reuses the key, so a double
- * submit, a retry after a network error and a reload of the tab are ONE attempt: the API answers a repeat with `200` and
- * the same order and token. A different body (another email, address, or a new total after a price change) gets a new
- * random key. Nothing personal is stored: the hash cannot be turned back into the body.
+ * One attempt `{key, salt, requestHash}` lives in `sessionStorage`: the `Idempotency-Key` of `POST /store/checkout`, a
+ * random salt, and the SHA-256 of the salt and the canonical request body (which holds the expected total). The same body
+ * reuses the key, so a double submit, a retry after a network error and a reload of the tab are ONE attempt: the API
+ * answers a repeat with `200` and the same order and token. A different body (another email, address, or a new total after
+ * a price change) gets a new random key and a new salt. Nothing personal is stored: the hash cannot be turned back into the
+ * body, and the per-attempt salt means it cannot be used to CONFIRM a guess of the email, phone or address either (an
+ * unsalted hash of a guessable body could be compared with candidates, or precomputed); the salt is random, not secret
+ * from a reader of the same storage entry, so a targeted guess still costs one hash per candidate and needs the entry.
  *
  * Secure context: `crypto.randomUUID` and `crypto.subtle` exist only on HTTPS and `localhost`. Without them the checkout
  * refuses to submit (`InsecureContextError`, a translated message); it never falls back to a weaker key such as
@@ -30,6 +33,8 @@ export const ATTEMPT_STORAGE_KEY = "fluxkit.checkoutAttempt";
 
 export interface CheckoutAttempt {
   key: string;
+  /** Random per attempt (`crypto.randomUUID`), stored next to the hash. */
+  salt: string;
   requestHash: string;
 }
 
@@ -104,11 +109,17 @@ export function canonicalJson(value: unknown): string {
 }
 
 /**
- * The hash of the request: the whole body and, named on its own, the expected total (it is in the body too; naming it
- * keeps the rule "a new total is a new attempt" visible even if the body shape changes).
+ * The salted hash of the request: the salt, then the whole body and, named on its own, the expected total (it is in the body
+ * too; naming it keeps the rule "a new total is a new attempt" visible even if the body shape changes).
  */
-export function requestHash(body: CheckoutBody, crypto: AttemptCrypto): Promise<string> {
-  return crypto.sha256Hex(canonicalJson({ request: body, expectedTotal: body.expectedTotal }));
+export function requestHash(
+  body: CheckoutBody,
+  crypto: AttemptCrypto,
+  salt: string,
+): Promise<string> {
+  return crypto.sha256Hex(
+    `${salt}\n${canonicalJson({ request: body, expectedTotal: body.expectedTotal })}`,
+  );
 }
 
 function parseAttempt(text: string | null): CheckoutAttempt | null {
@@ -121,9 +132,11 @@ function parseAttempt(text: string | null): CheckoutAttempt | null {
   }
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
-  if (Object.keys(record).length !== 2) return null;
-  const { key, requestHash: hash } = record;
-  return typeof key === "string" && typeof hash === "string" ? { key, requestHash: hash } : null;
+  if (Object.keys(record).length !== 3) return null;
+  const { key, salt, requestHash: hash } = record;
+  return typeof key === "string" && typeof salt === "string" && typeof hash === "string"
+    ? { key, salt, requestHash: hash }
+    : null;
 }
 
 export interface AttemptManager {
@@ -168,10 +181,17 @@ export function createAttemptManager(options: {
 
   return {
     async keyFor(body) {
-      const hash = await requestHash(body, crypto);
       const kept = read();
-      if (kept !== null && kept.requestHash === hash) return kept.key;
-      const attempt = { key: crypto.randomUUID(), requestHash: hash };
+      // The kept attempt's own salt: the same body gives the same hash, so it keeps its key.
+      if (kept !== null && kept.requestHash === (await requestHash(body, crypto, kept.salt))) {
+        return kept.key;
+      }
+      const salt = crypto.randomUUID();
+      const attempt = {
+        key: crypto.randomUUID(),
+        salt,
+        requestHash: await requestHash(body, crypto, salt),
+      };
       write(attempt);
       return attempt.key;
     },

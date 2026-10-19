@@ -1,5 +1,6 @@
 import { InvalidResponseError, NetworkError, type StoreFailure } from "@fluxkit/api-client";
 import type { Translator } from "@fluxkit/ui";
+import { isTimeout } from "./request-timeout";
 import {
   fieldErrorMessageKey,
   problemMessageKey,
@@ -70,13 +71,14 @@ export function failureFromResult(result: StoreFailure): Failure {
 }
 
 /**
- * A request that threw. A network failure and an unreadable answer are failures the shopper can retry; an abort and every
- * other error (a bug, `InvalidRequestError`) are rethrown, loud, never shown as a friendly message.
+ * A request that threw. A network failure, a timeout (`request-timeout.ts`) and an unreadable answer are failures the
+ * shopper can retry; a caller's own abort and every other error (a bug, `InvalidRequestError`) are rethrown, loud, never
+ * shown as a friendly message.
  */
 export function failureFromThrown(error: unknown): Failure {
-  if (error instanceof NetworkError && !error.aborted) {
+  if (error instanceof NetworkError && (!error.aborted || isTimeout(error))) {
     return {
-      messageKey: transportErrorMessageKey("network"),
+      messageKey: transportErrorMessageKey(isTimeout(error) ? "timeout" : "network"),
       status: null,
       code: null,
       retryAfterSeconds: null,

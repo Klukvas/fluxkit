@@ -34,6 +34,8 @@ export function ErrorView({
 export function NotFoundView({ t, homeHref }: { t: Translator; homeHref: string }) {
   return (
     <Container className="flex flex-col items-start gap-3 py-12">
+      {/* A client-rendered not-found cannot export metadata, so it names itself: React hoists <title> into the head. */}
+      <title>{t("seo.pageTitle", { title: t("notFound.title"), site: t("site.name") })}</title>
       <h1 className="text-2xl font-bold text-foreground">{t("notFound.title")}</h1>
       <p className="text-muted-foreground">{t("notFound.description")}</p>
       <Link href={homeHref} className={`${linkButton} mt-2`}>

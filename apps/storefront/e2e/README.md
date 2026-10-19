@@ -24,11 +24,11 @@ Redis and Meilisearch are required by the API at start-up (the same variables as
 
 `e2e/playwright.config.ts` starts three web servers (it never reuses a running one) and waits until they answer:
 
-| Server | Port | Command |
-|---|---|---|
-| API (built, `apps/api/dist/main.js`) | 3100 | `e2e/prepare-database.ts` first, then the API |
-| Storefront (built, `next start`) | 3101 | `.next/cache/fetch-cache` is deleted first (see Troubleshooting) |
-| Proxy (`e2e/proxy.ts`, the only origin a browser sees) | 3102 | `node --experimental-strip-types e2e/proxy.ts` |
+| Server                                                 | Port | Command                                                          |
+| ------------------------------------------------------ | ---- | ---------------------------------------------------------------- |
+| API (built, `apps/api/dist/main.js`)                   | 3100 | `e2e/prepare-database.ts` first, then the API                    |
+| Storefront (built, `next start`)                       | 3101 | `.next/cache/fetch-cache` is deleted first (see Troubleshooting) |
+| Proxy (`e2e/proxy.ts`, the only origin a browser sees) | 3102 | `node --experimental-strip-types e2e/proxy.ts`                   |
 
 Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`.
 
@@ -37,22 +37,22 @@ Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`.
 - **Same origin (ADR 0026).** The cookies have `Path=/store`, writes need `X-Fluxkit-CSRF` and the API sends no CORS headers, so the browser must reach `/store/*` and the pages on one origin. `proxy.ts` routes `/store/*` and `/admin/*` to the API and everything else to the storefront, and SETS `X-Forwarded-For` itself, like the production edge proxy (the API trusts exactly this one hop).
 - **Rate limits.** The `checkout` limit is 10 per 10 minutes per client address, in memory. Every test sends a header `x-e2e-client: <number>` (Playwright `extraHTTPHeaders`, see `support/fixtures.ts`); only the proxy reads it, turns it into `10.a.b.c`, uses that as `X-Forwarded-For` and removes it. So each test, retry and "other shopper" has its own address and window. No production code knows about the header. `MAX_OPEN_ORDERS` (3 unpaid orders per email) is avoided with a unique email per test (`uniqueEmail`).
 - **Workers.** One worker, tests in file order. The scenarios change shared catalog data (a price, the last unit of a product) and each test uses a product no other test changes, so they are deterministic; they do not depend on each other's orders.
-- **Retries and artifacts.** No retry locally; one in CI (`CI` set). Trace on the first retry, screenshot and video only on failure, in `apps/storefront/test-results/`; CI also writes the HTML report to `apps/storefront/playwright-report/` and uploads both when the job fails (both are git-ignored). Open a trace: `pnpm --filter @fluxkit/storefront exec playwright show-trace test-results/<test>/trace.zip`.
+- **Retries and artifacts.** No retry locally; one in CI (`CI` set). Trace on the first retry, screenshot and video only on failure, in `apps/storefront/test-results/`; CI also writes the HTML report to `apps/storefront/playwright-report/` and uploads both when the job fails (both are git-ignored). **The artifacts contain session material**: the `fluxkit_cart` and `fluxkit_customer_session` cookies, guest order tokens in request bodies and URLs, and the e2e owner's admin session. All of it belongs to a throwaway database that is wiped at every run and to an ephemeral API, so this is acceptable; keep it that way (never put a real secret or real data into the e2e environment). Retention is 7 days. Open a trace: `pnpm --filter @fluxkit/storefront exec playwright show-trace test-results/<test>/trace.zip`.
 - **No sleeps.** Tests wait with Playwright's auto-waiting and web-first assertions. The one synchronisation helper, `waitForHydration` (`support/flows.ts`), waits for the cart badge to show a count, which only happens after the page's islands run in the browser.
 
 ## Scenarios (`e2e/tests/*.e2e.ts`)
 
-| File | What it proves |
-|---|---|
-| `guest-purchase` | home -> product -> options -> cart -> checkout (address) -> order page with the token in the fragment (after the client-side navigation), the attempt removed from `sessionStorage`, the copy button, reload of the link, cancel with confirmation |
-| `customer-account` | register with a guest cart (kept, no notice needed), customer checkout of a digital product (no address, prefilled contact), account order list and detail, cancel; sign-in merge of 600 + 600 units: the notice is shown once and dismissed for good |
-| `cart-changes` | price changed through the admin API between cart and checkout: `cart_changed`, banner, blocked submit, OK, new total, order at the new total; last unit bought by another session: `checkout_refused` on the line, the attempt (key + hash only) survives a reload, the same body reuses the key, a changed body gets a new one |
-| `locale-switch` | the switcher keeps the page, the query and the order link's fragment (both directions); the copy button's fallback message when the Clipboard API is missing |
-| `keyboard-checkout` | the whole purchase and the order cancel with Tab, Enter, Space and typing only; focus order of the checkout form; focus follows the cancel steps |
-| `token-hygiene` | the order token is in no URL, request or response header, request body (except the lookup/cancel POST bodies, asserted to contain it), server HTML, title, cookie, storage or console message; `Referrer-Policy: no-referrer` on the order page |
-| `double-submit` | a double click on "Place the order" gives exactly one order (counted through the admin API) |
-| `failed-sign-in` | one message, no field marked, focus on the summary, password cleared |
-| `not-found` | unknown product, category, page and out-of-range page answer HTTP 404 with the not-found page, in both locales |
+| File                | What it proves                                                                                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guest-purchase`    | home -> product -> options -> cart -> checkout (address) -> order page with the token in the fragment (after the client-side navigation), the attempt removed from `sessionStorage`, the copy button, reload of the link, cancel with confirmation                                                                              |
+| `customer-account`  | register with a guest cart (kept, no notice needed), customer checkout of a digital product (no address, prefilled contact), account order list and detail, cancel; sign-in merge of 600 + 600 units: the notice is shown once and dismissed for good                                                                           |
+| `cart-changes`      | price changed through the admin API between cart and checkout: `cart_changed`, banner, blocked submit, OK, new total, order at the new total; last unit bought by another session: `checkout_refused` on the line, the attempt (key + hash only) survives a reload, the same body reuses the key, a changed body gets a new one |
+| `locale-switch`     | the switcher keeps the page, the query and the order link's fragment (both directions); the copy button's fallback message when the Clipboard API is missing                                                                                                                                                                    |
+| `keyboard-checkout` | the whole purchase and the order cancel with Tab, Enter, Space and typing only; focus order of the checkout form; focus follows the cancel steps                                                                                                                                                                                |
+| `token-hygiene`     | the order token is in no URL, request or response header, request body (except the lookup/cancel POST bodies, asserted to contain it), server HTML, title, cookie, storage or console message; `Referrer-Policy: no-referrer` on the order page                                                                                 |
+| `double-submit`     | a double click on "Place the order" gives exactly one order (counted through the admin API)                                                                                                                                                                                                                                     |
+| `failed-sign-in`    | one message, no field marked, focus on the summary, password cleared                                                                                                                                                                                                                                                            |
+| `not-found`         | unknown product, category, page and out-of-range page answer HTTP 404 with the not-found page, in both locales                                                                                                                                                                                                                  |
 
 ## Troubleshooting
 

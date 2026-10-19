@@ -91,10 +91,14 @@ test("the last unit sold to another session refuses the checkout on its line, an
   await expect(page.getByRole("button", { name: "Place the order" })).toBeEnabled();
   expect(keys).toHaveLength(1);
 
-  // The refusal keeps the attempt: an idempotency key and a hash, no personal data, and it survives a reload.
+  // The refusal keeps the attempt: an idempotency key, a random salt and a salted hash, no personal data, and it survives a reload.
   const attempt = await storedAttempt(page);
   expect(attempt).not.toBeNull();
-  expect(Object.keys(JSON.parse(attempt ?? "{}") as object).sort()).toEqual(["key", "requestHash"]);
+  expect(Object.keys(JSON.parse(attempt ?? "{}") as object).sort()).toEqual([
+    "key",
+    "requestHash",
+    "salt",
+  ]);
   expect(attempt).not.toContain(email);
   await page.reload();
   expect(await storedAttempt(page)).toBe(attempt);

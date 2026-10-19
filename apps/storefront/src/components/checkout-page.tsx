@@ -275,6 +275,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <form
+          method="post"
           onSubmit={props.onSubmit}
           noValidate
           aria-busy={props.pending}

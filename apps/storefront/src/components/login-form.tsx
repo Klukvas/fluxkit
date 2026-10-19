@@ -44,7 +44,13 @@ export function LoginFormView({
     password: t("account.field.password"),
   };
   return (
-    <form onSubmit={onSubmit} noValidate aria-busy={pending} className="flex flex-col gap-4">
+    <form
+      method="post"
+      onSubmit={onSubmit}
+      noValidate
+      aria-busy={pending}
+      className="flex flex-col gap-4"
+    >
       <h1 className="text-3xl font-bold text-foreground">{t("account.login.title")}</h1>
       <FormErrorSummary
         failure={failure}

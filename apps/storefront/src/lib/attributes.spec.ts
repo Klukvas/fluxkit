@@ -114,3 +114,37 @@ describe("attributeRows", () => {
     expect(rows[0]?.text).toBe("<b>bold</b>");
   });
 });
+
+describe("attribute codes that are names of Object.prototype members (review L2)", () => {
+  const reserved = ["constructor", "__proto__", "toString", "hasOwnProperty", "valueOf"];
+
+  it("skips a definition without a value instead of reading the inherited member", () => {
+    const rows = attributeRows(
+      product({
+        attributeDefinitions: reserved.map((code) => definition(code, "text")),
+        attributes: {},
+      }),
+      t,
+      "en",
+    );
+    expect(rows).toEqual([]);
+  });
+
+  it("shows the value of an attribute whose code is such a name", () => {
+    const attributes = JSON.parse(`{"constructor":"c","__proto__":"p","toString":"s"}`) as Record<
+      string,
+      string
+    >;
+    const rows = attributeRows(
+      product({
+        attributeDefinitions: ["constructor", "__proto__", "toString"].map((code) =>
+          definition(code, "text"),
+        ),
+        attributes,
+      }),
+      t,
+      "en",
+    );
+    expect(rows.map((row) => row.text)).toEqual(["c", "p", "s"]);
+  });
+});

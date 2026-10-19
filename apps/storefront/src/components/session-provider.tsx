@@ -11,6 +11,7 @@ import {
 } from "react";
 import { initialAccountState, type AccountState, type AccountStore } from "../lib/account-store";
 import { initialCartState, type CartState, type CartStore } from "../lib/cart-store";
+import { withTimeout } from "../lib/request-timeout";
 import { createSessionStores, type SessionStores } from "../lib/session-stores";
 
 /**
@@ -22,13 +23,18 @@ import { createSessionStores, type SessionStores } from "../lib/session-stores";
  * The stores talk to the API from the browser, same origin (`baseUrl ""`): the cookies have `Path=/store`.
  */
 
+/** Every browser call has a time limit (review M1): a hung request must free its form and say "try again". */
+const browserFetch = withTimeout((url, init) => globalThis.fetch(url, init));
+
 export const CartStoreContext = createContext<CartStore | null>(null);
 /** The page's one store client, for islands that make calls outside the two stores (the checkout, the order pages). */
 export const StoreClientContext = createContext<StoreClient | null>(null);
 export const AccountStoreContext = createContext<AccountStore | null>(null);
 
 export function SessionProvider({ locale, children }: { locale: string; children: ReactNode }) {
-  const [client] = useState<StoreClient>(() => createStoreClient({ baseUrl: "" }));
+  const [client] = useState<StoreClient>(() =>
+    createStoreClient({ baseUrl: "", fetch: browserFetch }),
+  );
   const [stores] = useState<SessionStores>(() => createSessionStores({ client, locale }));
 
   useEffect(() => {

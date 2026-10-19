@@ -9,3 +9,4 @@ Token-based component library shared by storefront and admin. Components are pre
 - Tests: `pnpm --filter @fluxkit/ui test` (Vitest, `renderToStaticMarkup`; interaction tests need a DOM library and are not set up).
 
 File map: `docs/files/ui.md`.
+- Inputs, textareas, selects, checkboxes and the quantity field use the `border-input` token (`border-border-input`, at least 3:1 against `background` and `muted`); the plain `border` token is decorative (cards, badges, dividers) and is not enough to identify a control.

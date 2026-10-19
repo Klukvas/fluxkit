@@ -3,11 +3,13 @@ import {
   CATALOG_REVALIDATE_SECONDS,
   SITEMAP_REVALIDATE_SECONDS,
   StoreUnavailableError,
+  isCacheableProductQuery,
   createStoreData,
   ensureLocalesSupported,
 } from "./store-data";
 import { LocaleMismatchError } from "./locale-check";
 
+import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 type Call = { url: string; init: RequestInit };
 
 const config = {
@@ -30,10 +32,14 @@ function problem(status: number, code: string): Response {
   );
 }
 
-function setup(handler: (call: Call, index: number) => Response | Promise<Response>) {
+function setup(
+  handler: (call: Call, index: number) => Response | Promise<Response>,
+  extra: { readTimeoutMs?: number } = {},
+) {
   const calls: Call[] = [];
   const events: string[] = [];
   const data = createStoreData({
+    ...extra,
     baseUrl: () => "http://api.internal:3000",
     beforeRequest: async () => {
       events.push("beforeRequest");
@@ -84,14 +90,13 @@ describe("createStoreData requests", () => {
 
   it("passes the product list filters and tags the products", async () => {
     const { data, calls } = setup(() => json({ items: [], total: 0, limit: 8, offset: 0 }));
-    await data.listProducts("uk", { limit: 8, category: "shoes", brand: "acme", offset: 16 });
+    await data.listProducts("uk", { limit: 8, category: "shoes", offset: 16 });
     const url = new URL(calls[0]?.url ?? "");
     expect(url.pathname).toBe("/store/products");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       locale: "uk",
       limit: "8",
       category: "shoes",
-      brand: "acme",
       offset: "16",
     });
     expect(((calls[0]?.init as { next?: { tags?: string[] } }).next ?? {}).tags).toEqual([
@@ -120,6 +125,156 @@ describe("createStoreData requests", () => {
     });
     await data.getConfig();
     expect(order).toEqual(["beforeRequest", "baseUrl"]);
+  });
+});
+
+describe("data cache of filtered lists (review M2)", () => {
+  type Init = { cache?: string; next?: { revalidate?: number; tags?: string[] } };
+
+  it("decides by the query: only a list without a brand filter is cached (the brand is a free value, every one would add a file to .next/cache)", () => {
+    expect(isCacheableProductQuery({})).toBe(true);
+    expect(isCacheableProductQuery({ limit: 24, offset: 48, category: "tools" })).toBe(true);
+    expect(isCacheableProductQuery({ brand: "acme" })).toBe(false);
+    expect(isCacheableProductQuery({ brand: "acme", category: "tools", limit: 24 })).toBe(false);
+    expect(isCacheableProductQuery({ brand: "" })).toBe(false);
+  });
+
+  it("sends a brand-filtered list with cache: no-store and no revalidate, an unfiltered one with the 60 s data cache", async () => {
+    const { data, calls } = setup(() => json({ items: [], total: 0, limit: 24, offset: 0 }));
+    await data.listProducts("uk", { limit: 24, brand: "acme" });
+    await data.listProducts("uk", { limit: 24 });
+    const filtered = calls[0]?.init as Init;
+    expect(filtered.cache).toBe("no-store");
+    expect(filtered.next).toBeUndefined();
+    const plain = calls[1]?.init as Init;
+    expect(plain.cache).toBeUndefined();
+    expect(plain.next?.revalidate).toBe(60);
+  });
+
+  it("still keeps the last good copy of a filtered list in memory (bounded to 200 entries)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = false;
+    const { data } = setup(() => {
+      if (down) throw new TypeError("fetch failed");
+      return json({ items: [1] });
+    });
+    await data.listProducts("uk", { brand: "acme" });
+    down = true;
+    expect(await data.listProducts("uk", { brand: "acme" })).toMatchObject({ stale: true });
+  });
+});
+
+describe("createStoreData timeouts (review M1)", () => {
+  /** A fetch that never answers on its own and rejects with the signal's reason when the signal ends. */
+  function hanging(call: Call): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      const signal = call.init.signal;
+      if (signal === null || signal === undefined) return;
+      signal.addEventListener("abort", () => {
+        reject(signal.reason);
+      });
+    });
+  }
+
+  it("gives every read a signal, 8 seconds by default", async () => {
+    expect(SERVER_READ_TIMEOUT_MS).toBe(8_000);
+    const { data, calls } = setup(() => json({ items: [] }));
+    await data.getConfig();
+    await data.listCategories("uk");
+    await data.listProducts("uk", {});
+    await data.getProduct("uk", "x");
+    expect(calls).toHaveLength(4);
+    for (const call of calls) expect(call.init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("serves the last good response when the API hangs past the limit", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let hang = false;
+    const { data } = setup((call) => (hang ? hanging(call) : json({ items: [{ id: "1" }] })), {
+      readTimeoutMs: 20,
+    });
+    await data.listCategories("uk");
+    hang = true;
+    expect(await data.listCategories("uk")).toEqual({
+      ok: true,
+      data: { items: [{ id: "1" }] },
+      stale: true,
+    });
+  });
+
+  it("throws StoreUnavailableError when the API hangs and nothing is cached (error.tsx renders, no 5 minute wait)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { data } = setup(hanging, { readTimeoutMs: 20 });
+    const started = Date.now();
+    await expect(data.getConfig()).rejects.toBeInstanceOf(StoreUnavailableError);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+});
+
+describe("createStoreData logs the root cause (review L3)", () => {
+  function refused(): TypeError {
+    // What undici throws: a TypeError "fetch failed" whose cause carries the system error code. The cause's message may hold
+    // an address or a URL; only its name and code are logged.
+    return new TypeError("fetch failed", {
+      cause: Object.assign(
+        new Error("connect ECONNREFUSED http://user:secret@10.0.0.7:3000/store?token=abc"),
+        {
+          code: "ECONNREFUSED",
+        },
+      ),
+    });
+  }
+
+  async function logged(failure: () => never): Promise<string> {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { data } = setup(failure);
+    await expect(data.getConfig()).rejects.toBeInstanceOf(StoreUnavailableError);
+    return String(error.mock.calls[0]?.[0]);
+  }
+
+  it("tells a refused connection from a timeout in the error log", async () => {
+    const refusedLog = await logged(() => {
+      throw refused();
+    });
+    expect(refusedLog).toContain("GET /store/config");
+    expect(refusedLog).toContain("ECONNREFUSED");
+    expect(refusedLog).not.toContain("TimeoutError");
+    vi.restoreAllMocks();
+    const timeoutLog = await logged(() => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    expect(timeoutLog).toContain("TimeoutError");
+    expect(timeoutLog).not.toContain("ECONNREFUSED");
+  });
+
+  it("never logs the cause's message, a URL or a credential", async () => {
+    const text = await logged(() => {
+      throw refused();
+    });
+    expect(text).not.toMatch(/secret|token=|10\.0\.0\.7|http:/);
+  });
+
+  it("logs the cause in the stale-copy warning too", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = false;
+    const { data } = setup(() => {
+      if (down) throw refused();
+      return json({ items: [] });
+    });
+    await data.listCategories("uk");
+    down = true;
+    await data.listCategories("uk");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("ECONNREFUSED");
+  });
+
+  it("follows a long or cyclic cause chain without looping", async () => {
+    const first: Error & { cause?: unknown } = new Error("a");
+    first.cause = new Error("b", { cause: first });
+    const text = await logged(() => {
+      throw first;
+    });
+    expect(text).toContain("GET /store/config");
   });
 });
 

@@ -4,6 +4,7 @@ import { Button } from "./button";
 import { Checkbox } from "./checkbox";
 import { Field } from "./field";
 import { Input } from "./input";
+import { QuantityInput } from "./quantity-input";
 import { Select } from "./select";
 import { Textarea } from "./textarea";
 import { VisuallyHidden } from "./visually-hidden";
@@ -160,5 +161,43 @@ describe("Button", () => {
     const button = first(render(<Button>Go</Button>), "button");
     expect(button.attributes.type).toBe("button");
     expect(button.attributes.class).toContain("focus-visible:outline-ring");
+  });
+});
+
+describe("input borders (WCAG 1.4.11, review M3)", () => {
+  // The line that identifies a text control needs 3:1; the decorative `border` token is only about 1.2:1.
+  function classesOf(markup: string, tag: string): string[] {
+    return String(first(markup, tag).attributes.class).split(/\s+/);
+  }
+
+  it("Input, Textarea, Select, Checkbox and the quantity field use the input border token", () => {
+    const quantity = render(
+      <QuantityInput
+        id="q"
+        name="q"
+        label="Quantity"
+        value={1}
+        min={1}
+        max={5}
+        onChange={() => undefined}
+        decreaseLabel="-"
+        increaseLabel="+"
+      />,
+    );
+    for (const [markup, tag] of [
+      [render(<Input />), "input"],
+      [render(<Textarea />), "textarea"],
+      [render(<Select />), "select"],
+      [render(<Checkbox label="x" id="c" />), "input"],
+      [quantity, "input"],
+    ] as const) {
+      const classes = classesOf(markup, tag);
+      expect(classes, `${tag}`).toContain("border-border-input");
+      expect(classes, `${tag}`).not.toContain("border-border");
+    }
+  });
+
+  it("keeps the invalid border on top of it", () => {
+    expect(classesOf(render(<Input />), "input")).toContain("aria-invalid:border-danger");
   });
 });

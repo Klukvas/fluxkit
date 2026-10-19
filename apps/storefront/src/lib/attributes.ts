@@ -38,6 +38,8 @@ export function attributeRows(
 ): AttributeRow[] {
   const rows: AttributeRow[] = [];
   for (const definition of product.attributeDefinitions) {
+    // Own properties only: `constructor` and `toString` are valid attribute codes, and `attributes[code]` would find the inherited member.
+    if (!Object.hasOwn(product.attributes, definition.code)) continue;
     const value = product.attributes[definition.code];
     if (value === undefined) continue;
     rows.push({

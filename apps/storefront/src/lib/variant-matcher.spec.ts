@@ -198,3 +198,43 @@ describe("selectedValueIds", () => {
     ]);
   });
 });
+
+describe("option codes that are names of Object.prototype members (review L2)", () => {
+  const reserved = ["constructor", "__proto__", "toString", "hasOwnProperty"];
+  const odd = product({
+    options: reserved.map((code) => option(code, ["a", "b"])),
+    variants: [
+      variant("v-aaaa", Object.fromEntries(reserved.map((code) => [code, "a"]))),
+      variant("v-bbbb", Object.fromEntries(reserved.map((code) => [code, "b"]))),
+    ],
+  });
+
+  it("does not treat an unchosen option as chosen (the inherited function)", () => {
+    expect(findVariant(odd, {})).toBeNull();
+    expect(findVariant(odd, Object.fromEntries([["constructor", "a"]]))).toBeNull();
+  });
+
+  it("selects, finds and repairs through such codes", () => {
+    const initial = initialSelection(odd);
+    expect(Object.keys(initial).sort()).toEqual([...reserved].sort());
+    expect(Object.getPrototypeOf(initial)).toBe(Object.prototype);
+    expect(findVariant(odd, initial)?.id).toBe("v-aaaa");
+    const next = selectValue(odd, initial, "constructor", "b");
+    expect(findVariant(odd, next)?.id).toBe("v-bbbb");
+    expect(selectedValueIds(odd, next)).toHaveLength(4);
+    expect(isValueAvailable(odd, {}, "toString", "a")).toBe(true);
+  });
+
+  it("repairs a later option whose code is __proto__ (assignment to it would change the prototype, not the value)", () => {
+    const grid = product({
+      options: [option("first", ["x", "y"]), option("__proto__", ["p", "q"])],
+      variants: [
+        variant("v-xp", { first: "x", ["__proto__"]: "p" }),
+        variant("v-yq", { first: "y", ["__proto__"]: "q" }),
+      ],
+    });
+    const next = selectValue(grid, initialSelection(grid), "first", "y");
+    expect(Object.hasOwn(next, "__proto__")).toBe(true);
+    expect(findVariant(grid, next)?.id).toBe("v-yq");
+  });
+});

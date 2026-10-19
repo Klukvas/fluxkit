@@ -119,6 +119,25 @@ describe("failureFromThrown", () => {
     });
   });
 
+  it("reports a timeout as a retryable failure with its own message (the request may or may not have arrived)", () => {
+    const timeout = new NetworkError("slow", {
+      cause: new DOMException("The operation timed out.", "TimeoutError"),
+      aborted: true,
+    });
+    expect(failureFromThrown(timeout)).toMatchObject({
+      messageKey: "errors.timeout",
+      status: null,
+      code: null,
+      fieldErrors: [],
+    });
+    // The same when the client did not mark it as aborted (the signal was not the caller's own).
+    const unmarked = new NetworkError("slow", {
+      cause: new DOMException("The operation timed out.", "TimeoutError"),
+      aborted: false,
+    });
+    expect(failureFromThrown(unmarked)).toMatchObject({ messageKey: "errors.timeout" });
+  });
+
   it("rethrows an abort and anything unexpected instead of hiding it", () => {
     const aborted = new NetworkError("aborted", { cause: new Error("x"), aborted: true });
     expect(() => failureFromThrown(aborted)).toThrow(aborted);

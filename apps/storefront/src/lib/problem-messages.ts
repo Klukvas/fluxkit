@@ -108,7 +108,7 @@ export function fieldErrorMessageKey(code: string): string {
   return includes(FIELD_ERROR_CODES, code) ? `errors.field.${code}` : GENERIC_KEY;
 }
 
-export function transportErrorMessageKey(kind: "network" | "invalidResponse"): string {
+export function transportErrorMessageKey(kind: "network" | "timeout" | "invalidResponse"): string {
   return `errors.${kind}`;
 }
 

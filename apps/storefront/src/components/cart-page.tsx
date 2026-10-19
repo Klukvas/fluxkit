@@ -78,7 +78,12 @@ export function QuantityFormView({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} noValidate className="flex flex-wrap items-center gap-2">
+    <form
+      method="post"
+      onSubmit={onSubmit}
+      noValidate
+      className="flex flex-wrap items-center gap-2"
+    >
       <QuantityInput
         label={t("cart.line.quantity", { title })}
         decreaseLabel={t("cart.line.decrease", { title })}
