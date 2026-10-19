@@ -42,6 +42,11 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     }
   });
 
+  it("mounts RouteFocus in the shell, so the focus follows a client-side navigation (review L9)", () => {
+    const shell = sources.find((file) => file.path === join("components", "site-shell.tsx"));
+    expect(shell?.text).toMatch(/<RouteFocus\s*\/>/);
+  });
+
   it("sets raw HTML only in the JSON-LD component, which escapes it", () => {
     const users = sources.filter((file) => file.text.includes("dangerouslySetInnerHTML"));
     expect(users.map((file) => file.path)).toEqual(["components/json-ld.tsx"]);
