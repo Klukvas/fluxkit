@@ -6,10 +6,16 @@
  * `docs/api/openapi.json` (OpenAPI 3.0), so a change on either side fails a test. The pair replaces a generator.
  */
 
+import type { JsonValue } from "../admin-types.js";
+
 type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
 type Distribute<T> = T extends unknown ? Shape<T> : never;
+/** True only for `JsonValue` itself: a value the API accepts and stores without looking inside. */
+type IsJsonValue<T> = [JsonValue] extends [T] ? ([T] extends [JsonValue] ? true : false) : false;
 
-export type Shape<T> = [T] extends [never]
+export type Shape<T> = IsJsonValue<T> extends true ? "any" : ShapeOf<T>;
+
+type ShapeOf<T> = [T] extends [never]
   ? never
   : [T] extends [undefined]
     ? "none"
@@ -118,7 +124,12 @@ export function compareShape(
     );
   }
 
-  if (shape === "any") return [];
+  if (shape === "any") {
+    const constraints = Object.keys(schema).filter((key) => key !== "description");
+    return constraints.length === 0
+      ? []
+      : [`${at}: openapi constrains the value (${constraints.join(", ")}), the type is any JSON`];
+  }
   if (shape === "never") {
     return schema.not !== undefined && Object.keys(schema.not).length === 0
       ? []
