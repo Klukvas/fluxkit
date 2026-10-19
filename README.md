@@ -24,7 +24,7 @@ Scaffold complete (plan `docs/plans/2026-10-14-monorepo-scaffold.md`). Catalog p
 - Customer accounts (`/store/account/*`: register, login, logout, profile, change password; separate cookie session, CSRF header on every `/store` write, lockout, rate limits) and admin customer management (`/admin/customers`, permissions `customers.read` and `customers.write`); no password reset or email verification yet: `docs/api/customers.md`.
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
 - Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token; at most `MAX_OPEN_ORDERS` unpaid orders per email or customer), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
-- Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 7): home, catalog and category pages, product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile; see `apps/storefront/README.md` and the Storefront walkthrough below. Admin: placeholder pages built from the shared UI and tokens (light and dark themes).
+- Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 8): home, catalog and category pages, product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile; see `apps/storefront/README.md` and the Storefront walkthrough below; Playwright end-to-end tests of the purchase flow (`pnpm test:e2e`, `apps/storefront/e2e/README.md`). Admin: placeholder pages built from the shared UI and tokens (light and dark themes).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test.
 
 Open decisions and next steps are listed at the end.
@@ -68,6 +68,8 @@ Use a subshell so the test variables do not leak into your terminal: Node's `--e
   pnpm test
 )
 ```
+
+The browser tests of the storefront (Playwright, Chromium) are separate and slower: `pnpm test:e2e` builds, starts the API, the storefront and a same-origin proxy on a throwaway database of its own and drives the purchase flow in a browser. It needs one more database whose name ends in `_e2e_test` (it is wiped at every run) and the Chromium download; the step-by-step is in `apps/storefront/e2e/README.md`.
 
 ## Database migrations
 
@@ -231,6 +233,7 @@ Notes:
 - **Use `localhost` or HTTPS.** The checkout needs a secure context for `crypto.randomUUID` and `crypto.subtle` (its idempotency key); on `http://<LAN address>` it refuses to place the order and says why. To test from a phone, put HTTPS in front (a tunnel or a local certificate).
 - The checkout keeps one attempt (an idempotency key and a hash of the request, no personal data) in `sessionStorage`: pressing the button twice, retrying after a network error or reloading the tab sends the SAME key, so at most one order is created and the guest gets the same link back.
 - A price changed in the admin between the cart and the checkout answers `409 cart_changed`: the page shows the new prices and total and asks to confirm them first.
+- The same flow, and the cases that are hard to click through by hand (a price change, the last unit sold to someone else, keyboard-only use, the order link's token staying out of every request), run unattended as `pnpm test:e2e` (`apps/storefront/e2e/README.md`).
 
 ## Scripts (root)
 
@@ -240,6 +243,7 @@ Notes:
 | `pnpm lint` / `pnpm format:check` (`pnpm format`) | ESLint (bans `any`, `@ts-ignore`, empty `catch`) / Prettier |
 | `pnpm check:boundaries` | module boundary rules (core must not import features, etc.); fails if nothing was checked |
 | `pnpm test` | builds, then runs Vitest in every package (needs the services above) |
+| `pnpm test:e2e` | builds, then runs the Playwright browser tests of the storefront (Chromium; needs the services above, a `*_e2e_test` database in `E2E_DATABASE_URL` that is wiped at every run, and `playwright install chromium` once); not part of `pnpm test`, see `apps/storefront/e2e/README.md` |
 | `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
 | `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm admin:unlock --email <address>` | builds, then clears the failed-login counter and the lock of one admin user (nothing else changes); see Admin sign-in |
