@@ -63,7 +63,7 @@ export function QuantityInput({
         max={max}
         disabled={disabled}
         className={cn(
-          "min-h-11 w-16 rounded-md border border-border bg-background px-2 text-center text-foreground disabled:opacity-50",
+          "min-h-11 w-16 rounded-md border border-border-input bg-background px-2 text-center text-foreground disabled:opacity-50",
           focusRing,
         )}
         onChange={(event) => {

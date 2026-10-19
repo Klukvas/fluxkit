@@ -5,6 +5,7 @@
   --color-muted: var(--fk-color-muted);
   --color-muted-foreground: var(--fk-color-muted-foreground);
   --color-border: var(--fk-color-border);
+  --color-border-input: var(--fk-color-border-input);
   --color-primary: var(--fk-color-primary);
   --color-primary-foreground: var(--fk-color-primary-foreground);
   --color-danger: var(--fk-color-danger);

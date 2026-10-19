@@ -10,6 +10,7 @@
   --fk-color-muted: #f1f5f9;
   --fk-color-muted-foreground: #475569;
   --fk-color-border: #e2e8f0;
+  --fk-color-border-input: #64748b;
   --fk-color-primary: #4f46e5;
   --fk-color-primary-foreground: #ffffff;
   --fk-color-danger: #b91c1c;
@@ -30,6 +31,7 @@
   --fk-color-muted: #172036;
   --fk-color-muted-foreground: #94a3b8;
   --fk-color-border: #26314d;
+  --fk-color-border-input: #6b7a99;
   --fk-color-primary: #818cf8;
   --fk-color-primary-foreground: #0b1020;
   --fk-color-danger: #f87171;
