@@ -540,3 +540,26 @@ describe("cartReducer", () => {
     expect(next.failure).toBeNull();
   });
 });
+
+describe("cart store: applyCart (a cart that arrived outside the store, the 409 cart_changed of the checkout)", () => {
+  it("replaces the state with the given cart and publishes it", async () => {
+    const { client, calls } = stagedClient();
+    const { store, published } = storeWith(client);
+    store.start();
+    calls[0]?.answer(json(cartOne));
+    await settle();
+    store.applyCart(cartThree);
+    expect(store.getState()).toMatchObject({ status: "ready", cart: cartThree, failure: null });
+    expect(published).toEqual([1, 3]);
+  });
+
+  it("wins over a read that started before it and answers after it", async () => {
+    const { client, calls } = stagedClient();
+    const { store } = storeWith(client);
+    store.start();
+    store.applyCart(cartThree);
+    calls[0]?.answer(json(cartOne));
+    await settle();
+    expect(store.getState().cart).toBe(cartThree);
+  });
+});

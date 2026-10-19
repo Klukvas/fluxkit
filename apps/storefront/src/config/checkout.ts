@@ -3,7 +3,11 @@
  * by the checkout form in step 7, never hardcoded in a component. Internal to the storefront in v1.
  */
 
-/** `Address` members of `POST /store/checkout` the form can show (`recipient*` fields are filled from the contact data). */
+/**
+ * `Address` members of `POST /store/checkout` the form can show. `countryCode` is always shown (a select of
+ * `allowedShippingCountries`); the `recipient*` members are not sent: the order's contact is the recipient
+ * (`lib/checkout-form.ts`).
+ */
 export type AddressFieldName = "region" | "city" | "postalCode" | "line1" | "line2";
 
 export interface AddressFieldConfig {
