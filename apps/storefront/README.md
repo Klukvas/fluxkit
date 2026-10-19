@@ -2,7 +2,7 @@
 
 Next.js 16 (App Router, Turbopack) customer storefront. Plan: `docs/plans/2026-10-18-storefront.md`, decisions: ADR 0026, rules: `AGENTS.md` section 2.2 (theming, i18n, layout composition) and `apps/storefront/AGENTS.md` (read the Next docs in `node_modules/next/dist/docs/` before writing Next code: this version differs from older knowledge).
 
-Status (step 8 of the plan; the browser tests are in `e2e/`, see "End-to-end tests (step 8)"): checkout and orders. On top of the catalog (home sections, catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt`) and the cart and accounts (step 6), the checkout page, the guest order page (private link with the token in the URL fragment) and the customer's order history and order page exist, all rendered in the browser (see "Checkout and orders (step 7)"). **v1 takes no payment** (owner answer 9): an order stays `awaiting_payment` until an admin marks it paid or it expires (`ORDER_PAYMENT_TTL_MINUTES`, 30 minutes by default), so the template is not for live sales until the payment plan.
+Status: steps 1 to 8 of the plan are merged (PRs #66 to #77); step 9 (docs sweep) is on its branch, step 10 (independent review) is pending. The browser tests are in `e2e/`, see "End-to-end tests (step 8)". Scope so far: checkout and orders. On top of the catalog (home sections, catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt`) and the cart and accounts (step 6), the checkout page, the guest order page (private link with the token in the URL fragment) and the customer's order history and order page exist, all rendered in the browser (see "Checkout and orders (step 7)"). **v1 takes no payment** (owner answer 9): an order stays `awaiting_payment` until an admin marks it paid or it expires (`ORDER_PAYMENT_TTL_MINUTES`, 30 minutes by default), so the template is not for live sales until the payment plan.
 
 ## Routes
 
@@ -36,7 +36,7 @@ pnpm --filter @fluxkit/storefront test           # Vitest (unit and renderToStat
 pnpm test:e2e                                    # (repository root) Playwright browser tests: builds, starts API + storefront + proxy on a *_e2e_test database; e2e/README.md
 ```
 
-`next.config.ts` loads the root `.env` for `dev` and `start` (shell variables win). Variables (`docs/contracts/config.md`):
+`next.config.ts` loads the root `.env` for `dev` and `start` (shell variables win). `next start` sets `NODE_ENV=production` when it is unset (`next/dist/bin/next`), so `STOREFRONT_PUBLIC_URL` is required there as well as `API_INTERNAL_URL`; `loadStorefrontEnv` runs per request, so a missing value shows on the first request that needs it, not at start-up. Variables (`docs/contracts/config.md`):
 
 | Variable | Read when | Used for |
 |---|---|---|
