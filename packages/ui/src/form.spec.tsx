@@ -162,6 +162,15 @@ describe("Button", () => {
     expect(button.attributes.type).toBe("button");
     expect(button.attributes.class).toContain("focus-visible:outline-ring");
   });
+
+  it("has a danger variant drawn with the danger token, outlined (no on-danger text color exists)", () => {
+    const classes = String(
+      first(render(<Button variant="danger">Delete</Button>), "button").attributes.class,
+    );
+    expect(classes).toContain("border-danger");
+    expect(classes).toContain("text-danger");
+    expect(classes).toContain("bg-background");
+  });
 });
 
 describe("input borders (WCAG 1.4.11, review M3)", () => {
