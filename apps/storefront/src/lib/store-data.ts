@@ -12,6 +12,7 @@ import {
   type StoreResult,
 } from "@fluxkit/api-client";
 import { assertLocalesSupported } from "./locale-check";
+import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 
 /**
  * Server-side reads of the public catalog (ADR 0026): the Next server calls the API directly at `API_INTERNAL_URL`, never
@@ -53,6 +54,8 @@ export interface StoreDataDependencies {
   /** The Next `connection()`: a catalog fetch never runs while Next prerenders (the build must not need the API). */
   beforeRequest?: () => Promise<unknown>;
   fetch?: FetchLike;
+  /** Longest a catalog read may take; `SERVER_READ_TIMEOUT_MS` by default. */
+  readTimeoutMs?: number;
 }
 
 export interface ReadOptions {
@@ -97,6 +100,8 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       ...(dependencies.fetch === undefined ? {} : { fetch: dependencies.fetch }),
     });
     const options: CallOptions = {
+      // A hung API ends here (review M1) and the last good copy or error.tsx takes over, instead of after undici's 300 s.
+      signal: AbortSignal.timeout(dependencies.readTimeoutMs ?? SERVER_READ_TIMEOUT_MS),
       fetchOptions: {
         next: {
           revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,

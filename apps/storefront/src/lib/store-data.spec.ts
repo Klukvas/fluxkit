@@ -8,6 +8,7 @@ import {
 } from "./store-data";
 import { LocaleMismatchError } from "./locale-check";
 
+import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 type Call = { url: string; init: RequestInit };
 
 const config = {
@@ -30,10 +31,14 @@ function problem(status: number, code: string): Response {
   );
 }
 
-function setup(handler: (call: Call, index: number) => Response | Promise<Response>) {
+function setup(
+  handler: (call: Call, index: number) => Response | Promise<Response>,
+  extra: { readTimeoutMs?: number } = {},
+) {
   const calls: Call[] = [];
   const events: string[] = [];
   const data = createStoreData({
+    ...extra,
     baseUrl: () => "http://api.internal:3000",
     beforeRequest: async () => {
       events.push("beforeRequest");
@@ -120,6 +125,54 @@ describe("createStoreData requests", () => {
     });
     await data.getConfig();
     expect(order).toEqual(["beforeRequest", "baseUrl"]);
+  });
+});
+
+describe("createStoreData timeouts (review M1)", () => {
+  /** A fetch that never answers on its own and rejects with the signal's reason when the signal ends. */
+  function hanging(call: Call): Promise<Response> {
+    return new Promise((_resolve, reject) => {
+      const signal = call.init.signal;
+      if (signal === null || signal === undefined) return;
+      signal.addEventListener("abort", () => {
+        reject(signal.reason);
+      });
+    });
+  }
+
+  it("gives every read a signal, 8 seconds by default", async () => {
+    expect(SERVER_READ_TIMEOUT_MS).toBe(8_000);
+    const { data, calls } = setup(() => json({ items: [] }));
+    await data.getConfig();
+    await data.listCategories("uk");
+    await data.listProducts("uk", {});
+    await data.getProduct("uk", "x");
+    expect(calls).toHaveLength(4);
+    for (const call of calls) expect(call.init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("serves the last good response when the API hangs past the limit", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let hang = false;
+    const { data } = setup((call) => (hang ? hanging(call) : json({ items: [{ id: "1" }] })), {
+      readTimeoutMs: 20,
+    });
+    await data.listCategories("uk");
+    hang = true;
+    expect(await data.listCategories("uk")).toEqual({
+      ok: true,
+      data: { items: [{ id: "1" }] },
+      stale: true,
+    });
+  });
+
+  it("throws StoreUnavailableError when the API hangs and nothing is cached (error.tsx renders, no 5 minute wait)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const { data } = setup(hanging, { readTimeoutMs: 20 });
+    const started = Date.now();
+    await expect(data.getConfig()).rejects.toBeInstanceOf(StoreUnavailableError);
+    expect(Date.now() - started).toBeLessThan(2_000);
   });
 });
 

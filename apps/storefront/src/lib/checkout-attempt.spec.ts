@@ -312,6 +312,18 @@ describe("checkoutOutcome", () => {
     });
   });
 
+  it("a timeout keeps the key and asks to try again", () => {
+    const timeout = new NetworkError("x", {
+      cause: new DOMException("timed out", "TimeoutError"),
+      aborted: true,
+    });
+    expect(checkoutOutcome({ thrown: timeout }, ctx)).toMatchObject({
+      kind: "retry",
+      attempt: "keep",
+      failure: { messageKey: "errors.timeout" },
+    });
+  });
+
   it("an aborted request or a bug is rethrown, never shown as a friendly message", () => {
     expect(() =>
       checkoutOutcome(
