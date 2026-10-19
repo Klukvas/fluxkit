@@ -141,3 +141,29 @@ describe("next.config headers", () => {
     expect(development[0]?.headers.some((h) => h.key === "Strict-Transport-Security")).toBe(false);
   });
 });
+
+describe("next.config images", () => {
+  it("lets next/image optimize https images of exactly the configured hosts, without wildcards", () => {
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com, Images.Example.org");
+    expect(config(PHASE_PRODUCTION_BUILD).images?.remotePatterns).toEqual([
+      { protocol: "https", hostname: "cdn.example.com" },
+      { protocol: "https", hostname: "images.example.org" },
+    ]);
+  });
+
+  it("allows no remote image at all without STOREFRONT_IMAGE_HOSTS", () => {
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "");
+    expect(config(PHASE_PRODUCTION_BUILD).images?.remotePatterns ?? []).toEqual([]);
+  });
+
+  it("uses the same hosts for the CSP img-src and the optimizer", async () => {
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com");
+    const resolved = config(PHASE_PRODUCTION_BUILD);
+    const rules = (await resolved.headers?.()) ?? [];
+    const csp = rules[0]?.headers.find((header) => header.key === "Content-Security-Policy")?.value;
+    expect(csp).toContain("https://cdn.example.com");
+    expect(resolved.images?.remotePatterns).toEqual([
+      { protocol: "https", hostname: "cdn.example.com" },
+    ]);
+  });
+});

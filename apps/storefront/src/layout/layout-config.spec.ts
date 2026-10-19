@@ -30,6 +30,12 @@ describe("home layout config", () => {
     }
   });
 
+  it("asks for a sensible number of category tiles", () => {
+    const section = homeSections.find((candidate) => candidate.type === "categoryTiles");
+    expect(section?.type === "categoryTiles" && section.props.limit).toBeGreaterThan(0);
+    expect(section?.type === "categoryTiles" && section.props.limit).toBeLessThanOrEqual(24);
+  });
+
   it("asks for a sensible number of new products", () => {
     const section = homeSections.find((candidate) => candidate.type === "newProducts");
     expect(section?.type === "newProducts" && section.props.limit).toBeGreaterThan(0);

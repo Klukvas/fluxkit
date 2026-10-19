@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CATALOG_REVALIDATE_SECONDS,
+  SITEMAP_REVALIDATE_SECONDS,
   StoreUnavailableError,
   createStoreData,
   ensureLocalesSupported,
@@ -51,6 +52,19 @@ afterEach(() => vi.restoreAllMocks());
 describe("createStoreData requests", () => {
   it("uses a 60 second revalidation as an internal constant", () => {
     expect(CATALOG_REVALIDATE_SECONDS).toBe(60);
+  });
+
+  it("lets a caller choose the cache lifetime of one read (the sitemap uses an hour) and defaults to 60 seconds", async () => {
+    expect(SITEMAP_REVALIDATE_SECONDS).toBe(3600);
+    const { data, calls } = setup(() => json({ items: [], total: 0, limit: 100, offset: 0 }));
+    await data.listProducts(
+      "uk",
+      { limit: 100 },
+      { revalidateSeconds: SITEMAP_REVALIDATE_SECONDS },
+    );
+    await data.listProducts("uk", { limit: 100 });
+    expect((calls[0]?.init as { next?: { revalidate?: number } }).next?.revalidate).toBe(3600);
+    expect((calls[1]?.init as { next?: { revalidate?: number } }).next?.revalidate).toBe(60);
   });
 
   it("calls the API directly with ?locale=, the data cache options, tags and no cookies", async () => {

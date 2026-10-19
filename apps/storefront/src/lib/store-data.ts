@@ -20,6 +20,9 @@ import { assertLocalesSupported } from "./locale-check";
  */
 export const CATALOG_REVALIDATE_SECONDS = 60;
 
+/** Staleness the sitemap accepts (plan, rendering table: 1 hour). A sitemap is crawled, not browsed. */
+export const SITEMAP_REVALIDATE_SECONDS = 3600;
+
 /** Data cache tags. No catalog events exist yet, so nothing revalidates by tag; they are here for the day it does. */
 export const STORE_TAGS = {
   all: "store",
@@ -52,12 +55,18 @@ export interface StoreDataDependencies {
   fetch?: FetchLike;
 }
 
+export interface ReadOptions {
+  /** Data cache lifetime of this read; the default is `CATALOG_REVALIDATE_SECONDS`. */
+  revalidateSeconds?: number;
+}
+
 export interface StoreData {
-  getConfig(): Promise<CatalogOutcome<StoreConfig>>;
-  listCategories(locale: string): Promise<CatalogOutcome<CategoryList>>;
+  getConfig(read?: ReadOptions): Promise<CatalogOutcome<StoreConfig>>;
+  listCategories(locale: string, read?: ReadOptions): Promise<CatalogOutcome<CategoryList>>;
   listProducts(
     locale: string,
     options?: Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">,
+    read?: ReadOptions,
   ): Promise<CatalogOutcome<ProductList>>;
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
 }
@@ -79,6 +88,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     operation: string,
     cacheKey: string,
     tag: string,
+    read: ReadOptions,
     call: (client: StoreClient, options: CallOptions) => Promise<StoreResult<T>>,
   ): Promise<CatalogOutcome<T>> {
     await dependencies.beforeRequest?.();
@@ -88,7 +98,10 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     });
     const options: CallOptions = {
       fetchOptions: {
-        next: { revalidate: CATALOG_REVALIDATE_SECONDS, tags: [STORE_TAGS.all, tag] },
+        next: {
+          revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,
+          tags: [STORE_TAGS.all, tag],
+        },
       },
     };
 
@@ -118,22 +131,24 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
   }
 
   return {
-    getConfig: () =>
-      run("GET /store/config", "config", STORE_TAGS.config, (client, options) =>
+    getConfig: (read = {}) =>
+      run("GET /store/config", "config", STORE_TAGS.config, read, (client, options) =>
         client.getConfig(options),
       ),
-    listCategories: (locale) =>
+    listCategories: (locale, read = {}) =>
       run(
         "GET /store/categories",
         `categories:${locale}`,
         STORE_TAGS.categories,
+        read,
         (client, options) => client.listCategories({ ...options, locale }),
       ),
-    listProducts: (locale, query = {}) =>
+    listProducts: (locale, query = {}, read = {}) =>
       run(
         "GET /store/products",
         `products:${locale}:${JSON.stringify(query)}`,
         STORE_TAGS.products,
+        read,
         (client, options) => client.listProducts({ ...query, ...options, locale }),
       ),
     getProduct: (locale, slug) =>
@@ -141,6 +156,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         "GET /store/products/{slug}",
         `product:${locale}:${slug}`,
         STORE_TAGS.products,
+        {},
         (client, options) => client.getProduct(slug, { ...options, locale }),
       ),
   };
