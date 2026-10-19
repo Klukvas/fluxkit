@@ -72,7 +72,7 @@ export interface StartAppOptions {
   /** `DEFAULT_LOCALE`; defaults to `uk`. Must be one of `locales`. */
   defaultLocale?: string;
   /** `LOCALES`; defaults to `uk`, `en`. */
-  locales?: readonly string[];
+  locales?: string[];
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {

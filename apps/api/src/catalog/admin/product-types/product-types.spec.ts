@@ -289,6 +289,8 @@ describe("admin product types API (real app, real Postgres)", () => {
         isRequired: true,
         position: 1,
         createdAt: expect.any(String),
+        // The attribute definition is embedded (docs/api/catalog.md); its shape is covered in product-types-detail.spec.ts.
+        attribute: expect.objectContaining({ id: first.id, code: first.code, options: [] }),
       });
       expect(result.body.options).toEqual([
         {

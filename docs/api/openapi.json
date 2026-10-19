@@ -16010,6 +16010,155 @@
                             "type": "string",
                             "format": "date-time",
                             "description": "ISO 8601, UTC."
+                          },
+                          "attribute": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "code": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "Translated text: locale code to text. The default locale is required for required texts."
+                              },
+                              "description": {
+                                "nullable": true,
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "string"
+                                },
+                                "description": "Translated text: locale code to text. The default locale is required for required texts."
+                              },
+                              "inputType": {
+                                "type": "string",
+                                "enum": [
+                                  "text",
+                                  "number",
+                                  "boolean",
+                                  "select",
+                                  "multiselect",
+                                  "date"
+                                ]
+                              },
+                              "isLocalized": {
+                                "type": "boolean"
+                              },
+                              "unit": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "validation": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Validation keys of the input type (ADR 0006 section 4), e.g. `min_length` for text, `min`/`max` for number. Unknown keys are rejected."
+                              },
+                              "isFilterable": {
+                                "type": "boolean"
+                              },
+                              "isSearchable": {
+                                "type": "boolean"
+                              },
+                              "isVisibleOnStorefront": {
+                                "type": "boolean"
+                              },
+                              "isComparable": {
+                                "type": "boolean"
+                              },
+                              "isSortable": {
+                                "type": "boolean"
+                              },
+                              "isInternal": {
+                                "type": "boolean"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "options": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "id": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "attributeId": {
+                                      "type": "string",
+                                      "format": "uuid"
+                                    },
+                                    "code": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "string"
+                                      },
+                                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                                    },
+                                    "position": {
+                                      "type": "integer",
+                                      "minimum": -9007199254740991,
+                                      "maximum": 9007199254740991
+                                    },
+                                    "createdAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "description": "ISO 8601, UTC."
+                                    },
+                                    "updatedAt": {
+                                      "type": "string",
+                                      "format": "date-time",
+                                      "description": "ISO 8601, UTC."
+                                    }
+                                  },
+                                  "required": [
+                                    "id",
+                                    "attributeId",
+                                    "code",
+                                    "label",
+                                    "position",
+                                    "createdAt",
+                                    "updatedAt"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "code",
+                              "name",
+                              "description",
+                              "inputType",
+                              "isLocalized",
+                              "unit",
+                              "validation",
+                              "isFilterable",
+                              "isSearchable",
+                              "isVisibleOnStorefront",
+                              "isComparable",
+                              "isSortable",
+                              "isInternal",
+                              "createdAt",
+                              "updatedAt",
+                              "options"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -16019,7 +16168,8 @@
                           "level",
                           "isRequired",
                           "position",
-                          "createdAt"
+                          "createdAt",
+                          "attribute"
                         ],
                         "additionalProperties": false
                       }

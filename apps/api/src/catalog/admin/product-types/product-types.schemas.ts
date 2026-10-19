@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../../common/openapi-formats.js";
 import { paginationQuerySchema } from "../../../common/pagination.js";
+import { attributeDetailResponseSchema } from "../attributes/attributes.schemas.js";
 import { codeSchema, positionSchema } from "../../shared/code-schemas.js";
 import { i18nTextSchema } from "../../shared/i18n-validation.js";
 
@@ -63,9 +64,17 @@ export const productTypeOptionResponseSchema = z.object({
   createdAt: timestampSchema,
 });
 
+/**
+ * An assignment in `GET /admin/product-types/:id` also carries the attribute definition with its options, exactly as
+ * `GET /admin/attributes/:id` shows it, so an editor needs no request per attribute.
+ */
+export const productTypeDetailAttributeResponseSchema = productTypeAttributeResponseSchema.extend({
+  attribute: attributeDetailResponseSchema,
+});
+
 /** `GET /admin/product-types/:id`: the type with its attribute and option assignments (position, then code). */
 export const productTypeDetailResponseSchema = productTypeResponseSchema.extend({
-  attributes: z.array(productTypeAttributeResponseSchema),
+  attributes: z.array(productTypeDetailAttributeResponseSchema),
   options: z.array(productTypeOptionResponseSchema),
 });
 
