@@ -377,9 +377,11 @@ describe("ProductPurchaseView", () => {
     { src: "https://cdn.example.com/a.jpg", alt: "§A", optionValueId: null },
     { src: null, alt: null, optionValueId: null },
   ];
+  const added = async () => ({ status: "added" as const });
   const view = (overrides: Partial<Parameters<typeof ProductPurchaseView>[0]> = {}) =>
     renderToStaticMarkup(
       <ProductPurchaseView
+        onAddToCart={added}
         product={multi}
         gallery={gallery}
         exponent={2}
@@ -535,6 +537,7 @@ describe("ProductPurchaseView", () => {
           locale="uk"
           t={real}
           brand={null}
+          onAddToCart={added}
         />,
       ),
     ).not.toThrow();

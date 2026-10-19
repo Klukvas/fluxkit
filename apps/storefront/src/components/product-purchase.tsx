@@ -1,6 +1,6 @@
 "use client";
 
-import { createStoreClient, type ProductDetail } from "@fluxkit/api-client";
+import type { ProductDetail } from "@fluxkit/api-client";
 import {
   Alert,
   Badge,
@@ -12,10 +12,9 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY, addToCart } from "../lib/add-to-cart";
+import { useState, type FormEvent, type ReactNode } from "react";
+import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
-import { publishCartChange } from "../lib/cart-events";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { galleryFor, type GalleryItem } from "../lib/product-media";
@@ -29,6 +28,7 @@ import {
   type Selection,
 } from "../lib/variant-matcher";
 import { useI18n } from "./i18n-provider";
+import { useCart } from "./session-provider";
 import { StoreImage } from "./store-image";
 import { focusRing } from "./styles";
 
@@ -53,11 +53,10 @@ export interface ProductPurchaseViewProps {
   brand: { name: string; path: string } | null;
   /** Server-rendered content below the purchase block (description, specifications). */
   children?: ReactNode;
-  /** Replaced in tests; the real one posts to the cart and tells the header badge. */
-  onAddToCart?: (input: {
+  /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
+  onAddToCart: (input: {
     variantId: string;
     quantity: number;
-    signal: AbortSignal;
   }) => Promise<{ status: "added" } | { status: "failed"; messageKey: string }>;
 }
 
@@ -75,15 +74,12 @@ export function ProductPurchaseView({
   t,
   brand,
   children,
-  onAddToCart = defaultAddToCart(locale),
+  onAddToCart,
 }: ProductPurchaseViewProps) {
   const [selection, setSelection] = useState<Selection>(() => initialSelection(product));
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
-  const controller = useRef<AbortController | null>(null);
-
-  useEffect(() => () => controller.current?.abort(), []);
 
   const variant = findVariant(product, selection);
   const images = galleryFor(gallery, selectedValueIds(product, selection));
@@ -96,24 +92,18 @@ export function ProductPurchaseView({
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (variant === null || !purchasable || pending) return;
-    controller.current?.abort();
-    const own = new AbortController();
-    controller.current = own;
     setStatus({ state: "pending" });
     try {
-      const outcome = await onAddToCart({
-        variantId: variant.id,
-        quantity,
-        signal: own.signal,
-      });
+      const outcome = await onAddToCart({ variantId: variant.id, quantity });
       setStatus(
         outcome.status === "added"
           ? { state: "added" }
           : { state: "failed", messageKey: outcome.messageKey },
       );
     } catch (error) {
-      // Only an abort (the page was left) is expected to reject; anything else is a bug and stays loud.
-      if (!own.signal.aborted) throw error;
+      // The store reports every failure the shopper can act on as an outcome; a throw is a bug. Free the button, stay loud.
+      setStatus({ state: "failed", messageKey: "errors.generic" });
+      throw error;
     }
   }
 
@@ -276,22 +266,23 @@ export function ProductPurchaseView({
   );
 }
 
-/** The real add: the browser posts to `/store/cart/items` (same origin) and tells the header badge the new item count. */
-function defaultAddToCart(locale: Locale): NonNullable<ProductPurchaseViewProps["onAddToCart"]> {
-  return async ({ variantId, quantity, signal }) => {
-    const outcome = await addToCart(createStoreClient({ baseUrl: "" }), {
-      variantId,
-      quantity,
-      locale,
-      signal,
-      onAdded: (cart) => publishCartChange({ itemCount: cart.itemCount }),
-    });
-    return outcome.status === "added" ? { status: "added" } : outcome;
-  };
-}
-
-/** The island: takes the translator from the page's provider. */
-export function ProductPurchase(props: Omit<ProductPurchaseViewProps, "locale" | "t">) {
+/** The island: takes the translator from the page's provider and adds through the shared cart store. */
+export function ProductPurchase(
+  props: Omit<ProductPurchaseViewProps, "locale" | "t" | "onAddToCart">,
+) {
   const { locale, t } = useI18n();
-  return <ProductPurchaseView {...props} locale={locale} t={t} />;
+  const { store } = useCart();
+  return (
+    <ProductPurchaseView
+      {...props}
+      locale={locale}
+      t={t}
+      onAddToCart={async ({ variantId, quantity }) => {
+        const outcome = await store.add(variantId, quantity);
+        return outcome.status === "ok"
+          ? { status: "added" }
+          : { status: "failed", messageKey: outcome.failure.messageKey };
+      }}
+    />
+  );
 }

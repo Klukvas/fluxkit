@@ -1,17 +1,16 @@
 "use client";
 
-import { createStoreClient } from "@fluxkit/api-client";
 import { Skeleton, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { sessionLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
-import { loadAccountLinkState, type AccountLinkState } from "../lib/session-state";
+import type { SessionState } from "../lib/account-store";
 import { useI18n } from "./i18n-provider";
+import { useAccount } from "./session-provider";
 import { navLink } from "./styles";
 
 /**
- * "Sign in" for a guest, "My account" otherwise. When the state cannot be read the neutral account link is shown (the
+ * "Sign in" for a guest, the customer's first name for a signed-in shopper, "My account" otherwise. When the state cannot be read the neutral account link is shown (the
  * account pages handle a missing session themselves). The slot has a fixed minimum width, so nothing shifts.
  */
 export function AccountLinkView({
@@ -19,7 +18,7 @@ export function AccountLinkView({
   t,
   locale,
 }: {
-  state: AccountLinkState;
+  state: SessionState;
   t: Translator;
   locale: Locale;
 }) {
@@ -34,6 +33,13 @@ export function AccountLinkView({
         <Link href={localizedHref(locale, sessionLinks.signIn)} className={navLink}>
           {t("nav.account.signIn")}
         </Link>
+      ) : state.status === "signedIn" ? (
+        <Link href={localizedHref(locale, sessionLinks.account)} className={`${navLink} max-w-48`}>
+          {/* The name is the customer's own text: rendered as text only, cut with an ellipsis when it is long. */}
+          <span className="truncate">
+            {t("nav.account.named", { name: state.customer.firstName })}
+          </span>
+        </Link>
       ) : (
         <Link href={localizedHref(locale, sessionLinks.account)} className={navLink}>
           {t("nav.account.account")}
@@ -43,21 +49,9 @@ export function AccountLinkView({
   );
 }
 
-/** Reads the session once per page load, from the browser (the session cookie has `Path=/store`). 401 means guest. */
+/** The session comes from the shared account store (`SessionProvider`): one `GET /store/account/me` per page load; 401 means guest. */
 export function AccountLink() {
   const { locale, t } = useI18n();
-  const [state, setState] = useState<AccountLinkState>({ status: "loading" });
-
-  useEffect(() => {
-    const controller = new AbortController();
-    loadAccountLinkState(createStoreClient({ baseUrl: "" }), controller.signal).then(
-      setState,
-      (error: unknown) => {
-        if (!controller.signal.aborted) throw error;
-      },
-    );
-    return () => controller.abort();
-  }, []);
-
-  return <AccountLinkView state={state} t={t} locale={locale} />;
+  const { state } = useAccount();
+  return <AccountLinkView state={state.session} t={t} locale={locale} />;
 }

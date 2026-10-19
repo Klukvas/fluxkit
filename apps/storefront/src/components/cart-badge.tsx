@@ -1,13 +1,12 @@
 "use client";
 
-import { createStoreClient } from "@fluxkit/api-client";
 import { Badge, Skeleton, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { sessionLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
-import { watchCartBadge, type CartBadgeState } from "../lib/session-state";
+import { cartBadgeState, type CartBadgeState } from "../lib/cart-model";
 import { useI18n } from "./i18n-provider";
+import { useCart } from "./session-provider";
 import { navLink } from "./styles";
 
 /**
@@ -45,25 +44,11 @@ export function CartBadgeView({
 }
 
 /**
- * Reads the cart once per page load, from the browser (the cart cookie has `Path=/store` and never reaches the server), and
- * follows the cart-changed events other islands publish (`lib/cart-events.ts`).
+ * The count comes from the shared cart store (`SessionProvider`): the one `GET /store/cart` of the page load, and every later
+ * change of the cart (the product page, the cart page, a sign-in). It makes no request of its own.
  */
 export function CartBadge() {
   const { locale, t } = useI18n();
-  const [state, setState] = useState<CartBadgeState>({ status: "loading" });
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const stop = watchCartBadge({
-      client: createStoreClient({ baseUrl: "" }),
-      onState: setState,
-      signal: controller.signal,
-    });
-    return () => {
-      stop();
-      controller.abort();
-    };
-  }, []);
-
-  return <CartBadgeView state={state} t={t} locale={locale} />;
+  const { state } = useCart();
+  return <CartBadgeView state={cartBadgeState(state)} t={t} locale={locale} />;
 }

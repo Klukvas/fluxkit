@@ -49,4 +49,57 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       expect(file.text, file.path).not.toMatch(/<img[\s>]/);
     }
   });
+
+  // The cart, the session and the account forms (plan: "no secrets in logs, URLs or localStorage"). The checkout attempt of
+  // step 7 may use sessionStorage for its idempotency key; that file is outside this pattern.
+  const personal = sources.filter((file) =>
+    /(^|\/)(cart|account|session|login|register|profile|form|use-form|failure)[^/]*\.tsx?$/.test(
+      file.path,
+    ),
+  );
+
+  it("finds the cart and account sources it guards", () => {
+    expect(personal.map((file) => file.path)).toEqual(
+      expect.arrayContaining([
+        join("lib", "cart-store.ts"),
+        join("lib", "account-store.ts"),
+        join("components", "login-form.tsx"),
+        join("components", "use-form.ts"),
+      ]),
+    );
+  });
+
+  it("keeps the cart, the session and the account forms out of browser storage and cookies", () => {
+    for (const file of personal) {
+      expect(file.text, file.path).not.toMatch(
+        /\b(localStorage|sessionStorage|indexedDB|document\.cookie)\b/,
+      );
+    }
+  });
+
+  it("never logs a password or a form value", () => {
+    for (const file of personal) {
+      for (const call of file.text.matchAll(/console\.\w+\([^;]*\)/gs)) {
+        expect(call[0], `${file.path} logs ${call[0]}`).not.toMatch(/password|values|body/i);
+      }
+    }
+  });
+
+  it("navigates only to paths built by the safe builders (no raw next, no raw URL)", () => {
+    const calls = sources.flatMap((file) =>
+      [...file.text.matchAll(/router\.(?:push|replace)\(([^;]*)\);/gs)].map((match) => ({
+        path: file.path,
+        argument: match[1] as string,
+      })),
+    );
+    expect(calls.length).toBeGreaterThan(3);
+    for (const call of calls) {
+      expect(call.argument, `${call.path}: router.replace(${call.argument})`).toMatch(
+        /^(safeNextPath\(|localizedHref\(|signInHref$)/,
+      );
+    }
+    for (const file of sources) {
+      expect(file.text, file.path).not.toMatch(/window\.location\s*(=|\.(href|assign|replace))/);
+    }
+  });
 });

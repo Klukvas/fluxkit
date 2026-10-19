@@ -1,6 +1,7 @@
-import { locales } from "@fluxkit/ui";
+import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { homeSections } from "../layout/home";
 import { MAIN_CONTENT_ID } from "../layout/navigation";
@@ -10,6 +11,7 @@ import { homeSectionRegistry, HomeSections } from "./home-sections";
 import { LocaleSwitcherView } from "./locale-switcher";
 import { SiteShell } from "./site-shell";
 import { ErrorView, LoadingView, NotFoundView } from "./status-views";
+import { customer } from "../lib/test-fixtures";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 
 const t = sentinelTranslator();
@@ -116,15 +118,36 @@ describe("header islands", () => {
       renderToStaticMarkup(<AccountLinkView state={state} t={t} locale="en" />);
     expect(slot({ status: "guest" })).toContain('href="/en/account/login"');
     expect(slot({ status: "guest" })).toContain("§nav.account.signIn");
-    expect(slot({ status: "signedIn" })).toContain('href="/en/account"');
-    expect(slot({ status: "signedIn" })).toContain("§nav.account.account");
+    expect(slot({ status: "signedIn", customer: customer() })).toContain('href="/en/account"');
+    expect(slot({ status: "signedIn", customer: customer() })).toContain("§nav.account.named");
+    expect(slot({ status: "error" })).toContain("§nav.account.account");
     expect(slot({ status: "error" })).toContain('href="/en/account"');
     const loading = slot({ status: "loading" });
     expect(loading).toContain("§nav.account.loading");
     expect(loading).not.toContain("<a ");
-    for (const state of ["loading", "guest", "signedIn", "error"] as const) {
-      expect(slot({ status: state } as never)).toContain("min-w-28");
+    for (const state of [
+      { status: "loading" },
+      { status: "guest" },
+      { status: "signedIn", customer: customer() },
+      { status: "error" },
+    ] as const) {
+      expect(slot(state)).toContain("min-w-28");
     }
+  });
+
+  it("shows the customer's first name as plain text, never as markup", () => {
+    const real = createTranslator(en, "en");
+    const hostile = customer({
+      firstName: '<img src=x onerror="alert(1)"><script>alert(2)</script>',
+    });
+    const html = renderToStaticMarkup(
+      <AccountLinkView state={{ status: "signedIn", customer: hostile }} t={real} locale="en" />,
+    );
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<script");
+    expect(html).toContain("&lt;img src=x");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).toContain("truncate");
   });
 
   it("switches locale on the same page, keeps the query, marks the current locale", () => {
