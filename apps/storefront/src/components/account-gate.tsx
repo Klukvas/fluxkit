@@ -4,9 +4,9 @@ import type { Customer } from "@fluxkit/api-client";
 import { Alert, Button, Container, Skeleton, Spinner, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { SessionState } from "../lib/account-store";
-import { loginHref } from "../lib/safe-next";
+import { currentPath, loginHref } from "../lib/safe-next";
 import { useI18n } from "./i18n-provider";
 import { useAccount } from "./session-provider";
 import { linkButton } from "./styles";
@@ -80,11 +80,19 @@ export function AccountGate({
   const { state, store } = useAccount();
   const router = useRouter();
   const pathname = usePathname();
-  const signInHref = loginHref(locale, pathname);
+  // The query string (`?page=3`) is read in the browser only, after hydration: the server render has none, and the link must
+  // not differ between the two. The redirect reads it again at the moment it happens, so it never uses a stale value.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    setSearch(window.location.search);
+  }, [pathname]);
+  const signInHref = loginHref(locale, currentPath(pathname, search));
 
   useEffect(() => {
-    if (state.session.status === "guest") router.replace(signInHref);
-  }, [state.session.status, router, signInHref]);
+    if (state.session.status === "guest") {
+      router.replace(loginHref(locale, currentPath(pathname, window.location.search)));
+    }
+  }, [state.session.status, router, locale, pathname]);
 
   return (
     <AccountGateView

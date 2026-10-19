@@ -53,9 +53,16 @@ function isDangerous(form: string): boolean {
   );
 }
 
-function isAuthPage(path: string, locale: Locale): boolean {
-  const pathname = path.split("?")[0] as string;
-  return AUTH_PAGES.some((page) => pathname === `/${locale}${page}`);
+/**
+ * Whether `parsed` (the candidate, resolved by the URL parser) is the login or register page. The parser resolves dot
+ * segments, so `/uk/account/./login` is the login page; the segments may also be percent-encoded (`%6Cogin`), and Next serves
+ * a trailing slash as the same page, so the pathname is decoded and its trailing slashes dropped before it is compared.
+ */
+function isAuthPage(parsed: URL, locale: Locale): boolean {
+  const pathnames = decodedForms(parsed.pathname) ?? [parsed.pathname];
+  return pathnames.some((pathname) =>
+    AUTH_PAGES.some((page) => pathname.replace(/\/+$/, "") === `/${locale}${page}`),
+  );
 }
 
 /**
@@ -70,17 +77,16 @@ export function safeNextPath(value: string | string[] | null | undefined, locale
   if (!value.startsWith(`/${locale}/`)) return fallback(locale);
   const forms = decodedForms(value);
   if (forms === null || forms.some(isDangerous)) return fallback(locale);
-  // The URL parser is the final judge: the result must stay on this origin and inside the locale after normalization.
+  // The string rules above leave no way for the URL parser to change the origin or leave `/{locale}/` (a leading `/{locale}/`,
+  // no `//`, `\`, control character, dot segment or fragment in any decoded form); `safe-next.spec.ts` proves it on generated
+  // values, parsing every answer. The parser is used here to resolve `.` segments for the auth page check.
   let parsed: URL;
   try {
     parsed = new URL(value, "http://storefront.invalid");
   } catch {
     return fallback(locale);
   }
-  if (parsed.origin !== "http://storefront.invalid" || !parsed.pathname.startsWith(`/${locale}/`)) {
-    return fallback(locale);
-  }
-  if (isAuthPage(value, locale)) return fallback(locale);
+  if (isAuthPage(parsed, locale)) return fallback(locale);
   return value;
 }
 
@@ -96,6 +102,11 @@ export function authHref(
   const base = `/${locale}/account/${page}`;
   if (value === null || value === undefined) return base;
   return safeNextPath(value, locale) === value ? `${base}?next=${encodeURIComponent(value)}` : base;
+}
+
+/** The path and query string of the page the visitor is on (`location.pathname + location.search`), as one `next` candidate. */
+export function currentPath(pathname: string, search: string): string {
+  return search === "" || search === "?" ? pathname : `${pathname}${search}`;
 }
 
 /** Where a protected page sends a visitor without a session: the login page, coming back to `currentPath` afterwards. */

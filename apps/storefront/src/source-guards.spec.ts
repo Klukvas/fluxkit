@@ -118,7 +118,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       // `result.href` is the checkout outcome's link, built only by `guestOrderHref`, `accountOrderHref` or the cart path
       // (`lib/checkout-attempt.ts`, tested there).
       expect(call.argument, `${call.path}: router.replace(${call.argument})`).toMatch(
-        /^(safeNextPath\(|localizedHref\(|signInHref$|result\.href$)/,
+        /^(safeNextPath\(|localizedHref\(|loginHref\(|signInHref$|result\.href$)/,
       );
     }
     for (const file of sources) {
