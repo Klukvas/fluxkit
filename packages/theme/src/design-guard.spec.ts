@@ -37,6 +37,17 @@ describe("design guard", () => {
     expect(sources.length).toBeGreaterThan(5);
   });
 
+  it("scans every root with at least one file, the admin app and the new admin components included", () => {
+    for (const root of roots) {
+      expect(files(root).length, root.replace(repoRoot, "")).toBeGreaterThan(0);
+    }
+    const uiFiles = files(join(repoRoot, "packages/ui/src")).map((file) =>
+      file.replace(repoRoot, ""),
+    );
+    expect(uiFiles).toContain("packages/ui/src/data-table.tsx");
+    expect(uiFiles).toContain("packages/ui/src/dialog.tsx");
+  });
+
   for (const [label, pattern] of forbidden) {
     it(`no ${label} in components or apps`, () => {
       const offenders = sources.filter((file) => pattern.test(readFileSync(file, "utf8")));

@@ -2,7 +2,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "./cn";
 import { focusRing } from "./styles";
 
-export type ButtonVariant = "primary" | "secondary";
+export type ButtonVariant = "primary" | "secondary" | "danger";
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
@@ -11,6 +11,8 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "bg-primary text-primary-foreground",
   secondary: "border border-border bg-background text-foreground",
+  /** Outlined, not filled: the theme has no on-danger text color, and the label says what it does. */
+  danger: "border border-danger bg-background text-danger",
 };
 
 export function Button({ variant = "primary", className, type = "button", ...props }: ButtonProps) {
