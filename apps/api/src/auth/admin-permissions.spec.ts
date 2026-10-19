@@ -39,12 +39,13 @@ const PUBLISH_ROUTES = new Set([
   "POST /admin/products/:id/restore",
 ]);
 
-/** The sign-in flow: login is public, the other three serve any signed-in admin whatever the role. */
+/** The sign-in flow: login is public, the other three serve any signed-in admin whatever the role; so does the config read. */
 const PUBLIC_ROUTES = ["POST /admin/auth/login"];
 const AUTHENTICATED_ROUTES = [
   "GET /admin/auth/me",
   "POST /admin/auth/change-password",
   "POST /admin/auth/logout",
+  "GET /admin/config",
 ];
 const USERS_ROUTES = [
   "GET /admin/users",
@@ -172,7 +173,7 @@ describe("admin route permissions", () => {
       }
     });
 
-    it("has exactly one public admin route (login) and exactly three any-signed-in-admin routes", () => {
+    it("has exactly one public admin route (login) and exactly four any-signed-in-admin routes", () => {
       const named = (kind: "public" | "authenticated") =>
         declaredAdminRoutes(manager.app)
           .filter(({ access }) => access.kind === kind)

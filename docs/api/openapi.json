@@ -1008,6 +1008,118 @@
         "tags": ["health"]
       }
     },
+    "/admin/config": {
+      "get": {
+        "operationId": "AdminConfigController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The shop settings.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "defaultLocale": {
+                      "type": "string",
+                      "description": "`DEFAULT_LOCALE`: the locale every required text must contain."
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "`LOCALES`: the locales accepted in translated texts."
+                    },
+                    "shopCurrency": {
+                      "type": "string",
+                      "description": "`SHOP_CURRENCY`: the one currency the shop sells in."
+                    },
+                    "currencyExponent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Digits after the decimal point of the shop currency (minor-unit exponent)."
+                    },
+                    "supportedCurrencies": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "exponent": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["code", "exponent"],
+                        "additionalProperties": false
+                      },
+                      "description": "Every currency a price can be stored in, with its minor-unit exponent."
+                    },
+                    "pricesIncludeTax": {
+                      "type": "boolean",
+                      "description": "`PRICES_INCLUDE_TAX`."
+                    },
+                    "lowStockThreshold": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "`LOW_STOCK_THRESHOLD`."
+                    }
+                  },
+                  "required": [
+                    "defaultLocale",
+                    "locales",
+                    "shopCurrency",
+                    "currencyExponent",
+                    "supportedCurrencies",
+                    "pricesIncludeTax",
+                    "lowStockThreshold"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Locales, shop currency, supported currencies and stock threshold, for the admin UI",
+        "tags": ["admin-config"]
+      }
+    },
     "/store/account/register": {
       "post": {
         "description": "Sets the session cookie. A taken email is 409 `conflict` on `email` (accepted while no email can be sent). A session cookie the request carried is revoked. The guest cart of the `fluxkit_cart` cookie is merged into the new account's cart and the cookie is cleared; `cartNotices` reports what the merge capped or dropped.",
