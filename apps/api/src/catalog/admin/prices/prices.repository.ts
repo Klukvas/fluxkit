@@ -21,6 +21,20 @@ export class PricesRepository {
       .orderBy(asc(price.currency));
   }
 
+  /**
+   * Every price of every variant of the product in one statement: variant position, variant id, then currency, so the
+   * list is stable. A product has at most 250 variants and the table 10 currencies, so it is never paged.
+   */
+  async listOfProduct(db: DbExecutor, productId: string): Promise<PriceRow[]> {
+    const rows = await db
+      .select({ price })
+      .from(price)
+      .innerJoin(variant, eq(variant.id, price.variantId))
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(variant.position), asc(variant.id), asc(price.currency));
+    return rows.map((row) => row.price);
+  }
+
   async find(db: DbExecutor, variantId: string, currency: string): Promise<PriceRow | undefined> {
     const [row] = await db
       .select()

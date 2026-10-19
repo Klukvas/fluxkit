@@ -18,11 +18,13 @@ import {
   inventoryResponseSchema,
   listMovementsQuerySchema,
   movementPageSchema,
+  productInventoryResponseSchema,
   type AdjustmentBody,
   type AdjustmentResponse,
   type InventoryResponse,
   type ListMovementsQuery,
   type MovementResponse,
+  type ProductInventoryResponse,
 } from "./inventory.schemas.js";
 
 const PRODUCT_PARAM = { name: "id", format: "uuid", description: "Product id." };
@@ -32,6 +34,19 @@ const VARIANT_PARAM = { name: "variantId", format: "uuid", description: "Variant
 @AdminController("products")
 export class InventoryController {
   constructor(private readonly inventory: InventoryService) {}
+
+  @Get(":id/inventory")
+  @ApiOperation({
+    summary: "Get the stock flags and levels of every variant of a product (admin only)",
+    description:
+      "One entry per variant in variant order, each exactly the shape of the per-variant read (`levels` per location, `totalAvailable`). Not paged: a product has at most 250 variants. Reads create nothing.",
+  })
+  @ApiParam(PRODUCT_PARAM)
+  @ApiZodResponse(200, productInventoryResponseSchema, "The inventory of every variant.")
+  @ApiProblemResponses(400, 404)
+  getOfProduct(@Param("id", uuidParam("id")) id: string): Promise<ProductInventoryResponse> {
+    return this.inventory.getOfProduct(id);
+  }
 
   @Get(":id/variants/:variantId/inventory")
   @ApiOperation({

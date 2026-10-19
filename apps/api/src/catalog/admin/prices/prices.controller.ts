@@ -42,6 +42,19 @@ export class PricesController {
     return this.prices.list(id, variantId);
   }
 
+  @Get(":id/prices")
+  @ApiOperation({
+    summary: "List the prices of every variant of a product, in every currency",
+    description:
+      "Variant order (position, then id), then currency; each item is the shape of the per-variant list, `variantId` included. Not paged: a product has at most 250 variants.",
+  })
+  @ApiParam(PRODUCT_PARAM)
+  @ApiZodResponse(200, priceListResponseSchema, "The prices (possibly none).")
+  @ApiProblemResponses(400, 404)
+  listOfProduct(@Param("id", uuidParam("id")) id: string): Promise<PriceListResponse> {
+    return this.prices.listOfProduct(id);
+  }
+
   @Put(":id/variants/:variantId/prices/:currency")
   @ApiOperation({
     summary: "Set the price of a variant in one currency (creates it or replaces it entirely)",

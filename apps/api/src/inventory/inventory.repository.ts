@@ -23,6 +23,10 @@ export interface MovementWithLocation extends MovementRow {
   locationCode: string;
 }
 
+export interface LevelOfVariantRow extends LevelWithLocation {
+  variantId: string;
+}
+
 export interface VariantStockRow {
   id: string;
   trackInventory: boolean;
@@ -65,6 +69,36 @@ export class InventoryRepository {
       .from(variant)
       .where(and(eq(variant.id, variantId), eq(variant.productId, productId)));
     return row;
+  }
+
+  /** The variants of the product in variant order (position, then id), one statement. */
+  listVariantsOfProduct(db: DbExecutor, productId: string): Promise<VariantStockRow[]> {
+    return db
+      .select({
+        id: variant.id,
+        trackInventory: variant.trackInventory,
+        allowBackorder: variant.allowBackorder,
+      })
+      .from(variant)
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(variant.position), asc(variant.id));
+  }
+
+  /** Every level row of every variant of the product, location code order within a variant, one statement. */
+  listLevelsOfProduct(db: DbExecutor, productId: string): Promise<LevelOfVariantRow[]> {
+    return db
+      .select({
+        variantId: inventoryLevel.variantId,
+        locationId: inventoryLevel.locationId,
+        locationCode: location.code,
+        onHand: inventoryLevel.onHand,
+        reserved: inventoryLevel.reserved,
+      })
+      .from(inventoryLevel)
+      .innerJoin(variant, eq(variant.id, inventoryLevel.variantId))
+      .innerJoin(location, eq(location.id, inventoryLevel.locationId))
+      .where(eq(variant.productId, productId))
+      .orderBy(asc(location.code));
   }
 
   listLevelsOfVariant(db: DbExecutor, variantId: string): Promise<LevelWithLocation[]> {

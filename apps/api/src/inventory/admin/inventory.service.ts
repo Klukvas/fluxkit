@@ -24,8 +24,10 @@ import type {
   AdjustmentBody,
   AdjustmentResponse,
   InventoryResponse,
+  LevelResponse,
   ListMovementsQuery,
   MovementResponse,
+  ProductInventoryResponse,
 } from "./inventory.schemas.js";
 import type { LocationListResponse } from "./locations.schemas.js";
 
@@ -68,6 +70,36 @@ export class InventoryService {
       allowBackorder: variant.allowBackorder,
       levels,
       totalAvailable: levels.reduce((sum, level) => sum + level.available, 0),
+    };
+  }
+
+  /**
+   * Every variant of the product with its levels, in three statements however many variants and locations there are.
+   * Reads only: a variant without level rows is listed with no levels and nothing is created.
+   */
+  async getOfProduct(productId: string): Promise<ProductInventoryResponse> {
+    await this.requireProduct(this.database, productId);
+    const [variants, levelRows] = await Promise.all([
+      this.inventory.listVariantsOfProduct(this.database, productId),
+      this.inventory.listLevelsOfProduct(this.database, productId),
+    ]);
+    const levelsByVariant = new Map<string, LevelResponse[]>();
+    for (const row of levelRows) {
+      const list = levelsByVariant.get(row.variantId) ?? [];
+      list.push(toLevelResponse(row));
+      levelsByVariant.set(row.variantId, list);
+    }
+    return {
+      items: variants.map((variant) => {
+        const levels = levelsByVariant.get(variant.id) ?? [];
+        return {
+          variantId: variant.id,
+          trackInventory: variant.trackInventory,
+          allowBackorder: variant.allowBackorder,
+          levels,
+          totalAvailable: levels.reduce((sum, level) => sum + level.available, 0),
+        };
+      }),
     };
   }
 

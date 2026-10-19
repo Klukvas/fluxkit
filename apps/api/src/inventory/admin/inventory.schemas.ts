@@ -86,6 +86,9 @@ export const inventoryResponseSchema = z.object({
     .meta({ description: "Sum of available over the levels, whatever the flags say." }),
 });
 
+/** `GET /admin/products/:id/inventory`: one entry per variant, each exactly the shape of the per-variant read. */
+export const productInventoryResponseSchema = z.object({ items: z.array(inventoryResponseSchema) });
+
 export const movementResponseSchema = z.object({
   id: uuidSchema,
   variantId: uuidSchema,
@@ -113,5 +116,6 @@ export type AdjustmentBody = z.output<typeof adjustmentSchema>;
 export type ListMovementsQuery = z.output<typeof listMovementsQuerySchema>;
 export type LevelResponse = z.output<typeof levelResponseSchema>;
 export type InventoryResponse = z.output<typeof inventoryResponseSchema>;
+export type ProductInventoryResponse = z.output<typeof productInventoryResponseSchema>;
 export type MovementResponse = z.output<typeof movementResponseSchema>;
 export type AdjustmentResponse = z.output<typeof adjustmentResponseSchema>;

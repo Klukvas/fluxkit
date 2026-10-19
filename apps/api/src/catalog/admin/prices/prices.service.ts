@@ -70,6 +70,13 @@ export class PricesService {
     return { items: rows.map(toPriceResponse) };
   }
 
+  /** All prices of all variants of the product, in the shape of the per-variant list. */
+  async listOfProduct(productId: string): Promise<PriceListResponse> {
+    await this.requireProduct(this.database, productId);
+    const rows = await this.prices.listOfProduct(this.database, productId);
+    return { items: rows.map(toPriceResponse) };
+  }
+
   /** Creates the price or replaces it entirely (`compareAtAmount` absent or null clears the old price). */
   async put(
     productId: string,

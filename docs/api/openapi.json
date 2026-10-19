@@ -2325,6 +2325,164 @@
         "tags": ["admin-customers"]
       }
     },
+    "/admin/products/{id}/inventory": {
+      "get": {
+        "description": "One entry per variant in variant order, each exactly the shape of the per-variant read (`levels` per location, `totalAvailable`). Not paged: a product has at most 250 variants. Reads create nothing.",
+        "operationId": "InventoryController_getOfProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The inventory of every variant.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "trackInventory": {
+                            "type": "boolean"
+                          },
+                          "allowBackorder": {
+                            "type": "boolean"
+                          },
+                          "levels": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "locationId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "locationCode": {
+                                  "type": "string"
+                                },
+                                "onHand": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "reserved": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "available": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991,
+                                  "description": "max(0, onHand - reserved)."
+                                }
+                              },
+                              "required": [
+                                "locationId",
+                                "locationCode",
+                                "onHand",
+                                "reserved",
+                                "available"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "description": "Only locations that hold a level row; none for a variant that never had stock."
+                          },
+                          "totalAvailable": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Sum of available over the levels, whatever the flags say."
+                          }
+                        },
+                        "required": [
+                          "variantId",
+                          "trackInventory",
+                          "allowBackorder",
+                          "levels",
+                          "totalAvailable"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get the stock flags and levels of every variant of a product (admin only)",
+        "tags": ["admin-products"]
+      }
+    },
     "/admin/products/{id}/variants/{variantId}/inventory": {
       "get": {
         "description": "Reads create nothing: a variant without level rows has an empty `levels` list and `totalAvailable` 0.",
@@ -17214,6 +17372,320 @@
         "tags": ["admin-products"]
       }
     },
+    "/admin/products/{id}/prices": {
+      "get": {
+        "description": "Variant order (position, then id), then currency; each item is the shape of the per-variant list, `variantId` included. Not paged: a product has at most 250 variants.",
+        "operationId": "PricesController_listOfProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The prices (possibly none).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the prices of every variant of a product, in every currency",
+        "tags": ["admin-products"]
+      },
+      "put": {
+        "description": "At most 500 items. Every item is validated; errors carry indexed paths (`items.3.amount`). A variant of another product, or the same variant and currency twice, is rejected.",
+        "operationId": "PricesController_putMany",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Product id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "variantId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                        },
+                        "currency": {
+                          "type": "string",
+                          "description": "Upper-case ISO 4217 code, exactly as listed: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD."
+                        },
+                        "amount": {
+                          "type": "number",
+                          "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
+                        },
+                        "compareAtAmount": {
+                          "nullable": true,
+                          "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
+                          "type": "number"
+                        }
+                      },
+                      "required": ["variantId", "currency", "amount"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["items"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The written prices, in request order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "variantId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "currency": {
+                            "type": "string"
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 1000000000000
+                          },
+                          "compareAtAmount": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "variantId",
+                          "currency",
+                          "amount",
+                          "compareAtAmount",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set many prices of one product's variants in one transaction (all or nothing)",
+        "tags": ["admin-products"]
+      }
+    },
     "/admin/products/{id}/variants/{variantId}/prices/{currency}": {
       "put": {
         "description": "Answers 201 when the price is new and 200 when it replaced one. `compareAtAmount` null or absent clears the old price. Only the shop currency is ever sold.",
@@ -17535,186 +18007,6 @@
           }
         },
         "summary": "Delete the price of a variant in one currency",
-        "tags": ["admin-products"]
-      }
-    },
-    "/admin/products/{id}/prices": {
-      "put": {
-        "description": "At most 500 items. Every item is validated; errors carry indexed paths (`items.3.amount`). A variant of another product, or the same variant and currency twice, is rejected.",
-        "operationId": "PricesController_putMany",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Product id.",
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "items": {
-                    "minItems": 1,
-                    "maxItems": 500,
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "variantId": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
-                        },
-                        "currency": {
-                          "type": "string",
-                          "description": "Upper-case ISO 4217 code, exactly as listed: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD."
-                        },
-                        "amount": {
-                          "type": "number",
-                          "description": "Integer in minor units (for example kopiykas), 0 to 1000000000000. Never a decimal."
-                        },
-                        "compareAtAmount": {
-                          "nullable": true,
-                          "description": "Old price in minor units, an integer strictly greater than amount. null or absent clears it.",
-                          "type": "number"
-                        }
-                      },
-                      "required": ["variantId", "currency", "amount"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["items"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "The written prices, in request order.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "items": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "variantId": {
-                            "type": "string",
-                            "format": "uuid"
-                          },
-                          "currency": {
-                            "type": "string"
-                          },
-                          "amount": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 1000000000000
-                          },
-                          "compareAtAmount": {
-                            "nullable": true,
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991
-                          },
-                          "createdAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          },
-                          "updatedAt": {
-                            "type": "string",
-                            "format": "date-time",
-                            "description": "ISO 8601, UTC."
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "variantId",
-                          "currency",
-                          "amount",
-                          "compareAtAmount",
-                          "createdAt",
-                          "updatedAt"
-                        ],
-                        "additionalProperties": false
-                      }
-                    }
-                  },
-                  "required": ["items"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Validation failed: malformed request or invalid fields (see errors).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication required.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Not found.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error. Details are only in the server log.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProblemDetailsDoc"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Set many prices of one product's variants in one transaction (all or nothing)",
         "tags": ["admin-products"]
       }
     },
