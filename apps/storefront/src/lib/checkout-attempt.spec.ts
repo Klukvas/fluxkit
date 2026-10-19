@@ -78,27 +78,77 @@ describe("canonicalJson", () => {
 });
 
 describe("requestHash", () => {
-  it("is the hex SHA-256 of the canonical request and changes with any field or the expected total", async () => {
+  const SALT = "0b9f3a52-6a3e-4e7b-9f55-3c1f2a8d7e11";
+
+  it("is a hex SHA-256 of the salt and the canonical request and changes with any field or the expected total", async () => {
     const crypto = webAttemptCrypto(globalThis.crypto);
-    const hash = await requestHash(body(), crypto);
+    const hash = await requestHash(body(), crypto, SALT);
     expect(hash).toMatch(/^[0-9a-f]{64}$/);
-    expect(await requestHash(body(), crypto)).toBe(hash);
-    expect(await requestHash(body({ email: "other@example.test" }), crypto)).not.toBe(hash);
+    expect(await requestHash(body(), crypto, SALT)).toBe(hash);
+    expect(await requestHash(body({ email: "other@example.test" }), crypto, SALT)).not.toBe(hash);
     expect(
-      await requestHash(body({ expectedTotal: { amount: 2999, currency: "UAH" } }), crypto),
+      await requestHash(body({ expectedTotal: { amount: 2999, currency: "UAH" } }), crypto, SALT),
     ).not.toBe(hash);
-    expect(await requestHash(body({ shippingAddress: null }), crypto)).not.toBe(hash);
+    expect(await requestHash(body({ shippingAddress: null }), crypto, SALT)).not.toBe(hash);
   });
 
-  it("holds no personal data: the stored attempt is a key and a hash only", async () => {
+  it("depends on the salt, and is not the plain hash of the body (nothing to precompute or to compare a guess with)", async () => {
+    const crypto = webAttemptCrypto(globalThis.crypto);
+    const salted = await requestHash(body(), crypto, SALT);
+    expect(await requestHash(body(), crypto, "another-salt")).not.toBe(salted);
+    const plain = await crypto.sha256Hex(
+      canonicalJson({ request: body(), expectedTotal: body().expectedTotal }),
+    );
+    expect(salted).not.toBe(plain);
+  });
+
+  it("holds no personal data: the stored attempt is a key, a random salt and a salted hash", async () => {
     const { storage, map } = memoryStorage();
     const manager = createAttemptManager({ storage, crypto: webAttemptCrypto(globalThis.crypto) });
     await manager.keyFor(body());
     const stored = map.get(ATTEMPT_STORAGE_KEY) as string;
-    expect(Object.keys(JSON.parse(stored) as object).sort()).toEqual(["key", "requestHash"]);
+    const parsed = JSON.parse(stored) as Record<string, string>;
+    expect(Object.keys(parsed).sort()).toEqual(["key", "requestHash", "salt"]);
+    expect(parsed["salt"]).toMatch(/^[0-9a-f-]{36}$/);
     for (const secret of ["guest@example.test", "380441234567", "Ada", "Kyiv", "Street"]) {
       expect(stored).not.toContain(secret);
     }
+    // A guess of the personal data cannot be confirmed with a plain hash.
+    const crypto = webAttemptCrypto(globalThis.crypto);
+    const unsalted = await crypto.sha256Hex(
+      canonicalJson({ request: body(), expectedTotal: body().expectedTotal }),
+    );
+    expect(stored).not.toContain(unsalted);
+  });
+
+  it("uses a new salt for every attempt, so the same body stores a different hash after clear()", async () => {
+    const { storage, map } = memoryStorage();
+    const manager = createAttemptManager({ storage, crypto: webAttemptCrypto(globalThis.crypto) });
+    await manager.keyFor(body());
+    const first = JSON.parse(map.get(ATTEMPT_STORAGE_KEY) as string) as Record<string, string>;
+    manager.clear();
+    await manager.keyFor(body());
+    const second = JSON.parse(map.get(ATTEMPT_STORAGE_KEY) as string) as Record<string, string>;
+    expect(second["salt"]).not.toBe(first["salt"]);
+    expect(second["requestHash"]).not.toBe(first["requestHash"]);
+  });
+
+  it("still recognises the same body through the stored salt, also after a reload", async () => {
+    const { storage } = memoryStorage();
+    const key = await createAttemptManager({ storage, crypto: countingCrypto() }).keyFor(body());
+    const reloaded = createAttemptManager({ storage, crypto: countingCrypto() });
+    expect(await reloaded.keyFor(body())).toBe(key);
+    expect(await reloaded.keyFor(body({ email: "other@example.test" }))).not.toBe(key);
+  });
+
+  it("does not trust an attempt stored without a salt (written by an earlier version): it starts a new one", async () => {
+    const { storage, map } = memoryStorage();
+    map.set(ATTEMPT_STORAGE_KEY, '{"key":"old-key","requestHash":"abc"}');
+    const key = await createAttemptManager({ storage, crypto: countingCrypto() }).keyFor(body());
+    expect(key).not.toBe("old-key");
+    expect(
+      Object.keys(JSON.parse(map.get(ATTEMPT_STORAGE_KEY) as string) as object).sort(),
+    ).toEqual(["key", "requestHash", "salt"]);
   });
 });
 
@@ -109,7 +159,8 @@ describe("createAttemptManager", () => {
     const first = await manager.keyFor(body());
     expect(first).toMatch(/^[0-9a-f-]{36}$/);
     expect(await manager.keyFor(body())).toBe(first);
-    expect(crypto.issued).toHaveLength(1);
+    // One attempt issues two random values, the key and the salt; the repeat issues none.
+    expect(crypto.issued).toHaveLength(2);
   });
 
   it("keeps the key across a reload of the tab (a new manager over the same sessionStorage)", async () => {
@@ -149,7 +200,9 @@ describe("createAttemptManager", () => {
       "{",
       "null",
       '{"key":1}',
-      '{"key":"a","requestHash":"b","x":1,"y":2}',
+      '{"key":"a","requestHash":"b","salt":"c","x":1,"y":2}',
+      '{"key":"a","requestHash":"b"}',
+      '{"key":"a","requestHash":"b","salt":3}',
       '"text"',
     ]) {
       const { storage, map } = memoryStorage();
