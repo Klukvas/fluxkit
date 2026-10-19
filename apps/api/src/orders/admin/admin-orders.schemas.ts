@@ -67,7 +67,7 @@ const instantSchema = z.iso
 /**
  * `GET /admin/orders`. Strict: a misspelt filter is a `400`, never a silent "all orders". `placedFrom` is inclusive,
  * `placedTo` exclusive. `q` is an exact order number (the way a person types it) or an exact email; an empty `q`
- * is no filter.
+ * is no filter. `customerId` is the exact id of the customer account that placed the order (guest orders never match).
  */
 export const listAdminOrdersQuerySchema = z
   .strictObject({
@@ -83,6 +83,7 @@ export const listAdminOrdersQuerySchema = z
     placedFrom: instantSchema.optional(),
     placedTo: instantSchema.optional(),
     q: z.string().max(EMAIL_MAX_LENGTH).optional(),
+    customerId: z.guid().meta({ format: "uuid" }).optional(),
   })
   .superRefine((query, context) => {
     if (

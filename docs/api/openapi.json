@@ -8308,9 +8308,19 @@
     },
     "/admin/orders": {
       "get": {
-        "description": "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix.",
+        "description": "Summaries only (no addresses). `placedFrom` is inclusive, `placedTo` exclusive. `q` is an order number (the way a person types it) or an exact email; nothing matches by prefix. `customerId` is the exact id of the customer account that placed the order; every filter combines (AND).",
         "operationId": "AdminOrdersController_list",
         "parameters": [
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "description": "Only the orders placed by this customer account (guest orders never match).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
           {
             "name": "q",
             "required": false,
