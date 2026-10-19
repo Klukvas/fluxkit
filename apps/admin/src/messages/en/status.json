@@ -1,0 +1,11 @@
+{
+  "notFound.title": "Page not found",
+  "notFound.body": "There is no such page in the admin. Check the address.",
+  "notAllowed.title": "Not allowed",
+  "notAllowed.body": "Your role does not allow this page. Ask a shop owner if you need it.",
+  "notBuilt.body": "This section is not built yet.",
+  "error.title": "Something went wrong",
+  "error.body": "The page could not be shown. Reload it; if it happens again, tell the developers.",
+  "error.notFoundData": "This item does not exist (any more).",
+  "error.forbiddenData": "Your role does not allow this. Your permissions were read again."
+}

@@ -1,0 +1,19 @@
+{
+  "account.details": "Account details",
+  "account.email": "Email",
+  "account.role": "Role",
+  "account.lastLogin": "Last sign-in",
+  "account.lastLoginNever": "Not recorded",
+  "role.owner": "Owner",
+  "role.manager": "Manager",
+  "role.viewer": "Viewer",
+  "account.password.heading": "Change password",
+  "account.password.current": "Current password",
+  "account.password.new": "New password",
+  "account.password.newHint": "{min} to {max} characters, not your email address. Your other sessions are signed out.",
+  "account.password.repeat": "Repeat the new password",
+  "account.password.mismatch": "The passwords do not match.",
+  "account.password.submit": "Change password",
+  "account.password.submitting": "Saving…",
+  "account.password.changed": "Password changed. Your other sessions were signed out."
+}

@@ -1,0 +1,11 @@
+{
+  "shell.skipLink": "Перейти до вмісту",
+  "shell.navLabel": "Розділи адмінки",
+  "shell.userLabel": "Ваш обліковий запис",
+  "shell.signedInAs": "Ви увійшли як {email}",
+  "shell.account": "Мій обліковий запис",
+  "shell.signOut": "Вийти",
+  "shell.signingOut": "Вихід…",
+  "shell.navigating": "Завантаження сторінки…",
+  "shell.sessionFailed": "Не вдалося перевірити вхід"
+}

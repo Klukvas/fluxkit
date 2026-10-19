@@ -1,0 +1,19 @@
+{
+  "account.details": "Дані облікового запису",
+  "account.email": "Електронна пошта",
+  "account.role": "Роль",
+  "account.lastLogin": "Останній вхід",
+  "account.lastLoginNever": "Немає даних",
+  "role.owner": "Власник",
+  "role.manager": "Менеджер",
+  "role.viewer": "Переглядач",
+  "account.password.heading": "Змінити пароль",
+  "account.password.current": "Поточний пароль",
+  "account.password.new": "Новий пароль",
+  "account.password.newHint": "Від {min} до {max} символів, не ваша електронна пошта. Інші ваші сеанси буде завершено.",
+  "account.password.repeat": "Повторіть новий пароль",
+  "account.password.mismatch": "Паролі не збігаються.",
+  "account.password.submit": "Змінити пароль",
+  "account.password.submitting": "Збереження…",
+  "account.password.changed": "Пароль змінено. Інші ваші сеанси завершено."
+}

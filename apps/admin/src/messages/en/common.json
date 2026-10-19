@@ -1,0 +1,15 @@
+{
+  "app.name": "Fluxkit Admin",
+  "app.documentTitle": "{page} · Fluxkit Admin",
+  "language.label": "Interface language",
+  "language.uk": "Українська",
+  "language.en": "English",
+  "action.retry": "Try again",
+  "action.reload": "Reload the page",
+  "action.goHome": "Go to the start page",
+  "status.loading": "Loading…",
+  "unsaved.title": "Leave this page?",
+  "unsaved.description": "Your unsaved changes will be lost.",
+  "unsaved.leave": "Leave",
+  "unsaved.stay": "Stay"
+}
