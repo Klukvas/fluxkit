@@ -212,6 +212,72 @@ describe("createStoreData timeouts (review M1)", () => {
   });
 });
 
+describe("createStoreData logs the root cause (review L3)", () => {
+  function refused(): TypeError {
+    // What undici throws: a TypeError "fetch failed" whose cause carries the system error code. The cause's message may hold
+    // an address or a URL; only its name and code are logged.
+    return new TypeError("fetch failed", {
+      cause: Object.assign(
+        new Error("connect ECONNREFUSED http://user:secret@10.0.0.7:3000/store?token=abc"),
+        {
+          code: "ECONNREFUSED",
+        },
+      ),
+    });
+  }
+
+  async function logged(failure: () => never): Promise<string> {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { data } = setup(failure);
+    await expect(data.getConfig()).rejects.toBeInstanceOf(StoreUnavailableError);
+    return String(error.mock.calls[0]?.[0]);
+  }
+
+  it("tells a refused connection from a timeout in the error log", async () => {
+    const refusedLog = await logged(() => {
+      throw refused();
+    });
+    expect(refusedLog).toContain("GET /store/config");
+    expect(refusedLog).toContain("ECONNREFUSED");
+    expect(refusedLog).not.toContain("TimeoutError");
+    vi.restoreAllMocks();
+    const timeoutLog = await logged(() => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    expect(timeoutLog).toContain("TimeoutError");
+    expect(timeoutLog).not.toContain("ECONNREFUSED");
+  });
+
+  it("never logs the cause's message, a URL or a credential", async () => {
+    const text = await logged(() => {
+      throw refused();
+    });
+    expect(text).not.toMatch(/secret|token=|10\.0\.0\.7|http:/);
+  });
+
+  it("logs the cause in the stale-copy warning too", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = false;
+    const { data } = setup(() => {
+      if (down) throw refused();
+      return json({ items: [] });
+    });
+    await data.listCategories("uk");
+    down = true;
+    await data.listCategories("uk");
+    expect(String(warn.mock.calls[0]?.[0])).toContain("ECONNREFUSED");
+  });
+
+  it("follows a long or cyclic cause chain without looping", async () => {
+    const first: Error & { cause?: unknown } = new Error("a");
+    first.cause = new Error("b", { cause: first });
+    const text = await logged(() => {
+      throw first;
+    });
+    expect(text).toContain("GET /store/config");
+  });
+});
+
 describe("createStoreData answers", () => {
   it("returns data for a success", async () => {
     const { data } = setup(() => json(config));

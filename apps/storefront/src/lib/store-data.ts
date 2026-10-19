@@ -185,8 +185,35 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
   };
 }
 
+/** Longest cause chain written to a log line (also stops a cycle). */
+const MAX_CAUSE_DEPTH = 5;
+
+/**
+ * The failure for a log line: its message (the client's messages name the operation only) and the NAME and CODE of every
+ * cause, so a timeout (`TimeoutError`) and a refused connection (`ECONNREFUSED`) read differently. Causes' messages are
+ * left out on purpose: undici puts addresses and URLs in them (AGENTS.md section 11).
+ */
 function describe(failure: unknown): string {
-  return failure instanceof Error ? failure.message : String(failure);
+  const head = failure instanceof Error ? failure.message : String(failure);
+  const causes: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = failure instanceof Error ? failure.cause : undefined;
+  while (current !== undefined && current !== null && !seen.has(current)) {
+    if (causes.length >= MAX_CAUSE_DEPTH) break;
+    seen.add(current);
+    if (typeof current !== "object") {
+      causes.push(typeof current);
+      break;
+    }
+    const { name, code } = current as { name?: unknown; code?: unknown };
+    causes.push(
+      [typeof name === "string" ? name : "unknown", typeof code === "string" ? code : null]
+        .filter((part) => part !== null)
+        .join(" "),
+    );
+    current = (current as { cause?: unknown }).cause;
+  }
+  return causes.length === 0 ? head : `${head} [cause: ${causes.join(" <- ")}]`;
 }
 
 /**
