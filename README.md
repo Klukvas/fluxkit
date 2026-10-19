@@ -318,7 +318,7 @@ packages/providers  payment and shipping provider plugins (none yet)
 packages/ui         token-based components and i18n helpers
 packages/theme      design tokens and their guard tests
 packages/config     env parsing (API and storefront) and feature flags
-packages/api-client typed store API client (hand-written types, checked against docs/api/openapi.json)
+packages/api-client typed store and admin API clients (hand-written types, checked against docs/api/openapi.json)
 seeds/              demo data and ProductType presets (pure data)
 infra/              Docker Compose for Postgres, Redis, Meilisearch
 scripts/            CI and policy scripts
