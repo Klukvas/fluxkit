@@ -12,6 +12,8 @@ for (const path of [
     await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Back to home" }).first()).toBeVisible();
     await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+    // Its own title, not the generic site title (review L9).
+    await expect(page).toHaveTitle(/^Page not found/);
   });
 }
 
@@ -20,4 +22,5 @@ test("the not-found page speaks the locale of the URL", async ({ page }) => {
   expect(response?.status()).toBe(404);
   await expect(page.locator("html")).toHaveAttribute("lang", "uk");
   await expect(page.getByRole("heading", { level: 1, name: "Сторінку не знайдено" })).toBeVisible();
+  await expect(page).toHaveTitle(/^Сторінку не знайдено/);
 });
