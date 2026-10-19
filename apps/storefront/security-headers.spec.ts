@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildContentSecurityPolicy, securityHeaders } from "./next.config.js";
+import { getPathMatch } from "next/dist/shared/lib/router/utils/path-match.js";
+import { buildContentSecurityPolicy, headerRules, securityHeaders } from "./next.config.js";
 
 function directives(policy: string): Map<string, string[]> {
   return new Map(
@@ -114,5 +115,35 @@ describe("securityHeaders", () => {
   it("emits each header once", () => {
     const keys = securityHeaders({ development: false, imageHosts: [] }).map((h) => h.key);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("headerRules: Referrer-Policy per page (Next's own matcher, last matching rule wins)", () => {
+  function headersFor(pathname: string): Map<string, string> {
+    const result = new Map<string, string>();
+    for (const rule of headerRules({ development: false, imageHosts: [] })) {
+      if (getPathMatch(rule.source)(pathname) === false) continue;
+      for (const header of rule.headers) result.set(header.key, header.value);
+    }
+    return result;
+  }
+
+  it("sends no Referer from the guest order page (its fragment holds the access token)", () => {
+    for (const path of ["/uk/order/7K3M-9QX2", "/en/order/7k3m9qx2"]) {
+      expect(headersFor(path).get("Referrer-Policy"), path).toBe("no-referrer");
+      expect(headersFor(path).get("Content-Security-Policy"), path).toContain("default-src 'self'");
+    }
+  });
+
+  it("keeps the site-wide policy everywhere else, the checkout and the account orders included", () => {
+    for (const path of [
+      "/uk",
+      "/uk/checkout",
+      "/en/account/orders/7K3M-9QX2",
+      "/uk/p/order",
+      "/uk/orders",
+    ]) {
+      expect(headersFor(path).get("Referrer-Policy"), path).toBe("strict-origin-when-cross-origin");
+    }
   });
 });
