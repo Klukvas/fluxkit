@@ -25,6 +25,7 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | tailwindcss | 4.3.3 | MIT | OK |
 | vite | 8.3.4 | MIT | OK |
 | @vitejs/plugin-react | 6.1.2 | MIT | OK |
+| react-router | 8.4.0 (pinned, see "Added in admin UI plan step 4b") | MIT | OK, runtime dependency of `apps/admin` only |
 | vitest | 5.0.4 | MIT | OK |
 | @playwright/test | 1.56.1 (pinned, see "Added in storefront plan step 8"; 1.64.1 was the latest seen) | Apache-2.0 | OK, devDependency of `apps/storefront` only (browser binaries are downloaded separately and are not part of any delivery) |
 | eslint | 10.12.0 | MIT | OK |
@@ -117,6 +118,23 @@ Approved by the owner 2026-10-18 (quiz, recommended answers): `@playwright/test`
 | Browser | not an npm package: `playwright install chromium` downloads Chromium and its headless shell (about 0.9 GB unpacked on disk: 597 MB + 323 MB + ffmpeg 5 MB for revision 1194) into the user cache or `PLAYWRIGHT_BROWSERS_PATH`; development and CI only, never shipped. Chromium's own third-party licenses are those of the browser build and are not redistributed by us |
 | Policy scripts | `pnpm check:licenses` allows it as a dev dependency on the strict list (Apache-2.0); `pnpm audit:prod` covers production dependencies only and never sees it; the `policy` job's report-only `pnpm audit` does |
 | Services | none added: the CI job uses the same Postgres, Redis and Meilisearch containers as `verify` (its own database, `fluxkit_e2e_test`) |
+
+## Added in admin UI plan step 4b (admin shell)
+Approved by the owner in principle on 2026-10-19 (admin UI plan, owner answer 4: `react-router` for routing; data hook, forms, validation, permission table and i18n stay hand-written; no `@tanstack/react-query`). Runtime dependency of `apps/admin` only; the storefront does not use it.
+
+| Item | Fact |
+|---|---|
+| Package and pin | `react-router` **8.4.0**, exact, lockfile committed. Published 2026-09-15 (more than two weeks before 2026-10-19); 8.5.0 (published 2026-10-19) was not taken. Peer `react` and `react-dom` `>=19.2.7` (installed 19.3.1); `engines.node >=22.22.0` (the sandbox runs 22.22.0; CI's Node 22 is the latest 22.x) |
+| Use | data-router mode only: `createBrowserRouter` with `basename: "/admin-ui"`, `RouterProvider` from `react-router/dom`, lazy route objects (one chunk per area), `useBlocker` (unsaved changes), `Link`, `Navigate`, `useMatches`, `useNavigation`, `useRouteError`, `useSearchParams`. No framework mode, no server features, no `ScrollRestoration` (it would need an inline script under the strict CSP) |
+| License | MIT (`react-router`, `@remix-run/route-pattern`, `cookie-es`); `pnpm check:licenses` exit 0 (366 packages, 164 runtime) |
+| Transitive packages | 2: `@remix-run/route-pattern` 0.22.1 (2026-06-05, MIT) and `cookie-es` 3.1.1 (2026-03-27, MIT) |
+| Installed size | about 3.2 MB on disk (`react-router` 2.6 MB with development and production builds, `@remix-run/route-pattern` 536 KB, `cookie-es` 48 KB); npm unpacked size of `react-router` 2 856 262 bytes |
+| Bundle cost (measured) | the APIs used add 95 107 bytes raw, 30 809 gzip to a React + React DOM bundle (a probe build: 218 436 to 313 543 raw, 67 385 to 98 194 gzip). The admin's initial JavaScript is 392 050 bytes raw, 120 027 gzip (budget 440 000 / 135 000 in `apps/admin/build-output.spec.ts`); before step 4b the placeholder app was 222 338 raw, 68 976 gzip |
+| Storage | the router reads one `sessionStorage` key of its own (applied view transitions) on start and writes it only after a view transition; the admin uses none, so nothing is written |
+| Audit | `pnpm audit:prod` exit 0 (no known vulnerabilities) on 2026-10-19 |
+| Alternatives considered | a hand-written router (the plan's recommendation, about 200 lines; rejected by the owner's answer); TanStack Router (MIT; typed routes, larger, brings its own conventions) |
+
+Also added to `apps/admin`, no new external package: `vitest` 5.0.4 (dev, same pin as the other packages), `@fluxkit/api-client` (workspace, runtime) and `@fluxkit/core` (workspace, devDependency used by tests only to compare copied constants; a test checks that the bundle contains no zod).
 
 ## Decision 2026-10-14: Python-2.0 for `argparse` at runtime
 Found by `scripts/check-licenses.mjs` (plan step 8): `argparse` is a RUNTIME transitive dependency (`@nestjs/swagger` -> `js-yaml` -> `argparse`). Approved by the owner for this package only

@@ -49,6 +49,13 @@ The storefront reads only these (and `NODE_ENV`); it never needs the API's varia
 
 The `/store/*` rewrite in `apps/storefront/next.config.ts` exists for `next dev` only (the Next phase, not `NODE_ENV`); production builds and servers never emit it. A deployed environment routes `/store/*` to the API with an edge reverse proxy that sets `X-Forwarded-For` itself and runs the API with the exact `TRUST_PROXY` hop count (ADR 0026; runtime evidence in `docs/plans/2026-10-18-storefront.md`, "Runtime test of the dev rewrite").
 
+## Environment variable read by `apps/admin` (development only)
+The admin SPA is static: the built files read no environment variable and `vite build` never calls the API (ADR 0027). One optional variable is read by `apps/admin/vite.config.ts` for `vite dev` and `vite preview` only, from the shell or the repository's root `.env` (the shell wins). Added by admin UI plan step 4b (additive).
+
+| Variable | Required | Default | Meaning |
+|---|---|---|---|
+| `ADMIN_DEV_API_URL` | no | `http://127.0.0.1:3000` | Target of the dev and preview proxy for `/admin`, `/admin/*` and `/admin?...` (never `/admin-ui`). An `http` or `https` origin without path, query, fragment or credentials; anything else stops the dev server with an error naming the variable. Not used in any deployed environment: there the edge proxy routes `/admin/*` to the API |
+
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.
 - `main` (default `dist/index.js`) must export `featureModule`, a Nest module. It is imported dynamically and mounted only if `<name>` is in `FEATURES_ENABLED`.
