@@ -251,6 +251,7 @@ describe("AccountGateView", () => {
       <AccountGateView
         state={state}
         t={t}
+        title="§title"
         signInHref="/uk/account/login?next=%2Fuk%2Faccount"
         onRetry={vi.fn()}
       >
@@ -269,7 +270,7 @@ describe("AccountGateView", () => {
     const html = gate({ status: "guest" });
     expect(html).toContain('href="/uk/account/login?next=%2Fuk%2Faccount"');
     expect(html).toContain("§account.gate.redirecting");
-    expect(html).toContain("<h1");
+    expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
   it("offers a retry when the session cannot be read, and a busy skeleton while it loads", () => {
@@ -277,6 +278,11 @@ describe("AccountGateView", () => {
     const loading = gate({ status: "loading" });
     expect(loading).toContain('aria-busy="true"');
     expect(loading).toContain("§account.loading");
+    // Every state of the route has one heading, the server-rendered one too.
+    for (const status of ["loading", "guest", "error"] as const) {
+      expect(gate({ status }).match(/<h1[^>]*>§title<\/h1>/g), status).toHaveLength(1);
+    }
+    expect(gate({ status: "signedIn", customer: customer() })).not.toContain("§title");
   });
 });
 

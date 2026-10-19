@@ -212,7 +212,6 @@
   "account.signedIn.title": "Ви увійшли",
   "account.signedIn.description": "Ви увійшли як {name}.",
   "account.signedIn.account": "Перейти до облікового запису",
-  "account.gate.title": "Мій обліковий запис",
   "account.gate.redirecting": "Переходимо до сторінки входу.",
   "account.gate.signIn": "Увійти",
   "account.gate.error": "Не вдалося завантажити обліковий запис.",

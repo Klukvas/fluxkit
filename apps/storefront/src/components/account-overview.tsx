@@ -84,7 +84,7 @@ export function AccountOverview() {
   }
 
   return (
-    <AccountGate>
+    <AccountGate titleKey="account.title">
       {(customer) => (
         <AccountOverviewView
           customer={customer}

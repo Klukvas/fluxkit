@@ -206,7 +206,6 @@
   "account.signedIn.title": "You are signed in",
   "account.signedIn.description": "Signed in as {name}.",
   "account.signedIn.account": "Go to my account",
-  "account.gate.title": "My account",
   "account.gate.redirecting": "Taking you to the sign-in page.",
   "account.gate.signIn": "Sign in",
   "account.gate.error": "Your account could not be loaded.",

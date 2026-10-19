@@ -263,7 +263,7 @@ function PasswordForm() {
 export function ProfilePage() {
   const { locale, t } = useI18n();
   return (
-    <AccountGate>
+    <AccountGate titleKey="account.profile.heading">
       {(customer) => (
         <Container className="flex flex-col gap-10 py-8">
           <div className="flex flex-col gap-2">
