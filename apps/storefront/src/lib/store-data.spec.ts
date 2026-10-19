@@ -3,6 +3,7 @@ import {
   CATALOG_REVALIDATE_SECONDS,
   SITEMAP_REVALIDATE_SECONDS,
   StoreUnavailableError,
+  isCacheableProductQuery,
   createStoreData,
   ensureLocalesSupported,
 } from "./store-data";
@@ -89,14 +90,13 @@ describe("createStoreData requests", () => {
 
   it("passes the product list filters and tags the products", async () => {
     const { data, calls } = setup(() => json({ items: [], total: 0, limit: 8, offset: 0 }));
-    await data.listProducts("uk", { limit: 8, category: "shoes", brand: "acme", offset: 16 });
+    await data.listProducts("uk", { limit: 8, category: "shoes", offset: 16 });
     const url = new URL(calls[0]?.url ?? "");
     expect(url.pathname).toBe("/store/products");
     expect(Object.fromEntries(url.searchParams)).toEqual({
       locale: "uk",
       limit: "8",
       category: "shoes",
-      brand: "acme",
       offset: "16",
     });
     expect(((calls[0]?.init as { next?: { tags?: string[] } }).next ?? {}).tags).toEqual([
@@ -125,6 +125,42 @@ describe("createStoreData requests", () => {
     });
     await data.getConfig();
     expect(order).toEqual(["beforeRequest", "baseUrl"]);
+  });
+});
+
+describe("data cache of filtered lists (review M2)", () => {
+  type Init = { cache?: string; next?: { revalidate?: number; tags?: string[] } };
+
+  it("decides by the query: only a list without a brand filter is cached (the brand is a free value, every one would add a file to .next/cache)", () => {
+    expect(isCacheableProductQuery({})).toBe(true);
+    expect(isCacheableProductQuery({ limit: 24, offset: 48, category: "tools" })).toBe(true);
+    expect(isCacheableProductQuery({ brand: "acme" })).toBe(false);
+    expect(isCacheableProductQuery({ brand: "acme", category: "tools", limit: 24 })).toBe(false);
+    expect(isCacheableProductQuery({ brand: "" })).toBe(false);
+  });
+
+  it("sends a brand-filtered list with cache: no-store and no revalidate, an unfiltered one with the 60 s data cache", async () => {
+    const { data, calls } = setup(() => json({ items: [], total: 0, limit: 24, offset: 0 }));
+    await data.listProducts("uk", { limit: 24, brand: "acme" });
+    await data.listProducts("uk", { limit: 24 });
+    const filtered = calls[0]?.init as Init;
+    expect(filtered.cache).toBe("no-store");
+    expect(filtered.next).toBeUndefined();
+    const plain = calls[1]?.init as Init;
+    expect(plain.cache).toBeUndefined();
+    expect(plain.next?.revalidate).toBe(60);
+  });
+
+  it("still keeps the last good copy of a filtered list in memory (bounded to 200 entries)", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    let down = false;
+    const { data } = setup(() => {
+      if (down) throw new TypeError("fetch failed");
+      return json({ items: [1] });
+    });
+    await data.listProducts("uk", { brand: "acme" });
+    down = true;
+    expect(await data.listProducts("uk", { brand: "acme" })).toMatchObject({ stale: true });
   });
 });
 

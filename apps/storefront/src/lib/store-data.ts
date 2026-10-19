@@ -61,6 +61,20 @@ export interface StoreDataDependencies {
 export interface ReadOptions {
   /** Data cache lifetime of this read; the default is `CATALOG_REVALIDATE_SECONDS`. */
   revalidateSeconds?: number;
+  /** Keep this read out of the Next data cache (`cache: "no-store"`). Set for reads whose URL holds a free value. */
+  noStore?: boolean;
+}
+
+type ProductListQuery = Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">;
+
+/**
+ * Whether a product list may enter the Next data cache. `next start` writes every cached answer to `.next/cache/fetch-cache`
+ * and never deletes one, so the cache key space must be bounded: the brand filter is a free slug the visitor chooses (there
+ * is no brand list to validate it against), so every distinct value would add a file. Everything else in a list URL is
+ * bounded: the locale, a category that exists (the page checks it first), the page size and an offset below the API's cap.
+ */
+export function isCacheableProductQuery(query: ProductListQuery): boolean {
+  return query.brand === undefined;
 }
 
 export interface StoreData {
@@ -68,7 +82,7 @@ export interface StoreData {
   listCategories(locale: string, read?: ReadOptions): Promise<CatalogOutcome<CategoryList>>;
   listProducts(
     locale: string,
-    options?: Omit<ListProductsOptions, "locale" | "signal" | "fetchOptions">,
+    options?: ProductListQuery,
     read?: ReadOptions,
   ): Promise<CatalogOutcome<ProductList>>;
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
@@ -102,12 +116,16 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
     const options: CallOptions = {
       // A hung API ends here (review M1) and the last good copy or error.tsx takes over, instead of after undici's 300 s.
       signal: AbortSignal.timeout(dependencies.readTimeoutMs ?? SERVER_READ_TIMEOUT_MS),
-      fetchOptions: {
-        next: {
-          revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,
-          tags: [STORE_TAGS.all, tag],
-        },
-      },
+      // Next warns when both `cache: "no-store"` and `next.revalidate` are given, so a no-store read carries only the first.
+      fetchOptions:
+        read.noStore === true
+          ? { cache: "no-store" }
+          : {
+              next: {
+                revalidate: read.revalidateSeconds ?? CATALOG_REVALIDATE_SECONDS,
+                tags: [STORE_TAGS.all, tag],
+              },
+            },
     };
 
     let failure: unknown;
@@ -153,7 +171,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         "GET /store/products",
         `products:${locale}:${JSON.stringify(query)}`,
         STORE_TAGS.products,
-        read,
+        isCacheableProductQuery(query) ? read : { ...read, noStore: true },
         (client, options) => client.listProducts({ ...query, ...options, locale }),
       ),
     getProduct: (locale, slug) =>
