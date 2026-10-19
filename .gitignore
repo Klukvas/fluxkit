@@ -13,3 +13,6 @@ coverage/
 *.tsbuildinfo
 third-party/
 .claude/worktrees/
+test-results/
+playwright-report/
+blob-report/
