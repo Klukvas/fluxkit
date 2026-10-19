@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-19 (branch `chore/storefront-step-9-docs`: step 9 of the storefront plan, the docs sweep; PR pending). Storefront steps 1 to 8 are merged (PRs #66 to #77); the details of each step are in the plan's Outcome, `docs/plans/2026-10-18-storefront.md`.
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-19 (branch `fix/storefront-review`: fixes for the storefront step 10 review; PR pending. Step 9, the docs sweep, is on `chore/storefront-step-9-docs`). Storefront steps 1 to 8 are merged (PRs #66 to #77); the details of each step are in the plan's Outcome, `docs/plans/2026-10-18-storefront.md`.
 
 ## Where we are
 
@@ -16,11 +16,11 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 | Auth and roles `2026-10-16-auth-and-roles.md` | Complete: plan PR #31; steps 1 to 4 merged (PRs #32 to #36); step 5 review fixes PR #37 (`pnpm admin:unlock`, ADR 0010). |
 | Pricing and inventory `2026-10-16-pricing-and-inventory.md` | Complete: steps 1 to 6 merged (PRs #40 to #46); review fixes PR #47; option changes keep stock history PR #48 (ADRs 0011 to 0014). |
 | Cart, customers and orders `2026-10-17-cart-and-orders.md` | Complete: plan PR #49; steps 1 to 8 merged (PRs #50 to #60); cancelling a paid order releases unsold reservations PR #59 (ADR 0022); step 8 review closed in PR #64; review fixes PR #61 (guest token on replay, ADR 0023), PR #62 (`MAX_OPEN_ORDERS`, `TRUST_PROXY`, ADR 0024), PR #63 (outbox leases and bounded jobs, ADR 0025). Plan Outcome and `2026-10-18-cart-orders-review-fixes.md`. |
-| Storefront v1 `2026-10-18-storefront.md` | Steps 1 to 8 merged: plan PR #65; ADR 0026 (#66); cart `requiresShipping` and OpenAPI `403` (#67); typed client and `loadStorefrontEnv` (#68); tokens and UI components (#69, danger colour #70); shell (#72); catalog (#73); cart and accounts (#74); checkout and orders (#76); Playwright e2e (#77). Step 9 (docs sweep) on branch `chore/storefront-step-9-docs`, PR pending; step 10 (independent review) pending. No online payment and no search in v1: orders stay `awaiting_payment` until an admin marks them paid or they expire. |
+| Storefront v1 `2026-10-18-storefront.md` | Steps 1 to 8 merged: plan PR #65; ADR 0026 (#66); cart `requiresShipping` and OpenAPI `403` (#67); typed client and `loadStorefrontEnv` (#68); tokens and UI components (#69, danger colour #70); shell (#72); catalog (#73); cart and accounts (#74); checkout and orders (#76); Playwright e2e (#77). Step 9 (docs sweep) on branch `chore/storefront-step-9-docs`, PR pending; step 10 (independent review) done 2026-10-19, its fixes are on `fix/storefront-review`, PR pending (plan: "Step 10 review outcome"). No online payment and no search in v1: orders stay `awaiting_payment` until an admin marks them paid or they expire. |
 
 ## Next steps (in order)
 
-1. **Storefront step 10**: independent review by a different agent than the authors (Opus or Codex): XSS and token leakage, CSRF and same-origin assumptions, open redirect, idempotency, money formatting, i18n, accessibility, no API call at build. Findings are fixed before the storefront plan closes. Then the owner decides the storefront known gaps below.
+1. **Storefront step 10 fixes**: the review is done (Opus 5.5, 1 high, 3 medium, 9 low); the fixes are on branch `fix/storefront-review` (PR pending, see the plan's "Step 10 review outcome"). After the merge the storefront plan closes; the owner decides the storefront known gaps below.
 2. **Next plans**, each with its own plan file and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by ADR 0005, see Open decisions), the admin UI (product, order and customer screens), and a privacy plan before the EU launch (not written yet).
 3. **Launch blockers still open**: rate limiting for the catalog routes of `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; in every deployed environment an edge proxy routes `/store/*` to the API and sets `X-Forwarded-For`, with `TRUST_PROXY` set to the exact hop count (ADR 0026; example configurations in `README.md`, not tested in this repository); check the per-address limits from two networks after deployment.
 4. **Auth follow-ups** (each needs its own plan): audit log, session token rotation, Redis-backed login throttle, two-factor, password reset by email.
@@ -41,7 +41,16 @@ Fluxkit is a white-label e-commerce template (own TypeScript core, NestJS + Driz
 
 ## Known gaps (storefront v1, not fixed)
 
-Recorded on purpose; the same list is in the plan's Outcome. None of them is a severity ranking: the e2e README gives no severity for the first four.
+Recorded on purpose; the same list is in the plan's Outcome.
+
+From the step 10 review (fixes on `fix/storefront-review`; these were recorded, not fixed):
+- **L1, order replay with a changed cart** (owner decision 2026-10-18: no API or storefront change). The API's checkout fingerprint covers the cart id, not the lines, and the storefront's attempt hash covers the body only. A lost `201`, then refilling the cart with the same total and sending the same body, returns `200` with the OLD order; the new lines are not ordered. Small impact: the old order holds the same products.
+- **L4, empty 404 and error shells without JavaScript.** Every 404 and error page is served as `<html id="__next_error__">` with an empty body, no `lang` and the generic title; the client renders the translated view. A Next 16 limitation (the 4b finding), not fixed.
+- **Catalog reads are not rate limited** (already a launch blocker below). Since the review fix, brand-filtered lists are not data-cached, so every view of one is an API call; the cache of the other lists is bounded.
+- **Focus after navigation is by path**: a query-only change (paging, a brand link) keeps the focus where it is.
+- **CI e2e artifacts** (traces, videos, screenshots, uploaded when the job fails, kept 7 days) contain throwaway cookies, guest tokens and the e2e owner's session; they belong to an ephemeral, wiped database. Keep real secrets out of the e2e environment.
+- The server-side time limit is 8 s per read and the layout reads the config and the categories one after the other, so a hung API answers a catalog page with `500` after about 16 s.
+ None of them is a severity ranking: the e2e README gives no severity for the first four.
 
 - Findings of storefront step 8 (`apps/storefront/e2e/README.md`, "Findings of step 8"):
   - `Referrer-Policy` belongs to the document: after the client-side navigation from checkout to the order page, the lookup request carries the checkout document's policy (the `Referer` is the order URL without its fragment, so no token). A `<meta name="referrer">` on the order route would close it; not done.

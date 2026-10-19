@@ -6,7 +6,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
 - `src/cn.ts`, `src/styles.ts` - class joiner; shared focus ring (`outline-ring`) and form-control classes.
 - `src/i18n.ts` - `locales`, `defaultLocale`, `isLocale`, `createTranslator(messages, locale?)` (`t(key, values)` with `{name}` interpolation, `t.plural(key, count, values)` with `<key>.<one|few|many|other>` forms from `Intl.PluralRules`; a missing key, form or placeholder value throws), `messagePlaceholders`.
 - `src/button.tsx`, `src/card.tsx`, `src/container.tsx` - primitives.
-- `src/input.tsx`, `src/textarea.tsx`, `src/select.tsx`, `src/checkbox.tsx` - form controls (`forwardRef`, native attributes; invalid style follows `aria-invalid`).
+- `src/input.tsx`, `src/textarea.tsx`, `src/select.tsx`, `src/checkbox.tsx` - form controls (`forwardRef`, native attributes; invalid style follows `aria-invalid`). Their border is `border-border-input` (3:1, WCAG 1.4.11), not the decorative `border-border`; the quantity field uses it too.
 - `src/field.tsx` - label, hint and error around a control; passes `id`, `aria-describedby`, `aria-invalid`, `required` to its render-prop child.
 - `src/alert.tsx` - `info`/`success`/`warning`/`danger`; `danger` is `role="alert"`, the others `role="status"`.
 - `src/badge.tsx`, `src/spinner.tsx` (name from `label`), `src/skeleton.tsx` (decorative, `aria-hidden`), `src/empty-state.tsx`.
