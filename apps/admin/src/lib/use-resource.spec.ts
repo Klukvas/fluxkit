@@ -24,6 +24,19 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/**
+ * A loader that throws once and then never answers: a retry added to the runner cannot loop forever (which would starve
+ * the timers and hang the test run); it shows up as a wrong state or call count instead.
+ */
+function failOnce(error: () => unknown) {
+  let calls = 0;
+  return async (): Promise<AdminResult<unknown>> => {
+    calls += 1;
+    if (calls > 1) return new Promise<AdminResult<unknown>>(() => undefined);
+    throw error();
+  };
+}
+
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("resourceStateFromResult", () => {
@@ -95,8 +108,10 @@ describe("createResourceRunner", () => {
   it("never retries: a network failure calls the loader once and shows an error", async () => {
     const { states, runner } = setup();
     let calls = 0;
+    // A second call would hang instead of failing again, so a retry shows up as a count (and never loops forever).
     runner.run(async () => {
       calls += 1;
+      if (calls > 1) return new Promise<AdminResult<unknown>>(() => undefined);
       throw new NetworkError("x", { cause: new TypeError("fetch failed"), aborted: false });
     });
     await flush();
@@ -107,17 +122,15 @@ describe("createResourceRunner", () => {
 
   it("reports a timeout and an invalid answer as their own failures", async () => {
     const { states, runner } = setup();
-    runner.run(async () => {
-      throw new NetworkError("x", {
-        cause: new DOMException("t", "TimeoutError"),
-        aborted: true,
-      });
-    });
+    runner.run(
+      failOnce(
+        () =>
+          new NetworkError("x", { cause: new DOMException("t", "TimeoutError"), aborted: true }),
+      ),
+    );
     await flush();
     expect(states.at(-1)).toEqual({ status: "error", failure: { kind: "timeout" } });
-    runner.run(async () => {
-      throw new InvalidResponseError("x", { status: 502 });
-    });
+    runner.run(failOnce(() => new InvalidResponseError("x", { status: 502 })));
     await flush();
     expect(states.at(-1)).toEqual({ status: "error", failure: { kind: "invalidResponse" } });
   });
@@ -125,9 +138,7 @@ describe("createResourceRunner", () => {
   it("passes a bug (not a client error) on as a crash, so the error boundary shows it", async () => {
     const { states, runner } = setup();
     const bug = new TypeError("undefined is not a function");
-    runner.run(async () => {
-      throw bug;
-    });
+    runner.run(failOnce(() => bug));
     await flush();
     expect(states.at(-1)).toEqual({ status: "crashed", error: bug });
   });
