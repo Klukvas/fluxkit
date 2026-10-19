@@ -35,6 +35,7 @@ import { AccountGate } from "./account-gate";
 import { OrderStatusView } from "./guest-order-page";
 import { useI18n } from "./i18n-provider";
 import { OrderDetailsView } from "./order-details";
+import { useCancelFocus } from "./use-cancel-focus";
 import { useAccount, useStoreClient } from "./session-provider";
 import { focusRing, linkButton } from "./styles";
 
@@ -222,6 +223,7 @@ function OrderDetail({ number, shop }: { number: string; shop: ShopMoney }) {
     () => store?.getState() ?? initialOrderState,
     () => initialOrderState,
   );
+  useCancelFocus(state.cancel);
 
   const malformed = !isOrderNumber(number);
 

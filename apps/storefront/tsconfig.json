@@ -9,6 +9,7 @@
     "allowJs": false,
     "incremental": true,
     "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "plugins": [{ "name": "next" }],
     "types": ["node"]
   },
@@ -17,6 +18,8 @@
     "next.config.ts",
     "next.config.spec.ts",
     "security-headers.spec.ts",
+    "vitest.config.ts",
+    "e2e",
     "src",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

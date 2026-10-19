@@ -3,7 +3,15 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "**/.turbo/**", "**/.next/**", "pnpm-lock.yaml"],
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "**/.turbo/**",
+      "**/.next/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
+      "pnpm-lock.yaml",
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,

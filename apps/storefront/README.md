@@ -2,7 +2,7 @@
 
 Next.js 16 (App Router, Turbopack) customer storefront. Plan: `docs/plans/2026-10-18-storefront.md`, decisions: ADR 0026, rules: `AGENTS.md` section 2.2 (theming, i18n, layout composition) and `apps/storefront/AGENTS.md` (read the Next docs in `node_modules/next/dist/docs/` before writing Next code: this version differs from older knowledge).
 
-Status (step 7 of the plan): checkout and orders. On top of the catalog (home sections, catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt`) and the cart and accounts (step 6), the checkout page, the guest order page (private link with the token in the URL fragment) and the customer's order history and order page exist, all rendered in the browser (see "Checkout and orders (step 7)"). **v1 takes no payment** (owner answer 9): an order stays `awaiting_payment` until an admin marks it paid or it expires (`ORDER_PAYMENT_TTL_MINUTES`, 30 minutes by default), so the template is not for live sales until the payment plan.
+Status (step 8 of the plan; the browser tests are in `e2e/`, see "End-to-end tests (step 8)"): checkout and orders. On top of the catalog (home sections, catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt`) and the cart and accounts (step 6), the checkout page, the guest order page (private link with the token in the URL fragment) and the customer's order history and order page exist, all rendered in the browser (see "Checkout and orders (step 7)"). **v1 takes no payment** (owner answer 9): an order stays `awaiting_payment` until an admin marks it paid or it expires (`ORDER_PAYMENT_TTL_MINUTES`, 30 minutes by default), so the template is not for live sales until the payment plan.
 
 ## Routes
 
@@ -33,6 +33,7 @@ pnpm build                                       # once, so the workspace packag
 pnpm --filter @fluxkit/storefront dev -p 3001    # development; needs API_INTERNAL_URL (root .env or shell) and the API on :3000
 pnpm --filter @fluxkit/storefront start -p 3001  # after `pnpm build`
 pnpm --filter @fluxkit/storefront test           # Vitest (unit and renderToStaticMarkup component tests)
+pnpm test:e2e                                    # (repository root) Playwright browser tests: builds, starts API + storefront + proxy on a *_e2e_test database; e2e/README.md
 ```
 
 `next.config.ts` loads the root `.env` for `dev` and `start` (shell variables win). Variables (`docs/contracts/config.md`):
@@ -174,7 +175,7 @@ Labelled inputs (`Field`), `aria-invalid`, hint and error linked with `aria-desc
 
 ### What is NOT tested (no browser here)
 
-Everything that needs a DOM and events: typing, the +/- and Update buttons of a line, focus actually moving after a failed submit, the redirect after sign-in, the account gate's `router.replace`, hydration of the islands, strict-mode double effects, the live region being read by a screen reader. What IS tested: all state logic with injected clients (including staged out-of-order responses), the markup of every view in every state with sentinel and real translators, the handlers a view calls (by reading the element tree), and a real run of the API flows through a same-origin proxy (the plan's "Manual run" with curl, evidence in the step 6 report).
+(Step 8 closed most of this list in a real browser: see "End-to-end tests (step 8)".) Everything that needs a DOM and events: typing, the +/- and Update buttons of a line, focus actually moving after a failed submit, the redirect after sign-in, the account gate's `router.replace`, hydration of the islands, strict-mode double effects, the live region being read by a screen reader. What IS tested: all state logic with injected clients (including staged out-of-order responses), the markup of every view in every state with sentinel and real translators, the handlers a view calls (by reading the element tree), and a real run of the API flows through a same-origin proxy (the plan's "Manual run" with curl, evidence in the step 6 report).
 
 ## Checkout and orders (step 7)
 
@@ -235,7 +236,23 @@ Behind the account gate. `/{locale}/account/orders?page=N`: 24 per page (the API
 
 ### What is NOT tested (no browser here)
 
-Typing, clicking, focus actually moving, `router.replace` after an order, the Clipboard API, `location.hash` being read after hydration and after a client-side navigation into the order page, the locale switcher picking up the fragment in a real browser, `sessionStorage` in real private modes, a screen reader announcing the live regions. Covered instead: the pure logic with injected clients, storage and crypto (including staged and failing requests), the markup of every view state with sentinel and real translators, the handlers a view calls (read from the element tree), source guards, and a real run of the API flows through a same-origin proxy with `next start` (curl, evidence in the step 7 report).
+(Superseded by "End-to-end tests (step 8)" below, which says what is now verified in a browser and what still is not.) Typing, clicking, focus actually moving, `router.replace` after an order, the Clipboard API, `location.hash` being read after hydration and after a client-side navigation into the order page, the locale switcher picking up the fragment in a real browser, `sessionStorage` in real private modes, a screen reader announcing the live regions. Covered instead: the pure logic with injected clients, storage and crypto (including staged and failing requests), the markup of every view state with sentinel and real translators, the handlers a view calls (read from the element tree), source guards, and a real run of the API flows through a same-origin proxy with `next start` (curl, evidence in the step 7 report).
+
+## End-to-end tests (step 8)
+
+`e2e/` holds the Playwright suite (Chromium; run `pnpm test:e2e` from the repository root; how it works, the database rule and troubleshooting: `e2e/README.md`). Nine files, 17 tests, about 40 seconds after a build.
+
+**Now verified in a real browser** (it was "not verified" in the steps 6 and 7 reports): typing into every checkout, login and register field; the redirects after sign-in, registration and checkout (`router.replace`); focus after a failed submit (the sign-in summary receives it; password cleared, email kept); `location.hash` read after hydration (reload of the order link) AND after the client-side navigation from the checkout to the order page; the locale switcher carrying the query string and the fragment in both directions (after hydration); the Clipboard copy and its fallback message when `navigator.clipboard` is missing; the `sessionStorage` attempt across a reload (a refused checkout keeps `{key, requestHash}` only, the same request reuses the key, a changed one gets a new key, a placed order removes it); a double click on the submit; the cart merge notice shown once and dismissed for good; the price-change flow with a real admin price change; `checkout_refused` on the line after another session bought the last unit; the whole purchase and the order cancel by keyboard alone (focus order of the form); the order token absent from every URL, header, body (except the two POST bodies that must carry it), server HTML, title, cookie, storage and console line; HTTP 404 with the not-found page in the browser.
+
+**Still NOT verified in a browser:** screen readers (the live regions and the focus moves are asserted as DOM state, not heard); private browsing and blocked storage (the in-memory attempt and its warning); the insecure-context refusal (all runs are on `127.0.0.1`, a secure context); the +/- and Update buttons of a cart line and removing a line; the account gate's redirect to sign-in with `next` (a guest opening an account page), sign-out, profile and password forms, order-history paging; other browsers and viewports; `next dev`; strict-mode double effects (the suite runs the production build).
+
+**Findings of step 8** (details in the step 8 report):
+- Fixed (separate commit): after "Cancel the order" and after confirming, the focused button disappeared and the focus fell to the start of the page. `lib/cancel-focus.ts` now decides where it goes (the safe answer, the ask button, the success message) and `use-cancel-focus.ts` applies it; the keyboard scenario fails without it.
+- `Referrer-Policy` is a property of a DOCUMENT. After the client-side navigation from the checkout to the order page the document is still the checkout's, so the lookup request carries the default policy's `Referer` (the order page URL without its fragment; a `Referer` never contains a fragment, so the token is not exposed). After a hard load (the bookmark case, a reload) the header applies and the e2e test asserts no `Referer`. A `<meta name="referrer">` on the order route would close the gap; not done (no leak found).
+- Before hydration the locale switcher's links have neither the query string nor the fragment (the server cannot know the fragment); a click in that first moment switches the language and loses them. The e2e test waits for the finished link.
+- After a failed sign-in the password field is cleared (the email stays); a second submit without typing the password again reports "Fill in this field".
+- The 60 s data cache of `next start` is kept on disk (`.next/cache/fetch-cache`): a storefront restarted within a minute of a re-seed shows variant ids of the old seed (add to cart answers "Nothing was found"). The suite deletes the directory before it starts the server.
+- The "confirm the new total" step after `409 cart_changed` is not part of the price-change flow: the price notice's OK is the consent and unblocks the submit (as designed in step 7); the confirmation appears for a changed total without a price notice.
 
 ## Accessibility baseline (what was checked)
 

@@ -26,7 +26,7 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | vite | 8.3.4 | MIT | OK |
 | @vitejs/plugin-react | 6.1.2 | MIT | OK |
 | vitest | 5.0.4 | MIT | OK |
-| @playwright/test | 1.64.1 | Apache-2.0 | OK (browser binaries are downloaded separately, licenses to review before bundling) |
+| @playwright/test | 1.56.1 (pinned, see "Added in storefront plan step 8"; 1.64.1 was the latest seen) | Apache-2.0 | OK, devDependency of `apps/storefront` only (browser binaries are downloaded separately and are not part of any delivery) |
 | eslint | 10.12.0 | MIT | OK |
 | typescript-eslint | 8.71.2 | MIT | OK |
 | prettier | 3.9.10 | MIT | OK |
@@ -104,6 +104,19 @@ Options for sharp: approve LGPL for unmodified, dynamically linked binaries; or 
 Decision (owner, 2026-10-14): both approved. `@img/sharp-libvips-*` (LGPL-3.0-or-later) only as unmodified, dynamically loaded prebuilt binaries brought by `next` -> `sharp`;
 `caniuse-lite` (CC-BY-4.0) as build-time browser data. Obligations to honor: keep license notices and attribution, never modify those packages, and include
 third-party notices with every client delivery (to be generated in CI, plan step 8). Any other LGPL/GPL-family or CC-BY package needs its own approval.
+
+## Added in storefront plan step 8 (end-to-end tests)
+Approved by the owner 2026-10-18 (quiz, recommended answers): `@playwright/test` as a devDependency of `apps/storefront`, Chromium only, the root script `pnpm test:e2e` and the CI job `e2e`. NOT approved and not added: `@axe-core/playwright`.
+
+| Item | Fact |
+|---|---|
+| Package and pin | `@playwright/test` **1.56.1**, exact (no range), lockfile committed. Chosen because its Chromium revision (1194, Chromium 141) is the one installed in the agent sandbox; 1.56.1 includes the fix for GHSA-7mvr-c777-76hp (browser download without TLS verification, fixed in 1.55.1). Dependabot may bump it; the CI job installs the browser that belongs to the version it finds |
+| License | Apache-2.0 (`@playwright/test`, `playwright`, `playwright-core`); optional macOS-only `fsevents@2.3.2` is MIT and not installed on Linux |
+| Transitive packages | 2 (`playwright`, `playwright-core`) plus the optional `fsevents` |
+| Installed size | about 13 MB in `node_modules/.pnpm` (`@playwright/test` 76 KB, `playwright` 4.2 MB, `playwright-core` 8.6 MB) |
+| Browser | not an npm package: `playwright install chromium` downloads Chromium and its headless shell (about 0.9 GB unpacked on disk: 597 MB + 323 MB + ffmpeg 5 MB for revision 1194) into the user cache or `PLAYWRIGHT_BROWSERS_PATH`; development and CI only, never shipped. Chromium's own third-party licenses are those of the browser build and are not redistributed by us |
+| Policy scripts | `pnpm check:licenses` allows it as a dev dependency on the strict list (Apache-2.0); `pnpm audit:prod` covers production dependencies only and never sees it; the `policy` job's report-only `pnpm audit` does |
+| Services | none added: the CI job uses the same Postgres, Redis and Meilisearch containers as `verify` (its own database, `fluxkit_e2e_test`) |
 
 ## Decision 2026-10-14: Python-2.0 for `argparse` at runtime
 Found by `scripts/check-licenses.mjs` (plan step 8): `argparse` is a RUNTIME transitive dependency (`@nestjs/swagger` -> `js-yaml` -> `argparse`). Approved by the owner for this package only
