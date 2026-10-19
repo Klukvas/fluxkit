@@ -24,11 +24,11 @@ Redis and Meilisearch are required by the API at start-up (the same variables as
 
 `e2e/playwright.config.ts` starts three web servers (it never reuses a running one) and waits until they answer:
 
-| Server | Port | Command |
-|---|---|---|
-| API (built, `apps/api/dist/main.js`) | 3100 | `e2e/prepare-database.ts` first, then the API |
-| Storefront (built, `next start`) | 3101 | `.next/cache/fetch-cache` is deleted first (see Troubleshooting) |
-| Proxy (`e2e/proxy.ts`, the only origin a browser sees) | 3102 | `node --experimental-strip-types e2e/proxy.ts` |
+| Server                                                 | Port | Command                                                          |
+| ------------------------------------------------------ | ---- | ---------------------------------------------------------------- |
+| API (built, `apps/api/dist/main.js`)                   | 3100 | `e2e/prepare-database.ts` first, then the API                    |
+| Storefront (built, `next start`)                       | 3101 | `.next/cache/fetch-cache` is deleted first (see Troubleshooting) |
+| Proxy (`e2e/proxy.ts`, the only origin a browser sees) | 3102 | `node --experimental-strip-types e2e/proxy.ts`                   |
 
 Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`.
 
@@ -42,17 +42,17 @@ Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`.
 
 ## Scenarios (`e2e/tests/*.e2e.ts`)
 
-| File | What it proves |
-|---|---|
-| `guest-purchase` | home -> product -> options -> cart -> checkout (address) -> order page with the token in the fragment (after the client-side navigation), the attempt removed from `sessionStorage`, the copy button, reload of the link, cancel with confirmation |
-| `customer-account` | register with a guest cart (kept, no notice needed), customer checkout of a digital product (no address, prefilled contact), account order list and detail, cancel; sign-in merge of 600 + 600 units: the notice is shown once and dismissed for good |
-| `cart-changes` | price changed through the admin API between cart and checkout: `cart_changed`, banner, blocked submit, OK, new total, order at the new total; last unit bought by another session: `checkout_refused` on the line, the attempt (key + hash only) survives a reload, the same body reuses the key, a changed body gets a new one |
-| `locale-switch` | the switcher keeps the page, the query and the order link's fragment (both directions); the copy button's fallback message when the Clipboard API is missing |
-| `keyboard-checkout` | the whole purchase and the order cancel with Tab, Enter, Space and typing only; focus order of the checkout form; focus follows the cancel steps |
-| `token-hygiene` | the order token is in no URL, request or response header, request body (except the lookup/cancel POST bodies, asserted to contain it), server HTML, title, cookie, storage or console message; `Referrer-Policy: no-referrer` on the order page |
-| `double-submit` | a double click on "Place the order" gives exactly one order (counted through the admin API) |
-| `failed-sign-in` | one message, no field marked, focus on the summary, password cleared |
-| `not-found` | unknown product, category, page and out-of-range page answer HTTP 404 with the not-found page, in both locales |
+| File                | What it proves                                                                                                                                                                                                                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `guest-purchase`    | home -> product -> options -> cart -> checkout (address) -> order page with the token in the fragment (after the client-side navigation), the attempt removed from `sessionStorage`, the copy button, reload of the link, cancel with confirmation                                                                              |
+| `customer-account`  | register with a guest cart (kept, no notice needed), customer checkout of a digital product (no address, prefilled contact), account order list and detail, cancel; sign-in merge of 600 + 600 units: the notice is shown once and dismissed for good                                                                           |
+| `cart-changes`      | price changed through the admin API between cart and checkout: `cart_changed`, banner, blocked submit, OK, new total, order at the new total; last unit bought by another session: `checkout_refused` on the line, the attempt (key + hash only) survives a reload, the same body reuses the key, a changed body gets a new one |
+| `locale-switch`     | the switcher keeps the page, the query and the order link's fragment (both directions); the copy button's fallback message when the Clipboard API is missing                                                                                                                                                                    |
+| `keyboard-checkout` | the whole purchase and the order cancel with Tab, Enter, Space and typing only; focus order of the checkout form; focus follows the cancel steps                                                                                                                                                                                |
+| `token-hygiene`     | the order token is in no URL, request or response header, request body (except the lookup/cancel POST bodies, asserted to contain it), server HTML, title, cookie, storage or console message; `Referrer-Policy: no-referrer` on the order page                                                                                 |
+| `double-submit`     | a double click on "Place the order" gives exactly one order (counted through the admin API)                                                                                                                                                                                                                                     |
+| `failed-sign-in`    | one message, no field marked, focus on the summary, password cleared                                                                                                                                                                                                                                                            |
+| `not-found`         | unknown product, category, page and out-of-range page answer HTTP 404 with the not-found page, in both locales                                                                                                                                                                                                                  |
 
 ## Troubleshooting
 

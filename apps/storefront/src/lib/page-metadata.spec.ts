@@ -1,7 +1,7 @@
 import { createTranslator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import uk from "../messages/uk.json";
-import { homeMetadata, listingMetadata, productMetadata } from "./page-metadata";
+import { homeMetadata, listingMetadata, privateMetadata, productMetadata } from "./page-metadata";
 import { product } from "./test-fixtures";
 
 const t = createTranslator(uk, "uk");
@@ -140,5 +140,15 @@ describe("homeMetadata", () => {
         "x-default": "https://shop.example/uk",
       },
     });
+  });
+});
+
+describe("privateMetadata (cart, checkout, account, orders)", () => {
+  it("is noindex AND nofollow, with a title and no canonical or alternates", () => {
+    const meta = privateMetadata(t, "cart.title");
+    expect(meta.robots).toEqual({ index: false, follow: false });
+    expect(String(meta.title)).toContain(uk["cart.title"]);
+    expect(meta.alternates).toBeUndefined();
+    expect(meta.openGraph).toBeUndefined();
   });
 });

@@ -51,4 +51,34 @@ describe("route structure", () => {
       .map((page) => relative(localeRoot, page));
     expect(offenders).toEqual(["(site)/page.tsx"]);
   });
+
+  it("gives every personal page (cart, checkout, account, order) the noindex metadata of privateMetadata", () => {
+    const pages = (directory: string): string[] =>
+      readdirSync(directory).flatMap((name) => {
+        const path = join(directory, name);
+        if (statSync(path).isDirectory()) return pages(path);
+        return name === "page.tsx" ? [path] : [];
+      });
+    const personal = pages(localeRoot).filter(
+      (page) =>
+        /^\(site\)\/(cart|checkout|account|order)\//.test(relative(localeRoot, page)) ||
+        /^\(site\)\/(cart|checkout|account|order)$/.test(dirname(relative(localeRoot, page))),
+    );
+    expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
+      "(site)/account/login/page.tsx",
+      "(site)/account/orders/[number]/page.tsx",
+      "(site)/account/orders/page.tsx",
+      "(site)/account/page.tsx",
+      "(site)/account/profile/page.tsx",
+      "(site)/account/register/page.tsx",
+      "(site)/cart/page.tsx",
+      "(site)/checkout/page.tsx",
+      "(site)/order/[number]/page.tsx",
+    ]);
+    for (const page of personal) {
+      const source = readFileSync(page, "utf8");
+      expect(source, relative(localeRoot, page)).toMatch(/return privateMetadata\(/);
+      expect(source, relative(localeRoot, page)).not.toMatch(/robots:/);
+    }
+  });
 });
