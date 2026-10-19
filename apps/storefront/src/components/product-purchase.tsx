@@ -19,6 +19,7 @@ import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { galleryFor, type GalleryItem } from "../lib/product-media";
 import {
+  chosenValue,
   findVariant,
   hasOptionPicker,
   initialSelection,
@@ -209,7 +210,7 @@ export function ProductPurchaseView({
                       label: value.name,
                       disabled: !isValueAvailable(product, selection, option.code, value.code),
                     }))}
-                    selected={selection[option.code] ?? null}
+                    selected={chosenValue(selection, option.code) ?? null}
                     onChange={(valueCode) => {
                       setSelection(selectValue(product, selection, option.code, valueCode));
                       setActiveImage(0);
