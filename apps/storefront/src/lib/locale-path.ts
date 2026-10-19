@@ -1,13 +1,18 @@
 import { isLocale, type Locale } from "@fluxkit/ui";
 
-/** The same page in another locale: swaps the first path segment and keeps the rest and the query. */
-export function switchLocalePath(pathname: string, target: Locale, search = ""): string {
+/**
+ * The same page in another locale: swaps the first path segment and keeps the rest, the query and the fragment. The
+ * fragment is known only in the browser (`location.hash`, never sent to a server); on the guest order page it holds the
+ * access token, which must survive a language change.
+ */
+export function switchLocalePath(pathname: string, target: Locale, search = "", hash = ""): string {
   const segments = pathname.split("/").filter((segment) => segment !== "");
   const [first, ...rest] = segments;
   if (first === undefined || !isLocale(first)) return `/${target}`;
   const path = [target, ...rest].join("/");
   const query = search === "?" ? "" : search;
-  return `/${path}${query}`;
+  const fragment = hash.startsWith("#") && hash.length > 1 ? hash : "";
+  return `/${path}${query}${fragment}`;
 }
 
 /**

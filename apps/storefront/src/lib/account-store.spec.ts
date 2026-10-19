@@ -362,6 +362,19 @@ describe("account store: profile and password", () => {
   });
 });
 
+describe("account store: sessionEnded (another route answered 401, the order pages)", () => {
+  it("makes the store a guest, drops the notices, and is not undone by an older read", async () => {
+    const { client, calls } = stagedClient();
+    const { store } = storeWith(client);
+    store.start();
+    store.sessionEnded();
+    expect(store.getState()).toEqual({ session: { status: "guest" }, cartNotices: [] });
+    calls[0]?.answer(json({ customer: ada }));
+    await settle();
+    expect(store.getState().session).toEqual({ status: "guest" });
+  });
+});
+
 describe("session stores wired together", () => {
   it("reloads the cart (the header badge) after logout, after a login and after a register", async () => {
     const { client, calls } = immediateClient((call) => {

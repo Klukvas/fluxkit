@@ -57,6 +57,9 @@ export function AccountOverviewView({
       </dl>
       {failure === null ? null : <Alert variant="danger">{failureText(t, failure)}</Alert>}
       <div className="flex flex-wrap gap-3">
+        <Link href={localizedHref(locale, "/account/orders")} className={linkButton}>
+          {t("account.overview.orders")}
+        </Link>
         <Link href={localizedHref(locale, "/account/profile")} className={linkButton}>
           {t("account.overview.edit")}
         </Link>

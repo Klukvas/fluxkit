@@ -7,6 +7,7 @@ import {
   loadHomeData,
   loadProductPage,
   loadShopExponent,
+  loadShopMoney,
 } from "./catalog-data";
 import type { CatalogOutcome, StoreData } from "./store-data";
 import { category, product, summary } from "./test-fixtures";
@@ -230,5 +231,11 @@ describe("loadShopExponent", () => {
     await expect(
       loadShopExponent(fakeData({ getConfig: async () => problem(500, "internal_error") })),
     ).rejects.toThrow(UnexpectedStoreResponseError);
+  });
+});
+
+describe("loadShopMoney", () => {
+  it("reads the shop currency and its digits from the cached shop config (the order pages)", async () => {
+    expect(await loadShopMoney(fakeData())).toEqual({ currency: "UAH", exponent: 2 });
   });
 });

@@ -48,12 +48,7 @@ export default function config(phase: string): NextConfig {
       return [{ source: "/", destination: `/${DEFAULT_LOCALE}`, permanent: false }];
     },
     async headers() {
-      return [
-        {
-          source: "/:path*",
-          headers: securityHeaders({ development: phase === PHASE_DEVELOPMENT_SERVER, imageHosts }),
-        },
-      ];
+      return headerRules({ development: phase === PHASE_DEVELOPMENT_SERVER, imageHosts });
     },
     async rewrites() {
       if (phase !== PHASE_DEVELOPMENT_SERVER) return [];
@@ -114,6 +109,26 @@ export function buildContentSecurityPolicy(options: SecurityHeadersOptions): str
     ["form-action", ["'self'"]],
   ];
   return directives.map(([name, sources]) => `${name} ${sources.join(" ")}`).join("; ");
+}
+
+/**
+ * The pages that show a guest order's access token (it lives in their URL fragment): `/{locale}/order/{number}`. They send
+ * no `Referer` at all. A fragment is never part of a `Referer` anyway; this also hides the order number and keeps the rule
+ * strict should a later change ever put something secret into the path.
+ */
+export const TOKEN_PAGE_SOURCE = "/:locale/order/:path*";
+
+/**
+ * Every header rule, in order. Next applies all rules that match a path and the LAST one wins for a repeated key, so the
+ * order page's `no-referrer` comes after the site-wide policy.
+ */
+export function headerRules(
+  options: SecurityHeadersOptions,
+): { source: string; headers: HeaderEntry[] }[] {
+  return [
+    { source: "/:path*", headers: securityHeaders(options) },
+    { source: TOKEN_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+  ];
 }
 
 export function securityHeaders(options: SecurityHeadersOptions): HeaderEntry[] {

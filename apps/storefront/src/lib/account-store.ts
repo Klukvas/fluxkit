@@ -68,6 +68,8 @@ export interface AccountStore {
   updateProfile(body: UpdateAccountBody): Promise<AccountOutcome<Customer>>;
   changePassword(body: ChangePasswordBody): Promise<AccountOutcome<undefined>>;
   dismissCartNotices(): void;
+  /** A protected call outside this store (the order pages) answered 401: the session is gone, the store is a guest now. */
+  sessionEnded(): void;
 }
 
 const NO_STORE = { fetchOptions: { cache: "no-store" } } as const;
@@ -208,6 +210,9 @@ export function createAccountStore(options: AccountStoreOptions): AccountStore {
       }),
     dismissCartNotices() {
       if (state.cartNotices.length > 0) set({ ...state, cartNotices: [] });
+    },
+    sessionEnded() {
+      apply((seq += 1), { status: "guest" }, []);
     },
   };
 

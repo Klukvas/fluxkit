@@ -5,6 +5,7 @@ import {
   loadHomeData,
   loadProductPage,
   loadShopExponent,
+  loadShopMoney,
 } from "./catalog-data";
 import { storeData } from "./store-data.server";
 
@@ -29,3 +30,6 @@ export const getProductPage = cache((locale: string, slug: string) =>
 
 /** The shop's currency digits, for the cart page's client component (it formats the API's amounts in the browser). */
 export const getShopExponent = cache(() => loadShopExponent(storeData));
+
+/** The shop currency and its digits, for the order pages (an order may be in an older currency). */
+export const getShopMoney = cache(() => loadShopMoney(storeData));

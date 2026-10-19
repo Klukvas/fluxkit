@@ -64,6 +64,7 @@ export const FIELD_ERROR_CODES = [
   "variant_not_sellable",
   "reserved_out_of_range",
   "line_total_out_of_range",
+  "product_title_missing",
   "equals_email",
   "contains_nul",
   "same_as_current",

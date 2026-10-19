@@ -35,6 +35,8 @@ export interface CartState {
 
 export const CART_BUSY_KEY = "cart";
 export const LOAD_BUSY_KEY = "load";
+/** Never in `busy`: `applyCart` marks nothing as busy, it only needs a key for the reducer. */
+const APPLY_KEY = "apply";
 
 export const initialCartState: CartState = {
   status: "loading",
@@ -138,6 +140,11 @@ export interface CartStore {
   /** `DELETE /store/cart`, then a read: the empty cart (with its currency) is the server's, never built here. */
   clear(): Promise<CartOutcome>;
   acknowledge(): Promise<CartOutcome>;
+  /**
+   * A cart the API sent in another answer (the `cart` of a checkout's `409 cart_changed`): it replaces the state like the
+   * answer of a new request (so an older read still in flight cannot undo it) and is published.
+   */
+  applyCart(cart: Cart): void;
   dismissFailure(): void;
 }
 
@@ -287,6 +294,11 @@ export function createCartStore(options: CartStoreOptions): CartStore {
         true,
       ),
     acknowledge: () => run(CART_BUSY_KEY, "acknowledged", () => client.acknowledgeCart(call), true),
+    applyCart(cart) {
+      const seq = (lastSeq += 1);
+      dispatch({ type: "applied", seq, key: APPLY_KEY, cart, announcement: null, failure: null });
+      if (state.appliedSeq === seq) publish(cart);
+    },
     dismissFailure: () => dispatch({ type: "dismissed" }),
   };
   return store;

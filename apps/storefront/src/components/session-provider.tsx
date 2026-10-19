@@ -1,6 +1,6 @@
 "use client";
 
-import { createStoreClient } from "@fluxkit/api-client";
+import { createStoreClient, type StoreClient } from "@fluxkit/api-client";
 import {
   createContext,
   useContext,
@@ -23,12 +23,13 @@ import { createSessionStores, type SessionStores } from "../lib/session-stores";
  */
 
 export const CartStoreContext = createContext<CartStore | null>(null);
+/** The page's one store client, for islands that make calls outside the two stores (the checkout, the order pages). */
+export const StoreClientContext = createContext<StoreClient | null>(null);
 export const AccountStoreContext = createContext<AccountStore | null>(null);
 
 export function SessionProvider({ locale, children }: { locale: string; children: ReactNode }) {
-  const [stores] = useState<SessionStores>(() =>
-    createSessionStores({ client: createStoreClient({ baseUrl: "" }), locale }),
-  );
+  const [client] = useState<StoreClient>(() => createStoreClient({ baseUrl: "" }));
+  const [stores] = useState<SessionStores>(() => createSessionStores({ client, locale }));
 
   useEffect(() => {
     // Both are idempotent, so a strict-mode remount does not read twice.
@@ -38,9 +39,13 @@ export function SessionProvider({ locale, children }: { locale: string; children
   }, [stores]);
 
   return (
-    <CartStoreContext.Provider value={stores.cart}>
-      <AccountStoreContext.Provider value={stores.account}>{children}</AccountStoreContext.Provider>
-    </CartStoreContext.Provider>
+    <StoreClientContext.Provider value={client}>
+      <CartStoreContext.Provider value={stores.cart}>
+        <AccountStoreContext.Provider value={stores.account}>
+          {children}
+        </AccountStoreContext.Provider>
+      </CartStoreContext.Provider>
+    </StoreClientContext.Provider>
   );
 }
 
@@ -54,6 +59,11 @@ export function useCart(): { state: CartState; store: CartStore } {
   const store = required(useContext(CartStoreContext), "useCart");
   const state = useSyncExternalStore(store.subscribe, store.getState, () => initialCartState);
   return { state, store };
+}
+
+/** The same-origin store client of the page (`baseUrl ""`): the cookies have `Path=/store`. */
+export function useStoreClient(): StoreClient {
+  return required(useContext(StoreClientContext), "useStoreClient");
 }
 
 export function useAccount(): { state: AccountState; store: AccountStore } {
