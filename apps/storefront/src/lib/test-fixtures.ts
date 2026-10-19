@@ -1,5 +1,8 @@
 import type {
   Availability,
+  Cart,
+  CartLine,
+  Customer,
   CategoryNode,
   ProductDetail,
   ProductOption,
@@ -92,6 +95,51 @@ export function category(
     name: `Name of ${slug}`,
     description: null,
     children,
+    ...overrides,
+  };
+}
+
+export function cartLine(variantId: string, overrides: Partial<CartLine> = {}): CartLine {
+  return {
+    variantId,
+    productSlug: `product-${variantId}`,
+    sku: `SKU-${variantId}`,
+    title: `Title of ${variantId}`,
+    variantTitle: null,
+    optionValues: [],
+    image: null,
+    quantity: 1,
+    unitPrice: { amount: 1999, currency: "UAH" },
+    compareAtAmount: null,
+    lineTotal: { amount: 1999, currency: "UAH" },
+    availability: "in_stock",
+    notices: [],
+    ...overrides,
+  };
+}
+
+/** Totals are given, never computed: the storefront never adds money and neither do its fixtures. */
+export function cartOf(lines: CartLine[], overrides: Partial<Cart> = {}): Cart {
+  return {
+    lines,
+    subtotal: { amount: 1999, currency: "UAH" },
+    total: { amount: 1999, currency: "UAH" },
+    itemCount: lines.reduce((count, line) => count + line.quantity, 0),
+    purchasable: lines.length > 0,
+    requiresShipping: true,
+    notices: [],
+    ...overrides,
+  };
+}
+
+export function customer(overrides: Partial<Customer> = {}): Customer {
+  return {
+    id: "customer-1",
+    email: "shopper@example.test",
+    firstName: "Ada",
+    lastName: "Shopper",
+    phone: null,
+    createdAt: "2026-10-01T10:00:00.000Z",
     ...overrides,
   };
 }

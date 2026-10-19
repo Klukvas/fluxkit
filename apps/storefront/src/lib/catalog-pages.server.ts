@@ -1,6 +1,11 @@
 import { cache } from "react";
 import { homeSections } from "../layout/home";
-import { loadCatalogListing, loadHomeData, loadProductPage } from "./catalog-data";
+import {
+  loadCatalogListing,
+  loadHomeData,
+  loadProductPage,
+  loadShopExponent,
+} from "./catalog-data";
 import { storeData } from "./store-data.server";
 
 /**
@@ -21,3 +26,6 @@ export const getListing = cache(
 export const getProductPage = cache((locale: string, slug: string) =>
   loadProductPage(storeData, locale, slug),
 );
+
+/** The shop's currency digits, for the cart page's client component (it formats the API's amounts in the browser). */
+export const getShopExponent = cache(() => loadShopExponent(storeData));

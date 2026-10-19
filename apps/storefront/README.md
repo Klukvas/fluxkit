@@ -2,7 +2,7 @@
 
 Next.js 16 (App Router, Turbopack) customer storefront. Plan: `docs/plans/2026-10-18-storefront.md`, decisions: ADR 0026, rules: `AGENTS.md` section 2.2 (theming, i18n, layout composition) and `apps/storefront/AGENTS.md` (read the Next docs in `node_modules/next/dist/docs/` before writing Next code: this version differs from older knowledge).
 
-Status (step 5 of the plan): the catalog. On top of the shell (header, footer, skip link, locale switcher, loading/error/not-found views, money and date formatting, the problem-message map, security headers, the server data layer) the home sections, the catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml` and `robots.txt` exist. The cart, checkout and account pages are later steps; links to them lead to the translated 404 page until then.
+Status (step 6 of the plan): the cart and accounts. On top of the catalog (home sections, catalog, category and product pages, SEO metadata, JSON-LD, `sitemap.xml`, `robots.txt`) the cart page, sign-in, registration, the account overview, profile edit, change password and sign out exist, all rendered in the browser from the shared cart and account stores (see "Cart and accounts (step 6)"). The checkout page and the order pages are step 7; links to them (the cart's checkout button, the account's order history, which has no link yet) lead to the translated 404 page until then.
 
 ## Routes
 
@@ -12,6 +12,9 @@ Status (step 5 of the plan): the catalog. On top of the shell (header, footer, s
 | `/{locale}/catalog` (`?page`, `?brand`) | server, per request | `GET /store/products?limit=24&offset=` (+ `brand`), `GET /store/config` | page 1 index; `noindex, follow` on a brand filter and on page 2 and later; canonical never has `brand` |
 | `/{locale}/c/{slug}` (`?page`, `?brand`) | server, per request | categories tree (breadcrumbs, children), products with `category=` (descendants included by the API) | same rules as the catalog |
 | `/{locale}/p/{slug}` | server, per request; `ProductPurchase` is a client island | `GET /store/products/{slug}`, config, categories | index, Product and BreadcrumbList JSON-LD |
+| `/{locale}/cart` | shell on the server (the shop's currency digits and the image host list); the cart itself is read in the browser | `GET /store/cart` and the cart writes, `no-store`, same origin | `noindex, nofollow`, no canonical |
+| `/{locale}/account/login`, `/register` (`?next`) | shell + client form | `POST /store/account/login`, `register` | `noindex, nofollow` |
+| `/{locale}/account`, `/account/profile` | shell + client, behind the account gate | `GET`, `PATCH /store/account/me`, `change-password`, `logout` | `noindex, nofollow` |
 | `/sitemap.xml`, `/robots.txt` | server, per request | products in pages of 100 (1 hour cache), categories | - |
 
 - **Real 404s.** The catalog, category and product routes live in the `(catalog)` route group, which has NO `loading.tsx` (see the finding in "Rendering and caching"): `notFound()` before the first byte answers HTTP 404. `route-structure.spec.ts` fails if a `loading.tsx` ever appears above them. The cost: these pages show no loading skeleton; the whole page waits for its data (cached 60 s, so usually fast).
@@ -74,9 +77,9 @@ Pure and niche-neutral: option and value codes are data from the API; nothing kn
 
 ## Add to cart and the cart event
 
-- `ProductPurchase` posts `POST /store/cart/items` from the browser (`lib/add-to-cart.ts`: the cart cookie has `Path=/store`, so only the browser can send it; the api-client adds `X-Fluxkit-CSRF`). Quantity 1 to 999 is checked before the request. The button is disabled while the request runs and for an `out_of_stock` variant (decision: the cart would accept such a line but the checkout refuses it; a backorder or untracked variant reports `in_stock`, so the shop's own rule decides).
-- **Messages:** failures show the translated message of the problem (`errors.rule.variant_not_sellable`, `errors.rule.quantity_limit`, `errors.too_many_requests` for 429, `errors.network`, `errors.invalidResponse`, `errors.generic` for anything unknown), never the API's text. The result is announced through a `role="status"` region that is always in the page (a live region only announces changes to a region that already exists); an error is an `Alert` with `role="alert"`.
-- **Cart event (`lib/cart-events.ts`, the base for step 6):** after a successful add the page dispatches `fluxkit:cart-changed` on `window` with `{ itemCount }` (the count the API returned). `watchCartBadge` (`lib/session-state.ts`) makes the header badge show the first `GET /store/cart` value and then every event; an event that arrives while the first read is in flight wins over the older read. Step 6's cart context should publish the same event from the cart page (or replace the listener with a context that feeds the badge); the badge needs no other change.
+- `ProductPurchase` adds through the shared cart store (`cart.add`, `lib/cart-store.ts`): the cart cookie has `Path=/store`, so only the browser can send it; the api-client adds `X-Fluxkit-CSRF`. Quantity 1 to 999 is checked before the request. The button is disabled while the request runs and for an `out_of_stock` variant (decision: the cart would accept such a line but the checkout refuses it; a backorder or untracked variant reports `in_stock`, so the shop's own rule decides).
+- **Messages:** failures show the translated message of the problem (`errors.rule.variant_not_sellable`, `errors.rule.quantity_limit`, `errors.too_many_requests` for 429, `errors.network`, `errors.invalidResponse`, `errors.generic` for anything unknown), never the API's text. The result is announced through a `role="status"` region that is always in the page (a live region only announces changes to a region that already exists); an error is an `Alert` with `role="alert"`. An add failure is returned to the product page and NOT kept in the shared state (the cart page would otherwise show a stale "too many requests" later).
+- **Cart event (`lib/cart-events.ts`, step 5, unchanged):** `fluxkit:cart-changed` on `window` with `{ itemCount }`. It is still the one signal, but the cart store now publishes it for EVERY applied answer (add, quantity, remove, clear, acknowledge, a sign-in's cart reload, the first read) and also follows it: an event from another publisher whose count differs from the store's re-reads the cart (once; the store's own events are ignored, so there is no loop).
 
 ## SEO
 
@@ -98,8 +101,8 @@ Applied to every path: `Content-Security-Policy` (`default-src 'self'`; `script-
 See `docs/files/storefront.md` for one line per file. In short:
 
 - `src/app/[locale]/` routes only compose. `layout.tsx` is the root layout (`<html lang>`, `SiteShell`); `(site)/` holds the pages that need the locale check and the loading state; `error.tsx`, `not-found.tsx` and `[...rest]` are the error states.
-- `src/components/`: storefront components; dumb token-styled parts come from `@fluxkit/ui`. Client islands (`'use client'`): `cart-badge`, `account-link`, `locale-switcher`, `i18n-provider` and the three tiny route files for loading, error and not-found. The pure `*View` components next to them are what the tests render.
-- `src/lib/`: logic without markup (`money`, `date`, `problem-messages`, `store-data` and `store-data.server`, `locale-check`, `locale-path`, `session-state`, `client-messages`, `navigation-categories`).
+- `src/components/`: storefront components; dumb token-styled parts come from `@fluxkit/ui`. Client islands (`'use client'`): `session-provider` (the cart and account stores), `cart-badge`, `account-link`, `session-notices`, `cart-page`, `login-form`, `register-form`, `account-gate`, `account-overview`, `profile-forms`, `product-purchase`, `store-image`, `locale-switcher`, `i18n-provider` and the three tiny route files for loading, error and not-found. The pure `*View` components next to them are what the tests render.
+- `src/lib/`: logic without markup (`money`, `date`, `problem-messages`, `failure`, `store-data` and `store-data.server`, `locale-check`, `locale-path`, `safe-next`, `cart-store`, `account-store`, `session-stores`, `cart-model`, `cart-handlers`, `client-messages`, `navigation-categories`).
 - `src/layout/` and `src/config/`: configuration (below). `src/messages/`: `uk.json`, `en.json`.
 
 ### Layout composition is configuration
@@ -113,10 +116,62 @@ See `docs/files/storefront.md` for one line per file. In short:
 ### i18n
 
 - Every user-facing string is a message key in `src/messages/{uk,en}.json`; components receive a translator (`createTranslator(messages, locale)` from `@fluxkit/ui`), a missing key or placeholder value throws. Server components build it from `messagesByLocale`; client components use `useI18n()`.
-- **Client subset:** only keys with a prefix in `lib/client-messages.ts` (`nav.`, `locale.`, `error.`, `errors.`, `notFound.`, `loading.`) are serialized into the page for the browser. A client component that needs a new namespace must add its prefix there.
+- **Client subset:** only keys with a prefix in `lib/client-messages.ts` (`nav.`, `locale.`, `error.`, `errors.`, `notFound.`, `loading.`, `product.`, `availability.`, `cart.`, `account.`) are serialized into the page for the browser. A client component that needs a new namespace must add its prefix there.
 - **Add a message:** add the key to BOTH files. Plural forms are separate keys (`nav.cart.items.one|few|many|other` for `uk`, `one|other` for `en`, each with `{count}`), used with `t.plural(key, count)`. `messages/messages.spec.ts` fails on: a key in one file only, different `{placeholders}`, an incomplete plural group, and a string literal in the source that looks like a key but is not in the files.
 - **Problems from the API** (`lib/problem-messages.ts`): only translated messages are shown, never the API's `detail` or `message`. `errors.<code>` for a problem `code` (every value of `ProblemDetailsDoc.code`; a test compares the list with `docs/api/openapi.json`), `errors.rule.<rule>` for a `rule_violation` rule, `errors.field.<code>` for an `errors[].code`, `errors.network` and `errors.invalidResponse` for the client's thrown errors, `errors.generic` for anything unknown (the unknown code is logged with `console.warn` in development only). A new API code fails the test until it gets a decision and a message.
 - Money and dates: `lib/money.ts` (`formatMoney({amount, currency}, exponent, locale)`: the amount becomes a decimal string with BigInt arithmetic and `Intl.NumberFormat` formats the string; the exponent is the shop's `currencyExponent` from `GET /store/config`, falling back to Intl's digits for the currency; the storefront never adds or multiplies money) and `lib/date.ts` (`Intl.DateTimeFormat`; an invalid date throws).
+
+## Cart and accounts (step 6)
+
+All personalized pages follow ADR 0026: a server-rendered shell plus client components that call `/store/*` from the browser (`baseUrl ""`, same origin, `cache: "no-store"`; the cookies have `Path=/store` and never reach the Next server). They live in the `(site)` route group (locale check and loading skeleton; they never answer a 404 themselves, so the `(catalog)` rule about real status codes does not apply) and never call `notFound()` (`lib/route-locale.ts` narrows the locale type instead).
+
+### One store, one read (how the cart context and the header badge share the fetch)
+
+`components/session-provider.tsx` sits in `SiteShell`, inside the locale layout, and creates two plain stores (no library; `useSyncExternalStore` hooks `useCart()` and `useAccount()`): `lib/cart-store.ts` and `lib/account-store.ts`, wired by `lib/session-stores.ts`. **Decision:** the header badge and the account link no longer fetch by themselves; they read the stores. So one page load makes ONE `GET /store/cart` and ONE `GET /store/account/me`, whichever islands exist, and the cart page, the badge and the add-to-cart button always show the same cart. `start()` is idempotent (React strict mode mounts twice and still reads once). When the cart page is opened by client-side navigation (the state is already known and may be old) it reads again once; on a direct load the first read is still in flight and no second one is made. Guards: `client-boundary.spec.ts` (the only client file that creates a store client is the provider; the header islands call nothing) and the store tests (`start` twice is one request).
+
+### Cart store rules (each has a test; `lib/cart-store.spec.ts`)
+
+- Server values only. No optimistic update of a quantity or an amount: the cart changes when an answer arrives (mutation checked: an optimistic quantity fails three tests). Busy lines are disabled instead.
+- Every answer that holds a cart replaces the state and publishes `fluxkit:cart-changed`: a `200`, and the `cart` inside a `409 cart_changed` (the reason is still shown, in `failure`).
+- Requests are numbered when they START; an answer replaces the state only when its number is higher than the last applied one. A slow older answer (a write whose reply arrives after a newer write's, or a read that started before a write) is dropped and not published; the failure of an older request is not shown either. Tested both with out-of-order and in-order answers.
+- A failed write (`429` with its `Retry-After` wait, network, `5xx`, a refused rule) keeps the previous cart and shows a translated message (`failureText`: the message, plus "Try again in N seconds" for a 429). A failed FIRST read leaves `status: "error"` with a retry. An unexpected exception (a bug) releases the busy mark and is rethrown.
+- `clear()` is `DELETE /store/cart` and then a read: the empty cart (with its currency) is the server's, the storefront never builds money. There is no "empty the cart" button yet (decision: an accidental click would drop up to 100 lines, and a confirmation step is more UI than step 6 needs); the store method exists and is tested.
+- Quantities 1 to 999 are checked before a request (`errors.field.invalid_quantity`).
+
+### Cart page (`/{locale}/cart`, `components/cart-page.tsx`)
+
+- Lines: image (`StoreImage`, the host allow-list comes from the server shell as a prop; any other host shows the placeholder), title linked to the product, option text from the API's `optionValues`, SKU, unit price, line total, quantity form, remove. The quantity is a draft until the shopper presses "Update" (one request per submit, not one per keystroke); a new server quantity resets the draft.
+- Notices exactly as the plan says: `price_changed` "was X, now Y" (a price seen in ANOTHER currency is formatted with that currency's own digits, not the shop's), `unavailable` (no price, no quantity box, remove), `out_of_stock` (badge plus a hint that the order may be refused), `line_total_out_of_range` ("lower the quantity"; the quantity box stays because lowering it is the repair).
+- Cart-level banner "prices changed" with OK = `POST /store/cart/acknowledge` (disabled while a whole-cart write runs).
+- Summary: item count, subtotal and total through `formatMoney` from the API values; nothing is added or multiplied (mutation checked: a subtotal summed from lines fails two tests). `lineTotal` is shown as the API gives it.
+- Checkout: a link to `/{locale}/checkout` while `purchasable`; otherwise a disabled button with a visible reason (`aria-describedby`). **The checkout page is step 7: the link leads to the translated 404 until then.**
+- States: skeleton with `aria-busy` (loading), an alert with retry (first read failed), an `EmptyState` with a link to the catalog, an alert with dismiss for a failed write. An always-mounted `role="status" aria-live="polite"` region says what the last action did ("Cart updated. Items: 2. Total: ...").
+
+### Session handling (`lib/account-store.ts`)
+
+- The header link shows "Sign in" for a guest (`401` from `me` is the normal answer and logs nothing), the customer's FIRST NAME for a signed-in shopper (`nav.account.named`, rendered as text: a test renders a hostile name and finds no markup; the link truncates a long name), and the neutral account link when the session could not be read.
+- A sign-in or registration sets the session, keeps `cartNotices` and asks the cart to reload (`onSessionChanged`), so the badge shows the merged cart. A sign-out does the same (the account's cart is no longer visible) and drops the notices; a `401` from logout means the session was already gone and counts as signed out. A late session read never overwrites a sign-in that finished after it started (numbered like the cart).
+- **Identical failure.** A `401` on login is ONE message (`account.login.invalid`) with no field marked, whatever the API body says (the API answers the same for an unknown email, a wrong password, a locked and an inactive account; the message only says that repeated failures pause sign-in "for a while", no number). A `429` shows `errors.too_many_requests` plus the wait from `Retry-After` (whole seconds only, capped at a day; anything else shows no wait). A taken email on registration is a field error worded "sign in instead" (the API accepts that trade-off, ADR 0016).
+- **Double submit:** the button is disabled while pending, a ref drops a second submit that arrives before React rendered the disabled button, and the store joins a second call of the same action to the request in flight (one request; tested).
+- **No secrets anywhere:** a password lives in the request body only: never in a URL, the stores' state, a log, `localStorage` or `sessionStorage` (`source-guards.spec.ts` fails on browser storage or `document.cookie` in the cart and account files and on a `console.*` that mentions a password, values or a body; a store test serializes the state after a failed login and looks for the password). A password field is emptied after a refused sign-in; both password fields are emptied after a password change.
+- **Account gate** (`components/account-gate.tsx`): `/account` and `/account/profile` show a skeleton while the session is read, the page for a signed-in customer, and for a guest a link to sign in plus a `router.replace` to the login page with the page as `next`. Any protected call that answers `401` (the session ended while the page was open) makes the store a guest, which triggers the same redirect. Every state has one `h1`, also in the server HTML. When the session cannot be read there is a retry.
+- **Sign-out** goes to the home page.
+
+### The safe `next` rule (`lib/safe-next.ts`)
+
+`/account/login?next=` and `/account/register?next=` say where to go after signing in. It comes from the URL, so `safeNextPath(value, locale)` accepts only a path inside the CURRENT locale's storefront: it must start with `/{locale}/`, contain no backslash, no `//`, no `#`, no control character or space, no `..` segment, in the text AND in any percent-decoded form of it (up to three decodings; a malformed escape is refused), must parse as a same-origin path, and must not be the login or register page itself (a loop). Anything else (including a missing value or a repeated parameter) falls back to `/{locale}/account`. Tested with `//evil.com`, `/\evil.com`, `https://evil.com`, `javascript:...` in mixed case, `data:`, encoded and double-encoded slashes and backslashes, encoded tabs, dot segments (plain and encoded), NUL, a fragment, another locale, a prefix that only looks like the locale, and a 2000 character value. `authHref`/`loginHref` build the links and keep `next` only when it passes. The forms navigate with `router.replace(safeNextPath(...))`; `source-guards.spec.ts` fails on any `router.push/replace` argument that is not built by `safeNextPath`, `localizedHref` or the gate's own login link, and on `window.location` assignments.
+
+### `cartNotices` (merge notices) once
+
+A sign-in or registration returns `cartNotices` (`quantity_capped`, `lines_dropped`). The account store keeps them in memory; `SessionNotices` (the only place that renders them, at the top of `<main>`, guarded by a source test) shows them as a dismissible polite message on whatever page the shopper lands on; dismissing clears them, the next sign-in replaces them, a reload loses them. Verified at the API with a real merge: 600 + 600 gives `quantity_capped` and a line of 999.
+
+### Forms and accessibility
+
+Labelled inputs (`Field`), `aria-invalid`, hint and error linked with `aria-describedby`, `required`, `autocomplete` tokens (`email`, `current-password`, `new-password`, `given-name`, `family-name`, `tel`; tested per input, a mutation removing one fails a test), `noValidate` forms with the server as the judge (blank required fields are reported at once, without a request). After a failed submit focus goes to the first invalid field in PAGE order, else to the error summary (`lib/failure.ts` `focusAfterFailure`, tested with a fake document); the summary is one `role="alert"` box that lists each field error as a link to its field. The password rules (12 to 128 characters, not the email) are a hint; the API's answer shows through `errors.field.*`.
+
+### What is NOT tested (no browser here)
+
+Everything that needs a DOM and events: typing, the +/- and Update buttons of a line, focus actually moving after a failed submit, the redirect after sign-in, the account gate's `router.replace`, hydration of the islands, strict-mode double effects, the live region being read by a screen reader. What IS tested: all state logic with injected clients (including staged out-of-order responses), the markup of every view in every state with sentinel and real translators, the handlers a view calls (by reading the element tree), and a real run of the API flows through a same-origin proxy (the plan's "Manual run" with curl, evidence in the step 6 report).
 
 ## Accessibility baseline (what was checked)
 
@@ -141,11 +196,17 @@ NOT checked (no browser or screen reader here): a real keyboard walk, focus orde
 
 `.next/diagnostics/route-bundle-stats.json` after `next build` (no API running): first-load JS `/[locale]` (home) 502,587 bytes uncompressed (148.9 KB gzip) against 485,404 (146 KB) in step 4b, `/[locale]/catalog` and `/[locale]/c/[slug]` 500,012 (148.0 KB gzip), `/[locale]/p/[slug]` 512,061 (151.7 KB gzip), `/_not-found` unchanged at 456,219. The growth is `next/image`, the purchase island and the cart event code. `@fluxkit/core`, `@fluxkit/config` and zod are still not in any client chunk.
 
+### Step 6 measurement
+
+`.next/diagnostics/route-bundle-stats.json` after `next build` (no API running), first-load JS uncompressed and gzip: `/[locale]` 512,433 (151.6 KB) against 502,587 (148.9 KB) in step 5, `/[locale]/catalog` and `/c/[slug]` 510,432 (150.9 KB) against 500,012, `/[locale]/p/[slug]` 519,343 (153.6 KB) against 512,061, `/[locale]/cart` 523,252 (154.5 KB), `/account` 501,917 (147.8 KB), `/account/login` 502,655 (148.3 KB), `/account/register` 505,299 (148.8 KB), `/account/profile` 506,450 (149.1 KB), `/_not-found` unchanged at 456,219. The growth of 7 to 10 KB on the catalog pages is the two stores and the provider, which now live in the shared layout chunk (the badge used to carry its own loader); the cart page adds about 11 KB over the home page. `@fluxkit/core`, `@fluxkit/config` and zod are still in no client chunk (all `.next/static/chunks/*.js` searched).
+
 ## Known limits and TODOs
 
 - `TODO(fluxkit)` the locale switcher keeps path and query but not the URL fragment; the guest order page (step 7, token in the fragment) must handle that.
 - `TODO(fluxkit)` the product page shows the product-level attributes only; the attributes of the selected variant (`variant.attributes`) are not shown.
-- `TODO(fluxkit)` the "go to the cart" link after an add and the header cart link lead to the 404 page until step 6 builds the cart page.
+- `TODO(fluxkit)` the cart's checkout button leads to `/{locale}/checkout`, which is the translated 404 until step 7. The account overview has no link to the order history (`/account/orders`, step 7) for the same reason.
+- `TODO(fluxkit)` no "empty the cart" button (the store's `clear()` is built and tested, the UI is not).
+- `TODO(fluxkit)` the cart store reads the cart once per page load and when the cart page is opened by navigation; a cart changed in another tab shows up at the next write or navigation (no polling, no `storage` or `focus` listener).
 - The 404 pages of the catalog routes arrive with an empty server-rendered body (the 4b finding: the client completes the page from the RSC payload). Status and `noindex` are correct; a crawler that does not run JavaScript sees no text, which is fine for a 404.
 - Image dimensions are not in the API, so every image is a square crop (`object-cover`); a client with other proportions changes `StoreImage` and the card, not the data.
 - `components/styles.ts` repeats the `focusRing` class of `@fluxkit/ui` (not exported there) and defines link styles because `@fluxkit/ui` has no link-styled button; an exported `focusRing` and a `ButtonLink` in the UI library would remove the duplication.

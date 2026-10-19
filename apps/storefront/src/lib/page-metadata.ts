@@ -95,3 +95,15 @@ export function productMetadata(input: {
     },
   };
 }
+
+/**
+ * Metadata of a page that belongs to one shopper (cart, checkout, account): a title and `noindex, nofollow`. No canonical
+ * and no alternates: the page is not a search result in any language. `robots.txt` keeps crawlers out as well
+ * (`lib/robots.ts`); this tag covers a crawler that follows a link anyway.
+ */
+export function privateMetadata(t: Translator, titleKey: string): Metadata {
+  return {
+    title: pageTitle(t, t(titleKey)),
+    robots: { index: false, follow: false },
+  };
+}
