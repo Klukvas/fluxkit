@@ -71,10 +71,28 @@ export const updateProductSchema = z.strictObject({
   attributes: attributeValuesSchema.optional(),
 });
 
+/**
+ * What a search text may contain: the characters of a slug and of a SKU (`a-z`, `A-Z`, `0-9`, `.`, `_`, `-`). Anything
+ * else cannot start a slug or equal a SKU, so it is a 400 instead of a silent empty result, and LIKE wildcards never
+ * reach the database (the repository escapes `_` anyway).
+ */
+const SEARCH_TEXT_PATTERN = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * `GET /admin/products`: `q` is the start of a slug or an exact SKU of any variant (never a title or a substring: text
+ * search belongs to the search index, AGENTS.md section 2.3). Trimmed; case does not matter.
+ */
 export const listProductsQuerySchema = paginationQuerySchema.extend({
   status: productStatusSchema.optional(),
   categoryId: idSchema.optional(),
   brandId: idSchema.optional(),
+  q: z
+    .string()
+    .trim()
+    .min(1)
+    .max(TEXT_LIMITS.slug)
+    .regex(SEARCH_TEXT_PATTERN, "must contain only letters, digits, dots, underscores and hyphens")
+    .optional(),
 });
 
 /**

@@ -7,6 +7,7 @@ import {
   generateUniqueSlug,
   nextPublishedAt,
   normalizeCategoryAssignments,
+  normalizeSku,
   proposeSku,
   publishPreconditions,
   slugLookupPrefix,
@@ -126,7 +127,10 @@ export class ProductsService {
   }
 
   async list(query: ListProductsQuery): Promise<Page<ProductResponse>> {
-    const { rows, total } = await this.products.list(this.database, query, query);
+    const { q, ...filter } = query;
+    const search =
+      q === undefined ? undefined : { slugPrefix: q.toLowerCase(), sku: normalizeSku(q) };
+    const { rows, total } = await this.products.list(this.database, query, { ...filter, search });
     return toPage(rows.map(toProductResponse), total, query);
   }
 

@@ -17989,8 +17989,21 @@
         "tags": ["admin-products"]
       },
       "get": {
+        "description": "`q` is the start of a slug or an exact SKU of any variant (case and surrounding spaces do not matter); never a title or a substring. It combines (AND) with the other filters. 1 to 160 characters of letters, digits, dots, underscores and hyphens, otherwise 400.",
         "operationId": "ProductsController_list",
         "parameters": [
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Start of a slug, or an exact SKU of any variant of the product.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9._-]+$"
+            }
+          },
           {
             "name": "brandId",
             "required": false,
@@ -18189,7 +18202,7 @@
             }
           }
         },
-        "summary": "List products, ordered by slug; filter by status, category or brand",
+        "summary": "List products, ordered by slug; filter by status, category, brand or search text",
         "tags": ["admin-products"]
       }
     },

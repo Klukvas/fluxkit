@@ -54,11 +54,21 @@ export class ProductsController {
   }
 
   @Get()
-  @ApiOperation({ summary: "List products, ordered by slug; filter by status, category or brand" })
+  @ApiOperation({
+    summary: "List products, ordered by slug; filter by status, category, brand or search text",
+    description:
+      "`q` is the start of a slug or an exact SKU of any variant (case and surrounding spaces do not matter); never a title or a substring. It combines (AND) with the other filters. 1 to 160 characters of letters, digits, dots, underscores and hyphens, otherwise 400.",
+  })
   @ApiPaginationQuery()
   @ApiQuery({ name: "status", required: false, enum: PRODUCT_STATUSES })
   @ApiQuery({ name: "categoryId", required: false, schema: { type: "string", format: "uuid" } })
   @ApiQuery({ name: "brandId", required: false, schema: { type: "string", format: "uuid" } })
+  @ApiQuery({
+    name: "q",
+    required: false,
+    description: "Start of a slug, or an exact SKU of any variant of the product.",
+    schema: { type: "string", minLength: 1, maxLength: 160, pattern: "^[A-Za-z0-9._-]+$" },
+  })
   @ApiZodResponse(200, pageSchema(productResponseSchema), "A page of products.")
   @ApiProblemResponses(400)
   list(
