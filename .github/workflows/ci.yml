@@ -122,6 +122,67 @@ jobs:
           exit 1
       - run: bash scripts/feature-matrix.sh ${{ matrix.mode }}
 
+  e2e:
+    name: End-to-end (Playwright, Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # The suite WIPES this database at every run (apps/storefront/e2e/README.md): a dedicated one, never the verify job's.
+      E2E_DATABASE_URL: postgres://fluxkit:ci-postgres@localhost:5432/fluxkit_e2e_test
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fluxkit
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: fluxkit_e2e_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fluxkit -d fluxkit_e2e_test" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+          MEILI_NO_ANALYTICS: "true"
+        ports: ["7700:7700"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Wait for Meilisearch
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS "$MEILI_URL/health" && exit 0
+            sleep 1
+          done
+          echo "Meilisearch did not become healthy" >&2
+          exit 1
+      - run: pnpm build
+      # Chromium only, the browser revision that belongs to the pinned @playwright/test (no cache: a restored browser of
+      # another revision would be a silent mismatch; the download is a few seconds).
+      - name: Install Chromium
+        run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
+      - run: pnpm test:e2e
+      - name: Upload the Playwright report and traces
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: |
+            apps/storefront/playwright-report
+            apps/storefront/test-results
+          retention-days: 7
+
   policy:
     name: Licenses, audit, notices
     runs-on: ubuntu-latest
