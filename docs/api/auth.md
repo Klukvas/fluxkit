@@ -5,6 +5,8 @@ Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag
 
 Every state-changing request needs `X-Fluxkit-CSRF: 1` (and `Content-Type: application/json` with a body), also login. Auth levels used below: `public` (no session), `signed in` (any role, no particular permission), `users.manage` (owner only).
 
+`GET /admin/config` (any signed-in admin, no permission) is documented in `docs/api/pricing.md` (Admin config). `openapi.json` marks every `/admin` operation with `x-fluxkit-permission` (a permission name, `authenticated` for the any-signed-in routes, `public` for the login), see `docs/api/catalog.md` (Conventions).
+
 ## Sign-in flow
 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
