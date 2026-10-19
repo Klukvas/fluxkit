@@ -363,15 +363,19 @@ export function CartPageView({
             <h2 id="cart-summary-heading" className="text-xl font-semibold text-foreground">
               {t("cart.summary.title")}
             </h2>
-            <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-foreground">
-              <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
-              <dd className="text-end">{t.plural("cart.count", cart.itemCount)}</dd>
-              <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
-              <dd className="text-end">{formatMoney(cart.subtotal, exponent, locale)}</dd>
-              <dt className="font-semibold">{t("cart.summary.total")}</dt>
-              <dd className="text-end font-semibold">
-                {formatMoney(cart.total, exponent, locale)}
-              </dd>
+            <dl className="flex max-w-sm flex-col gap-1 text-foreground">
+              <div className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
+                <dd>{t.plural("cart.count", cart.itemCount)}</dd>
+              </div>
+              <div className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
+                <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
+              </div>
+              <div className="flex justify-between gap-6 font-semibold">
+                <dt>{t("cart.summary.total")}</dt>
+                <dd>{formatMoney(cart.total, exponent, locale)}</dd>
+              </div>
             </dl>
             {block === null ? (
               <Link

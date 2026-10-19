@@ -33,17 +33,27 @@ export function AccountOverviewView({
     <Container className="flex flex-col gap-6 py-8">
       <h1 className="text-3xl font-bold text-foreground">{t("account.title")}</h1>
       <h2 className="text-xl font-semibold text-foreground">{t("account.overview.profile")}</h2>
-      <dl className="grid max-w-md grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-foreground">
-        <dt className="text-muted-foreground">{t("account.field.firstName")}</dt>
-        <dd>{customer.firstName}</dd>
-        <dt className="text-muted-foreground">{t("account.field.lastName")}</dt>
-        <dd>{customer.lastName}</dd>
-        <dt className="text-muted-foreground">{t("account.field.email")}</dt>
-        <dd className="break-all">{customer.email}</dd>
-        <dt className="text-muted-foreground">{t("account.field.phone")}</dt>
-        <dd>{customer.phone ?? t("account.overview.noPhone")}</dd>
-        <dt className="text-muted-foreground">{t("account.overview.since")}</dt>
-        <dd>{formatDate(customer.createdAt, locale)}</dd>
+      <dl className="flex max-w-md flex-col gap-2 text-foreground">
+        <div className="flex flex-wrap gap-x-6">
+          <dt className="w-40 text-muted-foreground">{t("account.field.firstName")}</dt>
+          <dd className="min-w-0">{customer.firstName}</dd>
+        </div>
+        <div className="flex flex-wrap gap-x-6">
+          <dt className="w-40 text-muted-foreground">{t("account.field.lastName")}</dt>
+          <dd className="min-w-0">{customer.lastName}</dd>
+        </div>
+        <div className="flex flex-wrap gap-x-6">
+          <dt className="w-40 text-muted-foreground">{t("account.field.email")}</dt>
+          <dd className="min-w-0 break-all">{customer.email}</dd>
+        </div>
+        <div className="flex flex-wrap gap-x-6">
+          <dt className="w-40 text-muted-foreground">{t("account.field.phone")}</dt>
+          <dd className="min-w-0">{customer.phone ?? t("account.overview.noPhone")}</dd>
+        </div>
+        <div className="flex flex-wrap gap-x-6">
+          <dt className="w-40 text-muted-foreground">{t("account.overview.since")}</dt>
+          <dd className="min-w-0">{formatDate(customer.createdAt, locale)}</dd>
+        </div>
       </dl>
       {failure === null ? null : <Alert variant="danger">{failureText(t, failure)}</Alert>}
       <div className="flex flex-wrap gap-3">
