@@ -67,29 +67,8 @@ export function levelAt(
   return { onHand: found?.onHand ?? 0, reserved: found?.reserved ?? 0 };
 }
 
-/** Who made a movement, without an API change (owner answer 11). */
-export type ActorLabel =
-  | { kind: "you" }
-  | { kind: "email"; email: string }
-  | { kind: "other"; shortId: string }
-  | { kind: "system" };
-
-/**
- * "You" for the signed-in admin; the email when the users list could be read (owners, `users.manage`; nobody else
- * makes that request); otherwise "another admin" with the first eight characters of the id; no actor is the system
- * (an order's sale, the demo seed, or an admin deleted since).
- */
-export function actorLabel(
-  actorId: string | null,
-  meId: string,
-  emails: ReadonlyMap<string, string> | null,
-): ActorLabel {
-  if (actorId === null) return { kind: "system" };
-  if (actorId === meId) return { kind: "you" };
-  const email = emails?.get(actorId);
-  if (email !== undefined) return { kind: "email", email };
-  return { kind: "other", shortId: actorId.slice(0, 8) };
-}
+/** Who made a movement (owner answer 11): shared with the orders area's history, so it lives in `src/lib`. */
+export { actorLabel, type ActorLabel } from "../../../lib/actor-label";
 
 /** What the reloaded journal says after an adjustment: its newest movement compared with the one seen before sending. */
 export type AdjustmentCheck = "new_by_you" | "new_by_other" | "none_new";
