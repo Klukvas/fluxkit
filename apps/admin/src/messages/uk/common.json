@@ -1,0 +1,15 @@
+{
+  "app.name": "Fluxkit Адмін",
+  "app.documentTitle": "{page} · Fluxkit Адмін",
+  "language.label": "Мова інтерфейсу",
+  "language.uk": "Українська",
+  "language.en": "English",
+  "action.retry": "Спробувати ще раз",
+  "action.reload": "Перезавантажити сторінку",
+  "action.goHome": "На головну сторінку",
+  "status.loading": "Завантаження…",
+  "unsaved.title": "Залишити сторінку?",
+  "unsaved.description": "Незбережені зміни буде втрачено.",
+  "unsaved.leave": "Залишити",
+  "unsaved.stay": "Залишитися"
+}

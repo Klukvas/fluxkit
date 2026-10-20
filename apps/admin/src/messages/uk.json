@@ -1,8 +1,0 @@
-{
-  "admin.title": "Адмінка Fluxkit",
-  "admin.welcome": "Тут будуть товари, замовлення та клієнти.",
-  "admin.nav.products": "Товари",
-  "admin.nav.orders": "Замовлення",
-  "admin.nav.customers": "Клієнти",
-  "admin.action.create": "Створити"
-}

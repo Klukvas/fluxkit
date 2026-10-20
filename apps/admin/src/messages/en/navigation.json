@@ -1,0 +1,18 @@
+{
+  "nav.group.catalog": "Catalog",
+  "nav.group.sales": "Sales",
+  "nav.group.settings": "Settings",
+  "page.login.title": "Sign in",
+  "page.home.title": "Start",
+  "page.home.welcome": "Choose a section in the menu.",
+  "page.account.title": "My account",
+  "page.products.title": "Products",
+  "page.attributes.title": "Attributes",
+  "page.options.title": "Options",
+  "page.productTypes.title": "Product types",
+  "page.brands.title": "Brands",
+  "page.categories.title": "Categories",
+  "page.orders.title": "Orders",
+  "page.customers.title": "Customers",
+  "page.users.title": "Admin users"
+}

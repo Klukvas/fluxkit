@@ -1,0 +1,18 @@
+{
+  "nav.group.catalog": "Каталог",
+  "nav.group.sales": "Продажі",
+  "nav.group.settings": "Налаштування",
+  "page.login.title": "Вхід",
+  "page.home.title": "Головна",
+  "page.home.welcome": "Оберіть розділ у меню.",
+  "page.account.title": "Мій обліковий запис",
+  "page.products.title": "Товари",
+  "page.attributes.title": "Атрибути",
+  "page.options.title": "Опції",
+  "page.productTypes.title": "Типи товарів",
+  "page.brands.title": "Бренди",
+  "page.categories.title": "Категорії",
+  "page.orders.title": "Замовлення",
+  "page.customers.title": "Покупці",
+  "page.users.title": "Адміністратори"
+}

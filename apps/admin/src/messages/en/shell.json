@@ -1,0 +1,11 @@
+{
+  "shell.skipLink": "Skip to content",
+  "shell.navLabel": "Admin sections",
+  "shell.userLabel": "Your account",
+  "shell.signedInAs": "Signed in as {email}",
+  "shell.account": "My account",
+  "shell.signOut": "Sign out",
+  "shell.signingOut": "Signing out…",
+  "shell.navigating": "Loading the page…",
+  "shell.sessionFailed": "Could not check your sign-in"
+}
