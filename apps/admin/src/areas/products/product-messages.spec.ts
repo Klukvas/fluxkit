@@ -4,6 +4,7 @@ import { messagesForArea } from "../../test-helpers";
 import { ATTRIBUTE_REASONS } from "./attribute-values-form";
 import { EDITOR_NOTICE_KINDS } from "./editor-notice";
 import { MESSAGE_FILES } from "./index";
+import { OPTION_REASONS } from "./option-selection";
 import { LIFECYCLE_ACTIONS, LIFECYCLE_CONFIRMATION } from "./lifecycle";
 import { PRODUCT_STATUSES } from "./product-list-query";
 import { statusLabelKey } from "./product-status";
@@ -13,6 +14,16 @@ import { statusLabelKey } from "./product-status";
  * generic "keys used in the source" test cannot see. Each family is checked in both languages, among the messages the
  * area loads, so a missing key is a test failure and not a thrown error in front of an admin.
  */
+/** Every reason `deleteBlock`, `defaultBlock` and `activeToggle` can give, as the Variants tab names them. */
+const VARIANT_HINTS = [
+  "defaultNeedsActive",
+  "default_variant_inactive",
+  "no_active_variant",
+  "product_not_draft",
+  "default_variant",
+  "last_variant",
+] as const;
+
 function expected(): string[] {
   const keys = [
     ...PRODUCT_EDITOR_TABS.map((tab) => tab.messageKey),
@@ -23,9 +34,9 @@ function expected(): string[] {
     ...EDITOR_NOTICE_KINDS.filter((kind) => kind !== "unknown").map(
       (kind) => `products.notice.${kind}`,
     ),
-    ...["media", "options", "variants", "prices", "stock"].map(
-      (tab) => `products.placeholder.${tab}`,
-    ),
+    ...["prices", "stock"].map((tab) => `products.placeholder.${tab}`),
+    ...OPTION_REASONS.map((reason) => `products.optionReason.${reason}`),
+    ...VARIANT_HINTS.map((hint) => `products.variants.hint.${hint}`),
     ...PRODUCT_STATUSES.map(statusLabelKey),
     ...ATTRIBUTE_REASONS.map((reason) => `products.attributeReason.${reason}`),
   ];

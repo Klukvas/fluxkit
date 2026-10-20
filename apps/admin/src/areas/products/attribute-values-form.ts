@@ -5,6 +5,7 @@ import type {
   JsonValue,
   LocalizedText,
   ProblemDetails,
+  ProductTypeAttributeLevel,
   UpdateAdminProductBody,
 } from "@fluxkit/api-client";
 import { diffForPatch, jsonEqual } from "../../lib/diff-for-patch";
@@ -18,6 +19,7 @@ import type { FormIssues } from "../catalog-dictionaries/form-rules";
 import {
   localeMapFromValues,
   localeValuesFrom,
+  resolveLocalized,
   type LocaleValues,
 } from "../catalog-dictionaries/locale-text";
 
@@ -171,10 +173,16 @@ export function parseRules(
   }
 }
 
-/** One field per PRODUCT-level assignment of the type, by assignment position then code. */
-export function attributeFieldSpecs(type: AdminProductTypeDetail): AttributeFieldSpec[] {
+/**
+ * One field per assignment of the type at one level, by assignment position then code: `product` for the product's
+ * Attributes tab, `variant` for a variant's form (step 6b). A variant-level attribute never shows on the product.
+ */
+export function attributeFieldSpecs(
+  type: AdminProductTypeDetail,
+  level: ProductTypeAttributeLevel = "product",
+): AttributeFieldSpec[] {
   return type.attributes
-    .filter((assignment) => assignment.level === "product")
+    .filter((assignment) => assignment.level === level)
     .sort(
       (left, right) =>
         left.position - right.position || left.attributeCode.localeCompare(right.attributeCode),
@@ -241,6 +249,41 @@ export function attributeFormFrom(
     }
   }
   return values;
+}
+
+/**
+ * A stored value as short text for a table cell (the Variants table): a localized text in the UI language with
+ * fallback, a choice by its label, several choices joined, a number with its unit, yes or no as a message; `""` for
+ * "not set". A stored choice that is no longer an option shows its code.
+ */
+export function attributeDisplay(
+  spec: AttributeFieldSpec,
+  value: JsonValue | undefined,
+  uiLocale: string,
+  defaultLocale: string,
+): string | MessageDescriptor {
+  if (value === undefined || value === null) return "";
+  const label = (code: string) => {
+    const found = spec.options.find((entry) => entry.code === code);
+    return found === undefined
+      ? code
+      : resolveLocalized(found.label, uiLocale, defaultLocale) || code;
+  };
+  if (typeof value === "boolean") {
+    return { key: value ? "products.attributes.yes" : "products.attributes.no" };
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => (typeof item === "string" ? label(item) : textOf(item))).join(", ");
+  }
+  if (isTextMap(value)) {
+    const map: LocalizedText = {};
+    for (const [locale, text] of Object.entries(value))
+      if (typeof text === "string") map[locale] = text;
+    return resolveLocalized(map, uiLocale, defaultLocale);
+  }
+  if (typeof value === "number")
+    return spec.unit === null ? String(value) : `${value} ${spec.unit}`;
+  return spec.inputType === "select" ? label(value) : value;
 }
 
 export function setText(

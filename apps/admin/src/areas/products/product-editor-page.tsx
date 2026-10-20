@@ -15,8 +15,16 @@ import { FailureMessage, PageHeading, ResourceFallback } from "../../views/statu
 import { ConfigGate, useContentLocales } from "../catalog-dictionaries/config-gate";
 import { BackLink, DeletedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../catalog-dictionaries/form-dialog";
-import { EditorNoticeBar, type EditorNoticeKind } from "./editor-notice";
-import { NO_DIRTY_TABS, dirtyTab, readTab, tabSearch, visibleTabs, withDirty } from "./editor-tabs";
+import { EditorNoticeBar, type EditorNotice, type EditorNoticeKind } from "./editor-notice";
+import {
+  NO_DIRTY_TABS,
+  dirtyTab,
+  productRevision,
+  readTab,
+  tabSearch,
+  visibleTabs,
+  withDirty,
+} from "./editor-tabs";
 import {
   LifecycleActionsView,
   ProductSummaryView,
@@ -25,6 +33,7 @@ import {
 } from "./editor-views";
 import { LIFECYCLE_CONFIRMATION, permittedActions, type LifecycleAction } from "./lifecycle";
 import { mapPublishProblems, type EditorTabId, type PublishProblem } from "./publish-problems";
+import type { ChangeDetail } from "./tab-props";
 
 interface EditorData {
   product: AdminProduct;
@@ -75,7 +84,7 @@ function ProductEditor({ id }: { id: string }) {
   const tabIds = tabs.map((tab) => tab.id);
   const selected = readTab(params, tabIds);
 
-  const [notice, setNotice] = useState<{ kind: EditorNoticeKind; n: number } | null>(null);
+  const [notice, setNotice] = useState<EditorNotice | null>(null);
   const noticeRef = useRef<HTMLDivElement>(null);
   const [dirty, setDirty] = useState(NO_DIRTY_TABS);
   const [problems, setProblems] = useState<PublishProblem[]>([]);
@@ -89,12 +98,23 @@ function ProductEditor({ id }: { id: string }) {
   const reload = resource.reload;
 
   const changed = useCallback(
-    (kind: EditorNoticeKind) => {
-      setNotice((current) => ({ kind, n: (current?.n ?? 0) + 1 }));
+    (kind: EditorNoticeKind, detail?: ChangeDetail) => {
+      setNotice((current) => ({
+        kind,
+        n: (current?.n ?? 0) + 1,
+        ...(detail?.values === undefined ? {} : { values: detail.values }),
+      }));
       if (kind !== "noChanges") reload();
-      // A saved tab's publish problems are out of date; the next publish checks again.
+      // A saved tab's publish problems are out of date (a saved variant: only that variant's); the next publish checks again.
       if (kind === "saved" && selected !== null) {
-        setProblems((current) => current.filter((problem) => problem.tab !== selected));
+        const variantId = detail?.variantId;
+        setProblems((current) =>
+          current.filter(
+            (problem) =>
+              problem.tab !== selected ||
+              (variantId !== undefined && problem.variantId !== variantId),
+          ),
+        );
       }
       requestAnimationFrame(() => noticeRef.current?.focus());
     },
@@ -246,7 +266,7 @@ function ProductEditor({ id }: { id: string }) {
               onChange={selectTab}
             >
               <Panel
-                key={`${selected}-${product.updatedAt}`}
+                key={`${selected}-${productRevision(product)}`}
                 product={product}
                 productType={data.productType}
                 content={content}

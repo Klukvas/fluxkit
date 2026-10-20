@@ -10,15 +10,44 @@ export const GENERAL_FIELD_IDS = {
   brand: "product-brand",
 } as const;
 
+/** The prefix of the generated attribute controls: the product's Attributes tab, or one variant's form. */
+export type AttributeIdPrefix = "product-attribute" | "variant-attribute";
+
 /** The control of one attribute (`-<locale>` for a localized text; the first checkbox of a multiselect). */
-export function attributeControlId(code: string, locale?: string): string {
-  return locale === undefined ? `product-attribute-${code}` : `product-attribute-${code}-${locale}`;
+export function attributeControlId(
+  code: string,
+  locale?: string,
+  prefix: AttributeIdPrefix = "product-attribute",
+): string {
+  return locale === undefined ? `${prefix}-${code}` : `${prefix}-${code}-${locale}`;
 }
 
 /** The categories tab's list, the target of a categories problem. */
 export const CATEGORIES_FOCUS_ID = "product-categories";
 
-/** The problems listed by a tab that is not built yet (media, options, variants). */
-export function placeholderFocusId(tab: string): string {
-  return `product-${tab}-problems`;
+/** The Media tab's list, the target of a problem of the whole list. */
+export const MEDIA_FOCUS_ID = "product-media";
+
+/**
+ * One field of one image row (`url`, `link` for the option value, `alt-<locale>`), by the row's index in the list
+ * (the API's `media.N`).
+ */
+export function mediaFieldId(index: number, field: string): string {
+  return `product-media-${index}-${field}`;
+}
+
+/** The Options tab's section, the target of a problem of the whole option set. */
+export const OPTIONS_FOCUS_ID = "product-options";
+
+/** One option's group on the Options tab, by option code (the publish path is `options.<code>`). */
+export function optionFocusId(optionCode: string): string {
+  return `product-option-${optionCode}`;
+}
+
+/** The Variants tab's problem list, the target of a problem of no (or no longer existing) variant. */
+export const VARIANTS_FOCUS_ID = "product-variants";
+
+/** The row header of one variant in the Variants table (focusable), by variant id. */
+export function variantRowFocusId(variantId: string): string {
+  return `product-variant-${variantId}`;
 }

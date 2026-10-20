@@ -16,7 +16,12 @@ import {
 import { AttributeFieldsView } from "./attribute-fields-view";
 import { attributeFieldSpecs, attributeFormFrom } from "./attribute-values-form";
 import { EDITOR_NOTICE_KINDS, EditorNoticeBar } from "./editor-notice";
-import { LifecycleActionsView, ProductSummaryView, PublishProblemsView } from "./editor-views";
+import {
+  LifecycleActionsView,
+  ProductSummaryView,
+  PublishProblemsView,
+  TabProblemsView,
+} from "./editor-views";
 import { MESSAGE_FILES } from "./index";
 import { LIFECYCLE_ACTIONS } from "./lifecycle";
 import { mapPublishProblems } from "./publish-problems";
@@ -296,11 +301,18 @@ describe("editor summary, lifecycle and publish problems", () => {
     expect(html).toContain("§products.problems.variantRow");
     expect(html).toContain("§errors.reason.price_missing");
     expect(html).toContain("§errors.reference");
-    const variants = renderInRouter(<ComingTabView t={t} tab="variants" problems={problems} />);
-    expect(variants).toContain('id="product-variants-problems"');
-    expect(variants).toContain("§products.placeholder.variants");
-    expect(renderInRouter(<ComingTabView t={t} tab="media" problems={problems} />)).not.toContain(
-      "problems",
+    const variants = renderInRouter(
+      <TabProblemsView
+        t={t}
+        id="product-variants"
+        problems={problems.filter((entry) => entry.tab === "variants")}
+      />,
+    );
+    expect(variants).toContain('id="product-variants"');
+    expect(variants).toContain("§products.problems.variantRow");
+    expect(renderInRouter(<TabProblemsView t={t} id="product-media" problems={[]} />)).toBe("");
+    expect(renderInRouter(<ComingTabView t={t} tab="prices" />)).toContain(
+      "§products.placeholder.prices",
     );
   });
 
@@ -372,10 +384,13 @@ describe("the editor with the real uk and en messages", () => {
           ),
         ).toContain("<button");
         for (const kind of EDITOR_NOTICE_KINDS) {
-          expect(renderInRouter(<EditorNoticeBar t={t} notice={{ kind, n: 1 }} />)).toContain("<p");
+          const values = { created: 2, skipped: 1, sku: "SKU-1" };
+          expect(
+            renderInRouter(<EditorNoticeBar t={t} notice={{ kind, n: 1, values }} />),
+          ).toContain("<p");
         }
-        for (const tab of ["media", "options", "variants", "prices", "stock"] as const) {
-          expect(renderInRouter(<ComingTabView t={t} tab={tab} problems={[]} />)).toContain("<p");
+        for (const tab of ["prices", "stock"] as const) {
+          expect(renderInRouter(<ComingTabView t={t} tab={tab} />)).toContain("<p");
         }
         const summary = renderInRouter(
           <ProductSummaryView

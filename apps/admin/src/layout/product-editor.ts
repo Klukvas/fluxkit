@@ -5,13 +5,10 @@ import type { ProductTabProps } from "../areas/products/tab-props";
 import { AttributesTab } from "../areas/products/tabs/attributes-tab";
 import { CategoriesTab } from "../areas/products/tabs/categories-tab";
 import { GeneralTab } from "../areas/products/tabs/general-tab";
-import {
-  MediaTab,
-  OptionsTab,
-  PricesTab,
-  StockTab,
-  VariantsTab,
-} from "../areas/products/tabs/coming-tabs";
+import { PricesTab, StockTab } from "../areas/products/tabs/coming-tabs";
+import { MediaTab } from "../areas/products/tabs/media-tab";
+import { OptionsTab } from "../areas/products/tabs/options-tab";
+import { VariantsTab } from "../areas/products/tabs/variants-tab";
 
 /**
  * The product editor's tabs as configuration (plan, "Layout is configuration"): in order, each with its message key, the

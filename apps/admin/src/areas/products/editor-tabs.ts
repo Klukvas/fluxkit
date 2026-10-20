@@ -55,3 +55,36 @@ export function dirtyTab(state: DirtyTabs): EditorTabId | null {
   const found = Object.keys(state)[0];
   return found === undefined ? null : (found as EditorTabId);
 }
+
+/** What `productRevision` reads of a product detail. */
+export interface RevisionSource {
+  updatedAt: string;
+  categories: readonly { categoryId: string; isPrimary: boolean; position: number }[];
+  media: readonly { id: string; updatedAt: string }[];
+  options: readonly { optionId: string; values: readonly { optionValueId: string }[] }[];
+  variants: readonly { id: string; updatedAt: string }[];
+}
+
+/**
+ * A short fingerprint of the stored content a tab shows, for its `key`: the editor remounts the tab when it changes, so
+ * after a write the form shows what the server stored (a variant, media or option write does not change the product's
+ * own `updatedAt`). A reload that finds the same content (a lost answer whose write did not land) keeps the tab and its
+ * input. FNV-1a over the ids and timestamps; not a security measure.
+ */
+export function productRevision(product: RevisionSource): string {
+  const text = [
+    product.updatedAt,
+    product.categories.map((entry) => `${entry.categoryId}:${entry.isPrimary}:${entry.position}`),
+    product.media.map((entry) => `${entry.id}@${entry.updatedAt}`),
+    product.options.map(
+      (entry) => `${entry.optionId}=${entry.values.map((value) => value.optionValueId).join(",")}`,
+    ),
+    product.variants.map((entry) => `${entry.id}@${entry.updatedAt}`),
+  ].join("|");
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(16);
+}

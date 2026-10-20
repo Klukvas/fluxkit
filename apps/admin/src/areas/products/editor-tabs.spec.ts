@@ -2,7 +2,15 @@ import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import { shouldBlockNavigation } from "../../router/unsaved-changes";
 import { PRODUCT_EDITOR_TABS } from "../../layout/product-editor";
-import { NO_DIRTY_TABS, dirtyTab, readTab, tabSearch, visibleTabs, withDirty } from "./editor-tabs";
+import {
+  NO_DIRTY_TABS,
+  dirtyTab,
+  productRevision,
+  readTab,
+  tabSearch,
+  visibleTabs,
+  withDirty,
+} from "./editor-tabs";
 import { EDITOR_TAB_IDS } from "./publish-problems";
 
 describe("editor tab configuration", () => {
@@ -42,6 +50,38 @@ describe("the selected tab in the URL (?tab=)", () => {
     const at = (search: string) => ({ pathname: "/products/x", search, hash: "" });
     expect(shouldBlockNavigation(true, at(""), at(tabSearch("attributes", ids)))).toBe(true);
     expect(shouldBlockNavigation(false, at(""), at(tabSearch("attributes", ids)))).toBe(false);
+  });
+});
+
+describe("the revision a tab is keyed by (remounted with the stored data after a write)", () => {
+  const variant = (id: string, updatedAt = "2026-10-20T10:00:00.000Z") => ({
+    id,
+    updatedAt,
+  });
+  const base = {
+    updatedAt: "2026-10-20T09:00:00.000Z",
+    categories: [{ categoryId: "c1", isPrimary: true, position: 0 }],
+    media: [{ id: "m1", updatedAt: "2026-10-20T09:00:00.000Z" }],
+    options: [{ optionId: "o1", values: [{ optionValueId: "v1" }] }],
+    variants: [variant("a"), variant("b")],
+  };
+
+  it("is the same for the same stored content", () => {
+    expect(productRevision(base)).toBe(productRevision(structuredClone(base)));
+    expect(productRevision(base)).toMatch(/^[0-9a-f]+$/);
+  });
+
+  it("changes when the product, a variant, the variant set, the media, the options or the categories change", () => {
+    const changed = [
+      { ...base, updatedAt: "2026-10-20T11:00:00.000Z" },
+      { ...base, variants: [variant("a"), variant("b", "2026-10-20T12:00:00.000Z")] },
+      { ...base, variants: [variant("a")] },
+      { ...base, variants: [variant("b"), variant("a")] },
+      { ...base, media: [{ id: "m2", updatedAt: "2026-10-20T09:00:00.000Z" }] },
+      { ...base, options: [{ optionId: "o1", values: [{ optionValueId: "v2" }] }] },
+      { ...base, categories: [{ categoryId: "c1", isPrimary: false, position: 0 }] },
+    ];
+    for (const product of changed) expect(productRevision(product)).not.toBe(productRevision(base));
   });
 });
 
