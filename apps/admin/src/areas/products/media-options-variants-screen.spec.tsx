@@ -363,7 +363,7 @@ describe("Options tab", () => {
         detail: "x",
         errors: [{ path: "options.axis_a", code: "option_not_allowed" }],
       },
-      { defaultLocale: "uk", variants: product().variants },
+      { defaultLocale: "uk", shopCurrency: "UAH", variants: product().variants },
     );
     const html = renderInRouter(
       <CurrentOptionsView
@@ -487,15 +487,15 @@ describe("Variants tab", () => {
         status: 400,
         code: "validation_failed",
         detail: "x",
-        errors: [{ path: "variants.1", code: "price_missing" }],
+        errors: [{ path: "variants.1", code: "default_variant_inactive" }],
       },
-      { defaultLocale: "uk", variants: product().variants },
+      { defaultLocale: "uk", shopCurrency: "UAH", variants: product().variants },
     );
     const html = table(allActions, {}, problems);
     const rows = html.split("<tr").slice(2);
     expect(rows).toHaveLength(2);
-    expect(rows[0]).not.toContain("§errors.reason.price_missing");
-    expect(rows[1]).toContain("§errors.reason.price_missing");
+    expect(rows[0]).not.toContain("§errors.reason.default_variant_inactive");
+    expect(rows[1]).toContain("§errors.reason.default_variant_inactive");
   });
 
   it("offers on a draft: edit, make default and switch for each, delete only where the API allows it", () => {

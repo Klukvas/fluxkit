@@ -12,7 +12,7 @@ import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { useSession } from "../../session/session-context";
 import { FailureMessage, PageHeading, ResourceFallback } from "../../views/status-views";
-import { ConfigGate, useContentLocales } from "../catalog-dictionaries/config-gate";
+import { ConfigGate, useAdminConfig, useContentLocales } from "../catalog-dictionaries/config-gate";
 import { BackLink, DeletedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../catalog-dictionaries/form-dialog";
 import { EditorNoticeBar, type EditorNotice, type EditorNoticeKind } from "./editor-notice";
@@ -34,6 +34,9 @@ import {
 import { LIFECYCLE_CONFIRMATION, permittedActions, type LifecycleAction } from "./lifecycle";
 import { mapPublishProblems, type EditorTabId, type PublishProblem } from "./publish-problems";
 import type { ChangeDetail } from "./tab-props";
+
+/** Frames to wait for a problem's field to appear after its tab opened (about five seconds at 60 frames a second). */
+const FOCUS_ATTEMPTS = 300;
 
 interface EditorData {
   product: AdminProduct;
@@ -75,6 +78,7 @@ const NOTICE_OF: Record<Exclude<LifecycleAction, "delete">, EditorNoticeKind> = 
 function ProductEditor({ id }: { id: string }) {
   const { t, locale } = useI18n();
   const content = useContentLocales();
+  const config = useAdminConfig();
   const session = useSession();
   const permissions = session.state.me?.permissions ?? null;
   const crash = useCrash();
@@ -130,10 +134,21 @@ function ProductEditor({ id }: { id: string }) {
 
   useEffect(() => {
     if (pendingFocus === null || pendingFocus.tab !== selected) return undefined;
-    const frame = requestAnimationFrame(() => {
-      document.getElementById(pendingFocus.id)?.focus();
-      setPendingFocus(null);
-    });
+    // A tab that reads its own data (Prices, Stock) renders the target only after its read: wait for it, a few seconds
+    // at most (then the problem list stays where it is).
+    let frame = 0;
+    let attempts = 0;
+    const tryFocus = () => {
+      const element = document.getElementById(pendingFocus.id);
+      attempts += 1;
+      if (element !== null || attempts > FOCUS_ATTEMPTS) {
+        element?.focus();
+        setPendingFocus(null);
+        return;
+      }
+      frame = requestAnimationFrame(tryFocus);
+    };
+    frame = requestAnimationFrame(tryFocus);
     return () => cancelAnimationFrame(frame);
   }, [pendingFocus, selected]);
 
@@ -183,6 +198,7 @@ function ProductEditor({ id }: { id: string }) {
           action === "publish" && outcome.status === 400
             ? mapPublishProblems(outcome.problem, {
                 defaultLocale: content.defaultLocale,
+                shopCurrency: config.shopCurrency,
                 variants: target.variants,
               })
             : [];

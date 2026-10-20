@@ -2,6 +2,7 @@ import type { ProblemDetails } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
 import {
   mapPublishProblems,
+  priceProblemIssues,
   problemsOnTab,
   variantIssues,
   variantProblems,
@@ -10,6 +11,7 @@ import {
 
 const context = {
   defaultLocale: "uk",
+  shopCurrency: "UAH",
   variants: [
     { id: "va", sku: "SKU-A" },
     { id: "vb", sku: "SKU-B" },
@@ -91,7 +93,7 @@ describe("publish problems on the editor's tabs", () => {
   });
 
   it("puts variants.N problems on the variant's row in Variants: N is the index in the product detail's variant order", () => {
-    expect(one("variants.1", "price_missing")).toEqual({
+    expect(one("variants.1", "default_variant_inactive")).toEqual({
       path: "variants.1",
       tab: "variants",
       field: null,
@@ -99,7 +101,7 @@ describe("publish problems on the editor's tabs", () => {
       variantIndex: 1,
       variantId: "vb",
       variantSku: "SKU-B",
-      message: { key: "errors.reason.price_missing" },
+      message: { key: "errors.reason.default_variant_inactive" },
     });
     expect(one("variants.0", "default_variant_inactive")).toMatchObject({
       variantIndex: 0,
@@ -107,6 +109,47 @@ describe("publish problems on the editor's tabs", () => {
       variantSku: "SKU-A",
       focusId: "product-variant-va",
     });
+  });
+
+  it("puts a missing price (variants.N price_missing) on the Prices tab, on that variant's shop-currency amount", () => {
+    expect(one("variants.1", "price_missing")).toEqual({
+      path: "variants.1",
+      tab: "prices",
+      field: "vb.UAH.amount",
+      focusId: "product-price-vb-UAH-amount",
+      variantIndex: 1,
+      variantId: "vb",
+      variantSku: "SKU-B",
+      message: { key: "errors.reason.price_missing" },
+    });
+    const stale = one("variants.7", "price_missing");
+    expect(stale).toMatchObject({
+      tab: "prices",
+      field: null,
+      focusId: "product-prices",
+      variantIndex: 7,
+    });
+    expect(stale.variantId).toBeUndefined();
+  });
+
+  it("gives the Prices tab its cell issues, by the grid's field names, and nothing of other tabs", () => {
+    const mapped = mapPublishProblems(
+      problem([
+        { path: "variants.0", code: "price_missing" },
+        { path: "variants.2", code: "price_missing" },
+        { path: "variants.1", code: "default_variant_inactive" },
+        { path: "variants.9", code: "price_missing" },
+      ]),
+      context,
+    );
+    expect(priceProblemIssues(mapped)).toEqual({
+      "va.UAH.amount": { key: "errors.reason.price_missing" },
+      "vc.UAH.amount": { key: "errors.reason.price_missing" },
+    });
+    expect(variantProblems(mapped, "va")).toEqual([]);
+    expect(variantProblems(mapped, "vb").map((entry) => entry.message.key)).toEqual([
+      "errors.reason.default_variant_inactive",
+    ]);
   });
 
   it("puts a variant attribute problem on that variant's attribute field (and locale), with the attribute reason", () => {
@@ -133,7 +176,7 @@ describe("publish problems on the editor's tabs", () => {
     expect(wide).toMatchObject({ tab: "variants", focusId: "product-variants" });
     expect(wide.variantIndex).toBeUndefined();
     expect(wide.variantId).toBeUndefined();
-    const stale = one("variants.7", "price_missing");
+    const stale = one("variants.7", "last_variant");
     expect(stale).toMatchObject({ tab: "variants", variantIndex: 7, focusId: "product-variants" });
     expect(stale.variantSku).toBeUndefined();
     expect(stale.variantId).toBeUndefined();
@@ -200,10 +243,16 @@ describe("publish problems on the editor's tabs", () => {
         { path: "title.uk", code: "empty" },
         { path: "attributes.model_code", code: "required" },
         { path: "variants.0", code: "price_missing" },
+        { path: "variants.1", code: "default_variant_inactive" },
       ]),
       context,
     );
-    expect(mapped.map((entry) => entry.tab)).toEqual(["general", "attributes", "variants"]);
+    expect(mapped.map((entry) => entry.tab)).toEqual([
+      "general",
+      "attributes",
+      "prices",
+      "variants",
+    ]);
     expect(
       mapPublishProblems({ ...problem([]), errors: undefined } as ProblemDetails, context),
     ).toEqual([]);
@@ -237,6 +286,7 @@ describe("publish problems on the editor's tabs", () => {
       problem([
         { path: "variants.0.attributes.per_variant", code: "required" },
         { path: "variants.1.attributes.per_variant", code: "too_long" },
+        { path: "variants.0", code: "default_variant_inactive" },
         { path: "variants.0", code: "price_missing" },
       ]),
       context,

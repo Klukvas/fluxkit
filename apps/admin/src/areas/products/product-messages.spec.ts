@@ -8,6 +8,14 @@ import { OPTION_REASONS } from "./option-selection";
 import { LIFECYCLE_ACTIONS, LIFECYCLE_CONFIRMATION } from "./lifecycle";
 import { PRODUCT_STATUSES } from "./product-list-query";
 import { statusLabelKey } from "./product-status";
+import { PRICE_ISSUES } from "./prices/price-grid";
+import { ADJUSTMENT_ISSUES, ADJUSTMENT_KINDS, modesFor } from "./stock/stock-adjustment";
+import { RESERVATION_STATUSES } from "./stock/stock-tab";
+import { STOCK_STATES } from "./stock/stock-view";
+
+/** Every movement kind the journal can show (`sale` is written by orders). */
+const MOVEMENT_KINDS = ["receipt", "adjustment", "sale", "return"] as const;
+const ADJUSTMENT_CHECKS = ["new_by_you", "new_by_other", "none_new", "unreadable"] as const;
 
 /**
  * Keys the products screens build from data (`products.tab.${id}`, `products.lifecycle.${action}`, ...), which the
@@ -34,11 +42,24 @@ function expected(): string[] {
     ...EDITOR_NOTICE_KINDS.filter((kind) => kind !== "unknown").map(
       (kind) => `products.notice.${kind}`,
     ),
-    ...["prices", "stock"].map((tab) => `products.placeholder.${tab}`),
     ...OPTION_REASONS.map((reason) => `products.optionReason.${reason}`),
     ...VARIANT_HINTS.map((hint) => `products.variants.hint.${hint}`),
     ...PRODUCT_STATUSES.map(statusLabelKey),
     ...ATTRIBUTE_REASONS.map((reason) => `products.attributeReason.${reason}`),
+    ...PRICE_ISSUES.map((issue) => `products.prices.reason.${issue}`),
+    ...ADJUSTMENT_ISSUES.map((issue) => `products.stock.issue.${issue}`),
+    ...STOCK_STATES.map((state) => `products.stock.state.${state}`),
+    ...MOVEMENT_KINDS.map((kind) => `products.stock.kindLabel.${kind}`),
+    ...ADJUSTMENT_KINDS.map((kind) => `products.stock.kindHint.${kind}`),
+    ...ADJUSTMENT_KINDS.flatMap(modesFor).map((mode) => `products.stock.modeLabel.${mode}`),
+    ...RESERVATION_STATUSES.flatMap((status) => [
+      `products.stock.reservation.${status}`,
+      `products.stock.noReservations.${status}`,
+    ]),
+    ...ADJUSTMENT_CHECKS.map((check) => `products.stock.result.${check}`),
+    ...(["onHand", "reserved", "available"] as const).map(
+      (column) => `products.stock.column.${column}`,
+    ),
   ];
   return keys;
 }

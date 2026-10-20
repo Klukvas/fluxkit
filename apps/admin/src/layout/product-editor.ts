@@ -5,9 +5,10 @@ import type { ProductTabProps } from "../areas/products/tab-props";
 import { AttributesTab } from "../areas/products/tabs/attributes-tab";
 import { CategoriesTab } from "../areas/products/tabs/categories-tab";
 import { GeneralTab } from "../areas/products/tabs/general-tab";
-import { PricesTab, StockTab } from "../areas/products/tabs/coming-tabs";
 import { MediaTab } from "../areas/products/tabs/media-tab";
 import { OptionsTab } from "../areas/products/tabs/options-tab";
+import { PricesTab } from "../areas/products/prices/prices-tab";
+import { StockTab } from "../areas/products/stock/stock-tab";
 import { VariantsTab } from "../areas/products/tabs/variants-tab";
 
 /**
