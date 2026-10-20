@@ -325,13 +325,20 @@ describe("order detail screen", () => {
     expect(detail(sentinel, order({ status: "fulfilled" }), manager)).not.toContain("<button");
   });
 
-  it("shows the customer's email as text until the customer route exists, and links the customer's orders", () => {
+  it("links the customer's email to the customer detail (step 9's route) and the customer's orders, by the account id", () => {
     const html = detail(sentinel, order(), null);
-    expect(html).not.toContain(`href="/admin-ui/customers/`);
+    expect(html).toMatch(
+      new RegExp(`<a[^>]*href="/admin-ui/customers/${CUSTOMER}"[^>]*>shopper@example.com</a>`),
+    );
     expect(html).toContain(`href="/admin-ui/orders?customerId=${CUSTOMER}"`);
+    // The link never carries the email, and a guest order or a deleted account has no customer link at all.
+    expect(html).not.toContain("customers/shopper");
     const guest = detail(sentinel, order({ customerId: null, isGuest: true }), null);
     expect(guest).toContain("§order.detail.guestOrder");
     expect(guest).not.toContain("customerId=");
+    expect(guest).not.toContain('href="/admin-ui/customers');
+    const deleted = detail(sentinel, order({ customerId: null, isGuest: false }), null);
+    expect(deleted).not.toContain('href="/admin-ui/customers');
   });
 
   it("shows a line image only for a plain https address, lazily and without a referrer", () => {

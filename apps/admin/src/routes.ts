@@ -264,6 +264,15 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "customerDetail",
+    "getCustomer",
+    "page.customerDetail.title",
+    areaPage(
+      () => import("./areas/customers"),
+      (module) => module.CustomerDetailPage,
+    ),
+  ),
+  route(
     "users",
     "listUsers",
     "page.users.title",
