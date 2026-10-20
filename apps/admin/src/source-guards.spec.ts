@@ -169,7 +169,10 @@ describe("source guards (AGENTS.md sections 2.2, 2.3 and 11; plan, Security (adm
   });
 
   it("does no floating point money math", () => {
-    const floatMoney = /\/\s*100\b|\*\s*100\b|toFixed\(|parseFloat\(|Math\.round\([^)]*amount/;
+    // Scaling a decimal by a power of ten (`* 10 ** exponent`, `Math.pow(10, ...)`) is float money math too, even when
+    // `Math.round` hides the error for small values; money text goes through `lib/money-input.ts` (BigInt) only.
+    const floatMoney =
+      /\/\s*100\b|\*\s*100\b|toFixed\(|parseFloat\(|Math\.round\([^)]*amount|\b10\s*\*\*|Math\.pow\(\s*10\b/;
     for (const file of sources) {
       expect(floatMoney.test(code(file.text)), `${file.path} looks like float money math`).toBe(
         false,
