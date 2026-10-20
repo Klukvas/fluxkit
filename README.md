@@ -240,7 +240,7 @@ server {
 }
 ```
 
-The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. The examples match `/store/*` and `/admin/*` only with a path after the prefix, so a bare `/admin` or `/store` reaches the storefront: the e2e proxies match them, the examples do not yet.
+The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. In the nginx example the API regex needs a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher lists the same paths, so check it with your version. The e2e proxies match both forms.
 
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 
