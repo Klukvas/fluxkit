@@ -2,7 +2,7 @@
 
 The admin SPA: React 19 on Vite, served as static files under `/admin-ui/` on the storefront origin (ADR 0027). It calls the admin API `/admin/*` on the same origin with the `HttpOnly` session cookie; authorization stays on the API. Plan: `docs/plans/2026-10-19-admin-ui.md`. File map: `docs/files/admin.md`.
 
-Status (step 10): the shell is built (sign-in, re-sign-in dialog, role-aware navigation, own account with password change, language switch, error, not-found and not-allowed views), the catalog dictionaries are built (attributes, options, product types, brands, category tree; see "Catalog dictionaries" below), the products (list, create, the editor with General, Attributes, Categories, Media, Options, Variants, Prices and Stock and the lifecycle; see "Products" below), the orders (list, detail, mark paid, mark fulfilled, cancel; see "Orders" below), the customers (list, detail, deactivate, activate, unlock; see "Customers" below) and the admin users (owner only: list, create, role, activity, password reset; see "Admin users" below). Every area of the plan is built; browser e2e is step 11.
+Status (step 10): the shell is built (sign-in, re-sign-in dialog, role-aware navigation, own account with password change, language switch, error, not-found and not-allowed views), the catalog dictionaries are built (attributes, options, product types, brands, category tree; see "Catalog dictionaries" below), the products (list, create, the editor with General, Attributes, Categories, Media, Options, Variants, Prices and Stock and the lifecycle; see "Products" below), the orders (list, detail, mark paid, mark fulfilled, cancel; see "Orders" below), the customers (list, detail, deactivate, activate, unlock; see "Customers" below) and the admin users (owner only: list, create, role, activity, password reset; see "Admin users" below). Every area of the plan is built. Browser e2e (step 11): `apps/admin/e2e` (Playwright, Chromium), run by the root `pnpm test:e2e` after the storefront suite; see `e2e/README.md`.
 
 ## Run
 
@@ -15,7 +15,7 @@ pnpm --filter @fluxkit/admin dev               # http://localhost:5173/admin-ui/
 - The dev server proxies `/admin`, `/admin/*` and `/admin?…` to `ADMIN_DEV_API_URL` (default `http://127.0.0.1:3000`; read from the shell or the root `.env`, development only, a malformed value stops the dev server). `/admin-ui` is never proxied.
 - Sign in with an owner from `pnpm admin:create`. The cookie is host-only, so open the dev server by the host name you configured (not a mix of `localhost` and `127.0.0.1`).
 - `pnpm --filter @fluxkit/admin preview` serves the build with the security headers below and the same proxy (a local CSP check).
-- Tests: `pnpm --filter @fluxkit/admin test` (Vitest, node, `renderToStaticMarkup`; no DOM library, owner answer 9). `build-output.spec.ts` checks `dist/`, so run `pnpm --filter @fluxkit/admin build` first (the root `pnpm test` builds). Browser e2e is step 11.
+- Tests: `pnpm --filter @fluxkit/admin test` (Vitest, node, `renderToStaticMarkup`; no DOM library, owner answer 9). `build-output.spec.ts` checks `dist/`, so run `pnpm --filter @fluxkit/admin build` first (the root `pnpm test` builds). Browser e2e: `pnpm test:e2e` from the root (builds, then the storefront suite and this app's `e2e/` suite; needs a `*_e2e_test` database in `E2E_DATABASE_URL` that is wiped, Redis, Meilisearch and Chromium), or `pnpm --filter @fluxkit/admin test:e2e` after a build; `e2e/README.md`.
 
 ## Serving and security headers
 
