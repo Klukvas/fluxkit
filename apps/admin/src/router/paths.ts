@@ -30,6 +30,7 @@ export const PATHS = {
   orders: "/orders",
   orderDetail: "/orders/:id",
   customers: "/customers",
+  customerDetail: "/customers/:id",
   users: "/users",
 } as const;
 

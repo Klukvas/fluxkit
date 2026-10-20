@@ -47,7 +47,7 @@ export const EAGER_FILES: Record<Locale, Record<string, Messages>> = {
 };
 
 /** The lazily loaded message files. A later area adds its name here and two loaders below. */
-export const LAZY_FILES = ["catalog-dictionaries", "products", "orders"] as const;
+export const LAZY_FILES = ["catalog-dictionaries", "products", "orders", "customers"] as const;
 export type LazyFile = (typeof LAZY_FILES)[number];
 
 type FileLoader = () => Promise<Messages>;
@@ -68,6 +68,10 @@ export const LAZY_FILE_LOADERS: Record<LazyFile, Record<Locale, FileLoader>> = {
   orders: {
     uk: () => import("./uk/orders.json").then((module) => module.default),
     en: () => import("./en/orders.json").then((module) => module.default),
+  },
+  customers: {
+    uk: () => import("./uk/customers.json").then((module) => module.default),
+    en: () => import("./en/customers.json").then((module) => module.default),
   },
 };
 

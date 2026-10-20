@@ -232,12 +232,11 @@ describe("who changed the status (owner answer 11)", () => {
 });
 
 describe("customer links", () => {
-  it("links the customer's detail only once that route exists (step 9), else nothing", () => {
+  it("links the customer's detail by the account id (the route exists since step 9)", () => {
     const id = "33333333-3333-4333-8333-333333333333";
-    const pattern = (PATHS as Readonly<Record<string, string>>).customerDetail;
-    expect(customerDetailHref(id)).toBe(
-      pattern === undefined ? null : pattern.replace(":id", encodeURIComponent(id)),
-    );
+    expect(PATHS.customerDetail).toBe("/customers/:id");
+    expect(customerDetailHref(id)).toBe(`/customers/${id}`);
+    expect(customerDetailHref("a/b")).toBe("/customers/a%2Fb");
   });
 
   it("lists the customer's orders through the customerId filter", () => {
