@@ -15,6 +15,7 @@ import {
 import { describe, expect, it } from "vitest";
 import {
   ATTRIBUTE_DEFAULTS,
+  attributeDisplay,
   attributeErrorsFromProblem,
   attributeFieldSpecs,
   attributeFormFrom,
@@ -178,6 +179,29 @@ describe("generated attribute fields", () => {
     expect(spec("length_value").unit).toBe("mm");
     expect(spec("secret_ref").isInternal).toBe(true);
     expect(spec("note").isLocalized).toBe(true);
+  });
+
+  it("are the variant-level assignments only for a variant (the same model, level variant)", () => {
+    const variantSpecs = attributeFieldSpecs(type, "variant");
+    expect(variantSpecs.map((entry) => entry.code)).toEqual(["per_variant"]);
+    expect(variantSpecs[0]).toMatchObject({ inputType: "number", isRequired: false });
+    expect(attributeFieldSpecs(type, "product")).toEqual(specs);
+  });
+
+  it("shows a stored value as text for a table, with option labels and the unit; unset is empty", () => {
+    const show = (code: string, stored: JsonObject[string] | undefined) =>
+      attributeDisplay(spec(code), stored, "en", "uk");
+    expect(show("model_code", "AB-12")).toBe("AB-12");
+    expect(show("note", { uk: "Нотатка", en: "Note" })).toBe("Note");
+    expect(show("length_value", 12.5)).toBe("12.5 mm");
+    expect(show("flag_one", true)).toEqual({ key: "products.attributes.yes" });
+    expect(show("flag_one", false)).toEqual({ key: "products.attributes.no" });
+    expect(show("finish", "gloss")).toBe("gloss-en");
+    expect(show("finish", "gone")).toBe("gone");
+    expect(show("tags", ["t2", "t1"])).toBe("t2-en, t1-en");
+    expect(show("release_on", "2024-02-29")).toBe("2024-02-29");
+    expect(show("model_code", undefined)).toBe("");
+    expect(show("tags", [])).toBe("");
   });
 
   it("list select options by position, with their labels", () => {
