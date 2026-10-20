@@ -3,7 +3,13 @@ import { useCallback, useRef, useState, type RefObject } from "react";
 import { runWrite, type WriteOutcome } from "../../lib/run-write";
 import { useCrash } from "../../lib/use-crash";
 import type { FormIssues } from "./form-rules";
-import { IDLE_SUBMIT, stateAfterOutcome, stateWithIssues, type SubmitState } from "./submit-errors";
+import {
+  IDLE_SUBMIT,
+  stateAfterOutcome,
+  stateWithIssues,
+  type ProblemMapper,
+  type SubmitState,
+} from "./submit-errors";
 
 export interface FormSubmit {
   state: SubmitState;
@@ -20,11 +26,16 @@ export interface FormSubmit {
  * errors on the fields and in a focused summary, and the "result unknown" state for a lost answer. It never retries and
  * never updates anything before the server answered. The decisions are pure functions in `submit-errors.ts`.
  */
-export function useFormSubmit(formFields: readonly string[]): FormSubmit {
+export function useFormSubmit(
+  formFields: readonly string[],
+  mapProblem?: ProblemMapper,
+): FormSubmit {
   const [state, setState] = useState<SubmitState>(IDLE_SUBMIT);
   const summaryRef = useRef<HTMLDivElement>(null);
   const fieldsRef = useRef(formFields);
   fieldsRef.current = formFields;
+  const mapRef = useRef(mapProblem);
+  mapRef.current = mapProblem;
   const crash = useCrash();
 
   const focusSummary = useCallback(() => {
@@ -49,7 +60,7 @@ export function useFormSubmit(formFields: readonly string[]): FormSubmit {
         crash(bug);
         return { kind: "aborted" };
       }
-      const next = stateAfterOutcome(outcome, fieldsRef.current);
+      const next = stateAfterOutcome(outcome, fieldsRef.current, mapRef.current);
       setState(next);
       if (next.summary.length > 0) focusSummary();
       return outcome;

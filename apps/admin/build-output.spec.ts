@@ -4,6 +4,7 @@ import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
 import { ADMIN_SECURITY_HEADERS } from "./security-headers";
 import { LOCALE_STORAGE_KEY } from "./src/i18n/locale-preference";
+import { LAZY_FILES, eagerMessages } from "./src/messages";
 import { ADMIN_BASE_PATH } from "./src/router/base-path";
 
 /**
@@ -19,8 +20,9 @@ const dist = join(import.meta.dirname, "dist");
  * The JavaScript loaded before any area: the entry chunk and its static imports. Measured 2026-10-19 (step 4b): 392 050
  * bytes raw, 120 027 gzip (React and React DOM about 218 KB, react-router about 95 KB, the shell, the UI library, the admin
  * client and both message catalogues the rest). The budget leaves about 12 % headroom; raising it is a decision for the PR
- * that needs it, with the new measurement. Step 5 (catalog dictionaries): 439 481 bytes raw, 129 557 gzip; the area's own
- * code is a separate lazy chunk, but its uk and en messages (47 KB) are merged into the entry by `messages/index.ts`.
+ * that needs it, with the new measurement. Step 5 (catalog dictionaries): 439 481 bytes raw, 129 557 gzip, because its uk
+ * and en messages (47 KB) were merged into the entry. Step 6a loads each area's messages with the area (one small chunk
+ * per file and language): 398 093 bytes raw, 121 328 gzip with the same areas; the budget stays, about 10 % above that.
  */
 const INITIAL_JS_BUDGET = { raw: 440_000, gzip: 135_000 };
 
@@ -146,6 +148,38 @@ describe("route chunks and the entry budget", () => {
     expect(raw).toBeGreaterThan(100_000);
     expect(raw).toBeLessThanOrEqual(INITIAL_JS_BUDGET.raw);
     expect(gzip).toBeLessThanOrEqual(INITIAL_JS_BUDGET.gzip);
+  });
+});
+
+describe("message chunks", () => {
+  it("keeps the lazy message files out of the initial JavaScript, each in its own chunk per language", () => {
+    const initialCode = [...initialChunks()]
+      .map((key) => manifest[key]?.file as string)
+      .filter((file) => file.endsWith(".js"))
+      .map((file) => readFileSync(join(dist, file), "utf8"))
+      .join("\n");
+    for (const file of LAZY_FILES) {
+      for (const locale of ["uk", "en"] as const) {
+        const source = `src/messages/${locale}/${file}.json`;
+        const chunk = manifest[source];
+        expect(chunk?.isDynamicEntry, source).toBe(true);
+        const messages = JSON.parse(
+          readFileSync(join(import.meta.dirname, source), "utf8"),
+        ) as Record<string, string>;
+        // A text that an eager file also has (the same sentence in two places) is in the entry legitimately.
+        const eagerValues = new Set(Object.values(eagerMessages[locale]));
+        const values = Object.values(messages).filter(
+          (value) => value.length > 20 && !eagerValues.has(value),
+        );
+        expect(values.length, source).toBeGreaterThan(5);
+        for (const value of values) {
+          expect(
+            initialCode.includes(JSON.stringify(value).slice(1, -1)),
+            `${source}: ${value}`,
+          ).toBe(false);
+        }
+      }
+    }
   });
 });
 

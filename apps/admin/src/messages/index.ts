@@ -1,7 +1,6 @@
 import type { Locale, Messages } from "@fluxkit/ui";
 import enAccount from "./en/account.json";
 import enAuth from "./en/auth.json";
-import enCatalogDictionaries from "./en/catalog-dictionaries.json";
 import enCommon from "./en/common.json";
 import enErrors from "./en/errors.json";
 import enNavigation from "./en/navigation.json";
@@ -9,7 +8,6 @@ import enShell from "./en/shell.json";
 import enStatus from "./en/status.json";
 import ukAccount from "./uk/account.json";
 import ukAuth from "./uk/auth.json";
-import ukCatalogDictionaries from "./uk/catalog-dictionaries.json";
 import ukCommon from "./uk/common.json";
 import ukErrors from "./uk/errors.json";
 import ukNavigation from "./uk/navigation.json";
@@ -17,15 +15,20 @@ import ukShell from "./uk/shell.json";
 import ukStatus from "./uk/status.json";
 
 /**
- * UI strings, one file per area and locale (`messages/{uk,en}/<area>.json`), so parallel steps touch disjoint files
- * (plan, "i18n"). A later area adds its two files and one line per locale below. `messages.spec.ts` checks that both
- * locales have the same files, keys and placeholders.
+ * UI strings, one file per area and locale (`messages/{uk,en}/<file>.json`), so parallel steps touch disjoint files
+ * (plan, "i18n"). Two kinds of files:
+ * - EAGER files are part of the entry chunk: the shell, sign-in, the start page, the own account, every route title (the
+ *   shell writes the title and the navigation before any area loads) and the problem-code map (`errors`).
+ * - LAZY files belong to an area and are loaded with it: an area module names the files its screens use
+ *   (`MESSAGE_FILES`), and the route renders the area only after they are loaded for the UI language
+ *   (`i18n/area-messages.tsx`), so the translator never meets a missing key.
+ * `messages.spec.ts` checks that both locales have the same files, keys and placeholders, and that the keys an area's
+ * source uses are in the eager files or in the files that area declares.
  */
-export const AREA_FILES: Record<Locale, Record<string, Messages>> = {
+export const EAGER_FILES: Record<Locale, Record<string, Messages>> = {
   uk: {
     account: ukAccount,
     auth: ukAuth,
-    "catalog-dictionaries": ukCatalogDictionaries,
     common: ukCommon,
     errors: ukErrors,
     navigation: ukNavigation,
@@ -35,7 +38,6 @@ export const AREA_FILES: Record<Locale, Record<string, Messages>> = {
   en: {
     account: enAccount,
     auth: enAuth,
-    "catalog-dictionaries": enCatalogDictionaries,
     common: enCommon,
     errors: enErrors,
     navigation: enNavigation,
@@ -44,7 +46,28 @@ export const AREA_FILES: Record<Locale, Record<string, Messages>> = {
   },
 };
 
-/** Merges the area files of one locale; a key defined in two files is a bug and throws (no silent override). */
+/** The lazily loaded message files. A later area adds its name here and two loaders below. */
+export const LAZY_FILES = ["catalog-dictionaries", "products"] as const;
+export type LazyFile = (typeof LAZY_FILES)[number];
+
+type FileLoader = () => Promise<Messages>;
+
+/**
+ * One dynamic import per file and locale: Vite emits each JSON file as its own small chunk, so an area loads only the
+ * language it shows.
+ */
+export const LAZY_FILE_LOADERS: Record<LazyFile, Record<Locale, FileLoader>> = {
+  "catalog-dictionaries": {
+    uk: () => import("./uk/catalog-dictionaries.json").then((module) => module.default),
+    en: () => import("./en/catalog-dictionaries.json").then((module) => module.default),
+  },
+  products: {
+    uk: () => import("./uk/products.json").then((module) => module.default),
+    en: () => import("./en/products.json").then((module) => module.default),
+  },
+};
+
+/** Merges message files; a key defined in two files is a bug and throws (no silent override). */
 export function mergeAreas(areas: Record<string, Messages>): Messages {
   const merged: Messages = {};
   const origin: Record<string, string> = {};
@@ -60,7 +83,37 @@ export function mergeAreas(areas: Record<string, Messages>): Messages {
   return merged;
 }
 
-export const messagesByLocale: Record<Locale, Messages> = {
-  uk: mergeAreas(AREA_FILES.uk),
-  en: mergeAreas(AREA_FILES.en),
+/** The messages every screen can use from the first render. */
+export const eagerMessages: Record<Locale, Messages> = {
+  uk: mergeAreas(EAGER_FILES.uk),
+  en: mergeAreas(EAGER_FILES.en),
 };
+
+/** The eager messages of a locale plus the given loaded lazy files (a key in two files throws). */
+export function messagesWith(
+  locale: Locale,
+  loaded: Partial<Record<LazyFile, Messages>>,
+): Messages {
+  return mergeAreas({ ...EAGER_FILES[locale], ...loaded });
+}
+
+/**
+ * Loads lazy files once per file and locale (concurrent callers share one request). A failed load is forgotten, so the
+ * next call tries again; the error itself reaches the caller.
+ */
+export function createFileLoader(loaders: Record<LazyFile, Record<Locale, FileLoader>>) {
+  const pending = new Map<string, Promise<Messages>>();
+  return (file: LazyFile, locale: Locale): Promise<Messages> => {
+    const key = `${locale}/${file}`;
+    const known = pending.get(key);
+    if (known !== undefined) return known;
+    const promise = loaders[file][locale]().catch((error: unknown) => {
+      pending.delete(key);
+      throw error;
+    });
+    pending.set(key, promise);
+    return promise;
+  };
+}
+
+export const loadMessageFile = createFileLoader(LAZY_FILE_LOADERS);

@@ -14,5 +14,17 @@
   "page.categories.title": "Категорії",
   "page.orders.title": "Замовлення",
   "page.customers.title": "Покупці",
-  "page.users.title": "Адміністратори"
+  "page.users.title": "Адміністратори",
+  "page.attributeNew.title": "Новий атрибут",
+  "page.attributeDetail.title": "Атрибут",
+  "page.optionNew.title": "Нова опція",
+  "page.optionDetail.title": "Опція",
+  "page.productTypeNew.title": "Новий тип товару",
+  "page.productTypeDetail.title": "Тип товару",
+  "page.brandNew.title": "Новий бренд",
+  "page.brandDetail.title": "Бренд",
+  "page.categoryNew.title": "Нова категорія",
+  "page.categoryDetail.title": "Категорія",
+  "page.productNew.title": "Новий товар",
+  "page.productDetail.title": "Товар"
 }

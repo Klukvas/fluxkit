@@ -4,6 +4,7 @@
   "language.label": "Мова інтерфейсу",
   "language.uk": "Українська",
   "language.en": "English",
+  "language.loadFailed": "Не вдалося завантажити тексти іншою мовою. Перевірте з’єднання й спробуйте ще раз.",
   "action.retry": "Спробувати ще раз",
   "action.reload": "Перезавантажити сторінку",
   "action.goHome": "На головну сторінку",

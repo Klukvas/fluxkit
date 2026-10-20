@@ -8,9 +8,9 @@ import {
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { createTranslator, type DataTableColumn, type Translator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
-import { messagesByLocale } from "../../messages";
 import {
   leftoverText,
+  messagesForArea,
   renderInRouter,
   sentinelTranslator,
   textAttributes,
@@ -30,6 +30,7 @@ import { CodeNameFormView } from "./code-name-form-view";
 import { ConfigGateView } from "./config-gate";
 import { emptyBrandForm, emptyCategoryForm, emptyOptionForm } from "./dictionary-forms";
 import { DictionaryNav, NoticeBar } from "./dictionary-frame";
+import { MESSAGE_FILES } from "./index";
 import { DICTIONARY_WRITE_OPERATIONS, canWriteDictionaries } from "./dictionary-permissions";
 import { ConfirmDelete, FormDialog } from "./form-dialog";
 import { ItemsSection } from "./items-section";
@@ -868,11 +869,11 @@ describe("category tree view", () => {
 // ---------------------------------------------------- the real messages, both languages
 
 describe("the screens with the real uk and en messages", () => {
-  it("render every state without a missing key (the real translator throws on one)", () => {
+  it("render every state without a missing key (the real translator throws on one)", async () => {
     const sentinel = t;
     try {
       for (const locale of ["uk", "en"] as const) {
-        t = createTranslator(messagesByLocale[locale], locale);
+        t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
         const base = emptyAttributeForm(content.locales);
         for (const type of [
           "text",

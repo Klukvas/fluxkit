@@ -37,6 +37,11 @@ export interface ServerPickerProps<T> {
   disabledReason?: (item: T) => string | null;
   /** Adds a first choice with an empty value, for example "Root level". */
   emptyChoiceLabel?: string;
+  /**
+   * The current value when it may not be on the loaded pages (a filter from the URL, the stored brand of a product): shown
+   * as a choice of its own while the loaded items do not contain it, so the control never pretends nothing is chosen.
+   */
+  selected?: { value: string; label: string } | null;
   required?: boolean;
   error?: MessageDescriptor;
   disabled?: boolean;
@@ -56,6 +61,7 @@ export function ServerPickerView<T>({
   labelOf,
   disabledReason,
   emptyChoiceLabel,
+  selected,
   required,
   error,
   disabled,
@@ -90,6 +96,12 @@ export function ServerPickerView<T>({
                 ? t("status.loading")
                 : (emptyChoiceLabel ?? t("dict.picker.choose"))}
             </option>
+            {selected !== undefined &&
+            selected !== null &&
+            selected.value !== "" &&
+            !state.items.some((item) => keyOf(item) === selected.value) ? (
+              <option value={selected.value}>{selected.label}</option>
+            ) : null}
             {state.items.map((item) => {
               const reason = disabledReason?.(item) ?? null;
               return (
