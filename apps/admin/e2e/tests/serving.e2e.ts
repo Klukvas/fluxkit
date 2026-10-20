@@ -1,9 +1,12 @@
-import type { Response } from "@playwright/test";
 import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../../security-headers.ts";
 import { SPA } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 
-function expectStrictHeaders(response: Response | null, cacheControl: string): void {
+/** A page response or an API response: only the headers are read. */
+function expectStrictHeaders(
+  response: { headers(): Record<string, string> } | null,
+  cacheControl: string,
+): void {
   expect(response, "a document response").not.toBeNull();
   const headers = response?.headers() ?? {};
   for (const [name, value] of Object.entries(ADMIN_SECURITY_HEADERS)) {
