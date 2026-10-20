@@ -2,6 +2,7 @@ import type { AdminOperationName, AdminOperationPermission } from "@fluxkit/api-
 import type { ComponentType } from "react";
 import { HomePage } from "./areas/home/home-page";
 import { LoginPage } from "./areas/auth/login-page";
+import type { LazyFile } from "./messages";
 import { permissionOf } from "./permissions";
 import { PATHS, type RouteId } from "./router/paths";
 
@@ -14,8 +15,22 @@ import { PATHS, type RouteId } from "./router/paths";
  */
 
 export type RoutePage =
-  | { kind: "eager"; Component: ComponentType }
-  | { kind: "lazy"; load: () => Promise<ComponentType> };
+  { kind: "eager"; Component: ComponentType } | { kind: "lazy"; load: () => Promise<LazyPage> };
+
+/** A loaded lazy page: the component and the lazy message files its area needs before it renders. */
+export interface LazyPage {
+  Component: ComponentType;
+  messageFiles: readonly LazyFile[];
+}
+
+/**
+ * What every lazily loaded area module exports besides its pages: the lazy message files its screens use (`[]` when the
+ * eager messages are enough). The type makes it impossible to forget; `messages.spec.ts` checks the list against the keys
+ * the area's source uses.
+ */
+export interface AreaModule {
+  MESSAGE_FILES: readonly LazyFile[];
+}
 
 export interface AppRoute {
   id: RouteId;
@@ -36,7 +51,16 @@ function route(
   return { id, path: PATHS[id], operation, permission: permissionOf(operation), titleKey, page };
 }
 
-const lazy = (load: () => Promise<ComponentType>): RoutePage => ({ kind: "lazy", load });
+function areaPage<Module extends AreaModule>(
+  load: () => Promise<Module>,
+  pick: (module: Module) => ComponentType,
+): RoutePage {
+  return {
+    kind: "lazy",
+    load: () =>
+      load().then((module) => ({ Component: pick(module), messageFiles: module.MESSAGE_FILES })),
+  };
+}
 
 export const ROUTES: readonly AppRoute[] = [
   route("login", "login", "page.login.title", { kind: "eager", Component: LoginPage }),
@@ -45,123 +69,181 @@ export const ROUTES: readonly AppRoute[] = [
     "account",
     "changePassword",
     "page.account.title",
-    lazy(() => import("./areas/account/account-page").then((module) => module.AccountPage)),
+    areaPage(
+      () => import("./areas/account/account-page"),
+      (module) => module.AccountPage,
+    ),
   ),
   route(
     "products",
     "listProducts",
     "page.products.title",
-    lazy(() => import("./areas/products").then((module) => module.ProductsPage)),
+    areaPage(
+      () => import("./areas/products"),
+      (module) => module.ProductsPage,
+    ),
   ),
   route(
     "attributes",
     "listAttributes",
     "page.attributes.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributesPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.AttributesPage,
+    ),
   ),
   route(
     "attributeNew",
     "createAttribute",
     "page.attributeNew.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributeNewPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.AttributeNewPage,
+    ),
   ),
   route(
     "attributeDetail",
     "getAttribute",
     "page.attributeDetail.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributeDetailPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.AttributeDetailPage,
+    ),
   ),
   route(
     "options",
     "listOptions",
     "page.options.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionsPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.OptionsPage,
+    ),
   ),
   route(
     "optionNew",
     "createOption",
     "page.optionNew.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionNewPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.OptionNewPage,
+    ),
   ),
   route(
     "optionDetail",
     "getOption",
     "page.optionDetail.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionDetailPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.OptionDetailPage,
+    ),
   ),
   route(
     "productTypes",
     "listProductTypes",
     "page.productTypes.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.ProductTypesPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.ProductTypesPage,
+    ),
   ),
   route(
     "productTypeNew",
     "createProductType",
     "page.productTypeNew.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.ProductTypeNewPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.ProductTypeNewPage,
+    ),
   ),
   route(
     "productTypeDetail",
     "getProductType",
     "page.productTypeDetail.title",
-    lazy(() =>
-      import("./areas/catalog-dictionaries").then((module) => module.ProductTypeDetailPage),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.ProductTypeDetailPage,
     ),
   ),
   route(
     "brands",
     "listBrands",
     "page.brands.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandsPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.BrandsPage,
+    ),
   ),
   route(
     "brandNew",
     "createBrand",
     "page.brandNew.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandNewPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.BrandNewPage,
+    ),
   ),
   route(
     "brandDetail",
     "getBrand",
     "page.brandDetail.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandDetailPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.BrandDetailPage,
+    ),
   ),
   route(
     "categories",
     "listCategories",
     "page.categories.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoriesPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.CategoriesPage,
+    ),
   ),
   route(
     "categoryNew",
     "createCategory",
     "page.categoryNew.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoryNewPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.CategoryNewPage,
+    ),
   ),
   route(
     "categoryDetail",
     "getCategory",
     "page.categoryDetail.title",
-    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoryDetailPage)),
+    areaPage(
+      () => import("./areas/catalog-dictionaries"),
+      (module) => module.CategoryDetailPage,
+    ),
   ),
   route(
     "orders",
     "listOrders",
     "page.orders.title",
-    lazy(() => import("./areas/orders").then((module) => module.OrdersPage)),
+    areaPage(
+      () => import("./areas/orders"),
+      (module) => module.OrdersPage,
+    ),
   ),
   route(
     "customers",
     "listCustomers",
     "page.customers.title",
-    lazy(() => import("./areas/customers").then((module) => module.CustomersPage)),
+    areaPage(
+      () => import("./areas/customers"),
+      (module) => module.CustomersPage,
+    ),
   ),
   route(
     "users",
     "listUsers",
     "page.users.title",
-    lazy(() => import("./areas/users").then((module) => module.UsersPage)),
+    areaPage(
+      () => import("./areas/users"),
+      (module) => module.UsersPage,
+    ),
   ),
 ];
 

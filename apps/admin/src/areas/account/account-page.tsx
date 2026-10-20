@@ -11,6 +11,7 @@ import {
 } from "@fluxkit/ui";
 import { useRef, useState, type FormEvent, type Ref } from "react";
 import { useI18n } from "../../i18n/i18n-context";
+import type { LazyFile } from "../../messages";
 import { adminClient } from "../../lib/api";
 import { failureFromError } from "../../lib/failure";
 import { formatDateTime } from "../../lib/format";
@@ -165,6 +166,9 @@ export function PasswordFormView({
 }
 
 const EMPTY: PasswordFormValues = { currentPassword: "", newPassword: "", repeatPassword: "" };
+
+/** The account messages are eager (the user menu links here from every page). */
+export const MESSAGE_FILES: readonly LazyFile[] = [];
 
 /** `/account`: the own user (from `me`) and the own password change, which ends the other sessions (ADR 0009). */
 export function AccountPage() {

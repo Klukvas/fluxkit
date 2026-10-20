@@ -4,6 +4,7 @@
   "language.label": "Interface language",
   "language.uk": "Українська",
   "language.en": "English",
+  "language.loadFailed": "The texts in the other language could not be loaded. Check the connection and try again.",
   "action.retry": "Try again",
   "action.reload": "Reload the page",
   "action.goHome": "Go to the start page",

@@ -1,5 +1,8 @@
+import { renderToStaticMarkup } from "react-dom/server";
 import { matchRoutes, type RouteObject } from "react-router";
 import { describe, expect, it } from "vitest";
+import { withAreaMessages } from "./i18n/area-messages";
+import { I18nProvider } from "./i18n/i18n-context";
 import { ADMIN_BASE_PATH, API_PATH_PATTERN } from "./router/base-path";
 import { browserPath } from "./router/paths";
 import { buildRouteObjects, NOT_FOUND_ROUTE_ID } from "./router/route-objects";
@@ -106,5 +109,38 @@ describe("route objects for the router", () => {
 
   it("find a route by id", () => {
     expect(routeById("orders").path).toBe("/orders");
+  });
+});
+
+describe("lazy pages and their message files", () => {
+  it("load each area page with the lazy message files its module declares", async () => {
+    const declared: Record<string, readonly string[]> = {};
+    for (const route of ROUTES) {
+      if (route.page.kind !== "lazy") continue;
+      const loaded = await route.page.load();
+      expect(typeof loaded.Component, route.id).toBe("function");
+      declared[route.id] = loaded.messageFiles;
+    }
+    expect(declared.attributes).toEqual(["catalog-dictionaries"]);
+    expect(declared.categoryDetail).toEqual(["catalog-dictionaries"]);
+    expect(declared.account).toEqual([]);
+    expect(declared.orders).toEqual([]);
+  });
+
+  it("render an area only after its files are loaded (the shell's loading view meanwhile)", () => {
+    function Page() {
+      return <p>page-body</p>;
+    }
+    expect(withAreaMessages(Page, [])).toBe(Page);
+    const Wrapped = withAreaMessages(Page, ["catalog-dictionaries"]);
+    expect(Wrapped).not.toBe(Page);
+    // Static rendering runs no effect, so the files are never loaded: the loading view stays.
+    const html = renderToStaticMarkup(
+      <I18nProvider initial="en">
+        <Wrapped />
+      </I18nProvider>,
+    );
+    expect(html).not.toContain("page-body");
+    expect(html).toContain('aria-busy="true"');
   });
 });

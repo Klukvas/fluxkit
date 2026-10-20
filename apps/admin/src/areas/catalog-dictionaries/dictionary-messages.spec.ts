@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { messagesByLocale } from "../../messages";
+import { messagesForArea } from "../../test-helpers";
 import { ATTRIBUTE_FLAGS, ATTRIBUTE_INPUT_TYPES, VALIDATION_FIELDS } from "./attribute-form";
 import { DICTIONARY_SCREENS, NOTICE_KINDS } from "./dictionary-frame";
+import { MESSAGE_FILES } from "./index";
 import { ITEM_MESSAGE_SUFFIXES } from "./items-section";
 
 /**
@@ -35,11 +36,12 @@ function expected(): string[] {
 }
 
 describe("dictionary message keys built from data", () => {
-  it("exist in uk and en", () => {
+  it("exist in uk and en, among the messages the area loads", async () => {
     const keys = expected();
     expect(keys.length).toBeGreaterThan(80);
     for (const locale of ["uk", "en"] as const) {
-      const missing = keys.filter((key) => !(key in messagesByLocale[locale]));
+      const messages = await messagesForArea(locale, MESSAGE_FILES);
+      const missing = keys.filter((key) => !(key in messages));
       expect(missing, locale).toEqual([]);
     }
   });

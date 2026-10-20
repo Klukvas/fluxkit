@@ -14,5 +14,15 @@
   "page.categories.title": "Categories",
   "page.orders.title": "Orders",
   "page.customers.title": "Customers",
-  "page.users.title": "Admin users"
+  "page.users.title": "Admin users",
+  "page.attributeNew.title": "New attribute",
+  "page.attributeDetail.title": "Attribute",
+  "page.optionNew.title": "New option",
+  "page.optionDetail.title": "Option",
+  "page.productTypeNew.title": "New product type",
+  "page.productTypeDetail.title": "Product type",
+  "page.brandNew.title": "New brand",
+  "page.brandDetail.title": "Brand",
+  "page.categoryNew.title": "New category",
+  "page.categoryDetail.title": "Category"
 }

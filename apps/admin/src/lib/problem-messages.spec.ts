@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createTranslator, locales } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
-import { messagesByLocale } from "../messages";
+import { eagerMessages } from "../messages";
 import {
   KNOWN_PROBLEM_CODES,
   KNOWN_REASON_CODES,
@@ -114,7 +114,7 @@ describe("problem code map", () => {
     ];
     expect(keys.length).toBeGreaterThan(100);
     for (const locale of locales) {
-      const messages = messagesByLocale[locale];
+      const messages = eagerMessages[locale];
       for (const key of keys) expect(messages[key], `${locale} ${key}`).toBeTruthy();
     }
   });
@@ -154,7 +154,7 @@ describe("describeProblem", () => {
   });
 
   it("never shows the API's English detail", () => {
-    const t = createTranslator(messagesByLocale.en, "en");
+    const t = createTranslator(eagerMessages.en, "en");
     const problem = { code: "conflict", detail: "SECRET-DETAIL-FROM-API" };
     const descriptor = describeProblem(409, problem);
     expect(t(descriptor.key)).not.toContain("SECRET");

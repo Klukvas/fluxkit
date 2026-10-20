@@ -1,4 +1,5 @@
 import type { RouteObject } from "react-router";
+import { withAreaMessages } from "../i18n/area-messages";
 import { useI18n } from "../i18n/i18n-context";
 import { ProtectedLayout } from "../layout/protected-layout";
 import type { RouteHandle } from "../layout/shell";
@@ -20,9 +21,17 @@ function toRouteObject(route: AppRoute): RouteObject {
     titleKey: route.titleKey,
     permission: route.permission,
   };
-  return route.page.kind === "eager"
-    ? { path: route.path, handle, Component: route.page.Component }
-    : { path: route.path, handle, lazy: { Component: route.page.load } };
+  const page = route.page;
+  if (page.kind === "eager") return { path: route.path, handle, Component: page.Component };
+  return {
+    path: route.path,
+    handle,
+    // The area renders after its message files are loaded for the UI language (no missing key on screen).
+    lazy: {
+      Component: () =>
+        page.load().then((loaded) => withAreaMessages(loaded.Component, loaded.messageFiles)),
+    },
+  };
 }
 
 /**

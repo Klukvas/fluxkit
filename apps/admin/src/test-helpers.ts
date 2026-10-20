@@ -1,8 +1,9 @@
-import type { Translator } from "@fluxkit/ui";
+import type { Locale, Messages, Translator } from "@fluxkit/ui";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { MemoryRouter } from "react-router";
+import { loadMessageFile, messagesWith, type LazyFile } from "./messages";
 
 /**
  * Test-only helpers (imported by spec files, never by the app). A translator that returns `§key` (`§key:count` for
@@ -40,4 +41,17 @@ export function renderInRouter(element: ReactElement, path = "/"): string {
       element,
     ),
   );
+}
+
+/**
+ * The messages a screen of an area sees in the app: the eager files plus the area's lazy files, loaded through the real
+ * loaders (`messages/index.ts`). A screen test that renders with them proves the area's `MESSAGE_FILES` are enough.
+ */
+export async function messagesForArea(
+  locale: Locale,
+  files: readonly LazyFile[],
+): Promise<Messages> {
+  const loaded: Partial<Record<LazyFile, Messages>> = {};
+  for (const file of files) loaded[file] = await loadMessageFile(file, locale);
+  return messagesWith(locale, loaded);
 }
