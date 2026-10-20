@@ -17,6 +17,8 @@
   "page.customers.title": "Покупці",
   "page.customerDetail.title": "Покупець",
   "page.users.title": "Адміністратори",
+  "page.userNew.title": "Новий адміністратор",
+  "page.userDetail.title": "Адміністратор",
   "page.attributeNew.title": "Новий атрибут",
   "page.attributeDetail.title": "Атрибут",
   "page.optionNew.title": "Нова опція",
