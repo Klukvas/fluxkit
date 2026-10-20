@@ -92,7 +92,7 @@ export interface VariantRowActions {
   onDelete: (variant: AdminVariant) => void;
 }
 
-function optionValuesText(naming: VariantNaming, variant: AdminVariant): string {
+export function optionValuesText(naming: VariantNaming, variant: AdminVariant): string {
   return variant.optionValues
     .map((value) =>
       valueLabel(

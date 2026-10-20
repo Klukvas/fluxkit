@@ -1,4 +1,9 @@
-import type { AdjustInventoryBody, StockAdjustmentKind } from "@fluxkit/api-client";
+import type { AdjustInventoryBody, ProblemDetails, StockAdjustmentKind } from "@fluxkit/api-client";
+import {
+  describeFieldError,
+  describeProblem,
+  type MessageDescriptor,
+} from "../../../lib/problem-messages";
 
 /**
  * The stock adjustment form's model (plan step 7, owner answer 12; `docs/api/inventory.md`): kind, a change (`delta`) or a
@@ -162,4 +167,52 @@ export function planAdjustment(
   const confirm: AdjustmentConfirmation | null =
     mode === "setOnHand" ? "set" : delta < 0n ? "lower" : null;
   return { ok: true, body, change, confirm };
+}
+
+const FIELD_OF_PATH: Readonly<Record<string, AdjustmentField>> = {
+  delta: "quantity",
+  setOnHand: "quantity",
+  locationId: "locationId",
+  reason: "reason",
+  reference: "reference",
+};
+
+function isAdjustmentIssue(code: string): code is AdjustmentIssue {
+  return (ADJUSTMENT_ISSUES as readonly string[]).includes(code);
+}
+
+function message(code: string): MessageDescriptor {
+  return isAdjustmentIssue(code)
+    ? { key: `products.stock.issue.${code}` }
+    : describeFieldError(code);
+}
+
+/**
+ * A refused adjustment on the form: a stock rule (`409 rule_violation`: `below_reserved`, `negative_on_hand`, `no_change`,
+ * `kind_requires_increase`) and a `400` on `delta` or `setOnHand` go on the quantity with the form's own explanation; other
+ * `400` paths on their field or in the summary; any other answer through the problem map. Nothing is retried: the tab
+ * reloads the level and the journal after every answer.
+ */
+export function adjustmentErrorsFromProblem(
+  problem: ProblemDetails,
+  status: number,
+): { fields: Partial<Record<AdjustmentField, MessageDescriptor>>; other: MessageDescriptor[] } {
+  const fields: Partial<Record<AdjustmentField, MessageDescriptor>> = {};
+  const other: MessageDescriptor[] = [];
+  if (
+    problem.code === "rule_violation" &&
+    problem.rule !== undefined &&
+    isAdjustmentIssue(problem.rule)
+  ) {
+    return { fields: { quantity: message(problem.rule) }, other };
+  }
+  if (problem.errors === undefined || problem.errors.length === 0) {
+    return { fields, other: [describeProblem(status, problem)] };
+  }
+  for (const error of problem.errors) {
+    const field = FIELD_OF_PATH[error.path];
+    if (field === undefined) other.push(describeFieldError(error.code));
+    else fields[field] ??= message(error.code);
+  }
+  return { fields, other };
 }

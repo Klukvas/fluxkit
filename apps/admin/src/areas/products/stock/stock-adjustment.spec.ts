@@ -4,6 +4,7 @@ import { MAX_ON_HAND as CORE_MAX_ON_HAND, decideAdjustment } from "@fluxkit/core
 import { describe, expect, it } from "vitest";
 import {
   ADJUSTMENT_KINDS,
+  adjustmentErrorsFromProblem,
   MAX_ON_HAND,
   REASON_MAX_LENGTH,
   REFERENCE_MAX_LENGTH,
@@ -322,5 +323,76 @@ describe("planAdjustment: the stock rules, predicted from the last read (the ser
       }
     }
     expect(compared).toBeGreaterThan(300);
+  });
+});
+
+describe("adjustmentErrorsFromProblem (the server's refusal on the form; never retried)", () => {
+  const base = { type: "about:blank", title: "x", detail: "x" };
+
+  it("puts a 409 rule of the stock rules on the quantity, with the form's own explanation", () => {
+    for (const rule of [
+      "below_reserved",
+      "negative_on_hand",
+      "no_change",
+      "kind_requires_increase",
+    ] as const) {
+      expect(
+        adjustmentErrorsFromProblem({ ...base, status: 409, code: "rule_violation", rule }, 409),
+      ).toEqual({ fields: { quantity: { key: `products.stock.issue.${rule}` } }, other: [] });
+    }
+  });
+
+  it("puts 400 errors on their fields: delta and setOnHand are the quantity", () => {
+    expect(
+      adjustmentErrorsFromProblem(
+        {
+          ...base,
+          status: 400,
+          code: "validation_failed",
+          errors: [
+            { path: "delta", code: "invalid_quantity", message: "x" },
+            { path: "locationId", code: "invalid_reference", message: "x" },
+            { path: "reason", code: "too_big", message: "x" },
+            { path: "", code: "delta_or_set_on_hand", message: "x" },
+            { path: "kind", code: "invalid_value", message: "x" },
+          ],
+        },
+        400,
+      ),
+    ).toEqual({
+      fields: {
+        quantity: { key: "products.stock.issue.invalid_quantity" },
+        locationId: { key: "errors.reason.invalid_reference" },
+        reason: { key: "errors.reason.too_big" },
+      },
+      other: [
+        { key: "errors.reason.delta_or_set_on_hand" },
+        { key: "errors.reason.invalid_value" },
+      ],
+    });
+    expect(
+      adjustmentErrorsFromProblem(
+        {
+          ...base,
+          status: 400,
+          code: "validation_failed",
+          errors: [{ path: "setOnHand", code: "on_hand_out_of_range", message: "x" }],
+        },
+        400,
+      ).fields,
+    ).toEqual({ quantity: { key: "products.stock.issue.on_hand_out_of_range" } });
+  });
+
+  it("explains any other answer through the problem map", () => {
+    expect(adjustmentErrorsFromProblem({ ...base, status: 404, code: "not_found" }, 404)).toEqual({
+      fields: {},
+      other: [{ key: "errors.code.not_found" }],
+    });
+    expect(
+      adjustmentErrorsFromProblem(
+        { ...base, status: 409, code: "rule_violation", rule: "odd" },
+        409,
+      ),
+    ).toEqual({ fields: {}, other: [{ key: "errors.code.rule_violation", code: "odd" }] });
   });
 });

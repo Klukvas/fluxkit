@@ -15,6 +15,7 @@ export const EDITOR_NOTICE_KINDS = [
   "created",
   "deleted",
   "valueAdded",
+  "priceRemoved",
 ] as const;
 export type EditorNoticeKind = (typeof EDITOR_NOTICE_KINDS)[number];
 

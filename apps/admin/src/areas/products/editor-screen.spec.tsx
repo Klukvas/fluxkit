@@ -26,7 +26,6 @@ import { MESSAGE_FILES } from "./index";
 import { LIFECYCLE_ACTIONS } from "./lifecycle";
 import { mapPublishProblems } from "./publish-problems";
 import { CategoryAssignmentsView } from "./tabs/categories-tab";
-import { ComingTabView } from "./tabs/coming-tabs";
 
 let t: Translator = sentinelTranslator();
 const noop = () => undefined;
@@ -311,9 +310,6 @@ describe("editor summary, lifecycle and publish problems", () => {
     expect(prices).toContain('id="product-prices"');
     expect(prices).toContain("§products.problems.variantRow");
     expect(renderInRouter(<TabProblemsView t={t} id="product-media" problems={[]} />)).toBe("");
-    expect(renderInRouter(<ComingTabView t={t} tab="prices" />)).toContain(
-      "§products.placeholder.prices",
-    );
   });
 
   it("lists the product's categories with the primary one; controls only for writers", () => {
@@ -388,9 +384,6 @@ describe("the editor with the real uk and en messages", () => {
           expect(
             renderInRouter(<EditorNoticeBar t={t} notice={{ kind, n: 1, values }} />),
           ).toContain("<p");
-        }
-        for (const tab of ["prices", "stock"] as const) {
-          expect(renderInRouter(<ComingTabView t={t} tab={tab} />)).toContain("<p");
         }
         const summary = renderInRouter(
           <ProductSummaryView
