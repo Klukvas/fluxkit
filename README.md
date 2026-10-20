@@ -202,10 +202,11 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # The admin SPA (apps/admin/dist). Hashed assets first: a missing file is a 404, never the HTML.
+    # The admin SPA. Copy apps/admin/dist to /srv/fluxkit/site/admin-ui, so that the URL path and the file path agree and
+    # the fallback below stays inside this location (a fallback to "/index.html" would be matched again against ALL
+    # locations and land in the storefront). Hashed assets first: a missing file is a 404, never the HTML.
     location ~ ^/admin-ui/assets/ {
-        rewrite ^/admin-ui/(.*)$ /$1 break;
-        root /srv/fluxkit/apps/admin/dist;
+        root /srv/fluxkit/site;
         try_files $uri =404;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
@@ -216,11 +217,10 @@ server {
         add_header Cross-Origin-Opener-Policy "same-origin" always;
     }
 
-    # Every other /admin-ui path (the start page too): index.html for SPA paths, the file when there is one.
+    # Every other /admin-ui path (the start page too): the file when there is one, else index.html (deep links, reloads).
     location ~ ^/admin-ui(/|$) {
-        rewrite ^/admin-ui/?(.*)$ /$1 break;
-        root /srv/fluxkit/apps/admin/dist;
-        try_files $uri /index.html;
+        root /srv/fluxkit/site;
+        try_files $uri /admin-ui/index.html;
         add_header Cache-Control "no-cache" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
