@@ -32,6 +32,8 @@ export const PATHS = {
   customers: "/customers",
   customerDetail: "/customers/:id",
   users: "/users",
+  userNew: "/users/new",
+  userDetail: "/users/:id",
 } as const;
 
 export type RouteId = keyof typeof PATHS;

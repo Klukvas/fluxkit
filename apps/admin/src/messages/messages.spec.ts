@@ -173,6 +173,7 @@ describe("the lazy file loader", () => {
       products: { uk: unused, en: unused },
       orders: { uk: unused, en: unused },
       customers: { uk: unused, en: unused },
+      users: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
