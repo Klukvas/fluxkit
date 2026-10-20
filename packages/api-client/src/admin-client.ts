@@ -99,7 +99,7 @@ export interface AdminPageOptions extends CallOptions {
 }
 
 export interface AdminListCustomersOptions extends AdminPageOptions {
-  /** A part of the email or the name. */
+  /** The start of the email (case and surrounding spaces do not matter); `%` and `_` are literal. */
   q?: string;
 }
 
