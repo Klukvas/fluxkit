@@ -8,10 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts"
   },
   "devDependencies": {
     "@fluxkit/core": "workspace:*",
+    "@playwright/test": "1.56.1",
     "@tailwindcss/vite": "4.3.3",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",
