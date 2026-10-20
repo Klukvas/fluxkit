@@ -28,6 +28,7 @@ import { adminClient } from "../../../lib/api";
 import { formatDateTime } from "../../../lib/format";
 import type { MessageDescriptor } from "../../../lib/problem-messages";
 import { runWrite } from "../../../lib/run-write";
+import { useAdminEmails } from "../../../lib/use-admin-emails";
 import { createSingleFlight } from "../../../lib/single-flight";
 import { useRefreshingResource } from "../../../lib/use-refreshing-resource";
 import { useResource } from "../../../lib/use-resource";
@@ -74,9 +75,6 @@ import {
 
 /** Journal and reservation pages: small, the newest first. */
 export const STOCK_PAGE_SIZE = 20;
-/** The users list is read only for owners (`users.manage`): at most this many pages of 100 (owner answer 11). */
-const MAX_USER_PAGES = 10;
-const USERS_PAGE_SIZE = 100;
 
 export const RESERVATION_STATUSES: readonly ReservationStatus[] = [
   "active",
@@ -789,29 +787,6 @@ export type AdjustmentResult =
   | { kind: "ok"; row: MovementRow }
   | { kind: "refused" }
   | { kind: "unknown"; check: AdjustmentCheck | "unreadable"; latest: MovementRow | null };
-
-/** The emails of the admin users, only for a session that may read them (owners); `null` otherwise (no request). */
-function useAdminEmails(enabled: boolean): ReadonlyMap<string, string> | null {
-  const users = useResource(
-    async (signal): Promise<AdminResult<ReadonlyMap<string, string> | null>> => {
-      if (!enabled) return { ok: true, status: 200, data: null };
-      const emails = new Map<string, string>();
-      for (let page = 0; page < MAX_USER_PAGES; page += 1) {
-        const result = await adminClient.listUsers({
-          limit: USERS_PAGE_SIZE,
-          offset: page * USERS_PAGE_SIZE,
-          signal,
-        });
-        if (!result.ok) return result;
-        for (const user of result.data.items) emails.set(user.id, user.email);
-        if (emails.size >= result.data.total || result.data.items.length === 0) break;
-      }
-      return { ok: true, status: 200, data: emails };
-    },
-    [enabled],
-  );
-  return users.status === "ready" ? users.data : null;
-}
 
 interface StockData {
   locations: AdminLocation[];

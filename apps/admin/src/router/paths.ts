@@ -28,6 +28,7 @@ export const PATHS = {
   categoryNew: "/catalog/categories/new",
   categoryDetail: "/catalog/categories/:id",
   orders: "/orders",
+  orderDetail: "/orders/:id",
   customers: "/customers",
   users: "/users",
 } as const;

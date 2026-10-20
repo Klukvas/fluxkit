@@ -1,12 +1,11 @@
-import { useI18n } from "../../i18n/i18n-context";
 import type { LazyFile } from "../../messages";
-import { NotBuiltView } from "../../views/status-views";
+import { OrderDetailPage } from "./order-detail-page";
+import { OrderListPage } from "./order-list-page";
 
-/** The eager messages are enough for the placeholder. */
-export const MESSAGE_FILES: readonly LazyFile[] = [];
+/** The orders area (plan step 8) loads its own messages only (`orders`). */
+export const MESSAGE_FILES: readonly LazyFile[] = ["orders"];
 
-/** Orders area (plan step 8). Its own lazy chunk; a placeholder until that step fills it. */
-export function OrdersPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.orders.title" />;
-}
+/** `/orders`: the order list. */
+export const OrdersPage = OrderListPage;
+/** `/orders/:id`: the order detail with its actions. */
+export { OrderDetailPage };

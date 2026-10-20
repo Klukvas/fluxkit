@@ -171,6 +171,7 @@ describe("the lazy file loader", () => {
     const load = createFileLoader({
       "catalog-dictionaries": { uk: loader("uk"), en: loader("en") },
       products: { uk: unused, en: unused },
+      orders: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),

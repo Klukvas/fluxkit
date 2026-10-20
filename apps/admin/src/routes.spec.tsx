@@ -78,6 +78,7 @@ describe("route table", () => {
       categoryNew: "catalog.write",
       categoryDetail: "catalog.read",
       orders: "orders.read",
+      orderDetail: "orders.read",
       customers: "customers.read",
       users: "users.manage",
     };
@@ -126,7 +127,8 @@ describe("lazy pages and their message files", () => {
     expect(declared.attributes).toEqual(["catalog-dictionaries"]);
     expect(declared.categoryDetail).toEqual(["catalog-dictionaries"]);
     expect(declared.account).toEqual([]);
-    expect(declared.orders).toEqual([]);
+    expect(declared.orders).toEqual(["orders"]);
+    expect(declared.orderDetail).toEqual(["orders"]);
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });
