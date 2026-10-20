@@ -11,7 +11,6 @@ import { PATHS, buildPath, pathTo } from "../../router/paths";
 import { readPaging, writeQuery } from "../../router/query";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
-import { useSession } from "../../session/session-context";
 import { ResourceFallback } from "../../views/status-views";
 import {
   attributeCreateBody,
@@ -24,7 +23,6 @@ import {
 } from "./attribute-form";
 import { AttributeFormView } from "./attribute-form-view";
 import { ConfigGate, useContentLocales } from "./config-gate";
-import { canWriteDictionaries } from "./dictionary-permissions";
 import {
   BackLink,
   DangerZone,
@@ -42,6 +40,7 @@ import { hasIssues } from "./form-rules";
 import { ItemsSection } from "./items-section";
 import { ListScreen } from "./list-screen";
 import { localeFieldNames, resolveLocalized } from "./locale-text";
+import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
 
@@ -66,11 +65,6 @@ export function attributeFieldNames(locales: readonly string[]): string[] {
     "validation.min_items",
     "validation.max_items",
   ];
-}
-
-function useCanWrite(): boolean {
-  const session = useSession();
-  return canWriteDictionaries(session.state.me?.permissions ?? null);
 }
 
 // ------------------------------------------------------------------------- list

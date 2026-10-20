@@ -12,7 +12,6 @@ import { resourceStateFromResult, useResource } from "../../lib/use-resource";
 import { PATHS, buildPath, pathTo } from "../../router/paths";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
-import { useSession } from "../../session/session-context";
 import {
   LoadingView,
   ResourceFallback,
@@ -55,12 +54,12 @@ import {
   primaryLinkClass,
   type NoticeKind,
 } from "./dictionary-frame";
-import { canWriteDictionaries } from "./dictionary-permissions";
 import { ConfirmDelete } from "./form-dialog";
 import { FormErrorSummary, TextField, type ContentLocales } from "./form-parts";
 import { hasIssues } from "./form-rules";
 import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { ServerPicker } from "./server-picker";
+import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
 
@@ -72,11 +71,6 @@ export function categoryFieldNames(locales: readonly string[]): string[] {
     ...localeFieldNames("name", locales),
     ...localeFieldNames("description", locales),
   ];
-}
-
-function useCanWrite(): boolean {
-  const session = useSession();
-  return canWriteDictionaries(session.state.me?.permissions ?? null);
 }
 
 // ------------------------------------------------------------------------- tree

@@ -11,7 +11,6 @@ import { PATHS, buildPath, pathTo } from "../../router/paths";
 import { readPaging, writeQuery } from "../../router/query";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
-import { useSession } from "../../session/session-context";
 import { ResourceFallback } from "../../views/status-views";
 import { BrandFormView } from "./brand-form-view";
 import { ConfigGate, useContentLocales } from "./config-gate";
@@ -34,12 +33,12 @@ import {
   linkClass,
   type NoticeKind,
 } from "./dictionary-frame";
-import { canWriteDictionaries } from "./dictionary-permissions";
 import { ConfirmDelete } from "./form-dialog";
 import type { ContentLocales } from "./form-parts";
 import { hasIssues } from "./form-rules";
 import { ListScreen } from "./list-screen";
 import { localeFieldNames, resolveLocalized } from "./locale-text";
+import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
 
@@ -52,11 +51,6 @@ export function brandFieldNames(locales: readonly string[]): string[] {
     ...localeFieldNames("name", locales),
     ...localeFieldNames("description", locales),
   ];
-}
-
-function useCanWrite(): boolean {
-  const session = useSession();
-  return canWriteDictionaries(session.state.me?.permissions ?? null);
 }
 
 function BrandsList() {

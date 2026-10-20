@@ -34,7 +34,7 @@ The edge proxy serves `apps/admin/dist` for `/admin-ui` and `/admin-ui/*` with a
 
 Image hosts: the same list as `STOREFRONT_IMAGE_HOSTS` (a static SPA has no runtime configuration). The CSP protects the SPA from injected script; it does NOT protect the admin API from an XSS in the storefront, which shares the origin (risk accepted in ADR 0027). The router writes the start page as `/admin-ui` (no slash), so the proxy must serve both `/admin-ui` and `/admin-ui/*`.
 
-Checked after every build (`build-output.spec.ts`): `index.html` has no inline script, style or handler and no external URL, every asset is under `/admin-ui/assets/`, each area is its own lazy chunk, the initial JavaScript stays within its budget (440 000 bytes raw, 135 000 gzip; measured 392 050 and 120 027 on 2026-10-19 for the shell, 439 481 and 129 560 on 2026-10-20 with the catalog dictionaries: their uk and en messages, 47 KB, are merged into the entry, so the next area's messages need a lazy message load or a new budget), no zod, `localStorage` once (the UI language).
+Checked after every build (`build-output.spec.ts`): `index.html` has no inline script, style or handler and no external URL, every asset is under `/admin-ui/assets/`, each area is its own lazy chunk, the initial JavaScript stays within its budget (440 000 bytes raw, 135 000 gzip; measured 392 050 and 120 027 on 2026-10-19 for the shell, 439 481 and 129 557 on 2026-10-20 with the catalog dictionaries: their uk and en messages, 47 KB, are merged into the entry, so the next area's messages need a lazy message load or a new budget), no zod, `localStorage` once (the UI language).
 
 ## Structure and conventions
 
