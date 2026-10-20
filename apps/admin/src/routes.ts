@@ -281,6 +281,24 @@ export const ROUTES: readonly AppRoute[] = [
       (module) => module.UsersPage,
     ),
   ),
+  route(
+    "userNew",
+    "createUser",
+    "page.userNew.title",
+    areaPage(
+      () => import("./areas/users"),
+      (module) => module.UserNewPage,
+    ),
+  ),
+  route(
+    "userDetail",
+    "getUser",
+    "page.userDetail.title",
+    areaPage(
+      () => import("./areas/users"),
+      (module) => module.UserDetailPage,
+    ),
+  ),
 ];
 
 export function routeById(id: RouteId): AppRoute {

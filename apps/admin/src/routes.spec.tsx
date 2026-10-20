@@ -82,6 +82,8 @@ describe("route table", () => {
       customers: "customers.read",
       customerDetail: "customers.read",
       users: "users.manage",
+      userNew: "users.manage",
+      userDetail: "users.manage",
     };
     expect(Object.fromEntries(ROUTES.map((route) => [route.id, route.permission]))).toEqual(
       expected,
@@ -132,6 +134,9 @@ describe("lazy pages and their message files", () => {
     expect(declared.orderDetail).toEqual(["orders"]);
     expect(declared.customers).toEqual(["customers"]);
     expect(declared.customerDetail).toEqual(["customers"]);
+    expect(declared.users).toEqual(["users"]);
+    expect(declared.userNew).toEqual(["users"]);
+    expect(declared.userDetail).toEqual(["users"]);
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });

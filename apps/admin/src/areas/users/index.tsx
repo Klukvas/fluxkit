@@ -1,12 +1,14 @@
-import { useI18n } from "../../i18n/i18n-context";
 import type { LazyFile } from "../../messages";
-import { NotBuiltView } from "../../views/status-views";
+import { UserCreatePage } from "./user-create-page";
+import { UserDetailPage } from "./user-detail-page";
+import { UserListPage } from "./user-list-page";
 
-/** The eager messages are enough for the placeholder. */
-export const MESSAGE_FILES: readonly LazyFile[] = [];
+/** The admin users area (plan step 10, owner only) loads its own messages only (`users`). */
+export const MESSAGE_FILES: readonly LazyFile[] = ["users"];
 
-/** Admin users area (plan step 10, owner only). Its own lazy chunk; a placeholder until that step fills it. */
-export function UsersPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.users.title" />;
-}
+/** `/users`: the list of admin users. */
+export const UsersPage = UserListPage;
+/** `/users/new`: create an admin user. */
+export const UserNewPage = UserCreatePage;
+/** `/users/:id`: one user with role, activity and password reset. */
+export { UserDetailPage };

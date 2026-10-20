@@ -17,6 +17,8 @@
   "page.customers.title": "Customers",
   "page.customerDetail.title": "Customer",
   "page.users.title": "Admin users",
+  "page.userNew.title": "New admin user",
+  "page.userDetail.title": "Admin user",
   "page.attributeNew.title": "New attribute",
   "page.attributeDetail.title": "Attribute",
   "page.optionNew.title": "New option",
