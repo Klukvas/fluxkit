@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import type { AdminApi } from "../support/api.ts";
 import { SPA } from "../support/env.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
 
@@ -31,18 +32,14 @@ async function tabTo(page: Page, target: string, limit = 40): Promise<string[]> 
   );
 }
 
-test("keyboard only: skip link, focus order, tabs with arrow keys, an edit saved, a dialog closed with Escape", async ({
-  page,
-  signIn,
-  owner,
-}, testInfo) => {
-  const u = unique(testInfo);
+/** A draft of the seeded "hand_tool" type, made through the API (setup only). */
+async function createDraft(owner: AdminApi, u: string): Promise<{ id: string }> {
   const types = await owner.get<{ items: { id: string; code: string }[] }>(
     "/admin/product-types?limit=100",
   );
   const handTool = types.items.find((type) => type.code === "hand_tool");
   if (handTool === undefined) throw new Error("the seed has no hand_tool product type");
-  const product = await owner.post<{ id: string }>(
+  return owner.post<{ id: string }>(
     "/admin/products",
     {
       productTypeId: handTool.id,
@@ -51,6 +48,15 @@ test("keyboard only: skip link, focus order, tabs with arrow keys, an edit saved
     },
     201,
   );
+}
+
+test("keyboard only: skip link, focus order, tabs with arrow keys, an edit saved, a dialog closed with Escape", async ({
+  page,
+  signIn,
+  owner,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const product = await createDraft(owner, u);
 
   await signIn("manager");
   await page.goto(`${SPA}/products/${product.id}`);
@@ -134,4 +140,32 @@ test("keyboard only: skip link, focus order, tabs with arrow keys, an edit saved
   expect((await owner.get<{ id: string }>(`/admin/products/${product.id}`)).id, "not deleted").toBe(
     product.id,
   );
+});
+
+test("two arrow keys faster than the router: the selected tab follows the focus", async ({
+  page,
+  signIn,
+  owner,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const product = await createDraft(owner, u);
+  await signIn("manager");
+  await page.goto(`${SPA}/products/${product.id}?tab=stock`);
+  const main = page.getByRole("main");
+  await expect(main.getByRole("tab", { name: "Stock" })).toHaveAttribute("aria-selected", "true");
+  await main.getByRole("tab", { name: "Stock" }).focus();
+  // ArrowRight (to General, wrapping) and ArrowLeft (back to Stock) in one task: the second key press arrives before the
+  // first tab switch (a navigation of the query string) has reached the tab list, as with a fast typist or key repeat.
+  await page.evaluate(() => {
+    const press = (key: string) =>
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }),
+      );
+    press("ArrowRight");
+    press("ArrowLeft");
+  });
+  expect(await focused(page)).toBe("tab:Stock");
+  await expect(page).toHaveURL(/[?&]tab=stock/);
+  await expect(main.getByRole("tab", { name: "Stock" })).toHaveAttribute("aria-selected", "true");
+  await expect(main.getByRole("tabpanel", { name: "Stock" })).toBeVisible();
 });

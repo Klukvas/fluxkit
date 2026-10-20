@@ -46,9 +46,11 @@ export function Tabs({ label, tabs, selectedId, onChange, children }: TabsProps)
     }
     event.preventDefault();
     buttons.current[target]?.focus();
-    if (next.id !== selectedId) {
-      onChange(next.id);
-    }
+    // Always ask for the tab the focus moved to, even when it looks selected already: `selectedId` is the value of the
+    // last render, and a parent that updates asynchronously (the admin's router changes the query string) may still be
+    // switching away from it. Comparing with it dropped the second of two fast key presses, leaving the focus on one tab
+    // and another selected (found by the admin keyboard e2e scenario). A click asks the same way.
+    onChange(next.id);
   };
 
   return (
