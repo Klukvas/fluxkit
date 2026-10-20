@@ -1,5 +1,10 @@
 import { ADMIN_OPERATIONS } from "@fluxkit/api-client";
-import { ORDER_STATUSES, ROLE_PERMISSIONS, decideTransition, type OrderStatus } from "@fluxkit/core";
+import {
+  ORDER_STATUSES,
+  ROLE_PERMISSIONS,
+  decideTransition,
+  type OrderStatus,
+} from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import {
   ORDER_ACTIONS,

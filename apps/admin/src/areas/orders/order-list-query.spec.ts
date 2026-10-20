@@ -127,7 +127,9 @@ describe("list request", () => {
     });
     expect(
       listRequest(
-        read(`?status=awaiting_payment&from=2026-10-25&to=2026-10-25&q=a@b.c&customerId=${CUSTOMER}&offset=20`),
+        read(
+          `?status=awaiting_payment&from=2026-10-25&to=2026-10-25&q=a@b.c&customerId=${CUSTOMER}&offset=20`,
+        ),
         "Europe/Kyiv",
       ),
     ).toEqual({

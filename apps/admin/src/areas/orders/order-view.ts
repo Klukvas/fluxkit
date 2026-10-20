@@ -30,7 +30,7 @@ export const ORDER_STATUS_TONES: Record<OrderStatus, StatusTone> = {
 };
 
 export function orderStatusLabelKey(status: OrderStatus): string {
-  return `orders.status.${status}`;
+  return `order.status.${status}`;
 }
 
 /**

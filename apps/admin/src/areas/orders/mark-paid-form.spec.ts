@@ -134,15 +134,15 @@ describe("after a lost answer (mark-paid is idempotent by reference)", () => {
   it("tells from the reloaded order whether the payment with that reference was recorded", () => {
     const base = { paymentReference: null, status: "awaiting_payment" as const };
     expect(markPaidCheckAfterUnknown(base, "R-1")).toBe("not_recorded");
-    expect(
-      markPaidCheckAfterUnknown({ status: "paid", paymentReference: "R-1" }, "R-1"),
-    ).toBe("recorded");
-    expect(
-      markPaidCheckAfterUnknown({ status: "fulfilled", paymentReference: "R-1" }, "R-1"),
-    ).toBe("recorded");
-    expect(
-      markPaidCheckAfterUnknown({ status: "paid", paymentReference: "OTHER" }, "R-1"),
-    ).toBe("paid_with_other_reference");
+    expect(markPaidCheckAfterUnknown({ status: "paid", paymentReference: "R-1" }, "R-1")).toBe(
+      "recorded",
+    );
+    expect(markPaidCheckAfterUnknown({ status: "fulfilled", paymentReference: "R-1" }, "R-1")).toBe(
+      "recorded",
+    );
+    expect(markPaidCheckAfterUnknown({ status: "paid", paymentReference: "OTHER" }, "R-1")).toBe(
+      "paid_with_other_reference",
+    );
     expect(markPaidCheckAfterUnknown({ status: "cancelled", paymentReference: null }, "R-1")).toBe(
       "not_payable",
     );
@@ -152,8 +152,9 @@ describe("after a lost answer (mark-paid is idempotent by reference)", () => {
   });
 
   it("keeps the SAME reference for a retry by the admin and asks for the confirmation again", () => {
-    expect(
-      valuesForRetry({ reference: "R-1", amount: { amount: 5, currency: "UAH" } }),
-    ).toEqual({ reference: "R-1", received: false });
+    expect(valuesForRetry({ reference: "R-1", amount: { amount: 5, currency: "UAH" } })).toEqual({
+      reference: "R-1",
+      received: false,
+    });
   });
 });

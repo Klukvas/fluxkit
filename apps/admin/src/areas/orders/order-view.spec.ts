@@ -99,7 +99,7 @@ describe("order status as text plus tone", () => {
   it("has a tone and a message key for every status the API has", () => {
     expect(Object.keys(ORDER_STATUS_TONES).sort()).toEqual([...ORDER_STATUSES].sort());
     for (const status of ORDER_STATUSES) {
-      expect(orderStatusLabelKey(status)).toBe(`orders.status.${status}`);
+      expect(orderStatusLabelKey(status)).toBe(`order.status.${status}`);
     }
     expect(ORDER_STATUS_TONES.awaiting_payment).toBe("warning");
     expect(ORDER_STATUS_TONES.paid).toBe("success");
