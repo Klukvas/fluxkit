@@ -65,6 +65,7 @@ From the step 10 review (fixes on `fix/storefront-review`; these were recorded, 
 - **L4, empty 404 and error shells without JavaScript.** Every 404 and error page is served as `<html id="__next_error__">` with an empty body, no `lang` and the generic title; the client renders the translated view. A Next 16 limitation (the 4b finding), not fixed.
 - **Catalog reads are not rate limited** (already a launch blocker below). Since the review fix, brand-filtered lists are not data-cached, so every view of one is an API call; the cache of the other lists is bounded.
 - **Focus after navigation is by path**: a query-only change (paging, a brand link) keeps the focus where it is.
+- **Storefront e2e flake seen once** (admin UI step 11 verification, 1 of 6 local `pnpm test:e2e` runs): `token-hygiene` timed out after 60 s inside `request.allHeaders()` (a request whose extra headers never arrive keeps the promise pending); the other 5 runs passed. Not investigated or changed in step 11 (outside its paths); CI retries once.
 - **CI e2e artifacts** (traces, videos, screenshots, uploaded when the job fails, kept 7 days) contain throwaway cookies, guest tokens and the e2e owner's session; they belong to an ephemeral, wiped database. Keep real secrets out of the e2e environment.
 - The server-side time limit is 8 s per read and the layout reads the config and the categories one after the other, so a hung API answers a catalog page with `500` after about 16 s.
  None of them is a severity ranking: the e2e README gives no severity for the first four.
