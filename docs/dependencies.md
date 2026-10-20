@@ -27,7 +27,7 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | @vitejs/plugin-react | 6.1.2 | MIT | OK |
 | react-router | 8.4.0 (pinned, see "Added in admin UI plan step 4b") | MIT | OK, runtime dependency of `apps/admin` only |
 | vitest | 5.0.4 | MIT | OK |
-| @playwright/test | 1.56.1 (pinned, see "Added in storefront plan step 8"; 1.64.1 was the latest seen) | Apache-2.0 | OK, devDependency of `apps/storefront` only (browser binaries are downloaded separately and are not part of any delivery) |
+| @playwright/test | 1.56.1 (pinned, see "Added in storefront plan step 8"; 1.64.1 was the latest seen) | Apache-2.0 | OK, devDependency of `apps/storefront` and, at the same exact version, of `apps/admin` (admin UI plan step 11, owner answer 7; no new package in the lockfile) (browser binaries are downloaded separately and are not part of any delivery) |
 | eslint | 10.12.0 | MIT | OK |
 | typescript-eslint | 8.71.2 | MIT | OK |
 | prettier | 3.9.10 | MIT | OK |
@@ -107,7 +107,7 @@ Decision (owner, 2026-10-14): both approved. `@img/sharp-libvips-*` (LGPL-3.0-or
 third-party notices with every client delivery (to be generated in CI, plan step 8). Any other LGPL/GPL-family or CC-BY package needs its own approval.
 
 ## Added in storefront plan step 8 (end-to-end tests)
-Approved by the owner 2026-10-18 (quiz, recommended answers): `@playwright/test` as a devDependency of `apps/storefront`, Chromium only, the root script `pnpm test:e2e` and the CI job `e2e`. NOT approved and not added: `@axe-core/playwright`.
+Approved by the owner 2026-10-18 (quiz, recommended answers): `@playwright/test` as a devDependency of `apps/storefront`, Chromium only, the root script `pnpm test:e2e` and the CI job `e2e`. NOT approved and not added: `@axe-core/playwright`. Approved by the owner on 2026-10-19 (admin UI plan, owner answer 7) and added in step 11: the same `@playwright/test` 1.56.1 as a devDependency of `apps/admin` for the separate admin suite `apps/admin/e2e`; the root `pnpm test:e2e` and the CI job `e2e` run both suites.
 
 | Item | Fact |
 |---|---|

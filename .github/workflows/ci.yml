@@ -127,7 +127,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      # The suite WIPES this database at every run (apps/storefront/e2e/README.md): a dedicated one, never the verify job's.
+      # Both suites (storefront, then admin) WIPE this database at the start of their run (apps/storefront/e2e/README.md,
+      # apps/admin/e2e/README.md): a dedicated one, never the verify job's.
       E2E_DATABASE_URL: postgres://fluxkit:ci-postgres@localhost:5432/fluxkit_e2e_test
     services:
       postgres:
@@ -169,9 +170,11 @@ jobs:
           exit 1
       - run: pnpm build
       # Chromium only, the browser revision that belongs to the pinned @playwright/test (no cache: a restored browser of
-      # another revision would be a silent mismatch; the download is a few seconds).
+      # another revision would be a silent mismatch; the download is a few seconds). The admin suite pins the same
+      # version, so this one browser serves both suites.
       - name: Install Chromium
         run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
+      # The storefront suite, then the admin suite; the first failure stops the step and pnpm names the failing package.
       - run: pnpm test:e2e
       - name: Upload the Playwright report and traces
         if: failure()
@@ -181,6 +184,8 @@ jobs:
           path: |
             apps/storefront/playwright-report
             apps/storefront/test-results
+            apps/admin/playwright-report
+            apps/admin/test-results
           retention-days: 7
 
   policy:
