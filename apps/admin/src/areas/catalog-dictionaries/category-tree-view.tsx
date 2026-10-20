@@ -1,4 +1,5 @@
 import { Alert, Button, StatusBadge, type Translator } from "@fluxkit/ui";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { PATHS, buildPath } from "../../router/paths";
 import type { TreeItem } from "./category-tree";
@@ -18,6 +19,14 @@ export interface CategoryTreeViewProps {
   onRetryChildren: (id: string) => void;
   /** Distinguishes the groups of two trees in one page (ids must be unique). */
   idPrefix?: string;
+  /**
+   * `browse` (default): each name links to its editor, with "add subcategory" for writers. `pick`: names are text and
+   * `renderActions` adds the controls of each row (the product editor chooses categories with it).
+   */
+  mode?: "browse" | "pick";
+  renderActions?: (item: TreeItem, name: string) => ReactNode;
+  /** The accessible name of the tree (default: the category tree). */
+  label?: string;
 }
 
 function TreeNodes({
@@ -30,6 +39,8 @@ function TreeNodes({
   onLoadMore,
   onRetryChildren,
   idPrefix = "category-tree",
+  mode = "browse",
+  renderActions,
 }: CategoryTreeViewProps) {
   return (
     <ul className="flex flex-col gap-1">
@@ -55,17 +66,21 @@ function TreeNodes({
               ) : (
                 <span className="inline-block min-w-11" aria-hidden="true" />
               )}
-              <Link
-                to={buildPath(PATHS.categoryDetail, { id: item.category.id })}
-                className={linkClass}
-              >
-                {name}
-              </Link>
+              {mode === "browse" ? (
+                <Link
+                  to={buildPath(PATHS.categoryDetail, { id: item.category.id })}
+                  className={linkClass}
+                >
+                  {name}
+                </Link>
+              ) : (
+                <span className="font-medium text-foreground">{name}</span>
+              )}
               <span className="text-sm text-muted-foreground">{item.category.slug}</span>
               {item.category.isActive ? null : (
                 <StatusBadge tone="warning" label={t("dict.category.inactive")} />
               )}
-              {canWrite && item.canExpand ? (
+              {mode === "browse" && canWrite && item.canExpand ? (
                 <Link
                   to={`${PATHS.categoryNew}?parentId=${encodeURIComponent(item.category.id)}`}
                   className="text-sm text-muted-foreground underline underline-offset-4"
@@ -74,6 +89,7 @@ function TreeNodes({
                   {t("dict.category.addChild")}
                 </Link>
               ) : null}
+              {renderActions?.(item, name)}
             </div>
             {item.expanded ? (
               <div id={groupId} className="ms-6 border-s border-border ps-3">
@@ -101,6 +117,8 @@ function TreeNodes({
                     onLoadMore={onLoadMore}
                     onRetryChildren={onRetryChildren}
                     idPrefix={idPrefix}
+                    mode={mode}
+                    renderActions={renderActions}
                   />
                 )}
                 {item.hasMore ? (
@@ -125,9 +143,9 @@ function TreeNodes({
  * category at the maximum depth has no button. The links open the editor, "add subcategory" the create form with its parent.
  */
 export function CategoryTreeView(props: CategoryTreeViewProps) {
-  const { t, items } = props;
+  const { t, items, label } = props;
   return (
-    <nav aria-label={t("dict.category.treeLabel")}>
+    <nav aria-label={label ?? t("dict.category.treeLabel")}>
       <TreeNodes {...props} items={items} />
     </nav>
   );

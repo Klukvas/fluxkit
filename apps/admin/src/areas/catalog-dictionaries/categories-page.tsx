@@ -1,34 +1,18 @@
 import type { AdminCategory } from "@fluxkit/api-client";
 import { Button, ConfirmDialog } from "@fluxkit/ui";
-import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
 import { jsonEqual } from "../../lib/diff-for-patch";
-import { failureFromError } from "../../lib/failure";
-import { useCrash } from "../../lib/use-crash";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
-import { resourceStateFromResult, useResource } from "../../lib/use-resource";
+import { useResource } from "../../lib/use-resource";
 import { PATHS, buildPath, pathTo } from "../../router/paths";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
-import {
-  LoadingView,
-  ResourceFallback,
-  type ResourceFallbackState,
-} from "../../views/status-views";
+import { LoadingView, ResourceFallback } from "../../views/status-views";
 import { CategoryFormView } from "./category-form-view";
-import {
-  CHILD_PAGE_SIZE,
-  ROOT_PAGE_SIZE,
-  collectRoots,
-  initialTreeState,
-  toggleNode,
-  treeItems,
-  treeReducer,
-  type TreeAction,
-  type TreeState,
-} from "./category-tree";
+import { treeItems } from "./category-tree";
 import { CategoryTreeView, TruncatedNotice } from "./category-tree-view";
 import { ConfigGate, useContentLocales } from "./config-gate";
 import {
@@ -60,6 +44,7 @@ import { hasIssues } from "./form-rules";
 import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { ServerPicker } from "./server-picker";
 import { useCanWrite } from "./use-can-write";
+import { useCategoryTree } from "./use-category-tree";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
 
@@ -79,104 +64,8 @@ function CategoryTree() {
   const { t, locale } = useI18n();
   const content = useContentLocales();
   const canWrite = useCanWrite();
-  const crash = useCrash();
-  const [tree, setTree] = useState<TreeState>(initialTreeState);
-  const [scanned, setScanned] = useState(0);
-  const [rootsFailure, setRootsFailure] = useState<ResourceFallbackState | null>(null);
-  const [attempt, setAttempt] = useState(0);
-  const treeRef = useRef(tree);
-  const controller = useRef<AbortController | null>(null);
-  useEffect(() => {
-    treeRef.current = tree;
-  });
-
-  const apply = (action: TreeAction) => setTree((current) => treeReducer(current, action));
-
-  useEffect(() => {
-    const own = new AbortController();
-    controller.current = own;
-    setTree(initialTreeState);
-    collectRoots((offset) =>
-      adminClient.listCategories({ limit: ROOT_PAGE_SIZE, offset, signal: own.signal }),
-    ).then(
-      (result) => {
-        if (own.signal.aborted) return;
-        if (result.ok) {
-          setScanned(result.scanned);
-          setRootsFailure(null);
-          setTree((current) =>
-            treeReducer(current, {
-              type: "rootsLoaded",
-              roots: result.roots,
-              truncated: result.truncated,
-            }),
-          );
-        } else {
-          const state = resourceStateFromResult(result.result);
-          setRootsFailure(state.status === "ready" || state.status === "crashed" ? null : state);
-          setTree((current) => treeReducer(current, { type: "rootsFailed" }));
-        }
-      },
-      (error: unknown) => {
-        if (own.signal.aborted) return;
-        try {
-          const failure = failureFromError(error);
-          if (failure !== null) {
-            setRootsFailure({ status: "error", failure });
-            setTree((current) => treeReducer(current, { type: "rootsFailed" }));
-          }
-        } catch (bug) {
-          crash(bug);
-        }
-      },
-    );
-    return () => own.abort();
-  }, [attempt, crash]);
-
-  function loadChildren(id: string, append: boolean) {
-    const own = controller.current;
-    if (own === null) return;
-    const offset = append ? (treeRef.current.nodes[id]?.childIds.length ?? 0) : 0;
-    adminClient
-      .listCategories({ parentId: id, limit: CHILD_PAGE_SIZE, offset, signal: own.signal })
-      .then(
-        (result) => {
-          if (own.signal.aborted) return;
-          if (result.ok) {
-            apply({
-              type: "childrenLoaded",
-              id,
-              items: result.data.items,
-              total: result.data.total,
-              append,
-            });
-          } else apply({ type: "childrenFailed", id });
-        },
-        (error: unknown) => {
-          if (own.signal.aborted) return;
-          try {
-            if (failureFromError(error) !== null) apply({ type: "childrenFailed", id });
-          } catch (bug) {
-            crash(bug);
-          }
-        },
-      );
-  }
-
-  function toggle(id: string) {
-    const { state, load } = toggleNode(treeRef.current, id);
-    setTree(state);
-    if (load) loadChildren(id, false);
-  }
-
-  function retryChildren(id: string) {
-    apply({ type: "childrenRequested", id });
-    loadChildren(id, false);
-  }
-
-  function loadMore(id: string) {
-    loadChildren(id, true);
-  }
+  const { tree, scanned, rootsFailure, retryRoots, toggle, retryChildren, loadMore } =
+    useCategoryTree();
 
   const createLink = canWrite ? (
     <Link to={pathTo("categoryNew")} className={primaryLinkClass}>
@@ -197,7 +86,7 @@ function CategoryTree() {
         <ResourceFallback
           t={t}
           state={rootsFailure ?? { status: "loading" }}
-          onRetry={() => setAttempt((count) => count + 1)}
+          onRetry={retryRoots}
         />
       ) : (
         <>

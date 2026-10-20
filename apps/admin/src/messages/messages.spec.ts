@@ -212,9 +212,20 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   users: users.MESSAGE_FILES,
 };
 
-/** The area folder of a source file, or `null` outside `src/areas` (shell code: eager messages only). */
+/**
+ * Files outside `src/areas` that only an area imports (they travel in its lazy chunk), with that area. Checked below: no
+ * other area and no shell file imports them.
+ */
+const AREA_OWNED_FILES: Record<string, string> = {
+  [join("layout", "product-editor.ts")]: "products",
+};
+
+/** The area folder of a source file, or `null` for shell code (eager messages only). */
 function areaOf(file: string): string | null {
-  const parts = relative(sourceRoot, file).split(sep);
+  const path = relative(sourceRoot, file);
+  const owned = AREA_OWNED_FILES[path];
+  if (owned !== undefined) return owned;
+  const parts = path.split(sep);
   return parts[0] === "areas" ? (parts[1] ?? null) : null;
 }
 
@@ -251,6 +262,17 @@ describe("message keys used in the source", () => {
       }
     }
     expect(used).toBeGreaterThan(30);
+  });
+
+  it("keeps the area-owned files out of the shell and of other areas", () => {
+    for (const [owned, area] of Object.entries(AREA_OWNED_FILES)) {
+      const module = owned.replace(/\.tsx?$/, "");
+      const importers = sourceFiles(sourceRoot).filter((file) =>
+        new RegExp(`from "[./]*${module.split(sep).join("/")}"`).test(readFileSync(file, "utf8")),
+      );
+      expect(importers.length, owned).toBeGreaterThan(0);
+      for (const file of importers) expect(areaOf(file), relative(sourceRoot, file)).toBe(area);
+    }
   });
 
   it("an area that imports another area's code loads that area's files too", () => {
