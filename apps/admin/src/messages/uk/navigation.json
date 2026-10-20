@@ -24,5 +24,7 @@
   "page.brandNew.title": "Новий бренд",
   "page.brandDetail.title": "Бренд",
   "page.categoryNew.title": "Нова категорія",
-  "page.categoryDetail.title": "Категорія"
+  "page.categoryDetail.title": "Категорія",
+  "page.productNew.title": "Новий товар",
+  "page.productDetail.title": "Товар"
 }

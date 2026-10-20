@@ -84,6 +84,24 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "productNew",
+    "createProduct",
+    "page.productNew.title",
+    areaPage(
+      () => import("./areas/products"),
+      (module) => module.ProductNewPage,
+    ),
+  ),
+  route(
+    "productDetail",
+    "getProduct",
+    "page.productDetail.title",
+    areaPage(
+      () => import("./areas/products"),
+      (module) => module.ProductDetailPage,
+    ),
+  ),
+  route(
     "attributes",
     "listAttributes",
     "page.attributes.title",

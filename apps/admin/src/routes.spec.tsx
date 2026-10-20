@@ -60,6 +60,8 @@ describe("route table", () => {
       home: "authenticated",
       account: "authenticated",
       products: "catalog.read",
+      productNew: "catalog.write",
+      productDetail: "catalog.read",
       attributes: "catalog.read",
       attributeNew: "catalog.write",
       attributeDetail: "catalog.read",
@@ -125,6 +127,8 @@ describe("lazy pages and their message files", () => {
     expect(declared.categoryDetail).toEqual(["catalog-dictionaries"]);
     expect(declared.account).toEqual([]);
     expect(declared.orders).toEqual([]);
+    expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
+    expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });
 
   it("render an area only after its files are loaded (the shell's loading view meanwhile)", () => {

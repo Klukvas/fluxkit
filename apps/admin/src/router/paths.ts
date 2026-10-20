@@ -10,6 +10,8 @@ export const PATHS = {
   home: "/",
   account: "/account",
   products: "/products",
+  productNew: "/products/new",
+  productDetail: "/products/:id",
   attributes: "/catalog/attributes",
   attributeNew: "/catalog/attributes/new",
   attributeDetail: "/catalog/attributes/:id",

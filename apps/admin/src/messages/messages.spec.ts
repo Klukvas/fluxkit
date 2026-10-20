@@ -167,9 +167,11 @@ describe("the lazy file loader", () => {
       }
       return Promise.resolve({ "dict.x": locale });
     };
+    const unused = () => Promise.reject(new Error("not asked for"));
     const load = createFileLoader({
       "catalog-dictionaries": { uk: loader("uk"), en: loader("en") },
-    } as typeof LAZY_FILE_LOADERS);
+      products: { uk: unused, en: unused },
+    });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
       load("catalog-dictionaries", "uk"),
