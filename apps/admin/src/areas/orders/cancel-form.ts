@@ -1,5 +1,5 @@
 import type { CancelAdminOrderBody, OrderStatus } from "@fluxkit/api-client";
-import { checkActionText, type TextIssue } from "./text-rules";
+import { checkActionText, type TextIssue } from "./action-text";
 
 /**
  * The cancel dialog's model: a required reason (the API keeps it on the order and in the status journal) and what the

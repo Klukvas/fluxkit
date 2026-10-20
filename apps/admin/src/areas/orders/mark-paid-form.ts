@@ -1,5 +1,5 @@
 import type { AdminOrder, MarkAdminOrderPaidBody } from "@fluxkit/api-client";
-import { checkActionText, type TextIssue } from "./text-rules";
+import { checkActionText, type TextIssue } from "./action-text";
 
 /**
  * The mark-paid dialog's model (owner answer 8). The amount is NOT a value of the form: the body takes the order's own
