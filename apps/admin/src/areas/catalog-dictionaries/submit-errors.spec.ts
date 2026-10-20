@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   IDLE_SUBMIT,
   formErrorsFromProblem,
+  needsDeleteHint,
   stateAfterOutcome,
   stateWithIssues,
   summaryOf,
@@ -175,5 +176,17 @@ describe("stateWithIssues", () => {
     expect(state.summary).toEqual([{ key: "dict.form.checkFields" }]);
     expect(state.busy).toBe(false);
     expect(state.status).toBeNull();
+  });
+});
+
+describe("needsDeleteHint", () => {
+  it("adds the hint to a generic 409 and not to a reason that already says what to do, nor to other statuses", () => {
+    expect(needsDeleteHint(409, [{ key: "errors.code.in_use" }])).toBe(true);
+    expect(needsDeleteHint(409, [{ key: "errors.code.rule_violation", code: "new_rule" }])).toBe(
+      true,
+    );
+    expect(needsDeleteHint(409, [{ key: "errors.reason.attribute_assigned" }])).toBe(false);
+    expect(needsDeleteHint(403, [{ key: "errors.code.forbidden" }])).toBe(false);
+    expect(needsDeleteHint(null, [])).toBe(false);
   });
 });

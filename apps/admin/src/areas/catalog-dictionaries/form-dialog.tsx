@@ -5,6 +5,7 @@ import type { AdminResult } from "@fluxkit/api-client";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import type { WriteOutcome } from "../../lib/run-write";
 import { FormErrorSummary } from "./form-parts";
+import { needsDeleteHint } from "./submit-errors";
 import { useFormSubmit } from "./use-form-submit";
 
 /**
@@ -92,7 +93,7 @@ export function ConfirmDelete({
   onUnknown: () => void;
   title: string;
   description: string;
-  /** What to do when the item is still used (shown with a 409). */
+  /** What to do when the item is still used (shown with a generic 409; a specific reason explains itself). */
   hint: string;
   confirmLabel: string;
 }) {
@@ -126,7 +127,9 @@ export function ConfirmDelete({
       onConfirm={() => void confirm()}
     >
       <FormErrorSummary t={t} summary={form.state.summary} summaryRef={form.summaryRef} />
-      {form.state.status === 409 ? <p className="mt-3 text-muted-foreground">{hint}</p> : null}
+      {needsDeleteHint(form.state.status, form.state.summary) ? (
+        <p className="mt-3 text-muted-foreground">{hint}</p>
+      ) : null}
     </ConfirmDialog>
   );
 }

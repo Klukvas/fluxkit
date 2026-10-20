@@ -80,3 +80,17 @@ export function stateAfterOutcome(
       return IDLE_SUBMIT;
   }
 }
+
+/** The generic answers that do not say what to do: a delete hint is shown for them, not for a specific reason's own message. */
+const GENERIC_KEYS = new Set([
+  "errors.code.in_use",
+  "errors.code.rule_violation",
+  "errors.code.conflict",
+]);
+
+export function needsDeleteHint(
+  status: number | null,
+  summary: readonly MessageDescriptor[],
+): boolean {
+  return status === 409 && summary.some((descriptor) => GENERIC_KEYS.has(descriptor.key));
+}
