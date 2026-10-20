@@ -19,7 +19,8 @@ const dist = join(import.meta.dirname, "dist");
  * The JavaScript loaded before any area: the entry chunk and its static imports. Measured 2026-10-19 (step 4b): 392 050
  * bytes raw, 120 027 gzip (React and React DOM about 218 KB, react-router about 95 KB, the shell, the UI library, the admin
  * client and both message catalogues the rest). The budget leaves about 12 % headroom; raising it is a decision for the PR
- * that needs it, with the new measurement.
+ * that needs it, with the new measurement. Step 5 (catalog dictionaries): 439 481 bytes raw, 129 557 gzip; the area's own
+ * code is a separate lazy chunk, but its uk and en messages (47 KB) are merged into the entry by `messages/index.ts`.
  */
 const INITIAL_JS_BUDGET = { raw: 440_000, gzip: 135_000 };
 
