@@ -8,12 +8,8 @@ import { NotBuiltView } from "../../views/status-views";
  */
 export const MESSAGE_FILES: readonly LazyFile[] = ["catalog-dictionaries", "products"];
 
+export { ProductNewPage } from "./product-create-page";
 export { ProductsPage } from "./product-list-page";
-
-export function ProductNewPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.productNew.title" />;
-}
 
 export function ProductDetailPage() {
   const { t } = useI18n();

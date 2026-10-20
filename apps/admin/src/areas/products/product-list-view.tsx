@@ -26,6 +26,7 @@ import {
   SEARCH_PATTERN_SOURCE,
   type ProductListQuery,
 } from "./product-list-query";
+import { shortId } from "./product-pickers";
 import { STATUS_TONES, statusLabelKey } from "./product-status";
 
 export interface ProductListViewProps {
@@ -47,11 +48,6 @@ export interface ProductListViewProps {
   brandFilter: ReactNode;
   categoryFilter: ReactNode;
   hrefForOffset: (offset: number) => string;
-}
-
-/** A short form of an id, for a reference whose name is not known (support can match it). */
-export function shortId(id: string): string {
-  return id.slice(0, 8);
 }
 
 function hasFilters(query: ProductListQuery): boolean {

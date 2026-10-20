@@ -1,10 +1,4 @@
-import type {
-  AdminBrand,
-  AdminCategory,
-  AdminProductSummary,
-  AdminResult,
-  LocalizedText,
-} from "@fluxkit/api-client";
+import type { AdminBrand, AdminCategory, AdminProductSummary } from "@fluxkit/api-client";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
@@ -28,12 +22,8 @@ import {
   type FilterChange,
   type ProductListQuery,
 } from "./product-list-query";
-import { ProductListView, shortId } from "./product-list-view";
-
-interface Named {
-  name: LocalizedText;
-  slug: string;
-}
+import { ProductListView } from "./product-list-view";
+import { useSelectedLabel } from "./product-pickers";
 import { useCan } from "./use-can";
 
 /**
@@ -69,29 +59,6 @@ function useBrandNames(products: readonly AdminProductSummary[] | null): Map<str
     return () => controller.abort();
   }, [key, crash]);
   return known;
-}
-
-/** The label of a filter's current value (a brand or category id from the URL that may not be on a loaded page). */
-function useFilterLabel(
-  id: string | undefined,
-  read: (id: string, signal: AbortSignal) => Promise<AdminResult<Named>>,
-): { value: string; label: string } | null {
-  const { locale } = useI18n();
-  const content = useContentLocales();
-  const resource = useResource<Named | null>(
-    (signal) =>
-      id === undefined ? Promise.resolve({ ok: true, status: 200, data: null }) : read(id, signal),
-    [id],
-  );
-  if (id === undefined) return null;
-  if (resource.status !== "ready" || resource.data === null) {
-    return { value: id, label: shortId(id) };
-  }
-  return {
-    value: id,
-    label:
-      resolveLocalized(resource.data.name, locale, content.defaultLocale) || resource.data.slug,
-  };
 }
 
 function ProductList() {
@@ -156,10 +123,10 @@ function ProductList() {
     if (check.ok && check.value !== query.q) apply({ q: check.value }, false);
   }
 
-  const brandSelected = useFilterLabel(query.brandId, (id, signal) =>
+  const brandSelected = useSelectedLabel(query.brandId, (id, signal) =>
     adminClient.getBrand(id, { signal }),
   );
-  const categorySelected = useFilterLabel(query.categoryId, (id, signal) =>
+  const categorySelected = useSelectedLabel(query.categoryId, (id, signal) =>
     adminClient.getCategory(id, { signal }),
   );
 

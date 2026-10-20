@@ -54,13 +54,13 @@ export interface FormOptions {
 
 export type FormMode = "create" | "edit";
 
-function nameIssue(values: LocaleValues, field: string, options: FormOptions): FormIssues {
+export function nameIssue(values: LocaleValues, field: string, options: FormOptions): FormIssues {
   return hasDefaultLocale(values, options.defaultLocale)
     ? {}
     : { [`${field}.${options.defaultLocale}`]: describeFieldError("default_locale_missing") };
 }
 
-function slugIssue(slug: string): FormIssues {
+export function slugIssue(slug: string): FormIssues {
   const trimmed = slug.trim();
   if (trimmed === "") return {};
   return SLUG_PATTERN.test(trimmed) && trimmed.length <= SLUG_MAX_LENGTH
