@@ -35,6 +35,9 @@ import { LIFECYCLE_CONFIRMATION, permittedActions, type LifecycleAction } from "
 import { mapPublishProblems, type EditorTabId, type PublishProblem } from "./publish-problems";
 import type { ChangeDetail } from "./tab-props";
 
+/** Frames to wait for a problem's field to appear after its tab opened (about five seconds at 60 frames a second). */
+const FOCUS_ATTEMPTS = 300;
+
 interface EditorData {
   product: AdminProduct;
   productType: AdminProductTypeDetail;
@@ -131,10 +134,21 @@ function ProductEditor({ id }: { id: string }) {
 
   useEffect(() => {
     if (pendingFocus === null || pendingFocus.tab !== selected) return undefined;
-    const frame = requestAnimationFrame(() => {
-      document.getElementById(pendingFocus.id)?.focus();
-      setPendingFocus(null);
-    });
+    // A tab that reads its own data (Prices, Stock) renders the target only after its read: wait for it, a few seconds
+    // at most (then the problem list stays where it is).
+    let frame = 0;
+    let attempts = 0;
+    const tryFocus = () => {
+      const element = document.getElementById(pendingFocus.id);
+      attempts += 1;
+      if (element !== null || attempts > FOCUS_ATTEMPTS) {
+        element?.focus();
+        setPendingFocus(null);
+        return;
+      }
+      frame = requestAnimationFrame(tryFocus);
+    };
+    frame = requestAnimationFrame(tryFocus);
     return () => cancelAnimationFrame(frame);
   }, [pendingFocus, selected]);
 
