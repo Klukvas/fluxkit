@@ -8,10 +8,67 @@ import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import type { LifecycleAction } from "./lifecycle";
 import { STATUS_TONES, statusLabelKey } from "./product-status";
 import type { EditorTabId, PublishProblem } from "./publish-problems";
-import { problemPlace } from "./tabs/coming-tabs";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
+
+/** Where a publish problem sits, in words: the variant's row (1-based) and SKU, and the attribute. */
+export function problemPlace(t: Translator, problem: PublishProblem): string | null {
+  const parts: string[] = [];
+  if (problem.variantIndex !== undefined) {
+    parts.push(
+      problem.variantSku === undefined
+        ? t("products.problems.variantRowNoSku", { row: problem.variantIndex + 1 })
+        : t("products.problems.variantRow", {
+            row: problem.variantIndex + 1,
+            sku: problem.variantSku,
+          }),
+    );
+  }
+  if (problem.attributeCode !== undefined) {
+    parts.push(t("products.problems.attribute", { code: problem.attributeCode }));
+  }
+  return parts.length === 0 ? null : parts.join(" · ");
+}
+
+/**
+ * The publish problems that belong to one tab, listed at the top of that tab (a focus target for problems that have no
+ * field of their own, such as a variant that no longer exists or a problem of the whole list).
+ */
+export function TabProblemsView({
+  t,
+  id,
+  problems,
+}: {
+  t: Translator;
+  id: string;
+  problems: readonly PublishProblem[];
+}) {
+  if (problems.length === 0) return null;
+  return (
+    <section
+      id={id}
+      tabIndex={-1}
+      aria-labelledby={`${id}-heading`}
+      className={`flex flex-col gap-2 rounded-md border border-danger p-4 ${focusClass}`}
+    >
+      <h2 id={`${id}-heading`} className="font-semibold">
+        {t("products.problems.onTab")}
+      </h2>
+      <ul className="flex flex-col gap-1">
+        {problems.map((problem, index) => {
+          const place = problemPlace(t, problem);
+          return (
+            <li key={`${problem.path}-${index}`}>
+              {place === null ? null : <span className="font-medium">{place}: </span>}
+              {describe(t, problem.message)}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 /** The editor's title: the product's title in the UI language (with fallback), else its slug. */
 export function productTitle(

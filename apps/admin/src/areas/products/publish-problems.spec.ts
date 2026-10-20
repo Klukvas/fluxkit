@@ -1,10 +1,20 @@
 import type { ProblemDetails } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
-import { mapPublishProblems, problemsOnTab, type PublishProblem } from "./publish-problems";
+import {
+  mapPublishProblems,
+  problemsOnTab,
+  variantIssues,
+  variantProblems,
+  type PublishProblem,
+} from "./publish-problems";
 
 const context = {
   defaultLocale: "uk",
-  variants: [{ sku: "SKU-A" }, { sku: "SKU-B" }, { sku: "SKU-C" }],
+  variants: [
+    { id: "va", sku: "SKU-A" },
+    { id: "vb", sku: "SKU-B" },
+    { id: "vc", sku: "SKU-C" },
+  ],
 };
 
 function problem(errors: { path: string; code: string }[]): ProblemDetails {
@@ -80,43 +90,67 @@ describe("publish problems on the editor's tabs", () => {
     });
   });
 
-  it("puts variants.N problems on Variants with N as the index in the product detail's variant order", () => {
+  it("puts variants.N problems on the variant's row in Variants: N is the index in the product detail's variant order", () => {
     expect(one("variants.1", "price_missing")).toEqual({
       path: "variants.1",
       tab: "variants",
       field: null,
-      focusId: "product-variants-problems",
+      focusId: "product-variant-vb",
       variantIndex: 1,
+      variantId: "vb",
       variantSku: "SKU-B",
       message: { key: "errors.reason.price_missing" },
     });
-    expect(one("variants.2.attributes.per_variant", "required")).toMatchObject({
+    expect(one("variants.0", "default_variant_inactive")).toMatchObject({
+      variantIndex: 0,
+      variantId: "va",
+      variantSku: "SKU-A",
+      focusId: "product-variant-va",
+    });
+  });
+
+  it("puts a variant attribute problem on that variant's attribute field (and locale), with the attribute reason", () => {
+    expect(one("variants.2.attributes.per_variant", "required")).toEqual({
+      path: "variants.2.attributes.per_variant",
       tab: "variants",
+      field: "attributes.per_variant",
+      focusId: "product-variant-vc",
       variantIndex: 2,
+      variantId: "vc",
       variantSku: "SKU-C",
       attributeCode: "per_variant",
       message: { key: "products.attributeReason.required" },
     });
-    expect(one("variants.0", "default_variant_inactive")).toMatchObject({
-      variantIndex: 0,
-      variantSku: "SKU-A",
+    expect(one("variants.0.attributes.note.en", "too_long")).toMatchObject({
+      field: "attributes.note.en",
+      variantId: "va",
+      attributeCode: "note",
     });
-    // A product-wide variant problem (no index), and an index the detail does not have (changed meanwhile).
-    expect(one("variants", "no_active_variant")).toMatchObject({
-      tab: "variants",
-      focusId: "product-variants-problems",
-    });
-    expect(one("variants", "no_active_variant").variantIndex).toBeUndefined();
-    const stale = one("variants.7", "price_missing");
-    expect(stale).toMatchObject({ tab: "variants", variantIndex: 7 });
-    expect(stale.variantSku).toBeUndefined();
   });
 
-  it("puts option, category and media problems on their tabs", () => {
-    expect(one("options.shade", "option_not_allowed")).toMatchObject({
+  it("keeps a product-wide variant problem and a stale index on the tab's own list", () => {
+    const wide = one("variants", "no_active_variant");
+    expect(wide).toMatchObject({ tab: "variants", focusId: "product-variants" });
+    expect(wide.variantIndex).toBeUndefined();
+    expect(wide.variantId).toBeUndefined();
+    const stale = one("variants.7", "price_missing");
+    expect(stale).toMatchObject({ tab: "variants", variantIndex: 7, focusId: "product-variants" });
+    expect(stale.variantSku).toBeUndefined();
+    expect(stale.variantId).toBeUndefined();
+  });
+
+  it("puts option, category and media problems on their tabs, on the option or the image's field", () => {
+    expect(one("options.shade", "option_not_allowed")).toEqual({
+      path: "options.shade",
       tab: "options",
-      focusId: "product-options-problems",
+      field: "options.shade",
+      focusId: "product-option-shade",
       message: { key: "errors.reason.option_not_allowed" },
+    });
+    expect(one("options", "too_many_options")).toMatchObject({
+      tab: "options",
+      field: null,
+      focusId: "product-options",
     });
     expect(one("categories", "required")).toMatchObject({
       tab: "categories",
@@ -128,9 +162,25 @@ describe("publish problems on the editor's tabs", () => {
     expect(one("primaryCategoryId", "primary_not_assigned")).toMatchObject({
       tab: "categories",
     });
-    expect(one("media.3.url", "invalid_format")).toMatchObject({
+    expect(one("media.3.url", "invalid_format")).toEqual({
+      path: "media.3.url",
       tab: "media",
-      focusId: "product-media-problems",
+      field: "media.3.url",
+      focusId: "product-media-3-url",
+      message: { key: "errors.reason.invalid_format" },
+    });
+    expect(one("media.0.alt.en", "too_long")).toMatchObject({
+      field: "media.0.alt.en",
+      focusId: "product-media-0-alt-en",
+    });
+    expect(one("media.1.optionValueId", "invalid_reference")).toMatchObject({
+      field: "media.1.optionValueId",
+      focusId: "product-media-1-link",
+    });
+    expect(one("media", "too_big")).toMatchObject({
+      tab: "media",
+      field: null,
+      focusId: "product-media",
     });
   });
 
@@ -166,6 +216,7 @@ describe("publish problems on the editor's tabs", () => {
         { path: "attributes.model_code", code: "required" },
         { path: "attributes.model_code", code: "too_short" },
         { path: "attributes", code: "values_too_large" },
+        { path: "media.0.url", code: "invalid_format" },
       ]),
       context,
     );
@@ -175,6 +226,33 @@ describe("publish problems on the editor's tabs", () => {
     expect(problemsOnTab(mapped, "attributes")).toEqual({
       "attributes.model_code": { key: "products.attributeReason.required" },
     });
+    expect(problemsOnTab(mapped, "media")).toEqual({
+      "media.0.url": { key: "errors.reason.invalid_format" },
+    });
     expect(problemsOnTab(mapped, "categories")).toEqual({});
+  });
+
+  it("gives one variant its own problems, and its attribute problems as field issues of its form", () => {
+    const mapped = mapPublishProblems(
+      problem([
+        { path: "variants.0.attributes.per_variant", code: "required" },
+        { path: "variants.1.attributes.per_variant", code: "too_long" },
+        { path: "variants.0", code: "price_missing" },
+      ]),
+      context,
+    );
+    expect(variantIssues(mapped, "va")).toEqual({
+      "attributes.per_variant": { key: "products.attributeReason.required" },
+    });
+    expect(variantIssues(mapped, "vb")).toEqual({
+      "attributes.per_variant": { key: "products.attributeReason.too_long" },
+    });
+    expect(variantProblems(mapped, "va").map((entry) => entry.path)).toEqual([
+      "variants.0.attributes.per_variant",
+      "variants.0",
+    ]);
+    expect(variantIssues(mapped, "vz")).toEqual({});
+    // Variant fields are per variant: the tab-wide issues never mix two variants' errors.
+    expect(problemsOnTab(mapped, "variants")).toEqual({});
   });
 });

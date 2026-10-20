@@ -1,8 +1,14 @@
 import type { AdminProduct, AdminProductTypeDetail } from "@fluxkit/api-client";
+import type { TranslationValues } from "@fluxkit/ui";
 import { useEffect } from "react";
 import type { EditorNoticeKind } from "./editor-notice";
 import type { ContentLocales } from "../catalog-dictionaries/form-parts";
 import type { PublishProblem } from "./publish-problems";
+
+export interface ChangeDetail {
+  values?: TranslationValues;
+  variantId?: string;
+}
 
 /** What the editor gives every tab panel (`src/layout/product-editor.ts`). */
 export interface ProductTabProps {
@@ -11,8 +17,11 @@ export interface ProductTabProps {
   content: ContentLocales;
   /** The problems of the last publish attempt (each tab shows its own). */
   problems: readonly PublishProblem[];
-  /** A write ended: the editor shows the status line and reloads the product (never a local change). */
-  onChanged: (kind: EditorNoticeKind) => void;
+  /**
+   * A write ended: the editor shows the status line and reloads the product (never a local change). `values` fill the
+   * status line's message; `variantId` says that one variant was saved (only its publish problems are cleared).
+   */
+  onChanged: (kind: EditorNoticeKind, detail?: ChangeDetail) => void;
   /** Whether the tab has unsaved input (the editor locks the lifecycle actions meanwhile). */
   onDirtyChange: (dirty: boolean) => void;
 }

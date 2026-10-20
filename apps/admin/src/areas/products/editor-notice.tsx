@@ -1,4 +1,4 @@
-import { LiveRegion, type Translator } from "@fluxkit/ui";
+import { LiveRegion, type TranslationValues, type Translator } from "@fluxkit/ui";
 import type { Ref } from "react";
 import { UnknownResultNotice } from "../catalog-dictionaries/form-parts";
 
@@ -11,8 +11,19 @@ export const EDITOR_NOTICE_KINDS = [
   "unpublished",
   "archived",
   "restored",
+  "generated",
+  "created",
+  "deleted",
+  "valueAdded",
 ] as const;
 export type EditorNoticeKind = (typeof EDITOR_NOTICE_KINDS)[number];
+
+/** One status line: what happened, a counter (the same message again is still announced), and the message's values. */
+export interface EditorNotice {
+  kind: EditorNoticeKind;
+  n: number;
+  values?: TranslationValues;
+}
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -27,7 +38,7 @@ export function EditorNoticeBar({
   innerRef,
 }: {
   t: Translator;
-  notice: { kind: EditorNoticeKind; n: number } | null;
+  notice: EditorNotice | null;
   innerRef?: Ref<HTMLDivElement>;
 }) {
   return (
@@ -37,7 +48,7 @@ export function EditorNoticeBar({
           <UnknownResultNotice t={t} />
         ) : (
           <p className="rounded-md border border-success p-3 text-foreground">
-            {t(`products.notice.${notice.kind}`)}
+            {t(`products.notice.${notice.kind}`, notice.values)}
           </p>
         )}
       </LiveRegion>

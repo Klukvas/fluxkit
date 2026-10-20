@@ -150,6 +150,17 @@ describe("checks before the save", () => {
     });
   });
 
+  it("asks for the default locale once any alt text is given (core validateI18nText); none at all is fine", () => {
+    const only = validateMedia(
+      updateMedia(three(), 2, { alt: { uk: "", en: "Only English" } }),
+      context,
+    );
+    expect(only["media.2.alt.uk"]).toEqual({ key: "errors.reason.default_locale_missing" });
+    expect(validateMedia(updateMedia(three(), 2, { alt: { uk: " ", en: " " } }), context)).toEqual(
+      {},
+    );
+  });
+
   it("refuses an option value the product has not chosen", () => {
     const issues = validateMedia(
       setMediaLink(three(), 2, { optionId: "opt-a", optionValueId: "val-9" }),

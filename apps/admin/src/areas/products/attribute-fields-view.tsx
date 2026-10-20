@@ -20,7 +20,7 @@ import {
   type AttributeFormValues,
   type AttributeRules,
 } from "./attribute-values-form";
-import { attributeControlId } from "./field-ids";
+import { attributeControlId, type AttributeIdPrefix } from "./field-ids";
 
 export interface AttributeFieldsViewProps {
   t: Translator;
@@ -37,7 +37,15 @@ export interface AttributeFieldsViewProps {
   /** `publish` for an active product: required attributes are required on every save. */
   mode: "draft" | "publish";
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  /** The controls' id prefix: the product's tab (default) or a variant's form. */
+  idPrefix?: AttributeIdPrefix;
 }
+
+/** The generated fields alone, for a form that has more fields (a variant's). */
+export type AttributeFieldListProps = Omit<
+  AttributeFieldsViewProps,
+  "summary" | "summaryRef" | "busy" | "onSubmit"
+>;
 
 const requiredMark = "dict.form.requiredMark";
 
@@ -90,10 +98,11 @@ function AttributeField({
   issues,
   canWrite,
   mode,
-}: Omit<AttributeFieldsViewProps, "specs" | "summary" | "summaryRef" | "busy" | "onSubmit"> & {
+  idPrefix,
+}: Omit<AttributeFieldListProps, "specs"> & {
   spec: AttributeFieldSpec;
 }) {
-  const id = attributeControlId(spec.code);
+  const id = attributeControlId(spec.code, undefined, idPrefix);
   const path = `attributes.${spec.code}`;
   const name = resolveLocalized(spec.name, uiLocale, content.defaultLocale) || spec.code;
   const label =
@@ -330,13 +339,11 @@ function AttributeField({
  * data the shop never shows). Read-only for an admin who may not update products: no actions at all.
  */
 export function AttributeFieldsView(props: AttributeFieldsViewProps) {
-  const { t, specs, summary, summaryRef, busy, canWrite, onSubmit } = props;
+  const { t, summary, summaryRef, busy, canWrite, onSubmit } = props;
   return (
     <form method="post" onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6">
       <FormErrorSummary t={t} summary={summary} summaryRef={summaryRef} />
-      {specs.map((spec) => (
-        <AttributeField key={spec.code} {...props} spec={spec} />
-      ))}
+      <AttributeFieldList {...props} />
       {canWrite ? (
         <FormActions
           t={t}
@@ -346,5 +353,16 @@ export function AttributeFieldsView(props: AttributeFieldsViewProps) {
         />
       ) : null}
     </form>
+  );
+}
+
+/** One generated field per attribute spec (the product's or a variant's), without a form around them. */
+export function AttributeFieldList(props: AttributeFieldListProps) {
+  return (
+    <>
+      {props.specs.map((spec) => (
+        <AttributeField key={spec.code} {...props} spec={spec} />
+      ))}
+    </>
   );
 }

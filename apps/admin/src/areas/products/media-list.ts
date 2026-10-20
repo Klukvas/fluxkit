@@ -131,7 +131,7 @@ export interface MediaCheckContext {
 /**
  * Early feedback, keyed by the API's error paths (`media.N.url`, `media.N.alt.<locale>`, `media.N.optionValueId`): an
  * address must be an absolute http(s) URL of at most 2048 characters (`safeHttpUrl`, the same check the preview uses), an
- * alt text at most 255 characters, a link one of the product's chosen values. The server checks again and decides.
+ * alt text at most 255 characters and, once given, also in the default locale, a link one of the product's chosen values. The server checks again and decides.
  */
 export function validateMedia(rows: readonly MediaRow[], context: MediaCheckContext): FormIssues {
   const issues: FormIssues = {};
@@ -149,6 +149,12 @@ export function validateMedia(rows: readonly MediaRow[], context: MediaCheckCont
           max: ALT_MAX_LENGTH,
         });
       }
+    }
+    const anyAlt = context.locales.some((locale) => (row.alt[locale] ?? "").trim() !== "");
+    if (anyAlt && (row.alt[context.defaultLocale] ?? "").trim() === "") {
+      // An optional text that is given needs the default locale too (core `validateI18nText`).
+      issues[`media.${index}.alt.${context.defaultLocale}`] ??=
+        describeFieldError("default_locale_missing");
     }
     if (
       row.optionId !== null &&

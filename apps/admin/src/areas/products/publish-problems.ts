@@ -5,8 +5,13 @@ import { attributeReason } from "./attribute-values-form";
 import {
   CATEGORIES_FOCUS_ID,
   GENERAL_FIELD_IDS,
+  MEDIA_FOCUS_ID,
+  OPTIONS_FOCUS_ID,
+  VARIANTS_FOCUS_ID,
   attributeControlId,
-  placeholderFocusId,
+  mediaFieldId,
+  optionFocusId,
+  variantRowFocusId,
 } from "./field-ids";
 
 /** The tabs of the product editor (their order and permissions are configuration: `src/layout/product-editor.ts`). */
@@ -24,8 +29,9 @@ export type EditorTabId = (typeof EDITOR_TAB_IDS)[number];
 
 /**
  * One reason a publish was refused (`400 validation_failed`, `errors[]`; `docs/api/catalog.md`), placed on the editor: the
- * tab that owns the path, the form field (the API path, for the inline error), the element to focus, and for a variant
- * problem its index `N` in the product detail's variant order (the API's `variants.N`) and its SKU.
+ * tab that owns the path, the form field (the API path, for the inline error; for a variant attribute the path inside that
+ * variant's form), the element to focus, and for a variant problem its index `N` in the product detail's variant order
+ * (the API's `variants.N`), its id and its SKU, so the problem stays on the right row when the table changes.
  */
 export interface PublishProblem {
   path: string;
@@ -34,6 +40,7 @@ export interface PublishProblem {
   field: string | null;
   focusId: string | null;
   variantIndex?: number;
+  variantId?: string;
   variantSku?: string;
   attributeCode?: string;
   message: MessageDescriptor;
@@ -41,8 +48,8 @@ export interface PublishProblem {
 
 export interface PublishContext {
   defaultLocale: string;
-  /** The product detail's variants, in its order. */
-  variants: readonly { sku: string }[];
+  /** The product detail's variants, in its order (the order the API's `variants.N` counts in). */
+  variants: readonly { id: string; sku: string }[];
 }
 
 const LOCALE_MAP_FIELDS = {
@@ -96,31 +103,41 @@ function mapOne(path: string, code: string, context: PublishContext): PublishPro
   }
   if (head === "variants") {
     const index = parts[1] === undefined || !/^\d+$/.test(parts[1]) ? undefined : Number(parts[1]);
-    const sku = index === undefined ? undefined : context.variants[index]?.sku;
+    const variant = index === undefined ? undefined : context.variants[index];
     const attributeCode = parts[2] === "attributes" ? parts[3] : undefined;
     return {
       ...base,
       tab: "variants",
-      focusId: placeholderFocusId("variants"),
+      field: attributeCode === undefined ? null : parts.slice(2).join("."),
+      focusId: variant === undefined ? VARIANTS_FOCUS_ID : variantRowFocusId(variant.id),
       ...(index === undefined ? {} : { variantIndex: index }),
-      ...(sku === undefined ? {} : { variantSku: sku }),
+      ...(variant === undefined ? {} : { variantId: variant.id, variantSku: variant.sku }),
       ...(attributeCode === undefined ? {} : { attributeCode }),
       message: attributeCode === undefined ? describeFieldError(code) : attributeReason(code),
     };
   }
   if (head === "options") {
+    const optionCode = parts[1];
     return {
       ...base,
       tab: "options",
-      focusId: placeholderFocusId("options"),
+      field: optionCode === undefined ? null : `options.${optionCode}`,
+      focusId: optionCode === undefined ? OPTIONS_FOCUS_ID : optionFocusId(optionCode),
       message: describeFieldError(code),
     };
   }
   if (head === "media") {
+    const index = parts[1] !== undefined && /^\d+$/.test(parts[1]) ? Number(parts[1]) : undefined;
+    const rest = parts.slice(2);
+    if (index === undefined || rest.length === 0) {
+      return { ...base, tab: "media", focusId: MEDIA_FOCUS_ID, message: describeFieldError(code) };
+    }
+    const control = rest[0] === "optionId" || rest[0] === "optionValueId" ? "link" : rest.join("-");
     return {
       ...base,
       tab: "media",
-      focusId: placeholderFocusId("media"),
+      field: path,
+      focusId: mediaFieldId(index, control),
       message: describeFieldError(code),
     };
   }
@@ -143,11 +160,33 @@ export function mapPublishProblems(
   return (problem.errors ?? []).map((error) => mapOne(error.path, error.code, context));
 }
 
-/** The problems of one tab as field issues (the first of each field), for the tab's inline errors. */
+/**
+ * The problems of one tab as field issues (the first of each field), for the tab's inline errors. Variant problems are
+ * per variant (`variantIssues`), so they are never mixed into one form here.
+ */
 export function problemsOnTab(problems: readonly PublishProblem[], tab: EditorTabId): FormIssues {
   const issues: FormIssues = {};
   for (const entry of problems) {
-    if (entry.tab === tab && entry.field !== null) issues[entry.field] ??= entry.message;
+    if (entry.tab === tab && entry.field !== null && entry.variantId === undefined) {
+      issues[entry.field] ??= entry.message;
+    }
+  }
+  return issues;
+}
+
+/** Every problem of one variant (its row lists them). */
+export function variantProblems(
+  problems: readonly PublishProblem[],
+  variantId: string,
+): PublishProblem[] {
+  return problems.filter((entry) => entry.tab === "variants" && entry.variantId === variantId);
+}
+
+/** One variant's attribute problems as field issues of its form (`attributes.<code>[.<locale>]`). */
+export function variantIssues(problems: readonly PublishProblem[], variantId: string): FormIssues {
+  const issues: FormIssues = {};
+  for (const entry of variantProblems(problems, variantId)) {
+    if (entry.field !== null) issues[entry.field] ??= entry.message;
   }
   return issues;
 }
