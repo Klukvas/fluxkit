@@ -8,7 +8,7 @@ import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import type { LifecycleAction } from "./lifecycle";
 import { STATUS_TONES, statusLabelKey } from "./product-status";
 import type { EditorTabId, PublishProblem } from "./publish-problems";
-import { problemPlace } from "./tabs/placeholder-tabs";
+import { problemPlace } from "./tabs/coming-tabs";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";

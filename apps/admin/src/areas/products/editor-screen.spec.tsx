@@ -21,7 +21,7 @@ import { MESSAGE_FILES } from "./index";
 import { LIFECYCLE_ACTIONS } from "./lifecycle";
 import { mapPublishProblems } from "./publish-problems";
 import { CategoryAssignmentsView } from "./tabs/categories-tab";
-import { ComingTabView } from "./tabs/placeholder-tabs";
+import { ComingTabView } from "./tabs/coming-tabs";
 
 let t: Translator = sentinelTranslator();
 const noop = () => undefined;

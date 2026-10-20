@@ -11,7 +11,7 @@ import {
   PricesTab,
   StockTab,
   VariantsTab,
-} from "../areas/products/tabs/placeholder-tabs";
+} from "../areas/products/tabs/coming-tabs";
 
 /**
  * The product editor's tabs as configuration (plan, "Layout is configuration"): in order, each with its message key, the
