@@ -58,14 +58,22 @@ export function stateWithIssues(issues: FormIssues): SubmitState {
   return { ...IDLE_SUBMIT, fieldErrors: issues, summary: summaryOf(issues, []) };
 }
 
+/** How a form puts a refusal on its fields; `formErrorsFromProblem` unless the form has its own reasons (attributes). */
+export type ProblemMapper = (
+  problem: ProblemDetails,
+  status: number,
+  formFields: readonly string[],
+) => FormErrors<string>;
+
 /** What a form shows once its write ended. The write itself is run once by the caller and never repeated. */
 export function stateAfterOutcome(
   outcome: WriteOutcome<unknown>,
   formFields: readonly string[],
+  mapProblem: ProblemMapper = formErrorsFromProblem,
 ): SubmitState {
   switch (outcome.kind) {
     case "problem": {
-      const mapped = formErrorsFromProblem(outcome.problem, outcome.status, formFields);
+      const mapped = mapProblem(outcome.problem, outcome.status, formFields);
       return {
         ...IDLE_SUBMIT,
         fieldErrors: mapped.fields,
