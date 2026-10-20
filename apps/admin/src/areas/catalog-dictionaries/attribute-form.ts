@@ -280,10 +280,7 @@ export function validationToJson(
       (field.min !== undefined && number < field.min) ||
       (field.max !== undefined && number > field.max)
     ) {
-      errors[field.key] = {
-        key: "dict.validation.outOfRange",
-        values: { min: field.min ?? "", max: field.max ?? "" },
-      };
+      errors[field.key] = { key: "dict.validation.outOfRange" };
       continue;
     }
     value[field.key] = number;

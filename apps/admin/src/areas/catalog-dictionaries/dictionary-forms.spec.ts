@@ -344,6 +344,14 @@ describe("category form", () => {
     ).toBe("dict.error.slugFormat");
   });
 
+  it("requires a slug on edit (it is always set)", () => {
+    const initial = categoryFormFrom(category, locales);
+    expect(validateCategoryForm({ ...initial, slug: " " }, options, "edit")["slug"]?.key).toBe(
+      "errors.reason.required",
+    );
+    expect(validateCategoryForm({ ...initial, slug: "" }, options, "create")).toEqual({});
+  });
+
   it("patches name, description, slug and isActive only, and never parentId or position", () => {
     const initial = categoryFormFrom(category, locales);
     expect(categoryPatchBody(initial, structuredClone(initial), locales)).toEqual({});

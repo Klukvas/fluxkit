@@ -1,29 +1,9 @@
-import { useI18n } from "../../i18n/i18n-context";
-import { NotBuiltView } from "../../views/status-views";
-
-/** Catalog dictionaries area (plan step 5): one lazy chunk for its five screens; placeholders until that step. */
-
-export function AttributesPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.attributes.title" />;
-}
-
-export function OptionsPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.options.title" />;
-}
-
-export function ProductTypesPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.productTypes.title" />;
-}
-
-export function BrandsPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.brands.title" />;
-}
-
-export function CategoriesPage() {
-  const { t } = useI18n();
-  return <NotBuiltView t={t} titleKey="page.categories.title" />;
-}
+/**
+ * Catalog dictionaries area (plan step 5): one lazy chunk for the screens of attributes, options, product types, brands
+ * and categories (a list or tree, a create form and an editor each). The route table names these exports.
+ */
+export { AttributeDetailPage, AttributeNewPage, AttributesPage } from "./attributes-page";
+export { BrandDetailPage, BrandNewPage, BrandsPage } from "./brands-page";
+export { CategoriesPage, CategoryDetailPage, CategoryNewPage } from "./categories-page";
+export { OptionDetailPage, OptionNewPage, OptionsPage } from "./options-page";
+export { ProductTypeDetailPage, ProductTypeNewPage, ProductTypesPage } from "./product-types-page";

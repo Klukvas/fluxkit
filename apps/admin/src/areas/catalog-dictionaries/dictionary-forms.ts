@@ -400,8 +400,18 @@ export function categoryFormFrom(
   };
 }
 
-export function validateCategoryForm(values: CategoryFormValues, options: FormOptions): FormIssues {
-  return { ...nameIssue(values.name, "name", options), ...slugIssue(values.slug) };
+/** On create the slug is optional (generated from the name); an existing category always has one. */
+export function validateCategoryForm(
+  values: CategoryFormValues,
+  options: FormOptions,
+  mode: FormMode = "create",
+): FormIssues {
+  return {
+    ...nameIssue(values.name, "name", options),
+    ...(mode === "edit" && values.slug.trim() === ""
+      ? { slug: describeFieldError("required") }
+      : slugIssue(values.slug)),
+  };
 }
 
 /** The new category goes last among its siblings (no `position`): reordering is the move action's job. */

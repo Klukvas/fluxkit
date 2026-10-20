@@ -1,6 +1,7 @@
 import type { Locale, Messages } from "@fluxkit/ui";
 import enAccount from "./en/account.json";
 import enAuth from "./en/auth.json";
+import enCatalogDictionaries from "./en/catalog-dictionaries.json";
 import enCommon from "./en/common.json";
 import enErrors from "./en/errors.json";
 import enNavigation from "./en/navigation.json";
@@ -8,6 +9,7 @@ import enShell from "./en/shell.json";
 import enStatus from "./en/status.json";
 import ukAccount from "./uk/account.json";
 import ukAuth from "./uk/auth.json";
+import ukCatalogDictionaries from "./uk/catalog-dictionaries.json";
 import ukCommon from "./uk/common.json";
 import ukErrors from "./uk/errors.json";
 import ukNavigation from "./uk/navigation.json";
@@ -23,6 +25,7 @@ export const AREA_FILES: Record<Locale, Record<string, Messages>> = {
   uk: {
     account: ukAccount,
     auth: ukAuth,
+    "catalog-dictionaries": ukCatalogDictionaries,
     common: ukCommon,
     errors: ukErrors,
     navigation: ukNavigation,
@@ -32,6 +35,7 @@ export const AREA_FILES: Record<Locale, Record<string, Messages>> = {
   en: {
     account: enAccount,
     auth: enAuth,
+    "catalog-dictionaries": enCatalogDictionaries,
     common: enCommon,
     errors: enErrors,
     navigation: enNavigation,

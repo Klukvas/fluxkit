@@ -18,7 +18,7 @@ export const VALUE_CODE_PATTERN_SOURCE = "[a-z0-9][a-z0-9_]{0,63}";
 export const SLUG_PATTERN_SOURCE = "[a-z0-9]+(-[a-z0-9]+)*";
 
 /** Local issues by field name (the API's `errors[].path`): the first message of each field. */
-export type FormIssues = Record<string, MessageDescriptor>;
+export type FormIssues = Partial<Record<string, MessageDescriptor>>;
 
 export function issue(key: string, values?: MessageDescriptor["values"]): MessageDescriptor {
   return values === undefined ? { key } : { key, values };
@@ -37,4 +37,8 @@ export function parsePosition(
   if (!/^\d{1,7}$/.test(trimmed)) return { ok: false };
   const value = Number(trimmed);
   return value <= POSITION_MAX ? { ok: true, value } : { ok: false };
+}
+
+export function hasIssues(issues: FormIssues): boolean {
+  return Object.values(issues).some((value) => value !== undefined);
 }

@@ -72,3 +72,16 @@ export function resolveLocalized(
       .find((text) => text !== undefined);
   return found ?? "";
 }
+
+/**
+ * The name of a content locale in the UI language ("Ukrainian"), for field labels. Falls back to the code itself when the
+ * browser does not know it (a malformed or unknown code makes `Intl.DisplayNames` throw a `RangeError`).
+ */
+export function languageName(code: string, uiLocale: string): string {
+  try {
+    return new Intl.DisplayNames([uiLocale], { type: "language" }).of(code) ?? code;
+  } catch (error) {
+    if (error instanceof RangeError) return code;
+    throw error;
+  }
+}

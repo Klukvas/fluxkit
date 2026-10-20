@@ -60,10 +60,34 @@ export const ROUTES: readonly AppRoute[] = [
     lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributesPage)),
   ),
   route(
+    "attributeNew",
+    "createAttribute",
+    "page.attributeNew.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributeNewPage)),
+  ),
+  route(
+    "attributeDetail",
+    "getAttribute",
+    "page.attributeDetail.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.AttributeDetailPage)),
+  ),
+  route(
     "options",
     "listOptions",
     "page.options.title",
     lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionsPage)),
+  ),
+  route(
+    "optionNew",
+    "createOption",
+    "page.optionNew.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionNewPage)),
+  ),
+  route(
+    "optionDetail",
+    "getOption",
+    "page.optionDetail.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.OptionDetailPage)),
   ),
   route(
     "productTypes",
@@ -72,16 +96,54 @@ export const ROUTES: readonly AppRoute[] = [
     lazy(() => import("./areas/catalog-dictionaries").then((module) => module.ProductTypesPage)),
   ),
   route(
+    "productTypeNew",
+    "createProductType",
+    "page.productTypeNew.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.ProductTypeNewPage)),
+  ),
+  route(
+    "productTypeDetail",
+    "getProductType",
+    "page.productTypeDetail.title",
+    lazy(() =>
+      import("./areas/catalog-dictionaries").then((module) => module.ProductTypeDetailPage),
+    ),
+  ),
+  route(
     "brands",
     "listBrands",
     "page.brands.title",
     lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandsPage)),
   ),
   route(
+    "brandNew",
+    "createBrand",
+    "page.brandNew.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandNewPage)),
+  ),
+  route(
+    "brandDetail",
+    "getBrand",
+    "page.brandDetail.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.BrandDetailPage)),
+  ),
+  route(
     "categories",
     "listCategories",
     "page.categories.title",
     lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoriesPage)),
+  ),
+  route(
+    "categoryNew",
+    "createCategory",
+    "page.categoryNew.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoryNewPage)),
+  ),
+  route(
+    "categoryDetail",
+    "getCategory",
+    "page.categoryDetail.title",
+    lazy(() => import("./areas/catalog-dictionaries").then((module) => module.CategoryDetailPage)),
   ),
   route(
     "orders",

@@ -15,6 +15,7 @@ import {
   URL_MAX_LENGTH,
   VALUE_CODE_PATTERN,
   VALUE_CODE_PATTERN_SOURCE,
+  hasIssues,
   parsePosition,
 } from "./form-rules";
 
@@ -65,5 +66,13 @@ describe("parsePosition", () => {
     for (const text of ["-1", "1.5", "abc", "1e3", String(POSITION_MAX + 1), "99999999"]) {
       expect(parsePosition(text), text).toEqual({ ok: false });
     }
+  });
+});
+
+describe("hasIssues", () => {
+  it("is true only when some field has a message", () => {
+    expect(hasIssues({})).toBe(false);
+    expect(hasIssues({ code: undefined })).toBe(false);
+    expect(hasIssues({ code: { key: "x" } })).toBe(true);
   });
 });

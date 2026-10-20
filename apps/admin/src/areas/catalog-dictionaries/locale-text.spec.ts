@@ -5,6 +5,7 @@ import {
   localeMapFromValues,
   localeValuesFrom,
   optionalLocaleMap,
+  languageName,
   resolveLocalized,
 } from "./locale-text";
 
@@ -62,5 +63,13 @@ describe("resolveLocalized", () => {
     expect(resolveLocalized({ uk: "", en: "b" }, "uk", "uk")).toBe("b");
     expect(resolveLocalized(null, "en", "uk")).toBe("");
     expect(resolveLocalized({}, "en", "uk")).toBe("");
+  });
+});
+
+describe("languageName", () => {
+  it("names a locale in the UI language and falls back to the code for a malformed one", () => {
+    expect(languageName("uk", "en")).toBe("Ukrainian");
+    expect(languageName("en", "uk")).toBe("англійська");
+    expect(languageName("not a locale!", "en")).toBe("not a locale!");
   });
 });
