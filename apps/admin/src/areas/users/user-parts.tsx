@@ -8,7 +8,7 @@ import {
   StatusBadge,
   type Translator,
 } from "@fluxkit/ui";
-import type { ReactNode, Ref } from "react";
+import { useId, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { mayConfirm, type Confirmation } from "./user-actions";
@@ -283,6 +283,8 @@ export function UserConfirmDialog({
   children: ReactNode;
 }) {
   const allowed = mayConfirm(confirmation, selfTicked);
+  // Every confirmation stays in the page while closed: each tick needs its own id for its label.
+  const selfCheckId = useId();
   return (
     <Dialog
       open={open}
@@ -317,11 +319,11 @@ export function UserConfirmDialog({
         {children}
         {confirmation.selfCheck ? (
           <label
-            htmlFor="user-self-check"
+            htmlFor={selfCheckId}
             className="inline-flex min-h-11 items-center gap-2 font-medium text-foreground"
           >
             <input
-              id="user-self-check"
+              id={selfCheckId}
               type="checkbox"
               checked={selfTicked}
               disabled={busy}

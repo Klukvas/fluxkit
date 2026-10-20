@@ -427,14 +427,14 @@ describe("the confirmations", () => {
       html.indexOf("§user.roleDialog.submit"),
     );
     expect(html).toContain('data-autofocus=""');
-    expect(html).not.toContain("user-self-check");
+    expect(html).not.toMatch(/type="checkbox"/);
   });
 
   it("own role: an explicit tick is required before the confirm button works", () => {
     const unticked = renderInRouter(
       <RoleChangeDialog t={sentinel} {...dialogProps} self from="owner" to="manager" />,
     );
-    expect(unticked).toContain('id="user-self-check"');
+    expect(unticked).toMatch(/<input[^>]*type="checkbox"/);
     expect(unticked).toContain("§user.self.losesUsersArea");
     const confirm = (html: string) =>
       buttons(html).find((button) => button.includes("§user.roleDialog.submit")) ?? "";
@@ -445,6 +445,23 @@ describe("the confirmations", () => {
     expect(isDisabled(confirm(ticked))).toBe(false);
   });
 
+  it("gives each dialog's tick its own id, so its label works while the other dialogs stay in the page", () => {
+    const html = renderInRouter(
+      <>
+        <RoleChangeDialog t={sentinel} {...dialogProps} self from="owner" to="manager" />
+        <DeactivateDialog t={sentinel} {...dialogProps} self />
+      </>,
+    );
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+    expect(new Set(ids).size).toBe(ids.length);
+    const checkboxes = [...html.matchAll(/<input[^>]*type="checkbox"[^>]*>/g)];
+    expect(checkboxes).toHaveLength(2);
+    for (const box of checkboxes) {
+      const id = /\sid="([^"]+)"/.exec(box[0])?.[1] ?? "missing";
+      expect(html).toContain(`for="${id}"`);
+    }
+  });
+
   it("deactivation: danger look, says the sessions end; own account needs the tick and says it locks you out", () => {
     const dangerClass = /class="([^"]*)"/.exec(
       renderToStaticMarkup(<Button variant="danger">x</Button>),
@@ -452,9 +469,9 @@ describe("the confirmations", () => {
     const html = renderInRouter(<DeactivateDialog t={sentinel} {...dialogProps} self={false} />);
     expect(html).toContain("§user.deactivateDialog.sessions");
     expect(html).toContain(`class="${dangerClass ?? "missing"}"`);
-    expect(html).not.toContain("user-self-check");
+    expect(html).not.toMatch(/type="checkbox"/);
     const own = renderInRouter(<DeactivateDialog t={sentinel} {...dialogProps} self />);
-    expect(own).toContain('id="user-self-check"');
+    expect(own).toMatch(/<input[^>]*type="checkbox"/);
     expect(own).toContain("§user.self.signedOutCannotSignIn");
   });
 
