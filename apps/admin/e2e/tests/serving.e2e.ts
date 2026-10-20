@@ -72,18 +72,15 @@ test("the CSP refuses inline script and the SPA itself causes no violation", asy
   await expect(page.getByRole("heading", { level: 1, name: "Products" })).toBeVisible();
   // Everything up to here ran under the policy without a single violation (the guard fails the test otherwise).
   guard.expectCspViolations(/script-src|Refused to execute inline script/);
-  const ran = await page.evaluate(async () => {
-    const scope = window as unknown as { __inlineRan?: boolean };
+  // An inline script runs synchronously when it is appended, so its effect is known at once; the violation report follows.
+  const ran = await page.evaluate(() => {
     const element = document.createElement("script");
     element.textContent = "window.__inlineRan = true;";
-    const violation = new Promise<string>((resolve) => {
-      document.addEventListener("securitypolicyviolation", (event) => {
-        resolve(event.effectiveDirective);
-      });
-    });
     document.body.append(element);
-    return { directive: await violation, ran: scope.__inlineRan === true };
+    return (window as unknown as { __inlineRan?: boolean }).__inlineRan === true;
   });
-  expect(ran).toEqual({ directive: "script-src-elem", ran: false });
-  await expect.poll(() => guard.csp.length).toBeGreaterThan(0);
+  expect(ran, "an inline script ran").toBe(false);
+  await expect
+    .poll(() => guard.csp.some((line) => line.startsWith("script-src-elem blocked inline")))
+    .toBe(true);
 });

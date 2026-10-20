@@ -54,11 +54,9 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
     await expect(main.getByRole("tabpanel", { name })).toBeVisible();
     // No save, add, remove, generate or record button on any tab.
     await expect(
-      main
-        .getByRole("tabpanel", { name })
-        .getByRole("button", {
-          name: /^(Save|Add|Remove|Generate|Record|Delete|Make|Switch|Create)/,
-        }),
+      main.getByRole("tabpanel", { name }).getByRole("button", {
+        name: /^(Save|Add|Remove|Generate|Record|Delete|Make|Switch|Create)/,
+      }),
     ).toHaveCount(0);
   }
   await expect(main.getByRole("table", { name: /Stock of the variants/ })).toBeVisible();

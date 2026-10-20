@@ -7,6 +7,7 @@ import {
   type PlaywrightWorkerArgs,
   type TestInfo,
 } from "@playwright/test";
+import { randomBytes } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { AdminApi, StoreApi, type Role } from "./api.ts";
@@ -30,18 +31,13 @@ export const CREDENTIALS: Readonly<Record<Role, { email: string; password: strin
   viewer: { email: VIEWER_EMAIL, password: VIEWER_PASSWORD },
 };
 
-let counter = 0;
-
 /**
- * A short lower-case suffix no other test (and no earlier attempt of this one) uses: codes, slugs and emails the scenarios
- * create carry it, so a test never meets data of another test or of a retry. `[a-z0-9]` only (valid in codes and slugs).
+ * A short lower-case suffix no other test, repeat or retry uses (a worker restarts after a failure, so a counter alone would
+ * repeat): codes, slugs, emails and SKUs the scenarios create carry it, so a test never meets data of another test. Only
+ * `[a-z0-9]` (valid in codes, slugs and SKUs).
  */
 export function unique(testInfo: TestInfo): string {
-  counter += 1;
-  return `${testInfo.testId
-    .slice(0, 6)
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")}r${String(testInfo.retry)}n${String(counter)}`;
+  return `r${String(testInfo.retry)}e${String(testInfo.repeatEachIndex)}${randomBytes(4).toString("hex")}`;
 }
 
 /** Every message text of the SPA (both languages), to tell the SPA's own sentences from an API detail it might show. */
