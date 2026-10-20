@@ -1,6 +1,12 @@
 import type { ProblemDetails } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
-import { formErrorsFromProblem, summaryOf } from "./submit-errors";
+import {
+  IDLE_SUBMIT,
+  formErrorsFromProblem,
+  stateAfterOutcome,
+  stateWithIssues,
+  summaryOf,
+} from "./submit-errors";
 
 function problem(
   overrides: Partial<ProblemDetails> & Pick<ProblemDetails, "code" | "status">,
@@ -106,5 +112,68 @@ describe("summaryOf", () => {
     ]);
     expect(summaryOf({}, [{ key: "errors.code.in_use" }])).toEqual([{ key: "errors.code.in_use" }]);
     expect(summaryOf({}, [])).toEqual([]);
+  });
+});
+
+describe("stateAfterOutcome", () => {
+  it("is idle after a success, with no leftover error", () => {
+    expect(stateAfterOutcome({ kind: "ok", status: 200, data: {} }, fields)).toEqual(IDLE_SUBMIT);
+    expect(stateAfterOutcome({ kind: "aborted" }, fields)).toEqual(IDLE_SUBMIT);
+    expect(IDLE_SUBMIT.busy).toBe(false);
+  });
+
+  it("shows the API's answer on the fields and in the summary, keeping the status for the 409 hint", () => {
+    const state = stateAfterOutcome(
+      {
+        kind: "problem",
+        status: 400,
+        retryAfter: null,
+        problem: problem({
+          code: "validation_failed",
+          status: 400,
+          errors: [{ path: "name.uk", code: "default_locale_missing" }],
+        }),
+      },
+      fields,
+    );
+    expect(state.busy).toBe(false);
+    expect(state.fieldErrors).toEqual({
+      "name.uk": { key: "errors.reason.default_locale_missing" },
+    });
+    expect(state.summary).toEqual([{ key: "dict.form.checkFields" }]);
+    expect(state.status).toBe(400);
+    expect(state.unknown).toBe(false);
+  });
+
+  it("explains a 409 in the summary and keeps its status", () => {
+    const state = stateAfterOutcome(
+      {
+        kind: "problem",
+        status: 409,
+        retryAfter: null,
+        problem: problem({ code: "in_use", status: 409 }),
+      },
+      [],
+    );
+    expect(state.summary).toEqual([{ key: "errors.code.in_use" }]);
+    expect(state.status).toBe(409);
+  });
+
+  it("says the result is unknown for a lost answer, with no error shown as if the server had refused", () => {
+    const state = stateAfterOutcome({ kind: "unknown", failure: { kind: "timeout" } }, fields);
+    expect(state.unknown).toBe(true);
+    expect(state.summary).toEqual([]);
+    expect(state.fieldErrors).toEqual({});
+    expect(state.busy).toBe(false);
+  });
+});
+
+describe("stateWithIssues", () => {
+  it("is the local check failing: the fields marked, the summary asking to check them, nothing busy", () => {
+    const state = stateWithIssues({ code: { key: "dict.error.codeFormat" } });
+    expect(state.fieldErrors).toEqual({ code: { key: "dict.error.codeFormat" } });
+    expect(state.summary).toEqual([{ key: "dict.form.checkFields" }]);
+    expect(state.busy).toBe(false);
+    expect(state.status).toBeNull();
   });
 });

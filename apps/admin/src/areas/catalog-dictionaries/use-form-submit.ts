@@ -2,30 +2,8 @@ import type { AdminResult } from "@fluxkit/api-client";
 import { useCallback, useRef, useState, type RefObject } from "react";
 import { runWrite, type WriteOutcome } from "../../lib/run-write";
 import { useCrash } from "../../lib/use-crash";
-import type { MessageDescriptor } from "../../lib/problem-messages";
 import type { FormIssues } from "./form-rules";
-import { formErrorsFromProblem, summaryOf } from "./submit-errors";
-
-export interface SubmitState {
-  /** A write is running: the buttons are disabled so it cannot be sent twice. */
-  busy: boolean;
-  /** By field name (the API's `errors[].path`). */
-  fieldErrors: FormIssues;
-  /** The error summary: it receives the focus when it appears. */
-  summary: MessageDescriptor[];
-  /** The last write got no answer: it may or may not have happened. */
-  unknown: boolean;
-  /** The status of the problem the API answered, `null` when there is none. */
-  status: number | null;
-}
-
-const idle: SubmitState = {
-  busy: false,
-  fieldErrors: {},
-  summary: [],
-  unknown: false,
-  status: null,
-};
+import { IDLE_SUBMIT, stateAfterOutcome, stateWithIssues, type SubmitState } from "./submit-errors";
 
 export interface FormSubmit {
   state: SubmitState;
@@ -40,34 +18,30 @@ export interface FormSubmit {
 /**
  * The state of one form's writes (plan, "Forms and validation", "Writes"): busy while a request runs, the server's field
  * errors on the fields and in a focused summary, and the "result unknown" state for a lost answer. It never retries and
- * never updates anything before the server answered.
+ * never updates anything before the server answered. The decisions are pure functions in `submit-errors.ts`.
  */
 export function useFormSubmit(formFields: readonly string[]): FormSubmit {
-  const [state, setState] = useState<SubmitState>(idle);
+  const [state, setState] = useState<SubmitState>(IDLE_SUBMIT);
   const summaryRef = useRef<HTMLDivElement>(null);
   const fieldsRef = useRef(formFields);
   fieldsRef.current = formFields;
   const crash = useCrash();
 
-  const show = useCallback(
-    (fieldErrors: FormIssues, other: MessageDescriptor[], status: number | null) => {
-      setState({
-        busy: false,
-        fieldErrors,
-        summary: summaryOf(fieldErrors, other),
-        unknown: false,
-        status,
-      });
-      requestAnimationFrame(() => summaryRef.current?.focus());
-    },
-    [],
-  );
+  const focusSummary = useCallback(() => {
+    requestAnimationFrame(() => summaryRef.current?.focus());
+  }, []);
 
-  const showIssues = useCallback((issues: FormIssues) => show(issues, [], null), [show]);
+  const showIssues = useCallback(
+    (issues: FormIssues) => {
+      setState(stateWithIssues(issues));
+      focusSummary();
+    },
+    [focusSummary],
+  );
 
   const submit = useCallback(
     async <T>(write: () => Promise<AdminResult<T>>): Promise<WriteOutcome<T>> => {
-      setState({ ...idle, busy: true });
+      setState({ ...IDLE_SUBMIT, busy: true });
       let outcome: WriteOutcome<T>;
       try {
         outcome = await runWrite(write);
@@ -75,19 +49,14 @@ export function useFormSubmit(formFields: readonly string[]): FormSubmit {
         crash(bug);
         return { kind: "aborted" };
       }
-      if (outcome.kind === "problem") {
-        const mapped = formErrorsFromProblem(outcome.problem, outcome.status, fieldsRef.current);
-        show(mapped.fields, mapped.other, outcome.status);
-      } else if (outcome.kind === "unknown") {
-        setState({ ...idle, unknown: true });
-      } else {
-        setState(idle);
-      }
+      const next = stateAfterOutcome(outcome, fieldsRef.current);
+      setState(next);
+      if (next.summary.length > 0) focusSummary();
       return outcome;
     },
-    [crash, show],
+    [crash, focusSummary],
   );
 
-  const clear = useCallback(() => setState(idle), []);
+  const clear = useCallback(() => setState(IDLE_SUBMIT), []);
   return { state, summaryRef, showIssues, submit, clear };
 }

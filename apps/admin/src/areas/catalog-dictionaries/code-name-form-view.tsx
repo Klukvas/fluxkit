@@ -91,7 +91,7 @@ export function CodeNameFormView<Values extends { code: string; name: LocaleValu
         <FormActions
           t={t}
           busy={busy}
-          submitLabel={t(create ? `${prefix}.create` : "dict.form.save")}
+          submitLabel={t(create ? `dict.${prefix}.create` : "dict.form.save")}
           busyLabel={t("dict.form.saving")}
           cancelTo={cancelTo}
           cancelLabel={t("dict.form.backToList")}
