@@ -161,8 +161,8 @@ export function wantsAdminEmails(permissions: readonly string[] | null): boolean
 }
 
 /**
- * The customer's detail page, once the route exists (plan step 9 adds `customerDetail`); until then `null` and the screen
- * shows the email as text. Read from the path table, so registering the route turns the link on.
+ * The customer's detail page (route `customerDetail`). Read from the path table: a build without that route gets `null`
+ * and the screen shows the email as text instead of a link.
  */
 export function customerDetailHref(customerId: string): string | null {
   const pattern = (PATHS as Readonly<Record<string, string>>).customerDetail;
