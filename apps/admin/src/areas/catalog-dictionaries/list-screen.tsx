@@ -2,7 +2,7 @@ import { DataTable, EmptyState, type DataTableColumn, type Translator } from "@f
 import { Link } from "react-router";
 import type { Paginated } from "@fluxkit/api-client";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { DictionaryPage, linkClass, type DictionaryId } from "./dictionary-frame";
+import { DictionaryPage, linkClass, primaryLinkClass, type DictionaryId } from "./dictionary-frame";
 
 export type ListState<Row> =
   | { status: "loading" }
@@ -68,9 +68,6 @@ export interface ListScreenProps<Row> {
   hrefForOffset: (offset: number) => string;
 }
 
-const createLinkClass =
-  "inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
-
 /** A dictionary list: loading rows, the failure with a retry, "not allowed", an empty state, or the table and its pager. */
 export function ListScreen<Row>({
   t,
@@ -91,7 +88,7 @@ export function ListScreen<Row>({
   hrefForOffset,
 }: ListScreenProps<Row>) {
   const createLink = canWrite ? (
-    <Link to={createTo} className={createLinkClass}>
+    <Link to={createTo} className={primaryLinkClass}>
       {createLabel}
     </Link>
   ) : null;
@@ -124,7 +121,7 @@ export function ListScreen<Row>({
             description={emptyBody}
             action={
               canWrite ? (
-                <Link to={createTo} className={createLinkClass}>
+                <Link to={createTo} className={primaryLinkClass}>
                   {createLabel}
                 </Link>
               ) : undefined

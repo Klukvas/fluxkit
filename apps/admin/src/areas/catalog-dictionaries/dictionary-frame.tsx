@@ -96,6 +96,12 @@ const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /**
+ * A link that looks like the primary button (the create actions). The focus outline is its own string, as in the UI library:
+ * it sits two pixels outside the box, on the page background, so the contrast scan must not pair it with the button fill.
+ */
+export const primaryLinkClass = `inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground ${focusClass}`;
+
+/**
  * The status line of a screen: always in the page (a live region announces changes of a region that was already there), and
  * focusable so the focus can move to it after a save. A lost answer is a warning that asks the admin to look at the
  * reloaded data, not a success.

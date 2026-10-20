@@ -52,6 +52,7 @@ import {
   FocusedPanel,
   NoticeBar,
   linkClass,
+  primaryLinkClass,
   type NoticeKind,
 } from "./dictionary-frame";
 import { canWriteDictionaries } from "./dictionary-permissions";
@@ -184,10 +185,7 @@ function CategoryTree() {
   }
 
   const createLink = canWrite ? (
-    <Link
-      to={pathTo("categoryNew")}
-      className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-    >
+    <Link to={pathTo("categoryNew")} className={primaryLinkClass}>
       {t("dict.category.new")}
     </Link>
   ) : null;
