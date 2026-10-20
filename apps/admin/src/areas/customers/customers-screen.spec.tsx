@@ -1,6 +1,7 @@
 import type { AdminCustomer, AdminCustomerSummary } from "@fluxkit/api-client";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
-import { createTranslator, type Translator } from "@fluxkit/ui";
+import { Button, createTranslator, type Translator } from "@fluxkit/ui";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { formatDate, formatDateTime } from "../../lib/format";
 import {
@@ -352,7 +353,12 @@ describe("the deactivation confirmation", () => {
     const buttons = [...html.matchAll(/<button[^>]*>/g)].map((match) => match[0]);
     expect(buttons.length).toBeGreaterThanOrEqual(2);
     for (const button of buttons) expect(button).toContain("disabled");
-    expect(dialog(false)).toMatch(/bg-danger|border-danger|text-danger/);
+    // The confirm button has the danger look: the very classes a danger Button renders.
+    const dangerClass = /class="([^"]*)"/.exec(
+      renderToStaticMarkup(<Button variant="danger">x</Button>),
+    )?.[1];
+    expect(dangerClass).toBeDefined();
+    expect(dialog(false)).toContain(`class="${dangerClass ?? ""}"`);
   });
 });
 
