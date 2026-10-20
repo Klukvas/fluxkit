@@ -15,9 +15,10 @@ Sold as a template plus a team that adapts design and features for each client.
 ## Status
 
 Complete: the scaffold (`docs/plans/2026-10-14-monorepo-scaffold.md`), the catalog (`docs/plans/2026-10-14-catalog.md`), admin authentication (`docs/plans/2026-10-16-auth-and-roles.md`), pricing and inventory (`docs/plans/2026-10-16-pricing-and-inventory.md`), and the cart, customers and orders (`docs/plans/2026-10-17-cart-and-orders.md`, with its review fixes in `docs/plans/2026-10-18-cart-orders-review-fixes.md`, PRs #61 to #63).
-Storefront v1 (`docs/plans/2026-10-18-storefront.md`): steps 1 to 8 merged (PRs #66 to #77); step 9 (this docs sweep) is on its branch, PR pending; step 10 (independent review) is pending.
+Storefront v1 (`docs/plans/2026-10-18-storefront.md`): steps 1 to 10 merged (PRs #66 to #79; #78 is the step 9 docs sweep, #79 the step 10 review fixes).
+Admin UI v1 (`docs/plans/2026-10-19-admin-ui.md`, ADR 0027): steps 1 to 11 merged (PRs #81 to #94); complete except the independent review (step 13) and the media upload (step 2b, own plan and ADR, not started). Step 12, the docs sweep, is pending.
 
-**Not built yet**: payment and shipping providers (an admin marks an order paid by hand), email delivery (no password reset or email verification), search (no search index; the storefront has no search and no sort), the admin screens (the admin app shows placeholder pages only: no product, order or customer screens), and a production deployment (no API, storefront or admin image; see the example reverse proxy in Deployment notes). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
+**Not built yet**: payment and shipping providers (an admin marks an order paid by hand), email delivery (no password reset or email verification), search (no search index; the storefront has no search and no sort), image upload (the admin takes product and brand images as http(s) addresses only; the upload is the media plan, step 2b, not started), and a production deployment (no API or storefront image; the admin is static files that the edge proxy serves, see Deployment notes). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
 
 - API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`, `0003_pricing_inventory`, `0004_cart_customers_orders`), BullMQ and Meilisearch spikes.
 - Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
@@ -27,7 +28,7 @@ Storefront v1 (`docs/plans/2026-10-18-storefront.md`): steps 1 to 8 merged (PRs 
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
 - Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token; at most `MAX_OPEN_ORDERS` unpaid orders per email or customer), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
 - Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 8 merged): home, catalog and category pages (brand filter, paging), product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile. Rendering and the same-origin rule: ADR 0026 and `apps/storefront/README.md`; the walkthrough is below. Playwright tests of the purchase flow (`pnpm test:e2e`, 23 tests in 12 files; `apps/storefront/e2e/README.md`).
-- Admin: the SPA under `/admin-ui/` (plan `docs/plans/2026-10-19-admin-ui.md`, steps 1 to 10 merged): sign-in, re-sign-in dialog, navigation by role, own account, uk/en; the catalog dictionaries (attributes, options, product types, brands, category tree); products (list, create, the editor with general fields, generated attributes, categories, media, options, variants, prices, stock and the lifecycle); orders (list, detail, mark paid, mark fulfilled, cancel); customers (deactivate, activate, unlock); admin users (owner only). Details in `apps/admin/README.md`. Playwright tests of the admin flows (`pnpm test:e2e` runs them after the storefront's, 17 tests in 10 files; `apps/admin/e2e/README.md`).
+- Admin: the SPA under `/admin-ui/` (plan `docs/plans/2026-10-19-admin-ui.md`, steps 1 to 11 merged; images are http(s) addresses until the media upload, step 2b): sign-in, re-sign-in dialog, navigation by role, own account, uk/en; the catalog dictionaries (attributes, options, product types, brands, category tree); products (list, create, the editor with general fields, generated attributes, categories, media, options, variants, prices, stock and the lifecycle); orders (list, detail, mark paid, mark fulfilled, cancel); customers (deactivate, activate, unlock); admin users (owner only). Details in `apps/admin/README.md`. Playwright tests of the admin flows (`pnpm test:e2e` runs them after the storefront's, 17 tests in 10 files; `apps/admin/e2e/README.md`).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test, and the Playwright `e2e` job (the storefront suite, then the admin suite).
 
 Open decisions and next steps are listed at the end.
@@ -56,7 +57,7 @@ pnpm seed                               # optional: demo catalog (needs a migrat
 pnpm admin:create --email you@example.com   # first owner (needs a migrated database); asks for the password, see Admin sign-in
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
 pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000); reads API_INTERNAL_URL from .env and proxies /store/* to the API (development only)
-pnpm --filter @fluxkit/admin dev                # Vite prints the URL (default http://localhost:5173)
+pnpm --filter @fluxkit/admin dev                # the admin SPA: http://localhost:5173/admin-ui/ (apps/admin/README.md)
 ```
 
 Run the full test suite (integration tests need real services and fail, not skip, without these variables; use the values from your `.env`).
@@ -108,15 +109,43 @@ The store rate limits (checkout, registration, login, order lookup, guest cancel
 - Keep the API reachable only through the proxy when `TRUST_PROXY` is above 0; otherwise anyone who can reach it directly can send the header themselves.
 - IPv6 clients are counted per /64 prefix after this step too. The counters are in memory per API process (ADR 0009, ADR 0016).
 
-### Example edge proxy: `/store/*` and `/admin/*` to the API, the rest to the storefront
+### Example edge proxy: the API, the admin SPA and the storefront
 
-These examples are **not tested in this repository**: neither Caddy nor nginx is installed in the build sandbox, and no Docker daemon was running. The routing rule is the one of `apps/storefront/e2e/proxy.ts`, the tested reference: the Playwright suite runs that proxy with the same routes, sets `X-Forwarded-For` the same way and runs the API with `TRUST_PROXY=1`. Check the directives against your proxy's version.
+These examples are **not tested in this repository**: neither Caddy nor nginx is installed in the build sandbox, and no Docker daemon was running. The routing that the suites test is in the two e2e proxies: `apps/storefront/e2e/proxy.ts` (`/store/*` and `/admin/*` to the API, everything else to the storefront, `X-Forwarded-For` set the same way) and `apps/admin/e2e/proxy.ts` (`/admin-ui` and `/admin-ui/*` from the built SPA with the `index.html` fallback and the headers of `apps/admin/security-headers.ts`; `/admin/*` and `/store/*` to the API). The `/admin-ui` blocks below follow the rules of `apps/admin/e2e/proxy.ts`. They are **untested** here: check the directives against your proxy's version before you rely on them.
 
-Matching settings: the API runs with `TRUST_PROXY=1`; `ADMIN_COOKIE_SECURE` and `STORE_COOKIE_SECURE` stay `true` (HTTPS); the storefront has `API_INTERNAL_URL=http://127.0.0.1:3000` and `STOREFRONT_PUBLIC_URL=https://shop.example.com`; `STOREFRONT_IMAGE_HOSTS` has the same value for `next build` and `next start`. The API (port 3000) and the storefront (port 3001) listen on loopback or a private network, so only the proxy is public. The admin UI is not built: `/admin/*` is the admin API.
+Matching settings: the API runs with `TRUST_PROXY=1`; `ADMIN_COOKIE_SECURE` and `STORE_COOKIE_SECURE` stay `true` (HTTPS); the storefront has `API_INTERNAL_URL=http://127.0.0.1:3000` and `STOREFRONT_PUBLIC_URL=https://shop.example.com`; `STOREFRONT_IMAGE_HOSTS` has the same value for `next build` and `next start`, and the same hosts go into the admin's `img-src` (a static SPA reads no runtime configuration, so the proxy header carries them; see `apps/admin/README.md`). The API (port 3000) and the storefront (port 3001) listen on loopback or a private network, so only the proxy is public.
+
+The admin SPA is static (ADR 0027): `pnpm --filter @fluxkit/admin build` writes `apps/admin/dist`, which the proxy serves under `/admin-ui` on the same host. The API never serves it, and the build never calls the API. The proxy must:
+
+- serve both `/admin-ui` and `/admin-ui/*` (the router writes the start page without a trailing slash);
+- answer a SPA path that is no file with `index.html` (deep links and reloads);
+- send the headers below on every `/admin-ui` response, `Cache-Control: no-cache` on `index.html` and `public, max-age=31536000, immutable` on `/admin-ui/assets/*`.
+
+Headers, from `apps/admin/security-headers.ts` (the CSP shown has no image hosts; add `https://<host>` to `img-src` for each `STOREFRONT_IMAGE_HOSTS` entry):
+
+| Header | Value |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` |
+| `X-Frame-Options` | `DENY` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `no-referrer` |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| `Cross-Origin-Opener-Policy` | `same-origin` |
+
+HSTS is set by the TLS proxy, as for the storefront.
 
 Caddy 2 (`Caddyfile`):
 
 ```
+(admin_security) {
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	header X-Frame-Options DENY
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy no-referrer
+	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	header Cross-Origin-Opener-Policy same-origin
+}
+
 shop.example.com {
 	@api path /store/* /admin/*
 	handle @api {
@@ -125,6 +154,32 @@ shop.example.com {
 		# removing it would leave the API with no client address and bring back the shop-wide window.
 		reverse_proxy 127.0.0.1:3000
 	}
+
+	# The admin SPA (apps/admin/dist). The start page is /admin-ui without a slash: it is served like /admin-ui/.
+	@adminStart path /admin-ui
+	rewrite @adminStart /admin-ui/
+
+	# Hashed assets: a missing file is a 404, never the HTML.
+	@adminAssets path /admin-ui/assets/*
+	handle @adminAssets {
+		import admin_security
+		header Cache-Control "public, max-age=31536000, immutable"
+		uri strip_prefix /admin-ui
+		root * /srv/fluxkit/apps/admin/dist
+		file_server
+	}
+
+	# Every other SPA path: index.html (deep links and reloads).
+	@adminPages path /admin-ui /admin-ui/*
+	handle @adminPages {
+		import admin_security
+		header Cache-Control no-cache
+		uri strip_prefix /admin-ui
+		root * /srv/fluxkit/apps/admin/dist
+		try_files {path} /index.html
+		file_server
+	}
+
 	handle {
 		reverse_proxy 127.0.0.1:3001
 	}
@@ -147,6 +202,34 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # The admin SPA (apps/admin/dist). Hashed assets first: a missing file is a 404, never the HTML.
+    location ~ ^/admin-ui/assets/ {
+        rewrite ^/admin-ui/(.*)$ /$1 break;
+        root /srv/fluxkit/apps/admin/dist;
+        try_files $uri =404;
+        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+    }
+
+    # Every other /admin-ui path (the start page too): index.html for SPA paths, the file when there is one.
+    location ~ ^/admin-ui(/|$) {
+        rewrite ^/admin-ui/?(.*)$ /$1 break;
+        root /srv/fluxkit/apps/admin/dist;
+        try_files $uri /index.html;
+        add_header Cache-Control "no-cache" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "no-referrer" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+    }
+
     # Everything else: the storefront (next start).
     location / {
         proxy_pass http://127.0.0.1:3001;
@@ -157,11 +240,13 @@ server {
 }
 ```
 
+The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. The examples match `/store/*` and `/admin/*` only with a path after the prefix, so a bare `/admin` or `/store` reaches the storefront: the e2e proxies match them, the examples do not yet.
+
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 
 ## Admin sign-in
 
-Every `/admin` route needs a signed-in user. There is no sign-up and no default account: the first owner is created with the command line, then signs in with `POST /admin/auth/login` (`docs/api/auth.md`).
+Every `/admin` route needs a signed-in user; the admin screens are the SPA under `/admin-ui/` on the same origin (`apps/admin/README.md`, ADR 0027). There is no sign-up and no default account: the first owner is created with the command line, then signs in with `POST /admin/auth/login` (`docs/api/auth.md`).
 
 ```bash
 pnpm admin:create --email you@example.com                  # in a terminal: asks for the password twice, nothing is echoed
@@ -311,7 +396,7 @@ Notes:
 ```
 apps/api            NestJS API (REST + OpenAPI)
 apps/storefront     Next.js storefront (App Router, Tailwind, tokens, uk/en)
-apps/admin          React + Vite admin (placeholder screens)
+apps/admin          React + Vite admin SPA, static, served under `/admin-ui` (ADR 0027)
 packages/core       domain rules, pure TypeScript: catalog, money, pricing, stock, auth, cart and orders (shipping, discounts and tax not yet)
 packages/features   optional feature modules (sample: _example)
 packages/providers  payment and shipping provider plugins (none yet)
@@ -329,10 +414,11 @@ docs/               architecture decisions, contracts, API and file maps, plans
 
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
-- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0026: cart, customers, orders, the scheduler, the order schema, guest order tokens, the open-order limit and `TRUST_PROXY`, the outbox and bounded jobs, the storefront architecture (index with status in `docs/adr/README.md`).
+- `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0026: cart, customers, orders, the scheduler, the order schema, guest order tokens, the open-order limit and `TRUST_PROXY`, the outbox and bounded jobs, the storefront architecture; 0027: the admin UI architecture (index with status in `docs/adr/README.md`).
 - `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API, domain events and order ports).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `apps/storefront/README.md` (rendering, configuration, checks) and `apps/storefront/e2e/README.md` (browser tests): the storefront.
+- `apps/admin/README.md` (run, headers, conventions) and `apps/admin/e2e/README.md` (browser tests): the admin SPA.
 - `docs/dependencies.md`: licenses and decisions. `docs/plans/`: task plans. `docs/AGENT_WORKFLOW.md`: roles, models and decisions log.
 
 ## Working with AI agents
@@ -348,7 +434,7 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 ## Open decisions and next steps
 
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
-2. Storefront step 10: an independent review by a different agent than the authors (XSS and token leakage, CSRF and same-origin assumptions, open redirect, idempotency, money formatting, i18n, accessibility, no API call at build). Its findings are fixed before the storefront plan closes (`docs/plans/2026-10-18-storefront.md`). The storefront's known gaps are in `docs/HANDOFF.md`.
-3. Next plans, each with its own plan file and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by item 1), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), the admin UI (products, orders, customers), and a privacy plan before the EU launch. Known follow-ups without a plan yet: rate limiting for the catalog routes of `/store/*` (needs a dependency), the auth follow-ups in the auth plan outcome, and the cart, customers and orders follow-ups in `docs/HANDOFF.md`.
-4. Production: API, storefront and admin images; the reverse proxy in front of the API and the storefront (the example in Deployment notes is not tested here); gate Swagger UI; branch protection on `main` with the CI checks required; pin GitHub Actions by commit SHA. The browser tests exist for the storefront and the admin (`pnpm test:e2e`, CI job `e2e`); `@axe-core/playwright` is not approved.
+2. Admin UI step 13: an independent review by a different agent than the authors (permission gating against the API, XSS, CSRF and same-origin assumptions, the CSP of the build, open redirect in `next`, money and stock flows, the re-sign-in state, i18n, accessibility, the bundle split, mutation checks). Its findings are fixed before the admin plan closes (`docs/plans/2026-10-19-admin-ui.md`). The known gaps are in `docs/HANDOFF.md`.
+3. Next plans, each with its own plan file and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by item 1), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), the admin media upload (step 2b: storage, upload endpoint, its own ADR), and a privacy plan before the EU launch. Known follow-ups without a plan yet: rate limiting for the catalog routes of `/store/*` (needs a dependency), the auth follow-ups in the auth plan outcome, and the cart, customers and orders follow-ups in `docs/HANDOFF.md`.
+4. Production: API and storefront images (the admin is static files, no image in v1); the edge proxy in front of the API, the admin SPA and the storefront (the examples in Deployment notes are not tested here); gate Swagger UI; branch protection on `main` with the CI checks required; pin GitHub Actions by commit SHA. The browser tests exist for the storefront and the admin (`pnpm test:e2e`, CI job `e2e`); `@axe-core/playwright` is not approved.
 5. `AGENTS.md` (the owner's file) does not yet list `pnpm test:e2e` (which now runs the storefront and the admin suites), `pnpm jobs:run-once`, the CI job `e2e` (both suites) or the scheduler variables; the owner adds them (`docs/HANDOFF.md`).
