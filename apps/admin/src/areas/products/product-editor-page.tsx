@@ -12,7 +12,7 @@ import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { useSession } from "../../session/session-context";
 import { FailureMessage, PageHeading, ResourceFallback } from "../../views/status-views";
-import { ConfigGate, useContentLocales } from "../catalog-dictionaries/config-gate";
+import { ConfigGate, useAdminConfig, useContentLocales } from "../catalog-dictionaries/config-gate";
 import { BackLink, DeletedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../catalog-dictionaries/form-dialog";
 import { EditorNoticeBar, type EditorNotice, type EditorNoticeKind } from "./editor-notice";
@@ -75,6 +75,7 @@ const NOTICE_OF: Record<Exclude<LifecycleAction, "delete">, EditorNoticeKind> = 
 function ProductEditor({ id }: { id: string }) {
   const { t, locale } = useI18n();
   const content = useContentLocales();
+  const config = useAdminConfig();
   const session = useSession();
   const permissions = session.state.me?.permissions ?? null;
   const crash = useCrash();
@@ -183,6 +184,7 @@ function ProductEditor({ id }: { id: string }) {
           action === "publish" && outcome.status === 400
             ? mapPublishProblems(outcome.problem, {
                 defaultLocale: content.defaultLocale,
+                shopCurrency: config.shopCurrency,
                 variants: target.variants,
               })
             : [];

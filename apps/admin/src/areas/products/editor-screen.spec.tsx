@@ -284,13 +284,13 @@ describe("editor summary, lifecycle and publish problems", () => {
           { path: "elsewhere", code: "brand_new_code" },
         ],
       },
-      { defaultLocale: "uk", variants: product().variants },
+      { defaultLocale: "uk", shopCurrency: "UAH", variants: product().variants },
     );
     const html = renderInRouter(
       <PublishProblemsView
         t={t}
         problems={problems}
-        visibleTabs={["general", "attributes", "variants"]}
+        visibleTabs={["general", "attributes", "prices"]}
         tabLabel={(tab) => `§products.tab.${tab}`}
         onGoTo={noop}
         onDismiss={noop}
@@ -301,15 +301,15 @@ describe("editor summary, lifecycle and publish problems", () => {
     expect(html).toContain("§products.problems.variantRow");
     expect(html).toContain("§errors.reason.price_missing");
     expect(html).toContain("§errors.reference");
-    const variants = renderInRouter(
+    const prices = renderInRouter(
       <TabProblemsView
         t={t}
-        id="product-variants"
-        problems={problems.filter((entry) => entry.tab === "variants")}
+        id="product-prices"
+        problems={problems.filter((entry) => entry.tab === "prices")}
       />,
     );
-    expect(variants).toContain('id="product-variants"');
-    expect(variants).toContain("§products.problems.variantRow");
+    expect(prices).toContain('id="product-prices"');
+    expect(prices).toContain("§products.problems.variantRow");
     expect(renderInRouter(<TabProblemsView t={t} id="product-media" problems={[]} />)).toBe("");
     expect(renderInRouter(<ComingTabView t={t} tab="prices" />)).toContain(
       "§products.placeholder.prices",

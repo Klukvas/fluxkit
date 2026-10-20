@@ -51,3 +51,20 @@ export const VARIANTS_FOCUS_ID = "product-variants";
 export function variantRowFocusId(variantId: string): string {
   return `product-variant-${variantId}`;
 }
+
+/** The Prices tab's grid, the target of a price problem of no (or no longer existing) variant. */
+export const PRICES_FOCUS_ID = "product-prices";
+
+/** One input of the Prices grid (`amount` or `compareAt`) of one variant in one currency. */
+export function priceFieldId(
+  variantId: string,
+  currency: string,
+  field: "amount" | "compareAt",
+): string {
+  return `product-price-${variantId}-${currency}-${field}`;
+}
+
+/** The Stock tab's section of one variant (its levels, adjustment form and journal). */
+export function stockVariantFocusId(variantId: string): string {
+  return `product-stock-${variantId}`;
+}

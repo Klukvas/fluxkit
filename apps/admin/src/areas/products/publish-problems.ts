@@ -7,12 +7,15 @@ import {
   GENERAL_FIELD_IDS,
   MEDIA_FOCUS_ID,
   OPTIONS_FOCUS_ID,
+  PRICES_FOCUS_ID,
   VARIANTS_FOCUS_ID,
   attributeControlId,
   mediaFieldId,
   optionFocusId,
+  priceFieldId,
   variantRowFocusId,
 } from "./field-ids";
+import { fieldName as priceFieldName } from "./prices/price-grid";
 
 /** The tabs of the product editor (their order and permissions are configuration: `src/layout/product-editor.ts`). */
 export const EDITOR_TAB_IDS = [
@@ -48,6 +51,8 @@ export interface PublishProblem {
 
 export interface PublishContext {
   defaultLocale: string;
+  /** `GET /admin/config` `shopCurrency`: a missing price is the variant's price in it. */
+  shopCurrency: string;
   /** The product detail's variants, in its order (the order the API's `variants.N` counts in). */
   variants: readonly { id: string; sku: string }[];
 }
@@ -104,6 +109,22 @@ function mapOne(path: string, code: string, context: PublishContext): PublishPro
   if (head === "variants") {
     const index = parts[1] === undefined || !/^\d+$/.test(parts[1]) ? undefined : Number(parts[1]);
     const variant = index === undefined ? undefined : context.variants[index];
+    if (code === "price_missing" && parts.length === 2) {
+      // An active variant without a shop-currency price: its amount cell on the Prices tab.
+      return {
+        ...base,
+        tab: "prices",
+        field:
+          variant === undefined ? null : priceFieldName(variant.id, context.shopCurrency, "amount"),
+        focusId:
+          variant === undefined
+            ? PRICES_FOCUS_ID
+            : priceFieldId(variant.id, context.shopCurrency, "amount"),
+        ...(index === undefined ? {} : { variantIndex: index }),
+        ...(variant === undefined ? {} : { variantId: variant.id, variantSku: variant.sku }),
+        message: describeFieldError(code),
+      };
+    }
     const attributeCode = parts[2] === "attributes" ? parts[3] : undefined;
     return {
       ...base,
@@ -187,6 +208,18 @@ export function variantIssues(problems: readonly PublishProblem[], variantId: st
   const issues: FormIssues = {};
   for (const entry of variantProblems(problems, variantId)) {
     if (entry.field !== null) issues[entry.field] ??= entry.message;
+  }
+  return issues;
+}
+
+/**
+ * The Prices tab's publish problems as issues of its grid (by the grid's field names, `<variantId>.<currency>.amount`),
+ * so a missing price shows on the cell itself until the tab is saved.
+ */
+export function priceProblemIssues(problems: readonly PublishProblem[]): FormIssues {
+  const issues: FormIssues = {};
+  for (const entry of problems) {
+    if (entry.tab === "prices" && entry.field !== null) issues[entry.field] ??= entry.message;
   }
   return issues;
 }
