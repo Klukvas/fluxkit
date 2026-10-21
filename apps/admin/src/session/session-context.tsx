@@ -6,7 +6,6 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -16,6 +15,7 @@ import { failureFromError, type Failure } from "../lib/failure";
 import { retryAfterMinutes } from "../lib/retry-after";
 import { canAccess } from "../permissions";
 import { initialSessionState, sessionReducer, type SessionState } from "./session-model";
+import { createSessionSync } from "./session-sync";
 
 /** How a sign-in attempt ended, in the terms the form shows. */
 export type SignInOutcome =
@@ -63,7 +63,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(sessionReducer, initialSessionState);
   const [attempt, setAttempt] = useState(0);
   const navigate = useNavigate();
-  const reloading = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -81,34 +80,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => controller.abort();
   }, [attempt]);
 
-  const reloadMe = useCallback(() => {
-    if (reloading.current) return;
-    reloading.current = true;
-    adminClient
-      .getMe()
-      .then(
-        (result) => {
-          if (result.ok) dispatch({ type: "meLoaded", me: result.data });
-          else if (result.status === 401) dispatch({ type: "meUnauthorized" });
-        },
-        (error: unknown) => {
-          const failure = failureFromError(error);
-          if (failure !== null) dispatch({ type: "meFailed", failure });
-        },
-      )
-      .finally(() => {
-        reloading.current = false;
-      });
-  }, []);
-
-  useEffect(
-    () =>
-      sessionSignals.subscribe((signal) => {
-        if (signal === "unauthorized") dispatch({ type: "unauthorized" });
-        else reloadMe();
-      }),
-    [reloadMe],
-  );
+  // `dispatch` is stable, so one sync object serves the provider's whole life.
+  const [sync] = useState(() => createSessionSync(() => adminClient.getMe(), dispatch));
+  const reloadMe = sync.reloadMe;
+  useEffect(() => sessionSignals.subscribe(sync.onSignal), [sync]);
 
   const redirectId = state.redirect?.id;
   const redirectTo = state.redirect?.to;
