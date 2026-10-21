@@ -208,7 +208,12 @@ server {
     location ~ ^/admin-ui/assets/ {
         root /srv/fluxkit/site;
         try_files $uri =404;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        # Without "always": nginx adds it to successful answers only, so a 404 for a hashed file a deployment removed is
+        # not cached for a year by browsers and CDNs (with "always" a tab open across the deployment would keep failing).
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        # A location with its own add_header inherits NONE of the server-level add_header lines: repeat your
+        # Strict-Transport-Security here and in the next location, for example:
+        # add_header Strict-Transport-Security "max-age=31536000" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -222,6 +227,7 @@ server {
         root /srv/fluxkit/site;
         try_files $uri /admin-ui/index.html;
         add_header Cache-Control "no-cache" always;
+        # add_header Strict-Transport-Security "max-age=31536000" always;   (repeat the server-level HSTS, see above)
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -240,7 +246,10 @@ server {
 }
 ```
 
-The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. In the nginx example the API regex needs a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher lists the same paths, so check it with your version. The e2e proxies match both forms.
+The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. Neither example is tested in this repository (the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references). Check before use:
+- In the nginx example the API regex needs a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher lists the same paths, so check it with your version. The e2e proxies match both forms.
+- A missing hashed asset must not be cached as a 404 for a year (it would keep a tab that was open across a deployment broken). nginx: the immutable `Cache-Control` line has no `always`, so nginx does not add it to the 404. Caddy: `header` sets its value before `file_server` answers, so the 404 for a missing file probably carries the immutable header too (reasoned, not tried); check it with your version and, if it does, send `Cache-Control: no-store` for that 404 (for example in a `handle_errors` block).
+- HSTS: nginx does not inherit server-level `add_header` lines into a location that has its own `add_header`, so a `Strict-Transport-Security` header set on the `server` must be repeated in both `/admin-ui` locations (the commented lines). Caddy has no such inheritance rule: a site-level `header Strict-Transport-Security ...` outside the `handle` blocks also applies to the `/admin-ui` answers (from the Caddy documentation, not tried here).
 
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 
