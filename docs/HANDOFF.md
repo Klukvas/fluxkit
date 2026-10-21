@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-20 (admin UI step 12, the docs sweep, on `chore/admin-docs-sweep`, PR pending; admin UI steps 1 to 11 merged in #81 to #94).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-21 (admin UI step 13: the review fixes on `fix/admin-review`, PR not opened yet; admin UI steps 1 to 12 merged in #81 to #95).
 
 ## Where we are
 
@@ -17,7 +17,7 @@ Fluxkit is a white-label e-commerce template: own TypeScript core, NestJS + Driz
 | Pricing and inventory `2026-10-16-pricing-and-inventory.md` | Complete: PRs #40 to #48 (ADRs 0011 to 0014). |
 | Cart, customers and orders `2026-10-17-cart-and-orders.md` | Complete: PRs #49 to #64 (ADRs 0015 to 0025). Review follow-ups below. |
 | Storefront v1 `2026-10-18-storefront.md` | Complete: steps 1 to 10 merged (PRs #66 to #79; #78 is the step 9 docs sweep, #79 the step 10 review fixes). No online payment and no search: orders stay `awaiting_payment` until an admin marks them paid or they expire. |
-| Admin UI v1 `2026-10-19-admin-ui.md` | Steps 1 to 11 merged (#81 to #94). Complete except step 13 (independent review) and step 2b (media upload). Step 12 is this docs sweep. |
+| Admin UI v1 `2026-10-19-admin-ui.md` | Steps 1 to 12 merged (#81 to #95). Step 13: the review is done (no High, one Medium, seven Low); its fixes are on `fix/admin-review` (PR not opened). Then only step 2b (media upload) is left. |
 
 Not built: payment and shipping providers, email delivery, search, image upload (the admin takes product and brand images as http(s) addresses only), and a production deployment (no API or storefront image; the admin is static files that the edge proxy serves, see `README.md`, Deployment notes).
 
@@ -40,16 +40,16 @@ Not built: payment and shipping providers, email delivery, search, image upload 
 | 9 | Customers | #92 |
 | 10 | Admin users (owner only) | #93 |
 | 11 | Admin end-to-end suite `apps/admin/e2e`; root `pnpm test:e2e` runs both suites | #94 |
-| 12 | Docs sweep | pending (`chore/admin-docs-sweep`) |
-| 13 | Independent review by a different model than the authors | not started |
+| 12 | Docs sweep | #95 |
+| 13 | Independent review by a different agent than the authors: done; fixes of M1, L1, L3 to L7 on `fix/admin-review` (plan, "Step 13 review outcome"); L2 kept as a known limitation | PR not opened |
 | 2b | Media upload (storage, upload endpoint, its own plan and ADR first) | not started |
 
 The first CI run of `main` after #94 (commit `a4f1a52`, which includes the `e2e` job with both suites) was still in progress when this file was written. Its result is not recorded here; check it before relying on the e2e suites in CI.
 
 ## Next steps (in order)
 
-1. Merge the docs sweep (step 12) on the owner's word. Its PR is not opened yet.
-2. Step 13: an independent review by a different agent than the authors (Opus or Codex). Scope is in the plan: permission gating against the API, XSS, CSRF and same-origin assumptions, the CSP of the build, open redirect in `next`, money and stock flows (no optimistic values, no automatic retries), the re-sign-in state, i18n, accessibility, the bundle split, mutation checks. Findings are fixed before the plan closes.
+1. Step 13 review fixes (`fix/admin-review`): open the PR, have it reviewed by a different agent than its author, merge on the owner's word. Then the admin UI plan is complete except step 2b.
+2. The root `README.md` still says "17 tests in 10 files" for the admin e2e suite; it has 21 tests in 10 files since the review fixes (the fix branch changed `README.md` for the nginx example only).
 3. Step 2b: media upload, with its own plan file and ADR first: storage provider abstraction (local disk first), an admin upload endpoint (type allow-list by content, size limit, random file names, never executed), safe serving headers, `img-src` for the storefront through `STOREFRONT_IMAGE_HOSTS`, a schema decision if media metadata needs a table. Red zone: API, schema, storage, security.
 4. Then, each with its own plan and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by ADR 0005, see Open decisions), and a privacy plan before the EU launch (not written yet).
 5. Launch blockers still open: rate limiting for the catalog routes of `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; the edge proxy in every deployed environment (`README.md`, Deployment notes; the examples are not tested in this repository, the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references), `TRUST_PROXY` set to the exact hop count (ADR 0026); check the per-address limits from two networks after deployment.
@@ -78,7 +78,7 @@ The first CI run of `main` after #94 (commit `a4f1a52`, which includes the `e2e`
 - Owner sign-off still wanted on the core rule inside ADR 0008: required variant-level attributes are asked only of active variants at publish.
 - Swagger UI and `/docs-json` in production (see Next steps 5).
 
-## Known gaps (admin UI, steps 1 to 11, not fixed)
+## Known gaps (admin UI, steps 1 to 13, not fixed)
 
 Catalog and products
 - **Categories: the roots are found by paging the flat list.** `GET /admin/categories` cannot list the root level alone (`parentId` takes only a uuid). The tree pages the list (100 rows a request, at most 10 requests); above 1 000 categories it shows "list truncated" and may miss roots. An additive `parentId=null` filter (a public contract change, red zone) removes the workaround (`apps/admin/src/areas/catalog-dictionaries/category-tree.ts`, `collectRoots`). Tree expansion is lost when an editor is opened and left.
@@ -108,7 +108,8 @@ Customers and admin users
 
 Shell, i18n, images and e2e
 - **CSP and images:** the admin CSP allows `'self' data:` and the configured `STOREFRONT_IMAGE_HOSTS`. The seed's images live on `example.com`, which the admin CSP refuses; the screens say so in text, and the e2e guard accepts exactly those refusals. Brand logos and product images from other hosts are not shown.
-- **Example proxies:** the nginx example in `README.md` routes `/store/*` and `/admin/*` only with a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher needs the same check. The e2e proxies match both forms; the examples need the fix before use (not changed in step 12).
+- **Example proxies:** the nginx example in `README.md` routes `/store/*` and `/admin/*` only with a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher needs the same check. The e2e proxies match both forms; the examples need the fix before use. Since the step 13 fixes the nginx example sends the immutable `Cache-Control` on successful asset answers only and shows where to repeat a server-level HSTS header; the Caddy example may still mark a 404 of a missing asset immutable (reasoned, not tried). Neither example is tested.
+- **A user change made in another tab is not noticed** (step 13 review L2, kept by the owner): `me` is read again only after a sign-in through the re-sign-in dialog or after a 403. If the cookie changes to another admin through another tab of the same browser, an open tab keeps the old user's header, navigation and permissions until a 401 or 403, while its requests run as the new user (no escalation: same browser profile). A fix would read `me` again on `visibilitychange` or focus.
 - Problem reasons the problem map does not list (`invalid_code`, `invalid_characters`, `locale_not_allowed`, `not_an_object`, `not_a_string`, and the attribute combination reasons the form prevents) show the generic message with the code in small print.
 - `react-router` 8.4.0 requires Node `>=22.22.0` (`engines`). The repository pins Node 22 (`.nvmrc`); CI and the sandbox use the latest 22.x.
 - **e2e (step 11):** Chromium only; no automated accessibility scan (`@axe-core/playwright` is not approved). Not covered in a browser: the lost-answer paths of the writes (the Vitest specs and the step smoke runs cover them), the owner's role change and password reset screens, the category delete, the product list filters, the reservations list with real orders, `vite dev`. The suite has been run locally; its first CI run is in the list above. See `apps/admin/e2e/README.md`, "Not covered".
