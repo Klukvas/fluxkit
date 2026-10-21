@@ -15,6 +15,7 @@ import type { LazyFile } from "../../messages";
 import { adminClient } from "../../lib/api";
 import { failureFromError } from "../../lib/failure";
 import { formatDateTime } from "../../lib/format";
+import { createSingleFlight } from "../../lib/single-flight";
 import { fieldErrorsFromProblem } from "../../lib/form-errors";
 import { describeFailure, type MessageDescriptor } from "../../lib/problem-messages";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
@@ -183,6 +184,8 @@ export function AccountPage() {
   const [done, setDone] = useState(false);
   const [crash, setCrash] = useState<{ error: unknown } | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+  // Two submits in one task (before React renders the busy button) send one change.
+  const [flight] = useState(createSingleFlight);
   const blocker = useUnsavedChangesGuard(isPasswordFormDirty(values) && !busy);
 
   if (crash !== null) throw crash.error;
@@ -203,9 +206,12 @@ export function AccountPage() {
     });
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    void flight.run(change);
+  }
+
+  async function change() {
     setDone(false);
     const local = localPasswordErrors(values);
     if (Object.keys(local).length > 0) {

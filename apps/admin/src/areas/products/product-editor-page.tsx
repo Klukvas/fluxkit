@@ -7,6 +7,7 @@ import { PRODUCT_EDITOR_TABS } from "../../layout/product-editor";
 import { adminClient } from "../../lib/api";
 import { describeProblem, type MessageDescriptor } from "../../lib/problem-messages";
 import { runWrite } from "../../lib/run-write";
+import { createSingleFlight } from "../../lib/single-flight";
 import { useCrash } from "../../lib/use-crash";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
@@ -96,6 +97,7 @@ function ProductEditor({ id }: { id: string }) {
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
   const failureRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<LifecycleAction | null>(null);
+  const [flight] = useState(createSingleFlight);
   const [confirming, setConfirming] = useState<LifecycleAction | null>(null);
   const [deleted, setDeleted] = useState(false);
   const [pendingFocus, setPendingFocus] = useState<{ tab: EditorTabId; id: string } | null>(null);
@@ -177,11 +179,14 @@ function ProductEditor({ id }: { id: string }) {
   }
 
   async function run(action: Exclude<LifecycleAction, "delete">, target: AdminProduct) {
+    // A second action in the same task (before React renders the busy buttons) sends nothing.
+    const running = flight.run(() => runWrite(() => LIFECYCLE_CALLS[action](target.id)));
+    if (running === null) return;
     setBusy(action);
     setFailure(null);
     let outcome;
     try {
-      outcome = await runWrite(() => LIFECYCLE_CALLS[action](target.id));
+      outcome = await running;
     } catch (bug) {
       crash(bug);
       return;
