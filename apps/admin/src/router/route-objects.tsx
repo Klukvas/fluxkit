@@ -1,14 +1,26 @@
-import type { RouteObject } from "react-router";
+import { Outlet, type RouteObject } from "react-router";
 import { withAreaMessages } from "../i18n/area-messages";
 import { useI18n } from "../i18n/i18n-context";
 import { ProtectedLayout } from "../layout/protected-layout";
 import type { RouteHandle } from "../layout/shell";
 import { ROUTES, type AppRoute } from "../routes";
-import { SessionRoot } from "../session/session-context";
+import { SessionProvider } from "../session/session-context";
 import { RootErrorBoundary, RouteErrorBoundary } from "../views/error-boundaries";
 import { NotFoundView } from "../views/status-views";
+import { RouteFocus } from "./route-focus";
 
 export const NOT_FOUND_ROUTE_ID = "notFound";
+
+/** Root route element: the session (it navigates, so it needs the router) and the focus after navigations. */
+function AppRoot() {
+  return (
+    <SessionProvider>
+      <RouteFocus>
+        <Outlet />
+      </RouteFocus>
+    </SessionProvider>
+  );
+}
 
 function NotFoundPage() {
   const { t } = useI18n();
@@ -55,7 +67,7 @@ export function buildRouteObjects(routes: readonly AppRoute[] = ROUTES): RouteOb
   };
   return [
     {
-      Component: SessionRoot,
+      Component: AppRoot,
       ErrorBoundary: RootErrorBoundary,
       children: [
         ...login,

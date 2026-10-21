@@ -1,10 +1,9 @@
 import type { AdminOperationPermission } from "@fluxkit/api-client";
 import { LiveRegion, SideNav, SkipLink, type SideNavGroup, type Translator } from "@fluxkit/ui";
-import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
 import { useDocumentTitle } from "../i18n/use-document-title";
-import { createNavigationFocus } from "../router/navigation-focus";
 import { PATHS } from "../router/paths";
 import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/unsaved-changes";
 import { ReauthDialog } from "../session/reauth-dialog";
@@ -88,23 +87,11 @@ export function ShellFrame({
   );
 }
 
-/** Moves the focus to the new page's `h1` after a path change, and back to the top of the page. */
-function useRouteFocus(pathname: string): void {
-  const [focus] = useState(() => createNavigationFocus(() => document));
-  const previous = useRef<string | null>(null);
-  useEffect(() => {
-    // The SPA uses no `ScrollRestoration` (it would need an inline script); a new page starts at the top.
-    if (previous.current !== null && previous.current !== pathname) window.scrollTo(0, 0);
-    previous.current = pathname;
-    focus.onPathname(pathname);
-  }, [focus, pathname]);
-}
-
 /**
- * The shell of every signed-in route: frame, navigation from the permissions, title and focus per route, the permission
- * gate (a route the role may not open shows "not allowed"), the re-sign-in dialog over the page when the session
- * ended, and the registry of unsaved input that sign-out consults. The pages are keyed by the session generation, so a
- * sign-out or a user change drops their state.
+ * The shell of every signed-in route: frame, navigation from the permissions, title per route (the focus after a
+ * navigation is `router/route-focus.tsx`, at the root), the permission gate (a route the role may not open shows "not
+ * allowed"), the re-sign-in dialog over the page when the session ended, and the registry of unsaved input that
+ * sign-out consults. The pages are keyed by the session generation, so a sign-out or a user change drops their state.
  */
 export function Shell() {
   const { t } = useI18n();
@@ -119,7 +106,6 @@ export function Shell() {
     .filter(isRouteHandle)
     .pop();
   useDocumentTitle(handle?.titleKey ?? "notFound.title");
-  useRouteFocus(location.pathname);
 
   const allowed = handle === undefined || session.can(handle.permission);
   const groups: SideNavGroup[] = visibleNavigation(session.state.me?.permissions ?? null).map(

@@ -28,9 +28,13 @@ export function LanguageSwitchView({
             variant={option === locale ? "primary" : "secondary"}
             lang={option}
             aria-pressed={option === locale}
-            disabled={busy}
-            onClick={() => onChange(option)}
-            className="min-h-11 px-3 py-1 text-sm"
+            // Not `disabled`: a disabled button drops the keyboard focus to the page (step 13 review, L3). While a
+            // switch runs, the buttons say so and ignore activation.
+            aria-disabled={busy || undefined}
+            onClick={() => {
+              if (!busy) onChange(option);
+            }}
+            className="min-h-11 px-3 py-1 text-sm aria-disabled:opacity-50"
           >
             {t(`language.${option}`)}
           </Button>

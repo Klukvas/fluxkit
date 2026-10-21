@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Outlet, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { adminClient, sessionSignals } from "../lib/api";
 import { failureFromError, type Failure } from "../lib/failure";
 import { retryAfterMinutes } from "../lib/retry-after";
@@ -174,13 +174,4 @@ export function useSession(): SessionValue {
   const value = useContext(SessionContext);
   if (value === null) throw new Error("useSession must be used inside SessionProvider.");
   return value;
-}
-
-/** Root route element: the session needs the router (it navigates), and every route needs the session. */
-export function SessionRoot() {
-  return (
-    <SessionProvider>
-      <Outlet />
-    </SessionProvider>
-  );
 }
