@@ -61,7 +61,7 @@ import {
   type AdjustmentPlan,
   type AdjustmentValues,
 } from "./stock-adjustment";
-import { runAdjustment, stockSections } from "./stock-access";
+import { runAdjustment, stockSections, submitAdjustment } from "./stock-access";
 import {
   STOCK_STATE_TONE,
   actorLabel,
@@ -965,22 +965,22 @@ function VariantStock({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (flight.current.pending() || busy || waiting) return;
-    const plan = planAdjustment(values, current, { locationCount: locations.length });
-    if (!plan.ok) {
-      const issues: Partial<Record<string, MessageDescriptor>> = {};
-      for (const [field, issue] of Object.entries(plan.issues)) {
-        issues[field] = { key: `products.stock.issue.${issue}` };
-      }
-      form.showIssues(issues);
-      return;
-    }
-    setResult(null);
-    if (plan.confirm !== null) {
-      setConfirming(plan);
-      return;
-    }
-    void flight.current.run(() => send(plan));
+    submitAdjustment({
+      writing: flight.current.pending(),
+      busy,
+      waiting,
+      plan: () => planAdjustment(values, current, { locationCount: locations.length }),
+      showIssues: (planIssues) => {
+        const issues: Partial<Record<string, MessageDescriptor>> = {};
+        for (const [field, issue] of Object.entries(planIssues)) {
+          issues[field] = { key: `products.stock.issue.${issue}` };
+        }
+        form.showIssues(issues);
+      },
+      clearResult: () => setResult(null),
+      confirm: setConfirming,
+      send: (plan) => void flight.current.run(() => send(plan)),
+    });
   }
 
   const journalRows: MovementRow[] =

@@ -40,7 +40,7 @@ import { priceProblemIssues, type PublishProblem } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { optionValuesText, type VariantNaming } from "../tabs/variants-tab";
 import { useSession } from "../../../session/session-context";
-import { priceControls } from "../stock/stock-access";
+import { priceControls, savePrices } from "../stock/stock-access";
 import { useOptionDefinitions } from "../use-option-definitions";
 import {
   addColumn,
@@ -451,25 +451,26 @@ function PricesEditor({
   useReportDirty(dirty, onDirtyChange);
   const issues = { ...priceProblemIssues(problems), ...form.state.fieldErrors };
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (form.state.busy) return;
-    const plan = planPriceSave(grid, stored, context);
-    if (!plan.ok) {
-      form.showIssues(issuesOf(plan.issues));
-      return;
-    }
-    if (plan.items.length === 0) {
-      form.clear();
-      onSaved(0);
-      return;
-    }
-    sentKeys.current = plan.items.map((entry) => entry.key);
-    const outcome = await form.submit(() =>
-      adminClient.putProductPrices(product.id, { items: plan.items.map((entry) => entry.item) }),
-    );
-    if (outcome.kind === "ok") onSaved(plan.items.length);
-    else if (outcome.kind === "unknown") onUnknown();
+    void savePrices({
+      busy: form.state.busy || form.pending(),
+      plan: () => planPriceSave(grid, stored, context),
+      showIssues: (planIssues) => form.showIssues(issuesOf(planIssues)),
+      nothingChanged: () => {
+        form.clear();
+        onSaved(0);
+      },
+      rememberSent: (keys) => {
+        sentKeys.current = keys;
+      },
+      submit: (items) =>
+        form.submit(() =>
+          adminClient.putProductPrices(product.id, { items: items.map((entry) => entry.item) }),
+        ),
+      onSaved,
+      onUnknown,
+    });
   }
 
   const removedVariant = removal?.variant ?? null;

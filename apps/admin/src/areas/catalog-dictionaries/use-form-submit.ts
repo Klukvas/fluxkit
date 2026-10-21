@@ -22,6 +22,8 @@ export interface FormSubmit {
    * runs, another submit sends nothing, leaves the state alone and answers `aborted` (nothing to act on).
    */
   submit: <T>(write: () => Promise<AdminResult<T>>) => Promise<WriteOutcome<T>>;
+  /** True from the moment a write starts (before React renders `state.busy`) until it settled. */
+  pending: () => boolean;
   clear: () => void;
 }
 
@@ -39,7 +41,7 @@ export interface FormWriterParts {
  * two submits in one task (before React renders the busy state: a script, an extension, a programmatic submit) send one
  * request (step 13 review, L1). The busy state is set synchronously, before the request leaves.
  */
-export function createFormWriter(parts: FormWriterParts): Pick<FormSubmit, "submit"> {
+export function createFormWriter(parts: FormWriterParts): Pick<FormSubmit, "submit" | "pending"> {
   const flight = createSingleFlight();
   async function once<T>(write: () => Promise<AdminResult<T>>): Promise<WriteOutcome<T>> {
     parts.setState({ ...IDLE_SUBMIT, busy: true });
@@ -59,6 +61,7 @@ export function createFormWriter(parts: FormWriterParts): Pick<FormSubmit, "subm
     submit<T>(write: () => Promise<AdminResult<T>>): Promise<WriteOutcome<T>> {
       return flight.run(() => once(write)) ?? Promise.resolve({ kind: "aborted" });
     },
+    pending: flight.pending,
   };
 }
 
@@ -104,5 +107,5 @@ export function useFormSubmit(
   );
 
   const clear = useCallback(() => setState(IDLE_SUBMIT), []);
-  return { state, summaryRef, showIssues, submit: writer.submit, clear };
+  return { state, summaryRef, showIssues, submit: writer.submit, pending: writer.pending, clear };
 }

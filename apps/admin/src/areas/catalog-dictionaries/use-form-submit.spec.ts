@@ -30,13 +30,16 @@ const ok: AdminResult<string> = { ok: true, status: 200, data: "saved" };
 describe("createFormWriter (the write half of useFormSubmit)", () => {
   it("sends ONE write for two submits in the same task; the second answers aborted and leaves the state alone", async () => {
     const { writer, states, sent, write } = harness();
+    expect(writer.pending()).toBe(false);
     const first = writer.submit(write);
+    expect(writer.pending()).toBe(true);
     const second = writer.submit(write);
     expect(sent).toHaveLength(1);
     expect(await second).toEqual({ kind: "aborted" });
     expect(states).toEqual([{ ...IDLE_SUBMIT, busy: true }]);
     sent[0]?.(ok);
     expect(await first).toEqual({ kind: "ok", status: 200, data: "saved" });
+    expect(writer.pending()).toBe(false);
     expect(states).toEqual([{ ...IDLE_SUBMIT, busy: true }, IDLE_SUBMIT]);
   });
 
