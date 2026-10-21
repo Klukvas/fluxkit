@@ -36,6 +36,11 @@ test("a session ended elsewhere: the next save opens the re-sign-in dialog and t
   const dialog = page.getByRole("dialog", { name: "Your session has ended" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText("This page and your input stay");
+  // Without a session there is nothing to go back to: Escape (twice: Chromium closes a modal natively on the second press)
+  // keeps the dialog.
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
   await expect(english).toHaveValue(`Session ${u} edited`);
   expect((await owner.get<{ name: { en: string } }>(`/admin/brands/${brand.id}`)).name.en).toBe(
     `Session ${u}`,
