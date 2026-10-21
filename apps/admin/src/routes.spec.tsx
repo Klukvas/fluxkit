@@ -1,12 +1,14 @@
+import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { matchRoutes, type RouteObject } from "react-router";
+import { createMemoryRouter, matchRoutes, type RouteObject } from "react-router";
 import { describe, expect, it } from "vitest";
 import { withAreaMessages } from "./i18n/area-messages";
 import { I18nProvider } from "./i18n/i18n-context";
 import { ADMIN_BASE_PATH, API_PATH_PATTERN } from "./router/base-path";
 import { browserPath } from "./router/paths";
 import { buildRouteObjects, NOT_FOUND_ROUTE_ID } from "./router/route-objects";
-import { ROUTES, routeById } from "./routes";
+import { ROUTES, routeById, type AppRoute } from "./routes";
+import { RouteErrorBoundary } from "./views/error-boundaries";
 
 const objects: RouteObject[] = buildRouteObjects();
 
@@ -156,5 +158,77 @@ describe("lazy pages and their message files", () => {
     );
     expect(html).not.toContain("page-body");
     expect(html).toContain('aria-busy="true"');
+  });
+});
+
+describe("a lazy route whose chunk cannot be loaded (step 13 review, M1)", () => {
+  const failure = new TypeError(
+    "Failed to fetch dynamically imported module: /admin-ui/assets/x.js",
+  );
+  function Orders() {
+    return <p>orders-body</p>;
+  }
+  function table(load: () => Promise<{ Component: () => ReactElement; messageFiles: [] }>) {
+    const orders: AppRoute = { ...routeById("orders"), page: { kind: "lazy", load } };
+    return buildRouteObjects([routeById("login"), routeById("home"), orders]);
+  }
+  type Router = ReturnType<typeof createMemoryRouter>;
+  function settled(router: Router): Promise<void> {
+    return new Promise((done) => {
+      const check = () => {
+        if (router.state.initialized && router.state.navigation.state === "idle") done();
+      };
+      router.subscribe(check);
+      check();
+    });
+  }
+  /** The route that holds the error, and whether it is the shell's error boundary. */
+  function errorAt(router: Router): { error: unknown; boundary: unknown } | null {
+    const entries = Object.entries(router.state.errors ?? {});
+    if (entries.length === 0) return null;
+    expect(entries).toHaveLength(1);
+    const [routeId, error] = entries[0] as [string, unknown];
+    const match = router.state.matches.find((entry) => entry.route.id === routeId);
+    // The router turns `ErrorBoundary` and `Component` into elements (`errorElement`, `element`).
+    return { error, boundary: (match?.route.errorElement as ReactElement | undefined)?.type };
+  }
+
+  it("ends an in-app navigation with the error at the shell's route error boundary (not a blank route)", async () => {
+    const router = createMemoryRouter(
+      table(() => Promise.reject(failure)),
+      {
+        initialEntries: ["/"],
+      },
+    );
+    await settled(router);
+    await router.navigate("/orders");
+    expect(router.state.location.pathname).toBe("/orders");
+    expect(errorAt(router)).toEqual({ error: failure, boundary: RouteErrorBoundary });
+    router.dispose();
+  });
+
+  it("does the same on a deep link (the first load)", async () => {
+    const router = createMemoryRouter(
+      table(() => Promise.reject(failure)),
+      {
+        initialEntries: ["/orders"],
+      },
+    );
+    await settled(router);
+    expect(errorAt(router)).toEqual({ error: failure, boundary: RouteErrorBoundary });
+    router.dispose();
+  });
+
+  it("renders the page and records no error when the chunk loads", async () => {
+    const router = createMemoryRouter(
+      table(() => Promise.resolve({ Component: Orders, messageFiles: [] })),
+      { initialEntries: ["/"] },
+    );
+    await settled(router);
+    await router.navigate("/orders");
+    expect(errorAt(router)).toBeNull();
+    const leaf = router.state.matches[router.state.matches.length - 1];
+    expect((leaf?.route.element as ReactElement | undefined)?.type).toBe(Orders);
+    router.dispose();
   });
 });

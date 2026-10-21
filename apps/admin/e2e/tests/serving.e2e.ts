@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../../security-headers.ts";
 import { SPA } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
@@ -86,4 +88,58 @@ test("the CSP refuses inline script and the SPA itself causes no violation", asy
   await expect
     .poll(() => guard.csp.some((line) => line.startsWith("script-src-elem blocked inline")))
     .toBe(true);
+});
+
+/** The built file of a source module, from the build's manifest (`vite.config.ts`, `build.manifest`). */
+function builtChunk(source: string): string {
+  const manifest = JSON.parse(
+    readFileSync(resolve(import.meta.dirname, "../../dist/.vite/manifest.json"), "utf8"),
+  ) as Record<string, { file: string }>;
+  const entry = manifest[source];
+  if (entry === undefined) throw new Error(`${source} is not in the build manifest`);
+  return entry.file;
+}
+
+test("an area chunk that cannot be loaded (a deployment replaced it) shows the error view in the shell; reload works when it is back", async ({
+  page,
+  signIn,
+  guard,
+}) => {
+  // The orders area module, not its message file (both are named orders-*.js).
+  const chunk = builtChunk("src/areas/orders/index.tsx");
+  const chunkUrl = `${SPA}/${chunk}`;
+  const importFailed = "Failed to fetch dynamically imported module";
+  // Chunk names are `[A-Za-z0-9_-]` plus dots and slashes; only the dots need escaping.
+  guard.expectConsoleErrors(
+    new RegExp(`${importFailed}: .*${chunk.replaceAll(".", "\\.")}|net::ERR_FAILED`),
+  );
+  const logged = () => guard.consoleErrors.filter((line) => line.includes(importFailed)).length;
+  await signIn("owner");
+  const main = page.getByRole("main");
+  const navigation = page.getByRole("navigation", { name: "Admin sections" });
+
+  // In-app navigation while the chunk cannot be fetched (network error).
+  await page.route(`**${chunkUrl}`, (route) => route.abort());
+  await navigation.getByRole("link", { name: "Orders" }).click();
+  await expect(main.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
+  await expect(main.getByRole("button", { name: "Reload the page" })).toBeVisible();
+  // The shell stays: header and navigation are usable, another area opens.
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect.poll(logged, "the failure is logged once").toBe(1);
+  await navigation.getByRole("link", { name: "Products" }).click();
+  await expect(main.getByRole("heading", { level: 1, name: "Products" })).toBeVisible();
+
+  // A deep link while a deployment answers the old chunk with 404.
+  await page.unroute(`**${chunkUrl}`);
+  await page.route(`**${chunkUrl}`, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.goto(`${SPA}/orders`);
+  await expect(main.getByRole("heading", { level: 1, name: "Something went wrong" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
+  await expect.poll(logged, "the failure is logged once").toBe(2);
+
+  // The chunk is back: the reload button loads the page.
+  await page.unroute(`**${chunkUrl}`);
+  await main.getByRole("button", { name: "Reload the page" }).click();
+  await expect(main.getByRole("heading", { level: 1, name: "Orders" })).toBeVisible();
+  expect(logged()).toBe(2);
 });
