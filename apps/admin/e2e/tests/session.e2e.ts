@@ -53,3 +53,58 @@ test("a session ended elsewhere: the next save opens the re-sign-in dialog and t
     `Session ${u} edited`,
   );
 });
+
+test("sign-out asks before unsaved input is discarded: from the header and from the re-sign-in dialog", async ({
+  page,
+  signIn,
+  owner,
+  playwright,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const brand = await owner.post<{ id: string }>("/admin/brands", {
+    name: { uk: `Вихід ${u}`, en: `Leave ${u}` },
+    slug: `leave-${u}`,
+  });
+  await signIn("manager");
+  const main = page.getByRole("main");
+  await page.goto(`${SPA}/catalog/brands/${brand.id}`);
+  const english = main.getByRole("textbox", { name: "Name (English)", exact: true });
+  await expect(english).toHaveValue(`Leave ${u}`);
+  await english.fill(`Leave ${u} typed`);
+  const leave = page.getByRole("alertdialog", { name: "Leave this page?" });
+
+  // The header's sign-out asks first; "Stay" keeps the session and the input.
+  await page.getByRole("banner").getByRole("button", { name: "Sign out" }).click();
+  await expect(leave).toBeVisible();
+  await expect(leave.getByRole("button", { name: "Stay" })).toBeFocused();
+  await leave.getByRole("button", { name: "Stay" }).click();
+  await expect(leave).toBeHidden();
+  await expect(english).toHaveValue(`Leave ${u} typed`);
+  expect((await page.request.get("/admin/auth/me")).status()).toBe(200);
+
+  // The session ends elsewhere; the re-sign-in dialog's sign-out asks the same question.
+  const elsewhere = await playwright.request.newContext({
+    baseURL: ADMIN_E2E_ORIGIN,
+    storageState: await page.context().storageState(),
+    extraHTTPHeaders: {
+      "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, "elsewhere"),
+    },
+  });
+  expect((await elsewhere.post("/admin/auth/logout", { headers: CSRF })).status()).toBe(204);
+  await elsewhere.dispose();
+  await main.getByRole("button", { name: "Save changes" }).click();
+  const reauth = page.getByRole("dialog", { name: "Your session has ended" });
+  await expect(reauth).toBeVisible();
+  await reauth.getByRole("button", { name: "Sign out" }).click();
+  await expect(leave).toBeVisible();
+  await leave.getByRole("button", { name: "Stay" }).click();
+  await expect(leave).toBeHidden();
+  await expect(reauth).toBeVisible();
+  await expect(english).toHaveValue(`Leave ${u} typed`);
+
+  // "Leave" signs out and goes to the sign-in page.
+  await reauth.getByRole("button", { name: "Sign out" }).click();
+  await leave.getByRole("button", { name: "Leave" }).click();
+  await expect(page).toHaveURL(new RegExp(`${SPA}/login`));
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to the admin" })).toBeVisible();
+});

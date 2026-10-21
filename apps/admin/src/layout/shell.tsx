@@ -6,6 +6,7 @@ import { useI18n } from "../i18n/i18n-context";
 import { useDocumentTitle } from "../i18n/use-document-title";
 import { createNavigationFocus } from "../router/navigation-focus";
 import { PATHS } from "../router/paths";
+import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/unsaved-changes";
 import { ReauthDialog } from "../session/reauth-dialog";
 import { useSession } from "../session/session-context";
 import { NotAllowedView } from "../views/status-views";
@@ -101,8 +102,9 @@ function useRouteFocus(pathname: string): void {
 
 /**
  * The shell of every signed-in route: frame, navigation from the permissions, title and focus per route, the permission
- * gate (a route the role may not open shows "not allowed"), and the re-sign-in dialog over the page when the session
- * ended. The pages are keyed by the session generation, so a sign-out or a user change drops their state.
+ * gate (a route the role may not open shows "not allowed"), the re-sign-in dialog over the page when the session
+ * ended, and the registry of unsaved input that sign-out consults. The pages are keyed by the session generation, so a
+ * sign-out or a user change drops their state.
  */
 export function Shell() {
   const { t } = useI18n();
@@ -110,6 +112,7 @@ export function Shell() {
   const location = useLocation();
   const matches = useMatches();
   const navigation = useNavigation();
+  const [unsaved] = useState(createUnsavedChangesRegistry);
 
   const handle = matches
     .map((match) => match.handle)
@@ -133,7 +136,7 @@ export function Shell() {
   );
 
   return (
-    <>
+    <UnsavedChangesContext.Provider value={unsaved}>
       <ShellFrame
         t={t}
         navigation={groups}
@@ -146,6 +149,6 @@ export function Shell() {
         </Fragment>
       </ShellFrame>
       {session.state.status === "expired" ? <ReauthDialog /> : null}
-    </>
+    </UnsavedChangesContext.Provider>
   );
 }
