@@ -50,8 +50,10 @@ export function sessionReducer(state: SessionState, event: SessionEvent): Sessio
     case "meLoaded": {
       const previous = state.me;
       if (previous !== null && previous.user.id !== event.me.user.id) {
-        // Another user now holds the cookie (signed in through the dialog, or in another tab): nothing of the previous
-        // user's screens may survive.
+        // Another user now holds the cookie: nothing of the previous user's screens may survive. This is seen only when
+        // `me` is read again: after a sign-in through the re-sign-in dialog, or after a 403. A user change made in another
+        // tab is NOT detected by itself (no polling, no focus check): the tab keeps the old user's screens until a 401 or
+        // 403 (step 13 review L2, a known limitation in docs/HANDOFF.md).
         return {
           status: "signedIn",
           me: event.me,
