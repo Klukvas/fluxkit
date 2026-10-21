@@ -20,7 +20,52 @@ const sources = sourceFiles(root)
 /** The source without comments, so a rule is not satisfied (or broken) by prose. */
 const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, "$1");
 
-/** JSX text and text attributes with letters in a .tsx file: each one is user-facing text that bypasses i18n. */
+/**
+ * The string literals that end up as rendered text when `expression` is rendered: the expression itself, the branches
+ * of a conditional, the right side of `&&` (both sides of `||` and `??`), array items, and template literals (their text
+ * parts). Never a condition, a call argument (`t("key")`), a property key or a comparison operand.
+ */
+function renderedLiterals(expression: ts.Expression): (ts.StringLiteral | ts.TemplateLiteral)[] {
+  if (ts.isStringLiteral(expression) || ts.isNoSubstitutionTemplateLiteral(expression)) {
+    return [expression];
+  }
+  if (ts.isTemplateExpression(expression)) return [expression];
+  if (ts.isParenthesizedExpression(expression)) return renderedLiterals(expression.expression);
+  if (ts.isConditionalExpression(expression)) {
+    return [...renderedLiterals(expression.whenTrue), ...renderedLiterals(expression.whenFalse)];
+  }
+  if (ts.isBinaryExpression(expression)) {
+    const operator = expression.operatorToken.kind;
+    if (operator === ts.SyntaxKind.AmpersandAmpersandToken)
+      return renderedLiterals(expression.right);
+    if (
+      operator === ts.SyntaxKind.BarBarToken ||
+      operator === ts.SyntaxKind.QuestionQuestionToken
+    ) {
+      return [...renderedLiterals(expression.left), ...renderedLiterals(expression.right)];
+    }
+    return [];
+  }
+  if (ts.isArrayLiteralExpression(expression)) {
+    return expression.elements.flatMap((element) =>
+      ts.isExpression(element) && !ts.isSpreadElement(element) ? renderedLiterals(element) : [],
+    );
+  }
+  return [];
+}
+
+/** The literal text of a rendered literal (the text parts of a template literal). */
+function literalText(literal: ts.StringLiteral | ts.TemplateLiteral): string {
+  if (ts.isStringLiteral(literal) || ts.isNoSubstitutionTemplateLiteral(literal))
+    return literal.text;
+  return [literal.head.text, ...literal.templateSpans.map((span) => span.literal.text)].join("");
+}
+
+/**
+ * JSX text, text attributes and literals rendered from JSX expressions (children and text attributes: `{"x"}`,
+ * `{busy ? "Saving" : t("save")}`, `{failed && "Failed"}`, `` {`${n} items`} ``) with letters in a .tsx file: each one
+ * is user-facing text that bypasses i18n. Expressions of other attributes (`className`, `id`, `href`, ...) are not text.
+ */
 function hardcodedText(path: string, text: string): string[] {
   const file = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const found: string[] = [];
@@ -33,27 +78,30 @@ function hardcodedText(path: string, text: string): string[] {
     "label",
   ]);
   const letters = /\p{L}/u;
+  const report = (expression: ts.Expression) => {
+    for (const literal of renderedLiterals(expression)) {
+      const value = literalText(literal);
+      if (letters.test(value)) found.push(`{${literal.getText(file)}}`);
+    }
+  };
   function visit(node: ts.Node): void {
     if (ts.isJsxText(node) && letters.test(node.text)) found.push(node.text.trim());
-    if (
-      ts.isJsxAttribute(node) &&
-      textAttributes.has(node.name.getText(file)) &&
-      node.initializer !== undefined &&
-      ts.isStringLiteral(node.initializer) &&
-      letters.test(node.initializer.text)
-    ) {
-      found.push(`${node.name.getText(file)}="${node.initializer.text}"`);
+    if (ts.isJsxAttribute(node) && textAttributes.has(node.name.getText(file))) {
+      const value = node.initializer;
+      if (value !== undefined && ts.isStringLiteral(value) && letters.test(value.text)) {
+        found.push(`${node.name.getText(file)}="${value.text}"`);
+      }
+      if (value !== undefined && ts.isJsxExpression(value) && value.expression !== undefined) {
+        report(value.expression);
+      }
     }
     if (
       ts.isJsxExpression(node) &&
       node.parent !== undefined &&
       (ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent)) &&
-      node.expression !== undefined &&
-      (ts.isStringLiteral(node.expression) ||
-        ts.isNoSubstitutionTemplateLiteral(node.expression)) &&
-      letters.test(node.expression.text)
+      node.expression !== undefined
     ) {
-      found.push(`{"${node.expression.text}"}`);
+      report(node.expression);
     }
     ts.forEachChild(node, visit);
   }
@@ -79,6 +127,42 @@ describe("source guards (AGENTS.md sections 2.2, 2.3 and 11; plan, Security (adm
   it("the hardcoded-text check itself finds text, text attributes and string children", () => {
     const sample = `const a = <p title="Hello">Save <b>{"now"}</b>{t("x")}{"§"}</p>;`;
     expect(hardcodedText("sample.tsx", sample)).toEqual(['title="Hello"', "Save", '{"now"}']);
+  });
+
+  it("the hardcoded-text check finds text in conditionals, && and template literals inside JSX (step 13 review, G02)", () => {
+    const sample = [
+      "const a = (",
+      '  <p aria-label={open ? "Close menu" : t("x")}>',
+      '    {signingOut ? "Signing out" : t("shell.signOut")}',
+      '    {failed && "Failed"}',
+      '    {name ?? "Unknown"}',
+      "    {`${count} items`}",
+      '    {["One", t("two")]}',
+      "  </p>",
+      ");",
+    ].join("\n");
+    expect(hardcodedText("sample.tsx", sample)).toEqual([
+      '{"Close menu"}',
+      '{"Signing out"}',
+      '{"Failed"}',
+      '{"Unknown"}',
+      "{`${count} items`}",
+      '{"One"}',
+    ]);
+  });
+
+  it("the hardcoded-text check leaves keys, conditions, comparisons and non-text attributes alone", () => {
+    const sample = [
+      "const a = (",
+      '  <p className={busy ? "opacity-50" : "block"} id={`row-${id}`} href={"/products"}>',
+      '    {status === "draft" ? t("products.draft") : null}',
+      '    {t(busy ? "shell.signingOut" : "shell.signOut", { name: "x" })}',
+      "    {`${a} – ${b}`}",
+      '    {"§"}',
+      "  </p>",
+      ");",
+    ].join("\n");
+    expect(hardcodedText("sample.tsx", sample)).toEqual([]);
   });
 
   it("never sets raw HTML (dangerouslySetInnerHTML)", () => {
