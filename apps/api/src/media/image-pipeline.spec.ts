@@ -279,6 +279,14 @@ describe("the image pipeline (real sharp, ADR 0028 decisions 3 and 10)", () => {
         reason: "processing_timeout",
       });
     });
+
+    it("answers a timeout only after libvips has stopped, so the caller's slot and temp files stay held (review L-4)", async () => {
+      const input = await solidPng(6000, 6000);
+      const result = await run(input, LIMITS, 1);
+      expect(result).toEqual({ ok: false, reason: "processing_timeout" });
+      // sharp counts its tasks in libvips; none may outlive the answer (the caller releases its slot on it).
+      expect(sharp.counters()).toEqual({ queue: 0, process: 0 });
+    });
   });
 });
 

@@ -550,7 +550,24 @@ describe("upload limits that need their own app", () => {
   it("refuses an image that does not finish within the processing budget: 400 processing_timeout", async () => {
     const media = await startMediaApp({ mediaTuning: { processingBudgetMs: 1 } });
     apps.push(media);
-    const result = await upload<ProblemBody>(media.baseUrl, await images.solidPng(3000, 3000));
+    const slots = media.app.get(ProcessingSlots);
+    const input = await images.solidPng(6000, 6000);
+    // Review L-4: libvips keeps working after the budget until its own timeout or the end; the slot must stay held until
+    // it has stopped, or more decodes than slots could run at once. Sampled until libvips is idle again.
+    const unheld: string[] = [];
+    const sampler = setInterval(() => {
+      const { queue, process } = sharp.counters();
+      if (queue + process > slots.inUse)
+        unheld.push(`${queue + process} tasks, ${slots.inUse} slots`);
+    }, 1);
+    let result: Answer<ProblemBody>;
+    try {
+      result = await upload<ProblemBody>(media.baseUrl, input);
+      await vi.waitFor(() => expect(sharp.counters()).toEqual({ queue: 0, process: 0 }));
+    } finally {
+      clearInterval(sampler);
+    }
+    expect(unheld).toEqual([]);
     expect(result.status).toBe(400);
     expect(result.body.errors).toEqual([expect.objectContaining({ code: "processing_timeout" })]);
     await vi.waitFor(async () => {
