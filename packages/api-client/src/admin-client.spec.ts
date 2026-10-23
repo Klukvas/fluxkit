@@ -10,7 +10,12 @@ import {
   type AdminOperationName,
   type AdminResult,
 } from "./index.js";
-import type { AdminConfig, AdminProduct, AdminProductList } from "./admin-types.js";
+import type {
+  AdminConfig,
+  AdminMediaUpload,
+  AdminProduct,
+  AdminProductList,
+} from "./admin-types.js";
 
 interface Recorded {
   url: string;
@@ -52,6 +57,8 @@ const operations = Object.entries(ADMIN_OPERATIONS) as [
   (typeof ADMIN_OPERATIONS)[AdminOperationName],
 ][];
 
+const UPLOAD_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+
 type LooseClient = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
 /** Calls the client function of `name` with one path value per `{placeholder}` and, when needed, an empty body. */
@@ -59,7 +66,8 @@ function callOperation(client: AdminClient, name: AdminOperationName, body: unkn
   const spec = ADMIN_OPERATIONS[name];
   const placeholders = [...spec.path.matchAll(/\{(\w+)\}/g)].length;
   const args: unknown[] = Array.from({ length: placeholders }, (_unused, index) => `p${index + 1}`);
-  if (spec.hasBody) args.push(body);
+  if (spec.bodyKind === "binary") args.push(UPLOAD_BYTES);
+  else if (spec.hasBody) args.push(body);
   const fn = (client as unknown as LooseClient)[name];
   if (fn === undefined) throw new Error(`The client has no function ${name}`);
   return fn(...args);
@@ -122,15 +130,21 @@ describe.each(operations)("%s", (name, spec) => {
   );
 
   it(
-    spec.hasBody
+    spec.bodyKind === "json"
       ? "sends the JSON body with a JSON content type"
-      : "sends no body and no content type",
+      : spec.bodyKind === "binary"
+        ? "sends the bytes untouched with an octet-stream content type"
+        : "sends no body and no content type",
     async () => {
       const body = { marker: name };
       const { fetch, calls } = fakeFetch(() => okFor(name));
       await callOperation(createAdminClient({ baseUrl: BASE, fetch }), name, body);
       const call = calls[0];
-      if (spec.hasBody) {
+      if (spec.bodyKind === "binary") {
+        expect(call?.init.headers.get("Content-Type")).toBe("application/octet-stream");
+        expect(call?.init.body).toBe(UPLOAD_BYTES);
+        expect(call?.init.headers.has("Content-Length")).toBe(false);
+      } else if (spec.bodyKind === "json") {
         expect(call?.init.headers.get("Content-Type")).toBe("application/json");
         expect(JSON.parse(String(call?.init.body))).toEqual(body);
       } else {
@@ -160,6 +174,84 @@ describe.each(operations)("%s", (name, spec) => {
     )) as AdminResult<unknown>;
     expect(result).toMatchObject({ ok: false, status: 503, retryAfter: "3" });
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("uploadMedia", () => {
+  const stored = {
+    id: "3f0e9d52-6d60-4d57-9d3e-0e0d6c0a9d11",
+    url: "/media/0123456789abcdef0123456789abcdef.jpg",
+    contentType: "image/jpeg",
+    byteSize: 1234,
+    width: 640,
+    height: 480,
+    createdAt: "2026-10-23T10:00:00.000Z",
+  };
+  const client = (response: () => Response) => {
+    const { fetch, calls } = fakeFetch(response);
+    return { calls, admin: createAdminClient({ baseUrl: BASE, fetch }) };
+  };
+
+  it("posts the file bytes to /admin/media/uploads and returns the typed upload", async () => {
+    const { admin, calls } = client(() => jsonOk(stored, 201));
+    const blob = new Blob([UPLOAD_BYTES], { type: "image/jpeg" });
+    const result = await admin.uploadMedia(blob);
+    expect(result).toMatchObject({ ok: true, status: 201, data: stored });
+    if (result.ok) expectTypeOf(result.data).toEqualTypeOf<AdminMediaUpload>();
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(`${BASE}/admin/media/uploads`);
+    expect(calls[0]?.init.method).toBe("POST");
+    expect(calls[0]?.init.body).toBe(blob);
+    // the blob's own type (image/jpeg) is not what goes on the wire
+    expect(calls[0]?.init.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(calls[0]?.init.headers.get(CSRF_HEADER)).toBe("1");
+  });
+
+  it("passes the abort signal so the caller can cancel, and reports an abort as NetworkError.aborted", async () => {
+    const controller = new AbortController();
+    const { fetch, calls } = fakeFetch(() => {
+      throw new DOMException("aborted", "AbortError");
+    });
+    const admin = createAdminClient({ baseUrl: BASE, fetch });
+    controller.abort();
+    const error = await admin
+      .uploadMedia(UPLOAD_BYTES, { signal: controller.signal })
+      .catch((cause: unknown) => cause);
+    expect(calls[0]?.init.signal).toBe(controller.signal);
+    expect(error).toBeInstanceOf(NetworkError);
+    expect((error as NetworkError).aborted).toBe(true);
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each([
+    [400, "validation_failed", "unsupported_type"],
+    [411, "validation_failed", "length_required"],
+    [413, "validation_failed", "file_too_large"],
+    [503, "storage_unavailable", undefined],
+    [503, "uploads_disabled", undefined],
+  ] as const)("%i %s is a value, never retried", async (status, code, reason) => {
+    const { admin, calls } = client(() =>
+      problemResponse(status, {
+        code,
+        ...(reason === undefined ? {} : { errors: [{ path: "body", code: reason }] }),
+      }),
+    );
+    const result = await admin.uploadMedia(UPLOAD_BYTES);
+    expect(result).toMatchObject({ ok: false, status });
+    if (result.ok) throw new Error("expected a problem");
+    expect(result.problem.code).toBe(code);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("rejects anything that is not bytes before a request is made", async () => {
+    const { admin, calls } = client(() => jsonOk(stored, 201));
+    const loose = admin as unknown as LooseClient;
+    for (const notBytes of [{ not: "bytes" }, "text", undefined, null, 42]) {
+      await expect(loose.uploadMedia?.(notBytes), String(notBytes)).rejects.toThrow(
+        InvalidRequestError,
+      );
+    }
+    expect(calls).toHaveLength(0);
   });
 });
 

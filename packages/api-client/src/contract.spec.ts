@@ -365,6 +365,8 @@ const problemDetails: Shape<ProblemDetails> = {
         "idempotency_key_reused",
         "too_many_open_orders",
         "service_unavailable",
+        "storage_unavailable",
+        "uploads_disabled",
       ],
     },
     detail: "string",

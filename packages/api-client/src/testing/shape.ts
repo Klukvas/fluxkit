@@ -61,6 +61,8 @@ export type ShapeNode =
 
 export interface OpenApiSchema {
   type?: string;
+  /** `binary` on a `string` schema marks raw bytes. */
+  format?: string;
   nullable?: boolean;
   enum?: readonly string[];
   properties?: Record<string, OpenApiSchema>;

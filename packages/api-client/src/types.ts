@@ -47,7 +47,11 @@ export type ProblemCode =
   | "checkout_refused"
   | "idempotency_key_reused"
   | "too_many_open_orders"
-  | "service_unavailable";
+  | "service_unavailable"
+  /** The media file could not be written (disk full, quota, unwritable directory); try again later. */
+  | "storage_unavailable"
+  /** `MEDIA_STORAGE_DRIVER=none`: uploads are switched off; enter image URLs instead. */
+  | "uploads_disabled";
 
 /** The `application/problem+json` body of every error answer. */
 export interface ProblemDetails {

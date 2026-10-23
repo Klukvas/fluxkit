@@ -19,6 +19,7 @@ import type {
   AdminLoginBody,
   AdminLoginResult,
   AdminMe,
+  AdminMediaUpload,
   AdminOption,
   AdminOptionList,
   AdminOptionValue,
@@ -78,6 +79,8 @@ import type {
   UpdateAdminUserBody,
   UpdateAdminVariantBody,
 } from "./admin-types.js";
+import { InvalidRequestError } from "./errors.js";
+import { BINARY_CONTENT_TYPE, type RawBytes } from "./request.js";
 import type { StoreResult } from "./response.js";
 import { createTransport, type CallOptions, type CallParts, type FetchLike } from "./transport.js";
 import type { OrderStatus } from "./types.js";
@@ -159,6 +162,15 @@ export interface AdminClient {
 
   // config
   getConfig(options?: CallOptions): Result<AdminConfig>;
+
+  // media
+  /**
+   * Uploads one image: the bytes go out as `application/octet-stream` whatever the `Blob`'s own type says, and the
+   * server decides the real type by content. The answer carries the `url` to put into a media list or a brand logo.
+   * Never retried (an upload is not idempotent; a lost answer leaves one unattached file the server cleans up).
+   * `fetch` reports no upload progress, so there is none here: pass `signal` to cancel. `Content-Length` is set by `fetch`.
+   */
+  uploadMedia(bytes: RawBytes, options?: CallOptions): Result<AdminMediaUpload>;
 
   // customers
   listCustomers(options?: AdminListCustomersOptions): Result<AdminCustomerList>;
@@ -386,7 +398,7 @@ export interface AdminClient {
 /**
  * The admin API client. It shares the request builder and the response parser with the store client, so the same
  * rules hold: `X-Fluxkit-CSRF: 1` on every request that is not GET or HEAD (the sign-in included), a JSON content
- * type exactly when there is a body, `credentials: "same-origin"`, one `fetch` per call and never a retry or a replay.
+ * type exactly when there is a JSON body (the upload sends raw bytes as `application/octet-stream`), `credentials: "same-origin"`, one `fetch` per call and never a retry or a replay.
  */
 export function createAdminClient(options: AdminClientOptions): AdminClient {
   const send = createTransport(options);
@@ -409,6 +421,18 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("resetUserPassword", { pathParams: { id }, body, options: opts }),
 
     getConfig: (opts) => call("getConfig", { options: opts }),
+
+    uploadMedia: async (bytes, opts) => {
+      const isBytes =
+        bytes instanceof Blob || bytes instanceof ArrayBuffer || bytes instanceof Uint8Array;
+      if (!isBytes) {
+        throw new InvalidRequestError("uploadMedia takes a Blob, an ArrayBuffer or a Uint8Array.");
+      }
+      return call<AdminMediaUpload>("uploadMedia", {
+        rawBody: { bytes, contentType: BINARY_CONTENT_TYPE },
+        options: opts,
+      });
+    },
 
     listCustomers: (opts) => call("listCustomers", { options: opts }),
     getCustomer: (id, opts) => call("getCustomer", { pathParams: { id }, options: opts }),

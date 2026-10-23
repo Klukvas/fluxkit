@@ -26,6 +26,7 @@ import type {
   AdminLocationList,
   AdminLoginResult,
   AdminMe,
+  AdminMediaUpload,
   AdminOption,
   AdminOptionList,
   AdminOptionValue,
@@ -166,6 +167,25 @@ const config: Shape<AdminConfig> = {
     supportedCurrencies: { array: { object: { code: "string", exponent: "integer" } } },
     pricesIncludeTax: "boolean",
     lowStockThreshold: "integer",
+    media: {
+      object: {
+        uploadsEnabled: "boolean",
+        maxBytes: "integer",
+        contentTypes: { array: "string" },
+      },
+    },
+  },
+};
+
+const mediaUpload: Shape<AdminMediaUpload> = {
+  object: {
+    id: "string",
+    url: "string",
+    contentType: { enum: ["image/jpeg", "image/png", "image/webp"] },
+    byteSize: "integer",
+    width: "integer",
+    height: "integer",
+    createdAt: "string",
   },
 };
 
@@ -813,16 +833,25 @@ type Placeholders<P extends string> = P extends `${string}{${string}}${infer Res
   ? [string, ...Placeholders<Rest>]
   : [];
 
-/** The body parameter of the client function, or `null` for an operation without a body. */
-type BodyOf<N extends AdminOperationName> = (typeof ADMIN_OPERATIONS)[N]["hasBody"] extends true
-  ? Parameters<AdminClient[N]> extends [
-      ...Placeholders<(typeof ADMIN_OPERATIONS)[N]["path"]>,
-      infer B,
-      ...unknown[],
-    ]
-    ? B
-    : never
-  : null;
+/** The JSON body parameter of the client function; `never` for an operation whose body is not JSON. */
+type JsonBodyOf<N extends AdminOperationName> =
+  (typeof ADMIN_OPERATIONS)[N]["bodyKind"] extends "json"
+    ? Parameters<AdminClient[N]> extends [
+        ...Placeholders<(typeof ADMIN_OPERATIONS)[N]["path"]>,
+        infer B,
+        ...unknown[],
+      ]
+      ? B
+      : never
+    : never;
+
+/** `null` without a body, `"binary"` for raw bytes (checked against the `string`/`binary` schema), a `Shape` for JSON. */
+type RequestShapeOf<N extends AdminOperationName> =
+  (typeof ADMIN_OPERATIONS)[N]["bodyKind"] extends "none"
+    ? null
+    : (typeof ADMIN_OPERATIONS)[N]["bodyKind"] extends "binary"
+      ? "binary"
+      : Shape<JsonBodyOf<N>>;
 
 const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
   login: loginResult,
@@ -835,6 +864,7 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
   updateUser: adminUser,
   resetUserPassword: "none",
   getConfig: config,
+  uploadMedia: mediaUpload,
   listCustomers: customerList,
   getCustomer: customer,
   updateCustomer: customer,
@@ -913,9 +943,7 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
 };
 
 /** Request body per operation, typed by the body parameter of the client function; `null` where there is none. */
-const REQUEST_SHAPES: {
-  [N in AdminOperationName]: BodyOf<N> extends null ? null : Shape<BodyOf<N>>;
-} = {
+const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   login: body.login,
   logout: null,
   getMe: null,
@@ -926,6 +954,7 @@ const REQUEST_SHAPES: {
   updateUser: body.updateUser,
   resetUserPassword: body.resetUserPassword,
   getConfig: null,
+  uploadMedia: "binary",
   listCustomers: null,
   getCustomer: null,
   updateCustomer: body.updateCustomer,
@@ -1052,6 +1081,19 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
     expect(documented.length).toBeGreaterThan(0);
   });
 
+  it("only the media upload takes raw bytes, with catalog.write; every other body is JSON", () => {
+    const binary = names.filter((name) => ADMIN_OPERATIONS[name].bodyKind === "binary");
+    expect(binary).toEqual(["uploadMedia"]);
+    expect(ADMIN_OPERATIONS.uploadMedia).toMatchObject({
+      method: "POST",
+      path: "/admin/media/uploads",
+      successStatuses: [201],
+      permission: "catalog.write",
+      hasBody: true,
+      bodyKind: "binary",
+    });
+  });
+
   it("shares no operation with the store table and lists no store route", () => {
     const store = new Set(Object.values(OPERATIONS).map((s) => `${s.method} ${s.path}`));
     for (const name of names) {
@@ -1102,9 +1144,13 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
     expect(operation["x-fluxkit-permission"]).toBe(spec.permission);
     expect(KNOWN_PERMISSIONS).toContain(spec.permission);
 
-    expect(operation.requestBody !== undefined).toBe(spec.hasBody);
+    expect(operation.requestBody !== undefined).toBe(spec.bodyKind !== "none");
+    expect(spec.hasBody).toBe(spec.bodyKind !== "none");
     if (operation.requestBody !== undefined) {
-      expect(Object.keys(operation.requestBody.content)).toEqual(["application/json"]);
+      expect(Object.keys(operation.requestBody.content)).toEqual([
+        spec.bodyKind === "binary" ? "application/octet-stream" : "application/json",
+      ]);
+      expect(operation.requestBody.required).toBe(true);
     }
 
     for (const [status, response] of Object.entries(operation.responses)) {
@@ -1133,9 +1179,13 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
       expect(schema, `${name} ${status} schema`).toBeDefined();
       if (schema !== undefined) expect(compareShape(shape, schema, document)).toEqual([]);
     }
-    const bodyShape = REQUEST_SHAPES[name] as ShapeNode | null;
+    const bodyShape = REQUEST_SHAPES[name] as ShapeNode | "binary" | null;
     if (bodyShape === null) {
       expect(operation.requestBody).toBeUndefined();
+    } else if (bodyShape === "binary") {
+      expect(spec.bodyKind).toBe("binary");
+      const schema = operation.requestBody?.content["application/octet-stream"]?.schema;
+      expect(schema).toMatchObject({ type: "string", format: "binary" });
     } else {
       const schema = operation.requestBody?.content["application/json"]?.schema;
       expect(schema).toBeDefined();
