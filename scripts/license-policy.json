@@ -6,12 +6,12 @@
     {
       "package": "@img/sharp-libvips-linux-x64",
       "license": "LGPL-3.0-or-later",
-      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp)"
+      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp); owner 2026-10-23: also sharp in apps/api, ADR 0028"
     },
     {
       "package": "@img/sharp-libvips-linuxmusl-x64",
       "license": "LGPL-3.0-or-later",
-      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp)"
+      "reason": "owner 2026-10-14: unmodified dynamically loaded binaries (next -> sharp); owner 2026-10-23: also sharp in apps/api, ADR 0028"
     },
     {
       "package": "caniuse-lite",
