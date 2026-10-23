@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, sql, type AnyColumn } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, sql, type AnyColumn } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../common/transaction.js";
-import { domainEvent, salesOrder } from "../database/schema/index.js";
+import { domainEvent, mediaUpload, salesOrder } from "../database/schema/index.js";
 
 /** Where the previous page of a keyset scan ended. `createdAt`/`expiresAt` are UTC text with microseconds (see `micros`). */
 export interface TimeCursor {
@@ -112,6 +112,48 @@ export class JobsRepository {
       delete from customer_session where id in (select id from doomed) returning id
     `);
     return result.rows.length;
+  }
+
+  /**
+   * One page of abandoned uploads, oldest first: never attached and created strictly before `cutoff`. The rows are
+   * locked (`FOR UPDATE SKIP LOCKED`), so a save that is attaching one right now keeps it (its lock is not waited for)
+   * and nobody can attach a page row until the caller's transaction ends. Uses `media_upload_created_at_unattached_idx`.
+   */
+  async lockAbandonedUploadIds(db: DbExecutor, cutoff: Date, limit: number): Promise<string[]> {
+    const rows = await db
+      .select({ id: mediaUpload.id })
+      .from(mediaUpload)
+      .where(and(isNull(mediaUpload.firstAttachedAt), lt(mediaUpload.createdAt, cutoff)))
+      .orderBy(asc(mediaUpload.createdAt), asc(mediaUpload.id))
+      .limit(limit)
+      .for("update", { skipLocked: true });
+    return rows.map((row) => row.id);
+  }
+
+  /**
+   * Deletes the given uploads and returns their storage keys, but only the ones that are STILL never attached and older
+   * than `cutoff`: the predicate is repeated here on purpose, so the statement is safe whatever the ids were chosen
+   * from (ADR 0028 decision 7: an attached upload is never deleted). The caller deletes the files after it commits.
+   */
+  async deleteAbandonedUploadsByIds(
+    db: DbExecutor,
+    ids: readonly string[],
+    cutoff: Date,
+  ): Promise<string[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+    const rows = await db
+      .delete(mediaUpload)
+      .where(
+        and(
+          inArray(mediaUpload.id, [...ids]),
+          isNull(mediaUpload.firstAttachedAt),
+          lt(mediaUpload.createdAt, cutoff),
+        ),
+      )
+      .returning({ storageKey: mediaUpload.storageKey });
+    return rows.map((row) => row.storageKey);
   }
 
   /**

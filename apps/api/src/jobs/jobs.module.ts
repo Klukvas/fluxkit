@@ -19,7 +19,7 @@ export interface JobsModuleOptions {
 
 /**
  * The scheduler (plan step 5c, ADR 0018): order expiry, the reservation sweep, domain event dispatch and the cart,
- * session and event cleanups, run by an in-process timer under a Postgres advisory lock and by `pnpm jobs:run-once`.
+ * session, event and abandoned upload cleanups, run by an in-process timer under a Postgres advisory lock and by `pnpm jobs:run-once`.
  * Core, no feature flag, no HTTP route. Needs the globals of `DatabaseModule`, `AuthModule` (clock) and `OrdersModule`.
  */
 @Module({})

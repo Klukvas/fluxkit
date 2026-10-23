@@ -74,7 +74,7 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     await pool.end();
   });
 
-  it("runs the six jobs in the documented order and reports each", async () => {
+  it("runs the seven jobs in the documented order and reports each", async () => {
     const reports = await runner.runAll(START);
     expect(reports.map((report) => report.name)).toEqual([...JOB_NAMES]);
     expect(JOB_NAMES).toEqual([
@@ -84,6 +84,7 @@ describe("JobsRunner (real Postgres, injected time)", () => {
       "delete-dispatched-events",
       "delete-carts",
       "delete-customer-sessions",
+      "delete-abandoned-uploads",
     ]);
     expect(reports.every((report) => report.ok)).toBe(true);
   });
@@ -140,7 +141,7 @@ describe("JobsRunner (real Postgres, injected time)", () => {
     const reports = await runner.runAll(START);
     const failed = reports.filter((report) => !report.ok);
     expect(failed.map((report) => report.name)).toEqual(["delete-carts"]);
-    expect(reports.filter((report) => report.ok)).toHaveLength(5);
+    expect(reports.filter((report) => report.ok)).toHaveLength(JOB_NAMES.length - 1);
     const logged = lines(errors).join("\n");
     expect(logged).toContain("Job delete-carts failed: TypeError cause=TypeError");
     expect(logged).not.toContain("buyer@example.test");
