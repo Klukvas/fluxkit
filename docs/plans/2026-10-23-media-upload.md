@@ -232,7 +232,7 @@ Media are part of the catalog (core in AGENTS.md section 2.1), and a storage pro
 | 1 | ADR 0028 "Media upload and storage" (decisions of this plan after the quiz), ADR index. Status 2026-10-23: written on `chore/adr-0028-media` (`docs/adr/0028-media-upload-and-storage.md`), PR not opened | Architect | `docs/adr/` | docs checks | Owner |
 | 2 | Dependency: `sharp` 0.35.5 exact in `apps/api` (if Q1/Q2 choose it); `docs/dependencies.md` record; owner's licence-policy change (`license-policy.json` reasons, AGENTS.md section 16 text: the owner's file) | Developer Sonnet + owner | `apps/api/package.json`, lockfile, `docs/dependencies.md`, `scripts/license-policy.json` | `pnpm install --frozen-lockfile`, `check:licenses`, `audit:prod`, `notices` | Owner: dependency and licence (red zone) |
 | 3 | Core: `packages/core/src/media/` (sniffing, limits, key, reasons, `MediaStoragePort` + token), tests first; config: `loadEnv` variables, `.env.example`, `docs/contracts/config.md`, `docs/files/core.md`, `docs/files/config.md` | Developer Sonnet (high) | `packages/core/src/media/`, `packages/config/src/` | unit tests failing first, then passing (evidence in the PR). Status 2026-10-23: written on `feature/media-core` (tests red first, then green; 20 mutation checks killed), PR not opened | Owner: config contract (red zone) |
-| 4 | API: migration 0005 + down + schema tests; `MediaModule` (local driver, pipeline, upload route, read route, CSRF exception, rate limit, semaphore), admin config block, attach marking in media and brand saves, OpenAPI, `docs/api/media.md`, `docs/api/catalog.md`, `docs/contracts/api.md`, `CHANGELOG.md`; memory measured | Developer Opus 5.5 (migration, auth, security) | `apps/api/src/media/`, `apps/api/src/auth/csrf.ts`, `admin.guard.ts`, `apps/api/src/rate-limit/`, `apps/api/src/catalog/admin/{products,brands}/`, `apps/api/src/admin-config/`, `apps/api/drizzle/`, `docs/api/` | full check set incl. `db:drift`, `openapi:export`; up, down, up, down | Owner: schema, API contract, CSRF/auth change (red zone) |
+| 4 | API: migration 0005 + down + schema tests; `MediaModule` (local driver, pipeline, upload route, read route, CSRF exception, rate limit, semaphore), admin config block, attach marking in media and brand saves, OpenAPI, `docs/api/media.md`, `docs/api/catalog.md`, `docs/contracts/api.md`, `CHANGELOG.md`; memory measured | Developer Opus 5.5 (migration, auth, security) | `apps/api/src/media/`, `apps/api/src/auth/csrf.ts`, `admin.guard.ts`, `apps/api/src/rate-limit/`, `apps/api/src/catalog/admin/{products,brands}/`, `apps/api/src/admin-config/`, `apps/api/drizzle/`, `docs/api/` | full check set incl. `db:drift`, `openapi:export`; up, down, up, down. Status 2026-10-23: written on `feature/media-api` (tests first for the gate, pipeline, CSRF and attach marking; 25 mutation checks killed; see "Step 4 outcome"), PR not opened | Owner: schema, API contract, CSRF/auth change (red zone) |
 | 5 | Cleanup job 7 `delete-abandoned-uploads`, `docs/api/jobs.md` | Developer Sonnet | `apps/api/src/jobs/`, `apps/api/src/media/` | job specs incl. the race | in plan |
 | 6 | api-client: binary body, `uploadMedia`, admin types, contract test | Developer Sonnet | `packages/api-client/` | unit + contract tests | in plan |
 | 7 | Admin UI: Media tab and brand logo upload, queue model, problem map, messages, specs | Developer Sonnet | `apps/admin/src/areas/products/`, `.../catalog-dictionaries/`, `apps/admin/src/lib/`, `apps/admin/src/messages/` | Vitest, bundle budget, manual run | in plan |
@@ -240,6 +240,33 @@ Media are part of the catalog (core in AGENTS.md section 2.1), and a storage pro
 | 9 | Independent review (different model than the authors): CSRF exception, gate, pipeline, headers, race, admin flow; the mutation checks above | Reviewer Opus 5.5 or Codex | read-only, findings file | mutation results | fixes before close |
 
 Order: `0 -> 1 -> 2 -> 3 -> 4 -> (5 || 6) -> 7 -> 8 -> 9`. Steps 5 and 6 touch disjoint paths.
+
+## Step 4 outcome (2026-10-23, `feature/media-api`)
+
+Decisions taken where the plan and ADR 0028 were silent (the owner may revisit):
+- **Body parser order**: Express' JSON parser runs before the guards, so a malformed JSON body sent to the upload route is answered `400` by the parser; a well-formed JSON body reaches the guard and is `403`. No body parser reads `application/octet-stream`.
+- **Early refusals close the connection**: `411`, `413` (declared or counted) and `503 uploads_disabled` set `Connection: close`, so Node does not read an unread body to its end. `401`/`403` from the guards keep the existing behaviour (Node discards the body).
+- **A body that ends early** (the client went away) is `400 validation_failed` without `errors[]` (no new reason code; nobody reads the answer).
+- **Insert failure after the file was stored**: the file is removed and the database error is answered as usual (a missing creator maps to `409 in_use` through the existing foreign-key mapping).
+- **Read route**: `ETag` is the quoted key (`"<key>"`); a matching `If-None-Match` answers `304`; every path under `/media/` that is not exactly `/media/<key>` (raw, not decoded) is `404` with `no-store`.
+- **Attach marking** compares the parsed origin (host case, default port) and the path prefix without case (Express routes are case-insensitive); a URL under the prefix with a query, fragment, credentials or a decorated key is `upload_not_found`. Without a `MEDIA_PUBLIC_BASE_URL` nothing is checked.
+- **Development default directory**: with `MEDIA_DIR` unset outside production, the API and `pnpm jobs:run-once` create `<repo>/var/media` (0750) at start, so a fresh checkout, the e2e suites and the feature matrix keep starting without a setup step; a set `MEDIA_DIR` (always in production) must exist, as ADR 0028 decision 8 says.
+- **Processing budget** stays 30 s: the measured worst cases below take 1 to 3.5 s on one core, so 30 s leaves room for slow hosts.
+- `MEDIA_STORAGE_DRIVER=local` without `MEDIA_DIR` or `MEDIA_PUBLIC_BASE_URL` cannot happen through `loadEnv`; `MediaModule` still refuses to start then.
+
+Memory (peak RSS of one Node process running only the pipeline, `process.resourceUsage().maxRSS`, sharp 0.35.5, linux-x64, sandbox; Node with sharp loaded starts at about 75 MB):
+
+| Input | Output | Time | Peak RSS |
+|---|---|---|---|
+| JPEG 8 000 x 6 250 (50 MP), 14 MB (above the 10 MiB limit, pipeline only) | 4 096 x 3 200 JPEG, 3.7 MB | 1.2 s | 202 MB |
+| JPEG 50 MP, 2.4 MB | 4 096 x 3 200, 1.3 MB | 0.8 s | 187 MB |
+| PNG 7 071 x 7 071 noise (49.99 MP), 158 MB (pipeline only) | 4 096 x 4 096 PNG, 46 MB | 1.6 s | 151 MB |
+| PNG 7 071 x 7 071 of 8 px blocks, 4.2 MB | 4 096 x 4 096 PNG, 50 MB (re-encoded output is not size-capped) | 1.5 s | 157 MB |
+| WebP 7 000 x 7 000 (49 MP), 3.8 MB | 4 096 x 4 096 WebP, 1.4 MB | 2.8 s | 302 MB |
+| two of that WebP at once (both slots) | | 3.5 s | 523 MB |
+| 50 MP JPEG and the 4.2 MB PNG at once | | 1.6 s | 265 MB |
+
+So the "about 512 MB headroom" of ADR 0028 holds: the worst measured case (two near-limit WebP uploads at once) adds about 450 MB to the process. Note: a 4 MB upload can be stored as a 50 MB PNG.
 
 ## Risks
 - **Decoder vulnerabilities in libvips and its codecs** reachable by any `catalog.write` admin. Mitigation: allow-list before decode, exact pin, Dependabot, audit. A sandboxed worker process (or a separate image service) is the later hardening.

@@ -20,7 +20,7 @@ No feature flag: the catalog is core.
 |---|---|---|
 | `validation_failed` | 400 | malformed body or query, unknown field (`unknown_field`), value rejected by a core rule (`errors[]` carries the core reason as `code`), missing reference (`invalid_reference`), publish preconditions not met |
 | `unauthorized` | 401 | no valid session: missing, malformed, unknown or expired cookie, or a deactivated user |
-| `forbidden` | 403 | signed in but the role lacks the route's permission (the detail names it), or a state-changing admin request lacks `X-Fluxkit-CSRF: 1` or, with a body, `Content-Type: application/json` |
+| `forbidden` | 403 | signed in but the role lacks the route's permission (the detail names it), or a state-changing admin request lacks `X-Fluxkit-CSRF: 1` or, with a body, `Content-Type: application/json` (`application/octet-stream` on `POST /admin/media/uploads`, the one exception, `docs/api/media.md`) |
 | `not_found` | 404 | unknown id or slug, or an unknown route |
 | `conflict` | 409 | unique value taken (`field` when the constraint is one column; `constraint` name); also after SKU or slug allocation retries are exhausted |
 | `in_use` | 409 | a referenced row still exists (database RESTRICT), or a category with children or products is deleted |
@@ -28,6 +28,8 @@ No feature flag: the catalog is core.
 | `rule_violation` | 409 | a core rule refuses the change; `rule` is the core reason code (for example `options_frozen`, `product_type_in_use`, `last_variant`) |
 | `too_many_requests` | 429 | too many login attempts from one client address (`POST /admin/auth/login`); `Retry-After` carries the seconds to wait |
 | `internal_error` | 500 | unexpected failure; the detail is generic |
+| `storage_unavailable` | 503 | an upload could not be written (`docs/api/media.md`) |
+| `uploads_disabled` | 503 | uploads are switched off, `MEDIA_STORAGE_DRIVER=none` (`docs/api/media.md`) |
 
 - Field error `code` values come from the request schema (`required`, `invalid_type`, `unknown_field`, `too_small`, `too_big`, `invalid_format`, `invalid_value`) or from core (for example `title_invalid`, `default_locale_missing`, `slug_missing`, `default_variant_inactive`).
 - Free-text fields that are not i18n maps (`barcode`, `logoUrl`, media `url`, attribute `unit`, a client-sent `sku`) answer `400 validation_failed` for a NUL character or an unpaired UTF-16 surrogate, like i18n texts and text attribute values do. An attribute value of the wrong type, however deeply nested, answers `400 invalid_type` for that attribute.
@@ -114,10 +116,10 @@ A product type defines which attributes and options a product of that type may h
 
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
-| `POST /admin/brands` | admin | Create a brand | body: `name` (i18n), optional `description` (i18n), `logoUrl` (http or https, max 2048), `slug` (generated from the default-locale name when omitted) | 201 brand, `Location` | 400, 409 (`conflict` on `slug`) | - |
+| `POST /admin/brands` | admin | Create a brand | body: `name` (i18n), optional `description` (i18n), `logoUrl` (http or https, max 2048; under `MEDIA_PUBLIC_BASE_URL` it must name an upload, which is then marked attached, `docs/api/media.md`), `slug` (generated from the default-locale name when omitted) | 201 brand, `Location` | 400 (`upload_not_found` at `logoUrl`), 409 (`conflict` on `slug`) | - |
 | `GET /admin/brands` | admin | List brands, ordered by slug | `limit`, `offset` | 200 page of brands | 400 | - |
 | `GET /admin/brands/{id}` | admin | Get a brand | path `id` | 200 brand | 400, 404 | - |
-| `PATCH /admin/brands/{id}` | admin | Change a brand | body: `name`, `description` (nullable), `logoUrl` (nullable), `slug` | 200 brand | 400, 404, 409 (`conflict` on `slug`) | - |
+| `PATCH /admin/brands/{id}` | admin | Change a brand | body: `name`, `description` (nullable), `logoUrl` (nullable; an uploaded URL as for create), `slug` | 200 brand | 400 (`upload_not_found` at `logoUrl`), 404, 409 (`conflict` on `slug`) | - |
 | `DELETE /admin/brands/{id}` | admin | Delete a brand that no product uses | path `id` | 204 | 400, 404, 409 (`in_use`) | - |
 
 ## Categories
@@ -149,7 +151,7 @@ A product (catalog entity) has one or more variants; a simple product has one de
 | `POST /admin/products/{id}/archive` | admin | Archive a draft or active product (soft delete) | path `id` | 200 product detail | 400, 404, 409 (`invalid_transition`) | - |
 | `POST /admin/products/{id}/restore` | admin | Restore an archived product as a draft; publishing again runs the preconditions again | path `id` | 200 product detail | 400, 404, 409 (`invalid_transition`) | - |
 | `PUT /admin/products/{id}/categories` | admin | Replace the categories of a product; exactly one assignment is primary | body: `categories` (list of `{categoryId, position?}`, max 100), optional `primaryCategoryId` (must be in the list) | 200 product detail | 400 (`invalid_reference` on a category), 404 | - |
-| `PUT /admin/products/{id}/media` | admin | Replace the media list of a product | body: `media` (list of `{url, alt?, position?, optionId?, optionValueId?}`, max 100; `optionId` and `optionValueId` come together) | 200 product detail | 400 (`option_pair_incomplete` and other field errors), 404 | - |
+| `PUT /admin/products/{id}/media` | admin | Replace the media list of a product | body: `media` (list of `{url, alt?, position?, optionId?, optionValueId?}`, max 100; `optionId` and `optionValueId` come together). A `url` under `MEDIA_PUBLIC_BASE_URL` must be `<prefix>/<key>` of an existing upload (`POST /admin/media/uploads`); those uploads are marked attached in the same transaction (`docs/api/media.md`) | 200 product detail | 400 (`option_pair_incomplete`, `upload_not_found` at `media.N.url` and other field errors), 404 | - |
 
 `q` on `GET /admin/products`: the start of a slug or an exact SKU of any variant of the product (`slug LIKE 'text%'` or `variant.sku = 'TEXT'`), never a title or a substring (text search belongs to the search index, AGENTS.md section 2.3). The text is trimmed; case does not matter (slugs are lower case, SKUs are normalized to upper case like on write). `%`, `_` and `\` are plain characters. A product that matches both ways is listed once; the list keeps its two statements (page and count). The SKU arm uses the unique index of `variant.sku`; the slug arm is a scan of the `product` table until an optional `text_pattern_ops` index on `product.slug` is approved (a migration), so keep it in mind for catalogs of many thousands of products.
 

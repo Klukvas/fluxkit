@@ -1,6 +1,6 @@
 # apps/api
 
-- `src/main.ts` - bootstrap: load env (refuses to start without `ORDER_TOKEN_SECRET`), create app, serve Swagger UI at `/docs`, listen.
+- `src/main.ts` - bootstrap: load env (refuses to start without `ORDER_TOKEN_SECRET`), create the development default media directory when `MEDIA_DIR` is unset (`media/media-directory.ts`), create app, serve Swagger UI at `/docs`, listen.
 - `src/index.ts` - placeholder entry (`export {}`); no public exports yet.
 - `src/app.factory.ts` - `createApp` (loads features, passes the admin and customer session settings, `CART_TTL_DAYS`, `ORDER_PAYMENT_TTL_MINUTES`, `ORDER_GUEST_ACCESS_DAYS`, `ORDER_TOKEN_SECRET`, `MAX_OPEN_ORDERS`, `SCHEDULER_ENABLED` and `SCHEDULER_INTERVAL_SECONDS` (off when the caller passes no environment), builds Nest app, sets Express `trust proxy` from `TRUST_PROXY` (0 when absent) in the one place the app is built, shutdown hooks) and `buildOpenApiDocument`; used by main, tests, export, `pnpm jobs:run-once`.
 - `src/app.module.ts` - root module; composes database, auth, rate limits, customer auth, customer accounts, common, health, catalog, inventory, the cart, orders, the scheduler (`src/jobs/`) and dynamically loaded feature modules. Must not import features statically.
@@ -41,7 +41,7 @@
 - `clock.ts` - `Clock` and `SystemClock`, injected so tests control time.
 - `auth-config.ts` - `AdminAuthConfig` (cookie `Secure`, idle minutes, maximum hours) and its secure defaults.
 - `admin.guard.ts` - `AdminGuard`: CSRF check, public short circuit, authentication (401), permission (403), once per request; `AdminPathGuard`: the global guard for every path under `/admin`.
-- `csrf.ts` - `assertCsrfSafe(request, scope)`: the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods; the one rule behind `/admin` (`AdminGuard`, scope `admin`, the default) and `/store` (`StoreCsrfGuard`, scope `store`; only the message differs).
+- `csrf.ts` - `assertCsrfSafe(request, scope, options)` and `@AcceptsBinaryUpload()` (the one route-scoped exception: exactly `application/octet-stream`, ADR 0028; read by `AdminGuard` from the handler only, never passed by the store guard): the `X-Fluxkit-CSRF: 1` header and JSON content type for state-changing methods; the one rule behind `/admin` (`AdminGuard`, scope `admin`, the default) and `/store` (`StoreCsrfGuard`, scope `store`; only the message differs).
 - `route-access.ts` - `@RequirePermission`, `@PublicAdminRoute`, `@AuthenticatedAdminRoute` (any signed-in admin, no permission: logout, me, change-password), `UseDefaultPermissionByMethod(defaults?)` and `resolveRouteAccess` (route, then controller, then the controller's default pair by HTTP method: `read` for GET and HEAD, `write` otherwise; `CATALOG_DEFAULT_PERMISSIONS` when none is named). Must not hold role tables: those are in `@fluxkit/core`.
 - `auth.controller.ts` - `/admin/auth/*`: login (public; sets the cookie), logout, me, change-password. Thin: validates, calls the service, sets or clears the cookie. No rules.
 - `auth.service.ts` - login (one scrypt per failure, identical 401, core lockout under a row lock, rehash, expired-session cleanup and the new session inside the same locked transaction), me, change-password; logs reason codes only. Must not log emails, passwords, hashes or tokens.
@@ -69,7 +69,7 @@
 ## Rate limits (`src/rate-limit/`)
 
 - `ip-window-limiter.ts` - `IpWindowLimiter`: one per client address fixed-window limit, in memory, bounded (`maxClients`), clock injected; `throttleKeyOf` keys IPv6 by its /64 prefix and maps IPv4-mapped addresses to IPv4. Single process only (documented in the file). The code of the former admin login throttle, moved here unchanged.
-- `rate-limiter.ts` - `RATE_LIMITS` (named internal limits: `login`, `registration`, `checkout`, `orderLookup`, `guestCancel`, `cartWrite`) and `RateLimiter`, one `IpWindowLimiter` per name so limits never share counts.
+- `rate-limiter.ts` - `RATE_LIMITS` (named internal limits: `login`, `registration`, `checkout`, `orderLookup`, `guestCancel`, `cartWrite`, `mediaUpload`), `RATE_LIMIT_SUBJECTS` (each limit counts the client address, `mediaUpload` the signed-in admin user) and `RateLimiter`, one `IpWindowLimiter` per name so limits never share counts.
 - `rate-limit.decorator.ts`, `rate-limit.guard.ts` - `@RateLimit(name)` on a route or controller and the guard behind it: `429 too_many_requests` with `Retry-After`. A route without the decorator is not limited.
 - `trust-proxy.spec.ts` - real app with `TRUST_PROXY=1`, `0` and unset: separate windows per forwarded address for the store limit and the admin login throttle, IPv6 /64 grouping of the forwarded address, the proxy-appended entry wins over client-supplied ones, `X-Forwarded-For` ignored when no proxy is trusted.
 - `rate-limit.module.ts` - global `RateLimitModule.register(overrides?)` (the overrides are for tests). Needs `CLOCK` from `AuthModule`.
@@ -147,7 +147,7 @@ Plan step 5c (ADR 0018, 0021, `docs/api/jobs.md`, `docs/contracts/events.md`). C
 - `expire-due-orders.job.ts`, `sweep-reservations.job.ts`, `dispatch-domain-events.job.ts`, `delete-dispatched-events.job.ts`, `delete-expired-carts.job.ts`, `delete-expired-customer-sessions.job.ts` - one job each. `batches.ts` - `drainInBatches` (bounded delete loop, `truncated`) and the cleanup limits.
 - `domain-event-handlers.ts` - `DomainEventHandlerRegistry`: finds providers whose class carries `DOMAIN_EVENT_HANDLER_METADATA` once at bootstrap and refuses a malformed one loudly; `handlersFor(type)`.
 - `event-error-code.ts` - `eventErrorCode(error)` (class name plus the cause's code, fits the column CHECK, never the message) and `HandlerTimeoutError`.
-- `run-once-command.ts`, `run-once.ts` - `pnpm jobs:run-once`: the command (builds the application without timer and listener, `runOnce()`, exit codes 0/1/2) and its entry point.
+- `run-once-command.ts`, `run-once.ts` - `pnpm jobs:run-once`: the command (creates the development default media directory like `main.ts`, builds the application without timer and listener, `runOnce()`, exit codes 0/1/2) and its entry point.
 - `*.spec.ts` (real Postgres, injected time) - one per job (`expire-due-orders.job`, `sweep-reservations.job`, `dispatch-domain-events.job` with the discovery, `cleanup.jobs`), `expire-orders-races` (expiry against payment and the three cancels, many rounds), `jobs-runner` (order, isolation, logging), `scheduler` (lock, two instances, ticks, timer, shutdown, `/health`), `run-once` (the built entry as a real process), `batches`, `event-error-code`.
 
 ## Catalog (`src/catalog/`)
@@ -211,6 +211,25 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `reservations/reservations-batch.spec.ts` - the batch operations: lock order, answers per reservation, backorder, duplicates, and two orders with crossing lines in parallel without a deadlock.
 - `inventory-journal.spec.ts` - no source file updates or deletes `stock_movement` and the repository is the only writer.
 
+## Media (`src/media/`, ADR 0028, `docs/api/media.md`)
+
+- `media.module.ts` - `MediaModule.register(config)`: global; the two controllers, `MEDIA_CONFIG`, the storage under core's `MEDIA_STORAGE_PORT` (the local driver, checked at start, or the disabled one), `ProcessingSlots`, the upload and attach services. Core, not a feature: switched by `MEDIA_STORAGE_DRIVER`.
+- `media-config.ts` - `MediaConfig` (`MEDIA_*` values plus the fixed tuning: 2 slots, 10 s wait, `Retry-After` 5, 30 s budget) and `DISABLED_MEDIA_CONFIG` for callers without an environment (specs, OpenAPI export, commands).
+- `media-directory.ts` - `prepareDefaultMediaDirectory`: creates `<repo>/var/media` only when `MEDIA_DIR` is unset outside production; a set `MEDIA_DIR` is never created.
+- `media-uploads.controller.ts` - `POST /admin/media/uploads` (`catalog.write` by the catalog default pair, `@AcceptsBinaryUpload()`, `@RateLimit("mediaUpload")`, OpenAPI binary body and 411/413/503). Thin: passes the raw request to the service.
+- `media-upload.service.ts` - the upload flow: driver check, length rules, counted body into a temp file, a processing slot, the pipeline, output temp file with fsync, random key, atomic store, row insert (file removed when it fails), one log line; temp files removed in every case; disk errors become `503 storage_unavailable`.
+- `upload-body.ts` - `checkUploadLength` (411, 413, empty) from the head and `readBodyToFile` (the counter that stops at limit + 1; a client abort is `UploadInterruptedError`, a write error stays the file-system error).
+- `image-pipeline.ts` - `processImageFile`: core `sniffImageType` before sharp, `checkDecodedHeader` (format equals the sniffed one, one page, core `checkDimensions`), decode with `limitInputPixels`/`failOn: warning`/`sequentialRead`/`pages: 1`, re-encode (`rotate`, sRGB, fit 4 096 without enlargement, same format, `ENCODE_SETTINGS`, no metadata), the processing budget. Sets `sharp.cache(false)` and `sharp.concurrency(1)`. Must never pass unsniffed data to sharp.
+- `processing-slots.ts` - `ProcessingSlots`: the in-process semaphore (FIFO, wait limit, idempotent release).
+- `local-media-storage.ts` - `LocalMediaStorage` (`MediaStoragePort` plus temp files): start-up check of `MEDIA_DIR`, sharded paths verified inside it, temp files `wx` 0640, fsync and `link` (never overwrites), `O_NOFOLLOW` reads, idempotent delete, stale temp cleanup; `DisabledMediaStorage` for `none`.
+- `media-files.controller.ts` - `GET`/`HEAD /media/{key}`: raw key check, no cookie and no database, the fixed headers (`MEDIA_FILE_HEADERS`), `ETag`/304, streaming; `404` with `no-store` for everything else under `/media/`.
+- `media-upload.repository.ts` - `media_upload` insert and `markAttached` (one `UPDATE ... RETURNING` under row locks).
+- `media-attach.service.ts` - `MediaAttachService.markAttached(tx, references)`: attach marking for the product media and brand saves inside their transaction (`upload_not_found`).
+- `media-url.ts` - `classifyMediaUrl`: `foreign`, `upload` (with its key) or `invalid` for a stored URL against `MEDIA_PUBLIC_BASE_URL`.
+- `media-problems.ts` - the problem answers (`mediaRefused`, `storageUnavailable`, `uploadsDisabled`, `uploadsBusy`, `uploadInterrupted`) and `isStorageUnavailableError`.
+- `media.schemas.ts` - zod schema of the `201` upload response.
+- `*.spec.ts` - unit specs (URL classification, storage, body counter, slots, pipeline with real sharp, the gate with a counting spy around the real sharp, the default directory), HTTP specs with real Postgres and a temp `MEDIA_DIR` (uploads, read route, attach marking and the two-connection race), the OpenAPI checks and the `MEDIA_LIMITS` parity with `@fluxkit/config`.
+
 ## Database (`src/database/`)
 
 - `database.module.ts` - global Postgres pool and Drizzle provider; closes the pool on shutdown. Error listeners on the pool (idle clients) AND on every client as it connects (checked-out clients), so a dropped connection inside a transaction rejects that query instead of ending the process; logs the error name and code only.
@@ -224,11 +243,13 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `schema/carts.ts` - `cart` (exactly one owner: token hash or customer) and `cart_item` (one line per cart and variant, seen price for the "price changed" notice; ADR 0015).
 - `schema/orders.ts` - `sales_order`, `order_item` (immutable snapshot), `order_adjustment`, `order_status_change` and `order_item_reservation` (ADR 0017, ADR 0019); limits mirror `packages/core`. The three triggers are in the migration, not here.
 - `schema/domain-events.ts` - `domain_event`, the transactional outbox (ADR 0018); no foreign key on the aggregate.
+- `schema/media.ts` - `media_upload` (ADR 0028 decision 5): one row per stored upload, key CHECK equal to core `isMediaKey`, creator `ON DELETE SET NULL`, partial index for the cleanup job. No foreign key from or to `media` and `brand`.
+- `media-upload-schema.spec.ts` - the `media_upload` constraints on real Postgres (key pattern against `isMediaKey`, checks, unique key, creator foreign key, the partial index, name lengths).
 - `catalog-schema.spec.ts` - constraint tests on real Postgres (inside rolled-back transactions).
 - `admin-auth-schema.spec.ts` - constraint, cascade and name tests for the admin auth tables.
 - `pricing-inventory-schema.spec.ts` - CHECK boundaries, uniqueness, cascades, RESTRICT, the default location and the `stock_movement` trigger (rejections and the two documented exceptions) on real Postgres.
 - `cart-orders-schema.spec.ts` - CHECK boundaries tied to the `@fluxkit/core` constants, uniqueness, foreign key actions (customer, admin user, product, variant, reservation, location, order), the three triggers (direct rejections, depth-2 exceptions through a helper trigger) and the outbox index on real Postgres.
-- `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database (0000 to 0004), the down script of 0004 refusing a dependent object, and an upgrade from a database holding 0003 data; refuses other database names.
+- `migrations.spec.ts` - migrations up, down, up, down on a `*_test` database (0000 to 0005, 0005 also alone), the down scripts of 0004 and 0005 refusing a dependent object, and an upgrade from a database holding 0003 data; refuses other database names.
 - `migrate.ts` - entry of `pnpm db:migrate` (built output run by Node); prints the result, exit code 1 on any error.
 - `migrate-command.ts` - `runMigrateCommand`: applies the pending migrations of `drizzle/` with the Drizzle migrator under a session-level advisory lock (`MIGRATION_LOCK_KEY`), refuses a database that is ahead of the journal, redacts connection strings and passwords from errors. Forward only: must never roll back, drop or delete. The folder is resolved from the file location, not the working directory.
 - `migrate-command.spec.ts` - the command on scratch `*_test` databases: fresh, repeat, incremental, ahead refusal, advisory lock, concurrency, failing migration, redaction.
@@ -241,6 +262,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `0002_admin_auth.sql` and `0002_admin_auth.down.sql` - `admin_user` and `admin_session`; the down script drops them (sessions first) and removes the bookkeeping row.
 - `0003_pricing_inventory.sql` and `0003_pricing_inventory.down.sql` - price and inventory tables, the `variant` stock flags, the `stock_movement_append_only` trigger function and trigger (hand-written tail of the generated file) and the default `main` location; the down script drops tables in reverse order, then the function and the variant columns, and removes the bookkeeping row.
 - `0004_cart_customers_orders.sql` and `0004_cart_customers_orders.down.sql` - customer, cart, order and outbox tables and the three trigger functions and triggers (`order_item_immutable`, `order_adjustment_append_only`, `order_status_change_append_only`; hand-written tail of the generated file); the down script drops tables in reverse order, then the functions, and removes the bookkeeping row. It never touches 0003 data.
+- `0005_media_upload.sql` and `0005_media_upload.down.sql` - the `media_upload` table (ADR 0028); the down script drops it (no CASCADE) and removes the bookkeeping row; stored files are not touched.
 - `meta/_journal.json`, `meta/*_snapshot.json` - drizzle-kit bookkeeping; generated, never edited by hand.
 - `drizzle.config.ts` (in `apps/api/`) - drizzle-kit config; schema from `src/database/schema/index.ts`. `pnpm --filter @fluxkit/api db:generate` creates a migration; `db:drift` checks that the schema and migrations agree.
 
@@ -259,7 +281,9 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `fake-clock.ts` - TEST ONLY: a `Clock` the test moves by hand.
 - `admin-user-fixtures.ts` - TEST ONLY: inserts and deletes admin users directly; with `password` the hash is real, so the user can log in.
 - `auth-http.ts` - TEST ONLY: `login`, `loginCookie` and `sessionCookieOf` for specs that sign in through the real endpoint.
-- `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs.
+- `routes.ts` - `registeredRoutes` / `adminRoutes`: every route of the real Express router, with params filled in, for route-walking specs; `sweepRequest` (the body a sweep sends: JSON, or octet-stream to the upload route).
+- `media-app.ts` - TEST ONLY: `startMediaApp` (the local media driver in a temp directory, real owner, manager and viewer users picked by the `x-test-admin` header), `rawRequest` (node:http, exact wire control), `filesUnder`.
+- `media-images.ts` - TEST ONLY: images generated with sharp (EXIF orientation 6 with GPS and ICC, alpha PNG, WebP, animated WebP, GIF, TIFF, AVIF, CMYK, 16-bit) and hand-built bad inputs (bomb headers, truncated, polyglot tails, SVG, HTML, PDF).
 - `store-routes.ts` - TEST ONLY: `storeRoutes` lists the `/store` routes of the real router with whether each is marked `@CustomerAuthenticated()` (read from the controllers' metadata; an unmatched route fails loudly).
 - `customer-probe.ts` - TEST ONLY, excluded from the build: probe controllers (customer-authenticated, public, rate-limited, sign-in and sign-out stand-ins) registered through `extraFeatures`, and a route under `/store/account` that forgot the decorator, for the route-walk test.
 - `admin-orders-world.ts` - TEST ONLY: four running apps (owner and manager as real `admin_user` rows, viewer, anonymous with the real session authenticator), orders placed through the real checkout, request helpers for the five admin routes, and `countStatements`.
