@@ -4,6 +4,7 @@ import { ATTRIBUTE_FLAGS, ATTRIBUTE_INPUT_TYPES, VALIDATION_FIELDS } from "./att
 import { DICTIONARY_SCREENS, NOTICE_KINDS } from "./dictionary-frame";
 import { MESSAGE_FILES } from "./index";
 import { ITEM_MESSAGE_SUFFIXES } from "./items-section";
+import { PLAIN_STATE_STATUSES, REJECT_REASONS } from "./upload-queue";
 
 /**
  * The screens build some message keys from data (`dict.${prefix}.heading`, `dict.inputType.${type}`, ...), which the
@@ -19,6 +20,8 @@ const families: Record<string, string[]> = {
   "dict.level": ["product", "variant"],
   "dict.attribute.flag": [...ATTRIBUTE_FLAGS],
   "dict.notice": NOTICE_KINDS.filter((kind) => kind !== "unknown"),
+  "dict.upload.reject": [...REJECT_REASONS],
+  "dict.upload.state": [...PLAIN_STATE_STATUSES],
 };
 
 function expected(): string[] {

@@ -71,6 +71,11 @@ export function newMediaRow(key: string, locales: readonly string[]): MediaRow {
   };
 }
 
+/** The row of an uploaded file: its URL from the server's answer, no alt text, no option value. Unsaved until the list is saved. */
+export function uploadedMediaRow(key: string, url: string, locales: readonly string[]): MediaRow {
+  return { ...newMediaRow(key, locales), url };
+}
+
 /** A new row at the end; the same list when it is full. */
 export function addMedia(rows: readonly MediaRow[], row: MediaRow): readonly MediaRow[] {
   return rows.length >= MAX_MEDIA ? rows : [...rows, row];
@@ -198,6 +203,19 @@ export function mediaDirty(
   locales: readonly string[],
 ): boolean {
   return !jsonEqual(mediaBody(initial, locales), mediaBody(current, locales));
+}
+
+/**
+ * Whether leaving the tab would lose something: edited rows, or uploads still running (the rows they will add are not
+ * in the list yet). Feeds the unsaved-changes guard and the editor's lifecycle lock.
+ */
+export function unsavedMedia(
+  initial: readonly MediaRow[],
+  current: readonly MediaRow[],
+  locales: readonly string[],
+  uploading: boolean,
+): boolean {
+  return uploading || mediaDirty(initial, current, locales);
 }
 
 /** How many stored images the edited list no longer has (the save asks before it removes them). */

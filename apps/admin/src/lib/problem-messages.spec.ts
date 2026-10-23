@@ -26,6 +26,7 @@ const ADMIN_DOCS = [
   "orders.md",
   "customers.md",
   "auth.md",
+  "media.md",
 ];
 
 /**
@@ -38,9 +39,13 @@ const NOT_ERROR_CODES = new Set([
   "actor_admin_id",
   "admin_user",
   "awaiting_payment",
+  "byte_size",
+  "content_type",
   "created_at",
+  "created_by",
   "customer_session",
   "expires_at",
+  "first_attached_at",
   "fluxkit_admin_session",
   "fluxkit_cart",
   "fluxkit_customer_session",
@@ -51,6 +56,7 @@ const NOT_ERROR_CODES = new Set([
   "last_seen_at",
   "lines_dropped",
   "low_stock",
+  "media_upload",
   "not_due",
   "on_hand",
   "order_item_reservation",
@@ -63,6 +69,7 @@ const NOT_ERROR_CODES = new Set([
   "requires_shipping",
   "sales_order",
   "stock_movement",
+  "storage_key",
   "text_pattern_ops",
   "unknown_account",
   "wrong_password",

@@ -2,15 +2,17 @@ import { NetworkError } from "@fluxkit/api-client";
 import { describe, expect, it, vi } from "vitest";
 import {
   BROWSER_READ_TIMEOUT_MS,
+  BROWSER_UPLOAD_TIMEOUT_MS,
   BROWSER_WRITE_TIMEOUT_MS,
   isTimeout,
   withTimeout,
 } from "./request-timeout";
 
 describe("timeouts", () => {
-  it("bounds reads (15 s) shorter than writes (30 s)", () => {
+  it("bounds reads (15 s) shorter than writes (30 s) and writes shorter than an image upload (60 s)", () => {
     expect(BROWSER_READ_TIMEOUT_MS).toBe(15_000);
     expect(BROWSER_WRITE_TIMEOUT_MS).toBe(30_000);
+    expect(BROWSER_UPLOAD_TIMEOUT_MS).toBe(60_000);
   });
 });
 
@@ -53,6 +55,24 @@ describe("withTimeout", () => {
       BROWSER_WRITE_TIMEOUT_MS,
     ]);
     for (const call of calls) expect(call.init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("gives only the image upload (POST /admin/media/uploads) the longer upload limit", async () => {
+    const { fetched, wanted } = setup();
+    await fetched("/admin/media/uploads", { method: "POST" });
+    await fetched("/admin/media/uploads?x=1", { method: "POST" });
+    await fetched("/admin/media/uploads", { method: "GET" });
+    await fetched("/admin/media/uploads/other", { method: "POST" });
+    await fetched("/admin/products/media/uploads", { method: "POST" });
+    await fetched("/admin/products/x/media", { method: "PUT" });
+    expect(wanted).toEqual([
+      BROWSER_UPLOAD_TIMEOUT_MS,
+      BROWSER_UPLOAD_TIMEOUT_MS,
+      BROWSER_READ_TIMEOUT_MS,
+      BROWSER_WRITE_TIMEOUT_MS,
+      BROWSER_WRITE_TIMEOUT_MS,
+      BROWSER_WRITE_TIMEOUT_MS,
+    ]);
   });
 
   it("keeps the other init fields (method, headers, body, credentials)", async () => {

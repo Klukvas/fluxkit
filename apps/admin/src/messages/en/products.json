@@ -158,7 +158,7 @@
   "products.attributeReason.too_many_items": "Choose fewer options.",
   "products.attributeReason.invalid_date": "Enter a real calendar date.",
   "products.categories.primaryMark": "primary",
-  "products.media.intro": "Images of the product as addresses (http or https), at most {max}, in the order shown here: the first one is the product's main image. Uploading files is not available yet; host the images elsewhere.",
+  "products.media.intro": "Images of the product, at most {max}, in the order shown here: the first one is the product's main image. Add each image by its address (http or https) or upload files.",
   "products.media.policy": "The admin shows a preview only for image hosts its content policy allows; an image from another host is reported in text instead. The shop shows it if its own policy allows the host.",
   "products.media.none": "The product has no images yet.",
   "products.media.listLabel": "Images in display order",
@@ -445,5 +445,10 @@
   "products.stock.issue.location_required": "Choose a location.",
   "products.stock.issue.reason_too_long": "The reason is too long.",
   "products.stock.issue.reference_too_long": "The reference is too long.",
-  "products.stock.result.unreadable": "The journal could not be read again. Look at the journal below before you send the change again."
+  "products.stock.result.unreadable": "The journal could not be read again. Look at the journal below before you send the change again.",
+  "products.media.uploadTitle": "Upload from your device",
+  "products.media.uploadLimits": "Allowed: {types}; at most {max} MB per file and {files} files at a time.",
+  "products.media.uploadHint": "Uploaded files are added to the list below but are not saved with the product until you save the images. If you leave without saving, the files stay on the server unused and are deleted after 24 hours.",
+  "products.media.dropHint": "You can also drop image files on the list.",
+  "products.media.uploadsOff": "Uploading files is switched off on this server. You can still add images by their address."
 }

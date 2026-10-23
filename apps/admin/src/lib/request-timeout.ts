@@ -11,6 +11,13 @@ import type { FetchLike } from "@fluxkit/api-client";
 export const BROWSER_READ_TIMEOUT_MS = 15_000;
 /** Writes. */
 export const BROWSER_WRITE_TIMEOUT_MS = 30_000;
+/**
+ * One image upload (`POST /admin/media/uploads`): the file travels and the server re-encodes it (up to 30 s). A timed-out
+ * upload is a lost answer ("the file may have been stored"), never retried.
+ */
+export const BROWSER_UPLOAD_TIMEOUT_MS = 60_000;
+
+const UPLOAD_PATH = "/admin/media/uploads";
 
 /**
  * True for a request that ran into its time limit: `fetch` rejects with the signal's reason, a `TimeoutError` (what
@@ -31,21 +38,25 @@ export function isTimeout(error: unknown): boolean {
 export interface TimeoutOptions {
   readMs?: number;
   writeMs?: number;
+  uploadMs?: number;
   /** The signal that ends after `ms`; `AbortSignal.timeout` by default, injectable for tests. */
   signalFor?: (ms: number) => AbortSignal;
 }
 
 /**
- * Wraps a `fetch` so every request ends after a limit: reads (GET and HEAD) get the read limit, everything else the write
- * limit. A signal the caller already put on the request still ends it too.
+ * Wraps a `fetch` so every request ends after a limit: reads (GET and HEAD) get the read limit, the image upload the upload
+ * limit, everything else the write limit. A signal the caller already put on the request still ends it too.
  */
 export function withTimeout(fetchImpl: FetchLike, options: TimeoutOptions = {}): FetchLike {
   const readMs = options.readMs ?? BROWSER_READ_TIMEOUT_MS;
   const writeMs = options.writeMs ?? BROWSER_WRITE_TIMEOUT_MS;
+  const uploadMs = options.uploadMs ?? BROWSER_UPLOAD_TIMEOUT_MS;
   const signalFor = options.signalFor ?? ((ms: number) => AbortSignal.timeout(ms));
   return (url, init) => {
     const method = (init.method ?? "GET").toUpperCase();
-    const limit = signalFor(method === "GET" || method === "HEAD" ? readMs : writeMs);
+    const isRead = method === "GET" || method === "HEAD";
+    const isUpload = method === "POST" && url.split("?")[0] === UPLOAD_PATH;
+    const limit = signalFor(isRead ? readMs : isUpload ? uploadMs : writeMs);
     const signal =
       init.signal === undefined || init.signal === null
         ? limit

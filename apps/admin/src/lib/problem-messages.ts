@@ -34,7 +34,7 @@ export const KNOWN_PROBLEM_CODES = [
 
 /**
  * Rules and field error codes the admin pages of `docs/api/` document (catalog, pricing, inventory, orders, customers,
- * auth). A test scans those pages and fails on a snake-case word that is neither here nor in its list of non-codes.
+ * auth, media). A test scans those pages and fails on a snake-case word that is neither here nor in its list of non-codes.
  */
 export const KNOWN_REASON_CODES = [
   // request schema
@@ -91,7 +91,16 @@ export const KNOWN_REASON_CODES = [
   "no_default_variant",
   "has_stock_history",
   "has_order_lines",
-  // media (the upload answers' own reasons are added with the upload UI)
+  // media (`docs/api/media.md`): the upload route's own reasons, and the attach check of the media and brand saves
+  "empty_file",
+  "unsupported_type",
+  "corrupt_image",
+  "animated_not_supported",
+  "dimensions_too_large",
+  "too_many_pixels",
+  "processing_timeout",
+  "file_too_large",
+  "length_required",
   "upload_not_found",
   // pricing
   "price_missing",
