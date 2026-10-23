@@ -209,8 +209,14 @@ server {
 
     # The API: /admin/* (admin API). An image upload is a raw body of up to MEDIA_MAX_BYTES (10 MiB by default); nginx refuses
     # more than 1 MB by default with its own 413 page, so allow a little more than MEDIA_MAX_BYTES, here and nowhere else.
+    # proxy_request_buffering off streams the body to the API as it arrives (untested here, see "Body size" below): with the
+    # default (on) nginx first reads the whole body, so the API's early 401, 403, 411, 413 and 503 come only after the full
+    # upload, and a chunked upload reaches the API as a buffered body with a Content-Length (the API's 411 never applies).
+    # Streaming needs HTTP/1.1 to the API.
     location ~ ^/admin(/|$) {
         client_max_body_size 12m;
+        proxy_request_buffering off;
+        proxy_http_version 1.1;
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
@@ -264,7 +270,7 @@ server {
 The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. Neither example is tested in this repository (the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references). Check before use:
 - The API locations (nginx) and the API matcher (Caddy) accept the bare prefixes (`/admin`, `/store`, `/media`) as well as the paths below them, like the e2e proxies; without that a bare `/admin` or `/store` would reach the storefront (the API accepts both). Check both with your version: a Caddy `path` matcher with no wildcard is meant to match exactly that path (reasoned from its documentation, not tried).
 - `/media/*`: the API answers a file with `Cache-Control: public, max-age=31536000, immutable` and a 404 of a key with `no-store`, and the proxy must pass both unchanged. The nginx locations and the Caddy `handle` above add nothing of their own. If you put a cache in front (nginx `proxy_cache`, a CDN), let it follow these headers and do not override them with a fixed `expires` or `Cache-Control`: a 404 marked immutable would be kept for a year (the same lesson as for the missing hashed assets above). The locations carry no `add_header`, so a server-level HSTS line is inherited.
-- Body size: nginx `client_max_body_size 12m` on the `/admin` location is what lets an upload through; keep it above `MEDIA_MAX_BYTES` and raise it with that variable. Caddy has no request body limit unless you set one (`request_body { max_size 12MB }`).
+- Body size: nginx `client_max_body_size 12m` on the `/admin` location is what lets an upload through; keep it above `MEDIA_MAX_BYTES` and raise it with that variable. Request buffering (step 9 review L-6, reasoned from nginx's documented defaults, NOT tested against a real nginx): with nginx's default `proxy_request_buffering on`, nginx reads the whole body (up to `client_max_body_size`, spooled to disk above its buffer) before the API sees the request, so an anonymous, viewer, oversized or "uploads disabled" request still costs the full upload, and a chunked upload is forwarded with a `Content-Length` (it succeeds behind nginx while the API alone answers `411`). The example therefore sets `proxy_request_buffering off;` with `proxy_http_version 1.1;` on the `/admin` location, so the API's early refusals reach the client before the body is sent; the e2e proxy streams too. With buffering off, nginx still refuses a body above `client_max_body_size` itself, and chunked uploads then reach the API as chunked bodies (answered `411`). Caddy has no request body limit unless you set one (`request_body { max_size 12MB }`).
 - A missing hashed asset must not be cached as a 404 for a year (it would keep a tab that was open across a deployment broken). nginx: the immutable `Cache-Control` line has no `always`, so nginx does not add it to the 404. Caddy: `header` sets its value before `file_server` answers, so the 404 for a missing file probably carries the immutable header too (reasoned, not tried); check it with your version and, if it does, send `Cache-Control: no-store` for that 404 (for example in a `handle_errors` block).
 - HSTS: nginx does not inherit server-level `add_header` lines into a location that has its own `add_header`, so a `Strict-Transport-Security` header set on the `server` must be repeated in both `/admin-ui` locations (the commented lines). Caddy has no such inheritance rule: a site-level `header Strict-Transport-Security ...` outside the `handle` blocks also applies to the `/admin-ui` answers (from the Caddy documentation, not tried here).
 
