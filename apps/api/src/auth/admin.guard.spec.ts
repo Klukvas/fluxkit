@@ -13,7 +13,8 @@ import {
   resolveRouteAccess,
 } from "./route-access.js";
 import { getCurrentAdmin } from "./current-admin.js";
-import { AcceptsBinaryUpload } from "./csrf.js";
+import { SetMetadata } from "@nestjs/common";
+import { ACCEPTS_BINARY_UPLOAD_KEY, AcceptsBinaryUpload } from "./csrf.js";
 
 function principal(role: AdminRole): AdminPrincipal {
   return {
@@ -41,6 +42,13 @@ class DefaultsController {
 class UploadController {
   @AcceptsBinaryUpload()
   upload(): void {}
+  create(): void {}
+}
+
+/** The marker set on a whole controller (the decorator cannot do it; the metadata key could) must not widen the exception. */
+@SetMetadata(ACCEPTS_BINARY_UPLOAD_KEY, true)
+@UseDefaultPermissionByMethod()
+class MarkedController {
   create(): void {}
 }
 
@@ -322,6 +330,14 @@ describe("AdminGuard", () => {
       ).rejects.toMatchObject({ code: "forbidden" });
       await expect(
         guard.canActivate(contextFor(DefaultsController, "create", "POST", binaryHeaders).context),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    });
+
+    it("ignores the marker on a controller: only a marked handler takes octet-stream", async () => {
+      await expect(
+        guardFor(() => principal("owner")).canActivate(
+          contextFor(MarkedController, "create", "POST", binaryHeaders).context,
+        ),
       ).rejects.toMatchObject({ code: "forbidden" });
     });
 
