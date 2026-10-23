@@ -53,6 +53,6 @@ All are `application/problem+json`. Validation answers carry one `errors[]` entr
 
 Peak resident memory of one Node process running only the pipeline (`process.resourceUsage().maxRSS`, sharp 0.35.5, linux-x64; about 75 MB with sharp loaded): 50 MP JPEG 187 to 202 MB, near-limit PNG (49.99 MP) 151 to 157 MB, 49 MP WebP 302 MB, two 49 MP WebP at once (both processing slots) 523 MB. Each took 0.8 to 3.5 s. Plan for about 512 MB of headroom above the API's normal use. The re-encoded output is not size-capped: a 4 MB PNG of noisy blocks was stored as a 50 MB PNG. Full table: `docs/plans/2026-10-23-media-upload.md`, Step 4 outcome.
 
-## Not built yet
+## Routing and operations (plan step 8)
 
-The `/media` routes of the e2e and dev proxies and the deployment notes (plan step 8). The admin UI controls (step 7) exist: `apps/admin/README.md`, "Image upload"; the cleanup job (step 5) and the api-client method (step 6) too.
+`/media/*` is routed to the API by the e2e proxies (`apps/admin/e2e/proxy.ts`, `apps/storefront/e2e/proxy.ts`), by the Vite dev and preview proxy (`apps/admin/vite.config.ts`, target `ADMIN_DEV_API_URL`) and in the README Caddy and nginx examples (untested). The browser e2e of uploads is `apps/admin/e2e/tests/media-upload.e2e.ts`. The volume, backup, memory, nginx body size, Next optimizer and cleanup-job notes are in the root `README.md`, "Uploaded images". The bare `/media` and `/media/` answer the router's `404` without `Cache-Control: no-store` and `X-Content-Type-Options` (every path with a segment has both; `apps/admin/e2e/README.md`, "Findings of media plan step 8").
