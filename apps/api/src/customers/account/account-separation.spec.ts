@@ -11,7 +11,7 @@ import { customerLogin, customerLoginCookie } from "../../test/customer-http.js"
 import { FakeClock } from "../../test/fake-clock.js";
 import { http } from "../../test/http.js";
 import { ensureMigrated } from "../../test/migrate.js";
-import { adminRoutes } from "../../test/routes.js";
+import { adminRoutes, sweepRequest } from "../../test/routes.js";
 import { storeRoutes } from "../../test/store-routes.js";
 
 const ADMIN_PASSWORD = "admin passphrase number one";
@@ -68,7 +68,7 @@ describe("customer and admin principals are separate on the real routes", () => 
     for (const { method, path } of routes) {
       const result = await http<ProblemBody>(running.baseUrl, method as "GET", path, {
         headers: { cookie },
-        ...(method === "GET" || method === "DELETE" ? {} : { body: {} }),
+        ...sweepRequest(method, path),
       });
       expect(result.status, `${method} ${path}`).toBe(401);
     }

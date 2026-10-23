@@ -29,6 +29,11 @@ const config: AdminConfig = {
   ],
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  media: {
+    uploadsEnabled: true,
+    maxBytes: 10485760,
+    contentTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
 };
 
 const ctx: MoneyContext = { locale: "en", config };

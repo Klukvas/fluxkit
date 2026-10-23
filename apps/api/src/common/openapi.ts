@@ -215,7 +215,47 @@ export function documentAdminCsrf(document: OpenAPIObject): OpenAPIObject {
       "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
     fallback403: PROBLEM_DESCRIPTION[403] ?? "Forbidden.",
   });
+  documentBinaryUploadCsrf(document);
   return document;
+}
+
+const BINARY_UPLOAD_TYPE = "application/octet-stream";
+
+/**
+ * The one admin route that takes a raw `application/octet-stream` body (`@AcceptsBinaryUpload()`, ADR 0028 decision 4)
+ * documents its CSRF rule instead of the JSON one. Recognized by its documented request body type, so the text cannot
+ * end up on a route whose body is JSON.
+ */
+function documentBinaryUploadCsrf(document: OpenAPIObject): void {
+  for (const [path, item] of Object.entries(document.paths)) {
+    if (!path.startsWith("/admin/")) {
+      continue;
+    }
+    for (const [method, operation] of Object.entries(item)) {
+      if (!CSRF_WRITE_METHODS.has(method) || typeof operation !== "object" || operation === null) {
+        continue;
+      }
+      const target = operation as {
+        parameters?: { name?: string; description?: string }[];
+        requestBody?: { content?: Record<string, unknown> };
+        responses: Record<string, { description?: string }>;
+      };
+      if (target.requestBody?.content?.[BINARY_UPLOAD_TYPE] === undefined) {
+        continue;
+      }
+      for (const parameter of target.parameters ?? []) {
+        if (parameter.name === "X-Fluxkit-CSRF") {
+          parameter.description =
+            "Must be `1` (CSRF defence, ADR 0009). This route is the one exception to the JSON rule (ADR 0028): its body must be `Content-Type: application/octet-stream`; every other type, JSON and multipart included, is refused with 403.";
+        }
+      }
+      const forbidden = target.responses["403"];
+      if (forbidden !== undefined) {
+        forbidden.description =
+          "Forbidden: the role lacks the route's permission, the X-Fluxkit-CSRF header is missing, or the body is not `Content-Type: application/octet-stream`.";
+      }
+    }
+  }
 }
 
 /**

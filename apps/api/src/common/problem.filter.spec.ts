@@ -151,9 +151,11 @@ describe("ProblemDetailsFilter", () => {
         "not_found",
         "rule_violation",
         "service_unavailable",
+        "storage_unavailable",
         "too_many_open_orders",
         "too_many_requests",
         "unauthorized",
+        "uploads_disabled",
         "validation_failed",
       ].sort(),
     );

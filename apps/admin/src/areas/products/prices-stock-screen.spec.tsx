@@ -54,6 +54,11 @@ const config = {
   supportedCurrencies: Object.entries(CURRENCIES).map(([code, exponent]) => ({ code, exponent })),
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  media: {
+    uploadsEnabled: true,
+    maxBytes: 10485760,
+    contentTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
 };
 
 function variant(id: string, overrides: Partial<AdminVariant> = {}): AdminVariant {

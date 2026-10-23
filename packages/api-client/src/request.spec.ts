@@ -80,6 +80,66 @@ describe("buildRequest headers", () => {
   });
 });
 
+describe("buildRequest raw (binary) body", () => {
+  const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+  const rawBody = { bytes, contentType: "application/octet-stream" } as const;
+
+  it("passes the bytes through untouched with an octet-stream content type and the CSRF header", () => {
+    const { init } = build({ method: "POST", path: "/admin/media/uploads", rawBody });
+    expect(init.body).toBe(bytes);
+    expect(init.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(init.headers.get("X-Fluxkit-CSRF")).toBe("1");
+    expect(init.credentials).toBe("same-origin");
+  });
+
+  it("accepts a Blob and an ArrayBuffer and never sets Content-Length (fetch computes it)", () => {
+    const blob = new Blob([bytes], { type: "image/jpeg" });
+    const buffer = new ArrayBuffer(4);
+    for (const given of [blob, buffer]) {
+      const { init } = build({
+        method: "POST",
+        rawBody: { bytes: given, contentType: "application/octet-stream" },
+      });
+      expect(init.body).toBe(given);
+      expect(init.headers.get("Content-Type")).toBe("application/octet-stream");
+      expect(init.headers.has("Content-Length")).toBe(false);
+    }
+  });
+
+  it("does not let a caller header replace the content type, the CSRF header or Content-Length", () => {
+    const { init } = build({
+      method: "POST",
+      rawBody,
+      headers: {
+        "content-type": "application/json",
+        "x-fluxkit-csrf": "0",
+        "Content-Length": "999",
+      },
+    });
+    expect(init.headers.get("Content-Type")).toBe("application/octet-stream");
+    expect(init.headers.get("X-Fluxkit-CSRF")).toBe("1");
+    expect(init.headers.has("Content-Length")).toBe(false);
+  });
+
+  it("refuses a raw body together with a JSON body, and on GET and HEAD", () => {
+    expect(() => build({ method: "POST", body: {}, rawBody })).toThrow(InvalidRequestError);
+    expect(() => build({ method: "GET", rawBody })).toThrow(InvalidRequestError);
+    expect(() => build({ method: "HEAD", rawBody })).toThrow(InvalidRequestError);
+  });
+
+  it("keeps the JSON path unchanged when there is no raw body", () => {
+    const { init } = build({ method: "POST", body: { a: 1 } });
+    expect(init.headers.get("Content-Type")).toBe("application/json");
+    expect(init.body).toBe('{"a":1}');
+  });
+
+  it("passes the abort signal", () => {
+    const controller = new AbortController();
+    const { init } = build({ method: "POST", rawBody, signal: controller.signal });
+    expect(init.signal).toBe(controller.signal);
+  });
+});
+
 describe("buildRequest URL", () => {
   it("is relative for an empty base URL (the browser, one origin)", () => {
     expect(build().url).toBe("/store/cart");

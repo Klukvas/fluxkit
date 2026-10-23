@@ -1081,6 +1081,224 @@
         "tags": ["health"]
       }
     },
+    "/admin/media/uploads": {
+      "post": {
+        "operationId": "MediaUploadsController_upload",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` (CSRF defence, ADR 0009). This route is the one exception to the JSON rule (ADR 0028): its body must be `Content-Type: application/octet-stream`; every other type, JSON and multipart included, is refused with 403.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The raw file bytes, one file per request. Content-Length is required; the declared type and any name are ignored.",
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The stored image (the re-encoded output). Put `url` into a product media list or a brand logo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key; put it into a media list or a brand logo."
+                    },
+                    "contentType": {
+                      "type": "string",
+                      "enum": ["image/jpeg", "image/png", "image/webp"]
+                    },
+                    "byteSize": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991,
+                      "description": "Bytes of the stored file."
+                    },
+                    "width": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "height": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "url",
+                    "contentType",
+                    "byteSize",
+                    "width",
+                    "height",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, the X-Fluxkit-CSRF header is missing, or the body is not `Content-Type: application/octet-stream`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "411": {
+            "description": "validation_failed with reason length_required: no Content-Length, or chunked transfer.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "validation_failed with reason file_too_large: larger than MEDIA_MAX_BYTES (checked before the body is read).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "storage_unavailable (the file could not be written: disk full, quota, read-only or missing directory) or uploads_disabled (MEDIA_STORAGE_DRIVER=none).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Upload one image (JPEG, PNG or WebP): checked by content, re-encoded without metadata, stored",
+        "tags": ["admin-media"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/media/{key}": {
+      "get": {
+        "operationId": "MediaFilesController_get",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "description": "32 lower-case hex digits and .jpg, .png or .webp.",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file, with fixed security and caching headers."
+          },
+          "304": {
+            "description": "If-None-Match matched the ETag (the key)."
+          },
+          "404": {
+            "description": "Not a key, no such file, or uploads switched off."
+          }
+        },
+        "summary": "An uploaded image (public, cached for a year, never changes)",
+        "tags": ["media"]
+      },
+      "head": {
+        "operationId": "MediaFilesController_head",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "description": "32 lower-case hex digits and .jpg, .png or .webp.",
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The headers of GET, no body."
+          },
+          "404": {
+            "description": "Not a key, no such file, or uploads switched off."
+          }
+        },
+        "summary": "The headers of an uploaded image, without the body",
+        "tags": ["media"]
+      }
+    },
     "/admin/config": {
       "get": {
         "operationId": "AdminConfigController_get",
@@ -1142,6 +1360,31 @@
                       "minimum": 0,
                       "maximum": 9007199254740991,
                       "description": "`LOW_STOCK_THRESHOLD`."
+                    },
+                    "media": {
+                      "type": "object",
+                      "properties": {
+                        "uploadsEnabled": {
+                          "type": "boolean",
+                          "description": "False with `MEDIA_STORAGE_DRIVER=none`: the upload route answers 503 uploads_disabled; enter image URLs instead."
+                        },
+                        "maxBytes": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991,
+                          "description": "`MEDIA_MAX_BYTES`: the largest file `POST /admin/media/uploads` accepts."
+                        },
+                        "contentTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "The image types an upload may have (decided by content, not by name)."
+                        }
+                      },
+                      "required": ["uploadsEnabled", "maxBytes", "contentTypes"],
+                      "additionalProperties": false,
+                      "description": "Image upload settings (ADR 0028), so the admin UI can mirror the server's limits."
                     }
                   },
                   "required": [
@@ -1151,7 +1394,8 @@
                     "currencyExponent",
                     "supportedCurrencies",
                     "pricesIncludeTax",
-                    "lowStockThreshold"
+                    "lowStockThreshold",
+                    "media"
                   ],
                   "additionalProperties": false
                 }
@@ -1189,7 +1433,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies and stock threshold, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold and upload limits, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -24946,7 +25190,9 @@
               "checkout_refused",
               "idempotency_key_reused",
               "too_many_open_orders",
-              "service_unavailable"
+              "service_unavailable",
+              "storage_unavailable",
+              "uploads_disabled"
             ]
           },
           "detail": {

@@ -33,7 +33,7 @@ export {
   type AdminOperationPermission,
   type AdminOperationSpec,
 } from "./admin-operations.js";
-export { CSRF_HEADER, CSRF_HEADER_VALUE } from "./request.js";
+export { CSRF_HEADER, CSRF_HEADER_VALUE, type RawBytes } from "./request.js";
 export type { StoreFailure, StoreResult, StoreSuccess } from "./response.js";
 export type * from "./types.js";
 export type * from "./admin-types.js";

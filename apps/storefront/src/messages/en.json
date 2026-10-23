@@ -106,6 +106,8 @@
   "errors.idempotency_key_reused": "The order could not be confirmed. Please submit it again.",
   "errors.too_many_open_orders": "You have too many unpaid orders. Pay or cancel them to place a new one.",
   "errors.service_unavailable": "The service is temporarily unavailable. Please try again in a few minutes.",
+  "errors.storage_unavailable": "The service is temporarily unavailable. Please try again in a few minutes.",
+  "errors.uploads_disabled": "This feature is not available right now.",
   "errors.rule.variant_not_sellable": "This product variant cannot be ordered right now.",
   "errors.rule.quantity_limit": "This quantity is above the limit for one item.",
   "errors.rule.too_many_lines": "The cart has too many different items.",

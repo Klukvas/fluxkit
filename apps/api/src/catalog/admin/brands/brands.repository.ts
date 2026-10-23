@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import { asc, eq, like } from "drizzle-orm";
+import type { DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { brand } from "../../../database/schema/index.js";
 import type { PaginationQuery } from "../../../common/pagination.js";
@@ -13,8 +14,9 @@ type BrandChanges = Partial<Omit<NewBrand, "id" | "createdAt" | "updatedAt">>;
 export class BrandsRepository {
   constructor(@Inject(DRIZZLE) private readonly db: Database) {}
 
-  async insert(values: NewBrand): Promise<BrandRow> {
-    const [row] = await this.db.insert(brand).values(values).returning();
+  /** `db` is an open transaction when the save also marks an uploaded logo attached. */
+  async insert(values: NewBrand, db: DbExecutor = this.db): Promise<BrandRow> {
+    const [row] = await db.insert(brand).values(values).returning();
     return required(row);
   }
 
@@ -37,9 +39,13 @@ export class BrandsRepository {
     return { rows, total };
   }
 
-  async update(id: string, changes: BrandChanges): Promise<BrandRow | undefined> {
+  async update(
+    id: string,
+    changes: BrandChanges,
+    db: DbExecutor = this.db,
+  ): Promise<BrandRow | undefined> {
     // `updated_at` is refreshed by the column's $onUpdate, which only the query builder applies.
-    const [row] = await this.db.update(brand).set(changes).where(eq(brand.id, id)).returning();
+    const [row] = await db.update(brand).set(changes).where(eq(brand.id, id)).returning();
     return row;
   }
 

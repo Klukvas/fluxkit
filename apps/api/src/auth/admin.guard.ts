@@ -9,7 +9,7 @@ import {
   type AdminAuthenticator,
   type AdminPrincipal,
 } from "./admin-authenticator.js";
-import { assertCsrfSafe } from "./csrf.js";
+import { ACCEPTS_BINARY_UPLOAD_KEY, assertCsrfSafe } from "./csrf.js";
 import { setCurrentAdmin } from "./current-admin.js";
 import { resolveRouteAccess } from "./route-access.js";
 
@@ -33,7 +33,8 @@ function isPrincipal(value: unknown): value is AdminPrincipal {
 
 /**
  * Default deny for the admin API. Order of checks (ADR 0009, plan step 3):
- * 1. CSRF header for state-changing methods (before authentication, also for anonymous callers),
+ * 1. CSRF header for state-changing methods (before authentication, also for anonymous callers); a body must be JSON,
+ *    or exactly `application/octet-stream` on a route marked `@AcceptsBinaryUpload()` (ADR 0028 decision 4),
  * 2. `@PublicAdminRoute` routes end here,
  * 3. authentication: no principal -> 401,
  * 4. permission: a route needs its `@RequirePermission` (or the `@AdminController` default); a route without any
@@ -51,7 +52,11 @@ export class AdminGuard implements CanActivate {
     if (passedRequests.has(request)) {
       return true;
     }
-    assertCsrfSafe(request);
+    // The handler's own marker only: a controller-level marker is never read, so the exception stays one route wide.
+    const acceptsBinaryUpload =
+      this.reflector.get<boolean | undefined>(ACCEPTS_BINARY_UPLOAD_KEY, context.getHandler()) ===
+      true;
+    assertCsrfSafe(request, "admin", { acceptsBinaryUpload });
     const access = resolveRouteAccess(
       this.reflector,
       context.getHandler(),

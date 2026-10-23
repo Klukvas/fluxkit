@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FakeClock } from "../test/fake-clock.js";
-import { RATE_LIMITS, RATE_LIMIT_NAMES, RateLimiter } from "./rate-limiter.js";
+import { RATE_LIMITS, RATE_LIMIT_NAMES, RATE_LIMIT_SUBJECTS, RateLimiter } from "./rate-limiter.js";
 
 const START = "2030-05-01T10:00:00.000Z";
 
@@ -13,8 +13,22 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       orderLookup: { maxAttempts: 20, windowMinutes: 10 },
       guestCancel: { maxAttempts: 20, windowMinutes: 10 },
       cartWrite: { maxAttempts: 120, windowMinutes: 1 },
+      mediaUpload: { maxAttempts: 60, windowMinutes: 10 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
+  });
+
+  it("counts every limit per client address, except mediaUpload, which counts per admin user (ADR 0028)", () => {
+    expect(RATE_LIMIT_SUBJECTS).toEqual({
+      login: "clientAddress",
+      registration: "clientAddress",
+      checkout: "clientAddress",
+      orderLookup: "clientAddress",
+      guestCancel: "clientAddress",
+      cartWrite: "clientAddress",
+      mediaUpload: "adminUser",
+    });
+    expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });
 });
 

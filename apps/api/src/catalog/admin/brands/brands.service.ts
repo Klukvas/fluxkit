@@ -4,6 +4,9 @@ import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page, type PaginationQuery } from "../../../common/pagination.js";
 import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
 import { conflict, notFound, validationFailed, type FieldError } from "../../../common/problem.js";
+import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { DRIZZLE, type Database } from "../../../database/database.module.js";
+import { MediaAttachService } from "../../../media/media-attach.service.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
 import { retryLostRaces } from "../../shared/retry.js";
 import { toBrandResponse } from "./brands.mapper.js";
@@ -20,6 +23,8 @@ export class BrandsService {
   constructor(
     private readonly brands: BrandsRepository,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(DRIZZLE) private readonly database: Database,
+    @Inject(MediaAttachService) private readonly mediaAttachments: MediaAttachService,
   ) {}
 
   async create(body: CreateBrandBody): Promise<BrandResponse> {
@@ -60,11 +65,14 @@ export class BrandsService {
       return this.get(id);
     }
     try {
-      const row = await this.brands.update(id, changes);
-      if (row === undefined) {
-        throw notFound("Brand");
-      }
-      return toBrandResponse(row);
+      return await withTransaction(this.database, async (tx) => {
+        const row = await this.brands.update(id, changes, tx);
+        if (row === undefined) {
+          throw notFound("Brand");
+        }
+        await this.markLogoAttached(tx, body.logoUrl);
+        return toBrandResponse(row);
+      });
     } catch (error) {
       throw translatePostgresError(error, { detail: "Another brand already uses this slug." });
     }
@@ -107,9 +115,32 @@ export class BrandsService {
     }
   }
 
+  /**
+   * ADR 0028: a logo URL under `MEDIA_PUBLIC_BASE_URL` must name an upload (`400 upload_not_found` at `logoUrl`); the
+   * upload is marked attached in the save's transaction. Other URLs and `null` are not looked at.
+   */
+  private async markLogoAttached(
+    tx: DbExecutor,
+    logoUrl: string | null | undefined,
+  ): Promise<void> {
+    if (typeof logoUrl === "string") {
+      await this.mediaAttachments.markAttached(tx, [{ path: "logoUrl", url: logoUrl }]);
+    }
+  }
+
+  /** Inserts the brand and marks its uploaded logo attached, in one transaction. */
+  private insertWithLogo(
+    values: Parameters<BrandsRepository["insert"]>[0],
+  ): Promise<ReturnType<typeof toBrandResponse>> {
+    return withTransaction(this.database, async (tx) => {
+      await this.markLogoAttached(tx, values.logoUrl);
+      return toBrandResponse(await this.brands.insert(values, tx));
+    });
+  }
+
   private async insert(values: Parameters<BrandsRepository["insert"]>[0]): Promise<BrandResponse> {
     try {
-      return toBrandResponse(await this.brands.insert(values));
+      return await this.insertWithLogo(values);
     } catch (error) {
       throw translatePostgresError(error, { detail: "Another brand already uses this slug." });
     }
@@ -151,7 +182,7 @@ export class BrandsService {
             ]);
           }
           log.record(generated.slug);
-          return toBrandResponse(await this.brands.insert({ ...values, slug: generated.slug }));
+          return this.insertWithLogo({ ...values, slug: generated.slug });
         },
       );
     } catch (error) {

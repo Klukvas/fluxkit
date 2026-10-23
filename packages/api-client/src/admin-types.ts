@@ -107,6 +107,32 @@ export interface AdminConfig {
   supportedCurrencies: AdminSupportedCurrency[];
   pricesIncludeTax: boolean;
   lowStockThreshold: number;
+  media: AdminMediaConfig;
+}
+
+/** The upload limits of the server (ADR 0028), so the SPA can mirror them and hide the controls when uploads are off. */
+export interface AdminMediaConfig {
+  /** False with `MEDIA_STORAGE_DRIVER=none`: the upload route answers 503 `uploads_disabled`. */
+  uploadsEnabled: boolean;
+  /** `MEDIA_MAX_BYTES`: the largest file the upload route accepts. */
+  maxBytes: number;
+  /** The image types an upload may have; decided by content, not by file name. */
+  contentTypes: string[];
+}
+
+/** The type of a stored upload: always the re-encoded output's, never the uploaded file's. */
+export type AdminMediaContentType = "image/jpeg" | "image/png" | "image/webp";
+
+/** The `201` answer of `POST /admin/media/uploads`: put `url` into a product media list or a brand logo. */
+export interface AdminMediaUpload {
+  id: string;
+  url: string;
+  contentType: AdminMediaContentType;
+  /** Bytes of the stored file. */
+  byteSize: number;
+  width: number;
+  height: number;
+  createdAt: string;
 }
 
 // ---------------------------------------------------------------- customers

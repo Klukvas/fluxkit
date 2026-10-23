@@ -1,11 +1,12 @@
 import { Get, Inject } from "@nestjs/common";
 import { ApiOperation } from "@nestjs/swagger";
-import { CURRENCIES, CURRENCY_CODES, exponentOf } from "@fluxkit/core";
+import { ALLOWED_IMAGE_TYPES, CURRENCIES, CURRENCY_CODES, exponentOf } from "@fluxkit/core";
 import { AdminController } from "../auth/admin-controller.decorator.js";
 import { AuthenticatedAdminRoute } from "../auth/route-access.js";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import { ApiZodResponse } from "../common/openapi.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
+import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { adminConfigResponseSchema, type AdminConfigResponse } from "./admin-config.schemas.js";
 
 /**
@@ -17,12 +18,14 @@ export class AdminConfigController {
   constructor(
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(MEDIA_CONFIG) private readonly media: MediaConfig,
   ) {}
 
   @Get()
   @AuthenticatedAdminRoute()
   @ApiOperation({
-    summary: "Locales, shop currency, supported currencies and stock threshold, for the admin UI",
+    summary:
+      "Locales, shop currency, supported currencies, stock threshold and upload limits, for the admin UI",
   })
   @ApiZodResponse(200, adminConfigResponseSchema, "The shop settings.")
   get(): AdminConfigResponse {
@@ -34,6 +37,11 @@ export class AdminConfigController {
       supportedCurrencies: CURRENCY_CODES.map((code) => ({ code, exponent: CURRENCIES[code] })),
       pricesIncludeTax: this.pricing.pricesIncludeTax,
       lowStockThreshold: this.pricing.lowStockThreshold,
+      media: {
+        uploadsEnabled: this.media.driver !== "none",
+        maxBytes: this.media.maxBytes,
+        contentTypes: Object.values(ALLOWED_IMAGE_TYPES).map(({ contentType }) => contentType),
+      },
     };
   }
 }

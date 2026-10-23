@@ -1,8 +1,28 @@
 import { Inject, Injectable, type CanActivate, type ExecutionContext } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
+import { getCurrentAdmin } from "../auth/current-admin.js";
 import { tooManyRequests } from "../common/problem.js";
-import { RATE_LIMIT_KEY, RateLimiter, type RateLimitName } from "./rate-limiter.js";
+import {
+  RATE_LIMIT_KEY,
+  RATE_LIMIT_SUBJECTS,
+  RateLimiter,
+  type RateLimitName,
+} from "./rate-limiter.js";
+
+/** The key a request is counted under for the named limit (see `RATE_LIMIT_SUBJECTS`). */
+function clientKeyOf(name: RateLimitName, request: Request): string {
+  if (RATE_LIMIT_SUBJECTS[name] === "adminUser") {
+    const principal = getCurrentAdmin(request);
+    if (principal === undefined) {
+      // A programming error (the limit is on a route without AdminGuard): a logged 500, never an unlimited pass.
+      throw new Error(`The rate limit "${name}" needs a signed-in admin; put it on an admin route`);
+    }
+    return `admin-user:${principal.userId}`;
+  }
+  // `request.ip` is the socket address unless Express `trust proxy` is set (see IpWindowLimiter).
+  return request.ip ?? "unknown";
+}
 
 /** Applies the limit named by `@RateLimit`. A route without it is not limited. */
 @Injectable()
@@ -21,8 +41,7 @@ export class RateLimitGuard implements CanActivate {
       return true;
     }
     const request = context.switchToHttp().getRequest<Request>();
-    // `request.ip` is the socket address unless Express `trust proxy` is set (see IpWindowLimiter).
-    const decision = this.limiter.attempt(name, request.ip ?? "unknown");
+    const decision = this.limiter.attempt(name, clientKeyOf(name, request));
     if (!decision.allowed) {
       throw tooManyRequests("Too many requests. Try again later.", decision.retryAfterSeconds);
     }

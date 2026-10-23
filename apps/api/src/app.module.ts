@@ -22,6 +22,8 @@ import type { LoadedFeature } from "./features/feature-loader.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
 import { JobsModule } from "./jobs/jobs.module.js";
+import { DISABLED_MEDIA_CONFIG, type MediaConfig } from "./media/media-config.js";
+import { MediaModule } from "./media/media.module.js";
 import { DISABLED_SCHEDULER_CONFIG, type SchedulerConfig } from "./jobs/scheduler-config.js";
 import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config.js";
 import { OrdersModule } from "./orders/orders.module.js";
@@ -44,6 +46,8 @@ export interface AppModuleOptions {
   orders?: OrdersConfig;
   /** Defaults to OFF (a caller without an environment must not start a timer); the API process passes `SCHEDULER_ENABLED`. */
   scheduler?: SchedulerConfig;
+  /** Defaults to uploads switched off (a caller without an environment needs no media directory); the API passes `MEDIA_*`. */
+  media?: MediaConfig;
   /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
   rateLimits?: RateLimitOverrides;
   /** Tests only: replaces the session-based authenticator. */
@@ -76,6 +80,7 @@ export class AppModule {
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),
         HealthModule,
+        MediaModule.register(options.media ?? DISABLED_MEDIA_CONFIG),
         AdminConfigModule,
         CustomersModule,
         CatalogModule,

@@ -14,9 +14,30 @@ export const RATE_LIMITS = Object.freeze({
   orderLookup: { maxAttempts: 20, windowMinutes: 10 },
   guestCancel: { maxAttempts: 20, windowMinutes: 10 },
   cartWrite: { maxAttempts: 120, windowMinutes: 1 },
+  // ADR 0028: image uploads, per signed-in admin user (admins in one office share an address).
+  mediaUpload: { maxAttempts: 60, windowMinutes: 10 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
+
+/** Who a limit counts: the client address (`request.ip`) or the signed-in admin user of an `/admin` route. */
+export type RateLimitSubject = "clientAddress" | "adminUser";
+
+/**
+ * The subject of each named limit. It belongs to the limit, not to the route, so a route cannot count an upload by address
+ * by mistake. `adminUser` needs a route behind `AdminGuard` (the guard sets the principal before route guards run).
+ */
+export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubject>> = Object.freeze(
+  {
+    login: "clientAddress",
+    registration: "clientAddress",
+    checkout: "clientAddress",
+    orderLookup: "clientAddress",
+    guestCancel: "clientAddress",
+    cartWrite: "clientAddress",
+    mediaUpload: "adminUser",
+  },
+);
 
 export const RATE_LIMIT_NAMES = Object.freeze(Object.keys(RATE_LIMITS) as RateLimitName[]);
 
@@ -44,12 +65,15 @@ export class RateLimiter {
     }
   }
 
-  /** Counts one attempt of the client at `address` against the named limit. */
-  attempt(name: RateLimitName, address: string): ThrottleDecision {
+  /**
+   * Counts one attempt of a client against the named limit. `client` is an address, or `admin-user:<id>` for a limit whose
+   * subject is the admin user (text that is not an IP address is counted as is).
+   */
+  attempt(name: RateLimitName, client: string): ThrottleDecision {
     const limiter = this.limiters.get(name);
     if (limiter === undefined) {
       throw new Error(`Unknown rate limit "${String(name)}"`);
     }
-    return limiter.attempt(address);
+    return limiter.attempt(client);
   }
 }

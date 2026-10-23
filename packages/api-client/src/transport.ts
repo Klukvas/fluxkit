@@ -1,5 +1,11 @@
-import { NetworkError } from "./errors.js";
-import { buildRequest, normalizeBaseUrl, type HttpMethod, type QueryValue } from "./request.js";
+import { InvalidRequestError, NetworkError } from "./errors.js";
+import {
+  buildRequest,
+  normalizeBaseUrl,
+  type HttpMethod,
+  type QueryValue,
+  type RawBody,
+} from "./request.js";
 import { parseResponse, type StoreResult } from "./response.js";
 
 /** The part of `fetch` the clients use; tests inject a fake. */
@@ -24,11 +30,15 @@ export interface TransportOperation {
   path: string;
   successStatuses: readonly number[];
   query: readonly string[];
+  /** The admin table says `binary` for the upload; the store table has no such operation and leaves it out. */
+  bodyKind?: "none" | "json" | "binary";
 }
 
 export interface CallParts {
   pathParams?: Record<string, string>;
   body?: unknown;
+  /** Raw bytes for an operation whose `bodyKind` is `binary`; never for any other. */
+  rawBody?: RawBody;
   headers?: Record<string, string>;
   options?: CallOptions;
 }
@@ -63,6 +73,15 @@ export function createTransport(options: TransportOptions) {
       if (typeof value === "string" || typeof value === "number") query[key] = value;
     }
 
+    // The binary kind is the one exception to the JSON rules and must never leak to another operation or the reverse.
+    if (operation.bodyKind === "binary") {
+      if (parts.rawBody === undefined || parts.body !== undefined) {
+        throw new InvalidRequestError(`${context}: this operation takes raw bytes only.`);
+      }
+    } else if (parts.rawBody !== undefined) {
+      throw new InvalidRequestError(`${context}: this operation does not take raw bytes.`);
+    }
+
     const request = buildRequest({
       baseUrl,
       method: operation.method,
@@ -70,6 +89,7 @@ export function createTransport(options: TransportOptions) {
       ...(parts.pathParams === undefined ? {} : { pathParams: parts.pathParams }),
       query,
       ...(parts.body === undefined ? {} : { body: parts.body }),
+      ...(parts.rawBody === undefined ? {} : { rawBody: parts.rawBody }),
       ...(parts.headers === undefined ? {} : { headers: parts.headers }),
       ...(parts.options?.signal === undefined ? {} : { signal: parts.options.signal }),
       ...(parts.options?.fetchOptions === undefined

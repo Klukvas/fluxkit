@@ -4,6 +4,7 @@ import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
+import type { MediaTuning } from "../media/media-config.js";
 import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
 import { AllowAllAdminAuthenticator } from "./allow-all-admin-authenticator.js";
 import { requireEnv } from "./env.js";
@@ -73,6 +74,14 @@ export interface StartAppOptions {
   defaultLocale?: string;
   /** `LOCALES`; defaults to `uk`, `en`. */
   locales?: string[];
+  /** `MEDIA_STORAGE_DRIVER`; without it uploads are switched off (see `startMediaApp` in media-app.ts). */
+  mediaStorageDriver?: "local" | "none";
+  mediaDir?: string;
+  mediaPublicBaseUrl?: string;
+  mediaMaxBytes?: number;
+  mediaMaxPixels?: number;
+  /** Other processing slots, waits and budgets of the media upload. */
+  mediaTuning?: Partial<MediaTuning>;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -102,6 +111,11 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       pricesIncludeTax: options.pricesIncludeTax,
       defaultLocale: options.defaultLocale,
       locales: options.locales,
+      mediaStorageDriver: options.mediaStorageDriver,
+      mediaDir: options.mediaDir,
+      mediaPublicBaseUrl: options.mediaPublicBaseUrl,
+      mediaMaxBytes: options.mediaMaxBytes,
+      mediaMaxPixels: options.mediaMaxPixels,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,
@@ -109,6 +123,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       clock: options.clock,
       scrypt: TEST_SCRYPT_PARAMS,
       extraFeatures: options.extraFeatures,
+      mediaTuning: options.mediaTuning,
     },
   );
   await app.listen(0, "127.0.0.1");

@@ -17,6 +17,12 @@ import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config
 import { documentAdminPermissions } from "./auth/admin-permission-docs.js";
 import { documentAdminCsrf, documentStoreContract } from "./common/openapi.js";
 import {
+  DEFAULT_MEDIA_TUNING,
+  DISABLED_MEDIA_CONFIG,
+  type MediaConfig,
+  type MediaTuning,
+} from "./media/media-config.js";
+import {
   DEFAULT_FEATURES_DIR,
   loadFeatures,
   type LoadedFeature,
@@ -45,6 +51,11 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "shopCurrency"
       | "pricesIncludeTax"
       | "lowStockThreshold"
+      | "mediaStorageDriver"
+      | "mediaDir"
+      | "mediaPublicBaseUrl"
+      | "mediaMaxBytes"
+      | "mediaMaxPixels"
     >
   >;
 
@@ -63,6 +74,26 @@ export interface CreateAppOptions {
   cleanExpiredSessionsOnBootstrap?: boolean;
   /** Default `["error", "warn", "log"]`. The command line passes `["error", "warn"]` and prints its own report. */
   logLevels?: LogLevel[];
+  /** Tests only: other processing slots, waits and budgets of the media upload (ADR 0028 decision 3). */
+  mediaTuning?: Partial<MediaTuning>;
+}
+
+/**
+ * The media configuration of an environment. A caller without `MEDIA_STORAGE_DRIVER` (tests, the OpenAPI export, the
+ * commands) gets uploads switched off and needs no directory; the API passes the values of `loadEnv`.
+ */
+function mediaConfigOf(env: CreateAppEnv, tuning: Partial<MediaTuning> = {}): MediaConfig {
+  if (env.mediaStorageDriver === undefined) {
+    return DISABLED_MEDIA_CONFIG;
+  }
+  return {
+    driver: env.mediaStorageDriver,
+    directory: env.mediaDir,
+    publicBaseUrl: env.mediaPublicBaseUrl,
+    maxBytes: env.mediaMaxBytes ?? DISABLED_MEDIA_CONFIG.maxBytes,
+    maxPixels: env.mediaMaxPixels ?? DISABLED_MEDIA_CONFIG.maxPixels,
+    tuning: { ...DEFAULT_MEDIA_TUNING, ...tuning },
+  };
 }
 
 export async function createApp(
@@ -108,6 +139,7 @@ export async function createApp(
         enabled: env.schedulerEnabled ?? DISABLED_SCHEDULER_CONFIG.enabled,
         intervalSeconds: env.schedulerIntervalSeconds ?? DISABLED_SCHEDULER_CONFIG.intervalSeconds,
       },
+      media: mediaConfigOf(env, options.mediaTuning),
       rateLimits: options.rateLimits,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
