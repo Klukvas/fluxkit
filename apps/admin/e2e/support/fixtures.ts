@@ -60,8 +60,9 @@ const NETWORK_STATUS_LINE = /^Failed to load resource: the server responded with
 
 /**
  * What every browser context of the suite is checked for, during the whole test (plan step 11):
- * - every request goes to the proxy origin and only to `/admin-ui` (the SPA's files) or `/admin/*` (the API): the SPA calls
- *   nothing else, no third party, no `/store`;
+ * - every request goes to the proxy origin and only to `/admin-ui` (the SPA's files), `/admin/*` (the API) or, as an IMAGE
+ *   load, `/media/*` (uploaded images, served by the API through the proxy): the SPA calls nothing else, no third party, no
+ *   `/store`; a script, fetch or any other kind of request to `/media` is a problem;
  * - every write to `/admin/*` (POST, PUT, PATCH, DELETE) carries `X-Fluxkit-CSRF: 1`;
  * - no Content-Security-Policy violation (a `securitypolicyviolation` event or a "Refused to" console line), so no inline
  *   script ran and nothing external was loaded;
@@ -140,9 +141,11 @@ export class Guard {
       }
       const isSpa = url.pathname === SPA || url.pathname.startsWith(`${SPA}/`);
       const isApi = url.pathname === "/admin" || url.pathname.startsWith("/admin/");
-      if (!isSpa && !isApi) {
+      const isUploadedImage =
+        url.pathname.startsWith("/media/") && request.resourceType() === "image";
+      if (!isSpa && !isApi && !isUploadedImage) {
         this.problems.push(
-          `request outside /admin-ui and /admin: ${request.method()} ${url.pathname}`,
+          `request outside /admin-ui, /admin and image loads of /media: ${request.method()} ${url.pathname}`,
         );
       }
       if (isApi && !["GET", "HEAD"].includes(request.method()) && csrf !== "1") {
