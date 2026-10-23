@@ -4,6 +4,7 @@ import * as cart from "./cart/index.js";
 import * as catalog from "./catalog/index.js";
 import * as core from "./index.js";
 import * as inventory from "./inventory/index.js";
+import * as media from "./media/index.js";
 import * as orders from "./orders/index.js";
 import * as pricing from "./pricing/index.js";
 
@@ -109,6 +110,20 @@ describe("public entry point", () => {
     expect(core.GUEST_ACCESS_DAYS.default).toBe(90);
   });
 
+  it("exports the media rules and limits", () => {
+    for (const name of [
+      "sniffImageType",
+      "checkDimensions",
+      "isMediaKey",
+      "keyToRelativePath",
+      "generateMediaKey",
+    ] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.MEDIA_LIMITS.maxSide).toBe(12_000);
+    expect(core.MEDIA_STORAGE_PORT).toBe("fluxkit:media-storage-port");
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of ["orders.read", "orders.write", "customers.read", "customers.write"]) {
       expect(core.PERMISSIONS, permission).toContain(permission);
@@ -116,7 +131,7 @@ describe("public entry point", () => {
   });
 
   it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
-    const parts = [auth, cart, catalog, inventory, orders, pricing];
+    const parts = [auth, cart, catalog, inventory, media, orders, pricing];
     const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);
     expect(Object.keys(core).length).toBe(total);
   });

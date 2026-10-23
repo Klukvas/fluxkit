@@ -16,3 +16,5 @@ third-party/
 test-results/
 playwright-report/
 blob-report/
+# Local media uploads (MEDIA_DIR default, ADR 0028)
+var/
