@@ -55,4 +55,4 @@ Peak resident memory of one Node process running only the pipeline (`process.res
 
 ## Not built yet
 
-The cleanup job for abandoned uploads (plan step 5), the api-client method (step 6), the admin UI controls (step 7), the `/media` routes of the e2e and dev proxies and the deployment notes (step 8).
+The `/media` routes of the e2e and dev proxies and the deployment notes (plan step 8). The admin UI controls (step 7) exist: `apps/admin/README.md`, "Image upload"; the cleanup job (step 5) and the api-client method (step 6) too.

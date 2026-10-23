@@ -64,6 +64,8 @@ describe("the upload controller (one queue per screen)", () => {
     const first = controller.start([file("a.jpg"), file("b.jpg")]);
     const second = controller.start([file("c.jpg")]);
     expect(second).toBeNull();
+    // The ignored selection leaves the running queue's list alone.
+    expect(controller.state().items.map((item) => item.name)).toEqual(["a.jpg", "b.jpg"]);
     expect(controller.state().running).toBe(true);
     expect(controller.pending()).toBe(true);
     await tick();
