@@ -6,9 +6,9 @@ import { buildOpenApiDocument } from "../app.factory.js";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { testPrincipal } from "../test/allow-all-admin-authenticator.js";
-import { http } from "../test/http.js";
+import { http, type HttpOptions } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
-import { SOME_ID } from "../test/routes.js";
+import { SOME_ID, sweepRequest } from "../test/routes.js";
 import type { AdminPrincipal } from "./admin-authenticator.js";
 import { RequirePermission } from "./route-access.js";
 
@@ -178,11 +178,12 @@ describe("the admin part of docs/api/openapi.json", () => {
     /** Fires one documented operation with the given identity; the body is empty on purpose (validation answers 400). */
     async function fire(method: string, path: string, who: AdminPrincipal | undefined) {
       signedIn = who;
+      const concrete = path.replace(/\{[A-Za-z]+\}/g, SOME_ID);
       return http<ProblemBody>(
         running.baseUrl,
         method.toUpperCase() as "GET",
-        path.replace(/\{[A-Za-z]+\}/g, SOME_ID),
-        method === "get" ? {} : { body: {} },
+        concrete,
+        method === "get" ? {} : (sweepRequest(method, concrete) as HttpOptions),
       );
     }
 

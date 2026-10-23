@@ -19,7 +19,7 @@ import {
 import { customerProbeFeature } from "../../test/customer-probe.js";
 import { http } from "../../test/http.js";
 import { ensureMigrated } from "../../test/migrate.js";
-import { adminRoutes } from "../../test/routes.js";
+import { adminRoutes, sweepRequest } from "../../test/routes.js";
 import { CUSTOMER_SESSION_COOKIE_NAME } from "./customer-session-cookie.js";
 import { CustomerSessionService } from "./customer-session.service.js";
 
@@ -99,7 +99,7 @@ describe("customer and admin sessions are separate principals", () => {
       checked += 1;
       const result = await http<ProblemBody>(running.baseUrl, method as "GET", path, {
         headers: { cookie },
-        ...(method === "GET" || method === "DELETE" ? {} : { body: {} }),
+        ...sweepRequest(method, path),
       });
       expect(result.status, `${method} ${path}`).toBe(401);
       expect(result.body, `${method} ${path}`).toMatchObject({ code: "unauthorized" });

@@ -4,7 +4,7 @@ import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
-import { adminRoutes, SOME_ID } from "../test/routes.js";
+import { adminRoutes, SOME_ID, sweepRequest } from "../test/routes.js";
 import type { AdminAuthenticator } from "./admin-authenticator.js";
 
 /** A controller written by someone who forgot `@AdminController`: the global guard must still protect it. */
@@ -74,7 +74,7 @@ describe("admin default deny (global guard)", () => {
         running.baseUrl,
         method as "GET",
         path,
-        method === "GET" || method === "DELETE" ? {} : { body: {} },
+        sweepRequest(method, path),
       );
       expect(result.status, `${method} ${path}`).toBe(401);
       expect(result.body, `${method} ${path}`).toMatchObject({ code: "unauthorized" });

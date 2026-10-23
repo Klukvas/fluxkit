@@ -19,6 +19,9 @@ export const PROBLEM_CODES = [
   "idempotency_key_reused",
   "too_many_open_orders",
   "service_unavailable",
+  // Media upload (ADR 0028, docs/api/media.md).
+  "storage_unavailable",
+  "uploads_disabled",
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -40,6 +43,8 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   idempotency_key_reused: 409,
   too_many_open_orders: 409,
   service_unavailable: 503,
+  storage_unavailable: 503,
+  uploads_disabled: 503,
 };
 
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
@@ -59,6 +64,8 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   idempotency_key_reused: "Idempotency key reused",
   too_many_open_orders: "Too many unpaid orders",
   service_unavailable: "Service unavailable",
+  storage_unavailable: "Storage unavailable",
+  uploads_disabled: "Uploads are switched off",
 };
 
 /** One problem with a request field. `path` is dotted (`name.uk`, `attributes.size`); empty for the whole body. */

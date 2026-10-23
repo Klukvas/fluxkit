@@ -1,5 +1,6 @@
 import { loadEnv } from "@fluxkit/config";
 import { createApp } from "../app.factory.js";
+import { prepareDefaultMediaDirectory } from "../media/media-directory.js";
 import { describeMigrateError } from "../database/migrate-command.js";
 import { describeAllCounts, type JobReport } from "./jobs-runner.js";
 import { SchedulerService } from "./scheduler.service.js";
@@ -45,6 +46,7 @@ export async function runJobsOnceCommand(
     );
   }
   const config = loadEnv({ ...env });
+  await prepareDefaultMediaDirectory(config, env);
   const app = await createApp(
     { ...config, schedulerEnabled: false },
     { cleanExpiredSessionsOnBootstrap: false, logLevels: ["error", "warn"] },

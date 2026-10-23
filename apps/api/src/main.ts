@@ -1,6 +1,7 @@
 import { loadEnv } from "@fluxkit/config";
 import { SwaggerModule } from "@nestjs/swagger";
 import { buildOpenApiDocument, createApp } from "./app.factory.js";
+import { prepareDefaultMediaDirectory } from "./media/media-directory.js";
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv(process.env);
@@ -10,6 +11,7 @@ async function bootstrap(): Promise<void> {
       "ORDER_TOKEN_SECRET is required to start the API (at least 32 characters; see .env.example).",
     );
   }
+  await prepareDefaultMediaDirectory(env, process.env);
   const app = await createApp(env);
   SwaggerModule.setup("docs", app, buildOpenApiDocument(app));
   await app.listen(env.port);

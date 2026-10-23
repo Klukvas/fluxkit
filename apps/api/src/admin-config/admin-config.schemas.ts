@@ -21,6 +21,23 @@ export const adminConfigResponseSchema = z.object({
     }),
   pricesIncludeTax: z.boolean().meta({ description: "`PRICES_INCLUDE_TAX`." }),
   lowStockThreshold: z.number().int().min(0).meta({ description: "`LOW_STOCK_THRESHOLD`." }),
+  media: z
+    .object({
+      uploadsEnabled: z.boolean().meta({
+        description:
+          "False with `MEDIA_STORAGE_DRIVER=none`: the upload route answers 503 uploads_disabled; enter image URLs instead.",
+      }),
+      maxBytes: z.number().int().min(1).meta({
+        description: "`MEDIA_MAX_BYTES`: the largest file `POST /admin/media/uploads` accepts.",
+      }),
+      contentTypes: z.array(z.string()).meta({
+        description: "The image types an upload may have (decided by content, not by name).",
+      }),
+    })
+    .meta({
+      description:
+        "Image upload settings (ADR 0028), so the admin UI can mirror the server's limits.",
+    }),
 });
 
 export type AdminConfigResponse = z.output<typeof adminConfigResponseSchema>;

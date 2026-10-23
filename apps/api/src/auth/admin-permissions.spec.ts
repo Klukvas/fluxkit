@@ -251,6 +251,20 @@ describe("admin route permissions", () => {
       }
     });
 
+    it("gives the media upload catalog.write by the catalog default pair of its controller (ADR 0028)", () => {
+      const media = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/media"),
+      );
+      expect(media.map(({ method, pattern }) => `${method} ${pattern}`)).toEqual([
+        "POST /admin/media/uploads",
+      ]);
+      expect(media[0]?.access).toEqual({
+        kind: "permission",
+        permission: "catalog.write",
+        source: "default",
+      });
+    });
+
     it("resolves each route to the documented permission: users.manage for users, the customer pair for customers, publish for the four lifecycle routes, read for GET, write otherwise", () => {
       const routes = declaredAdminRoutes(manager.app);
       for (const { method, pattern, access } of routes) {
