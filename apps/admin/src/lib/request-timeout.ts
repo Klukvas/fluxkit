@@ -12,10 +12,12 @@ export const BROWSER_READ_TIMEOUT_MS = 15_000;
 /** Writes. */
 export const BROWSER_WRITE_TIMEOUT_MS = 30_000;
 /**
- * One image upload (`POST /admin/media/uploads`): the file travels and the server re-encodes it (up to 30 s). A timed-out
- * upload is a lost answer ("the file may have been stored"), never retried.
+ * One image upload (`POST /admin/media/uploads`): the file travels, waits for a processing slot (up to 10 s) and is
+ * re-encoded (up to 30 s). 120 s (step 9 review L-2; 60 s before) leaves about 80 s for the body, so a 10 MiB file needs
+ * about 1.1 Mbit/s of uplink in the worst case (about 0.7 Mbit/s when the server answers at once). A timed-out upload is a
+ * lost answer ("the file may have been stored"), never retried.
  */
-export const BROWSER_UPLOAD_TIMEOUT_MS = 60_000;
+export const BROWSER_UPLOAD_TIMEOUT_MS = 120_000;
 
 const UPLOAD_PATH = "/admin/media/uploads";
 

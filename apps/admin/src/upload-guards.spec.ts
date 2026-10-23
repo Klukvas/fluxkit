@@ -141,9 +141,9 @@ describe("upload source guards", () => {
     expect(logo).toMatch(/maxRows: 1,\s*maxFiles: 1,/);
   });
 
-  it("gives every upload the 60 s limit and nothing else", () => {
+  it("gives every upload the 120 s limit and nothing else", () => {
     const timeout = file("lib/request-timeout.ts").code;
-    expect(timeout).toMatch(/BROWSER_UPLOAD_TIMEOUT_MS = 60_000/);
+    expect(timeout).toMatch(/BROWSER_UPLOAD_TIMEOUT_MS = 120_000/);
     expect(timeout).toMatch(/method === "POST" && url\.split\("\?"\)\[0\] === UPLOAD_PATH/);
   });
 });
