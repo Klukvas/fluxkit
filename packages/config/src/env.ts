@@ -1,3 +1,5 @@
+import { dirname, isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { parseEnabledFeatures } from "./features.js";
 
@@ -93,6 +95,30 @@ export const SUPPORTED_SHOP_CURRENCIES: readonly string[] = [
 /** Same bound as the largest on-hand quantity of `@fluxkit/core`: a larger threshold is a typo, not a policy. */
 const MAX_LOW_STOCK_THRESHOLD = 1_000_000_000;
 
+/**
+ * Defaults and bounds of the media variables (ADR 0028 decision 8). They equal `MEDIA_LIMITS` of `@fluxkit/core` (a test in
+ * apps/api asserts it); this package does not depend on core, so the numbers are repeated here.
+ */
+export const MEDIA_STORAGE_DRIVERS = ["local", "none"] as const;
+export type MediaStorageDriver = (typeof MEDIA_STORAGE_DRIVERS)[number];
+export const DEFAULT_MEDIA_MAX_BYTES = 10 * 1024 * 1024;
+const MIN_MEDIA_MAX_BYTES = 1024;
+const MAX_MEDIA_MAX_BYTES = 50 * 1024 * 1024;
+export const DEFAULT_MEDIA_MAX_PIXELS = 50_000_000;
+const MIN_MEDIA_MAX_PIXELS = 1;
+const MAX_MEDIA_MAX_PIXELS = 100_000_000;
+
+/**
+ * Where uploads go outside production: `<repo>/var/media`, which `.gitignore` lists. Built from the location of this file
+ * (the same depth in `src/` and in `dist/`), the way the API finds the feature packages. Only a path is computed here; the
+ * directory is neither read nor created, the API checks it at start. It is a function, and plain path segments instead of
+ * `new URL("...", import.meta.url)`, because the storefront bundles this package and its bundler would try to resolve that
+ * URL form as a file asset and fail the build.
+ */
+function defaultMediaDirectory(): string {
+  return resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "var", "media");
+}
+
 /** Exactly `true` or `false`: a typo in a security flag must fail loudly, not fall back to a default. */
 const strictBoolean = z.enum(["true", "false"]).transform((value) => value === "true");
 
@@ -112,6 +138,55 @@ function nonNegativeInteger(max: number) {
     .regex(/^(0|[1-9][0-9]*)$/, "must be a non-negative whole number")
     .transform(Number)
     .pipe(z.number().max(max, `must be at most ${max}`));
+}
+
+/** An absolute path without a NUL byte, and not the file system root (an upload directory is never `/`). Returned normalized. */
+const mediaDirectory = z
+  .string()
+  .refine((value) => !value.includes("\0") && isAbsolute(value), {
+    message: "must be an absolute path",
+  })
+  .transform((value) => resolve(value))
+  .refine((value) => resolve(value, "..") !== value, {
+    message: "must not be the file system root",
+  });
+
+/**
+ * The URL prefix of stored uploads. Written in normalized form on purpose: stored URLs are compared with this text as a
+ * prefix (attach marking, ADR 0028 decision 5), so `HTTPS://Host`, a default port or a dot segment would never match.
+ * The messages are fixed text: the value may carry credentials and must not reach a log.
+ */
+const mediaPublicBaseUrl = z.string().superRefine((value, context) => {
+  const problem = describeBaseUrlProblem(value);
+  if (problem !== undefined) {
+    context.addIssue({ code: "custom", message: problem });
+  }
+});
+
+function describeBaseUrlProblem(value: string): string | undefined {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return "must be an absolute http or https URL";
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return "must be an absolute http or https URL";
+  }
+  if (url.username !== "" || url.password !== "" || /^[a-z]+:\/\/[^/]*@/i.test(value)) {
+    return "must not contain credentials";
+  }
+  if (value.includes("?") || value.includes("#")) {
+    return "must not contain a query or a fragment";
+  }
+  if (value.endsWith("/")) {
+    return "must not end with a slash";
+  }
+  const normalized = url.pathname === "/" ? url.origin : url.href;
+  if (normalized !== value) {
+    return "must be written in normalized form (lower-case scheme and host, no default port, no dot segments)";
+  }
+  return undefined;
 }
 
 const envSchema = z
@@ -184,8 +259,49 @@ const envSchema = z
     LOW_STOCK_THRESHOLD: nonNegativeInteger(MAX_LOW_STOCK_THRESHOLD).default(
       DEFAULT_LOW_STOCK_THRESHOLD,
     ),
+    // No default here: in production the driver must be named, outside production `local` is applied in `loadEnv`.
+    MEDIA_STORAGE_DRIVER: z.enum(MEDIA_STORAGE_DRIVERS).optional(),
+    MEDIA_DIR: mediaDirectory.optional(),
+    MEDIA_PUBLIC_BASE_URL: mediaPublicBaseUrl.optional(),
+    MEDIA_MAX_BYTES: positiveInteger(MAX_MEDIA_MAX_BYTES)
+      .pipe(z.number().min(MIN_MEDIA_MAX_BYTES, `must be at least ${MIN_MEDIA_MAX_BYTES}`))
+      .default(DEFAULT_MEDIA_MAX_BYTES),
+    MEDIA_MAX_PIXELS: positiveInteger(MAX_MEDIA_MAX_PIXELS)
+      .pipe(z.number().min(MIN_MEDIA_MAX_PIXELS, `must be at least ${MIN_MEDIA_MAX_PIXELS}`))
+      .default(DEFAULT_MEDIA_MAX_PIXELS),
   })
   .superRefine((env, context) => {
+    const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
+    if (inProduction && env.MEDIA_STORAGE_DRIVER === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["MEDIA_STORAGE_DRIVER"],
+        message: `is required when NODE_ENV is production (${MEDIA_STORAGE_DRIVERS.join(" or ")}); there is no silent fallback to local disk`,
+      });
+    }
+    if (inProduction && env.MEDIA_STORAGE_DRIVER === "local") {
+      if (env.MEDIA_DIR === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEDIA_DIR"],
+          message: "is required when MEDIA_STORAGE_DRIVER is local and NODE_ENV is production",
+        });
+      }
+      if (env.MEDIA_PUBLIC_BASE_URL === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEDIA_PUBLIC_BASE_URL"],
+          message: "is required when MEDIA_STORAGE_DRIVER is local and NODE_ENV is production",
+        });
+      }
+    }
+    if (inProduction && env.MEDIA_PUBLIC_BASE_URL?.startsWith("https://") === false) {
+      context.addIssue({
+        code: "custom",
+        path: ["MEDIA_PUBLIC_BASE_URL"],
+        message: "must use https when NODE_ENV is production",
+      });
+    }
     if ((env.NODE_ENV ?? "").trim().toLowerCase() === "production" && !env.ORDER_TOKEN_SECRET) {
       context.addIssue({
         code: "custom",
@@ -260,6 +376,23 @@ export interface AppEnv {
   pricesIncludeTax: boolean;
   /** `low_stock` when the available quantity is above 0 and at most this many. */
   lowStockThreshold: number;
+  /** Where uploaded images are stored (ADR 0028): `local` disk, or `none` (uploads off, URL entry only). */
+  mediaStorageDriver: MediaStorageDriver;
+  /**
+   * Absolute, normalized upload directory. Set with `local` (default `<repo>/var/media` outside production); with `none`
+   * only when given. The parser does not touch the file system: the API checks that it exists and is writable.
+   */
+  mediaDir: string | undefined;
+  /**
+   * URL prefix of every stored upload, without a trailing slash (`<prefix>/<key>`). Set with `local` (default
+   * `http://127.0.0.1:<PORT>/media` outside production; `https` required in production); with `none` only when given.
+   * Changing it later does not rewrite stored URLs.
+   */
+  mediaPublicBaseUrl: string | undefined;
+  /** Largest accepted upload in bytes (1 KiB to 50 MiB). */
+  mediaMaxBytes: number;
+  /** Largest accepted input width times height (1 to 100 000 000). */
+  mediaMaxPixels: number;
 }
 
 /** Validates and normalizes process environment variables. Throws with a readable message on invalid input. */
@@ -272,6 +405,9 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     throw new Error(`Invalid environment: ${details}`);
   }
   const env = parsed.data;
+  // Production without a driver was refused above, so the `local` default only ever applies outside production.
+  const mediaStorageDriver = env.MEDIA_STORAGE_DRIVER ?? "local";
+  const usesLocalDisk = mediaStorageDriver === "local";
   return {
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
@@ -297,5 +433,12 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     shopCurrency: env.SHOP_CURRENCY,
     pricesIncludeTax: env.PRICES_INCLUDE_TAX,
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,
+    mediaStorageDriver,
+    mediaDir: env.MEDIA_DIR ?? (usesLocalDisk ? defaultMediaDirectory() : undefined),
+    mediaPublicBaseUrl:
+      env.MEDIA_PUBLIC_BASE_URL ??
+      (usesLocalDisk ? `http://127.0.0.1:${env.PORT}/media` : undefined),
+    mediaMaxBytes: env.MEDIA_MAX_BYTES,
+    mediaMaxPixels: env.MEDIA_MAX_PIXELS,
   };
 }

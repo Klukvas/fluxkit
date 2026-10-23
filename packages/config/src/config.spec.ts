@@ -283,8 +283,14 @@ describe("loadEnv ORDER_TOKEN_SECRET", () => {
     "is required when NODE_ENV is %j",
     (nodeEnv) => {
       expect(() => loadEnv({ ...base, NODE_ENV: nodeEnv })).toThrow(/ORDER_TOKEN_SECRET/);
+      // Production also requires the media driver (ADR 0028); `none` keeps this test about the secret only.
       expect(
-        loadEnv({ ...base, NODE_ENV: nodeEnv, ORDER_TOKEN_SECRET: SECRET }).orderTokenSecret,
+        loadEnv({
+          ...base,
+          NODE_ENV: nodeEnv,
+          ORDER_TOKEN_SECRET: SECRET,
+          MEDIA_STORAGE_DRIVER: "none",
+        }).orderTokenSecret,
       ).toBe(SECRET);
     },
   );
