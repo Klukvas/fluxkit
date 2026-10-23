@@ -111,3 +111,103 @@ describe("assertCsrfSafe messages by scope", () => {
     );
   });
 });
+
+describe("the binary upload exception (ADR 0028 decision 4)", () => {
+  const BINARY = { acceptsBinaryUpload: true } as const;
+  const body = (contentType?: string): Record<string, string> => ({
+    ...OK,
+    "content-length": "10",
+    ...(contentType === undefined ? {} : { "content-type": contentType }),
+  });
+
+  it("accepts application/octet-stream only with the option, compared like the JSON type", () => {
+    for (const contentType of [
+      "application/octet-stream",
+      "Application/Octet-Stream",
+      "application/octet-stream; foo=bar",
+      " application/octet-stream ",
+    ]) {
+      expect(
+        () => assertCsrfSafe(request("POST", body(contentType)), "admin", BINARY),
+        contentType,
+      ).not.toThrow();
+      expect(() => assertCsrfSafe(request("POST", body(contentType))), contentType).toThrowError(
+        expect.objectContaining({ code: "forbidden" }) as Error,
+      );
+    }
+  });
+
+  it("refuses every other content type on the upload route, JSON included", () => {
+    for (const contentType of [
+      "multipart/form-data; boundary=x",
+      "text/plain",
+      "application/x-www-form-urlencoded",
+      "image/jpeg",
+      "image/png",
+      "application/json",
+      "application/octet-streamx",
+      "application/octet",
+      "octet-stream",
+      undefined,
+    ]) {
+      expect(
+        () => assertCsrfSafe(request("POST", body(contentType)), "admin", BINARY),
+        String(contentType),
+      ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+    }
+  });
+
+  it("treats a chunked body as a body on the upload route too", () => {
+    expect(() =>
+      assertCsrfSafe(
+        request("POST", { ...OK, "transfer-encoding": "chunked", "content-type": "text/plain" }),
+        "admin",
+        BINARY,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+  });
+
+  it("still requires the CSRF header with an octet-stream body", () => {
+    expect(() =>
+      assertCsrfSafe(
+        request("POST", { "content-length": "10", "content-type": "application/octet-stream" }),
+        "admin",
+        BINARY,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+    expect(() =>
+      assertCsrfSafe(
+        request("POST", {
+          "x-fluxkit-csrf": "true",
+          "content-length": "10",
+          "content-type": "application/octet-stream",
+        }),
+        "admin",
+        BINARY,
+      ),
+    ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+  });
+
+  it("says which content type the upload route needs", () => {
+    let message = "";
+    try {
+      assertCsrfSafe(request("POST", body("image/png")), "admin", BINARY);
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toBe(
+      "This upload route needs Content-Type: application/octet-stream with the header X-Fluxkit-CSRF: 1.",
+    );
+  });
+
+  it("is off by default and when the option is false", () => {
+    expect(() =>
+      assertCsrfSafe(request("POST", body("application/octet-stream")), "admin", {
+        acceptsBinaryUpload: false,
+      }),
+    ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+    expect(() =>
+      assertCsrfSafe(request("POST", body("application/octet-stream")), "store"),
+    ).toThrowError(expect.objectContaining({ code: "forbidden" }) as Error);
+  });
+});

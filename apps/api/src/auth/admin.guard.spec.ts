@@ -13,6 +13,7 @@ import {
   resolveRouteAccess,
 } from "./route-access.js";
 import { getCurrentAdmin } from "./current-admin.js";
+import { AcceptsBinaryUpload } from "./csrf.js";
 
 function principal(role: AdminRole): AdminPrincipal {
   return {
@@ -34,6 +35,13 @@ class DefaultsController {
   login(): void {}
   @AuthenticatedAdminRoute()
   logout(): void {}
+}
+
+@UseDefaultPermissionByMethod()
+class UploadController {
+  @AcceptsBinaryUpload()
+  upload(): void {}
+  create(): void {}
 }
 
 class PlainController {
@@ -292,6 +300,61 @@ describe("AdminGuard", () => {
           handler,
         ).rejects.toThrow(/cannot be both/);
       }
+    });
+  });
+
+  describe("@AcceptsBinaryUpload (ADR 0028 decision 4)", () => {
+    const binaryHeaders = {
+      "x-fluxkit-csrf": "1",
+      "content-length": "4",
+      "content-type": "application/octet-stream",
+    };
+
+    it("lets an octet-stream body through on the marked route only", async () => {
+      const guard = guardFor(() => principal("manager"));
+      expect(
+        await guard.canActivate(
+          contextFor(UploadController, "upload", "POST", binaryHeaders).context,
+        ),
+      ).toBe(true);
+      await expect(
+        guard.canActivate(contextFor(UploadController, "create", "POST", binaryHeaders).context),
+      ).rejects.toMatchObject({ code: "forbidden" });
+      await expect(
+        guard.canActivate(contextFor(DefaultsController, "create", "POST", binaryHeaders).context),
+      ).rejects.toMatchObject({ code: "forbidden" });
+    });
+
+    it("refuses JSON and a missing CSRF header on the marked route, before authentication", async () => {
+      let calls = 0;
+      const guard = guardFor(() => {
+        calls += 1;
+        return principal("owner");
+      });
+      for (const headers of [
+        { ...binaryHeaders, "content-type": "application/json" },
+        { ...binaryHeaders, "content-type": "multipart/form-data; boundary=x" },
+        { "content-length": "4", "content-type": "application/octet-stream" },
+      ]) {
+        await expect(
+          guard.canActivate(contextFor(UploadController, "upload", "POST", headers).context),
+          JSON.stringify(headers),
+        ).rejects.toMatchObject({ code: "forbidden" });
+      }
+      expect(calls).toBe(0);
+    });
+
+    it("still authenticates and checks the permission after the exception", async () => {
+      await expect(
+        guardFor(() => undefined).canActivate(
+          contextFor(UploadController, "upload", "POST", binaryHeaders).context,
+        ),
+      ).rejects.toMatchObject({ code: "unauthorized" });
+      await expect(
+        guardFor(() => principal("viewer")).canActivate(
+          contextFor(UploadController, "upload", "POST", binaryHeaders).context,
+        ),
+      ).rejects.toMatchObject({ code: "forbidden" });
     });
   });
 });
