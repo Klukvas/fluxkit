@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
 import { describeFailure, type MessageDescriptor } from "../lib/problem-messages";
 import { PATHS } from "../router/paths";
+import { useConfirmLeave } from "../router/unsaved-changes-dialog";
 import { useSession } from "../session/session-context";
 
 export interface UserMenuViewProps {
@@ -48,6 +49,8 @@ export function UserMenu() {
   const session = useSession();
   const [signingOut, setSigningOut] = useState(false);
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
+  // Sign-out discards the page: unsaved input asks "Leave this page?" first, as a navigation would.
+  const leave = useConfirmLeave();
 
   async function signOut() {
     setSigningOut(true);
@@ -58,12 +61,15 @@ export function UserMenu() {
   }
 
   return (
-    <UserMenuView
-      t={t}
-      email={session.state.me?.user.email ?? ""}
-      signingOut={signingOut}
-      failure={failure}
-      onSignOut={() => void signOut()}
-    />
+    <>
+      <UserMenuView
+        t={t}
+        email={session.state.me?.user.email ?? ""}
+        signingOut={signingOut}
+        failure={failure}
+        onSignOut={() => leave.confirm(() => void signOut())}
+      />
+      {leave.dialog}
+    </>
   );
 }

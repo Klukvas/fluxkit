@@ -1,3 +1,5 @@
+import { Children, isValidElement, type ReactElement, type ReactNode } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { AccountDetailsView, PasswordFormView } from "../areas/account/account-page";
 import { LoginFrame } from "../areas/auth/login-page";
@@ -93,6 +95,33 @@ describe("ResourceFallback", () => {
     for (const status of ["loading", "forbidden", "notFound"] as const) {
       expectNoHardcodedText(render({ status }));
     }
+  });
+});
+
+describe("language switch while a switch runs (step 13 review, L3)", () => {
+  /** The language buttons of the view's element tree (the view has no hooks, so it can be called directly). */
+  function buttons(element: ReactNode): ReactElement<{ lang?: string; onClick?: () => void }>[] {
+    if (!isValidElement(element)) return [];
+    const props = element.props as { lang?: string; children?: ReactNode };
+    const own = typeof props.lang === "string" ? [element as ReactElement<{ lang?: string }>] : [];
+    return [...own, ...Children.toArray(props.children).flatMap(buttons)];
+  }
+
+  it("keeps the buttons focusable (aria-disabled, never disabled) and ignores their activation", () => {
+    const chosen: string[] = [];
+    const busy = <LanguageSwitchView t={t} locale="uk" onChange={(l) => chosen.push(l)} busy />;
+    const html = renderToStaticMarkup(busy);
+    expect(html.match(/aria-disabled="true"/g)).toHaveLength(2);
+    expect(html).not.toMatch(/\sdisabled=""/);
+    const found = buttons(
+      LanguageSwitchView({ t, locale: "uk", onChange: (l) => chosen.push(l), busy: true }),
+    );
+    expect(found.map((button) => button.props.lang)).toEqual(["uk", "en"]);
+    for (const button of found) button.props.onClick?.();
+    expect(chosen).toEqual([]);
+    const idle = buttons(LanguageSwitchView({ t, locale: "uk", onChange: (l) => chosen.push(l) }));
+    idle[1]?.props.onClick?.();
+    expect(chosen).toEqual(["en"]);
   });
 });
 

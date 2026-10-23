@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import type { AdminApi } from "../support/api.ts";
 import { SPA } from "../support/env.ts";
-import { expect, test, unique } from "../support/fixtures.ts";
+import { CREDENTIALS, expect, test, unique } from "../support/fixtures.ts";
 
 /** A short description of the focused element: role or tag, and its accessible text. */
 function focused(page: Page): Promise<string> {
@@ -168,4 +168,45 @@ test("two arrow keys faster than the router: the selected tab follows the focus"
   await expect(page).toHaveURL(/[?&]tab=stock/);
   await expect(main.getByRole("tab", { name: "Stock" })).toHaveAttribute("aria-selected", "true");
   await expect(main.getByRole("tabpanel", { name: "Stock" })).toBeVisible();
+});
+
+test("keyboard only: the focus lands on the page heading after sign-in and after a navigation, and stays on the language button", async ({
+  page,
+}) => {
+  // Sign-in from a deep link with the keyboard: the requested page's heading gets the focus (the shell's first render
+  // after the sign-in page is a navigation; the products area is a lazy chunk with lazy message files).
+  await page.goto(`${SPA}/products`);
+  await expect(page.getByRole("heading", { level: 1, name: "Sign in to the admin" })).toBeVisible();
+  await page.getByLabel("Email", { exact: true }).focus();
+  await page.keyboard.type(CREDENTIALS.manager.email);
+  await page.keyboard.press("Tab");
+  await page.keyboard.type(CREDENTIALS.manager.password);
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: "Products" })).toBeVisible();
+  await expect.poll(() => focused(page)).toBe("h1:Products");
+
+  // A side navigation link activated with Enter: the new area's heading, not `main` and not the link.
+  const navigation = page.getByRole("navigation", { name: "Admin sections" });
+  await navigation.getByRole("link", { name: "Customers" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeVisible();
+  await expect.poll(() => focused(page)).toBe("h1:Customers");
+  // The heading is focusable by script only: Tab goes on from it into the page.
+  await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toHaveAttribute(
+    "tabindex",
+    "-1",
+  );
+
+  // The language switch keeps the focus on the pressed button while the texts load and after.
+  const ukrainian = page.getByRole("button", { name: "Українська" });
+  await ukrainian.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: "Покупці" })).toBeVisible();
+  await expect(ukrainian).toHaveAttribute("aria-pressed", "true");
+  expect(await focused(page)).toBe("button:Українська");
+  await page.keyboard.press("Tab");
+  expect(await focused(page)).toBe("button:English");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { level: 1, name: "Customers" })).toBeVisible();
+  expect(await focused(page)).toBe("button:English");
 });

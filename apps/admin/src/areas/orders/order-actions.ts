@@ -41,3 +41,13 @@ export function offeredActions(
       FROM[action].includes(status) && canRun(permissions, ORDER_ACTION_OPERATIONS[action]),
   );
 }
+
+/**
+ * Whether an order dialog may close now (Escape, Cancel, or a close in the same task as the submit): never while its write
+ * runs, counted from the moment the write starts (`writing`, the page's single flight, before React renders the busy
+ * state) to its answer. A dialog closed under a running write would hide the answer and the admin's input (step 13
+ * review, G15).
+ */
+export function canCloseOrderDialog(state: { busy: boolean; writing: boolean }): boolean {
+  return !state.busy && !state.writing;
+}

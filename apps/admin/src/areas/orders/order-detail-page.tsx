@@ -36,7 +36,7 @@ import {
   type MarkPaidCheck,
   type MarkPaidValues,
 } from "./mark-paid-form";
-import { offeredActions, type OrderAction } from "./order-actions";
+import { canCloseOrderDialog, offeredActions, type OrderAction } from "./order-actions";
 import { OrderDetailView, type HistoryRow } from "./order-detail-view";
 import { CancelDialog, FulfilDialog, MarkPaidDialog } from "./order-dialogs";
 import {
@@ -138,7 +138,7 @@ function OrderDetail({ orderId, config }: { orderId: string; config: AdminConfig
   }
 
   function closeDialog() {
-    if (busy) return;
+    if (!canCloseOrderDialog({ busy, writing: flight.pending() })) return;
     setDialog({ kind: "none" });
     setActionError(null);
   }

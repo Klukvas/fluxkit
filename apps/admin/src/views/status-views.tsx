@@ -1,17 +1,28 @@
 import { Alert, Button, Spinner, type Translator } from "@fluxkit/ui";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { Failure } from "../lib/failure";
 import { describeFailure, type MessageDescriptor } from "../lib/problem-messages";
 import { PATHS } from "../router/paths";
+import { useRouteFocus } from "../router/route-focus";
 
 /**
  * Presentational building blocks for page states: props in, markup out, every word from the translator. Each full-page
- * view renders exactly one `h1` (the shell moves the focus to it after a navigation).
+ * view renders exactly one `h1` (the route focus moves the focus to it after a navigation).
  */
 
+/** The page's `h1`. When it mounts after a navigation (a lazy page), it tells the route focus, which may focus it. */
 export function PageHeading({ children }: { children: ReactNode }) {
-  return <h1 className="text-2xl font-bold text-foreground">{children}</h1>;
+  const focus = useRouteFocus();
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (focus !== null && ref.current !== null) focus.onHeadingMounted(ref.current);
+  }, [focus]);
+  return (
+    <h1 ref={ref} className="text-2xl font-bold text-foreground">
+      {children}
+    </h1>
+  );
 }
 
 function PageView({ title, children }: { title: string; children: ReactNode }) {

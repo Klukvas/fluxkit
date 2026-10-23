@@ -116,7 +116,7 @@ export interface AdminListOrdersOptions extends AdminPageOptions {
 }
 
 export interface AdminListProductsOptions extends AdminPageOptions {
-  /** A slug prefix, a SKU or a title fragment, see `docs/api/catalog.md`. */
+  /** A slug prefix or an exact SKU (no title search), see `docs/api/catalog.md`. */
   q?: string;
   brandId?: string;
   /** Matches direct category assignments only. */

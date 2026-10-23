@@ -65,7 +65,8 @@ const NETWORK_STATUS_LINE = /^Failed to load resource: the server responded with
  * - every write to `/admin/*` (POST, PUT, PATCH, DELETE) carries `X-Fluxkit-CSRF: 1`;
  * - no Content-Security-Policy violation (a `securitypolicyviolation` event or a "Refused to" console line), so no inline
  *   script ran and nothing external was loaded;
- * - no uncaught page error and no console error except Chromium's "Failed to load resource" line for an HTTP error status;
+ * - no uncaught page error and no console error except Chromium's "Failed to load resource" line for an HTTP error status
+ *   (and the errors one scenario names with `expectConsoleErrors`: the route chunk it breaks on purpose);
  * - the English `detail` of a problem answer never appears in the page's text (the SPA shows its own translated messages).
  * Only browser traffic is watched: `page.request` and API contexts (test setup) are not browser requests.
  */
@@ -81,6 +82,8 @@ export class Guard {
   private readonly foreignImages = new Set<string>();
   private readonly blockedImages = new Set<string>();
   private allowedCsp: RegExp | undefined;
+  private allowedConsole: RegExp | undefined;
+  private readonly allowedConsoleErrors: string[] = [];
 
   async watch(context: BrowserContext): Promise<void> {
     // Nothing of the suite may reach the internet: a request to another host is answered here, never sent.
@@ -173,6 +176,10 @@ export class Guard {
         return;
       }
       if (NETWORK_STATUS_LINE.test(text)) return;
+      if (this.allowedConsole?.test(text) === true) {
+        this.allowedConsoleErrors.push(text);
+        return;
+      }
       this.errors.push(`console error: ${text}`);
     });
     context.on("weberror", (error) => {
@@ -183,6 +190,18 @@ export class Guard {
   /** The one scenario that provokes a CSP violation on purpose names it; any other violation still fails. */
   expectCspViolations(pattern: RegExp): void {
     this.allowedCsp = pattern;
+  }
+
+  /**
+   * The one scenario that breaks a request on purpose (a route chunk that cannot be loaded) names the console errors it
+   * expects; they are kept in `consoleErrors` for the test to count, and any other console error still fails.
+   */
+  expectConsoleErrors(pattern: RegExp): void {
+    this.allowedConsole = pattern;
+  }
+
+  get consoleErrors(): readonly string[] {
+    return this.allowedConsoleErrors;
   }
 
   get csp(): readonly string[] {

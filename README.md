@@ -28,7 +28,7 @@ Admin UI v1 (`docs/plans/2026-10-19-admin-ui.md`, ADR 0027): steps 1 to 11 merge
 - Cart (`/store/cart/*`: add, change, remove, acknowledge, delete): guest carts by cookie (`fluxkit_cart`, `CART_TTL_DAYS`) and one cart per signed-in customer, always repriced with the current catalog prices and notices (`price_changed`, `unavailable`, `out_of_stock`), no stock held, server-side totals, and the guest cart merged into the customer's at login and registration (`cartNotices`): `docs/api/cart.md`.
 - Checkout and orders (`POST /store/checkout`, `/store/orders/lookup|cancel`, `/store/account/orders`): one transaction reserves the stock of every line (all or nothing, 30 minutes by default: `ORDER_PAYMENT_TTL_MINUTES`), stores an immutable snapshot with server-side totals and empties the cart; an `Idempotency-Key` makes a retry safe; guests get an access token (`ORDER_GUEST_ACCESS_DAYS`; derived from the order and the idempotency key with `ORDER_TOKEN_SECRET`, so a double submit returns the same token; at most `MAX_OPEN_ORDERS` unpaid orders per email or customer), customers see their history; unpaid orders can be cancelled by their owner. Admins list, read, cancel, mark paid and mark fulfilled orders (`/admin/orders`, permissions `orders.read` and `orders.write`; not the viewer), and plugins read an order through the `OrderReadPort`. Payment and shipping providers are the next steps: `docs/api/orders.md`, `docs/contracts/events.md`. Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs below).
 - Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 8 merged): home, catalog and category pages (brand filter, paging), product page with variants, cart, guest and customer checkout, the guest order page (private link) and the customer's order history, sign-in, registration and profile. Rendering and the same-origin rule: ADR 0026 and `apps/storefront/README.md`; the walkthrough is below. Playwright tests of the purchase flow (`pnpm test:e2e`, 23 tests in 12 files; `apps/storefront/e2e/README.md`).
-- Admin: the SPA under `/admin-ui/` (plan `docs/plans/2026-10-19-admin-ui.md`, steps 1 to 11 merged; images are http(s) addresses until the media upload, step 2b): sign-in, re-sign-in dialog, navigation by role, own account, uk/en; the catalog dictionaries (attributes, options, product types, brands, category tree); products (list, create, the editor with general fields, generated attributes, categories, media, options, variants, prices, stock and the lifecycle); orders (list, detail, mark paid, mark fulfilled, cancel); customers (deactivate, activate, unlock); admin users (owner only). Details in `apps/admin/README.md`. Playwright tests of the admin flows (`pnpm test:e2e` runs them after the storefront's, 17 tests in 10 files; `apps/admin/e2e/README.md`).
+- Admin: the SPA under `/admin-ui/` (plan `docs/plans/2026-10-19-admin-ui.md`, steps 1 to 11 merged; images are http(s) addresses until the media upload, step 2b): sign-in, re-sign-in dialog, navigation by role, own account, uk/en; the catalog dictionaries (attributes, options, product types, brands, category tree); products (list, create, the editor with general fields, generated attributes, categories, media, options, variants, prices, stock and the lifecycle); orders (list, detail, mark paid, mark fulfilled, cancel); customers (deactivate, activate, unlock); admin users (owner only). Details in `apps/admin/README.md`. Playwright tests of the admin flows (`pnpm test:e2e` runs them after the storefront's, 21 tests in 10 files; `apps/admin/e2e/README.md`).
 - CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test, and the Playwright `e2e` job (the storefront suite, then the admin suite).
 
 Open decisions and next steps are listed at the end.
@@ -208,7 +208,12 @@ server {
     location ~ ^/admin-ui/assets/ {
         root /srv/fluxkit/site;
         try_files $uri =404;
-        add_header Cache-Control "public, max-age=31536000, immutable" always;
+        # Without "always": nginx adds it to successful answers only, so a 404 for a hashed file a deployment removed is
+        # not cached for a year by browsers and CDNs (with "always" a tab open across the deployment would keep failing).
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        # A location with its own add_header inherits NONE of the server-level add_header lines: repeat your
+        # Strict-Transport-Security here and in the next location, for example:
+        # add_header Strict-Transport-Security "max-age=31536000" always;
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -222,6 +227,7 @@ server {
         root /srv/fluxkit/site;
         try_files $uri /admin-ui/index.html;
         add_header Cache-Control "no-cache" always;
+        # add_header Strict-Transport-Security "max-age=31536000" always;   (repeat the server-level HSTS, see above)
         add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
@@ -240,7 +246,10 @@ server {
 }
 ```
 
-The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. In the nginx example the API regex needs a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher lists the same paths, so check it with your version. The e2e proxies match both forms.
+The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block is unchanged. Neither example is tested in this repository (the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references). Check before use:
+- In the nginx example the API regex needs a slash after the prefix, so a bare `/admin` or `/store` reaches the storefront (the API accepts both); the Caddy matcher lists the same paths, so check it with your version. The e2e proxies match both forms.
+- A missing hashed asset must not be cached as a 404 for a year (it would keep a tab that was open across a deployment broken). nginx: the immutable `Cache-Control` line has no `always`, so nginx does not add it to the 404. Caddy: `header` sets its value before `file_server` answers, so the 404 for a missing file probably carries the immutable header too (reasoned, not tried); check it with your version and, if it does, send `Cache-Control: no-store` for that 404 (for example in a `handle_errors` block).
+- HSTS: nginx does not inherit server-level `add_header` lines into a location that has its own `add_header`, so a `Strict-Transport-Security` header set on the `server` must be repeated in both `/admin-ui` locations (the commented lines). Caddy has no such inheritance rule: a site-level `header Strict-Transport-Security ...` outside the `handle` blocks also applies to the `/admin-ui` answers (from the Caddy documentation, not tried here).
 
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
 

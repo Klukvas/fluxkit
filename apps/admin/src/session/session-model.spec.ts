@@ -69,7 +69,7 @@ describe("session model", () => {
     expect(other.redirect?.to).toBe("/");
   });
 
-  it("also resets when a reload of me shows another user (a sign-in in another tab)", () => {
+  it("also resets when a reload of me (after a 403) shows another user", () => {
     const state = sessionReducer(signedIn(), { type: "meLoaded", me: me("u2") });
     expect(state.redirect?.to).toBe("/");
   });

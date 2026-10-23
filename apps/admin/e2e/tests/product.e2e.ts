@@ -157,3 +157,39 @@ test("product flow: create, generated attributes, options, variants, prices, sto
   expect(writes.length).toBeGreaterThanOrEqual(8);
   expect(writes.filter((write) => write.csrf !== "1")).toEqual([]);
 });
+
+test("two submits of the create form in one task send one create", async ({
+  page,
+  signIn,
+  guard,
+  owner,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const slug = `e2e-once-${u}`;
+  await signIn("manager");
+  const main = page.getByRole("main");
+  await page.goto(`${SPA}/products/new`);
+  await main
+    .getByRole("combobox", { name: "Product type" })
+    .selectOption({ label: "Clothing (clothing)" });
+  await main.getByRole("textbox", { name: "Title (Ukrainian)", exact: true }).fill(`Раз ${u}`);
+  await main.getByRole("textbox", { name: "Title (English)", exact: true }).fill(`Once ${u}`);
+  await main.getByRole("textbox", { name: "Slug", exact: true }).fill(slug);
+  // Both submits run before React renders the busy state (a script, an extension, a future programmatic submit).
+  await main.getByRole("button", { name: "Create the product" }).evaluate((button) => {
+    const form = (button as HTMLButtonElement).form;
+    form?.requestSubmit();
+    form?.requestSubmit();
+  });
+  await expect(main.getByText(`Product “Once ${u}” created as a draft.`)).toBeVisible();
+  const creates = guard
+    .writes()
+    .filter(
+      (write) => write.method === "POST" && new URL(write.url).pathname === "/admin/products",
+    );
+  expect(creates, "one create request").toHaveLength(1);
+  const stored = await owner.get<{ items: { slug: string }[] }>(
+    `/admin/products?q=${encodeURIComponent(slug)}&limit=10`,
+  );
+  expect(stored.items.map((item) => item.slug)).toEqual([slug]);
+});

@@ -7,6 +7,7 @@ import {
 } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import {
+  canCloseOrderDialog,
   ORDER_ACTIONS,
   ORDER_ACTION_OPERATIONS,
   ORDER_ACTION_TARGETS,
@@ -60,5 +61,14 @@ describe("order actions offered per status (hints: the server decides)", () => {
       expect(offeredActions(status, ["orders.read"]), status).toEqual([]);
     }
     expect(offeredActions("awaiting_payment", ["orders.write"])).toEqual(["markPaid", "cancel"]);
+  });
+});
+
+describe("canCloseOrderDialog (step 13 review, G15)", () => {
+  it("keeps a dialog open while its write runs, from the start of the write to its answer", () => {
+    expect(canCloseOrderDialog({ busy: true, writing: false })).toBe(false);
+    expect(canCloseOrderDialog({ busy: false, writing: true })).toBe(false);
+    expect(canCloseOrderDialog({ busy: true, writing: true })).toBe(false);
+    expect(canCloseOrderDialog({ busy: false, writing: false })).toBe(true);
   });
 });

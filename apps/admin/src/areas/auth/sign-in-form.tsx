@@ -1,6 +1,7 @@
 import { Alert, Button, Field, Input, type Translator } from "@fluxkit/ui";
 import { useRef, useState, type FormEvent, type Ref } from "react";
 import { describeFailure, type MessageDescriptor } from "../../lib/problem-messages";
+import { createSingleFlight } from "../../lib/single-flight";
 import { useI18n } from "../../i18n/i18n-context";
 import { useSession, type SignInOutcome } from "../../session/session-context";
 import { FailureMessage } from "../../views/status-views";
@@ -122,10 +123,15 @@ export function SignInForm({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<SignInMessage | null>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  // Two submits in one task (before React renders the busy button) send one sign-in.
+  const [flight] = useState(createSingleFlight);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (busy) return;
+    void flight.run(attempt);
+  }
+
+  async function attempt() {
     setBusy(true);
     setMessage(null);
     const outcome = await signIn({ email, password });
