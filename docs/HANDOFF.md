@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-21 (admin UI step 13: the review fixes on `fix/admin-review`, PR not opened yet; admin UI steps 1 to 12 merged in #81 to #95).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-23 (media upload plan drafted on `chore/media-upload-plan`, waiting for the owner's quiz). Before that, 2026-10-21 (admin UI step 13: the review fixes on `fix/admin-review`, PR not opened yet; admin UI steps 1 to 12 merged in #81 to #95).
 
 ## Where we are
 
@@ -49,7 +49,7 @@ The first CI run of `main` after #94 (commit `a4f1a52`, which includes the `e2e`
 ## Next steps (in order)
 
 1. Step 13 review fixes (`fix/admin-review`): open the PR, have it reviewed by a different agent than its author, merge on the owner's word. Then the admin UI plan is complete except step 2b.
-2. Step 2b: media upload, with its own plan file and ADR first: storage provider abstraction (local disk first), an admin upload endpoint (type allow-list by content, size limit, random file names, never executed), safe serving headers, `img-src` for the storefront through `STOREFRONT_IMAGE_HOSTS`, a schema decision if media metadata needs a table. Red zone: API, schema, storage, security.
+2. Step 2b: media upload. Plan drafted: `docs/plans/2026-10-23-media-upload.md` (12 open questions for the owner's quiz; ADR 0028 follows the answers). Scope, with its own plan file and ADR first: storage provider abstraction (local disk first), an admin upload endpoint (type allow-list by content, size limit, random file names, never executed), safe serving headers, `img-src` for the storefront through `STOREFRONT_IMAGE_HOSTS`, a schema decision if media metadata needs a table. Red zone: API, schema, storage, security.
 3. Then, each with its own plan and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by ADR 0005, see Open decisions), and a privacy plan before the EU launch (not written yet).
 4. Launch blockers still open: rate limiting for the catalog routes of `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; the edge proxy in every deployed environment (`README.md`, Deployment notes; the examples are not tested in this repository, the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references), `TRUST_PROXY` set to the exact hop count (ADR 0026); check the per-address limits from two networks after deployment.
 5. Auth follow-ups (each needs its own plan): audit log, session token rotation, Redis-backed login throttle, two-factor, password reset by email.
