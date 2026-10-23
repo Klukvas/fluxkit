@@ -14,6 +14,8 @@ import {
   removeMedia,
   removedMediaCount,
   setMediaLink,
+  unsavedMedia,
+  uploadedMediaRow,
   updateMedia,
   validateMedia,
   type MediaRow,
@@ -242,5 +244,44 @@ describe("removals on save (confirmed before the PUT)", () => {
     expect(removedMediaCount(initial, removeMedia(removeMedia(initial, 0), 0))).toBe(2);
     const added = addMedia(initial, newMediaRow("n", locales));
     expect(removedMediaCount(initial, removeMedia(added, 3))).toBe(0);
+  });
+});
+
+describe("an uploaded image's row", () => {
+  it("has the returned URL, empty alt texts in every content locale and no option value", () => {
+    const row = uploadedMediaRow("new-3", "https://shop.example/media/abc.webp", locales);
+    expect(row).toEqual({
+      key: "new-3",
+      url: "https://shop.example/media/abc.webp",
+      alt: { uk: "", en: "" },
+      optionId: null,
+      optionValueId: null,
+    });
+  });
+
+  it("is appended at the end of the unsaved list and is part of the save body with the next position", () => {
+    const rows = addMedia(
+      three(),
+      uploadedMediaRow("new-1", "https://shop.example/media/abc.webp", locales),
+    );
+    expect(rows.at(-1)?.url).toBe("https://shop.example/media/abc.webp");
+    expect(mediaBody(rows, locales).media.at(-1)).toEqual({
+      url: "https://shop.example/media/abc.webp",
+      alt: null,
+      position: 3,
+      optionId: null,
+      optionValueId: null,
+    });
+    expect(mediaDirty(three(), rows, locales)).toBe(true);
+    expect(validateMedia(rows, context)).toEqual({});
+  });
+});
+
+describe("unsaved media (the unsaved-changes guard)", () => {
+  it("is true for pending uploads even before a row arrived, and for edited rows; false when nothing differs", () => {
+    expect(unsavedMedia(three(), three(), locales, false)).toBe(false);
+    expect(unsavedMedia(three(), three(), locales, true)).toBe(true);
+    const edited = addMedia(three(), newMediaRow("new-1", locales));
+    expect(unsavedMedia(three(), edited, locales, false)).toBe(true);
   });
 });

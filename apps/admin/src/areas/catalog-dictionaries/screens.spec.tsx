@@ -14,6 +14,7 @@ import {
   renderInRouter,
   sentinelTranslator,
   textAttributes,
+  uploadControls,
 } from "../../test-helpers";
 import { AttributeFormView } from "./attribute-form-view";
 import {
@@ -426,6 +427,8 @@ describe("brand form", () => {
         onSubmit={noop}
         cancelTo="/catalog/brands"
         logoAlt="Logo of Acme"
+        uploadsEnabled={true}
+        upload={uploadControls()}
       />,
     );
 

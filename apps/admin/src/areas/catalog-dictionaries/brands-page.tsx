@@ -13,6 +13,7 @@ import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { ResourceFallback } from "../../views/status-views";
 import { BrandFormView } from "./brand-form-view";
+import { useBrandLogoUpload } from "./brand-logo-upload";
 import { ConfigGate, useContentLocales } from "./config-gate";
 import {
   brandCreateBody,
@@ -120,13 +121,15 @@ function BrandCreate() {
   const [created, setCreated] = useState<AdminBrand | null>(null);
   const [unknown, setUnknown] = useState(false);
   const form = useFormSubmit(brandFieldNames(content.locales));
+  const logo = useBrandLogoUpload((logoUrl) => setValues((current) => ({ ...current, logoUrl })));
   const blocker = useUnsavedChangesGuard(
-    !jsonEqual(initial, values) && created === null && !form.state.busy,
+    (!jsonEqual(initial, values) || logo.controls.running) && created === null && !form.state.busy,
   );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (form.state.busy) return;
+    // A save must not race the logo that is still uploading.
+    if (form.state.busy || logo.controls.running) return;
     const issues = validateBrandForm(values, content, "create");
     if (hasIssues(issues)) {
       form.showIssues(issues);
@@ -188,6 +191,8 @@ function BrandCreate() {
             logoAlt={t("dict.brand.logoAlt", {
               name: values.name[content.defaultLocale]?.trim() ?? "",
             })}
+            uploadsEnabled={logo.uploadsEnabled}
+            upload={logo.controls}
           />
         </>
       )}
@@ -218,11 +223,15 @@ function BrandEditForm({
   const [initial, setInitial] = useState(() => brandFormFrom(brand, content.locales));
   const [values, setValues] = useState<BrandFormValues>(initial);
   const form = useFormSubmit(brandFieldNames(content.locales));
-  const blocker = useUnsavedChangesGuard(!jsonEqual(initial, values) && !form.state.busy);
+  const logo = useBrandLogoUpload((logoUrl) => setValues((current) => ({ ...current, logoUrl })));
+  const blocker = useUnsavedChangesGuard(
+    (!jsonEqual(initial, values) || logo.controls.running) && !form.state.busy,
+  );
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (form.state.busy || !canWrite) return;
+    // A save must not race the logo that is still uploading.
+    if (form.state.busy || !canWrite || logo.controls.running) return;
     const issues = validateBrandForm(values, content, "edit");
     if (hasIssues(issues)) {
       form.showIssues(issues);
@@ -260,6 +269,8 @@ function BrandEditForm({
         logoAlt={t("dict.brand.logoAlt", {
           name: resolveLocalized(brand.name, locale, content.defaultLocale) || brand.slug,
         })}
+        uploadsEnabled={logo.uploadsEnabled}
+        upload={logo.controls}
       />
       <UnsavedChangesDialog blocker={blocker} />
     </>
