@@ -59,7 +59,7 @@ The admin SPA is static: the built files read no environment variable and `vite 
 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
-| `ADMIN_DEV_API_URL` | no | `http://127.0.0.1:3000` | Target of the dev and preview proxy for `/admin`, `/admin/*` and `/admin?...` (never `/admin-ui`). An `http` or `https` origin without path, query, fragment or credentials; anything else stops the dev server with an error naming the variable. Not used in any deployed environment: there the edge proxy routes `/admin/*` to the API |
+| `ADMIN_DEV_API_URL` | no | `http://127.0.0.1:3000` | Target of the dev and preview proxy for `/admin`, `/admin/*` and `/admin?...` and for `/media`, `/media/*` and `/media?...` (never `/admin-ui`). An `http` or `https` origin without path, query, fragment or credentials; anything else stops the dev server with an error naming the variable. Not used in any deployed environment: there the edge proxy routes `/admin/*` and `/media/*` to the API |
 
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.

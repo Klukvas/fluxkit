@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /** Ports and credentials of the e2e stack. Throwaway values for a database that is wiped at every run. */
 export const E2E_API_PORT = Number(process.env["E2E_API_PORT"] ?? 3100);
@@ -6,6 +8,13 @@ export const E2E_STOREFRONT_PORT = Number(process.env["E2E_STOREFRONT_PORT"] ?? 
 /** The only origin a browser sees: the proxy (`proxy.ts`). */
 export const E2E_PORT = Number(process.env["E2E_PORT"] ?? 3102);
 export const E2E_ORIGIN = `http://127.0.0.1:${E2E_PORT}`;
+
+/**
+ * Where the API of this suite stores uploaded images: a directory under the system temp directory, never the repository's
+ * `var/media`. Fixed per proxy port (Playwright evaluates the config in its main process and in every worker);
+ * `prepare-database.ts` wipes and creates it before the API starts and `global-teardown.ts` removes it.
+ */
+export const E2E_MEDIA_DIR = join(tmpdir(), `fluxkit-storefront-e2e-media-${String(E2E_PORT)}`);
 
 export const ADMIN_EMAIL = "e2e-owner@example.com";
 export const ADMIN_PASSWORD = "e2e-owner-password-0123456789";
@@ -101,6 +110,12 @@ export function apiEnvironment(env: Env = process.env): Env {
     MAX_OPEN_ORDERS: "3",
     ORDER_PAYMENT_TTL_MINUTES: "30",
     ORDER_GUEST_ACCESS_DAYS: "90",
+    // Uploads on a temp directory; the URLs the API hands out point at the proxy (which routes /media to the API).
+    MEDIA_STORAGE_DRIVER: "local",
+    MEDIA_DIR: E2E_MEDIA_DIR,
+    MEDIA_PUBLIC_BASE_URL: `${E2E_ORIGIN}/media`,
+    MEDIA_MAX_BYTES: "10485760",
+    MEDIA_MAX_PIXELS: "50000000",
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];

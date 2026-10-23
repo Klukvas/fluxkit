@@ -17,7 +17,7 @@ const apiOrigin = `http://127.0.0.1:${String(ADMIN_E2E_API_PORT)}`;
  * nothing is reused (`reuseExistingServer: false`: a leftover server could hide a broken start):
  *   1. the BUILT API on a wiped, migrated and seeded `*_e2e_test` database (`e2e/prepare-database.ts` runs first),
  *   2. `e2e/proxy.ts`, the same-origin proxy the browser talks to: the BUILT SPA under `/admin-ui` with its security
- *      headers, `/admin/*` and `/store/*` to the API (ADR 0027).
+ *      headers, `/admin/*`, `/store/*` and `/media/*` (uploaded images) to the API (ADR 0027, ADR 0028).
  * `global-setup.ts` then creates the manager and the viewer through the users API. `apiEnvironment()` throws before
  * anything starts when a required variable is missing.
  */
@@ -26,6 +26,7 @@ export default defineConfig({
   testMatch: "**/*.e2e.ts",
   outputDir: "../test-results",
   globalSetup: "./global-setup.ts",
+  globalTeardown: "./global-teardown.ts",
   // One worker, files and tests in order: the scenarios share one database (the seed, the three admins), and each test
   // creates the data it changes under its own unique codes, slugs and emails (support/unique.ts), so the order does not
   // matter for the result; one worker keeps the API's in-memory windows and the run time predictable.
