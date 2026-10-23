@@ -3,7 +3,7 @@
 Read this first when you pick up the project (Claude Code, Codex, or a human). It says where we are, what is next, and the working agreements that are not obvious from the code.
 Rules live in `AGENTS.md`; decisions in `docs/adr/`; plans in `docs/plans/`. This file is the short bridge between them.
 
-**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-23 (media upload plan drafted on `chore/media-upload-plan`, waiting for the owner's quiz). Before that, 2026-10-21 (admin UI step 13: the review fixes on `fix/admin-review`, PR not opened yet; admin UI steps 1 to 12 merged in #81 to #95).
+**Update this file in every PR that changes project state** (a PR merged, a step finished, a decision taken, a new working agreement). Last updated: 2026-10-23 (media upload plan answered by the owner on `chore/media-upload-plan`; admin UI step 13 merged as #101). Before that, 2026-10-21 (admin UI step 13: the review fixes on `fix/admin-review`, PR not opened yet; admin UI steps 1 to 12 merged in #81 to #95).
 
 ## Where we are
 
@@ -17,7 +17,7 @@ Fluxkit is a white-label e-commerce template: own TypeScript core, NestJS + Driz
 | Pricing and inventory `2026-10-16-pricing-and-inventory.md` | Complete: PRs #40 to #48 (ADRs 0011 to 0014). |
 | Cart, customers and orders `2026-10-17-cart-and-orders.md` | Complete: PRs #49 to #64 (ADRs 0015 to 0025). Review follow-ups below. |
 | Storefront v1 `2026-10-18-storefront.md` | Complete: steps 1 to 10 merged (PRs #66 to #79; #78 is the step 9 docs sweep, #79 the step 10 review fixes). No online payment and no search: orders stay `awaiting_payment` until an admin marks them paid or they expire. |
-| Admin UI v1 `2026-10-19-admin-ui.md` | Steps 1 to 12 merged (#81 to #95). Step 13: the review is done (no High, one Medium, seven Low); its fixes are on `fix/admin-review` (PR not opened). Then only step 2b (media upload) is left. |
+| Admin UI v1 `2026-10-19-admin-ui.md` | Steps 1 to 12 merged (#81 to #95). Step 13 merged (#101): independent review (no High, one Medium, seven Low) and its fixes. Only step 2b (media upload) is left. |
 
 Not built: payment and shipping providers, email delivery, search, image upload (the admin takes product and brand images as http(s) addresses only), and a production deployment (no API or storefront image; the admin is static files that the edge proxy serves, see `README.md`, Deployment notes).
 
@@ -42,19 +42,18 @@ Not built: payment and shipping providers, email delivery, search, image upload 
 | 11 | Admin end-to-end suite `apps/admin/e2e`; root `pnpm test:e2e` runs both suites | #94 |
 | 12 | Docs sweep | #95 |
 | 13 | Independent review by a different agent than the authors: done; fixes of M1, L1, L3 to L7 on `fix/admin-review` (plan, "Step 13 review outcome"); L2 kept as a known limitation | PR not opened |
-| 2b | Media upload (storage, upload endpoint, its own plan and ADR first) | not started |
+| 2b | Media upload (storage, upload endpoint, its own plan and ADR first) | plan answered by the owner 2026-10-23 (`docs/plans/2026-10-23-media-upload.md`); implementation not started |
 
 The first CI run of `main` after #94 (commit `a4f1a52`, which includes the `e2e` job with both suites) was still in progress when this file was written. Its result is not recorded here; check it before relying on the e2e suites in CI.
 
 ## Next steps (in order)
 
-1. Step 13 review fixes (`fix/admin-review`): open the PR, have it reviewed by a different agent than its author, merge on the owner's word. Then the admin UI plan is complete except step 2b.
-2. Step 2b: media upload. Plan drafted: `docs/plans/2026-10-23-media-upload.md` (12 open questions for the owner's quiz; ADR 0028 follows the answers). Scope, with its own plan file and ADR first: storage provider abstraction (local disk first), an admin upload endpoint (type allow-list by content, size limit, random file names, never executed), safe serving headers, `img-src` for the storefront through `STOREFRONT_IMAGE_HOSTS`, a schema decision if media metadata needs a table. Red zone: API, schema, storage, security.
-3. Then, each with its own plan and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by ADR 0005, see Open decisions), and a privacy plan before the EU launch (not written yet).
-4. Launch blockers still open: rate limiting for the catalog routes of `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; the edge proxy in every deployed environment (`README.md`, Deployment notes; the examples are not tested in this repository, the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references), `TRUST_PROXY` set to the exact hop count (ADR 0026); check the per-address limits from two networks after deployment.
-5. Auth follow-ups (each needs its own plan): audit log, session token rotation, Redis-backed login throttle, two-factor, password reset by email.
-6. Tooling: `pnpm db:migrate` (forward only; rollbacks are manual through `drizzle/NNNN_name.down.sql`), `pnpm seed`, `pnpm admin:create`, `pnpm admin:unlock` and `pnpm jobs:run-once` exist; there is no migration status or rollback command yet.
-7. Smaller follow-ups from the reviews: the catalog items (C5, tests for the surviving mutations, the `variant.title` column that no route writes, the public attribute definition's display name in the serializer, `requiredText` in the store serializer); pricing (optional migrations `CHECK (reserved <= 1000000000)` on `inventory_level` and a statement-level `TRUNCATE` trigger on `stock_movement`, ADR 0012 and 0013; each needs its own approval).
+1. Step 2b: media upload. Plan with the owner's 12 answers (all recommended options): `docs/plans/2026-10-23-media-upload.md`; merge the plan, then its steps (the first writes ADR 0028). Owner actions: widen the LGPL exception for the `@img/sharp-libvips-*` binaries to the API (`scripts/license-policy.json` and AGENTS.md section 16). Scope, with its own plan file and ADR first: storage provider abstraction (local disk first), an admin upload endpoint (type allow-list by content, size limit, random file names, never executed), safe serving headers, `img-src` for the storefront through `STOREFRONT_IMAGE_HOSTS`, a schema decision if media metadata needs a table. Red zone: API, schema, storage, security.
+2. Then, each with its own plan and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), shipping providers, email delivery (password reset, email verification, order mails), search indexing (blocked by ADR 0005, see Open decisions), and a privacy plan before the EU launch (not written yet).
+3. Launch blockers still open: rate limiting for the catalog routes of `/store/*` (needs a dependency, red zone); decide whether Swagger UI and `/docs-json` stay public in production; the edge proxy in every deployed environment (`README.md`, Deployment notes; the examples are not tested in this repository, the e2e proxies `apps/storefront/e2e/proxy.ts` and `apps/admin/e2e/proxy.ts` are the tested routing references), `TRUST_PROXY` set to the exact hop count (ADR 0026); check the per-address limits from two networks after deployment.
+4. Auth follow-ups (each needs its own plan): audit log, session token rotation, Redis-backed login throttle, two-factor, password reset by email.
+5. Tooling: `pnpm db:migrate` (forward only; rollbacks are manual through `drizzle/NNNN_name.down.sql`), `pnpm seed`, `pnpm admin:create`, `pnpm admin:unlock` and `pnpm jobs:run-once` exist; there is no migration status or rollback command yet.
+6. Smaller follow-ups from the reviews: the catalog items (C5, tests for the surviving mutations, the `variant.title` column that no route writes, the public attribute definition's display name in the serializer, `requiredText` in the store serializer); pricing (optional migrations `CHECK (reserved <= 1000000000)` on `inventory_level` and a statement-level `TRUNCATE` trigger on `stock_movement`, ADR 0012 and 0013; each needs its own approval).
 
 ## Open decisions (owner)
 

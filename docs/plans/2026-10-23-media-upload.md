@@ -1,6 +1,6 @@
 # Plan: media upload (admin UI plan step 2b)
 
-Status: draft, waiting for the owner's quiz answers (see "Open questions"). Nothing is built. No code, schema, dependency, config, OpenAPI or CI change is made by this plan's PR.
+Status: owner's quiz answered 2026-10-23, all 12 answers are the recommended options (section "Owner answers"); approved when this plan's PR is merged on the owner's word. Nothing is built. No code, schema, dependency, config, OpenAPI or CI change is made by this plan's PR.
 Roles: Architect (this plan, ADR 0028 in step 1), Orchestrator (task split, path ownership, verification, mutation checks), Developers (Sonnet 5.5; Opus 5.5 for the migration and the upload pipeline, which are security-critical), independent Reviewer (Opus 5.5 or Codex, never the author's model), Docs inside each step.
 Follows: `docs/plans/2026-10-19-admin-ui.md` (owner answer 5 "Image file upload in v1", its consequence paragraph "Q5, file upload now", step 2b). Design basis: AGENTS.md sections 1 (providers are core abstractions), 2.1, 2.3, 3, 11, 13, 14, 16; ADR 0004, 0006 (media table), 0007, 0009 (CSRF), 0018 (ports), 0025 (bounded jobs), 0026, 0027.
 
@@ -264,6 +264,24 @@ ADR 0028 and the ADR index; `docs/api/media.md` (new) and `docs/api/README.md`, 
 - **Config schema**: `MEDIA_STORAGE_DRIVER`, `MEDIA_DIR`, `MEDIA_PUBLIC_BASE_URL`, `MEDIA_MAX_BYTES`, `MEDIA_MAX_PIXELS`; the `ADMIN_DEV_API_URL` row text.
 - **CI**: none planned (no new job or service); the e2e suites gain scenarios.
 - Not touched: payments, pricing, order totals, the session and login rules, core/feature moves, feature flags.
+
+## Owner answers (quiz 2026-10-23; every answer is the recommended option)
+| # | Question | Answer |
+|---|---|---|
+| 1 | Processing | Re-encode: orientation applied, metadata (incl. GPS) dropped, downscaled to fit 4 096 px |
+| 2 | Library | `sharp` in `apps/api`; the owner widens the LGPL exception for the `@img/sharp-libvips-*` binaries to the API (edits `license-policy.json` and AGENTS.md section 16) |
+| 3 | Formats | JPEG, PNG, WebP (checked by magic bytes before `sharp` sees the file) |
+| 4 | SVG | Refused (an external SVG URL can still be entered by hand) |
+| 5 | Limits | 10 MiB, 50 MP, 12 000 px per side in; output fits 4 096 px |
+| 6 | Records | Table `media_upload` (migration 0005 with a hand-written down script); `media.url` and `brand.logo_url` keep the URL, the public store API shape is unchanged |
+| 7 | Serving | The API route `GET /media/{key}` behind the edge proxy; `MEDIA_PUBLIC_BASE_URL` allows a cookie-less host or a CDN |
+| 8 | Draft product images | Public at an unguessable URL, listed nowhere |
+| 9 | Core or feature | Core, switched by `MEDIA_STORAGE_DRIVER=local\|none` (`none` leaves URL entry only) |
+| 10 | Alt text | Keep the current model (product media `alt` as a translated field; brands have none) |
+| 11 | Request format | Raw `application/octet-stream`, one file per request; the CSRF header stays mandatory and `application/octet-stream` is allowed on this one route only (an auth change approved by this answer; ADR needed) |
+| 12 | Deletion | Only uploads never attached within 24 hours; files that were ever attached stay (order snapshots store the image URL) |
+
+Consequences to carry into the steps: the red-zone approvals listed in "Needs approval" are given by these answers for the items named there (sharp and the LGPL scope, migration 0005, the upload and `GET /media/{key}` contracts, the `media` block of `/admin/config`, the CSRF exception for one route, the config variables); the owner's own file edits (AGENTS.md section 16, `scripts/license-policy.json` scope) stay with the owner and are tracked in HANDOFF; the first implementation step writes the ADR (storage port, CSRF exception, serving) before code.
 
 ## Open questions (owner quiz; recommended option first; ordered by importance)
 1. **Store the uploaded file as is, or re-encode it?**
