@@ -72,6 +72,16 @@ export class MediaFilesController {
     return this.serve(request, response, false);
   }
 
+  /**
+   * The bare `/media` and `/media/` (no key): the same 404 instead of the router's cacheable one (step 9 review). Express
+   * answers HEAD with this GET handler (no body), so no separate HEAD route is needed here.
+   */
+  @Get()
+  @ApiExcludeEndpoint()
+  getBare(@Req() request: Request, @Res() response: Response): Promise<void> {
+    return this.serve(request, response, true);
+  }
+
   /** Deeper paths (`/media/ab/cd/<key>`) are never files: the same 404 instead of the router's cacheable one. */
   @Get("*rest")
   @ApiExcludeEndpoint()

@@ -311,7 +311,7 @@ Decisions taken where the plan was silent (the owner may revisit):
 - **`vite-config.spec.ts`** (outside the listed paths) changed with the config: it asserted exactly one proxy key. `docs/api/media.md` "Not built yet" became "Routing and operations" (doc only; the section was stale).
 - **Vite and previews**: an upload's URL is `MEDIA_PUBLIC_BASE_URL/<key>`, whose default is the API's own origin, so the `/media` proxy rule helps only when the API is started with that variable set to the dev server's origin plus `/media`; `apps/admin/README.md` says so.
 
-Finding (not fixed, `apps/api`): `/media` and `/media/` (no key segment) answer the router's `404` without `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; every path with a segment has both. `docs/api/media.md` and the step 4 outcome say every path under `/media/` is a `no-store` 404. Low impact.
+Finding (fixed by the step 9 review, see "Step 9 review outcome"): `/media` and `/media/` (no key segment) answer the router's `404` without `Cache-Control: no-store` and `X-Content-Type-Options: nosniff`; every path with a segment has both. `docs/api/media.md` and the step 4 outcome say every path under `/media/` is a `no-store` 404. Low impact.
 
 ## Risks
 - **Decoder vulnerabilities in libvips and its codecs** reachable by any `catalog.write` admin. Mitigation: allow-list before decode, exact pin, Dependabot, audit. A sandboxed worker process (or a separate image service) is the later hardening.

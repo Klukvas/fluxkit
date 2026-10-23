@@ -418,11 +418,12 @@ test("/media reaches the API: unknown keys and traversal attempts are a plain 40
     expect(answer.headers()["set-cookie"], path).toBeUndefined();
     expect(await answer.text(), path).not.toContain("etc");
   }
-  // The bare prefix is also routed to the API (not to a proxy 404 text). Its 404 is the router's own: see the findings in
-  // README.md ("no `Cache-Control: no-store`"), so only the status is pinned here.
+  // The bare prefix is also routed to the API (not to a proxy 404 text), with the same never-cached 404 (step 9 review).
   for (const path of ["/media", "/media/"]) {
     const answer = await anonymous.get(path);
     expect(answer.status(), path).toBe(404);
+    expect(answer.headers()["cache-control"], path).toBe("no-store");
+    expect(answer.headers()["x-content-type-options"], path).toBe("nosniff");
     expect(await answer.text(), path).not.toContain("e2e proxy");
   }
 });

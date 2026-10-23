@@ -44,7 +44,7 @@ All are `application/problem+json`. Validation answers carry one `errors[]` entr
 
 ## Served headers (`GET /media/{key}`, pinned by `media-files.spec.ts`)
 
-`Content-Type` (`image/jpeg`, `image/png` or `image/webp`, from the key's extension), `Content-Length`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`, `Content-Disposition: inline; filename="<key>"`, `Cache-Control: public, max-age=31536000, immutable`, `ETag: "<key>"`, `Cross-Origin-Resource-Policy: cross-origin`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`. A `404` carries `Cache-Control: no-store` and `nosniff`. Any path under `/media/` that is not exactly `/media/<key>` (percent-encoded keys, upper case, traversal, deeper paths) is `404`.
+`Content-Type` (`image/jpeg`, `image/png` or `image/webp`, from the key's extension), `Content-Length`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox`, `Content-Disposition: inline; filename="<key>"`, `Cache-Control: public, max-age=31536000, immutable`, `ETag: "<key>"`, `Cross-Origin-Resource-Policy: cross-origin`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`. A `404` carries `Cache-Control: no-store` and `nosniff`. Any path under `/media/` that is not exactly `/media/<key>` (percent-encoded keys, upper case, traversal, deeper paths) is `404`, and so are the bare `/media` and `/media/` (with `no-store` and `nosniff` since the step 9 review; before, they got the router's plain `404`).
 
 ## Attach marking (product media and brand logos)
 
@@ -66,4 +66,4 @@ Peak resident memory of one Node process running only the pipeline (`process.res
 
 ## Routing and operations (plan step 8)
 
-`/media/*` is routed to the API by the e2e proxies (`apps/admin/e2e/proxy.ts`, `apps/storefront/e2e/proxy.ts`), by the Vite dev and preview proxy (`apps/admin/vite.config.ts`, target `ADMIN_DEV_API_URL`) and in the README Caddy and nginx examples (untested). The browser e2e of uploads is `apps/admin/e2e/tests/media-upload.e2e.ts`. The volume, backup, memory, nginx body size, Next optimizer and cleanup-job notes are in the root `README.md`, "Uploaded images". The bare `/media` and `/media/` answer the router's `404` without `Cache-Control: no-store` and `X-Content-Type-Options` (every path with a segment has both; `apps/admin/e2e/README.md`, "Findings of media plan step 8").
+`/media/*` is routed to the API by the e2e proxies (`apps/admin/e2e/proxy.ts`, `apps/storefront/e2e/proxy.ts`), by the Vite dev and preview proxy (`apps/admin/vite.config.ts`, target `ADMIN_DEV_API_URL`) and in the README Caddy and nginx examples (untested). The browser e2e of uploads is `apps/admin/e2e/tests/media-upload.e2e.ts`. The volume, backup, memory, nginx body size, Next optimizer and cleanup-job notes are in the root `README.md`, "Uploaded images".
