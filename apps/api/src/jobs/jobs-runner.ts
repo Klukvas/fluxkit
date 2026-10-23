@@ -1,8 +1,11 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import { summarizeError } from "../common/error-summary.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
+import { MEDIA_STORAGE_PORT, type MediaStoragePort } from "@fluxkit/core";
+import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
 import { OrdersService } from "../orders/orders.service.js";
+import { ABANDONED_UPLOAD_LIMITS, deleteAbandonedUploads } from "./delete-abandoned-uploads.job.js";
 import { deleteDispatchedEvents } from "./delete-dispatched-events.job.js";
 import { deleteExpiredCarts } from "./delete-expired-carts.job.js";
 import { deleteExpiredCustomerSessions } from "./delete-expired-customer-sessions.job.js";
@@ -24,6 +27,7 @@ export const JOB_NAMES = [
   "delete-dispatched-events",
   "delete-carts",
   "delete-customer-sessions",
+  "delete-abandoned-uploads",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -48,6 +52,8 @@ export class JobsRunner {
     @Inject(OrdersService) private readonly orders: OrdersService,
     @Inject(ReservationsService) private readonly reservations: ReservationsService,
     @Inject(DomainEventHandlerRegistry) private readonly handlers: DomainEventHandlerRegistry,
+    @Inject(MEDIA_STORAGE_PORT) private readonly mediaStorage: MediaStoragePort,
+    @Inject(MEDIA_CONFIG) private readonly mediaConfig: MediaConfig,
     @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
   ) {
     this.leases = pgEventLeaseSource(databaseUrl);
@@ -56,7 +62,7 @@ export class JobsRunner {
   /**
    * Order, on purpose: the time-critical jobs first, so that nothing slow after them can delay them (ADR 0025): orders
    * (their expiry releases the reservations and writes `order.expired`), then the generic reservation sweep (which now
-   * only finds orphans), then the events (including the ones just written), then the three cleanups. Every job gets its
+   * only finds orphans), then the events (including the ones just written), then the four cleanups (the last one deletes files, so it goes last). Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -102,6 +108,14 @@ export class JobsRunner {
     );
     await run("delete-customer-sessions", (budget) =>
       deleteExpiredCustomerSessions({ database, repository }, now, DEFAULT_CLEANUP_LIMITS, budget),
+    );
+    await run("delete-abandoned-uploads", (budget) =>
+      deleteAbandonedUploads(
+        { database, repository, storage: this.mediaStorage, config: this.mediaConfig },
+        now,
+        ABANDONED_UPLOAD_LIMITS,
+        budget,
+      ),
     );
     return reports;
   }

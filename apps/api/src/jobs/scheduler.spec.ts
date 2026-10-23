@@ -1,7 +1,11 @@
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { Logger } from "@nestjs/common";
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { keyToRelativePath, type MediaKey } from "@fluxkit/core";
 import { createApp } from "../app.factory.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { startApp, type RunningApp } from "../test/app.js";
@@ -10,6 +14,7 @@ import { CartCatalog } from "../test/cart-fixtures.js";
 import { createTestCustomer, type TestCustomer } from "../test/customer-fixtures.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { FakeClock } from "../test/fake-clock.js";
+import { startMediaApp } from "../test/media-app.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { PlacedOrders } from "../test/order-fixtures.js";
 import { eventsOf, orderRow } from "../test/order-http.js";
@@ -348,6 +353,35 @@ describe("the scheduler: advisory lock, ticks, shutdown (real Postgres)", () => 
         clock.set(START);
         await placedOrders.cleanup();
         await pool.query("delete from customer where id = $1", [customer.id]);
+      }
+    });
+
+    it("a tick deletes an abandoned upload and its file (real MEDIA_DIR, injected clock)", async () => {
+      const media = await startMediaApp({ clock });
+      const key = `${randomUUID().replaceAll("-", "")}.webp` as MediaKey;
+      const path = join(media.mediaDir, keyToRelativePath(key));
+      try {
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, "webp-bytes");
+        await pool.query(
+          `insert into media_upload (storage_key, content_type, byte_size, width, height, sha256, created_at)
+           values ($1, 'image/webp', 10, 1, 1, $2, $3)`,
+          [key, "d".repeat(64), new Date(START.getTime() - 25 * 60 * MINUTE)],
+        );
+        const outcome = await schedulerOf(media).tick();
+        expect(outcome.status).toBe("ran");
+        const report =
+          outcome.status === "ran"
+            ? outcome.reports.find((candidate) => candidate.name === "delete-abandoned-uploads")
+            : undefined;
+        expect(report).toMatchObject({ ok: true, result: { deleted: 1, truncated: false } });
+        expect(
+          (await pool.query("select 1 from media_upload where storage_key = $1", [key])).rowCount,
+        ).toBe(0);
+        expect(existsSync(path)).toBe(false);
+      } finally {
+        await pool.query("delete from media_upload where storage_key = $1", [key]);
+        await media.close();
       }
     });
 

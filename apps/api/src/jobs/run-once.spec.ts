@@ -1,8 +1,13 @@
+import { randomBytes } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { keyToRelativePath, type MediaKey } from "@fluxkit/core";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { JobsRepository } from "./jobs.repository.js";
@@ -80,6 +85,42 @@ describe("pnpm jobs:run-once (real Postgres)", () => {
         /^expire-orders: scanned=\d+ expired=\d+ notDue=\d+ failures=0 truncated=false$/,
       );
       expect(lines.every((line) => !line.includes("FAILED"))).toBe(true);
+    });
+
+    it("deletes an abandoned upload and its file in a real process (a real MEDIA_DIR)", async () => {
+      const mediaDir = await mkdtemp(join(tmpdir(), "fluxkit-run-once-media-"));
+      const pool = new pg.Pool({ connectionString: databaseUrl });
+      const key = `${randomBytes(16).toString("hex")}.png` as MediaKey;
+      const path = join(mediaDir, keyToRelativePath(key));
+      try {
+        await mkdir(dirname(path), { recursive: true });
+        await writeFile(path, "png-bytes");
+        await pool.query(
+          `insert into media_upload (storage_key, content_type, byte_size, width, height, sha256, created_at)
+           values ($1, 'image/png', 9, 1, 1, $2, now() - interval '3 days')`,
+          [key, "c".repeat(64)],
+        );
+        const result = await runEntry([], {
+          ...env,
+          MEDIA_DIR: mediaDir,
+          MEDIA_PUBLIC_BASE_URL: "https://shop.example.test/media",
+        });
+        expect(result.stderr).toBe("");
+        expect(result.code).toBe(0);
+        const line = result.stdout
+          .split("\n")
+          .find((candidate) => candidate.startsWith("delete-abandoned-uploads:"));
+        expect(line).toMatch(
+          /^delete-abandoned-uploads: deleted=[1-9]\d* truncated=false fileErrors=0$/,
+        );
+        const left = await pool.query("select 1 from media_upload where storage_key = $1", [key]);
+        expect(left.rowCount).toBe(0);
+        expect(existsSync(path)).toBe(false);
+      } finally {
+        await pool.query("delete from media_upload where storage_key = $1", [key]);
+        await pool.end();
+        await rm(mediaDir, { recursive: true, force: true });
+      }
     });
 
     it("does not wait for a running scheduler: it says so, runs nothing and exits 2", async () => {
