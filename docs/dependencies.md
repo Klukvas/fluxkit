@@ -143,3 +143,10 @@ Found by `scripts/check-licenses.mjs` (plan step 8): `argparse` is a RUNTIME tra
 ## Audit (2026-10-14)
 `pnpm audit`: 1 moderate finding, `esbuild <=0.24.2` (dev server request exposure) via `drizzle-kit` -> `@esbuild-kit/*` (dev tooling only, not shipped). CI fails only on high severity in production dependencies
 and reports the rest.
+
+## Added in media upload plan step 2 (`sharp` in the API)
+Approved by the owner on 2026-10-23 (media upload plan `docs/plans/2026-10-23-media-upload.md`, quiz answer 2, and the owner's "yes" to using the library; ADR 0028): `sharp` 0.35.5, exact pin, a runtime dependency of `apps/api` for re-encoding uploaded images (orientation applied, metadata dropped, output fitted to 4 096 px). It is already in the lockfile through `next` (image optimization); the API now uses it directly.
+- Licenses: `sharp` and `@img/sharp-linux-x64` are Apache-2.0; the prebuilt `@img/sharp-libvips-*` binaries are LGPL-3.0-or-later. The existing exception (unmodified, dynamically loaded binaries; never copy or modify their code; keep the notices) now also covers the API's use. `scripts/license-policy.json` records it in the `reason` of the two existing entries; `scripts/check-licenses.mjs` matches by package name and license, so it cannot tell who uses a package: the scope is a policy decision, not a technical check. The AGENTS.md section 16 sentence is the owner's file and is updated by the owner. Packages for other platforms (for example `darwin-arm64`, `linux-arm64`) are not in the exceptions list: add them only if the check fails on a machine that installs them.
+- Alternatives considered (plan open question 2): a pure JS/WASM codec (slower, more of our own code, licences unchecked), a separate image service (a new service in Compose). Third-party notices (`pnpm notices`) must be shipped with a client delivery, as before.
+- It decodes SVG, AVIF/HEIF, TIFF and GIF as well: our own magic-byte gate runs before `sharp` sees a file (ADR 0028).
+
