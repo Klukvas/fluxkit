@@ -16,7 +16,9 @@ export interface MediaReference {
  * Attach marking (ADR 0028 decision 5), called by the product media and brand saves inside THEIR transaction: every URL
  * under `MEDIA_PUBLIC_BASE_URL` must name an existing upload, else the save fails with `400 validation_failed`,
  * `upload_not_found` at the URL's field (and rolls back); the uploads it names get `first_attached_at` where it is null.
- * URLs on other prefixes are not looked at. Without a public base URL (driver `none` and none configured) nothing is ours.
+ * URLs on other prefixes are not looked at. Also with the driver `none` (step 9 review M-2): `loadEnv` keeps the prefix there
+ * (the development default, or the given value), so a save made while uploads are off still marks the uploads it uses.
+ * Without a public base URL (`none` in production with none configured) nothing is ours.
  */
 @Injectable()
 export class MediaAttachService {

@@ -384,9 +384,9 @@ export interface AppEnv {
    */
   mediaDir: string | undefined;
   /**
-   * URL prefix of every stored upload, without a trailing slash (`<prefix>/<key>`). Set with `local` (default
-   * `http://127.0.0.1:<PORT>/media` outside production; `https` required in production); with `none` only when given.
-   * Changing it later does not rewrite stored URLs.
+   * URL prefix of every stored upload, without a trailing slash (`<prefix>/<key>`), and the prefix attach marking looks
+   * for. Default `http://127.0.0.1:<PORT>/media` outside production with either driver; in production required with
+   * `local` (`https`), and with `none` set only when given. Changing it later does not rewrite stored URLs.
    */
   mediaPublicBaseUrl: string | undefined;
   /** Largest accepted upload in bytes (1 KiB to 50 MiB). */
@@ -408,6 +408,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
   // Production without a driver was refused above, so the `local` default only ever applies outside production.
   const mediaStorageDriver = env.MEDIA_STORAGE_DRIVER ?? "local";
   const usesLocalDisk = mediaStorageDriver === "local";
+  const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
   return {
     databaseUrl: env.DATABASE_URL,
     redisUrl: env.REDIS_URL,
@@ -435,9 +436,11 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     lowStockThreshold: env.LOW_STOCK_THRESHOLD,
     mediaStorageDriver,
     mediaDir: env.MEDIA_DIR ?? (usesLocalDisk ? defaultMediaDirectory() : undefined),
+    // Also with `none`: attach marking must keep recognising uploads stored earlier under this prefix (step 9 review M-2).
+    // In production `local` requires the variable, so the localhost default only ever applies outside production.
     mediaPublicBaseUrl:
       env.MEDIA_PUBLIC_BASE_URL ??
-      (usesLocalDisk ? `http://127.0.0.1:${env.PORT}/media` : undefined),
+      (inProduction ? undefined : `http://127.0.0.1:${env.PORT}/media`),
     mediaMaxBytes: env.MEDIA_MAX_BYTES,
     mediaMaxPixels: env.MEDIA_MAX_PIXELS,
   };

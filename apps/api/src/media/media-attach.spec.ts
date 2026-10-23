@@ -2,10 +2,12 @@ import { randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { loadEnv } from "@fluxkit/config";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { withTransaction } from "../common/transaction.js";
 import { brand, mediaUpload, product, productType } from "../database/schema/index.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
+import { startApp, type RunningApp } from "../test/app.js";
 import { http } from "../test/http.js";
 import { startMediaApp, TEST_MEDIA_BASE_URL, type MediaApp } from "../test/media-app.js";
 import * as images from "../test/media-images.js";
@@ -338,5 +340,99 @@ describe("attach marking in product media and brand saves (ADR 0028 decision 5)"
       }
       expect(await attachedAt(uploaded.id)).toBeInstanceOf(Date);
     });
+  });
+});
+
+describe("attach marking while MEDIA_STORAGE_DRIVER=none (step 9 review M-2)", () => {
+  // Both apps take their media settings from loadEnv, as the API process does, with the development default base URL.
+  const environment = { DATABASE_URL: requireTestDatabaseUrl(), PORT: "3000" };
+  const localEnv = loadEnv({ ...environment, MEDIA_STORAGE_DRIVER: "local" });
+  const noneEnv = loadEnv({ ...environment, MEDIA_STORAGE_DRIVER: "none" });
+  let local: MediaApp;
+  let none: RunningApp;
+  let productTypeId: string;
+  const productIds: string[] = [];
+  const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
+
+  beforeAll(async () => {
+    await ensureMigrated();
+    // An upload made while the driver was still `local`.
+    local = await startMediaApp({ mediaPublicBaseUrl: localEnv.mediaPublicBaseUrl });
+    none = await startApp({
+      mediaStorageDriver: noneEnv.mediaStorageDriver,
+      mediaPublicBaseUrl: noneEnv.mediaPublicBaseUrl,
+    });
+    const created = await http<{ id: string }>(none.baseUrl, "POST", "/admin/product-types", {
+      body: { code: `attach_none_${randomUUID().slice(0, 8)}`, name: { uk: "Тип" } },
+    });
+    expect(created.status).toBe(201);
+    productTypeId = created.body.id;
+  });
+
+  afterAll(async () => {
+    try {
+      if (productIds.length > 0)
+        await local.db.delete(product).where(inArray(product.id, productIds));
+      await local.db.delete(productType).where(eq(productType.id, productTypeId));
+    } finally {
+      await none.app.close();
+      await local.close();
+      await pool.end();
+    }
+  });
+
+  async function newProduct(): Promise<string> {
+    const created = await http<{ id: string }>(none.baseUrl, "POST", "/admin/products", {
+      body: { productTypeId, title: { uk: `Товар ${randomUUID()}` } },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    productIds.push(created.body.id);
+    return created.body.id;
+  }
+
+  it("marks an upload saved while none is active, so the cleanup job's delete (unattached only) skips it", async () => {
+    const response = await fetch(`${local.baseUrl}/admin/media/uploads`, {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream", "x-fluxkit-csrf": "1" },
+      body: await images.jpeg(8, 8),
+    });
+    expect(response.status).toBe(201);
+    const uploaded = (await response.json()) as { id: string; url: string };
+    expect(uploaded.url.startsWith(`${localEnv.mediaPublicBaseUrl ?? "(unset)"}/`)).toBe(true);
+
+    const saved = await http(none.baseUrl, "PUT", `/admin/products/${await newProduct()}/media`, {
+      body: { media: [{ url: uploaded.url }] },
+    });
+    expect(saved.status).toBe(200);
+    const [row] = await local.db
+      .select({ firstAttachedAt: mediaUpload.firstAttachedAt })
+      .from(mediaUpload)
+      .where(eq(mediaUpload.id, uploaded.id));
+    expect(row?.firstAttachedAt).toBeInstanceOf(Date);
+    // The job's delete condition (first_attached_at IS NULL) no longer matches once the driver is `local` again.
+    const deleted = await pool.query(
+      "delete from media_upload where id = $1 and first_attached_at is null returning storage_key",
+      [uploaded.id],
+    );
+    expect(deleted.rowCount).toBe(0);
+  });
+
+  it("refuses a URL under the prefix that names no upload with upload_not_found, as with local", async () => {
+    const result = await http<ProblemBody>(
+      none.baseUrl,
+      "PUT",
+      `/admin/products/${await newProduct()}/media`,
+      {
+        body: {
+          media: [
+            { url: `${localEnv.mediaPublicBaseUrl ?? ""}/ffffffffffffffffffffffffffffffff.png` },
+          ],
+        },
+      },
+    );
+    expect(result.status).toBe(400);
+    expect(result.body.errors).toEqual([
+      expect.objectContaining({ path: "media.0.url", code: "upload_not_found" }),
+    ]);
   });
 });

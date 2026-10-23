@@ -96,17 +96,38 @@ describe("loadEnv media: MEDIA_STORAGE_DRIVER", () => {
     },
   );
 
-  it("none in production needs no directory and no base URL, and leaves them unset", () => {
+  it("none in production needs no directory and no base URL, and leaves them unset (no prefix to protect)", () => {
     const env = loadEnv({ ...production, MEDIA_STORAGE_DRIVER: "none" });
     expect(env.mediaStorageDriver).toBe("none");
     expect(env.mediaDir).toBeUndefined();
     expect(env.mediaPublicBaseUrl).toBeUndefined();
   });
 
-  it("none outside production leaves the directory and the base URL unset too", () => {
+  it("none in production keeps a given base URL, so attach marking still protects uploads under it (review M-2)", () => {
+    const url = "https://shop.example.test/media";
+    const env = loadEnv({
+      ...production,
+      MEDIA_STORAGE_DRIVER: "none",
+      MEDIA_PUBLIC_BASE_URL: url,
+    });
+    expect(env.mediaPublicBaseUrl).toBe(url);
+  });
+
+  it("none outside production leaves the directory unset but resolves the base URL like local (review M-2)", () => {
+    // Uploads made earlier with `local` live under the development default prefix; attach marking must still see them.
     const env = loadEnv({ ...development, MEDIA_STORAGE_DRIVER: "none" });
     expect(env.mediaDir).toBeUndefined();
-    expect(env.mediaPublicBaseUrl).toBeUndefined();
+    expect(env.mediaPublicBaseUrl).toBe("http://127.0.0.1:3000/media");
+    expect(
+      loadEnv({ ...development, MEDIA_STORAGE_DRIVER: "none", PORT: "4123" }).mediaPublicBaseUrl,
+    ).toBe("http://127.0.0.1:4123/media");
+    expect(
+      loadEnv({
+        ...development,
+        MEDIA_STORAGE_DRIVER: "none",
+        MEDIA_PUBLIC_BASE_URL: "http://localhost:9/media",
+      }).mediaPublicBaseUrl,
+    ).toBe("http://localhost:9/media");
   });
 
   it("still validates a directory or base URL given with none (a typo must fail loudly)", () => {
