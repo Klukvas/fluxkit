@@ -31,6 +31,7 @@ import {
 } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
+import { MediaAttachService } from "../../../media/media-attach.service.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
 import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
 import { assertAllowed } from "../../shared/rules.js";
@@ -86,6 +87,7 @@ export class ProductsService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(MediaAttachService) private readonly mediaAttachments: MediaAttachService,
   ) {}
 
   /** Creates a draft and its single default variant in one transaction. */
@@ -273,7 +275,10 @@ export class ProductsService {
     }
   }
 
-  /** Replaces the media list. An option pair must be a value the product chose (`product_option_value`). */
+  /**
+   * Replaces the media list. An option pair must be a value the product chose (`product_option_value`); a URL under
+   * `MEDIA_PUBLIC_BASE_URL` must name an upload (`upload_not_found`), which is then marked attached.
+   */
   async putMedia(id: string, body: PutProductMediaBody): Promise<ProductDetailResponse> {
     const errors = body.media.flatMap((item, index) =>
       item.alt === undefined || item.alt === null
@@ -310,6 +315,11 @@ export class ProductsService {
         if (unknownPairs.length > 0) {
           throw validationFailed(unknownPairs);
         }
+        // ADR 0028: URLs under our media prefix must name an upload; those uploads are marked attached in THIS transaction.
+        await this.mediaAttachments.markAttached(
+          tx,
+          body.media.map((item, index) => ({ path: `media.${index}.url`, url: item.url })),
+        );
         await this.products.replaceMedia(
           tx,
           id,
