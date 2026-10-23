@@ -9,8 +9,8 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 const DEFAULT_API_URL = "http://127.0.0.1:3000";
 
 /**
- * Where `vite dev` and `vite preview` send `/admin/*`: `ADMIN_DEV_API_URL` from the shell or the repository's root `.env`
- * (the shell wins), default `http://127.0.0.1:3000`. Development only: `vite build` never reads it and never calls the
+ * Where `vite dev` and `vite preview` send `/admin/*` and `/media/*`: `ADMIN_DEV_API_URL` from the shell or the
+ * repository's root `.env` (the shell wins), default `http://127.0.0.1:3000`. Development only: `vite build` never reads it and never calls the
  * API. A malformed value stops the dev server (no silent fallback).
  */
 export function devApiUrl(value: string | undefined): string {
@@ -41,7 +41,14 @@ export function devApiUrl(value: string | undefined): string {
 function apiProxy(target: string): Record<string, ProxyOptions> {
   // The API's own prefix rule `^/admin(?:/|$)` (plus a bare query string); `/admin-ui` (the SPA) does not match.
   // The Host header stays the browser's, so the host-only admin cookie belongs to the dev server's host.
-  return { "^/admin(?:/|\\?|$)": { target, changeOrigin: false } };
+  // `/media` is the read route of uploaded images (ADR 0028). An upload's URL is `MEDIA_PUBLIC_BASE_URL/<key>`: when the API
+  // is started with that variable set to this server's origin plus `/media`, the preview loads through this proxy (and
+  // passes the `img-src 'self'` of `vite preview`). With the default (the API's own origin) the image comes from the API
+  // directly and `vite preview`'s policy refuses it.
+  return {
+    "^/admin(?:/|\\?|$)": { target, changeOrigin: false },
+    "^/media(?:/|\\?|$)": { target, changeOrigin: false },
+  };
 }
 
 export default defineConfig(({ command, mode }) => {

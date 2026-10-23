@@ -13,15 +13,43 @@ describe("vite config", () => {
     expect(build.build?.manifest).toBe(true);
   });
 
-  it("proxies the API prefix in development, and never the SPA's own /admin-ui", () => {
-    const keys = Object.keys(serve.server?.proxy ?? {});
-    expect(keys).toHaveLength(1);
-    const pattern = new RegExp(keys[0] as string);
+  it("proxies the API prefixes in development, and never the SPA's own /admin-ui", () => {
+    const proxy = serve.server?.proxy ?? {};
+    const keys = Object.keys(proxy);
+    expect(keys).toHaveLength(2);
+    const matching = (path: string) =>
+      keys.filter((key) => new RegExp(key).test(path)).map((key) => key.replace(/\W/g, ""));
     for (const path of ["/admin", "/admin/", "/admin/auth/me", "/admin?x=1"]) {
-      expect(pattern.test(path), path).toBe(true);
+      expect(matching(path), path).toEqual(["admin"]);
     }
-    for (const path of ["/admin-ui/", "/admin-ui/orders", "/administration", "/store/cart", "/"]) {
-      expect(pattern.test(path), path).toBe(false);
+    for (const path of [
+      "/media",
+      "/media/",
+      "/media/0123456789abcdef0123456789abcdef.jpg",
+      "/media/..%2f..%2fetc%2fpasswd",
+      "/media?x=1",
+    ]) {
+      expect(matching(path), path).toEqual(["media"]);
+    }
+    for (const path of [
+      "/admin-ui/",
+      "/admin-ui/orders",
+      "/administration",
+      "/media-library",
+      "/store/cart",
+      "/",
+    ]) {
+      expect(matching(path), path).toEqual([]);
+    }
+  });
+
+  it("sends /admin and /media to the same target, with the browser's Host header", () => {
+    for (const config of [serve.server?.proxy, serve.preview?.proxy]) {
+      const options = Object.values(config ?? {});
+      expect(options).toHaveLength(2);
+      for (const option of options) {
+        expect(option).toEqual({ target: "http://127.0.0.1:3000", changeOrigin: false });
+      }
     }
   });
 

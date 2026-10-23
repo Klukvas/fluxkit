@@ -1,6 +1,7 @@
-// Same-origin reverse proxy for the e2e suite (ADR 0026): the browser talks to ONE origin; `/store/*` and `/admin/*` go to
-// the API, everything else to the storefront. It mirrors the production edge proxy, and like it SETS `X-Forwarded-For`
-// itself (the API runs with TRUST_PROXY=1, so exactly this one hop is trusted).
+// Same-origin reverse proxy for the e2e suite (ADR 0026): the browser talks to ONE origin; `/store/*`, `/admin/*` and `/media/*`
+// (uploaded images, ADR 0028) go to the API, everything else to the storefront. It mirrors the production edge proxy, and like it SETS `X-Forwarded-For`
+// itself (the API runs with TRUST_PROXY=1, so exactly this one hop is trusted). The answer of the API goes back unchanged:
+// the proxy adds no cookie and no header of its own.
 //
 // TEST-ONLY: the suite gives every test its own client address so that the in-memory rate limits (10 checkouts per 10
 // minutes per address) never couple tests together. A test marks its requests with the header `x-e2e-client: <number>`;
@@ -10,7 +11,7 @@
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 
 const CLIENT_HEADER = "x-e2e-client";
-const API_ROUTE = /^\/(store|admin)(\/|\?|$)/;
+const API_ROUTE = /^\/(store|admin|media)(\/|\?|$)/;
 
 function requiredPort(name: string): number {
   const value = process.env[name];
@@ -83,6 +84,6 @@ const server = createServer((incoming, outgoing) => {
 
 server.listen(listenPort, "127.0.0.1", () => {
   console.log(
-    `e2e proxy on 127.0.0.1:${listenPort} -> /store,/admin: ${apiPort}, rest: ${storefrontPort}`,
+    `e2e proxy on 127.0.0.1:${listenPort} -> /store,/admin,/media: ${apiPort}, rest: ${storefrontPort}`,
   );
 });

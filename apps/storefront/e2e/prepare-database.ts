@@ -4,11 +4,13 @@
 // (`pnpm build` first), the same commands as `pnpm db:migrate`, `pnpm seed` and `pnpm admin:create` without their
 // `--env-file`; `pg` is the API's own dependency, resolved from `apps/api`, so the storefront package adds nothing.
 import { execFileSync } from "node:child_process";
+import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
+  E2E_MEDIA_DIR,
   apiEnvironment,
   databaseNameOf,
   type Env,
@@ -45,6 +47,11 @@ try {
   await client.end();
 }
 console.log(`e2e: wiped database ${String(name)}`);
+
+// A fresh, empty upload directory (the API refuses to start without it). It is a fixed path under the temp directory.
+rmSync(E2E_MEDIA_DIR, { recursive: true, force: true });
+mkdirSync(E2E_MEDIA_DIR, { recursive: true, mode: 0o750 });
+console.log(`e2e: upload directory ${E2E_MEDIA_DIR}`);
 
 const env = apiEnvironment();
 const run = (script: string, args: string[] = [], extra: Env = {}) =>

@@ -29,6 +29,7 @@ export default defineConfig({
   testDir: "./tests",
   testMatch: "**/*.e2e.ts",
   outputDir: "../test-results",
+  globalTeardown: "./global-teardown.ts",
   // One worker, files and tests in order: the scenarios change shared catalog data (a price, the last unit of a product), so
   // they run one after the other and stay deterministic. Each test still has its own addresses and emails (e2e/support).
   fullyParallel: false,

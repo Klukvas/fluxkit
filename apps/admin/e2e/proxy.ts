@@ -2,8 +2,9 @@
 // edge proxy of the storefront host serves the admin SPA under `/admin-ui/`:
 //   - `/admin-ui` and `/admin-ui/*`: the BUILT SPA (`apps/admin/dist`), with the `index.html` fallback for SPA paths (deep
 //     links, reloads) and the security and cache headers of `security-headers.ts` on every response;
-//   - `/admin/*` and `/store/*`: the API. Like the production edge proxy it SETS `X-Forwarded-For` itself (the API runs with
-//     TRUST_PROXY=1, so exactly this one hop is trusted);
+//   - `/admin/*`, `/store/*` and `/media/*` (the uploaded images; the API serves GET and HEAD): the API. Like the production edge proxy it
+//     SETS `X-Forwarded-For` itself (the API runs with TRUST_PROXY=1, so exactly this one hop is trusted). The answer of the
+//     API goes back unchanged: the proxy adds no cookie and no header of its own, the media headers are the API's;
 //   - anything else: 404 (the storefront is not part of this suite; its own suite tests it).
 //
 // TEST-ONLY: every test gets its own client address so that the in-memory login limit (20 attempts per 10 minutes per
@@ -25,7 +26,7 @@ import { extname, resolve, sep } from "node:path";
 import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../security-headers.ts";
 
 const CLIENT_HEADER = "x-e2e-client";
-const API_ROUTE = /^\/(store|admin)(\/|\?|$)/;
+const API_ROUTE = /^\/(store|admin|media)(\/|\?|$)/;
 const SPA_ROUTE = /^\/admin-ui(\/|\?|$)/;
 const SPA_PREFIX = "/admin-ui";
 const distRoot = resolve(import.meta.dirname, "../dist");
@@ -188,11 +189,15 @@ const server = createServer((incoming, outgoing) => {
     });
     return;
   }
-  sendText(outgoing, 404, "Not Found (the admin e2e proxy serves /admin-ui, /admin and /store)");
+  sendText(
+    outgoing,
+    404,
+    "Not Found (the admin e2e proxy serves /admin-ui, /admin, /store and /media)",
+  );
 });
 
 server.listen(listenPort, "127.0.0.1", () => {
   console.log(
-    `admin e2e proxy on 127.0.0.1:${String(listenPort)} -> /admin-ui: ${distRoot}, /admin,/store: ${String(apiPort)}`,
+    `admin e2e proxy on 127.0.0.1:${String(listenPort)} -> /admin-ui: ${distRoot}, /admin,/store,/media: ${String(apiPort)}`,
   );
 });

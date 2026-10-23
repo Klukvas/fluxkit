@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * Ports and credentials of the admin e2e stack. Throwaway values for a database that is wiped at every run. The ports differ
@@ -10,6 +12,17 @@ export const ADMIN_E2E_PORT = Number(process.env["ADMIN_E2E_PORT"] ?? 3112);
 export const ADMIN_E2E_ORIGIN = `http://127.0.0.1:${String(ADMIN_E2E_PORT)}`;
 /** The SPA's base path (`src/router/base-path.ts`). */
 export const SPA = "/admin-ui";
+
+/**
+ * Where the API of this suite stores uploaded images: a directory under the system temp directory, never the repository's
+ * `var/media`. The path is fixed per proxy port (the config file is evaluated by Playwright's main process and by every
+ * worker, so a random name would differ between them); `prepare-database.ts` wipes and creates it before the API starts and
+ * `global-teardown.ts` removes it.
+ */
+export const ADMIN_E2E_MEDIA_DIR = join(
+  tmpdir(),
+  `fluxkit-admin-e2e-media-${String(ADMIN_E2E_PORT)}`,
+);
 
 /** The owner made by `prepare-database.ts` with the built `create-admin`. */
 export const OWNER_EMAIL = "e2e-owner@example.com";
@@ -112,6 +125,12 @@ export function apiEnvironment(env: Env = process.env): Env {
     MAX_OPEN_ORDERS: "3",
     ORDER_PAYMENT_TTL_MINUTES: "30",
     ORDER_GUEST_ACCESS_DAYS: "90",
+    // Uploads on a temp directory; the URLs the API hands out point at the proxy, so the browser loads them through it.
+    MEDIA_STORAGE_DRIVER: "local",
+    MEDIA_DIR: ADMIN_E2E_MEDIA_DIR,
+    MEDIA_PUBLIC_BASE_URL: `${ADMIN_E2E_ORIGIN}/media`,
+    MEDIA_MAX_BYTES: "10485760",
+    MEDIA_MAX_PIXELS: "50000000",
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];

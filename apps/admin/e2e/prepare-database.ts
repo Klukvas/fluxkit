@@ -6,9 +6,11 @@
 // The manager and the viewer need the running API (they are created through the users API with the owner's session, as an
 // owner would): `global-setup.ts` does that once the servers are up.
 import { execFileSync } from "node:child_process";
+import { mkdirSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import {
+  ADMIN_E2E_MEDIA_DIR,
   OWNER_EMAIL,
   OWNER_PASSWORD,
   apiEnvironment,
@@ -47,6 +49,11 @@ try {
   await client.end();
 }
 console.log(`admin e2e: wiped database ${String(name)}`);
+
+// A fresh, empty upload directory (the API refuses to start without it). It is a fixed path under the temp directory.
+rmSync(ADMIN_E2E_MEDIA_DIR, { recursive: true, force: true });
+mkdirSync(ADMIN_E2E_MEDIA_DIR, { recursive: true, mode: 0o750 });
+console.log(`admin e2e: upload directory ${ADMIN_E2E_MEDIA_DIR}`);
 
 const env = apiEnvironment();
 const run = (script: string, args: string[] = [], extra: Env = {}) =>
