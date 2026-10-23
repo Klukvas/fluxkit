@@ -95,6 +95,14 @@ describe("upload source guards", () => {
     );
   });
 
+  it("locks the file input while a queue runs without disabling it (the focus stays; step 9 review L-1)", () => {
+    const panel = file("areas/catalog-dictionaries/upload-panel.tsx").code;
+    const input = /<input\b[\s\S]*?\/>/.exec(panel)?.[0] ?? "";
+    expect(input).not.toMatch(/(?<![-\w])disabled=/);
+    expect(input).toContain("aria-disabled={running ? true : undefined}");
+    expect(input).toContain("onClick={(event) => keepFileDialogClosed(running, event)}");
+  });
+
   it("gives the file input no name, so a form submit never carries a file", () => {
     const panel = file("areas/catalog-dictionaries/upload-panel.tsx").code;
     const input = /<input\b[\s\S]*?\/>/.exec(panel)?.[0] ?? "";

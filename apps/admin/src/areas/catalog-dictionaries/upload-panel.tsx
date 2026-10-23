@@ -32,6 +32,15 @@ function Message({ t, descriptor }: { t: Translator; descriptor: MessageDescript
   );
 }
 
+/**
+ * While a queue runs, a click on the file input (the label's click, Enter or Space) must not open the file dialog. The input
+ * is never `disabled` for this: disabling the focused input drops the keyboard focus to `<body>` (step 9 review L-1). It is
+ * `aria-disabled` instead, and a selection that still arrives is ignored by the controller (one queue at a time).
+ */
+export function keepFileDialogClosed(running: boolean, event: { preventDefault(): void }): void {
+  if (running) event.preventDefault();
+}
+
 const TONE: Record<UploadState["status"], string> = {
   queued: "text-muted-foreground",
   uploading: "text-foreground",
@@ -46,7 +55,8 @@ const TONE: Record<UploadState["status"], string> = {
  * The upload button, the cancel button, the per-file status list and the live-region summary of one screen's queue. The
  * button is a `<label>` around a visually hidden file input: the keyboard reaches the input itself (Enter or Space opens
  * the file dialog), and the label text is its name. The input's `accept` comes from the server's `media.contentTypes`.
- * The input is cleared after each selection, so the same file can be chosen again. Nothing here uploads by itself.
+ * The input is cleared after each selection, so the same file can be chosen again. While the queue runs the input keeps the
+ * focus and its label (`aria-disabled`, see `keepFileDialogClosed`). Nothing here uploads by itself.
  */
 export function UploadPanel({
   t,
@@ -82,7 +92,8 @@ export function UploadPanel({
             className="sr-only"
             multiple={multiple}
             accept={acceptAttribute(limits.contentTypes)}
-            disabled={running}
+            aria-disabled={running ? true : undefined}
+            onClick={(event) => keepFileDialogClosed(running, event)}
             onChange={(event) => {
               const input = event.currentTarget;
               // Copy the list first: clearing the input empties it. Cleared so the same file can be chosen again.

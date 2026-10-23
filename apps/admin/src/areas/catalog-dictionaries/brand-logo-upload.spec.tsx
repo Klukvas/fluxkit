@@ -100,7 +100,7 @@ describe("brand form: Upload logo", () => {
     }
   });
 
-  it("locks the file input and Save while the logo uploads, with the normal label on Save", () => {
+  it("locks the file input (aria-disabled, never disabled: it keeps the focus) and Save while the logo uploads", () => {
     const html = form({
       upload: uploadControls({
         maxFiles: 1,
@@ -108,7 +108,13 @@ describe("brand form: Upload logo", () => {
         items: [item("logo.png", { status: "uploading" })],
       }),
     });
-    expect(isDisabled(fileInputs(html)[0] as string)).toBe(true);
+    // A disabled input would drop the keyboard focus to <body> (step 9 review L-1).
+    expect(isDisabled(fileInputs(html)[0] as string)).toBe(false);
+    expect(fileInputs(html)[0]).toContain('aria-disabled="true"');
+    expect(fileInputs(form({}))[0]).not.toContain("aria-disabled");
+    expect(html).toMatch(
+      /<label\b[^>]*for="brand-logoUpload"[^>]*>\s*<span>§dict\.upload\.logo<\/span>/,
+    );
     expect(isDisabled(submitButton(html))).toBe(true);
     expect(html).toContain("§dict.form.save");
     expect(html).not.toContain("§dict.form.saving");
