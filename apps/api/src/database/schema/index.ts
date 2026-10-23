@@ -6,3 +6,4 @@ export * from "./customers.js";
 export * from "./carts.js";
 export * from "./orders.js";
 export * from "./domain-events.js";
+export * from "./media.js";

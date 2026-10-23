@@ -40,6 +40,7 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "media_upload",
       "domain_event",
       "order_item_reservation",
       "order_status_change",
@@ -1422,7 +1423,8 @@ describe("catalog schema (real Postgres)", () => {
           'health_check', 'admin_user', 'admin_session',
           'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
-          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
+          'media_upload'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1443,7 +1445,8 @@ describe("catalog schema (real Postgres)", () => {
           'health_check', 'admin_user', 'admin_session',
           'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
-          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event'
+          'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
+          'media_upload'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.

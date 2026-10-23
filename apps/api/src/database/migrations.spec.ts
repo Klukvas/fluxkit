@@ -55,6 +55,9 @@ const cartCustomersOrdersTables = [
   "domain_event",
 ] as const;
 
+// Migration 0005 (ADR 0028): one table.
+const mediaTables = ["media_upload"] as const;
+
 const cartCustomersOrdersFunctions = [
   "order_item_immutable",
   "order_adjustment_append_only",
@@ -98,6 +101,14 @@ describe("migrations", () => {
   async function existingCartCustomersOrdersTables(): Promise<string[]> {
     const present: string[] = [];
     for (const name of cartCustomersOrdersTables) {
+      if (await tableExists(name)) present.push(name);
+    }
+    return present;
+  }
+
+  async function existingMediaTables(): Promise<string[]> {
+    const present: string[] = [];
+    for (const name of mediaTables) {
       if (await tableExists(name)) present.push(name);
     }
     return present;
@@ -149,6 +160,9 @@ describe("migrations", () => {
   async function dropEverything(): Promise<void> {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE: leftovers of a failed run must not hide a broken down script.
+    for (const name of [...mediaTables].reverse()) {
+      await pool.query(`drop table if exists "${name}"`);
+    }
     for (const name of [...cartCustomersOrdersTables].reverse()) {
       await pool.query(`drop table if exists "${name}"`);
     }
@@ -184,7 +198,7 @@ describe("migrations", () => {
     }
   });
 
-  it("applies 0000 to 0004, rolls back 0004, 0003, 0002, 0001 then 0000, applies again and rolls back again", async () => {
+  it("applies 0000 to 0005, rolls back 0005, 0004, 0003, 0002, 0001 then 0000, applies again and rolls back again", async () => {
     expect(await tableExists("health_check")).toBe(false);
     expect(await existingCatalogTables()).toEqual([]);
     expect(await existingAdminAuthTables()).toEqual([]);
@@ -205,6 +219,7 @@ describe("migrations", () => {
     const adminAuthWhen = whenOf("0002_admin_auth");
     const pricingInventoryWhen = whenOf("0003_pricing_inventory");
     const cartCustomersOrdersWhen = whenOf("0004_cart_customers_orders");
+    const mediaWhen = whenOf("0005_media_upload");
 
     for (let round = 1; round <= 2; round += 1) {
       await migrate(drizzle(pool), { migrationsFolder });
@@ -224,10 +239,35 @@ describe("migrations", () => {
         "allow_backorder",
         "track_inventory",
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(5);
+      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(6);
       expect(await journalRowCount(cartCustomersOrdersWhen), `round ${round}: up`).toBe(1);
+      expect(await existingMediaTables(), `round ${round}: up`).toEqual([...mediaTables]);
+      expect(await journalRowCount(mediaWhen), `round ${round}: up`).toBe(1);
+
+      // Down 0005 only: its table and its journal row are gone, everything else stays applied.
+      await rollback("0005_media_upload.down.sql");
+      expect(await existingMediaTables(), `round ${round}: down 0005`).toEqual([]);
+      expect(await existingAdminAuthTables(), `round ${round}: down 0005`).toEqual([
+        ...adminAuthTables,
+      ]);
+      expect(await existingCatalogTables(), `round ${round}: down 0005`).toEqual([
+        ...catalogTables,
+      ]);
+      expect(await existingCartCustomersOrdersTables(), `round ${round}: down 0005`).toEqual([
+        ...cartCustomersOrdersTables,
+      ]);
+      expect(await appliedMigrationCount(), `round ${round}: down 0005`).toBe(5);
+      expect(await journalRowCount(mediaWhen), `round ${round}: down 0005`).toBe(0);
+      expect(await journalRowCount(cartCustomersOrdersWhen), `round ${round}: down 0005`).toBe(1);
+
+      // Up again: only 0005 may run. This fails if the down script forgot its bookkeeping row.
+      await migrate(drizzle(pool), { migrationsFolder });
+      expect(await existingMediaTables(), `round ${round}: re-up 0005`).toEqual([...mediaTables]);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0005`).toBe(6);
+      expect(await journalRowCount(mediaWhen), `round ${round}: re-up 0005`).toBe(1);
 
       // Down 0004 only: its tables and functions and its journal row are gone, the rest stays applied.
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
       expect(await existingCartCustomersOrdersTables(), `round ${round}: down 0004`).toEqual([]);
       expect(await existingCartCustomersOrdersFunctions(), `round ${round}: down 0004`).toEqual([]);
@@ -243,8 +283,9 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0004`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(5);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(6);
 
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
 
       // Down 0003: its tables, function, variant columns and journal row are gone, the rest stays applied.
@@ -269,8 +310,9 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0003`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(5);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(6);
 
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
       await rollback("0003_pricing_inventory.down.sql");
 
@@ -289,8 +331,9 @@ describe("migrations", () => {
       expect(await existingAdminAuthTables(), `round ${round}: re-up 0002`).toEqual([
         ...adminAuthTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(5);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(6);
 
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
       await rollback("0003_pricing_inventory.down.sql");
       await rollback("0002_admin_auth.down.sql");
@@ -315,8 +358,9 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0001`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(5);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(6);
 
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
       await rollback("0003_pricing_inventory.down.sql");
       await rollback("0002_admin_auth.down.sql");
@@ -338,6 +382,7 @@ describe("migrations", () => {
     await pool.query('create view "catalog_down_probe" as select id from "product"');
     try {
       // 0004, 0003 and 0002 are rolled back first: they hold foreign keys to variant.
+      await rollback("0005_media_upload.down.sql");
       await rollback("0004_cart_customers_orders.down.sql");
       await rollback("0003_pricing_inventory.down.sql");
       await rollback("0002_admin_auth.down.sql");
@@ -362,10 +407,11 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersFunctions()).toEqual(
         [...cartCustomersOrdersFunctions].sort(),
       );
-      expect(await appliedMigrationCount()).toBe(5);
+      expect(await appliedMigrationCount()).toBe(6);
     } finally {
       await pool.query('drop view if exists "orders_down_probe"');
     }
+    await rollback("0005_media_upload.down.sql");
     await rollback("0004_cart_customers_orders.down.sql");
     await rollback("0003_pricing_inventory.down.sql");
     await rollback("0002_admin_auth.down.sql");
@@ -373,9 +419,31 @@ describe("migrations", () => {
     await rollback("0000_health_check.down.sql");
   });
 
+  it("refuses to drop media_upload when it has a dependent object, and changes nothing", async () => {
+    await migrate(drizzle(pool), { migrationsFolder });
+    await pool.query('create view "media_down_probe" as select id from "media_upload"');
+    try {
+      await expect(rollback("0005_media_upload.down.sql")).rejects.toMatchObject({
+        code: "2BP01",
+      });
+      expect(await existingMediaTables()).toEqual([...mediaTables]);
+      expect(await appliedMigrationCount()).toBe(6);
+    } finally {
+      await pool.query('drop view if exists "media_down_probe"');
+    }
+    await rollback("0005_media_upload.down.sql");
+    await rollback("0004_cart_customers_orders.down.sql");
+    await rollback("0003_pricing_inventory.down.sql");
+    await rollback("0002_admin_auth.down.sql");
+    await rollback("0001_catalog.down.sql");
+    await rollback("0000_health_check.down.sql");
+    expect(await existingMediaTables()).toEqual([]);
+  });
+
   it("upgrades a database that already holds 0003 data without touching it, and the down script leaves it intact", async () => {
     // A database exactly as release 0003 left it: everything applied, then 0004 rolled back (tables and bookkeeping row).
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0005_media_upload.down.sql");
     await rollback("0004_cart_customers_orders.down.sql");
     expect(await appliedMigrationCount()).toBe(4);
 
@@ -428,9 +496,9 @@ describe("migrations", () => {
     const before = await pricingInventorySnapshot();
     expect(JSON.stringify(before)).toContain("upgrade-ref");
 
-    // The real migrator applies only 0004 to this database.
+    // The real migrator applies only 0004 and 0005 to this database.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(5);
+    expect(await appliedMigrationCount()).toBe(6);
     expect(await existingCartCustomersOrdersTables()).toEqual([...cartCustomersOrdersTables]);
     expect(await pricingInventorySnapshot()).toEqual(before);
 
@@ -458,6 +526,7 @@ describe("migrations", () => {
     ).rejects.toMatchObject({ code: "23503" });
 
     // Down 0004: the new tables and their data are gone; every 0003 row is exactly as before.
+    await rollback("0005_media_upload.down.sql");
     await rollback("0004_cart_customers_orders.down.sql");
     expect(await existingCartCustomersOrdersTables()).toEqual([]);
     expect(await appliedMigrationCount()).toBe(4);
