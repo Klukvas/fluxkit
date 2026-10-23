@@ -559,6 +559,39 @@ describe("upload limits that need their own app", () => {
     });
   });
 
+  it("refuses a re-encoded output above MEDIA_MAX_BYTES: 400 output_too_large, nothing stored, slot free (review M-1)", async () => {
+    // A 1-bit noise PNG grows when re-encoded as 24-bit RGB; the cap is inclusive, so learn the exact output size first.
+    const input = await images.noisyOneBitPng(600, 600);
+    const measure = await startMediaApp();
+    apps.push(measure);
+    const measured = await upload(measure.baseUrl, input);
+    expect(measured.status).toBe(201);
+    const outputBytes = measured.body.byteSize;
+    expect(outputBytes).toBeGreaterThan(input.length + 1);
+
+    const tight = await startMediaApp({ mediaMaxBytes: outputBytes - 1 });
+    apps.push(tight);
+    const owner = tight.admins.authenticate({ headers: {} })?.userId ?? "";
+    const refused = await upload<ProblemBody>(tight.baseUrl, input);
+    expect(refused.status).toBe(400);
+    expect(refused.body).toMatchObject({
+      code: "validation_failed",
+      errors: [expect.objectContaining({ path: "body", code: "output_too_large" })],
+    });
+    expect(refused.body.errors).toHaveLength(1);
+    expect(await filesUnder(tight.mediaDir)).toEqual([]);
+    expect(
+      await tight.db.select().from(mediaUpload).where(eq(mediaUpload.createdBy, owner)),
+    ).toEqual([]);
+    expect(tight.app.get(ProcessingSlots).inUse).toBe(0);
+
+    const exact = await startMediaApp({ mediaMaxBytes: outputBytes });
+    apps.push(exact);
+    const accepted = await upload(exact.baseUrl, input);
+    expect(accepted.status).toBe(201);
+    expect(accepted.body.byteSize).toBe(outputBytes);
+  });
+
   it("applies a configured MEDIA_MAX_BYTES to the declared length", async () => {
     const media = await startMediaApp({ mediaMaxBytes: 2048 });
     apps.push(media);

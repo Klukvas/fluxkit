@@ -43,7 +43,13 @@ export class MediaUploadsController {
     mediaUploadResponseSchema,
     "The stored image (the re-encoded output). Put `url` into a product media list or a brand logo.",
   )
-  @ApiProblemResponses(400, 429)
+  @ApiProblemResponses(429)
+  @ApiResponse({
+    status: 400,
+    description:
+      "validation_failed with one errors[] entry at path body; its code is the reason: empty_file, unsupported_type, corrupt_image, animated_not_supported, dimensions_too_large, too_many_pixels, processing_timeout, or output_too_large (the re-encoded image would be larger than MEDIA_MAX_BYTES). A body that ended early has no errors[].",
+    content: PROBLEM,
+  })
   @ApiResponse({
     status: 411,
     description:

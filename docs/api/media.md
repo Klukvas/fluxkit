@@ -25,6 +25,7 @@ All are `application/problem+json`. Validation answers carry one `errors[]` entr
 | 400 | `validation_failed` | `dimensions_too_large` | More than 12 000 px on a side, read from the header before decoding |
 | 400 | `validation_failed` | `too_many_pixels` | Width times height above `MEDIA_MAX_PIXELS`, read from the header |
 | 400 | `validation_failed` | `processing_timeout` | Decoding and re-encoding took longer than 30 s |
+| 400 | `validation_failed` | `output_too_large` | The re-encoded output is larger than `MEDIA_MAX_BYTES` (a two-colour PNG becomes 24-bit RGB and can grow several times); nothing is stored. Added by the step 9 review (M-1), additive |
 | 400 | `validation_failed` | (none) | The body ended before `Content-Length` bytes arrived (the client went away) |
 | 401 | `unauthorized` | | No session; answered before the body is read |
 | 403 | `forbidden` | | Missing `X-Fluxkit-CSRF: 1`, a body that is not `application/octet-stream` (JSON, multipart, `text/plain`, form, `image/*` included), or a role without `catalog.write` (viewer); before the body is read |
@@ -51,7 +52,11 @@ All are `application/problem+json`. Validation answers carry one `errors[]` entr
 
 ## Memory (measured for step 4)
 
-Peak resident memory of one Node process running only the pipeline (`process.resourceUsage().maxRSS`, sharp 0.35.5, linux-x64; about 75 MB with sharp loaded): 50 MP JPEG 187 to 202 MB, near-limit PNG (49.99 MP) 151 to 157 MB, 49 MP WebP 302 MB, two 49 MP WebP at once (both processing slots) 523 MB. Each took 0.8 to 3.5 s. Plan for about 512 MB of headroom above the API's normal use. The re-encoded output is not size-capped: a 4 MB PNG of noisy blocks was stored as a 50 MB PNG. Full table: `docs/plans/2026-10-23-media-upload.md`, Step 4 outcome.
+Peak resident memory of one Node process running only the pipeline (`process.resourceUsage().maxRSS`, sharp 0.35.5, linux-x64; about 75 MB with sharp loaded): 50 MP JPEG 187 to 202 MB, near-limit PNG (49.99 MP) 151 to 157 MB, 49 MP WebP 302 MB, two 49 MP WebP at once (both processing slots) 523 MB. Each took 0.8 to 3.5 s. Plan for about 512 MB of headroom above the API's normal use. Full table: `docs/plans/2026-10-23-media-upload.md`, Step 4 outcome.
+
+- **Output cap (step 9 review M-1).** The re-encoded output may not be larger than `MEDIA_MAX_BYTES` (inclusive); above it the upload is `400 output_too_large` and nothing is written. Without the cap a 6.1 MB two-colour noise PNG of 7 000 x 7 000 was stored as a 40 MB PNG (the re-encode is 24-bit RGB). PNG output is not quantised to a palette (that would be lossy for photos; ADR 0028 keeps PNG lossless).
+- **The output is one in-memory buffer** per processing slot until the cap check (sharp `toBuffer`; libvips has no streaming encoder behind sharp's output stream). The largest possible one is a 4 096 x 4 096 RGBA PNG that does not compress, about 67 MB. The cap bounds the disk, not this peak. Measured after the fix (fresh process, sharp 0.35.5, linux-x64): the 6.1 MB 1-bit PNG (output 40 MB, refused at the default cap) peaks at 134 MB RSS, a 5.1 MB 1-bit PNG with transparency (output 34 MB) at 150 MB, both at once at 214 MB: inside the measured worst case above (two 49 MP WebP, 523 MB), so the 512 MB headroom stays the figure to plan with.
+- **Disk-fill worst case with the cap and the rate limit:** one signed-in `catalog.write` user can store at most 60 uploads per 10 minutes of at most `MEDIA_MAX_BYTES` each: 8 640 x 10 MiB, about 84 GiB per user per day at the default (about 422 GiB at the 50 MiB maximum of `MEDIA_MAX_BYTES`). Unattached uploads are deleted by job 7 once older than 24 hours, so without attaching anything the standing worst case is about one day of that per user (plus the time until the next tick); attached uploads stay. The rate limit counts per process, so several API processes multiply it; several managers add up. A per-user byte quota does not exist (later plan). While up to 2 slots process, `MEDIA_DIR/.tmp` also holds each upload's input (at most `MEDIA_MAX_BYTES`) and its output temp file (at most `MEDIA_MAX_BYTES`).
 
 ## Routing and operations (plan step 8)
 

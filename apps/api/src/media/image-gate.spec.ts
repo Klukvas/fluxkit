@@ -27,6 +27,7 @@ const LIMITS = {
   maxPixels: MEDIA_LIMITS.maxPixels.default,
   maxSide: MEDIA_LIMITS.maxSide,
   outputMaxSide: MEDIA_LIMITS.outputMaxSide,
+  maxOutputBytes: MEDIA_LIMITS.maxBytes.default,
 };
 
 describe("the magic-byte gate runs before sharp sees anything", () => {

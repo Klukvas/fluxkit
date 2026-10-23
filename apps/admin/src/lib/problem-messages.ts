@@ -99,6 +99,7 @@ export const KNOWN_REASON_CODES = [
   "dimensions_too_large",
   "too_many_pixels",
   "processing_timeout",
+  "output_too_large",
   "file_too_large",
   "length_required",
   "upload_not_found",

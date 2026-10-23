@@ -106,6 +106,7 @@ export class MediaUploadService {
             maxPixels: this.config.maxPixels,
             maxSide: MEDIA_LIMITS.maxSide,
             outputMaxSide: MEDIA_LIMITS.outputMaxSide,
+            maxOutputBytes: this.config.maxBytes,
           },
           this.config.tuning.processingBudgetMs,
         );

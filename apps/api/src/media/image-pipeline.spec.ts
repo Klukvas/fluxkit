@@ -14,6 +14,7 @@ import {
   jpeg,
   jpegHeaderClaiming,
   jpegWithExif,
+  noisyOneBitPng,
   PDF_DOCUMENT,
   png16,
   pngHeaderClaiming,
@@ -38,6 +39,7 @@ const LIMITS: PipelineLimits = {
   maxPixels: MEDIA_LIMITS.maxPixels.default,
   maxSide: MEDIA_LIMITS.maxSide,
   outputMaxSide: MEDIA_LIMITS.outputMaxSide,
+  maxOutputBytes: MEDIA_LIMITS.maxBytes.default,
 };
 const BUDGET_MS = 30_000;
 
@@ -255,6 +257,20 @@ describe("the image pipeline (real sharp, ADR 0028 decisions 3 and 10)", () => {
         reason: "too_many_pixels",
       });
       expect((await run(await solidPng(100, 100), limits)).ok).toBe(true);
+    });
+
+    it("an output above maxOutputBytes as output_too_large; exactly the cap is kept (1-bit noise PNG grows)", async () => {
+      const input = await noisyOneBitPng(400, 400);
+      const free = await run(input);
+      if (!free.ok) throw new Error(`expected a stored image, got ${free.reason}`);
+      const outputBytes = free.image.data.length;
+      expect(outputBytes).toBeGreaterThan(input.length);
+      expect(await run(input, { ...LIMITS, maxOutputBytes: outputBytes - 1 })).toEqual({
+        ok: false,
+        reason: "output_too_large",
+      });
+      const exact = await run(input, { ...LIMITS, maxOutputBytes: outputBytes });
+      expect(exact.ok && exact.image.data.length).toBe(outputBytes);
     });
 
     it("an image that takes longer than the processing budget as processing_timeout", async () => {

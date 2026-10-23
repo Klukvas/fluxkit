@@ -33,6 +33,11 @@ export interface PipelineLimits {
   readonly maxSide: number;
   /** The output fits this many pixels on its longer side, never enlarged (core `MEDIA_LIMITS.outputMaxSide`). */
   readonly outputMaxSide: number;
+  /**
+   * `MEDIA_MAX_BYTES`: the re-encoded output may not be larger than an upload may be (step 9 review M-1). A two-colour
+   * PNG is re-encoded as 24-bit RGB and can grow several times, so without this a 6 MB upload could store 40 MB.
+   */
+  readonly maxOutputBytes: number;
 }
 
 export interface ProcessedImage {
@@ -141,7 +146,12 @@ async function decodeAndEncode(
         fit: "inside",
         withoutEnlargement: true,
       });
+    // libvips encodes into one buffer (at most about 67 MB: a 4 096 x 4 096 RGBA PNG that does not compress); it is
+    // dropped right here when it is above the cap, before anything is written (docs/api/media.md, Memory).
     const { data, info } = await encoder(pipeline, sniffed).toBuffer({ resolveWithObject: true });
+    if (data.length > limits.maxOutputBytes) {
+      return refused("output_too_large");
+    }
     return { ok: true, image: { type: sniffed, data, width: info.width, height: info.height } };
   } catch {
     // Truncated or corrupt data (failOn "warning"), or libvips' own timeout. The input is what we refuse, not a fault.

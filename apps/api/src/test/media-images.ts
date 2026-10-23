@@ -177,6 +177,17 @@ export function noisyPng(width: number, height: number): Promise<Buffer> {
     .toBuffer();
 }
 
+/**
+ * A two-colour (1-bit, paletted) PNG of random black and white pixels: small on input, but its re-encode is a 24-bit
+ * RGB PNG that barely compresses, so the stored output is several times larger than the upload (step 9 review M-1).
+ */
+export function noisyOneBitPng(width: number, height: number): Promise<Buffer> {
+  const pixels = Buffer.from(randomBytes(width * height).map((byte) => (byte & 1 ? 255 : 0)));
+  return sharp(pixels, { raw: { width, height, channels: 1 } })
+    .png({ palette: true, colours: 2 })
+    .toBuffer();
+}
+
 /** A solid PNG of `width` x `height` pixels: compresses to almost nothing, so a near-limit image is cheap to send. */
 export function solidPng(width: number, height: number): Promise<Buffer> {
   return solid(width, height).png({ compressionLevel: 9 }).toBuffer();

@@ -199,6 +199,7 @@ describe("describeUploadProblem: every server answer has a translated message", 
     "dimensions_too_large",
     "too_many_pixels",
     "processing_timeout",
+    "output_too_large",
   ];
   it.each(reasons)("maps the 400 reason %s", (reason) => {
     expect(
