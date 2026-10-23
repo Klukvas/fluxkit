@@ -49,6 +49,11 @@ const config: AdminConfig = {
   supportedCurrencies: [{ code: "UAH", exponent: 2 }],
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  media: {
+    uploadsEnabled: true,
+    maxBytes: 10485760,
+    contentTypes: ["image/jpeg", "image/png", "image/webp"],
+  },
 };
 
 function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
