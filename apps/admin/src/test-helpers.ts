@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { MemoryRouter } from "react-router";
+import type { UploadControls } from "./areas/catalog-dictionaries/upload-panel";
 import { loadMessageFile, messagesWith, type LazyFile } from "./messages";
 
 /**
@@ -54,4 +55,27 @@ export async function messagesForArea(
   const loaded: Partial<Record<LazyFile, Messages>> = {};
   for (const file of files) loaded[file] = await loadMessageFile(file, locale);
   return messagesWith(locale, loaded);
+}
+
+/** The server's upload limits as the screens get them from `GET /admin/config` (`media`). */
+export const TEST_UPLOAD_LIMITS = {
+  maxBytes: 10 * 1024 * 1024,
+  contentTypes: ["image/jpeg", "image/png", "image/webp"],
+};
+
+/** An idle upload queue (nothing selected, nothing running) for the screens' props; `overrides` set the state a test needs. */
+export function uploadControls(overrides: Partial<UploadControls> = {}): UploadControls {
+  const nothing = () => undefined;
+  return {
+    items: [],
+    running: false,
+    notice: null,
+    selectFiles: nothing,
+    dropFiles: nothing,
+    cancelQueued: nothing,
+    dismiss: nothing,
+    limits: TEST_UPLOAD_LIMITS,
+    maxFiles: 20,
+    ...overrides,
+  };
 }

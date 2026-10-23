@@ -14,7 +14,9 @@ import {
   messagesForArea,
   renderInRouter,
   sentinelTranslator,
+  uploadControls,
 } from "../../test-helpers";
+import type { UploadControls } from "../catalog-dictionaries/upload-panel";
 import { attributeFieldSpecs, attributeFormFrom } from "./attribute-values-form";
 import { MESSAGE_FILES } from "./index";
 import { mediaRowsFrom, newMediaRow, type MediaRow } from "./media-list";
@@ -260,6 +262,8 @@ const links = [
 function media(
   canWrite: boolean,
   rows: readonly MediaRow[] = mediaRowsFrom(product().media, content.locales),
+  uploadsEnabled = true,
+  upload: UploadControls = uploadControls(),
 ) {
   return renderInRouter(
     <MediaListView
@@ -275,6 +279,8 @@ function media(
       problems={[]}
       busy={false}
       canWrite={canWrite}
+      uploadsEnabled={uploadsEnabled}
+      upload={upload}
       onSubmit={noop}
     />,
   );

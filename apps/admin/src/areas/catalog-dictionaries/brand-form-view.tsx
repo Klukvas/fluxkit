@@ -10,6 +10,8 @@ import {
   TextField,
   type ContentLocales,
 } from "./form-parts";
+import { UploadPanel, type UploadControls } from "./upload-panel";
+import { limitValues } from "./upload-queue";
 import {
   SLUG_MAX_LENGTH,
   SLUG_PATTERN_SOURCE,
@@ -67,9 +69,16 @@ export interface BrandFormViewProps {
   cancelTo: string;
   /** The brand's name for the logo's alt text (the default locale's, or the first available). */
   logoAlt: string;
+  /** `GET /admin/config` `media.uploadsEnabled`: false leaves URL entry only (a hint says so). */
+  uploadsEnabled: boolean;
+  /** The logo upload queue (one file); its controls render only with write permission and enabled uploads. */
+  upload: UploadControls;
 }
 
-/** The brand form, create and edit. The logo is a URL (no upload in this version). Read-only without write permission. */
+/**
+ * The brand form, create and edit. The logo is an address, typed or filled by "Upload logo" (one file; the normal save
+ * attaches it). Read-only without write permission. While the logo uploads, Save is disabled.
+ */
 export function BrandFormView({
   t,
   uiLocale,
@@ -86,8 +95,11 @@ export function BrandFormView({
   onSubmit,
   cancelTo,
   logoAlt,
+  uploadsEnabled,
+  upload,
 }: BrandFormViewProps) {
   const create = mode === "create";
+  const canUpload = canWrite && uploadsEnabled;
   return (
     <form method="post" onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6">
       <FormErrorSummary t={t} summary={summary} summaryRef={summaryRef} />
@@ -151,6 +163,22 @@ export function BrandFormView({
           error={issues["logoUrl"]}
           onChange={(logoUrl) => onChange({ ...values, logoUrl })}
         />
+        {canUpload ? (
+          <>
+            <UploadPanel
+              t={t}
+              id={`${idPrefix}-logoUpload`}
+              label={t("dict.upload.logo")}
+              multiple={false}
+              controls={upload}
+            />
+            <p className="text-sm text-muted-foreground">
+              {t("dict.brand.logoUploadHint", limitValues(upload.limits, upload.maxFiles))}
+            </p>
+          </>
+        ) : canWrite ? (
+          <p className="text-sm text-muted-foreground">{t("dict.brand.logoUploadsOff")}</p>
+        ) : null}
         <BrandLogoPreview
           url={values.logoUrl}
           alt={logoAlt}
@@ -161,6 +189,7 @@ export function BrandFormView({
         <FormActions
           t={t}
           busy={busy}
+          locked={upload.running}
           submitLabel={t(create ? "dict.brand.create" : "dict.form.save")}
           busyLabel={t("dict.form.saving")}
           cancelTo={cancelTo}

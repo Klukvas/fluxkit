@@ -183,6 +183,7 @@ export function FormActions({
   busyLabel,
   cancelTo,
   cancelLabel,
+  locked = false,
 }: {
   t: Translator;
   busy: boolean;
@@ -190,10 +191,12 @@ export function FormActions({
   busyLabel: string;
   cancelTo?: string;
   cancelLabel?: string;
+  /** Disables the submit button without the "saving" label (uploads still running: a save must not race them). */
+  locked?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Button type="submit" disabled={busy} aria-busy={busy || undefined}>
+      <Button type="submit" disabled={busy || locked} aria-busy={busy || undefined}>
         {busy ? busyLabel : submitLabel}
       </Button>
       {cancelTo === undefined ? null : (
