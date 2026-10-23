@@ -28,6 +28,8 @@ export const KNOWN_PROBLEM_CODES = [
   "idempotency_key_reused",
   "too_many_open_orders",
   "service_unavailable",
+  "storage_unavailable",
+  "uploads_disabled",
 ] as const;
 
 /**
@@ -89,6 +91,8 @@ export const KNOWN_REASON_CODES = [
   "no_default_variant",
   "has_stock_history",
   "has_order_lines",
+  // media (the upload answers' own reasons are added with the upload UI)
+  "upload_not_found",
   // pricing
   "price_missing",
   "last_shop_price",
