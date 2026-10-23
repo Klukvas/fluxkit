@@ -177,6 +177,23 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
       expect(await fileExists(attachedRecently.path)).toBe(true);
     });
 
+    it("old attached uploads do not starve the abandoned ones: the page selection itself skips attached rows", async () => {
+      // 120 attached rows older than the abandoned ones: if the page select ignored `first_attached_at`, the first page would
+      // hold 100 attached rows, delete nothing and the abandoned rows behind them would never be reached.
+      const attached: string[] = [];
+      for (let index = 0; index < 120; index += 1) {
+        attached.push((await seed({ ageMs: 900 * DAY - index, attached: true, file: false })).id);
+      }
+      const abandoned = [await seed({ ageMs: 3 * DAY }), await seed({ ageMs: 4 * DAY })];
+      expect(await deleteAbandonedUploads(deps(), NOW)).toEqual({
+        deleted: 2,
+        truncated: false,
+        fileErrors: 0,
+      });
+      expect(await remaining(abandoned.map((row) => row.id))).toEqual([]);
+      expect((await remaining(attached)).length).toBe(120);
+    });
+
     it("is idempotent: a second run finds nothing", async () => {
       await seed({ ageMs: 3 * DAY });
       await seed({ ageMs: 4 * DAY });
