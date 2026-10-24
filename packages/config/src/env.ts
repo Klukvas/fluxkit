@@ -2,6 +2,7 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { parseEnabledFeatures } from "./features.js";
+import { parseEnabledShippingProviders } from "./shipping-providers.js";
 
 /** Lowercase letters, 2 to 8, optional `-` segments (`uk`, `en`, `en-us`). */
 const LOCALE_CODE = /^[a-z]{2,8}(-[a-z]{2,8})*$/;
@@ -196,6 +197,7 @@ const envSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     FEATURES_ENABLED: z.string().optional(),
     FEATURES_DIR: z.string().min(1).optional(),
+    SHIPPING_PROVIDERS_ENABLED: z.string().optional(),
     DEFAULT_LOCALE: localeCode.default(DEFAULT_LOCALE),
     LOCALES: z
       .string()
@@ -331,6 +333,8 @@ export interface AppEnv {
   port: number;
   enabledFeatures: string[];
   featuresDir: string | undefined;
+  /** Codes from `SHIPPING_PROVIDERS_ENABLED`; the API loads exactly these provider packages (ADR 0029 decision 8). */
+  enabledShippingProviders: string[];
   /** Locale that every translated text must contain (ADR 0006 decision 1). */
   defaultLocale: string;
   /** Locales accepted in translated texts; contains `defaultLocale`. */
@@ -415,6 +419,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     port: env.PORT,
     enabledFeatures: parseEnabledFeatures(env.FEATURES_ENABLED),
     featuresDir: env.FEATURES_DIR,
+    enabledShippingProviders: parseEnabledShippingProviders(env.SHIPPING_PROVIDERS_ENABLED),
     defaultLocale: env.DEFAULT_LOCALE,
     locales: env.LOCALES,
     adminCookieSecure: env.ADMIN_COOKIE_SECURE,

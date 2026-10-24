@@ -311,6 +311,7 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 ## Features, health and spikes
 
 - `src/features/feature-loader.ts` - discovers feature packages by manifest and imports enabled ones (`FEATURES_ENABLED`) dynamically. `feature-loader.spec.ts`, `feature-flags.spec.ts` test it.
+- `src/shipping/registry/` - the shipping provider loader and registry (ADR 0029 decision 8), the only place that knows provider packages exist; no route. `shipping-provider-loader.ts` (`loadShippingProviders`: reads `packages/providers` manifests only when something is enabled, imports exactly the enabled ones dynamically, fails loudly on missing, broken, invalid or duplicate; must NOT import any provider statically), `shipping-provider-registry.ts` (`ShippingProviderRegistry`: finds classes marked `SHIPPING_PROVIDER_METADATA` with `DiscoveryService`, validates them against the port, `get(code)`, `list()`, logs `Shipping providers loaded: ...`), `shipping-registry.module.ts` (`ShippingRegistryModule.register(providers)` mounts the loaded provider modules), `index.ts`; `shipping-provider-loader.spec.ts` and `shipping-provider-registry.spec.ts` test them.
 - `src/health/` - `GET /health` (`health.controller.ts`, `health.module.ts`, `health.spec.ts`).
 - `src/spikes/queue.spec.ts` - BullMQ spike against real Redis.
 - `src/spikes/search.spec.ts` - Meilisearch spike (Ukrainian text, variant filters, facets); findings in `docs/adr/0005-search-notes.md`.

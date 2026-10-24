@@ -27,12 +27,18 @@ import {
   loadFeatures,
   type LoadedFeature,
 } from "./features/feature-loader.js";
+import {
+  DEFAULT_SHIPPING_PROVIDERS_DIR,
+  loadShippingProviders,
+  type LoadedShippingProvider,
+} from "./shipping/registry/index.js";
 
 export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "featuresDir"> &
   Partial<
     Pick<
       AppEnv,
       | "defaultLocale"
+      | "enabledShippingProviders"
       | "locales"
       | "adminCookieSecure"
       | "adminSessionIdleMinutes"
@@ -70,6 +76,10 @@ export interface CreateAppOptions {
   scrypt?: ScryptParams;
   /** Tests only: extra modules loaded as if they were enabled features (for example a probe controller). */
   extraFeatures?: LoadedFeature[];
+  /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
+  extraShippingProviders?: LoadedShippingProvider[];
+  /** Tests only: where provider packages are looked up (default `<repo>/packages/providers`). */
+  shippingProvidersDir?: string;
   /** Default true. `pnpm jobs:run-once` passes false: it changes nothing but the data its jobs handle. */
   cleanExpiredSessionsOnBootstrap?: boolean;
   /** Default `["error", "warn", "log"]`. The command line passes `["error", "warn"]` and prints its own report. */
@@ -104,10 +114,15 @@ export async function createApp(
     enabled: env.enabledFeatures,
     featuresDir: env.featuresDir ?? DEFAULT_FEATURES_DIR,
   });
+  const shippingProviders = await loadShippingProviders({
+    enabled: env.enabledShippingProviders ?? [],
+    providersDir: options.shippingProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
+  });
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register({
       databaseUrl: env.databaseUrl,
       features: [...features, ...(options.extraFeatures ?? [])],
+      shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
       locale: {
         defaultLocale: env.defaultLocale ?? DEFAULT_LOCALE,
         locales: env.locales ?? DEFAULT_LOCALES,

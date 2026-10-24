@@ -4,4 +4,5 @@
 - `src/media-env.spec.ts` - unit tests of the media variables (`MEDIA_STORAGE_DRIVER`, `MEDIA_DIR`, `MEDIA_PUBLIC_BASE_URL`, `MEDIA_MAX_BYTES`, `MEDIA_MAX_PIXELS`): defaults, production rules, bounds, error messages that never echo values.
 - `src/storefront-env.ts` - `loadStorefrontEnv`: validates the storefront's own variables (`API_INTERNAL_URL`, `STOREFRONT_PUBLIC_URL`, `STOREFRONT_IMAGE_HOSTS`, plus `NODE_ENV`) and returns typed `StorefrontEnv`; reads nothing else, so the storefront never needs the API's secrets. Errors name the variable and never echo its value.
 - `src/features.ts` - `parseEnabledFeatures`: parses and validates `FEATURES_ENABLED`.
+- `src/shipping-providers.ts` - `parseEnabledShippingProviders` and the code pattern: parses and validates `SHIPPING_PROVIDERS_ENABLED` (same rules as the features list, codes may contain underscores). `src/shipping-providers.spec.ts` tests it.
 - `src/config.spec.ts`, `src/storefront-env.spec.ts` - unit tests.

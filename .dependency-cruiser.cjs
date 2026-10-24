@@ -20,6 +20,16 @@ module.exports = {
       to: { path: "(^packages/providers/|(^|/node_modules/)@fluxkit/provider-)" },
     },
     {
+      name: "apps-must-not-import-providers",
+      comment:
+        "Applications never import a provider package statically (ADR 0029 decision 8): apps/api discovers and imports " +
+        "enabled providers dynamically (SHIPPING_PROVIDERS_ENABLED), so deleting a provider folder never breaks a build. " +
+        "Matches a resolved path under packages/providers and an unresolved bare @fluxkit/provider-* name.",
+      severity: "error",
+      from: { path: "^apps/" },
+      to: { path: "(^packages/providers/|(^|/node_modules/)@fluxkit/provider-)" },
+    },
+    {
       name: "core-must-not-import-infrastructure",
       comment:
         "Core domain logic stays pure: no framework, ORM, database, cache, queue or search client. " +
