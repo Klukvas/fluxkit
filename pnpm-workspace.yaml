@@ -13,3 +13,9 @@ ignoredBuiltDependencies:
   - "@scarf/scarf"
   - msgpackr-extract
   - "@swc/core"
+
+# Security override (high advisory GHSA-q7qp-rjg7-q26m, multer < 2.5.0): @nestjs/platform-express pins multer 2.4.0 exactly,
+# even in its latest release. The API uses no multipart upload (the media upload reads a raw body); remove this override as
+# soon as @nestjs/platform-express depends on multer >= 2.5.0.
+overrides:
+  multer: 2.5.0
