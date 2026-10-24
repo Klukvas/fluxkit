@@ -1,4 +1,4 @@
-import type { ConsoleMessage, Request, Response } from "@playwright/test";
+import type { ConsoleMessage, Request } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
 import {
   fillCheckoutForm,
@@ -24,28 +24,53 @@ test("the guest order token never appears in a URL, a header, the page source, t
   const requests: Seen[] = [];
   const responses: Seen[] = [];
   const consoleLines: string[] = [];
-  // `allHeaders()` is the complete set, including what the browser adds itself (Referer, Cookie); it is asynchronous, so
-  // the promises are collected and awaited before anything is judged.
+  // `allHeaders()` is the complete set, including what the browser adds itself (Referer, Cookie), but Playwright resolves
+  // it only when Chromium reports the raw headers of a request that got its response. For a request that is still in
+  // flight, or that was cancelled by the next navigation (the reload and the language switch below cancel prefetches), it
+  // can stay pending until the test times out. So a request is only read with `allHeaders()` once it has FINISHED; one that
+  // failed or is still in flight when recording stops is judged with `headers()` (what Playwright itself knows, without
+  // Referer and Cookie) and is counted, so the loss of coverage is visible. The token is in no cookie (checked below with
+  // `context.cookies()`) and a Referer never has a fragment, so those two headers cannot carry it either way.
+  const inFlight = new Map<Request, Pick<Seen, "phase" | "url" | "body">>();
   const pending: Promise<void>[] = [];
+  let withoutRawHeaders = 0;
   let phase: Seen["phase"] = "flow";
   const onRequest = (request: Request) => {
-    const startedIn = phase;
+    inFlight.set(request, { phase, url: request.url(), body: request.postData() });
+  };
+  const judgeWithoutRawHeaders = async (request: Request, failed: boolean): Promise<void> => {
+    const started = inFlight.get(request);
+    if (started === undefined) return;
+    inFlight.delete(request);
+    withoutRawHeaders += 1;
+    requests.push({ ...started, headers: request.headers() });
+    // Settles at once for a FAILED request (null when no response came); for one in flight it would wait, so it is not asked.
+    const response = failed ? await request.response() : null;
+    if (response !== null) {
+      responses.push({ ...started, url: response.url(), headers: response.headers(), body: null });
+    }
+  };
+  const onRequestFinished = (request: Request) => {
+    const started = inFlight.get(request);
+    if (started === undefined) return;
+    inFlight.delete(request);
     pending.push(
-      request.allHeaders().then((headers) => {
-        requests.push({ phase: startedIn, url: request.url(), headers, body: request.postData() });
-      }),
+      (async () => {
+        const response = await request.response();
+        const headers = await request.allHeaders();
+        requests.push({ ...started, headers });
+        if (response === null)
+          throw new Error(`a finished request has no response: ${started.url}`);
+        const [responseHeaders, body] = await Promise.all([
+          response.allHeaders(),
+          request.isNavigationRequest() ? response.text() : null,
+        ]);
+        responses.push({ ...started, url: response.url(), headers: responseHeaders, body });
+      })(),
     );
   };
-  const onResponse = (response: Response) => {
-    const isDocument = response.request().isNavigationRequest();
-    const startedIn = phase;
-    pending.push(
-      Promise.all([response.allHeaders(), isDocument ? response.text() : null]).then(
-        ([headers, body]) => {
-          responses.push({ phase: startedIn, url: response.url(), headers, body });
-        },
-      ),
-    );
+  const onRequestFailed = (request: Request) => {
+    pending.push(judgeWithoutRawHeaders(request, true));
   };
   const onConsole = (message: ConsoleMessage) => {
     consoleLines.push(`${message.text()} ${message.location().url}`);
@@ -54,7 +79,8 @@ test("the guest order token never appears in a URL, a header, the page source, t
     consoleLines.push(`${error.message} ${error.stack ?? ""}`);
   };
   page.on("request", onRequest);
-  page.on("response", onResponse);
+  page.on("requestfinished", onRequestFinished);
+  page.on("requestfailed", onRequestFailed);
   page.on("console", onConsole);
   page.on("pageerror", onPageError);
 
@@ -91,10 +117,17 @@ test("the guest order token never appears in a URL, a header, the page source, t
 
   // Stop recording, then wait for every pending read of headers and bodies before judging.
   page.off("request", onRequest);
-  page.off("response", onResponse);
+  page.off("requestfinished", onRequestFinished);
+  page.off("requestfailed", onRequestFailed);
   page.off("console", onConsole);
   page.off("pageerror", onPageError);
   await Promise.all(pending);
+  // Whatever never finished is judged without raw headers, after everything else has settled.
+  await Promise.all([...inFlight.keys()].map((request) => judgeWithoutRawHeaders(request, false)));
+  // Most of the traffic must have been read completely, or the header checks below would be hollow.
+  expect(requests.length - withoutRawHeaders, "requests read with allHeaders()").toBeGreaterThan(
+    10,
+  );
   const lookups = requests.filter((seen) => pathOf(seen.url) === "/store/orders/lookup");
   // Positive control: the token IS sent, in the body of a POST, so the checks below look at real traffic.
   expect(lookups.length).toBeGreaterThanOrEqual(2);

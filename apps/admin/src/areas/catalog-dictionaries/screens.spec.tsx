@@ -354,7 +354,7 @@ describe("attribute form", () => {
     expect(idle).toContain("§dict.attribute.create");
     const busy = attributeForm(base, { busy: true });
     expect(busy).toMatch(
-      /<button[^>]*disabled[^>]*type="submit"|<button[^>]*type="submit"[^>]*disabled/,
+      /<button[^>]*\sdisabled=""[^>]*type="submit"|<button[^>]*type="submit"[^>]*\sdisabled=""/,
     );
     expect(busy).toContain("§dict.form.saving");
   });
@@ -688,7 +688,7 @@ describe("server picker", () => {
 
   it("is disabled and busy while the first page loads", () => {
     const html = picker(initialPickerState);
-    expect(html).toMatch(/<select[^>]*disabled/);
+    expect(html).toMatch(/<select[^>]*\sdisabled=""/);
     expect(html).toContain('aria-busy="true"');
   });
 

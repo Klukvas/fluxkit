@@ -24,6 +24,9 @@ import {
 import { StatusLine } from "./customer-parts";
 
 const noop = () => undefined;
+
+/** The `disabled` attribute itself: the class list of every `Button` holds `disabled:opacity-50`, which proves nothing. */
+const hasDisabledAttribute = (tag: string): boolean => /\sdisabled=""/.test(tag);
 const sentinel = sentinelTranslator();
 const ID = "33333333-3333-4333-8333-333333333333";
 const owner = [...ROLE_PERMISSIONS.owner];
@@ -318,7 +321,7 @@ describe("customer detail screen", () => {
     const html = detail(sentinel, customer({ isLocked: true }), owner, { busy: true });
     const buttons = [...html.matchAll(/<button[^>]*>/g)].map((match) => match[0]);
     expect(buttons.length).toBe(2);
-    for (const button of buttons) expect(button).toContain("disabled");
+    for (const button of buttons) expect(hasDisabledAttribute(button), button).toBe(true);
   });
 
   it("explains in the hint what each action does, and nothing else", () => {
@@ -352,7 +355,7 @@ describe("the deactivation confirmation", () => {
     expect(html).toContain("§customer.dialog.sending");
     const buttons = [...html.matchAll(/<button[^>]*>/g)].map((match) => match[0]);
     expect(buttons.length).toBeGreaterThanOrEqual(2);
-    for (const button of buttons) expect(button).toContain("disabled");
+    for (const button of buttons) expect(hasDisabledAttribute(button), button).toBe(true);
     // The confirm button has the danger look: the very classes a danger Button renders.
     const dangerClass = /class="([^"]*)"/.exec(
       renderToStaticMarkup(<Button variant="danger">x</Button>),

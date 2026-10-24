@@ -42,6 +42,9 @@ import type { VariantNaming } from "./tabs/variants-tab";
 
 let t: Translator = sentinelTranslator();
 const noop = () => undefined;
+
+/** The `disabled` attribute itself: the class list of every `Button` holds `disabled:opacity-50`, which proves nothing. */
+const hasDisabledAttribute = (tag: string): boolean => /\sdisabled=""/.test(tag);
 const stamp = "2026-10-20T10:00:00.000Z";
 const content = { defaultLocale: "uk", locales: ["uk", "en"] };
 const naming: VariantNaming = { uiLocale: "en", content, options: new Map() };
@@ -218,7 +221,7 @@ describe("Prices grid", () => {
     const html = prices({ dirty: true });
     expect(html).toContain("§products.prices.removeWhileDirty");
     for (const button of html.match(/<button[^>]*§products\.prices\.removeLabel[^>]*>/g) ?? []) {
-      expect(button).toContain("disabled");
+      expect(hasDisabledAttribute(button), button).toBe(true);
     }
   });
 
@@ -414,7 +417,7 @@ describe("Stock views", () => {
         onSubmit={noop}
       />,
     );
-    expect(busy).toMatch(/<button[^>]*type="submit"[^>]*disabled/);
+    expect(busy).toMatch(/<button[^>]*type="submit"[^>]*\sdisabled=""/);
     expect(busy).toContain("§products.stock.sending");
   });
 
