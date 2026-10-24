@@ -9,7 +9,7 @@
 - `pnpm-lock.yaml` - lockfile, always committed.
 - `eslint.config.mjs` - ESLint flat config: strict TS rules, bans `any`, `@ts-ignore`/`@ts-expect-error`, empty `catch`, unused disable directives.
 - `.prettierrc.json`, `.prettierignore` - Prettier for code and config (Markdown is ignored).
-- `.dependency-cruiser.cjs` - module boundary rules (core must not import features, features isolated, packages must not import apps, no deep imports, no cycles).
+- `.dependency-cruiser.cjs` - module boundary rules (core must not import features, infrastructure clients or provider packages (`packages/providers/*`, `@fluxkit/provider-*`), features isolated, packages must not import apps, no deep imports, no cycles).
 - `scripts/check-boundaries.mjs` - runs dependency-cruiser; fails on violations or if zero modules were cruised.
 
 ## Apps

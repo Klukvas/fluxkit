@@ -7,6 +7,7 @@ import * as inventory from "./inventory/index.js";
 import * as media from "./media/index.js";
 import * as orders from "./orders/index.js";
 import * as pricing from "./pricing/index.js";
+import * as shipping from "./shipping/index.js";
 
 describe("public entry point", () => {
   it("exports the catalog domain functions", () => {
@@ -124,6 +125,33 @@ describe("public entry point", () => {
     expect(core.MEDIA_STORAGE_PORT).toBe("fluxkit:media-storage-port");
   });
 
+  it("exports the shipping rules, port constants and limits", () => {
+    for (const name of [
+      "validateShippingPricing",
+      "decideShippingPrice",
+      "buildShippingAdjustment",
+      "decideMethodAvailability",
+      "validateCountryCodes",
+      "parseShippingSelection",
+      "decideShippingRequirement",
+      "checkSelectionForKind",
+      "decideShipmentTransition",
+      "isTerminalShipmentStatus",
+      "isActiveShipmentStatus",
+      "isTrackedShipmentStatus",
+      "shipmentEventTypeFor",
+      "buildShipmentEventPayload",
+      "shippingProviderMetadata",
+      "providerOk",
+      "providerFailure",
+    ] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.SHIPPING_PROVIDER_METADATA).toBe("fluxkit:shipping-provider");
+    expect(core.SHIPMENT_STATUSES).toHaveLength(10);
+    expect(core.SHIPPING_LIMITS.maxTiers).toBe(20);
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of ["orders.read", "orders.write", "customers.read", "customers.write"]) {
       expect(core.PERMISSIONS, permission).toContain(permission);
@@ -131,7 +159,7 @@ describe("public entry point", () => {
   });
 
   it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
-    const parts = [auth, cart, catalog, inventory, media, orders, pricing];
+    const parts = [auth, cart, catalog, inventory, media, orders, pricing, shipping];
     const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);
     expect(Object.keys(core).length).toBe(total);
   });

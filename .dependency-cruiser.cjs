@@ -10,6 +10,16 @@ module.exports = {
       to: { path: "^packages/features/" },
     },
     {
+      name: "core-must-not-import-providers",
+      comment:
+        "Core must never import payment or shipping provider plugins (ADR 0029 decision 2); providers implement core " +
+        "ports and are loaded by the API. Matches a resolved path under packages/providers and an unresolved bare " +
+        "@fluxkit/provider-* name (core does not install provider packages).",
+      severity: "error",
+      from: { path: "^packages/core/" },
+      to: { path: "(^packages/providers/|(^|/node_modules/)@fluxkit/provider-)" },
+    },
+    {
       name: "core-must-not-import-infrastructure",
       comment:
         "Core domain logic stays pure: no framework, ORM, database, cache, queue or search client. " +
