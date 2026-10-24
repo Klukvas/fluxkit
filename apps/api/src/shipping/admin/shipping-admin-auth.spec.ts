@@ -1,6 +1,7 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ProblemBody } from "../../common/problem.filter.js";
+import { testShippingProviders } from "../../test/test-shipping-provider.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { requireTestDatabaseUrl } from "../../test/env.js";
 import { http } from "../../test/http.js";
@@ -37,9 +38,9 @@ describe("shipping routes behind the real default guard and the CSRF rule", () =
     await ensureMigrated();
     anonymous = await startApp({
       adminAuthenticator: "production-default",
-      enabledShippingProviders: ["fake"],
+      extraShippingProviders: testShippingProviders(),
     });
-    owner = await startApp({ enabledShippingProviders: ["fake"] });
+    owner = await startApp({ extraShippingProviders: testShippingProviders() });
   });
 
   afterAll(async () => {

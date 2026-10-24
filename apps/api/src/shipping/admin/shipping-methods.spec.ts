@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { ProblemBody } from "../../common/problem.filter.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { orderShipping, salesOrder, shippingMethod } from "../../database/schema/index.js";
+import { testShippingProviders } from "../../test/test-shipping-provider.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { requireTestDatabaseUrl } from "../../test/env.js";
 import { http } from "../../test/http.js";
@@ -91,7 +92,7 @@ describe("admin shipping methods", () => {
 
   beforeAll(async () => {
     await ensureMigrated();
-    owner = await startApp({ enabledShippingProviders: ["fake"] });
+    owner = await startApp({ extraShippingProviders: testShippingProviders() });
     db = owner.app.get<Database>(DRIZZLE);
   });
 

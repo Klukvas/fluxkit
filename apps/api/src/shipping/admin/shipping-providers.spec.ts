@@ -4,6 +4,10 @@ import type { ProblemBody } from "../../common/problem.filter.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { shippingProviderSetting } from "../../database/schema/index.js";
 import { testPrincipal } from "../../test/allow-all-admin-authenticator.js";
+import {
+  testShippingProviders,
+  type TestShippingProvider,
+} from "../../test/test-shipping-provider.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { createTestAdminUser, deleteTestAdminUsers } from "../../test/admin-user-fixtures.js";
 import { http } from "../../test/http.js";
@@ -11,15 +15,6 @@ import { ensureMigrated } from "../../test/migrate.js";
 import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
 
 type Json = Record<string, unknown>;
-
-/** The test hooks of the fake provider (packages/providers/_fake); apps never import a provider package, so only their shape is named. */
-interface FakeHooks {
-  failNext(
-    operation: "checkConnection",
-    failure?: { reason?: string; providerCodes?: string[]; hang?: boolean },
-  ): void;
-  reset(): void;
-}
 
 describe("admin shipping provider settings and connection check", () => {
   let signedIn: RunningApp;
@@ -29,8 +24,8 @@ describe("admin shipping provider settings and connection check", () => {
   let adminId: string;
 
   const settingsPath = (code: string) => `/admin/shipping/providers/${code}/settings`;
-  const fake = (): FakeHooks =>
-    signedIn.app.get(ShippingProviderRegistry).get("fake") as unknown as FakeHooks;
+  const fake = (): TestShippingProvider =>
+    signedIn.app.get(ShippingProviderRegistry).get("fake") as TestShippingProvider;
 
   beforeAll(async () => {
     await ensureMigrated();
@@ -41,11 +36,11 @@ describe("admin shipping provider settings and connection check", () => {
     adminId = user.id;
     const principal = { ...testPrincipal("owner"), userId: user.id };
     signedIn = await startApp({
-      enabledShippingProviders: ["fake"],
+      extraShippingProviders: testShippingProviders(),
       adminAuthenticator: { authenticate: () => principal },
     });
     tightLimit = await startApp({
-      enabledShippingProviders: ["fake"],
+      extraShippingProviders: testShippingProviders(),
       adminAuthenticator: { authenticate: () => principal },
       rateLimits: { shippingCheck: { maxAttempts: 2, windowMinutes: 1 } },
     });
@@ -215,7 +210,7 @@ describe("admin shipping provider settings and connection check", () => {
     });
 
     it("answers the typed reason and carrier codes only, never a message or a key", async () => {
-      fake().failNext("checkConnection", {
+      fake().failNext({
         reason: "invalid_credentials",
         providerCodes: ["401", "KEY_EXPIRED"],
       });
@@ -230,7 +225,7 @@ describe("admin shipping provider settings and connection check", () => {
         reason: "invalid_credentials",
         providerCodes: ["401", "KEY_EXPIRED"],
       });
-      fake().failNext("checkConnection", { reason: "unavailable" });
+      fake().failNext({ reason: "unavailable" });
       const down = await http<Json>(
         signedIn.baseUrl,
         "POST",
@@ -244,7 +239,7 @@ describe("admin shipping provider settings and connection check", () => {
     });
 
     it("turns a provider that never answers into 'unavailable' after the API's time limit", async () => {
-      fake().failNext("checkConnection", { hang: true });
+      fake().failNext({ hang: true });
       const result = await http<Json>(
         signedIn.baseUrl,
         "POST",
