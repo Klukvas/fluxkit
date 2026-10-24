@@ -153,7 +153,13 @@ describe("public entry point", () => {
   });
 
   it("exports the new admin permissions", () => {
-    for (const permission of ["orders.read", "orders.write", "customers.read", "customers.write"]) {
+    for (const permission of [
+      "orders.read",
+      "orders.write",
+      "customers.read",
+      "customers.write",
+      "shipping.manage",
+    ]) {
       expect(core.PERMISSIONS, permission).toContain(permission);
     }
   });

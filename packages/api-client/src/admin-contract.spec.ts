@@ -46,6 +46,11 @@ import type {
   AdminProductTypeOptionAssignment,
   AdminReservationList,
   AdminSessionUser,
+  AdminShippingMethod,
+  AdminShippingMethodList,
+  AdminShippingPricing,
+  AdminShippingProviderCheck,
+  AdminShippingProviderSettings,
   AdminStockMovement,
   AdminStockMovementList,
   AdminUser,
@@ -139,6 +144,7 @@ const me: Shape<AdminMe> = {
           "orders.write",
           "customers.read",
           "customers.write",
+          "shipping.manage",
         ],
       },
     },
@@ -395,6 +401,61 @@ const attributeWithOptions: Shape<AdminAttributeWithOptions> = {
   object: { ...attribute.object, options: { array: attributeOption } },
 };
 const attributeList: Shape<AdminAttributeList> = paginated(attribute);
+
+// shipping
+const shippingKind = { enum: ["address", "pickup_point", "store_pickup"] } as const;
+const shippingPricing: Shape<AdminShippingPricing> = {
+  oneOf: [
+    { object: { type: { enum: ["flat"] }, amount: "integer" } },
+    { object: { type: { enum: ["free_over"] }, amount: "integer", freeFrom: "integer" } },
+    {
+      object: {
+        type: { enum: ["tiers"] },
+        tiers: { array: { object: { fromSubtotal: "integer", amount: "integer" } } },
+      },
+    },
+    { object: { type: { enum: ["carrier_on_delivery"] } } },
+  ],
+};
+const shippingMethod: Shape<AdminShippingMethod> = {
+  object: {
+    id: "string",
+    code: "string",
+    title: localized,
+    description: { nullable: localized },
+    kind: shippingKind,
+    providerCode: { nullable: "string" },
+    providerService: { nullable: "string" },
+    pricing: shippingPricing,
+    currency: "string",
+    countryCodes: { array: "string" },
+    isActive: "boolean",
+    position: "integer",
+    createdAt: "string",
+    updatedAt: "string",
+  },
+};
+const shippingMethodList: Shape<AdminShippingMethodList> = paginated(shippingMethod);
+const shippingProviderSettings: Shape<AdminShippingProviderSettings> = {
+  object: {
+    providerCode: "string",
+    settings: json,
+    updatedAt: { nullable: "string" },
+    updatedBy: { nullable: "string" },
+  },
+};
+const shippingProviderCheck: Shape<AdminShippingProviderCheck> = {
+  oneOf: [
+    { object: { ok: { literal: true } } },
+    {
+      object: {
+        ok: { literal: false },
+        reason: { enum: ["unavailable", "rejected", "invalid_credentials", "not_supported"] },
+        providerCodes: { array: "string" },
+      },
+    },
+  ],
+};
 
 // brands, categories
 const brand: Shape<AdminBrand> = {
@@ -666,6 +727,36 @@ const body = {
   updateAttributeOption: {
     object: { label: { optional: localized }, position: { optional: "integer" } },
   } satisfies Shape<Admin.UpdateAdminAttributeOptionBody>,
+  createShippingMethod: {
+    object: {
+      code: "string",
+      title: localized,
+      description: { optional: localized },
+      kind: shippingKind,
+      providerCode: { optional: { nullable: "string" } },
+      providerService: { optional: { nullable: "string" } },
+      pricing: shippingPricing,
+      countryCodes: { array: "string" },
+      isActive: { optional: "boolean" },
+      position: { optional: "integer" },
+    },
+  } satisfies Shape<Admin.CreateAdminShippingMethodBody>,
+  updateShippingMethod: {
+    object: {
+      title: { optional: localized },
+      description: { optional: { nullable: localized } },
+      kind: { optional: shippingKind },
+      providerCode: { optional: { nullable: "string" } },
+      providerService: { optional: { nullable: "string" } },
+      pricing: { optional: shippingPricing },
+      countryCodes: { optional: { array: "string" } },
+      isActive: { optional: "boolean" },
+      position: { optional: "integer" },
+    },
+  } satisfies Shape<Admin.UpdateAdminShippingMethodBody>,
+  putShippingProviderSettings: {
+    object: { settings: json },
+  } satisfies Shape<Admin.PutAdminShippingProviderSettingsBody>,
   createBrand: {
     object: {
       name: localized,
@@ -888,6 +979,14 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
   createAttributeOption: attributeOption,
   updateAttributeOption: attributeOption,
   deleteAttributeOption: "none",
+  createShippingMethod: shippingMethod,
+  listShippingMethods: shippingMethodList,
+  getShippingMethod: shippingMethod,
+  updateShippingMethod: shippingMethod,
+  deleteShippingMethod: "none",
+  getShippingProviderSettings: shippingProviderSettings,
+  putShippingProviderSettings: shippingProviderSettings,
+  checkShippingProvider: shippingProviderCheck,
   createBrand: brand,
   listBrands: brandList,
   getBrand: brand,
@@ -978,6 +1077,14 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   createAttributeOption: body.createAttributeOption,
   updateAttributeOption: body.updateAttributeOption,
   deleteAttributeOption: null,
+  createShippingMethod: body.createShippingMethod,
+  listShippingMethods: null,
+  getShippingMethod: null,
+  updateShippingMethod: body.updateShippingMethod,
+  deleteShippingMethod: null,
+  getShippingProviderSettings: null,
+  putShippingProviderSettings: body.putShippingProviderSettings,
+  checkShippingProvider: null,
   createBrand: body.createBrand,
   listBrands: null,
   getBrand: null,
@@ -1066,6 +1173,7 @@ const KNOWN_PERMISSIONS: readonly AdminOperationPermission[] = [
   "orders.write",
   "customers.read",
   "customers.write",
+  "shipping.manage",
   "authenticated",
   "public",
   "denied",
@@ -1259,6 +1367,23 @@ describe("the comparison fails when an admin type drifts from the contract", () 
     status.enum = ["draft", "active"];
     expect(compareShape(product as ShapeNode, enumDrift, document).join("\n")).toContain(
       "enum values differ",
+    );
+  });
+
+  it("detects a boolean literal that drifts (the shipping check result)", () => {
+    const schema = structuredClone(
+      document.paths["/admin/shipping/providers/{code}/check"]?.post?.responses["200"]?.content?.[
+        "application/json"
+      ]?.schema,
+    );
+    if (schema === undefined) throw new Error("check schema missing");
+    expect(compareShape(shippingProviderCheck as ShapeNode, schema, document)).toEqual([]);
+    const ok = schema.oneOf?.[0]?.properties?.ok;
+    if (ok === undefined) throw new Error("ok missing");
+    expect(compareShape({ literal: true }, ok, document)).toEqual([]);
+    (ok as { enum?: unknown }).enum = [false];
+    expect(compareShape({ literal: true }, ok, document).join("\n")).toContain(
+      "openapi is not the boolean literal true",
     );
   });
 

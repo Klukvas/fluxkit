@@ -4,6 +4,7 @@ import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
+import type { LoadedShippingProvider } from "../shipping/registry/index.js";
 import type { MediaTuning } from "../media/media-config.js";
 import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
 import { AllowAllAdminAuthenticator } from "./allow-all-admin-authenticator.js";
@@ -37,6 +38,8 @@ export interface StartAppOptions {
   rateLimits?: RateLimitOverrides;
   /** A controlled clock for session expiry (use with `"production-default"`). */
   clock?: Clock;
+  /** Shipping provider modules mounted as if enabled, for example `testShippingProviders()` (no package under packages/providers is read). */
+  extraShippingProviders?: LoadedShippingProvider[];
   /** Extra modules loaded like enabled features, for probe controllers. */
   extraFeatures?: LoadedFeature[];
   adminCookieSecure?: boolean;
@@ -123,6 +126,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       clock: options.clock,
       scrypt: TEST_SCRYPT_PARAMS,
       extraFeatures: options.extraFeatures,
+      extraShippingProviders: options.extraShippingProviders,
       mediaTuning: options.mediaTuning,
     },
   );

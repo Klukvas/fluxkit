@@ -12,6 +12,7 @@
   "user.permission.orders.write": "Позначати замовлення оплаченими чи виконаними та скасовувати їх",
   "user.permission.customers.read": "Переглядати облікові записи покупців",
   "user.permission.customers.write": "Деактивувати, активувати й розблоковувати облікові записи покупців",
+  "user.permission.shipping.manage": "Керувати способами доставки, тарифами й налаштуваннями перевізників",
   "user.password.hint": "Від {min} до {max} символів, не адреса електронної пошти користувача. Інших правил немає.",
   "user.password.met": "Виконано:",
   "user.password.notMet": "Не виконано:",

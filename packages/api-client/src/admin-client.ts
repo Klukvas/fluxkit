@@ -8,6 +8,13 @@ import type {
   AdminAttributeOption,
   AdminAttributeWithOptions,
   AdminBrand,
+  AdminShippingMethod,
+  AdminShippingMethodList,
+  AdminShippingProviderCheck,
+  AdminShippingProviderSettings,
+  CreateAdminShippingMethodBody,
+  PutAdminShippingProviderSettingsBody,
+  UpdateAdminShippingMethodBody,
   AdminBrandList,
   AdminCategory,
   AdminCategoryList,
@@ -242,6 +249,32 @@ export interface AdminClient {
   ): Result<AdminAttributeOption>;
   deleteAttributeOption(id: string, optionId: string, options?: CallOptions): Result<undefined>;
 
+  // shipping settings (ADR 0029; every operation needs `shipping.manage`)
+  createShippingMethod(
+    body: CreateAdminShippingMethodBody,
+    options?: CallOptions,
+  ): Result<AdminShippingMethod>;
+  listShippingMethods(options?: AdminPageOptions): Result<AdminShippingMethodList>;
+  getShippingMethod(id: string, options?: CallOptions): Result<AdminShippingMethod>;
+  updateShippingMethod(
+    id: string,
+    body: UpdateAdminShippingMethodBody,
+    options?: CallOptions,
+  ): Result<AdminShippingMethod>;
+  /** `409 rule_violation` (`rule: "method_in_use"`) when an order used the method: deactivate it instead. */
+  deleteShippingMethod(id: string, options?: CallOptions): Result<undefined>;
+  getShippingProviderSettings(
+    code: string,
+    options?: CallOptions,
+  ): Result<AdminShippingProviderSettings>;
+  putShippingProviderSettings(
+    code: string,
+    body: PutAdminShippingProviderSettingsBody,
+    options?: CallOptions,
+  ): Result<AdminShippingProviderSettings>;
+  /** A failed check is still a `200` with `{ok: false, reason, providerCodes}`. */
+  checkShippingProvider(code: string, options?: CallOptions): Result<AdminShippingProviderCheck>;
+
   // brands
   createBrand(body: CreateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
   listBrands(options?: AdminPageOptions): Result<AdminBrandList>;
@@ -473,6 +506,21 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("updateAttributeOption", { pathParams: { id, optionId }, body, options: opts }),
     deleteAttributeOption: (id, optionId, opts) =>
       call("deleteAttributeOption", { pathParams: { id, optionId }, options: opts }),
+
+    createShippingMethod: (body, opts) => call("createShippingMethod", { body, options: opts }),
+    listShippingMethods: (opts) => call("listShippingMethods", { options: opts }),
+    getShippingMethod: (id, opts) =>
+      call("getShippingMethod", { pathParams: { id }, options: opts }),
+    updateShippingMethod: (id, body, opts) =>
+      call("updateShippingMethod", { pathParams: { id }, body, options: opts }),
+    deleteShippingMethod: (id, opts) =>
+      call("deleteShippingMethod", { pathParams: { id }, options: opts }),
+    getShippingProviderSettings: (code, opts) =>
+      call("getShippingProviderSettings", { pathParams: { code }, options: opts }),
+    putShippingProviderSettings: (code, body, opts) =>
+      call("putShippingProviderSettings", { pathParams: { code }, body, options: opts }),
+    checkShippingProvider: (code, opts) =>
+      call("checkShippingProvider", { pathParams: { code }, options: opts }),
 
     createBrand: (body, opts) => call("createBrand", { body, options: opts }),
     listBrands: (opts) => call("listBrands", { options: opts }),

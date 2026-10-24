@@ -16,6 +16,8 @@ export const RATE_LIMITS = Object.freeze({
   cartWrite: { maxAttempts: 120, windowMinutes: 1 },
   // ADR 0028: image uploads, per signed-in admin user (admins in one office share an address).
   mediaUpload: { maxAttempts: 60, windowMinutes: 10 },
+  // ADR 0029 decision 13: the provider connection check calls a carrier under the shop's key; per signed-in admin user.
+  shippingCheck: { maxAttempts: 30, windowMinutes: 10 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -36,6 +38,7 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     guestCancel: "clientAddress",
     cartWrite: "clientAddress",
     mediaUpload: "adminUser",
+    shippingCheck: "adminUser",
   },
 );
 

@@ -15,6 +15,8 @@ export class ShippingRegistryModule {
   static register(providers: readonly LoadedShippingProvider[]): DynamicModule {
     return {
       module: ShippingRegistryModule,
+      // Global: the admin settings API and the later store and shipment modules read the registry without importing it.
+      global: true,
       imports: [DiscoveryModule, ...providers.map((provider) => provider.module)],
       providers: [
         { provide: LOADED_SHIPPING_PROVIDER_CODES, useValue: providers.map((p) => p.code) },

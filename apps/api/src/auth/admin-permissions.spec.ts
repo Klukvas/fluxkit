@@ -72,6 +72,18 @@ const ORDERS_ROUTES = [
   "POST /admin/orders/:id/mark-fulfilled",
 ];
 
+/** Shipping settings: declared once on the controllers with their own default pair (`shipping.manage` for reads and writes). */
+const SHIPPING_ROUTES = [
+  "GET /admin/shipping/methods",
+  "POST /admin/shipping/methods",
+  "GET /admin/shipping/methods/:id",
+  "PATCH /admin/shipping/methods/:id",
+  "DELETE /admin/shipping/methods/:id",
+  "GET /admin/shipping/providers/:code/settings",
+  "PUT /admin/shipping/providers/:code/settings",
+  "POST /admin/shipping/providers/:code/check",
+];
+
 /** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */
 const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventory/reservations";
 
@@ -81,6 +93,7 @@ function expectedPermission(method: string, pattern: string): AdminPermission {
   if (ORDERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";
   }
+  if (SHIPPING_ROUTES.includes(`${method} ${pattern}`)) return "shipping.manage";
   if (CUSTOMERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "customers.read" : "customers.write";
   }
@@ -235,12 +248,29 @@ describe("admin route permissions", () => {
       }
     });
 
+    it("gives the shipping routes shipping.manage by the controller default, reads included", () => {
+      const shipping = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/shipping"),
+      );
+      expect(shipping.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...SHIPPING_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of shipping) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: "shipping.manage",
+          source: "default",
+        });
+      }
+    });
+
     it("keeps every other controller on the catalog pair: no catalog route changed its permission", () => {
       const others = declaredAdminRoutes(manager.app).filter(
         ({ method, pattern, access }) =>
           access.kind === "permission" &&
           access.source === "default" &&
           !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`) &&
+          !SHIPPING_ROUTES.includes(`${method} ${pattern}`) &&
           !ORDERS_ROUTES.includes(`${method} ${pattern}`),
       );
       expect(others.length).toBeGreaterThan(30);
@@ -298,6 +328,7 @@ describe("admin route permissions", () => {
         "customers.write",
         "orders.read",
         "orders.write",
+        "shipping.manage",
         "users.manage",
       ]);
       for (const permission of needed) {
@@ -305,6 +336,9 @@ describe("admin route permissions", () => {
       }
       expect(permissionsOf("manager")).not.toContain("users.manage");
       expect(permissionsOf("viewer")).not.toContain("users.manage");
+      // Shipping settings are shop configuration: owner and manager, not the viewer.
+      expect(permissionsOf("manager")).toContain("shipping.manage");
+      expect(permissionsOf("viewer")).not.toContain("shipping.manage");
       // The customer permissions hold personal data: manager and owner have them, the viewer has neither.
       for (const permission of [
         "customers.read",
@@ -375,6 +409,21 @@ describe("admin route permissions", () => {
           method === "GET" ? {} : { body: {} },
         );
         expect(result.status, route).toBe(403);
+      }
+    });
+
+    it("is forbidden on every shipping route, reads included", async () => {
+      for (const route of SHIPPING_ROUTES) {
+        const [method, pattern] = route.split(" ") as ["GET", string];
+        const result = await http<ProblemBody>(
+          viewer.baseUrl,
+          method,
+          pattern.replace(":id", SOME_ID).replace(":code", "fake"),
+          method === "GET" || method === "DELETE" ? {} : { body: {} },
+        );
+        expect(result.status, route).toBe(403);
+        expect(result.body, route).toMatchObject({ code: "forbidden" });
+        expect(result.body.detail, route).toContain("shipping.manage");
       }
     });
 
@@ -501,6 +550,58 @@ describe("admin route permissions", () => {
         name: "POST /admin/orders/:id/mark-fulfilled",
         permission: "orders.write",
         call: (url) => http(url, "POST", `/admin/orders/${SOME_ID}/mark-fulfilled`),
+        allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/shipping/methods",
+        permission: "shipping.manage",
+        call: (url) => http(url, "GET", "/admin/shipping/methods"),
+        allowedStatus: 200,
+      },
+      {
+        name: "POST /admin/shipping/methods",
+        permission: "shipping.manage",
+        call: (url) => http(url, "POST", "/admin/shipping/methods", { body: {} }),
+        allowedStatus: 400,
+      },
+      {
+        name: "GET /admin/shipping/methods/:id",
+        permission: "shipping.manage",
+        call: (url) => http(url, "GET", `/admin/shipping/methods/${SOME_ID}`),
+        allowedStatus: 404,
+      },
+      {
+        name: "PATCH /admin/shipping/methods/:id",
+        permission: "shipping.manage",
+        call: (url) =>
+          http(url, "PATCH", `/admin/shipping/methods/${SOME_ID}`, { body: { isActive: false } }),
+        allowedStatus: 404,
+      },
+      {
+        name: "DELETE /admin/shipping/methods/:id",
+        permission: "shipping.manage",
+        call: (url) => http(url, "DELETE", `/admin/shipping/methods/${SOME_ID}`),
+        allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/shipping/providers/:code/settings",
+        permission: "shipping.manage",
+        call: (url) => http(url, "GET", "/admin/shipping/providers/nowhere/settings"),
+        allowedStatus: 404,
+      },
+      {
+        name: "PUT /admin/shipping/providers/:code/settings",
+        permission: "shipping.manage",
+        call: (url) =>
+          http(url, "PUT", "/admin/shipping/providers/nowhere/settings", {
+            body: { settings: {} },
+          }),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/shipping/providers/:code/check",
+        permission: "shipping.manage",
+        call: (url) => http(url, "POST", "/admin/shipping/providers/nowhere/check"),
         allowedStatus: 404,
       },
       {
