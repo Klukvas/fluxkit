@@ -63,6 +63,7 @@ Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`.
 - A web server "timed out": run the three commands of the table by hand to see the error. The API needs `pnpm build` (the suite uses `dist/`), Redis and Meilisearch.
 - Product pages answer "Nothing was found" on add to cart: the storefront rendered ids of a previous seed from its on-disk data cache (`.next/cache/fetch-cache`, 60 s). The suite deletes that directory before it starts the storefront; if you start the storefront yourself against a re-seeded database, delete it too.
 - Port in use: another run or server holds 3100 to 3102 (`reuseExistingServer` is off on purpose): stop it or set the `E2E_*` ports.
+- A test hangs in `request.allHeaders()` until its timeout: that promise settles only for a request that got its response (Chromium reports the raw headers then). Read it in `requestfinished`, never in `request` (`token-hygiene.e2e.ts` shows how; it showed up under load, several workers).
 - One Playwright run at a time per database (the schema is wiped at the start).
 
 ## Not covered
