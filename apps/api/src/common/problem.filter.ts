@@ -17,6 +17,7 @@ import {
   markStoreAccountResponseUncacheable,
   markStoreCartResponseUncacheable,
   markStoreOrderResponseUncacheable,
+  markStoreShippingResponseUncacheable,
 } from "./store-path.js";
 
 export const PROBLEM_CONTENT_TYPE = "application/problem+json";
@@ -91,6 +92,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
     markStoreAccountResponseUncacheable(request, response);
     markStoreCartResponseUncacheable(request, response);
     markStoreOrderResponseUncacheable(request, response);
+    markStoreShippingResponseUncacheable(request, response);
     if (
       exception instanceof HttpException &&
       !(exception instanceof ProblemException) &&

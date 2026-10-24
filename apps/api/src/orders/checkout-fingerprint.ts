@@ -20,10 +20,15 @@ export interface FingerprintInput {
   /** The locale actually used (the default when the request sent none). */
   readonly locale: string;
   readonly expectedTotal: { readonly amount: number; readonly currency: string };
+  /** The normalized shipping member (version 2); `null` when none was sent. */
+  readonly shipping: { readonly methodCode: string; readonly pickupPointRef?: string } | null;
 }
 
-/** Bump when the fields above change, so an old order is never matched against a new layout by accident. */
-const FINGERPRINT_VERSION = 1;
+/**
+ * Bump when the fields above change, so an old order is never matched against a new layout by accident. Version 2 (ADR 0029
+ * decision 4) adds `shipping`; a replay of an order placed under version 1 answers `idempotency_key_reused` (accepted).
+ */
+export const FINGERPRINT_VERSION = 2;
 
 /**
  * JSON with the keys of every object sorted, so that equal values give equal text whatever the order the keys were

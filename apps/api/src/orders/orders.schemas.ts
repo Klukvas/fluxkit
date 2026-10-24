@@ -1,4 +1,12 @@
-import { CATALOG_LIMITS, MAX_AMOUNT, MAX_LINE_QUANTITY, ORDER_STATUSES } from "@fluxkit/core";
+import {
+  CATALOG_LIMITS,
+  MAX_AMOUNT,
+  MAX_LINE_QUANTITY,
+  ORDER_STATUSES,
+  PICKUP_POINT_KINDS,
+  SHIPPING_METHOD_KINDS,
+  SHIPPING_PAYERS,
+} from "@fluxkit/core";
 import { z } from "zod";
 import { timestampSchema } from "../common/openapi-formats.js";
 
@@ -42,9 +50,25 @@ export const checkoutBodySchema = z.strictObject({
     .meta({ description: "Required when any line's product type ships physical goods." }),
   billingAddress: addressInput.nullable().optional(),
   locale: localeField.optional(),
+  shipping: z
+    .strictObject({
+      methodCode: z.string().meta({
+        description: "The `methodCode` of an option of `GET /store/shipping/options`.",
+      }),
+      pickupPointRef: z.string().optional().meta({
+        description:
+          "Required for a `pickup_point` method, refused for the others: the `ref` of `GET /store/shipping/providers/{code}/pickup-points`.",
+      }),
+    })
+    .nullable()
+    .optional()
+    .meta({
+      description:
+        "The shipping method (docs/api/shipping.md). Required when the cart ships goods and the shop has an active method; refused (`shipping_not_applicable`) for a cart that ships nothing. Missing or `null` means not sent.",
+    }),
   expectedTotal: z.strictObject({ amount: z.number(), currency: z.string() }).meta({
     description:
-      "The total the shopper saw. A consent check only: the server prices everything itself, and a different total answers 409 `cart_changed`.",
+      "The total the shopper saw: the subtotal, plus the option's price when a shipping method is chosen (send the option's `total`). A consent check only: the server prices everything itself; a different total answers 409 `cart_changed` or `shipping_changed`.",
   }),
 });
 
@@ -90,6 +114,10 @@ export const amountSchema = z
 
 export const moneySchema = z.object({ amount: amountSchema, currency: z.string() });
 
+function moneySchemaOf() {
+  return z.object({ amount: amountSchema, currency: z.string() });
+}
+
 export const signedMoneySchema = z.object({
   amount: z.number().int().min(-MAX_AMOUNT).max(MAX_AMOUNT),
   currency: z.string(),
@@ -107,6 +135,46 @@ export const addressOutput = z.object({
   recipientFirstName: z.string().optional(),
   recipientLastName: z.string().optional(),
   recipientPhone: z.string().optional(),
+});
+
+/** The pickup point of a `pickup_point` order: public carrier data of the snapshot (`order_shipping.destination`). */
+export const orderPickupPointSchema = z.object({
+  providerRef: z.string(),
+  number: z.string(),
+  kind: z.enum(PICKUP_POINT_KINDS),
+  cityRef: z.string(),
+  cityName: z.string(),
+  description: z.string(),
+});
+
+const orderShippingFields = {
+  methodCode: z.string(),
+  kind: z.enum(SHIPPING_METHOD_KINDS),
+  providerCode: z.string().nullable(),
+  amount: moneySchemaOf().meta({
+    description: "What the shop charged for shipping; equals the shipping adjustment.",
+  }),
+  payer: z.enum(SHIPPING_PAYERS).meta({
+    description: "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier.",
+  }),
+  estimatedCarrierAmount: moneySchemaOf().nullable().meta({
+    description: "The carrier's informational estimate known at checkout; never charged.",
+  }),
+  destination: orderPickupPointSchema.nullable().meta({ description: "Only for `pickup_point`." }),
+};
+
+/** The store view of the shipping snapshot (ADR 0029 decision 5): the method title in the read's locale. */
+export const storeOrderShippingSchema = z.object({
+  ...orderShippingFields,
+  title: z.string(),
+});
+
+/** The admin view of the shipping snapshot: every locale of the title, the method link and the provider service. */
+export const adminOrderShippingSchema = z.object({
+  methodId: z.string().nullable().meta({ description: "Null once the method was deleted." }),
+  ...orderShippingFields,
+  providerService: z.string().nullable(),
+  title: z.record(z.string(), z.string()),
 });
 
 export const storeOrderItemSchema = z.object({
@@ -154,6 +222,10 @@ export const storeOrderSchema = z.object({
   }),
   shippingAddress: addressOutput.nullable(),
   billingAddress: addressOutput.nullable(),
+  shipping: storeOrderShippingSchema.nullable().meta({
+    description:
+      "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+  }),
   history: z.array(z.object({ status: statusSchema, at: timestampSchema })),
 });
 

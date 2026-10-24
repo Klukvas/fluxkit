@@ -51,7 +51,15 @@ export type ProblemCode =
   /** The media file could not be written (disk full, quota, unwritable directory); try again later. */
   | "storage_unavailable"
   /** `MEDIA_STORAGE_DRIVER=none`: uploads are switched off; enter image URLs instead. */
-  | "uploads_disabled";
+  | "uploads_disabled"
+  /** The cart ships goods and the shop has an active shipping method: the checkout must name one. */
+  | "shipping_method_required"
+  /** The checkout named a shipping method for a cart that ships nothing. */
+  | "shipping_not_applicable"
+  /** Only the shipping price or the method's availability changed: `shipping` carries the fresh option. */
+  | "shipping_changed"
+  /** The carrier cannot be reached and nothing usable is cached; only that method or lookup fails (`Retry-After`). */
+  | "shipping_provider_unavailable";
 
 /** The `application/problem+json` body of every error answer. */
 export interface ProblemDetails {
@@ -66,6 +74,8 @@ export interface ProblemDetails {
   rule?: string;
   /** The fresh cart of a `cart_changed` answer. */
   cart?: Cart;
+  /** The chosen method's fresh option of a `shipping_changed` answer. */
+  shipping?: ShippingChanged;
 }
 
 // -------------------------------------------------------------------- cart
@@ -242,9 +252,11 @@ export interface Order {
   total: Money;
   adjustments: OrderAdjustment[];
   contact: OrderContact;
-  /** `null` when the order has nothing to ship. */
+  /** `null` when the order has nothing to ship (or ships to a store pickup). A pickup point order holds the point's address. */
   shippingAddress: Address | null;
   billingAddress: Address | null;
+  /** The shipping method chosen at checkout (immutable snapshot); `null` for an order placed without one. */
+  shipping: OrderShipping | null;
   history: OrderHistoryEntry[];
 }
 
@@ -274,8 +286,120 @@ export interface CheckoutBody {
   shippingAddress?: AddressInput | null;
   billingAddress?: AddressInput | null;
   locale?: string;
-  /** The total the shopper saw; the server answers `cart_changed` when it differs. */
+  /**
+   * The shipping method (docs/api/shipping.md): required when the cart ships goods and the shop has an active method,
+   * refused (`shipping_not_applicable`) for a cart that ships nothing. `null` or missing means not sent.
+   */
+  shipping?: CheckoutShipping | null;
+  /**
+   * The total the shopper saw: the cart subtotal, or with a shipping method the option's `total`. The server answers
+   * `cart_changed` or `shipping_changed` when it differs.
+   */
   expectedTotal: Money;
+}
+
+export interface CheckoutShipping {
+  /** The `methodCode` of a shipping option. */
+  methodCode: string;
+  /** Required for a `pickup_point` method, refused for the others: a `ref` of the pickup point lookup. */
+  pickupPointRef?: string;
+}
+
+// ---------------------------------------------------------------- shipping
+
+export type ShippingMethodKind = "address" | "pickup_point" | "store_pickup";
+export type ShippingPayer = "shop_charge" | "recipient_on_delivery";
+export type PickupPointKind = "branch" | "locker";
+export type ShippingUnavailableReason =
+  | "inactive"
+  | "currency_not_offered"
+  | "country_required"
+  | "country_not_served"
+  | "provider_not_enabled"
+  | "pricing_invalid"
+  | "total_out_of_range";
+
+/** One method for the current cart, priced by the server (`GET /store/shipping/options`). */
+export interface ShippingOption {
+  methodCode: string;
+  kind: ShippingMethodKind;
+  title: string;
+  /** For `store_pickup` the pickup instructions. */
+  description: string | null;
+  providerCode: string | null;
+  countryCodes: string[];
+  available: boolean;
+  /** Only when `available` is false. */
+  reason?: ShippingUnavailableReason;
+  price: Money | null;
+  payer: ShippingPayer | null;
+  /** Cart subtotal plus `price`: send it as the checkout's `expectedTotal`. */
+  total: Money | null;
+  /** The carrier's own price: informational, never charged. */
+  estimate: Money | null;
+}
+
+export interface ShippingOptions {
+  subtotal: Money;
+  options: ShippingOption[];
+}
+
+/** The `shipping` member of `shipping_changed`: the fresh option, or the method is not offered at all any more. */
+export type ShippingChanged =
+  | ShippingOption
+  | { methodCode: string; available: false; reason: "inactive" | "currency_not_offered" };
+
+export interface ShippingCity {
+  ref: string;
+  name: string;
+  region: string | null;
+}
+
+export interface ShippingPickupPoint {
+  /** Send it as the checkout's `shipping.pickupPointRef`. */
+  ref: string;
+  number: string;
+  kind: PickupPointKind;
+  cityRef: string;
+  cityName: string;
+  countryCode: string;
+  description: string;
+  maxWeightGrams: number | null;
+}
+
+export interface ShippingLookupPage<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+  /** The carrier could not be reached; the data is cached up to 72 hours past its expiry. */
+  stale: boolean;
+}
+
+export type ShippingCityPage = ShippingLookupPage<ShippingCity>;
+export type ShippingPickupPointPage = ShippingLookupPage<ShippingPickupPoint>;
+
+/** The pickup point of a `pickup_point` order: public carrier data. */
+export interface OrderPickupPoint {
+  providerRef: string;
+  number: string;
+  kind: PickupPointKind;
+  cityRef: string;
+  cityName: string;
+  description: string;
+}
+
+/** The shipping snapshot of an order, the title in the read's locale. */
+export interface OrderShipping {
+  methodCode: string;
+  kind: ShippingMethodKind;
+  providerCode: string | null;
+  amount: Money;
+  payer: ShippingPayer;
+  /** The carrier's informational estimate known at checkout; never charged. */
+  estimatedCarrierAmount: Money | null;
+  destination: OrderPickupPoint | null;
+  title: string;
 }
 
 export interface CheckoutResult {

@@ -86,6 +86,10 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
   getConfig: (c) => c.getConfig(),
   listProducts: (c) => c.listProducts(),
   getProduct: (c) => c.getProduct("shirt"),
+  getShippingOptions: (c) => c.getShippingOptions({ country: "UA" }),
+  listShippingCities: (c) => c.listShippingCities("nova_poshta", "Ки"),
+  listShippingPickupPoints: (c) =>
+    c.listShippingPickupPoints("nova_poshta", "city-1", { kinds: ["branch", "locker"] }),
 };
 
 /** A response each operation accepts: its first documented success status with a matching body. */

@@ -32,6 +32,7 @@ export const FAKE_PROVIDER_CODE = "fake";
 export const FAKE_OPERATIONS = Object.freeze([
   "searchCities",
   "listPickupPoints",
+  "findPickupPoint",
   "estimate",
   "createWaybill",
   "findWaybill",
@@ -115,6 +116,7 @@ function pointsOf(city: FakeCity): PickupPoint[] {
     kind,
     cityRef: city.ref,
     cityName: city.nameEn,
+    countryCode: "UA",
     description: `Fake ${kind} ${String(index + 1)}, ${city.nameEn}`,
     maxWeightGrams: kind === "branch" ? 30_000 : 20_000,
   }));
@@ -209,6 +211,21 @@ export class FakeShippingProvider implements ShippingProviderPort {
       return city === undefined
         ? []
         : pointsOf(city).filter((point) => input.kinds.includes(point.kind));
+    });
+  }
+
+  findPickupPoint(
+    input: { readonly ref: string },
+    signal: ProviderAbortSignal,
+  ): Promise<PickupPoint | null> {
+    return this.run("findPickupPoint", signal, () => {
+      for (const city of CITIES) {
+        const point = pointsOf(city).find((candidate) => candidate.ref === input.ref);
+        if (point !== undefined) {
+          return point;
+        }
+      }
+      return null;
     });
   }
 

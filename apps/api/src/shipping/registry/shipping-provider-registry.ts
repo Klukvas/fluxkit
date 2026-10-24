@@ -14,6 +14,7 @@ export const LOADED_SHIPPING_PROVIDER_CODES = Symbol("fluxkit:loaded-shipping-pr
 const PORT_METHODS = [
   "searchCities",
   "listPickupPoints",
+  "findPickupPoint",
   "estimate",
   "createWaybill",
   "findWaybill",

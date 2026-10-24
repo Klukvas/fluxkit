@@ -106,6 +106,21 @@ describe("the shipping provider port (ADR 0029 decision 9)", () => {
       },
       searchCities: () => Promise.resolve([{ ref: "city-1", name: "Місто", region: null }]),
       listPickupPoints: () => Promise.resolve([]),
+      findPickupPoint: ({ ref }) =>
+        Promise.resolve(
+          ref === "point-1"
+            ? {
+                ref,
+                number: "1",
+                kind: "branch" as const,
+                cityRef: "city-1",
+                cityName: "Місто",
+                countryCode: "UA",
+                description: "Відділення 1",
+                maxWeightGrams: null,
+              }
+            : null,
+        ),
       estimate: notSupported,
       createWaybill: notSupported,
       findWaybill: notSupported,
@@ -124,6 +139,8 @@ describe("the shipping provider port (ADR 0029 decision 9)", () => {
     expect(await port.searchCities({ query: "Мі", locale: "uk", limit: 10 }, signal)).toHaveLength(
       1,
     );
+    expect((await port.findPickupPoint({ ref: "point-1" }, signal))?.countryCode).toBe("UA");
+    expect(await port.findPickupPoint({ ref: "point-2" }, signal)).toBeNull();
     expect(await port.track({ trackingNumbers: ["1"], phones: [] }, signal)).toEqual({
       ok: false,
       reason: "not_supported",

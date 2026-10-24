@@ -56,6 +56,7 @@ function anOrder(overrides: Partial<Order> = {}): Order {
     contact: { email: "§email", phone: "§phone", firstName: "§first", lastName: "§last" },
     shippingAddress: { countryCode: "UA", city: "§city", line1: "§line1", postalCode: "§zip" },
     billingAddress: null,
+    shipping: null,
     history: [{ status: "awaiting_payment", at: "2026-10-19T10:00:00.000Z" }],
     ...overrides,
   };

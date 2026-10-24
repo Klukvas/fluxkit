@@ -9,7 +9,13 @@ import {
 } from "@fluxkit/core";
 import { z } from "zod";
 import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
-import { addressOutput, moneySchema, signedMoneySchema, statusSchema } from "../orders.schemas.js";
+import {
+  addressOutput,
+  adminOrderShippingSchema,
+  moneySchema,
+  signedMoneySchema,
+  statusSchema,
+} from "../orders.schemas.js";
 
 // Admin order API shapes (docs/api/orders.md, plan step 6). Request schemas check structure and the content rules that
 // have no home in core (a free-text reason, a payment reference); money is judged by core `createMoney`.
@@ -222,6 +228,10 @@ export const adminOrderSchema = z.object({
       source: z.string().nullable(),
     }),
   ),
+  shipping: adminOrderShippingSchema.nullable().meta({
+    description:
+      "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+  }),
   history: z.array(
     z.object({
       fromStatus: statusSchema.nullable(),

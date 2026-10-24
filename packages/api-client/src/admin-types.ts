@@ -8,7 +8,15 @@
  * `types.ts`. When the API changes, change `docs/api/openapi.json` and this file in the same commit.
  */
 
-import type { Address, Money, OrderContact, OrderStatus } from "./types.js";
+import type {
+  Address,
+  Money,
+  OrderContact,
+  OrderPickupPoint,
+  OrderStatus,
+  ShippingMethodKind,
+  ShippingPayer,
+} from "./types.js";
 
 /** Any JSON value. The API validates attribute values and attribute validation rules against the attribute's input type. */
 export type JsonValue =
@@ -324,6 +332,8 @@ export interface AdminOrder {
   taxTotal: Money;
   total: Money;
   adjustments: AdminOrderAdjustment[];
+  /** The shipping snapshot of the checkout; `null` for an order placed without a shipping method. */
+  shipping: AdminOrderShipping | null;
   history: AdminOrderHistoryEntry[];
   placedAt: string;
   expiresAt: string;
@@ -333,6 +343,21 @@ export interface AdminOrder {
   expiredAt: string | null;
   cancellationReason: string | null;
   paymentReference: string | null;
+}
+
+/** The shipping snapshot of an order as the admin sees it: every locale of the title, the method link. */
+export interface AdminOrderShipping {
+  /** Null once the method was deleted (the snapshot stays). */
+  methodId: string | null;
+  methodCode: string;
+  kind: ShippingMethodKind;
+  providerCode: string | null;
+  amount: Money;
+  payer: ShippingPayer;
+  estimatedCarrierAmount: Money | null;
+  destination: OrderPickupPoint | null;
+  providerService: string | null;
+  title: Record<string, string>;
 }
 
 export interface CancelAdminOrderBody {

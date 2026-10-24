@@ -1,11 +1,13 @@
 import {
   createMoney,
+  parseShippingSelection,
   normalizePhone,
   validateAddress,
   validateEmail,
   validatePersonName,
   type Address,
   type Money,
+  type ShippingSelection,
 } from "@fluxkit/core";
 import { validationFailed, type FieldError } from "../common/problem.js";
 import type { CheckoutBody } from "./orders.schemas.js";
@@ -23,6 +25,8 @@ export interface CheckoutInput {
   /** As sent; the service checks it against the configured locales. */
   readonly requestedLocale: string | undefined;
   readonly expectedTotal: Money;
+  /** The shipping member as core parsed it; `undefined` when it was not sent (or `null`). */
+  readonly shipping: ShippingSelection | undefined;
 }
 
 function addressErrors(prefix: string, input: unknown): FieldError[] | Address {
@@ -43,7 +47,9 @@ function isErrors(value: FieldError[] | Address): value is FieldError[] {
 /**
  * The checkout fields judged by the core rules (email, phone, names, addresses, expected total), all errors at once
  * with the path of the field. A signed-in customer may omit the email: the account email is used. Whether a shipping
- * address is needed depends on the cart and is decided in the checkout transaction. The input is not changed.
+ * address or a shipping method is needed depends on the cart and the shop's methods and is decided in the checkout
+ * transaction; here the `shipping` member is only checked for its shape (core `parseShippingSelection`). The input is not
+ * changed.
  */
 export function parseCheckoutInput(
   body: CheckoutBody,
@@ -124,6 +130,21 @@ export function parseCheckoutInput(
     expectedTotal = money.money;
   }
 
+  let shipping: ShippingSelection | undefined;
+  if (body.shipping !== undefined && body.shipping !== null) {
+    const parsed = parseShippingSelection(body.shipping);
+    if (parsed.ok) {
+      shipping = parsed.selection;
+    } else {
+      errors.push(
+        ...parsed.errors.map(({ field, reason }) => ({
+          path: field === "" ? "shipping" : `shipping.${field}`,
+          code: reason,
+        })),
+      );
+    }
+  }
+
   if (errors.length > 0) {
     throw validationFailed(errors);
   }
@@ -136,5 +157,6 @@ export function parseCheckoutInput(
     billingAddress,
     requestedLocale: body.locale,
     expectedTotal,
+    shipping,
   };
 }

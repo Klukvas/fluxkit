@@ -78,6 +78,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
       postalCode: "01001",
     },
     billingAddress: null,
+    shipping: null,
     items: [
       {
         position: 0,

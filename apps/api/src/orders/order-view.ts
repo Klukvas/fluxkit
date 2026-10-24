@@ -1,5 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { resolveTextWithFallback, type StoreLocale } from "@fluxkit/core";
+import {
+  resolveTextWithFallback,
+  SHIPPING_METHOD_KINDS,
+  SHIPPING_PAYERS,
+  type ShippingMethodKind,
+  type ShippingPayer,
+  type StoreLocale,
+} from "@fluxkit/core";
 import { z } from "zod";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import type { DbExecutor } from "../common/transaction.js";
@@ -9,9 +16,14 @@ import {
   type OrderAdjustmentRow,
   type OrderItemRow,
   type OrderRow,
+  type OrderShippingRow,
   type OrderStatusChangeRow,
 } from "./orders.repository.js";
-import type { StoreOrder, StoreOrderSummary } from "./orders.schemas.js";
+import {
+  orderPickupPointSchema,
+  type StoreOrder,
+  type StoreOrderSummary,
+} from "./orders.schemas.js";
 
 /*
  * The store view of an order (docs/api/orders.md): what a shopper may see of their own order, resolved to one locale.
@@ -51,6 +63,27 @@ function money(amount: number, currency: string) {
   return { amount, currency };
 }
 
+/** The fields of the shipping snapshot both views share (ADR 0029 decision 7); the title is resolved by each view. */
+export function parseOrderShipping(row: OrderShippingRow) {
+  // Written by the checkout under the table's CHECKs: a value that does not parse is damaged data (loud).
+  if (!SHIPPING_METHOD_KINDS.includes(row.kind as ShippingMethodKind)) {
+    throw new RangeError("The shipping snapshot has an unknown kind");
+  }
+  if (!SHIPPING_PAYERS.includes(row.payer as ShippingPayer)) {
+    throw new RangeError("The shipping snapshot has an unknown payer");
+  }
+  return {
+    methodCode: row.methodCode,
+    kind: row.kind as ShippingMethodKind,
+    providerCode: row.providerCode,
+    amount: money(row.amount, row.currency),
+    payer: row.payer as ShippingPayer,
+    estimatedCarrierAmount:
+      row.estimatedCarrierAmount === null ? null : money(row.estimatedCarrierAmount, row.currency),
+    destination: row.destination === null ? null : orderPickupPointSchema.parse(row.destination),
+  };
+}
+
 function toItem(row: OrderItemRow, locale: StoreLocale): StoreOrder["items"][number] {
   const options = optionValuesSchema.parse(row.optionValues);
   return {
@@ -74,6 +107,7 @@ export function toStoreOrder(
   items: readonly OrderItemRow[],
   history: readonly OrderStatusChangeRow[],
   adjustments: readonly OrderAdjustmentRow[],
+  shipping: OrderShippingRow | undefined,
   locale: StoreLocale,
 ): StoreOrder {
   return {
@@ -103,6 +137,10 @@ export function toStoreOrder(
     },
     shippingAddress: parseAddress(order.shippingAddress),
     billingAddress: parseAddress(order.billingAddress),
+    shipping:
+      shipping === undefined
+        ? null
+        : { ...parseOrderShipping(shipping), title: text(textMap.parse(shipping.title), locale) },
     history: history.map((row) => ({
       status: row.toStatus as StoreOrder["status"],
       at: row.createdAt.toISOString(),
@@ -121,7 +159,7 @@ export function toStoreOrderSummary(order: OrderRow, itemCount: number): StoreOr
   };
 }
 
-/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments) and builds it. */
+/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments, shipping) and builds it. */
 @Injectable()
 export class OrderViewService {
   constructor(
@@ -148,7 +186,8 @@ export class OrderViewService {
     const items = await this.orders.listItems(db, [order.id]);
     const history = await this.orders.listHistory(db, [order.id]);
     const adjustments = await this.orders.listAdjustments(db, [order.id]);
-    return toStoreOrder(order, items, history, adjustments, locale);
+    const [shipping] = await this.orders.listShipping(db, [order.id]);
+    return toStoreOrder(order, items, history, adjustments, shipping, locale);
   }
 
   async summaries(db: DbExecutor, rows: readonly OrderRow[]): Promise<StoreOrderSummary[]> {

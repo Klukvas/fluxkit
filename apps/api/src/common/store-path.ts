@@ -71,3 +71,23 @@ export function markStoreOrderResponseUncacheable(
     response.setHeader("Cache-Control", "no-store");
   }
 }
+
+const STORE_SHIPPING_PATH = /^\/store\/shipping(?:\/|$)/i;
+
+/** `/store/shipping` and everything below it (options and carrier lookups), matched like `isStorePath`. */
+export function isStoreShippingPath(path: string): boolean {
+  return STORE_SHIPPING_PATH.test(path);
+}
+
+/**
+ * Shipping options depend on the cart cookie or the session and must never be stored; a lookup that fails must not be
+ * stored either (a successful lookup replaces this with `public, max-age=300` in its handler).
+ */
+export function markStoreShippingResponseUncacheable(
+  request: { path: string },
+  response: { setHeader(name: string, value: string): unknown },
+): void {
+  if (isStoreShippingPath(request.path)) {
+    response.setHeader("Cache-Control", "no-store");
+  }
+}

@@ -15,6 +15,8 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       cartWrite: { maxAttempts: 120, windowMinutes: 1 },
       mediaUpload: { maxAttempts: 60, windowMinutes: 10 },
       shippingCheck: { maxAttempts: 30, windowMinutes: 10 },
+      shippingOptions: { maxAttempts: 30, windowMinutes: 1 },
+      shippingLookup: { maxAttempts: 60, windowMinutes: 1 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
   });
@@ -29,6 +31,8 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       cartWrite: "clientAddress",
       mediaUpload: "adminUser",
       shippingCheck: "adminUser",
+      shippingOptions: "clientAddress",
+      shippingLookup: "clientAddress",
     });
     expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });

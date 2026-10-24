@@ -342,6 +342,33 @@ const order: Shape<AdminOrder> = {
         },
       },
     },
+    shipping: {
+      nullable: {
+        object: {
+          methodId: { nullable: "string" },
+          methodCode: "string",
+          kind: { enum: ["address", "pickup_point", "store_pickup"] },
+          providerCode: { nullable: "string" },
+          amount: money,
+          payer: { enum: ["shop_charge", "recipient_on_delivery"] },
+          estimatedCarrierAmount: { nullable: money },
+          destination: {
+            nullable: {
+              object: {
+                providerRef: "string",
+                number: "string",
+                kind: { enum: ["branch", "locker"] },
+                cityRef: "string",
+                cityName: "string",
+                description: "string",
+              },
+            },
+          },
+          providerService: { nullable: "string" },
+          title: localized,
+        },
+      },
+    },
     history: {
       array: {
         object: {

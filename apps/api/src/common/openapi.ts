@@ -12,6 +12,10 @@ import {
 } from "@nestjs/swagger";
 import { z } from "zod";
 import { cartSchema, type CartResponse } from "../cart/cart.schemas.js";
+import {
+  shippingChangedSchema,
+  type ShippingChanged,
+} from "../shipping/store/shipping-store.schemas.js";
 import { PROBLEM_CODES, PROBLEM_TITLE, type ProblemCode } from "./problem.js";
 
 type JsonSchemaIo = "input" | "output";
@@ -104,6 +108,14 @@ export class ProblemDetailsDoc {
     properties: {},
   })
   cart?: CartResponse;
+  // Placeholder: `documentStoreContract` replaces it with the shipping option schema (as `cart` above).
+  @ApiPropertyOptional({
+    description:
+      "Only on `shipping_changed`: the chosen method's fresh option, exactly as `GET /store/shipping/options` returns it, or `{methodCode, available: false, reason}` when the method is not offered any more.",
+    type: "object",
+    properties: {},
+  })
+  shipping?: ShippingChanged;
 }
 
 const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
@@ -274,9 +286,27 @@ function documentCartProblem(document: OpenAPIObject): void {
   };
 }
 
+/** The `shipping` of a `shipping_changed` problem is the option schema of `GET /store/shipping/options` (ADR 0029). */
+function documentShippingProblem(document: OpenAPIObject): void {
+  const problem = document.components?.schemas?.["ProblemDetailsDoc"];
+  if (
+    problem === undefined ||
+    "$ref" in problem ||
+    problem.properties?.["shipping"] === undefined
+  ) {
+    throw new Error("ProblemDetailsDoc.shipping is missing from the OpenAPI document");
+  }
+  const placeholder = problem.properties["shipping"];
+  problem.properties["shipping"] = {
+    ...zodToOpenApiSchema(shippingChangedSchema, "output"),
+    ...("description" in placeholder ? { description: placeholder.description } : {}),
+  };
+}
+
 /** Finishes the generated document with what decorators cannot say: the store contract (`docs/contracts/api.md`). */
 export function documentStoreContract(document: OpenAPIObject): OpenAPIObject {
   documentStoreCsrf(document);
   documentCartProblem(document);
+  documentShippingProblem(document);
   return document;
 }

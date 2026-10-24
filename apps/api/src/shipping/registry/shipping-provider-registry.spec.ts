@@ -28,6 +28,7 @@ function portOf(code: string): ShippingProviderPort {
     },
     searchCities: unused,
     listPickupPoints: unused,
+    findPickupPoint: unused,
     estimate: unused,
     createWaybill: unused,
     findWaybill: unused,

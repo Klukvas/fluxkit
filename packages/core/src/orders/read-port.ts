@@ -1,3 +1,5 @@
+import type { ShippingMethodKind, ShippingPayer } from "../shipping/limits.js";
+import type { PickupPointKind } from "../shipping/provider-port.js";
 import type { Address } from "./contact.js";
 import type { OrderActor, OrderStatus } from "./status.js";
 
@@ -74,6 +76,34 @@ export interface AdminOrderHistoryEntry {
   readonly at: string;
 }
 
+/** The pickup point of a `pickup_point` order as the snapshot keeps it: public carrier data, no personal data. */
+export interface OrderPickupPointView {
+  readonly providerRef: string;
+  readonly number: string;
+  readonly kind: PickupPointKind;
+  readonly cityRef: string;
+  readonly cityName: string;
+  readonly description: string;
+}
+
+/** The immutable shipping snapshot of an order (ADR 0029 decision 7, `order_shipping`). */
+export interface AdminOrderShippingView {
+  /** Null once the method row was deleted (the snapshot stays). */
+  readonly methodId: string | null;
+  readonly methodCode: string;
+  readonly kind: ShippingMethodKind;
+  readonly providerCode: string | null;
+  readonly providerService: string | null;
+  readonly title: AdminOrderTexts;
+  /** What the shop charged; equals the shipping adjustment. */
+  readonly amount: AdminOrderMoney;
+  readonly payer: ShippingPayer;
+  /** The carrier's informational estimate shown at checkout, never charged. */
+  readonly estimatedCarrierAmount: AdminOrderMoney | null;
+  /** Only for `pickup_point`. */
+  readonly destination: OrderPickupPointView | null;
+}
+
 export interface AdminOrderView {
   readonly id: string;
   readonly number: string;
@@ -100,6 +130,8 @@ export interface AdminOrderView {
   readonly taxTotal: AdminOrderMoney;
   readonly total: AdminOrderMoney;
   readonly adjustments: readonly AdminOrderAdjustmentView[];
+  /** The shipping snapshot; `null` for an order placed without a shipping method (digital goods, or a shop without one). */
+  readonly shipping: AdminOrderShippingView | null;
   readonly history: readonly AdminOrderHistoryEntry[];
   /** ISO 8601, UTC. */
   readonly placedAt: string;

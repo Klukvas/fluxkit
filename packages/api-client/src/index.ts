@@ -4,6 +4,9 @@ export {
   type ListOrdersOptions,
   type ListProductsOptions,
   type LocaleOptions,
+  type ShippingLookupOptions,
+  type ShippingOptionsOptions,
+  type ShippingPickupPointsOptions,
   type StoreClient,
   type StoreClientOptions,
 } from "./client.js";

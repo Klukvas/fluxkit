@@ -6,6 +6,7 @@ import {
   orderAdjustment,
   orderItem,
   orderItemReservation,
+  orderShipping,
   orderStatusChange,
   reservation,
   salesOrder,
@@ -18,6 +19,7 @@ export type NewOrderItem = typeof orderItem.$inferInsert;
 export type OrderStatusChangeRow = typeof orderStatusChange.$inferSelect;
 export type NewOrderStatusChange = typeof orderStatusChange.$inferInsert;
 export type OrderAdjustmentRow = typeof orderAdjustment.$inferSelect;
+export type OrderShippingRow = typeof orderShipping.$inferSelect;
 export type NewDomainEvent = typeof domainEvent.$inferInsert;
 
 /** The reservation of one order line, with the facts a batch needs to take locks in order. */
@@ -328,6 +330,17 @@ export class OrdersRepository {
         asc(orderStatusChange.createdAt),
         asc(orderStatusChange.id),
       );
+  }
+
+  /** The shipping snapshots of the orders (at most one each; none for an order without a shipping method). */
+  async listShipping(db: DbExecutor, orderIds: readonly string[]): Promise<OrderShippingRow[]> {
+    if (orderIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(orderShipping)
+      .where(inArray(orderShipping.orderId, [...orderIds]));
   }
 
   async listAdjustments(

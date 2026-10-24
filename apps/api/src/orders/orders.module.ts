@@ -11,6 +11,7 @@ import { ORDER_PAYMENTS_PORT, ORDER_READ_PORT } from "@fluxkit/core";
 import { StoreModule } from "../catalog/store/store.module.js";
 import { markStoreOrderResponseUncacheable } from "../common/store-path.js";
 import { InventoryModule } from "../inventory/inventory.module.js";
+import { ShippingStoreModule } from "../shipping/store/shipping-store.module.js";
 import { AdminOrderViewService } from "./admin/admin-order-view.js";
 import { AdminOrdersController } from "./admin/admin-orders.controller.js";
 import { AdminOrdersService } from "./admin/admin-orders.service.js";
@@ -48,7 +49,7 @@ export class OrdersModule implements NestModule {
   static register(options: OrdersModuleOptions): DynamicModule {
     return {
       module: OrdersModule,
-      imports: [StoreModule, InventoryModule],
+      imports: [StoreModule, InventoryModule, ShippingStoreModule],
       controllers: [
         CheckoutController,
         StoreOrdersController,

@@ -1,6 +1,8 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   canonicalJson,
+  FINGERPRINT_VERSION,
   fingerprintsEqual,
   requestFingerprint,
   type FingerprintInput,
@@ -16,6 +18,7 @@ const base: FingerprintInput = {
   billingAddress: null,
   locale: "uk",
   expectedTotal: { amount: 12_500, currency: "UAH" },
+  shipping: null,
 };
 
 describe("canonicalJson", () => {
@@ -66,10 +69,32 @@ describe("requestFingerprint", () => {
     ["the locale", { locale: "en" }],
     ["the expected amount", { expectedTotal: { amount: 12_501, currency: "UAH" } }],
     ["the expected currency", { expectedTotal: { amount: 12_500, currency: "USD" } }],
+    ["a shipping method", { shipping: { methodCode: "courier" } }],
+    ["a pickup point", { shipping: { methodCode: "courier", pickupPointRef: "point-1" } }],
   ];
 
   it.each(changes)("changes with %s", (_name, change) => {
     expect(requestFingerprint({ ...base, ...change })).not.toBe(requestFingerprint(base));
+  });
+
+  it("tells methods and pickup points apart", () => {
+    const point = (pickupPointRef: string) =>
+      requestFingerprint({ ...base, shipping: { methodCode: "branch", pickupPointRef } });
+    expect(point("a")).not.toBe(point("b"));
+    expect(requestFingerprint({ ...base, shipping: { methodCode: "a" } })).not.toBe(
+      requestFingerprint({ ...base, shipping: { methodCode: "b" } }),
+    );
+  });
+
+  it("is version 2 (ADR 0029): the same request never matches a version 1 fingerprint", () => {
+    expect(FINGERPRINT_VERSION).toBe(2);
+    const version1Fields: Record<string, unknown> = { ...base };
+    delete version1Fields["shipping"];
+    const version1 = createHash("sha256")
+      .update(canonicalJson({ v: 1, ...version1Fields }))
+      .digest("hex");
+    expect(requestFingerprint(base)).not.toBe(version1);
+    expect(fingerprintsEqual(version1, requestFingerprint(base))).toBe(false);
   });
 
   it("cannot be confused by moving text between fields (no ambiguous concatenation)", () => {

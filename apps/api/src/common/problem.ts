@@ -22,6 +22,11 @@ export const PROBLEM_CODES = [
   // Media upload (ADR 0028, docs/api/media.md).
   "storage_unavailable",
   "uploads_disabled",
+  // Shipping at checkout (ADR 0029 decision 4, docs/api/shipping.md).
+  "shipping_method_required",
+  "shipping_not_applicable",
+  "shipping_changed",
+  "shipping_provider_unavailable",
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -45,6 +50,10 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   service_unavailable: 503,
   storage_unavailable: 503,
   uploads_disabled: 503,
+  shipping_method_required: 400,
+  shipping_not_applicable: 400,
+  shipping_changed: 409,
+  shipping_provider_unavailable: 503,
 };
 
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
@@ -66,6 +75,10 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   service_unavailable: "Service unavailable",
   storage_unavailable: "Storage unavailable",
   uploads_disabled: "Uploads are switched off",
+  shipping_method_required: "A shipping method is required",
+  shipping_not_applicable: "Nothing to ship",
+  shipping_changed: "The shipping changed",
+  shipping_provider_unavailable: "Shipping provider unavailable",
 };
 
 /** One problem with a request field. `path` is dotted (`name.uk`, `attributes.size`); empty for the whole body. */
@@ -202,6 +215,44 @@ export function tooManyOpenOrders(): ProblemException {
     code: "too_many_open_orders",
     detail:
       "There are too many unpaid orders already. Pay or cancel one of them, or wait until it expires, and try again.",
+  });
+}
+
+/** The cart ships goods and the shop has an active shipping method, but the checkout names none (ADR 0029 decision 4). */
+export function shippingMethodRequired(): ProblemException {
+  return new ProblemException({
+    code: "shipping_method_required",
+    detail: "Choose a shipping method.",
+  });
+}
+
+/** The checkout names a shipping method for a cart that ships nothing (digital goods only). */
+export function shippingNotApplicable(): ProblemException {
+  return new ProblemException({
+    code: "shipping_not_applicable",
+    detail: "This cart ships nothing, so it takes no shipping method.",
+  });
+}
+
+/**
+ * Only the shipping price or the method's availability changed since the shopper saw it; `shipping` is the method's fresh
+ * option as `GET /store/shipping/options` returns it, or `{methodCode, available: false, reason}` when it is not offered.
+ */
+export function shippingChanged(shipping: unknown): ProblemException {
+  return new ProblemException({
+    code: "shipping_changed",
+    detail: "The shipping changed since you saw it. Check it and try again.",
+    members: { shipping },
+  });
+}
+
+/** The carrier could not be reached and nothing usable is cached; only this method or lookup fails. */
+export function shippingProviderUnavailable(retryAfterSeconds: number): ProblemException {
+  return new ProblemException({
+    code: "shipping_provider_unavailable",
+    detail:
+      "The delivery service cannot be reached right now. Try again later or choose another method.",
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
   });
 }
 

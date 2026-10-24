@@ -2,16 +2,19 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   buildOrderLine,
-  compareMoney,
   computeOrderTotals,
+  decideCheckoutConsent,
+  decideShippingRequirement,
   formatOrderNumber,
   ORDER_NUMBER_BYTES,
   guestAccessExpiresAt,
   orderExpiresAt,
   reservationExpiresAt,
   shippingAddressRequired,
+  type Address,
   type OrderLineSnapshot,
   type StoreLocale,
+  type TotalsAdjustment,
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../auth/clock.js";
 import { hashSessionToken } from "../auth/session-token.js";
@@ -29,12 +32,21 @@ import {
   checkoutRefused,
   idempotencyKeyReused,
   ruleViolation,
+  shippingChanged,
+  shippingMethodRequired,
+  shippingNotApplicable,
   tooManyOpenOrders,
   validationFailed,
 } from "../common/problem.js";
 import { withTransaction, type Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
+import {
+  NOTHING_PREPARED,
+  ShippingCheckoutService,
+  type PreparedShipping,
+  type ShippingDecision,
+} from "../shipping/store/shipping-checkout.service.js";
 import { deriveAccessToken, type IssuedAccessToken } from "./access-token.js";
 import { fingerprintsEqual, requestFingerprint } from "./checkout-fingerprint.js";
 import { parseCheckoutInput, type CheckoutInput } from "./checkout-input.js";
@@ -91,6 +103,7 @@ export class CheckoutService {
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(CART_CONFIG) private readonly cartConfig: CartConfig,
     @Inject(ORDERS_CONFIG) private readonly config: OrdersConfig,
+    @Inject(ShippingCheckoutService) private readonly shipping: ShippingCheckoutService,
   ) {}
 
   async place(request: CheckoutRequest): Promise<CheckoutOutcome> {
@@ -103,10 +116,29 @@ export class CheckoutService {
     const idempotencyKey = request.idempotencyKey.toLowerCase();
     const input = parseCheckoutInput(request.body, request.accountEmail);
     const locale = this.store.resolveLocale(input.requestedLocale);
+    const prepared = await this.prepareShipping(idempotencyKey, input);
     return retryOnDeadlock(
-      () => this.attempt(request.owner, idempotencyKey, input, locale),
+      () => this.attempt(request.owner, idempotencyKey, input, locale, prepared),
       (message) => this.logger.warn(message),
     );
+  }
+
+  /**
+   * The ONLY step that may call a shipping provider (ADR 0029 decision 4): before the transaction opens, outside every lock.
+   * Skipped when the key already names an order (read without a lock): a replay never calls a provider, and the replay
+   * check inside the transaction stays the first thing it does.
+   */
+  private async prepareShipping(
+    idempotencyKey: string,
+    input: CheckoutInput,
+  ): Promise<PreparedShipping> {
+    if (input.shipping?.pickupPointRef === undefined) {
+      return NOTHING_PREPARED;
+    }
+    if ((await this.orders.findByIdempotencyKey(this.database, idempotencyKey)) !== undefined) {
+      return NOTHING_PREPARED;
+    }
+    return this.shipping.prepare(input.shipping);
   }
 
   /**
@@ -119,11 +151,12 @@ export class CheckoutService {
     idempotencyKey: string,
     input: CheckoutInput,
     locale: StoreLocale,
+    prepared: PreparedShipping,
   ): Promise<CheckoutOutcome> {
     for (let round = 0; ; round += 1) {
       try {
         return await withTransaction(this.database, (tx) =>
-          this.inTransaction(tx, owner, idempotencyKey, input, locale),
+          this.inTransaction(tx, owner, idempotencyKey, input, locale, prepared),
         );
       } catch (error) {
         if (round === 0 && isUniqueViolation(error, IDEMPOTENCY_KEY_KEY)) {
@@ -140,6 +173,7 @@ export class CheckoutService {
     idempotencyKey: string,
     input: CheckoutInput,
     locale: StoreLocale,
+    prepared: PreparedShipping,
   ): Promise<CheckoutOutcome> {
     const now = this.clock.now();
     const cart = await this.lockCart(tx, owner);
@@ -153,6 +187,7 @@ export class CheckoutService {
       billingAddress: input.billingAddress === null ? null : { ...input.billingAddress },
       locale: locale.locale,
       expectedTotal: { amount: input.expectedTotal.amount, currency: input.expectedTotal.currency },
+      shipping: input.shipping === undefined ? null : { ...input.shipping },
     });
 
     const existing = await this.orders.findByIdempotencyKey(tx, idempotencyKey);
@@ -200,17 +235,89 @@ export class CheckoutService {
     }
 
     const lines = this.snapshotLines(context);
-    const totals = computeOrderTotals(lines, []);
-    if (!totals.ok) {
+    const linePricesChanged = priced.lines.some((line) =>
+      line.notices.some((notice) => notice.code === "price_changed"),
+    );
+    const requiresShipping = shippingAddressRequired(lines);
+    const requirement = decideShippingRequirement({
+      cartRequiresShipping: requiresShipping,
+      // Only asked when it decides something: a cart that ships, without a method in the request.
+      activeMethodExists:
+        requiresShipping && input.shipping === undefined
+          ? await this.shipping.activeMethodExists(tx)
+          : false,
+      selection: input.shipping,
+    });
+    if (!requirement.ok) {
+      throw requirement.reason === "shipping_not_applicable"
+        ? shippingNotApplicable()
+        : shippingMethodRequired();
+    }
+
+    const withoutShipping = computeOrderTotals(lines, []);
+    if (!withoutShipping.ok) {
       // `priceCart` already refused every overflow, so core refusing the same lines is a bug, not a shopper's problem.
-      throw new Error(`Order totals were refused after the cart was priced: ${totals.reason}`);
+      throw new Error(
+        `Order totals were refused after the cart was priced: ${withoutShipping.reason}`,
+      );
     }
-    const agreed = compareMoney(totals.totals.total, input.expectedTotal);
-    if (!agreed.ok || agreed.ordering !== 0) {
-      throw cartChanged(this.pricing.toResponse(context, locale));
-    }
-    if (shippingAddressRequired(lines) && input.shippingAddress === null) {
-      throw validationFailed([{ path: "shippingAddress", code: "shipping_address_required" }]);
+    let totals = withoutShipping.totals;
+    let shippingAddress: Address | null = input.shippingAddress;
+    let decision: Extract<ShippingDecision, { kind: "priced" }> | undefined;
+    if (requirement.mode === "none") {
+      // Today's checkout, unchanged: no method chosen (a cart that ships nothing, or a shop without an active method).
+      const consent = decideCheckoutConsent({
+        expectedTotal: input.expectedTotal,
+        total: totals.total,
+        shippingSelected: false,
+        linePricesChanged,
+      });
+      if (!consent.ok) {
+        throw cartChanged(this.pricing.toResponse(context, locale));
+      }
+      if (requiresShipping && input.shippingAddress === null) {
+        throw validationFailed([{ path: "shippingAddress", code: "shipping_address_required" }]);
+      }
+    } else {
+      const decided = await this.shipping.decide(tx, {
+        selection: requirement.selection,
+        subtotal: totals.subtotal,
+        shippingAddress: input.shippingAddress,
+        locale,
+        prepared,
+      });
+      if (decided.kind === "priced") {
+        const adjustment: TotalsAdjustment = decided.adjustment;
+        const withShipping = computeOrderTotals(lines, [adjustment]);
+        if (!withShipping.ok) {
+          if (
+            withShipping.reason === "adjustments_out_of_range" ||
+            withShipping.reason === "total_out_of_range"
+          ) {
+            throw ruleViolation(
+              "The order total with shipping is too large to be ordered. Remove a line.",
+              withShipping.reason,
+            );
+          }
+          throw new Error(`Order totals with shipping were refused: ${withShipping.reason}`);
+        }
+        totals = withShipping.totals;
+        shippingAddress = decided.shippingAddress;
+        decision = decided;
+      }
+      // The cart's own change first, then the shipping (ADR 0029 decision 4); nothing is reserved either way.
+      const consent = decideCheckoutConsent({
+        expectedTotal: input.expectedTotal,
+        total: decision === undefined ? null : totals.total,
+        shippingSelected: true,
+        linePricesChanged,
+      });
+      if (!consent.ok) {
+        if (consent.answer === "cart_changed") {
+          throw cartChanged(this.pricing.toResponse(context, locale));
+        }
+        throw shippingChanged(decided.kind === "priced" ? decided.option : decided.changed);
+      }
     }
 
     const placedAt = now;
@@ -227,15 +334,15 @@ export class CheckoutService {
       phone: input.phone,
       firstName: input.firstName,
       lastName: input.lastName,
-      shippingAddress: input.shippingAddress,
+      shippingAddress,
       billingAddress: input.billingAddress,
       locale: locale.locale,
-      currency: totals.totals.total.currency,
-      subtotalAmount: totals.totals.subtotal.amount,
-      shippingTotal: totals.totals.shippingTotal.amount,
-      discountTotal: totals.totals.discountTotal.amount,
-      taxTotal: totals.totals.taxTotal.amount,
-      totalAmount: totals.totals.total.amount,
+      currency: totals.total.currency,
+      subtotalAmount: totals.subtotal.amount,
+      shippingTotal: totals.shippingTotal.amount,
+      discountTotal: totals.discountTotal.amount,
+      taxTotal: totals.taxTotal.amount,
+      totalAmount: totals.total.amount,
       accessTokenHash: guestToken?.hash ?? null,
       accessExpiresAt:
         guestToken === undefined ? null : guestAccessExpiresAt(now, this.config.guestAccessDays),
@@ -296,6 +403,10 @@ export class CheckoutService {
           : [];
       }),
     );
+    if (decision !== undefined) {
+      // After the inventory locks: the snapshot's foreign key takes its share lock on the method row last.
+      await this.shipping.write(tx, order.id, decision);
+    }
     await this.orderService.recordPlacement(tx, order, {
       type: owner.kind === "customer" ? "customer" : "guest",
     });
