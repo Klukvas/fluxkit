@@ -37,6 +37,8 @@ export interface StartAppOptions {
   rateLimits?: RateLimitOverrides;
   /** A controlled clock for session expiry (use with `"production-default"`). */
   clock?: Clock;
+  /** `SHIPPING_PROVIDERS_ENABLED`: provider packages the loader imports, for example `["fake"]` (build first; the fake is test-only). */
+  enabledShippingProviders?: string[];
   /** Extra modules loaded like enabled features, for probe controllers. */
   extraFeatures?: LoadedFeature[];
   adminCookieSecure?: boolean;
@@ -91,6 +93,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
     {
       databaseUrl: requireEnv("DATABASE_URL"),
       enabledFeatures: options.enabledFeatures ?? [],
+      enabledShippingProviders: options.enabledShippingProviders,
       featuresDir: options.featuresDir,
       adminCookieSecure: options.adminCookieSecure,
       adminSessionIdleMinutes: options.adminSessionIdleMinutes,

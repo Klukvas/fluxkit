@@ -29,6 +29,7 @@ import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config
 import { OrdersModule } from "./orders/orders.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
+import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
 import { ShippingRegistryModule, type LoadedShippingProvider } from "./shipping/registry/index.js";
 
 export interface AppModuleOptions {
@@ -95,6 +96,7 @@ export class AppModule {
           databaseUrl: options.databaseUrl,
         }),
         ShippingRegistryModule.register(options.shippingProviders ?? []),
+        ShippingAdminModule,
         ...options.features.map((feature) => feature.module),
       ],
     };
