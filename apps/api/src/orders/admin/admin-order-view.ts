@@ -2,13 +2,14 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORDER_ACTORS, ORDER_STATUSES, type OrderReadPort } from "@fluxkit/core";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import type { DbExecutor } from "../../common/transaction.js";
-import { optionValuesSchema, parseAddress, textMap } from "../order-view.js";
+import { optionValuesSchema, parseAddress, parseOrderShipping, textMap } from "../order-view.js";
 import {
   OrdersRepository,
   type OrderAdjustmentRow,
   type OrderItemReservationRow,
   type OrderItemRow,
   type OrderRow,
+  type OrderShippingRow,
   type OrderStatusChangeRow,
 } from "../orders.repository.js";
 import type { AdminOrderDetail, AdminOrderSummary } from "./admin-orders.schemas.js";
@@ -51,6 +52,8 @@ export interface AdminOrderParts {
   readonly history: readonly OrderStatusChangeRow[];
   readonly adjustments: readonly OrderAdjustmentRow[];
   readonly reservations: readonly OrderItemReservationRow[];
+  /** The shipping snapshot; `undefined` for an order without one. */
+  readonly shipping: OrderShippingRow | undefined;
 }
 
 export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
@@ -107,6 +110,15 @@ export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
       includedInPrice: row.includedInPrice,
       source: row.source,
     })),
+    shipping:
+      parts.shipping === undefined
+        ? null
+        : {
+            methodId: parts.shipping.methodId,
+            ...parseOrderShipping(parts.shipping),
+            providerService: parts.shipping.providerService,
+            title: textMap.parse(parts.shipping.title),
+          },
     history: parts.history.map((row) => ({
       fromStatus: row.fromStatus === null ? null : status(row.fromStatus),
       toStatus: status(row.toStatus),
@@ -143,7 +155,7 @@ export function toAdminOrderSummary(order: OrderRow, itemCount: number): AdminOr
 }
 
 /**
- * Loads the parts of one order in a fixed number of statements (order, items, journal, adjustments, reservations) and
+ * Loads the parts of one order in a fixed number of statements (order, items, journal, adjustments, reservations, shipping) and
  * builds the view. Implements `OrderReadPort` (token `ORDER_READ_PORT`): the admin detail route and the plugins share
  * this one method.
  */
@@ -178,7 +190,8 @@ export class AdminOrderViewService implements OrderReadPort {
     const history = await this.orders.listHistory(db, [order.id]);
     const adjustments = await this.orders.listAdjustments(db, [order.id]);
     const reservations = await this.orders.listItemReservations(db, [order.id]);
-    return buildAdminOrderView({ order, items, history, adjustments, reservations });
+    const [shipping] = await this.orders.listShipping(db, [order.id]);
+    return buildAdminOrderView({ order, items, history, adjustments, reservations, shipping });
   }
 
   async summaries(db: DbExecutor, rows: readonly OrderRow[]): Promise<AdminOrderSummary[]> {

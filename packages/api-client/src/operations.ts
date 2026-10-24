@@ -73,6 +73,18 @@ export const OPERATIONS = {
     query: ["brand", "category", "offset", "limit", "locale"],
   }),
   getProduct: operation("GET", "/store/products/{slug}", [200], { query: LOCALE }),
+  getShippingOptions: operation("GET", "/store/shipping/options", [200], {
+    query: ["country", "locale", "cityRef", "pickupPointRef"],
+  }),
+  listShippingCities: operation("GET", "/store/shipping/providers/{code}/cities", [200], {
+    query: ["q", "locale", "limit", "offset"],
+  }),
+  listShippingPickupPoints: operation(
+    "GET",
+    "/store/shipping/providers/{code}/pickup-points",
+    [200],
+    { query: ["cityRef", "q", "kinds", "limit", "offset"] },
+  ),
 } as const satisfies Record<string, OperationSpec>;
 
 export type OperationName = keyof typeof OPERATIONS;

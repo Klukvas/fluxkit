@@ -26,6 +26,11 @@ import type {
   ProductList,
   RegisterBody,
   SetCartItemQuantityBody,
+  ShippingChanged,
+  ShippingCityPage,
+  ShippingOption,
+  ShippingOptions,
+  ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
 } from "./types.js";
@@ -137,6 +142,110 @@ const addressInput: Shape<AddressInput> = {
   },
 };
 
+const shippingKind = { enum: ["address", "pickup_point", "store_pickup"] } as const;
+const shippingPayer = { enum: ["shop_charge", "recipient_on_delivery"] } as const;
+const pickupPointKind = { enum: ["branch", "locker"] } as const;
+
+const orderShipping = {
+  nullable: {
+    object: {
+      methodCode: "string",
+      kind: shippingKind,
+      providerCode: { nullable: "string" },
+      amount: money,
+      payer: shippingPayer,
+      estimatedCarrierAmount: { nullable: money },
+      destination: {
+        nullable: {
+          object: {
+            providerRef: "string",
+            number: "string",
+            kind: pickupPointKind,
+            cityRef: "string",
+            cityName: "string",
+            description: "string",
+          },
+        },
+      },
+      title: "string",
+    },
+  },
+} as const;
+
+const shippingOption: Shape<ShippingOption> = {
+  object: {
+    methodCode: "string",
+    kind: shippingKind,
+    title: "string",
+    description: { nullable: "string" },
+    providerCode: { nullable: "string" },
+    countryCodes: { array: "string" },
+    available: "boolean",
+    reason: {
+      optional: {
+        enum: [
+          "inactive",
+          "currency_not_offered",
+          "country_required",
+          "country_not_served",
+          "provider_not_enabled",
+          "pricing_invalid",
+          "total_out_of_range",
+        ],
+      },
+    },
+    price: { nullable: money },
+    payer: { nullable: shippingPayer },
+    total: { nullable: money },
+    estimate: { nullable: money },
+  },
+};
+
+const shippingOptions: Shape<ShippingOptions> = {
+  object: { subtotal: money, options: { array: shippingOption } },
+};
+
+const shippingChanged: Shape<ShippingChanged> = {
+  oneOf: [
+    shippingOption,
+    {
+      object: {
+        methodCode: "string",
+        available: { literal: false },
+        reason: { enum: ["inactive", "currency_not_offered"] },
+      },
+    },
+  ],
+};
+
+const lookupPage = <T extends ShapeNode>(item: T) =>
+  ({
+    object: {
+      items: { array: item },
+      total: "integer",
+      limit: "integer",
+      offset: "integer",
+      stale: "boolean",
+    },
+  }) as const;
+
+const shippingCityPage: Shape<ShippingCityPage> = lookupPage({
+  object: { ref: "string", name: "string", region: { nullable: "string" } },
+});
+
+const shippingPickupPointPage: Shape<ShippingPickupPointPage> = lookupPage({
+  object: {
+    ref: "string",
+    number: "string",
+    kind: pickupPointKind,
+    cityRef: "string",
+    cityName: "string",
+    countryCode: "string",
+    description: "string",
+    maxWeightGrams: { nullable: "integer" },
+  },
+});
+
 const order: Shape<Order> = {
   object: {
     number: "string",
@@ -180,6 +289,7 @@ const order: Shape<Order> = {
     },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
+    shipping: orderShipping,
     history: { array: { object: { status: orderStatus, at: "string" } } },
   },
 };
@@ -367,6 +477,10 @@ const problemDetails: Shape<ProblemDetails> = {
         "service_unavailable",
         "storage_unavailable",
         "uploads_disabled",
+        "shipping_method_required",
+        "shipping_not_applicable",
+        "shipping_changed",
+        "shipping_provider_unavailable",
       ],
     },
     detail: "string",
@@ -375,6 +489,7 @@ const problemDetails: Shape<ProblemDetails> = {
     constraint: { optional: "string" },
     rule: { optional: "string" },
     cart: { optional: cart },
+    shipping: { optional: shippingChanged },
   },
 };
 
@@ -412,6 +527,11 @@ const checkoutBody: Shape<CheckoutBody> = {
     shippingAddress: { optional: { nullable: addressInput } },
     billingAddress: { optional: { nullable: addressInput } },
     locale: { optional: "string" },
+    shipping: {
+      optional: {
+        nullable: { object: { methodCode: "string", pickupPointRef: { optional: "string" } } },
+      },
+    },
     expectedTotal: { object: { amount: "number", currency: "string" } },
   },
 };
@@ -448,6 +568,9 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getConfig: storeConfig,
   listProducts: productList,
   getProduct: productDetail,
+  getShippingOptions: shippingOptions,
+  listShippingCities: shippingCityPage,
+  listShippingPickupPoints: shippingPickupPointPage,
 };
 
 /** Request body per operation; `null` where the operation has none. */
@@ -474,6 +597,9 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getConfig: null,
   listProducts: null,
   getProduct: null,
+  getShippingOptions: null,
+  listShippingCities: null,
+  listShippingPickupPoints: null,
 };
 
 // ------------------------------------------------------------------- tests

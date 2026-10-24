@@ -59,6 +59,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
     contact: { email: "a@example.com", phone: "+380501234567", firstName: "A", lastName: "B" },
     shippingAddress: null,
     billingAddress: null,
+    shipping: null,
     items: [
       {
         position: 0,

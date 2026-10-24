@@ -30,6 +30,10 @@ export const KNOWN_PROBLEM_CODES = [
   "service_unavailable",
   "storage_unavailable",
   "uploads_disabled",
+  "shipping_method_required",
+  "shipping_not_applicable",
+  "shipping_changed",
+  "shipping_provider_unavailable",
 ] as const;
 
 /** Rules of `rule_violation` the store routes answer (docs/api/cart.md, docs/api/orders.md). */

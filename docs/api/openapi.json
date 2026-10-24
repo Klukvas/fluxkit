@@ -5757,6 +5757,23 @@
                     "maxLength": 16,
                     "description": "One of the configured locales. Missing means the default locale."
                   },
+                  "shipping": {
+                    "description": "The shipping method (docs/api/shipping.md). Required when the cart ships goods and the shop has an active method; refused (`shipping_not_applicable`) for a cart that ships nothing. Missing or `null` means not sent.",
+                    "nullable": true,
+                    "type": "object",
+                    "properties": {
+                      "methodCode": {
+                        "type": "string",
+                        "description": "The `methodCode` of an option of `GET /store/shipping/options`."
+                      },
+                      "pickupPointRef": {
+                        "description": "Required for a `pickup_point` method, refused for the others: the `ref` of `GET /store/shipping/providers/{code}/pickup-points`.",
+                        "type": "string"
+                      }
+                    },
+                    "required": ["methodCode"],
+                    "additionalProperties": false
+                  },
                   "expectedTotal": {
                     "type": "object",
                     "properties": {
@@ -5769,7 +5786,7 @@
                     },
                     "required": ["amount", "currency"],
                     "additionalProperties": false,
-                    "description": "The total the shopper saw. A consent check only: the server prices everything itself, and a different total answers 409 `cart_changed`."
+                    "description": "The total the shopper saw: the subtotal, plus the option's price when a shipping method is chosen (send the option's `total`). A consent check only: the server prices everything itself; a different total answers 409 `cart_changed` or `shipping_changed`."
                   }
                 },
                 "required": ["phone", "firstName", "lastName", "expectedTotal"],
@@ -6109,6 +6126,113 @@
                           "required": ["countryCode", "city", "line1"],
                           "additionalProperties": false
                         },
+                        "shipping": {
+                          "nullable": true,
+                          "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                          "type": "object",
+                          "properties": {
+                            "methodCode": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["address", "pickup_point", "store_pickup"]
+                            },
+                            "providerCode": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "object",
+                              "properties": {
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000000,
+                                  "description": "Minor units of the order currency."
+                                },
+                                "currency": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false,
+                              "description": "What the shop charged for shipping; equals the shipping adjustment."
+                            },
+                            "payer": {
+                              "type": "string",
+                              "enum": ["shop_charge", "recipient_on_delivery"],
+                              "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                            },
+                            "estimatedCarrierAmount": {
+                              "nullable": true,
+                              "description": "The carrier's informational estimate known at checkout; never charged.",
+                              "type": "object",
+                              "properties": {
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000000,
+                                  "description": "Minor units of the order currency."
+                                },
+                                "currency": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "destination": {
+                              "nullable": true,
+                              "description": "Only for `pickup_point`.",
+                              "type": "object",
+                              "properties": {
+                                "providerRef": {
+                                  "type": "string"
+                                },
+                                "number": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["branch", "locker"]
+                                },
+                                "cityRef": {
+                                  "type": "string"
+                                },
+                                "cityName": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "providerRef",
+                                "number",
+                                "kind",
+                                "cityRef",
+                                "cityName",
+                                "description"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "title": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "methodCode",
+                            "kind",
+                            "providerCode",
+                            "amount",
+                            "payer",
+                            "estimatedCarrierAmount",
+                            "destination",
+                            "title"
+                          ],
+                          "additionalProperties": false
+                        },
                         "history": {
                           "type": "array",
                           "items": {
@@ -6151,6 +6275,7 @@
                         "contact",
                         "shippingAddress",
                         "billingAddress",
+                        "shipping",
                         "history"
                       ],
                       "additionalProperties": false
@@ -6496,6 +6621,113 @@
                           "required": ["countryCode", "city", "line1"],
                           "additionalProperties": false
                         },
+                        "shipping": {
+                          "nullable": true,
+                          "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                          "type": "object",
+                          "properties": {
+                            "methodCode": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["address", "pickup_point", "store_pickup"]
+                            },
+                            "providerCode": {
+                              "nullable": true,
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "object",
+                              "properties": {
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000000,
+                                  "description": "Minor units of the order currency."
+                                },
+                                "currency": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false,
+                              "description": "What the shop charged for shipping; equals the shipping adjustment."
+                            },
+                            "payer": {
+                              "type": "string",
+                              "enum": ["shop_charge", "recipient_on_delivery"],
+                              "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                            },
+                            "estimatedCarrierAmount": {
+                              "nullable": true,
+                              "description": "The carrier's informational estimate known at checkout; never charged.",
+                              "type": "object",
+                              "properties": {
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 1000000000000,
+                                  "description": "Minor units of the order currency."
+                                },
+                                "currency": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false
+                            },
+                            "destination": {
+                              "nullable": true,
+                              "description": "Only for `pickup_point`.",
+                              "type": "object",
+                              "properties": {
+                                "providerRef": {
+                                  "type": "string"
+                                },
+                                "number": {
+                                  "type": "string"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "enum": ["branch", "locker"]
+                                },
+                                "cityRef": {
+                                  "type": "string"
+                                },
+                                "cityName": {
+                                  "type": "string"
+                                },
+                                "description": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "providerRef",
+                                "number",
+                                "kind",
+                                "cityRef",
+                                "cityName",
+                                "description"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "title": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "methodCode",
+                            "kind",
+                            "providerCode",
+                            "amount",
+                            "payer",
+                            "estimatedCarrierAmount",
+                            "destination",
+                            "title"
+                          ],
+                          "additionalProperties": false
+                        },
                         "history": {
                           "type": "array",
                           "items": {
@@ -6538,6 +6770,7 @@
                         "contact",
                         "shippingAddress",
                         "billingAddress",
+                        "shipping",
                         "history"
                       ],
                       "additionalProperties": false
@@ -6992,6 +7225,113 @@
                       "required": ["countryCode", "city", "line1"],
                       "additionalProperties": false
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                      "type": "object",
+                      "properties": {
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -7034,6 +7374,7 @@
                     "contact",
                     "shippingAddress",
                     "billingAddress",
+                    "shipping",
                     "history"
                   ],
                   "additionalProperties": false
@@ -7470,6 +7811,113 @@
                       "required": ["countryCode", "city", "line1"],
                       "additionalProperties": false
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                      "type": "object",
+                      "properties": {
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -7512,6 +7960,7 @@
                     "contact",
                     "shippingAddress",
                     "billingAddress",
+                    "shipping",
                     "history"
                   ],
                   "additionalProperties": false
@@ -8096,6 +8545,113 @@
                       "required": ["countryCode", "city", "line1"],
                       "additionalProperties": false
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                      "type": "object",
+                      "properties": {
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -8138,6 +8694,7 @@
                     "contact",
                     "shippingAddress",
                     "billingAddress",
+                    "shipping",
                     "history"
                   ],
                   "additionalProperties": false
@@ -8551,6 +9108,113 @@
                       "required": ["countryCode", "city", "line1"],
                       "additionalProperties": false
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+                      "type": "object",
+                      "properties": {
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "title": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -8593,6 +9257,7 @@
                     "contact",
                     "shippingAddress",
                     "billingAddress",
+                    "shipping",
                     "history"
                   ],
                   "additionalProperties": false
@@ -9317,6 +9982,127 @@
                         "additionalProperties": false
                       }
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+                      "type": "object",
+                      "properties": {
+                        "methodId": {
+                          "nullable": true,
+                          "description": "Null once the method was deleted.",
+                          "type": "string"
+                        },
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "providerService": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "methodId",
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "providerService",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -9434,6 +10220,7 @@
                     "taxTotal",
                     "total",
                     "adjustments",
+                    "shipping",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -9950,6 +10737,127 @@
                         "additionalProperties": false
                       }
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+                      "type": "object",
+                      "properties": {
+                        "methodId": {
+                          "nullable": true,
+                          "description": "Null once the method was deleted.",
+                          "type": "string"
+                        },
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "providerService": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "methodId",
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "providerService",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -10067,6 +10975,7 @@
                     "taxTotal",
                     "total",
                     "adjustments",
+                    "shipping",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -10609,6 +11518,127 @@
                         "additionalProperties": false
                       }
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+                      "type": "object",
+                      "properties": {
+                        "methodId": {
+                          "nullable": true,
+                          "description": "Null once the method was deleted.",
+                          "type": "string"
+                        },
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "providerService": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "methodId",
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "providerService",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -10726,6 +11756,7 @@
                     "taxTotal",
                     "total",
                     "adjustments",
+                    "shipping",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -11234,6 +12265,127 @@
                         "additionalProperties": false
                       }
                     },
+                    "shipping": {
+                      "nullable": true,
+                      "description": "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+                      "type": "object",
+                      "properties": {
+                        "methodId": {
+                          "nullable": true,
+                          "description": "Null once the method was deleted.",
+                          "type": "string"
+                        },
+                        "methodCode": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": ["address", "pickup_point", "store_pickup"]
+                        },
+                        "providerCode": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "amount": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the shop charged for shipping; equals the shipping adjustment."
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["shop_charge", "recipient_on_delivery"],
+                          "description": "`recipient_on_delivery`: the shop charged 0 and the recipient pays the carrier."
+                        },
+                        "estimatedCarrierAmount": {
+                          "nullable": true,
+                          "description": "The carrier's informational estimate known at checkout; never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "destination": {
+                          "nullable": true,
+                          "description": "Only for `pickup_point`.",
+                          "type": "object",
+                          "properties": {
+                            "providerRef": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["branch", "locker"]
+                            },
+                            "cityRef": {
+                              "type": "string"
+                            },
+                            "cityName": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "providerRef",
+                            "number",
+                            "kind",
+                            "cityRef",
+                            "cityName",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "providerService": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "title": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "methodId",
+                        "methodCode",
+                        "kind",
+                        "providerCode",
+                        "amount",
+                        "payer",
+                        "estimatedCarrierAmount",
+                        "destination",
+                        "providerService",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -11351,6 +12503,7 @@
                     "taxTotal",
                     "total",
                     "adjustments",
+                    "shipping",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -14200,6 +15353,607 @@
           }
         },
         "summary": "Get an active product by slug with options, variants, media and public attributes",
+        "tags": ["store"]
+      }
+    },
+    "/store/shipping/options": {
+      "get": {
+        "description": "Each active method in the shop currency with `available`, the shop's `price` and the `total` (cart subtotal plus price) the checkout expects as `expectedTotal`. `estimate` is the carrier's own price, informational only, filled when `cityRef` or `pickupPointRef` names a destination and the carrier answers within 5 s. Empty for an empty cart, a cart that ships nothing, and a shop without an active method. Never creates a cart.",
+        "operationId": "ShippingStoreController_listOptions",
+        "parameters": [
+          {
+            "name": "pickupPointRef",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cityRef",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "country",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The options.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "subtotal": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "methodCode": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["address", "pickup_point", "store_pickup"]
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "nullable": true,
+                            "description": "The method's description; for `store_pickup` the pickup instructions.",
+                            "type": "string"
+                          },
+                          "providerCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "countryCodes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "The countries the method serves."
+                          },
+                          "available": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "description": "Why the method is not available; only when `available` is false.",
+                            "type": "string",
+                            "enum": [
+                              "inactive",
+                              "currency_not_offered",
+                              "country_required",
+                              "country_not_served",
+                              "provider_not_enabled",
+                              "pricing_invalid",
+                              "total_out_of_range"
+                            ]
+                          },
+                          "price": {
+                            "nullable": true,
+                            "description": "What the shop charges for shipping; `null` when not available.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": ["shop_charge", "recipient_on_delivery"]
+                          },
+                          "total": {
+                            "nullable": true,
+                            "description": "The cart subtotal plus `price`, computed by the server: send it back as the checkout's `expectedTotal`. `null` when not available.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": {
+                            "nullable": true,
+                            "description": "The carrier's own price, informational only (never charged): only when `cityRef` or `pickupPointRef` is sent and the provider answers in time.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "methodCode",
+                          "kind",
+                          "title",
+                          "description",
+                          "providerCode",
+                          "countryCodes",
+                          "available",
+                          "price",
+                          "payer",
+                          "total",
+                          "estimate"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Empty for an empty cart, a cart that ships nothing, and a shop without an active method."
+                    }
+                  },
+                  "required": ["subtotal", "options"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The shipping methods for the current cart, priced by the server",
+        "tags": ["store"]
+      }
+    },
+    "/store/shipping/providers/{code}/cities": {
+      "get": {
+        "description": "Through the API's cache (24 h; when the carrier is down, cached data up to 72 h past its expiry is served with `stale: true`). 503 `shipping_provider_unavailable` with `Retry-After` when the carrier cannot be reached and nothing is cached.",
+        "operationId": "ShippingStoreController_cities",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "Provider code of an enabled shipping provider.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of cities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "nullable": true,
+                            "type": "string"
+                          }
+                        },
+                        "required": ["ref", "name", "region"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "stale": {
+                      "type": "boolean",
+                      "description": "The carrier could not be reached and the answer comes from data cached up to 72 hours past its expiry."
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset", "stale"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search the cities of a shipping provider",
+        "tags": ["store"]
+      }
+    },
+    "/store/shipping/providers/{code}/pickup-points": {
+      "get": {
+        "description": "The city's full list is fetched once and filtered here (cache 12 h, stale up to 72 h past its expiry with `stale: true`). 503 `shipping_provider_unavailable` with `Retry-After` when the carrier cannot be reached and nothing is cached.",
+        "operationId": "ShippingStoreController_pickupPoints",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "path",
+            "description": "Provider code of an enabled shipping provider.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]{0,63}$"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          },
+          {
+            "name": "kinds",
+            "required": false,
+            "in": "query",
+            "description": "Comma-separated `branch`, `locker`; both by default.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 50
+            }
+          },
+          {
+            "name": "cityRef",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of pickup points.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string",
+                            "description": "Send it as the checkout's `shipping.pickupPointRef`."
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["branch", "locker"]
+                          },
+                          "cityRef": {
+                            "type": "string"
+                          },
+                          "cityName": {
+                            "type": "string"
+                          },
+                          "countryCode": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "maxWeightGrams": {
+                            "nullable": true,
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": [
+                          "ref",
+                          "number",
+                          "kind",
+                          "cityRef",
+                          "cityName",
+                          "countryCode",
+                          "description",
+                          "maxWeightGrams"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "stale": {
+                      "type": "boolean",
+                      "description": "The carrier could not be reached and the answer comes from data cached up to 72 hours past its expiry."
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset", "stale"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "The pickup points (branches, parcel lockers) of a city",
         "tags": ["store"]
       }
     },
@@ -27034,7 +28788,11 @@
               "too_many_open_orders",
               "service_unavailable",
               "storage_unavailable",
-              "uploads_disabled"
+              "uploads_disabled",
+              "shipping_method_required",
+              "shipping_not_applicable",
+              "shipping_changed",
+              "shipping_provider_unavailable"
             ]
           },
           "detail": {
@@ -27329,6 +29087,146 @@
             ],
             "additionalProperties": false,
             "description": "Only on `cart_changed`: the fresh cart, exactly as `GET /store/cart` returns it."
+          },
+          "shipping": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "methodCode": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["address", "pickup_point", "store_pickup"]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "nullable": true,
+                    "description": "The method's description; for `store_pickup` the pickup instructions.",
+                    "type": "string"
+                  },
+                  "providerCode": {
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "countryCodes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The countries the method serves."
+                  },
+                  "available": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "description": "Why the method is not available; only when `available` is false.",
+                    "type": "string",
+                    "enum": [
+                      "inactive",
+                      "currency_not_offered",
+                      "country_required",
+                      "country_not_served",
+                      "provider_not_enabled",
+                      "pricing_invalid",
+                      "total_out_of_range"
+                    ]
+                  },
+                  "price": {
+                    "nullable": true,
+                    "description": "What the shop charges for shipping; `null` when not available.",
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "payer": {
+                    "nullable": true,
+                    "type": "string",
+                    "enum": ["shop_charge", "recipient_on_delivery"]
+                  },
+                  "total": {
+                    "nullable": true,
+                    "description": "The cart subtotal plus `price`, computed by the server: send it back as the checkout's `expectedTotal`. `null` when not available.",
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "estimate": {
+                    "nullable": true,
+                    "description": "The carrier's own price, informational only (never charged): only when `cityRef` or `pickupPointRef` is sent and the provider answers in time.",
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "currency": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "methodCode",
+                  "kind",
+                  "title",
+                  "description",
+                  "providerCode",
+                  "countryCodes",
+                  "available",
+                  "price",
+                  "payer",
+                  "total",
+                  "estimate"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "methodCode": {
+                    "type": "string"
+                  },
+                  "available": {
+                    "type": "boolean",
+                    "enum": [false]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "enum": ["inactive", "currency_not_offered"]
+                  }
+                },
+                "required": ["methodCode", "available", "reason"],
+                "additionalProperties": false
+              }
+            ],
+            "description": "Only on `shipping_changed`: the chosen method's fresh option, exactly as `GET /store/shipping/options` returns it, or `{methodCode, available: false, reason}` when the method is not offered any more."
           }
         },
         "required": ["type", "title", "status", "code", "detail"]

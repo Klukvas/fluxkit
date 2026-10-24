@@ -17,8 +17,12 @@ import type {
   OrderList,
   ProductDetail,
   ProductList,
+  PickupPointKind,
   RegisterBody,
   SetCartItemQuantityBody,
+  ShippingCityPage,
+  ShippingOptions,
+  ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
 } from "./types.js";
@@ -42,6 +46,29 @@ export interface ListProductsOptions extends LocaleOptions {
 }
 
 export interface ListOrdersOptions extends LocaleOptions {
+  limit?: number;
+  offset?: number;
+}
+
+export interface ShippingOptionsOptions extends LocaleOptions {
+  /** The destination country of the address the shopper entered (ISO 3166-1 alpha-2). */
+  country?: string;
+  /** A city of a provider: asks for the carrier's estimate. */
+  cityRef?: string;
+  /** A pickup point of a provider: its country and the carrier's estimate. */
+  pickupPointRef?: string;
+}
+
+export interface ShippingLookupOptions extends LocaleOptions {
+  limit?: number;
+  offset?: number;
+}
+
+export interface ShippingPickupPointsOptions extends CallOptions {
+  /** Filters by number or description. */
+  q?: string;
+  /** Both kinds when missing. */
+  kinds?: readonly PickupPointKind[];
   limit?: number;
   offset?: number;
 }
@@ -84,6 +111,20 @@ export interface StoreClient {
   getConfig(options?: CallOptions): Result<StoreConfig>;
   listProducts(options?: ListProductsOptions): Result<ProductList>;
   getProduct(slug: string, options?: LocaleOptions): Result<ProductDetail>;
+  /** The shipping methods for the current cart (cookie or session), priced by the server; `no-store`. */
+  getShippingOptions(options?: ShippingOptionsOptions): Result<ShippingOptions>;
+  /** City search of a provider (`query`: 2 to 50 characters). */
+  listShippingCities(
+    providerCode: string,
+    query: string,
+    options?: ShippingLookupOptions,
+  ): Result<ShippingCityPage>;
+  /** The pickup points of a provider's city. */
+  listShippingPickupPoints(
+    providerCode: string,
+    cityRef: string,
+    options?: ShippingPickupPointsOptions,
+  ): Result<ShippingPickupPointPage>;
 }
 
 /** Header-safe: visible ASCII only, so a key can never inject a header or be silently altered. */
@@ -131,5 +172,22 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     getConfig: (opts) => call("getConfig", { options: opts }),
     listProducts: (opts) => call("listProducts", { options: opts }),
     getProduct: (slug, opts) => call("getProduct", { pathParams: { slug }, options: opts }),
+    getShippingOptions: (opts) => call("getShippingOptions", { options: opts }),
+    listShippingCities: (providerCode, query, opts) =>
+      call("listShippingCities", {
+        pathParams: { code: providerCode },
+        options: { ...opts, q: query } as CallOptions,
+      }),
+    listShippingPickupPoints: (providerCode, cityRef, opts) => {
+      const { kinds, ...rest } = opts ?? {};
+      return call("listShippingPickupPoints", {
+        pathParams: { code: providerCode },
+        options: {
+          ...rest,
+          cityRef,
+          ...(kinds === undefined ? {} : { kinds: kinds.join(",") }),
+        } as CallOptions,
+      });
+    },
   };
 }

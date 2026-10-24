@@ -18,6 +18,10 @@ export const RATE_LIMITS = Object.freeze({
   mediaUpload: { maxAttempts: 60, windowMinutes: 10 },
   // ADR 0029 decision 13: the provider connection check calls a carrier under the shop's key; per signed-in admin user.
   shippingCheck: { maxAttempts: 30, windowMinutes: 10 },
+  // ADR 0029 decision 5 (numbers fixed in plan step 6): the store options read the cart and may ask a carrier for an
+  // estimate; the lookups proxy anonymous requests to a carrier under the shop's key (a picker types, debounced 300 ms).
+  shippingOptions: { maxAttempts: 30, windowMinutes: 1 },
+  shippingLookup: { maxAttempts: 60, windowMinutes: 1 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -39,6 +43,8 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     cartWrite: "clientAddress",
     mediaUpload: "adminUser",
     shippingCheck: "adminUser",
+    shippingOptions: "clientAddress",
+    shippingLookup: "clientAddress",
   },
 );
 
