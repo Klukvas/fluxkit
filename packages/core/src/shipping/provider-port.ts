@@ -140,6 +140,11 @@ export interface PickupPoint {
   readonly kind: PickupPointKind;
   readonly cityRef: string;
   readonly cityName: string;
+  /**
+   * ISO alpha-2 country of the point (`COUNTRY_CODE_PATTERN`): the destination country of a `pickup_point` order, checked
+   * against the method's country list (ADR 0029 decision 4, "the carrier's country"). Added in plan step 6.
+   */
+  readonly countryCode: string;
   /** The carrier's description (address text), as sent. Public carrier data, no personal data. */
   readonly description: string;
   /** The heaviest parcel the point accepts, when the carrier says. */
@@ -224,6 +229,15 @@ export interface ShippingProviderPort {
     input: { readonly cityRef: string; readonly kinds: readonly PickupPointKind[] },
     signal: ProviderAbortSignal,
   ): Promise<PickupPoint[]>;
+  /**
+   * One point by its ref, `null` when the carrier has no such point. How the API resolves a checkout's `pickupPointRef`
+   * when the point is not in its directory cache (another instance served the lookup, a restart, an evicted city): the
+   * checkout names a point, not a city. Throws on failure, like the other lookups. Added in plan step 6.
+   */
+  findPickupPoint(
+    input: { readonly ref: string },
+    signal: ProviderAbortSignal,
+  ): Promise<PickupPoint | null>;
   estimate(input: EstimateRequest, signal: ProviderAbortSignal): Promise<ProviderResult<Money>>;
   createWaybill(
     input: WaybillRequest,

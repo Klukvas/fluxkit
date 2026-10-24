@@ -80,6 +80,30 @@ describe("FakeShippingProvider", () => {
         await fake.listPickupPoints({ cityRef: "nowhere", kinds: ["branch"] }, signal),
       ).toEqual([]);
     });
+
+    it("finds one point by its ref, in Ukraine, and nothing for an unknown ref", async () => {
+      const point = await fake.findPickupPoint({ ref: "fake-city-odesa-point-2" }, signal);
+      expect(point).toMatchObject({
+        ref: "fake-city-odesa-point-2",
+        kind: "locker",
+        cityRef: "fake-city-odesa",
+        countryCode: "UA",
+      });
+      const listed = await fake.listPickupPoints(
+        { cityRef: "fake-city-odesa", kinds: ["locker"] },
+        signal,
+      );
+      expect(listed).toEqual([point]);
+      expect(await fake.findPickupPoint({ ref: "nowhere" }, signal)).toBeNull();
+    });
+
+    it("throws when findPickupPoint is told to fail, as the port says lookups do", async () => {
+      fake.failNext("findPickupPoint");
+      await expect(
+        fake.findPickupPoint({ ref: "fake-city-kyiv-point-1" }, signal),
+      ).rejects.toThrow();
+      expect(await fake.findPickupPoint({ ref: "fake-city-kyiv-point-1" }, signal)).not.toBeNull();
+    });
   });
 
   describe("estimate", () => {
