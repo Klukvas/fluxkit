@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
-# Feature matrix (AGENTS.md section 18). Usage: scripts/feature-matrix.sh on|off|deleted
+# Feature and provider matrix (AGENTS.md section 18).
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
+# The provider modes do the same for the test-only shipping provider packages/providers/_fake (ADR 0029 decision 8). Their
+# observable is the line the provider registry logs at startup, "Shipping providers loaded: <codes|none>": it needs no route
+# and so no new public contract.
+#   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
+#   providers-off     build, start the API with no providers, expect "none" and no mention of fake
+#   providers-deleted remove packages/providers/_fake, reinstall, then lint, typecheck, boundaries and tests must pass, and
+#                     an API told to load fake must refuse to start, loudly (destructive: CI only)
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -13,8 +21,9 @@ export ORDER_TOKEN_SECRET="${ORDER_TOKEN_SECRET:-feature-matrix-throwaway-secret
 
 run_api() {
   local features="$1"
+  local providers="${2:-}"
   pnpm build
-  FEATURES_ENABLED="$features" PORT="$port" node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
+  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" PORT="$port" node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
   api_pid=$!
   trap 'kill "$api_pid" 2>/dev/null || true' EXIT
   for _ in $(seq 1 30); do
@@ -48,9 +57,37 @@ case "$mode" in
     pnpm check:boundaries
     pnpm test
     ;;
+  providers-on)
+    run_api "" "fake"
+    grep -F "Shipping providers loaded: fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the registry to report the fake provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ;;
+  providers-off)
+    run_api "" ""
+    grep -F "Shipping providers loaded: none" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the registry to report no provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -qi "fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fake provider must leave no trace when it is not enabled" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ;;
+  providers-deleted)
+    [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
+    rm -rf packages/providers/_fake
+    pnpm install --no-frozen-lockfile
+    pnpm lint
+    pnpm typecheck
+    pnpm check:boundaries
+    pnpm test
+    # A provider that is enabled but gone must stop the startup, not be skipped. The check runs before any connection.
+    if SHIPPING_PROVIDERS_ENABLED=fake PORT="$port" timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started although the enabled fake provider is deleted" >&2
+      exit 1
+    fi
+    grep -F 'Shipping provider "fake" is enabled' /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a loud startup error naming the missing provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ;;
   *)
     echo "unknown mode: $mode" >&2
     exit 2
     ;;
 esac
-echo "feature matrix '$mode': OK"
+echo "feature/provider matrix '$mode': OK"
