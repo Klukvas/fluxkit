@@ -29,10 +29,13 @@ import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config
 import { OrdersModule } from "./orders/orders.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
+import { ShippingRegistryModule, type LoadedShippingProvider } from "./shipping/registry/index.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
   features: LoadedFeature[];
+  /** The enabled shipping provider packages (`SHIPPING_PROVIDERS_ENABLED`); defaults to none. */
+  shippingProviders?: LoadedShippingProvider[];
   locale: LocaleConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (UAH, prices include tax, threshold 5). */
   pricing?: PricingConfig;
@@ -91,6 +94,7 @@ export class AppModule {
           config: options.scheduler ?? DISABLED_SCHEDULER_CONFIG,
           databaseUrl: options.databaseUrl,
         }),
+        ShippingRegistryModule.register(options.shippingProviders ?? []),
         ...options.features.map((feature) => feature.module),
       ],
     };
