@@ -4,6 +4,7 @@ import { codeSchema, positionSchema } from "../../catalog/shared/code-schemas.js
 import { i18nTextSchema } from "../../catalog/shared/i18n-validation.js";
 import { isDatabaseSafeText, UNSAFE_TEXT_MESSAGE } from "../../catalog/shared/text.js";
 import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
+import { zodToOpenApiSchema } from "../../common/openapi.js";
 import { paginationQuerySchema } from "../../common/pagination.js";
 
 // Schemas check structure and static limits. Rules that depend on configuration (locales, the shop currency, the
@@ -40,6 +41,19 @@ const countryCodesSchema = z
     });
   });
 
+const amountSchema = z.number().int().min(0);
+
+/** The four stored shapes of `pricing`, for the documentation of responses. */
+const pricingSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("flat"), amount: amountSchema }),
+  z.object({ type: z.literal("free_over"), amount: amountSchema, freeFrom: amountSchema }),
+  z.object({
+    type: z.literal("tiers"),
+    tiers: z.array(z.object({ fromSubtotal: amountSchema, amount: amountSchema })),
+  }),
+  z.object({ type: z.literal("carrier_on_delivery") }),
+]);
+
 /**
  * The request shape of `pricing`: any object here; the exact rules (type, fields, integer minor units, tiers) are core's
  * `validateShippingPricing`, whose reasons the answer carries. The four shapes are in `pricingSchema` below. A custom check
@@ -51,8 +65,7 @@ const pricingInputSchema = z
     { message: "Must be a JSON object.", params: { code: "invalid_type" } },
   )
   .meta({
-    type: "object",
-    additionalProperties: true,
+    ...zodToOpenApiSchema(pricingSchema, "input"),
     description:
       "One of `{type: 'flat', amount}`, `{type: 'free_over', amount, freeFrom}`, `{type: 'tiers', tiers: [{fromSubtotal, amount}]}` or `{type: 'carrier_on_delivery'}`. Every amount is an integer in minor units of the shop currency. Tiers start at `fromSubtotal` 0 and strictly ascend.",
     examples: [
@@ -97,19 +110,6 @@ export const updateShippingMethodSchema = z.strictObject({
 });
 
 export const listShippingMethodsQuerySchema = paginationQuerySchema;
-
-const amountSchema = z.number().int().min(0);
-
-/** The four stored shapes of `pricing`, for the documentation of responses. */
-const pricingSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("flat"), amount: amountSchema }),
-  z.object({ type: z.literal("free_over"), amount: amountSchema, freeFrom: amountSchema }),
-  z.object({
-    type: z.literal("tiers"),
-    tiers: z.array(z.object({ fromSubtotal: amountSchema, amount: amountSchema })),
-  }),
-  z.object({ type: z.literal("carrier_on_delivery") }),
-]);
 
 export const shippingMethodResponseSchema = z.object({
   id: uuidSchema,

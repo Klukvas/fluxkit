@@ -208,6 +208,47 @@ export const ADMIN_OPERATIONS = {
   getBrand: operation("GET", "/admin/brands/{id}", [200], "catalog.read"),
   updateBrand: operation("PATCH", "/admin/brands/{id}", [200], "catalog.write", { body: "json" }),
   deleteBrand: operation("DELETE", "/admin/brands/{id}", [204], "catalog.write"),
+  createShippingMethod: operation("POST", "/admin/shipping/methods", [201], "shipping.manage", {
+    body: "json",
+  }),
+  listShippingMethods: operation("GET", "/admin/shipping/methods", [200], "shipping.manage", {
+    query: ["limit", "offset"],
+  }),
+  getShippingMethod: operation("GET", "/admin/shipping/methods/{id}", [200], "shipping.manage"),
+  updateShippingMethod: operation(
+    "PATCH",
+    "/admin/shipping/methods/{id}",
+    [200],
+    "shipping.manage",
+    {
+      body: "json",
+    },
+  ),
+  deleteShippingMethod: operation(
+    "DELETE",
+    "/admin/shipping/methods/{id}",
+    [204],
+    "shipping.manage",
+  ),
+  getShippingProviderSettings: operation(
+    "GET",
+    "/admin/shipping/providers/{code}/settings",
+    [200],
+    "shipping.manage",
+  ),
+  putShippingProviderSettings: operation(
+    "PUT",
+    "/admin/shipping/providers/{code}/settings",
+    [200],
+    "shipping.manage",
+    { body: "json" },
+  ),
+  checkShippingProvider: operation(
+    "POST",
+    "/admin/shipping/providers/{code}/check",
+    [200],
+    "shipping.manage",
+  ),
   createCategory: operation("POST", "/admin/categories", [201], "catalog.write", { body: "json" }),
   listCategories: operation("GET", "/admin/categories", [200], "catalog.read", {
     query: ["parentId", "limit", "offset"],

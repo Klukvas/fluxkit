@@ -11491,8 +11491,82 @@
                     "maxLength": 64
                   },
                   "pricing": {
-                    "type": "object",
-                    "additionalProperties": true,
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["flat"]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["type", "amount"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["free_over"]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "freeFrom": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["type", "amount", "freeFrom"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["tiers"]
+                          },
+                          "tiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromSubtotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["fromSubtotal", "amount"]
+                            }
+                          }
+                        },
+                        "required": ["type", "tiers"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["carrier_on_delivery"]
+                          }
+                        },
+                        "required": ["type"]
+                      }
+                    ],
                     "description": "One of `{type: 'flat', amount}`, `{type: 'free_over', amount, freeFrom}`, `{type: 'tiers', tiers: [{fromSubtotal, amount}]}` or `{type: 'carrier_on_delivery'}`. Every amount is an integer in minor units of the shop currency. Tiers start at `fromSubtotal` 0 and strictly ascend.",
                     "examples": [
                       {
@@ -12357,8 +12431,82 @@
                     "maxLength": 64
                   },
                   "pricing": {
-                    "type": "object",
-                    "additionalProperties": true,
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["flat"]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["type", "amount"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["free_over"]
+                          },
+                          "amount": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "freeFrom": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["type", "amount", "freeFrom"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["tiers"]
+                          },
+                          "tiers": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromSubtotal": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "amount": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["fromSubtotal", "amount"]
+                            }
+                          }
+                        },
+                        "required": ["type", "tiers"]
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string",
+                            "enum": ["carrier_on_delivery"]
+                          }
+                        },
+                        "required": ["type"]
+                      }
+                    ],
                     "description": "One of `{type: 'flat', amount}`, `{type: 'free_over', amount, freeFrom}`, `{type: 'tiers', tiers: [{fromSubtotal, amount}]}` or `{type: 'carrier_on_delivery'}`. Every amount is an integer in minor units of the shop currency. Tiers start at `fromSubtotal` 0 and strictly ascend.",
                     "examples": [
                       {
@@ -12884,7 +13032,7 @@
                 "properties": {
                   "settings": {
                     "type": "object",
-                    "additionalProperties": true,
+                    "additionalProperties": {},
                     "description": "Non-secret settings of the provider (sender data, default parcel). A plain JSON object: at most 16384 bytes, 4 levels deep, 50 keys per object, keys of letters, digits and _ , and no key that names a credential (API keys live in the environment, never here)."
                   }
                 },

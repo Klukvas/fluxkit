@@ -9,7 +9,8 @@
 import type { JsonValue } from "../admin-types.js";
 
 type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
-type Distribute<T> = T extends unknown ? Shape<T> : never;
+// A boolean inside a union is "boolean" (it distributes to true | false); a literal is only a property type of its own.
+type Distribute<T> = T extends boolean ? "boolean" : T extends unknown ? Shape<T> : never;
 /** True only for `JsonValue` itself: a value the API accepts and stores without looking inside. */
 type IsJsonValue<T> = [JsonValue] extends [T] ? ([T] extends [JsonValue] ? true : false) : false;
 
@@ -22,7 +23,9 @@ type ShapeOf<T> = [T] extends [never]
     : null extends T
       ? { nullable: Shape<NonNullable<T>> }
       : [T] extends [boolean]
-        ? "boolean"
+        ? boolean extends T
+          ? "boolean"
+          : { literal: T }
         : [T] extends [string]
           ? string extends T
             ? "string"
@@ -53,6 +56,7 @@ export type ShapeNode =
   | "any"
   | "never"
   | { enum: readonly string[] }
+  | { literal: boolean }
   | { nullable: ShapeNode }
   | { array: ShapeNode }
   | { record: ShapeNode }
@@ -146,6 +150,14 @@ export function compareShape(
     if (schema.enum !== undefined)
       problems.push(`${at}: openapi has an enum, the type is a plain ${shape}`);
     return problems;
+  }
+  if ("literal" in shape) {
+    // A boolean literal (`ok: true`) is documented as a one-value boolean enum.
+    return schema.type === "boolean" &&
+      schema.enum?.length === 1 &&
+      (schema.enum as readonly unknown[])[0] === shape.literal
+      ? []
+      : [`${at}: openapi is not the boolean literal ${String(shape.literal)}`];
   }
   if ("enum" in shape) {
     if (schema.type !== "string" || schema.enum === undefined)

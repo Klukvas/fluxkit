@@ -454,6 +454,87 @@ export interface UpdateAdminBrandBody {
   slug?: string;
 }
 
+// ----------------------------------------------------------------- shipping
+
+export type AdminShippingMethodKind = "address" | "pickup_point" | "store_pickup";
+
+export interface AdminShippingTier {
+  fromSubtotal: number;
+  amount: number;
+}
+
+/** Every amount is an integer in minor units of the method's currency (the shop currency). */
+export type AdminShippingPricing =
+  | { type: "flat"; amount: number }
+  | { type: "free_over"; amount: number; freeFrom: number }
+  | { type: "tiers"; tiers: AdminShippingTier[] }
+  | { type: "carrier_on_delivery" };
+
+export interface AdminShippingMethod {
+  id: string;
+  code: string;
+  title: LocalizedText;
+  description: LocalizedText | null;
+  kind: AdminShippingMethodKind;
+  providerCode: string | null;
+  providerService: string | null;
+  pricing: AdminShippingPricing;
+  currency: string;
+  countryCodes: string[];
+  isActive: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminShippingMethodList = Paginated<AdminShippingMethod>;
+
+/** The method is created INACTIVE unless `isActive` is true; the currency is the shop currency. */
+export interface CreateAdminShippingMethodBody {
+  code: string;
+  title: LocalizedText;
+  description?: LocalizedText;
+  kind: AdminShippingMethodKind;
+  providerCode?: string | null;
+  providerService?: string | null;
+  pricing: AdminShippingPricing;
+  countryCodes: string[];
+  isActive?: boolean;
+  position?: number;
+}
+
+/** The code never changes. */
+export interface UpdateAdminShippingMethodBody {
+  title?: LocalizedText;
+  description?: LocalizedText | null;
+  kind?: AdminShippingMethodKind;
+  providerCode?: string | null;
+  providerService?: string | null;
+  pricing?: AdminShippingPricing;
+  countryCodes?: string[];
+  isActive?: boolean;
+  position?: number;
+}
+
+/** The saved non-secret profile of a provider; `{}` and two nulls before the first save. */
+export interface AdminShippingProviderSettings {
+  providerCode: string;
+  settings: JsonObject;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface PutAdminShippingProviderSettingsBody {
+  settings: JsonObject;
+}
+
+export type AdminShippingProviderFailureReason =
+  "unavailable" | "rejected" | "invalid_credentials" | "not_supported";
+
+/** The result of a connection check: a typed reason and raw carrier codes, never a message or a key. */
+export type AdminShippingProviderCheck =
+  { ok: true } | { ok: false; reason: AdminShippingProviderFailureReason; providerCodes: string[] };
+
 // --------------------------------------------------------------- categories
 
 export interface AdminCategory {

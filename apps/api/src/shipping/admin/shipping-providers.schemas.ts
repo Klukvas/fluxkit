@@ -15,7 +15,7 @@ const settingsInputSchema = z
   )
   .meta({
     type: "object",
-    additionalProperties: true,
+    additionalProperties: {},
     description: `Non-secret settings of the provider (sender data, default parcel). A plain JSON object: at most ${String(PROVIDER_SETTINGS_LIMITS.maxBytes)} bytes, ${String(PROVIDER_SETTINGS_LIMITS.maxDepth)} levels deep, ${String(PROVIDER_SETTINGS_LIMITS.maxKeysPerObject)} keys per object, keys of letters, digits and _ , and no key that names a credential (API keys live in the environment, never here).`,
   });
 
