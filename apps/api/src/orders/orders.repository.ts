@@ -10,6 +10,8 @@ import {
   orderStatusChange,
   reservation,
   salesOrder,
+  shipment,
+  shipmentStatusChange,
 } from "../database/schema/index.js";
 
 export type OrderRow = typeof salesOrder.$inferSelect;
@@ -21,6 +23,8 @@ export type NewOrderStatusChange = typeof orderStatusChange.$inferInsert;
 export type OrderAdjustmentRow = typeof orderAdjustment.$inferSelect;
 export type OrderShippingRow = typeof orderShipping.$inferSelect;
 export type NewDomainEvent = typeof domainEvent.$inferInsert;
+export type ShipmentRow = typeof shipment.$inferSelect;
+export type ShipmentStatusChangeRow = typeof shipmentStatusChange.$inferSelect;
 
 /** The reservation of one order line, with the facts a batch needs to take locks in order. */
 export interface OrderReservationRow {
@@ -341,6 +345,37 @@ export class OrdersRepository {
       .select()
       .from(orderShipping)
       .where(inArray(orderShipping.orderId, [...orderIds]));
+  }
+
+  /** The shipments of the orders, oldest first (ADR 0029 decision 10; at most one active per order). */
+  async listShipments(db: DbExecutor, orderIds: readonly string[]): Promise<ShipmentRow[]> {
+    if (orderIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(shipment)
+      .where(inArray(shipment.orderId, [...orderIds]))
+      .orderBy(asc(shipment.orderId), asc(shipment.createdAt), asc(shipment.id));
+  }
+
+  /** The status journals of the shipments, in the order the changes happened. */
+  async listShipmentStatusChanges(
+    db: DbExecutor,
+    shipmentIds: readonly string[],
+  ): Promise<ShipmentStatusChangeRow[]> {
+    if (shipmentIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(shipmentStatusChange)
+      .where(inArray(shipmentStatusChange.shipmentId, [...shipmentIds]))
+      .orderBy(
+        asc(shipmentStatusChange.shipmentId),
+        asc(shipmentStatusChange.createdAt),
+        asc(shipmentStatusChange.id),
+      );
   }
 
   async listAdjustments(

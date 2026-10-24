@@ -11,6 +11,7 @@ import { z } from "zod";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import type { DbExecutor } from "../common/transaction.js";
 import { StoreService } from "../catalog/store/store.service.js";
+import { toStoreShipments } from "../shipping/shipments/shipment-view.js";
 import {
   OrdersRepository,
   type OrderAdjustmentRow,
@@ -18,6 +19,7 @@ import {
   type OrderRow,
   type OrderShippingRow,
   type OrderStatusChangeRow,
+  type ShipmentRow,
 } from "./orders.repository.js";
 import {
   orderPickupPointSchema,
@@ -108,6 +110,7 @@ export function toStoreOrder(
   history: readonly OrderStatusChangeRow[],
   adjustments: readonly OrderAdjustmentRow[],
   shipping: OrderShippingRow | undefined,
+  shipments: readonly ShipmentRow[],
   locale: StoreLocale,
 ): StoreOrder {
   return {
@@ -141,6 +144,7 @@ export function toStoreOrder(
       shipping === undefined
         ? null
         : { ...parseOrderShipping(shipping), title: text(textMap.parse(shipping.title), locale) },
+    shipments: toStoreShipments(shipments),
     history: history.map((row) => ({
       status: row.toStatus as StoreOrder["status"],
       at: row.createdAt.toISOString(),
@@ -159,7 +163,7 @@ export function toStoreOrderSummary(order: OrderRow, itemCount: number): StoreOr
   };
 }
 
-/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments, shipping) and builds it. */
+/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments, shipping, shipments) and builds it. */
 @Injectable()
 export class OrderViewService {
   constructor(
@@ -187,7 +191,8 @@ export class OrderViewService {
     const history = await this.orders.listHistory(db, [order.id]);
     const adjustments = await this.orders.listAdjustments(db, [order.id]);
     const [shipping] = await this.orders.listShipping(db, [order.id]);
-    return toStoreOrder(order, items, history, adjustments, shipping, locale);
+    const shipments = await this.orders.listShipments(db, [order.id]);
+    return toStoreOrder(order, items, history, adjustments, shipping, shipments, locale);
   }
 
   async summaries(db: DbExecutor, rows: readonly OrderRow[]): Promise<StoreOrderSummary[]> {

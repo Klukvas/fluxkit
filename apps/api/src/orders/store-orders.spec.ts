@@ -321,6 +321,7 @@ describe("store orders: guest lookup and cancel, customer history (real app, rea
           "postalCode",
           "productTitle",
           "quantity",
+          "shipments",
           "shipping",
           "shippingAddress",
           "shippingTotal",

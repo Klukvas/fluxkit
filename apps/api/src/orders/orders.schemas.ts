@@ -4,11 +4,14 @@ import {
   MAX_LINE_QUANTITY,
   ORDER_STATUSES,
   PICKUP_POINT_KINDS,
+  SHIPMENT_ACTORS,
+  SHIPMENT_PAYERS,
+  SHIPMENT_STATUSES,
   SHIPPING_METHOD_KINDS,
   SHIPPING_PAYERS,
 } from "@fluxkit/core";
 import { z } from "zod";
-import { timestampSchema } from "../common/openapi-formats.js";
+import { timestampSchema, uuidSchema } from "../common/openapi-formats.js";
 
 // Store order API shapes (docs/api/orders.md, ADR 0015, ADR 0017). Request schemas check structure only: the content
 // of names, phone, email and addresses is judged by the core rules (`checkout-input.ts`), so a rule and its error code
@@ -177,6 +180,70 @@ export const adminOrderShippingSchema = z.object({
   title: z.record(z.string(), z.string()),
 });
 
+export const shipmentStatusSchema = z.enum(SHIPMENT_STATUSES);
+
+/**
+ * A carrier waybill as the shopper sees it (ADR 0029 decision 5): only one that has a waybill number (the carrier
+ * answered), with the normalized status. No carrier text, no reference, no parcel data.
+ */
+export const storeShipmentSchema = z.object({
+  providerCode: z.string(),
+  trackingNumber: z.string(),
+  status: shipmentStatusSchema,
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  deliveredAt: timestampSchema.nullable(),
+  cancelledAt: timestampSchema.nullable(),
+});
+
+/**
+ * A carrier waybill as an admin (and `OrderReadPort`) sees it (ADR 0029 decision 10). No recipient name or phone and no
+ * carrier text: the raw carrier code only. `unknown`: the carrier's answer to the creation was lost; settle it with
+ * `POST .../shipments/{shipmentId}/reconcile`.
+ */
+export const adminShipmentSchema = z.object({
+  id: uuidSchema,
+  status: shipmentStatusSchema,
+  providerCode: z.string(),
+  providerService: z.string().nullable(),
+  trackingNumber: z.string().nullable().meta({ description: "Null until the carrier answered." }),
+  carrierStatusCode: z
+    .string()
+    .nullable()
+    .meta({ description: "The raw carrier code, never text." }),
+  carrierStatusAt: timestampSchema.nullable(),
+  clientReference: z.string().meta({ description: "Our order number as sent to the carrier." }),
+  declaredValue: moneySchemaOf(),
+  carrierCost: moneySchemaOf()
+    .nullable()
+    .meta({ description: "The carrier's price of the waybill: informational, never charged." }),
+  payer: z.enum(SHIPMENT_PAYERS),
+  weightGrams: z.number().int().min(1),
+  lengthMm: z.number().int().min(1),
+  widthMm: z.number().int().min(1),
+  heightMm: z.number().int().min(1),
+  seats: z.number().int().min(1),
+  createdBy: uuidSchema.nullable().meta({ description: "Null once that admin user was deleted." }),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  cancelledAt: timestampSchema.nullable(),
+  deliveredAt: timestampSchema.nullable(),
+  nextTrackAt: timestampSchema.nullable().meta({
+    description:
+      "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+  }),
+  history: z.array(
+    z.object({
+      fromStatus: shipmentStatusSchema.nullable(),
+      toStatus: shipmentStatusSchema,
+      carrierStatusCode: z.string().nullable(),
+      actorType: z.enum(SHIPMENT_ACTORS),
+      actorAdminId: uuidSchema.nullable(),
+      at: timestampSchema,
+    }),
+  ),
+});
+
 export const storeOrderItemSchema = z.object({
   sku: z.string(),
   productTitle: z.string(),
@@ -225,6 +292,10 @@ export const storeOrderSchema = z.object({
   shipping: storeOrderShippingSchema.nullable().meta({
     description:
       "The shipping method chosen at checkout (immutable snapshot); null for an order placed without one.",
+  }),
+  shipments: z.array(storeShipmentSchema).meta({
+    description:
+      "The carrier waybills of the order that have a number, oldest first; empty until the shop created one.",
   }),
   history: z.array(z.object({ status: statusSchema, at: timestampSchema })),
 });

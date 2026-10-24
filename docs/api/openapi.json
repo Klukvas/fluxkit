@@ -6233,6 +6233,68 @@
                           ],
                           "additionalProperties": false
                         },
+                        "shipments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "providerCode": {
+                                "type": "string"
+                              },
+                              "trackingNumber": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "unknown",
+                                  "created",
+                                  "in_transit",
+                                  "arrived",
+                                  "delivered",
+                                  "returning",
+                                  "returned",
+                                  "cancelled",
+                                  "failed"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "deliveredAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "cancelledAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": [
+                              "providerCode",
+                              "trackingNumber",
+                              "status",
+                              "createdAt",
+                              "updatedAt",
+                              "deliveredAt",
+                              "cancelledAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                        },
                         "history": {
                           "type": "array",
                           "items": {
@@ -6276,6 +6338,7 @@
                         "shippingAddress",
                         "billingAddress",
                         "shipping",
+                        "shipments",
                         "history"
                       ],
                       "additionalProperties": false
@@ -6728,6 +6791,68 @@
                           ],
                           "additionalProperties": false
                         },
+                        "shipments": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "providerCode": {
+                                "type": "string"
+                              },
+                              "trackingNumber": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "unknown",
+                                  "created",
+                                  "in_transit",
+                                  "arrived",
+                                  "delivered",
+                                  "returning",
+                                  "returned",
+                                  "cancelled",
+                                  "failed"
+                                ]
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "deliveredAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              },
+                              "cancelledAt": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": [
+                              "providerCode",
+                              "trackingNumber",
+                              "status",
+                              "createdAt",
+                              "updatedAt",
+                              "deliveredAt",
+                              "cancelledAt"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                        },
                         "history": {
                           "type": "array",
                           "items": {
@@ -6771,6 +6896,7 @@
                         "shippingAddress",
                         "billingAddress",
                         "shipping",
+                        "shipments",
                         "history"
                       ],
                       "additionalProperties": false
@@ -7332,6 +7458,68 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "providerCode",
+                          "trackingNumber",
+                          "status",
+                          "createdAt",
+                          "updatedAt",
+                          "deliveredAt",
+                          "cancelledAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -7375,6 +7563,7 @@
                     "shippingAddress",
                     "billingAddress",
                     "shipping",
+                    "shipments",
                     "history"
                   ],
                   "additionalProperties": false
@@ -7918,6 +8107,68 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "providerCode",
+                          "trackingNumber",
+                          "status",
+                          "createdAt",
+                          "updatedAt",
+                          "deliveredAt",
+                          "cancelledAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -7961,6 +8212,7 @@
                     "shippingAddress",
                     "billingAddress",
                     "shipping",
+                    "shipments",
                     "history"
                   ],
                   "additionalProperties": false
@@ -8652,6 +8904,68 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "providerCode",
+                          "trackingNumber",
+                          "status",
+                          "createdAt",
+                          "updatedAt",
+                          "deliveredAt",
+                          "cancelledAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -8695,6 +9009,7 @@
                     "shippingAddress",
                     "billingAddress",
                     "shipping",
+                    "shipments",
                     "history"
                   ],
                   "additionalProperties": false
@@ -9215,6 +9530,68 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "providerCode",
+                          "trackingNumber",
+                          "status",
+                          "createdAt",
+                          "updatedAt",
+                          "deliveredAt",
+                          "cancelledAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order that have a number, oldest first; empty until the shop created one."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -9258,6 +9635,7 @@
                     "shippingAddress",
                     "billingAddress",
                     "shipping",
+                    "shipments",
                     "history"
                   ],
                   "additionalProperties": false
@@ -10103,6 +10481,250 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "providerService": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "nullable": true,
+                            "description": "Null until the carrier answered.",
+                            "type": "string"
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "description": "The raw carrier code, never text.",
+                            "type": "string"
+                          },
+                          "carrierStatusAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "clientReference": {
+                            "type": "string",
+                            "description": "Our order number as sent to the carrier."
+                          },
+                          "declaredValue": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "carrierCost": {
+                            "nullable": true,
+                            "description": "The carrier's price of the waybill: informational, never charged.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "type": "string",
+                            "enum": ["sender", "recipient"]
+                          },
+                          "weightGrams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "lengthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "widthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "heightMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "createdBy": {
+                            "nullable": true,
+                            "description": "Null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "nextTrackAt": {
+                            "nullable": true,
+                            "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromStatus": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "carrierStatusCode": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "actorType": {
+                                  "type": "string",
+                                  "enum": ["admin", "system"]
+                                },
+                                "actorAdminId": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                }
+                              },
+                              "required": [
+                                "fromStatus",
+                                "toStatus",
+                                "carrierStatusCode",
+                                "actorType",
+                                "actorAdminId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "providerCode",
+                          "providerService",
+                          "trackingNumber",
+                          "carrierStatusCode",
+                          "carrierStatusAt",
+                          "clientReference",
+                          "declaredValue",
+                          "carrierCost",
+                          "payer",
+                          "weightGrams",
+                          "lengthMm",
+                          "widthMm",
+                          "heightMm",
+                          "seats",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "cancelledAt",
+                          "deliveredAt",
+                          "nextTrackAt",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order, oldest first (at most one active)."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -10221,6 +10843,7 @@
                     "total",
                     "adjustments",
                     "shipping",
+                    "shipments",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -10858,6 +11481,250 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "providerService": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "nullable": true,
+                            "description": "Null until the carrier answered.",
+                            "type": "string"
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "description": "The raw carrier code, never text.",
+                            "type": "string"
+                          },
+                          "carrierStatusAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "clientReference": {
+                            "type": "string",
+                            "description": "Our order number as sent to the carrier."
+                          },
+                          "declaredValue": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "carrierCost": {
+                            "nullable": true,
+                            "description": "The carrier's price of the waybill: informational, never charged.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "type": "string",
+                            "enum": ["sender", "recipient"]
+                          },
+                          "weightGrams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "lengthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "widthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "heightMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "createdBy": {
+                            "nullable": true,
+                            "description": "Null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "nextTrackAt": {
+                            "nullable": true,
+                            "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromStatus": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "carrierStatusCode": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "actorType": {
+                                  "type": "string",
+                                  "enum": ["admin", "system"]
+                                },
+                                "actorAdminId": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                }
+                              },
+                              "required": [
+                                "fromStatus",
+                                "toStatus",
+                                "carrierStatusCode",
+                                "actorType",
+                                "actorAdminId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "providerCode",
+                          "providerService",
+                          "trackingNumber",
+                          "carrierStatusCode",
+                          "carrierStatusAt",
+                          "clientReference",
+                          "declaredValue",
+                          "carrierCost",
+                          "payer",
+                          "weightGrams",
+                          "lengthMm",
+                          "widthMm",
+                          "heightMm",
+                          "seats",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "cancelledAt",
+                          "deliveredAt",
+                          "nextTrackAt",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order, oldest first (at most one active)."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -10976,6 +11843,7 @@
                     "total",
                     "adjustments",
                     "shipping",
+                    "shipments",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -11639,6 +12507,250 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "providerService": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "nullable": true,
+                            "description": "Null until the carrier answered.",
+                            "type": "string"
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "description": "The raw carrier code, never text.",
+                            "type": "string"
+                          },
+                          "carrierStatusAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "clientReference": {
+                            "type": "string",
+                            "description": "Our order number as sent to the carrier."
+                          },
+                          "declaredValue": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "carrierCost": {
+                            "nullable": true,
+                            "description": "The carrier's price of the waybill: informational, never charged.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "type": "string",
+                            "enum": ["sender", "recipient"]
+                          },
+                          "weightGrams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "lengthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "widthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "heightMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "createdBy": {
+                            "nullable": true,
+                            "description": "Null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "nextTrackAt": {
+                            "nullable": true,
+                            "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromStatus": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "carrierStatusCode": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "actorType": {
+                                  "type": "string",
+                                  "enum": ["admin", "system"]
+                                },
+                                "actorAdminId": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                }
+                              },
+                              "required": [
+                                "fromStatus",
+                                "toStatus",
+                                "carrierStatusCode",
+                                "actorType",
+                                "actorAdminId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "providerCode",
+                          "providerService",
+                          "trackingNumber",
+                          "carrierStatusCode",
+                          "carrierStatusAt",
+                          "clientReference",
+                          "declaredValue",
+                          "carrierCost",
+                          "payer",
+                          "weightGrams",
+                          "lengthMm",
+                          "widthMm",
+                          "heightMm",
+                          "seats",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "cancelledAt",
+                          "deliveredAt",
+                          "nextTrackAt",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order, oldest first (at most one active)."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -11757,6 +12869,7 @@
                     "total",
                     "adjustments",
                     "shipping",
+                    "shipments",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -12386,6 +13499,250 @@
                       ],
                       "additionalProperties": false
                     },
+                    "shipments": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "providerService": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "nullable": true,
+                            "description": "Null until the carrier answered.",
+                            "type": "string"
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "description": "The raw carrier code, never text.",
+                            "type": "string"
+                          },
+                          "carrierStatusAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "clientReference": {
+                            "type": "string",
+                            "description": "Our order number as sent to the carrier."
+                          },
+                          "declaredValue": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "carrierCost": {
+                            "nullable": true,
+                            "description": "The carrier's price of the waybill: informational, never charged.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "type": "string",
+                            "enum": ["sender", "recipient"]
+                          },
+                          "weightGrams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "lengthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "widthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "heightMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "createdBy": {
+                            "nullable": true,
+                            "description": "Null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "nextTrackAt": {
+                            "nullable": true,
+                            "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromStatus": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "carrierStatusCode": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "actorType": {
+                                  "type": "string",
+                                  "enum": ["admin", "system"]
+                                },
+                                "actorAdminId": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                }
+                              },
+                              "required": [
+                                "fromStatus",
+                                "toStatus",
+                                "carrierStatusCode",
+                                "actorType",
+                                "actorAdminId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "providerCode",
+                          "providerService",
+                          "trackingNumber",
+                          "carrierStatusCode",
+                          "carrierStatusAt",
+                          "clientReference",
+                          "declaredValue",
+                          "carrierCost",
+                          "payer",
+                          "weightGrams",
+                          "lengthMm",
+                          "widthMm",
+                          "heightMm",
+                          "seats",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "cancelledAt",
+                          "deliveredAt",
+                          "nextTrackAt",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "The carrier waybills of the order, oldest first (at most one active)."
+                    },
                     "history": {
                       "type": "array",
                       "items": {
@@ -12504,6 +13861,7 @@
                     "total",
                     "adjustments",
                     "shipping",
+                    "shipments",
                     "history",
                     "placedAt",
                     "expiresAt",
@@ -14424,6 +15782,1965 @@
         "summary": "Test the connection to a shipping provider",
         "tags": ["admin-shipping"],
         "x-fluxkit-permission": "shipping.manage"
+      }
+    },
+    "/admin/orders/{id}/shipments": {
+      "get": {
+        "description": "Every carrier waybill of the order, oldest first, with its status journal.",
+        "operationId": "ShipmentsController_list",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shipments.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "providerCode": {
+                            "type": "string"
+                          },
+                          "providerService": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "trackingNumber": {
+                            "nullable": true,
+                            "description": "Null until the carrier answered.",
+                            "type": "string"
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "description": "The raw carrier code, never text.",
+                            "type": "string"
+                          },
+                          "carrierStatusAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "clientReference": {
+                            "type": "string",
+                            "description": "Our order number as sent to the carrier."
+                          },
+                          "declaredValue": {
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "carrierCost": {
+                            "nullable": true,
+                            "description": "The carrier's price of the waybill: informational, never charged.",
+                            "type": "object",
+                            "properties": {
+                              "amount": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the order currency."
+                              },
+                              "currency": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "payer": {
+                            "type": "string",
+                            "enum": ["sender", "recipient"]
+                          },
+                          "weightGrams": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "lengthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "widthMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "heightMm": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "seats": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "createdBy": {
+                            "nullable": true,
+                            "description": "Null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "cancelledAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deliveredAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "nextTrackAt": {
+                            "nullable": true,
+                            "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "history": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "fromStatus": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "toStatus": {
+                                  "type": "string",
+                                  "enum": [
+                                    "pending",
+                                    "unknown",
+                                    "created",
+                                    "in_transit",
+                                    "arrived",
+                                    "delivered",
+                                    "returning",
+                                    "returned",
+                                    "cancelled",
+                                    "failed"
+                                  ]
+                                },
+                                "carrierStatusCode": {
+                                  "nullable": true,
+                                  "type": "string"
+                                },
+                                "actorType": {
+                                  "type": "string",
+                                  "enum": ["admin", "system"]
+                                },
+                                "actorAdminId": {
+                                  "nullable": true,
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "at": {
+                                  "type": "string",
+                                  "format": "date-time",
+                                  "description": "ISO 8601, UTC."
+                                }
+                              },
+                              "required": [
+                                "fromStatus",
+                                "toStatus",
+                                "carrierStatusCode",
+                                "actorType",
+                                "actorAdminId",
+                                "at"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "status",
+                          "providerCode",
+                          "providerService",
+                          "trackingNumber",
+                          "carrierStatusCode",
+                          "carrierStatusAt",
+                          "clientReference",
+                          "declaredValue",
+                          "carrierCost",
+                          "payer",
+                          "weightGrams",
+                          "lengthMm",
+                          "widthMm",
+                          "heightMm",
+                          "seats",
+                          "createdBy",
+                          "createdAt",
+                          "updatedAt",
+                          "cancelledAt",
+                          "deliveredAt",
+                          "nextTrackAt",
+                          "history"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Oldest first; at most one is active."
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the shipments of an order",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.read"
+      },
+      "post": {
+        "description": "Only for a `paid` order with no line awaiting stock, a shipping method with a carrier and no active shipment. The shipment is stored as `pending` before the carrier is asked (15 s limit), then answered as `created`, `failed` (with `failure`) or `unknown` (the answer was lost: whether a waybill exists is not known; never create again, call `POST .../reconcile`). The order status does not change. The recipient's name and phone are taken from the order and sent to the carrier only.",
+        "operationId": "ShipmentsController_create",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weightGrams": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000,
+                    "description": "Parcel weight in grams, 1 to 1000000."
+                  },
+                  "lengthMm": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "description": "Length in millimetres, 1 to 10000."
+                  },
+                  "widthMm": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "description": "Width in millimetres, 1 to 10000."
+                  },
+                  "heightMm": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000,
+                    "description": "Height in millimetres, 1 to 10000."
+                  },
+                  "description": {
+                    "description": "Cargo description for the carrier; trimmed, 1 to 200 characters. Sent to the carrier only, never stored.",
+                    "type": "string"
+                  },
+                  "declaredValue": {
+                    "description": "The value declared to the carrier, in the order currency. Missing: the order subtotal.",
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "number",
+                        "description": "Integer minor units of the order currency."
+                      },
+                      "currency": {
+                        "type": "string",
+                        "description": "ISO 4217 code; must be the order currency."
+                      }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "payer": {
+                    "description": "Who pays the carrier. Missing: `recipient` for a method the recipient pays on delivery, else `sender`.",
+                    "type": "string",
+                    "enum": ["sender", "recipient"]
+                  }
+                },
+                "required": ["weightGrams", "lengthMm", "widthMm", "heightMm", "description"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The shipment as the carrier left it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "shipment": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "pending",
+                            "unknown",
+                            "created",
+                            "in_transit",
+                            "arrived",
+                            "delivered",
+                            "returning",
+                            "returned",
+                            "cancelled",
+                            "failed"
+                          ]
+                        },
+                        "providerCode": {
+                          "type": "string"
+                        },
+                        "providerService": {
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "trackingNumber": {
+                          "nullable": true,
+                          "description": "Null until the carrier answered.",
+                          "type": "string"
+                        },
+                        "carrierStatusCode": {
+                          "nullable": true,
+                          "description": "The raw carrier code, never text.",
+                          "type": "string"
+                        },
+                        "carrierStatusAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "clientReference": {
+                          "type": "string",
+                          "description": "Our order number as sent to the carrier."
+                        },
+                        "declaredValue": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "carrierCost": {
+                          "nullable": true,
+                          "description": "The carrier's price of the waybill: informational, never charged.",
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 1000000000000,
+                              "description": "Minor units of the order currency."
+                            },
+                            "currency": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "payer": {
+                          "type": "string",
+                          "enum": ["sender", "recipient"]
+                        },
+                        "weightGrams": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "lengthMm": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "widthMm": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "heightMm": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "seats": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "createdBy": {
+                          "nullable": true,
+                          "description": "Null once that admin user was deleted.",
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "cancelledAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "deliveredAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "nextTrackAt": {
+                          "nullable": true,
+                          "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "history": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "fromStatus": {
+                                "nullable": true,
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "unknown",
+                                  "created",
+                                  "in_transit",
+                                  "arrived",
+                                  "delivered",
+                                  "returning",
+                                  "returned",
+                                  "cancelled",
+                                  "failed"
+                                ]
+                              },
+                              "toStatus": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "unknown",
+                                  "created",
+                                  "in_transit",
+                                  "arrived",
+                                  "delivered",
+                                  "returning",
+                                  "returned",
+                                  "cancelled",
+                                  "failed"
+                                ]
+                              },
+                              "carrierStatusCode": {
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "actorType": {
+                                "type": "string",
+                                "enum": ["admin", "system"]
+                              },
+                              "actorAdminId": {
+                                "nullable": true,
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "ISO 8601, UTC."
+                              }
+                            },
+                            "required": [
+                              "fromStatus",
+                              "toStatus",
+                              "carrierStatusCode",
+                              "actorType",
+                              "actorAdminId",
+                              "at"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "status",
+                        "providerCode",
+                        "providerService",
+                        "trackingNumber",
+                        "carrierStatusCode",
+                        "carrierStatusAt",
+                        "clientReference",
+                        "declaredValue",
+                        "carrierCost",
+                        "payer",
+                        "weightGrams",
+                        "lengthMm",
+                        "widthMm",
+                        "heightMm",
+                        "seats",
+                        "createdBy",
+                        "createdAt",
+                        "updatedAt",
+                        "cancelledAt",
+                        "deliveredAt",
+                        "nextTrackAt",
+                        "history"
+                      ],
+                      "additionalProperties": false,
+                      "description": "`created`: the carrier accepted the waybill. `failed`: it refused (see `failure`). `unknown`: the answer was lost (timeout, network) and whether a waybill exists is not known: do NOT create again, call `POST .../reconcile`."
+                    },
+                    "failure": {
+                      "nullable": true,
+                      "description": "The carrier's typed refusal of a `failed` shipment; null otherwise.",
+                      "type": "object",
+                      "properties": {
+                        "reason": {
+                          "type": "string",
+                          "enum": [
+                            "unavailable",
+                            "rejected",
+                            "invalid_credentials",
+                            "not_supported"
+                          ]
+                        },
+                        "providerCodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          },
+                          "description": "Raw carrier codes, never message text."
+                        }
+                      },
+                      "required": ["reason", "providerCodes"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["shipment", "failure"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create the carrier waybill of a paid order",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
+      }
+    },
+    "/admin/orders/{id}/shipments/{shipmentId}/reconcile": {
+      "post": {
+        "description": "Asks the carrier for the waybill created with our order number: found makes the shipment `created`, none makes it `failed` (then a new create is allowed). For an `unknown` shipment, or a `pending` one older than 2 minutes (left by a crash). A carrier failure changes nothing (503 `shipping_provider_unavailable` or 409 `carrier_*`).",
+        "operationId": "ShipmentsController_reconcile",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "shipmentId",
+            "required": true,
+            "in": "path",
+            "description": "Shipment id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The settled shipment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "unknown",
+                        "created",
+                        "in_transit",
+                        "arrived",
+                        "delivered",
+                        "returning",
+                        "returned",
+                        "cancelled",
+                        "failed"
+                      ]
+                    },
+                    "providerCode": {
+                      "type": "string"
+                    },
+                    "providerService": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "trackingNumber": {
+                      "nullable": true,
+                      "description": "Null until the carrier answered.",
+                      "type": "string"
+                    },
+                    "carrierStatusCode": {
+                      "nullable": true,
+                      "description": "The raw carrier code, never text.",
+                      "type": "string"
+                    },
+                    "carrierStatusAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "clientReference": {
+                      "type": "string",
+                      "description": "Our order number as sent to the carrier."
+                    },
+                    "declaredValue": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "carrierCost": {
+                      "nullable": true,
+                      "description": "The carrier's price of the waybill: informational, never charged.",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "payer": {
+                      "type": "string",
+                      "enum": ["sender", "recipient"]
+                    },
+                    "weightGrams": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "lengthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "widthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "heightMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "seats": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "createdBy": {
+                      "nullable": true,
+                      "description": "Null once that admin user was deleted.",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "cancelledAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "deliveredAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "nextTrackAt": {
+                      "nullable": true,
+                      "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fromStatus": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actorType": {
+                            "type": "string",
+                            "enum": ["admin", "system"]
+                          },
+                          "actorAdminId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "fromStatus",
+                          "toStatus",
+                          "carrierStatusCode",
+                          "actorType",
+                          "actorAdminId",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "providerCode",
+                    "providerService",
+                    "trackingNumber",
+                    "carrierStatusCode",
+                    "carrierStatusAt",
+                    "clientReference",
+                    "declaredValue",
+                    "carrierCost",
+                    "payer",
+                    "weightGrams",
+                    "lengthMm",
+                    "widthMm",
+                    "heightMm",
+                    "seats",
+                    "createdBy",
+                    "createdAt",
+                    "updatedAt",
+                    "cancelledAt",
+                    "deliveredAt",
+                    "nextTrackAt",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Settle an unknown shipment with the carrier",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
+      }
+    },
+    "/admin/orders/{id}/shipments/{shipmentId}/cancel": {
+      "post": {
+        "description": "Only a `created` shipment (the carrier allows it until the parcel is handed over). Never touches the order or its stock. A carrier failure changes nothing.",
+        "operationId": "ShipmentsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "shipmentId",
+            "required": true,
+            "in": "path",
+            "description": "Shipment id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled shipment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "unknown",
+                        "created",
+                        "in_transit",
+                        "arrived",
+                        "delivered",
+                        "returning",
+                        "returned",
+                        "cancelled",
+                        "failed"
+                      ]
+                    },
+                    "providerCode": {
+                      "type": "string"
+                    },
+                    "providerService": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "trackingNumber": {
+                      "nullable": true,
+                      "description": "Null until the carrier answered.",
+                      "type": "string"
+                    },
+                    "carrierStatusCode": {
+                      "nullable": true,
+                      "description": "The raw carrier code, never text.",
+                      "type": "string"
+                    },
+                    "carrierStatusAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "clientReference": {
+                      "type": "string",
+                      "description": "Our order number as sent to the carrier."
+                    },
+                    "declaredValue": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "carrierCost": {
+                      "nullable": true,
+                      "description": "The carrier's price of the waybill: informational, never charged.",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "payer": {
+                      "type": "string",
+                      "enum": ["sender", "recipient"]
+                    },
+                    "weightGrams": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "lengthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "widthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "heightMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "seats": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "createdBy": {
+                      "nullable": true,
+                      "description": "Null once that admin user was deleted.",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "cancelledAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "deliveredAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "nextTrackAt": {
+                      "nullable": true,
+                      "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fromStatus": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actorType": {
+                            "type": "string",
+                            "enum": ["admin", "system"]
+                          },
+                          "actorAdminId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "fromStatus",
+                          "toStatus",
+                          "carrierStatusCode",
+                          "actorType",
+                          "actorAdminId",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "providerCode",
+                    "providerService",
+                    "trackingNumber",
+                    "carrierStatusCode",
+                    "carrierStatusAt",
+                    "clientReference",
+                    "declaredValue",
+                    "carrierCost",
+                    "payer",
+                    "weightGrams",
+                    "lengthMm",
+                    "widthMm",
+                    "heightMm",
+                    "seats",
+                    "createdBy",
+                    "createdAt",
+                    "updatedAt",
+                    "cancelledAt",
+                    "deliveredAt",
+                    "nextTrackAt",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel a created waybill at the carrier",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
+      }
+    },
+    "/admin/orders/{id}/shipments/{shipmentId}/refresh": {
+      "post": {
+        "description": "What the tracking job does, now, for one shipment with a waybill that is still on its way; a new status is journalled with this admin as the actor. A carrier failure changes nothing.",
+        "operationId": "ShipmentsController_refresh",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "shipmentId",
+            "required": true,
+            "in": "path",
+            "description": "Shipment id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The shipment.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "unknown",
+                        "created",
+                        "in_transit",
+                        "arrived",
+                        "delivered",
+                        "returning",
+                        "returned",
+                        "cancelled",
+                        "failed"
+                      ]
+                    },
+                    "providerCode": {
+                      "type": "string"
+                    },
+                    "providerService": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "trackingNumber": {
+                      "nullable": true,
+                      "description": "Null until the carrier answered.",
+                      "type": "string"
+                    },
+                    "carrierStatusCode": {
+                      "nullable": true,
+                      "description": "The raw carrier code, never text.",
+                      "type": "string"
+                    },
+                    "carrierStatusAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "clientReference": {
+                      "type": "string",
+                      "description": "Our order number as sent to the carrier."
+                    },
+                    "declaredValue": {
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "carrierCost": {
+                      "nullable": true,
+                      "description": "The carrier's price of the waybill: informational, never charged.",
+                      "type": "object",
+                      "properties": {
+                        "amount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 1000000000000,
+                          "description": "Minor units of the order currency."
+                        },
+                        "currency": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "payer": {
+                      "type": "string",
+                      "enum": ["sender", "recipient"]
+                    },
+                    "weightGrams": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "lengthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "widthMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "heightMm": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "seats": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "createdBy": {
+                      "nullable": true,
+                      "description": "Null once that admin user was deleted.",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "cancelledAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "deliveredAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "nextTrackAt": {
+                      "nullable": true,
+                      "description": "When the tracking job asks the carrier next; null when it does not (no waybill yet, terminal, or given up after 30 days).",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fromStatus": {
+                            "nullable": true,
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "toStatus": {
+                            "type": "string",
+                            "enum": [
+                              "pending",
+                              "unknown",
+                              "created",
+                              "in_transit",
+                              "arrived",
+                              "delivered",
+                              "returning",
+                              "returned",
+                              "cancelled",
+                              "failed"
+                            ]
+                          },
+                          "carrierStatusCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "actorType": {
+                            "type": "string",
+                            "enum": ["admin", "system"]
+                          },
+                          "actorAdminId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "fromStatus",
+                          "toStatus",
+                          "carrierStatusCode",
+                          "actorType",
+                          "actorAdminId",
+                          "at"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "providerCode",
+                    "providerService",
+                    "trackingNumber",
+                    "carrierStatusCode",
+                    "carrierStatusAt",
+                    "clientReference",
+                    "declaredValue",
+                    "carrierCost",
+                    "payer",
+                    "weightGrams",
+                    "lengthMm",
+                    "widthMm",
+                    "heightMm",
+                    "seats",
+                    "createdBy",
+                    "createdAt",
+                    "updatedAt",
+                    "cancelledAt",
+                    "deliveredAt",
+                    "nextTrackAt",
+                    "history"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask the carrier for the current status of one shipment",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.write"
+      }
+    },
+    "/admin/orders/{id}/shipments/{shipmentId}/label": {
+      "get": {
+        "description": "Fetched from the carrier by the API and passed on as a download (`Content-Disposition: attachment`, `no-store`, `nosniff`, at most 10 MiB, checked to be a PDF); a carrier label URL never reaches the browser. 503 when the carrier cannot be reached or answers anything but a PDF.",
+        "operationId": "ShipmentsController_label",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Order id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "shipmentId",
+            "required": true,
+            "in": "path",
+            "description": "Shipment id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The label.",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Download the printable label of a waybill (PDF)",
+        "tags": ["admin-orders"],
+        "x-fluxkit-permission": "orders.read"
       }
     },
     "/store/categories": {
@@ -29227,6 +32544,18 @@
               }
             ],
             "description": "Only on `shipping_changed`: the chosen method's fresh option, exactly as `GET /store/shipping/options` returns it, or `{methodCode, available: false, reason}` when the method is not offered any more."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Only on a carrier failure of a shipment route (`shipping_provider_unavailable`, `rule_violation` `carrier_*`): the provider's typed reason.",
+            "enum": ["unavailable", "rejected", "invalid_credentials", "not_supported"]
+          },
+          "providerCodes": {
+            "description": "Only on a carrier failure of a shipment route: the raw carrier codes (never message text); may be empty.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": ["type", "title", "status", "code", "detail"]

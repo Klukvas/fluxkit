@@ -1,6 +1,7 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import { InventoryModule } from "../inventory/inventory.module.js";
+import { ShipmentsModule } from "../shipping/shipments/shipments.module.js";
 import { DomainEventHandlerRegistry } from "./domain-event-handlers.js";
 import { JobsRepository } from "./jobs.repository.js";
 import { JobsRunner } from "./jobs-runner.js";
@@ -18,8 +19,8 @@ export interface JobsModuleOptions {
 }
 
 /**
- * The scheduler (plan step 5c, ADR 0018): order expiry, the reservation sweep, domain event dispatch and the cart,
- * session, event and abandoned upload cleanups, run by an in-process timer under a Postgres advisory lock and by `pnpm jobs:run-once`.
+ * The scheduler (plan step 5c, ADR 0018): order expiry, the reservation sweep, domain event dispatch, the cart,
+ * session, event and abandoned upload cleanups and the shipment tracking (job 8, ADR 0029), run by an in-process timer under a Postgres advisory lock and by `pnpm jobs:run-once`.
  * Core, no feature flag, no HTTP route. Needs the globals of `DatabaseModule`, `AuthModule` (clock) and `OrdersModule`.
  */
 @Module({})
@@ -27,7 +28,7 @@ export class JobsModule {
   static register(options: JobsModuleOptions): DynamicModule {
     return {
       module: JobsModule,
-      imports: [DiscoveryModule, InventoryModule],
+      imports: [DiscoveryModule, InventoryModule, ShipmentsModule],
       providers: [
         { provide: SCHEDULER_CONFIG, useValue: options.config },
         { provide: SCHEDULER_DATABASE_URL, useValue: options.databaseUrl },

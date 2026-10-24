@@ -32,6 +32,8 @@ export interface TransportOperation {
   query: readonly string[];
   /** The admin table says `binary` for the upload; the store table has no such operation and leaves it out. */
   bodyKind?: "none" | "json" | "binary";
+  /** The admin table says `pdf` for the shipment label; every other operation answers JSON. */
+  responseKind?: "json" | "pdf";
 }
 
 export interface CallParts {
@@ -95,6 +97,7 @@ export function createTransport(options: TransportOptions) {
       ...(parts.options?.fetchOptions === undefined
         ? {}
         : { fetchOptions: parts.options.fetchOptions }),
+      ...(operation.responseKind === undefined ? {} : { responseKind: operation.responseKind }),
     });
 
     let response: Response;
@@ -106,6 +109,13 @@ export function createTransport(options: TransportOptions) {
         aborted: isAbort(cause, parts.options?.signal),
       });
     }
-    return parseResponse<T>({ successStatuses: operation.successStatuses, context }, response);
+    return parseResponse<T>(
+      {
+        successStatuses: operation.successStatuses,
+        context,
+        ...(operation.responseKind === undefined ? {} : { responseKind: operation.responseKind }),
+      },
+      response,
+    );
   };
 }

@@ -10,6 +10,7 @@ import {
   type ApiResponseOptions,
   type OpenAPIObject,
 } from "@nestjs/swagger";
+import { PROVIDER_FAILURE_REASONS, type ProviderFailureReason } from "@fluxkit/core";
 import { z } from "zod";
 import { cartSchema, type CartResponse } from "../cart/cart.schemas.js";
 import {
@@ -116,6 +117,18 @@ export class ProblemDetailsDoc {
     properties: {},
   })
   shipping?: ShippingChanged;
+  @ApiPropertyOptional({
+    description:
+      "Only on a carrier failure of a shipment route (`shipping_provider_unavailable`, `rule_violation` `carrier_*`): the provider's typed reason.",
+    enum: [...PROVIDER_FAILURE_REASONS],
+  })
+  reason?: ProviderFailureReason;
+  @ApiPropertyOptional({
+    description:
+      "Only on a carrier failure of a shipment route: the raw carrier codes (never message text); may be empty.",
+    type: [String],
+  })
+  providerCodes?: string[];
 }
 
 const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {

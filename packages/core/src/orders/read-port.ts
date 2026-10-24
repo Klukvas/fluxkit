@@ -1,5 +1,6 @@
 import type { ShippingMethodKind, ShippingPayer } from "../shipping/limits.js";
 import type { PickupPointKind } from "../shipping/provider-port.js";
+import type { ShipmentActor, ShipmentPayer, ShipmentStatus } from "../shipping/shipment-status.js";
 import type { Address } from "./contact.js";
 import type { OrderActor, OrderStatus } from "./status.js";
 
@@ -104,6 +105,56 @@ export interface AdminOrderShippingView {
   readonly destination: OrderPickupPointView | null;
 }
 
+/** One status change of a shipment (`shipment_status_change`). */
+export interface AdminOrderShipmentHistoryEntry {
+  /** Null for the creation of the shipment row. */
+  readonly fromStatus: ShipmentStatus | null;
+  readonly toStatus: ShipmentStatus;
+  /** The raw carrier code that caused the change; null for an admin action without a carrier answer. */
+  readonly carrierStatusCode: string | null;
+  readonly actorType: ShipmentActor;
+  /** The admin who acted; null for the tracking job, and once that admin user was deleted. */
+  readonly actorAdminId: string | null;
+  /** ISO 8601, UTC. */
+  readonly at: string;
+}
+
+/**
+ * A carrier waybill of the order (ADR 0029 decisions 7 and 10, `shipment`). No recipient name or phone and no carrier
+ * text: the raw carrier code only. `unknown` means the carrier's answer to the creation was lost: an admin settles it with
+ * `POST /admin/orders/{id}/shipments/{shipmentId}/reconcile`.
+ */
+export interface AdminOrderShipmentView {
+  readonly id: string;
+  readonly status: ShipmentStatus;
+  readonly providerCode: string;
+  readonly providerService: string | null;
+  /** The waybill number; null until the carrier answered. */
+  readonly trackingNumber: string | null;
+  readonly carrierStatusCode: string | null;
+  readonly carrierStatusAt: string | null;
+  /** Our order number as sent to the carrier. */
+  readonly clientReference: string;
+  readonly declaredValue: AdminOrderMoney;
+  /** The carrier's own price of the waybill: informational, never charged. */
+  readonly carrierCost: AdminOrderMoney | null;
+  readonly payer: ShipmentPayer;
+  readonly weightGrams: number;
+  readonly lengthMm: number;
+  readonly widthMm: number;
+  readonly heightMm: number;
+  readonly seats: number;
+  /** Null once that admin user was deleted. */
+  readonly createdBy: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly cancelledAt: string | null;
+  readonly deliveredAt: string | null;
+  /** When the tracking job asks the carrier next; null when it does not (not yet created, terminal, or given up). */
+  readonly nextTrackAt: string | null;
+  readonly history: readonly AdminOrderShipmentHistoryEntry[];
+}
+
 export interface AdminOrderView {
   readonly id: string;
   readonly number: string;
@@ -132,6 +183,8 @@ export interface AdminOrderView {
   readonly adjustments: readonly AdminOrderAdjustmentView[];
   /** The shipping snapshot; `null` for an order placed without a shipping method (digital goods, or a shop without one). */
   readonly shipping: AdminOrderShippingView | null;
+  /** The carrier waybills of the order, oldest first (at most one active); empty when none was created. */
+  readonly shipments: readonly AdminOrderShipmentView[];
   readonly history: readonly AdminOrderHistoryEntry[];
   /** ISO 8601, UTC. */
   readonly placedAt: string;
@@ -147,7 +200,8 @@ export interface AdminOrderView {
 /**
  * How a plugin reads an order (ADR 0018): the payment plugin before it asks the provider for a payment, the email
  * plugin when a domain event arrives with only an id and a number. `undefined` when no such order exists. Reads
- * only; changes go through `OrderPaymentsPort` and, for fulfilment, a port the shipping plan adds.
+ * only; changes go through `OrderPaymentsPort`. Fulfilment stays an admin action: the shipping plan (step 8) added no
+ * fulfilment port, because the owner keeps fulfilment manual (ADR 0029 decision 10).
  */
 export interface OrderReadPort {
   getOrder(orderId: string): Promise<AdminOrderView | undefined>;

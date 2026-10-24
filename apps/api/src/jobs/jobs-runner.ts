@@ -18,6 +18,8 @@ import { JobsRepository } from "./jobs.repository.js";
 import { DEFAULT_CLEANUP_LIMITS } from "./batches.js";
 import { SCHEDULER_DATABASE_URL } from "./scheduler-config.js";
 import { sweepReservations } from "./sweep-reservations.job.js";
+import { ShipmentTrackingService } from "../shipping/shipments/shipment-tracking.service.js";
+import { trackShipments } from "./track-shipments.job.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
 export const JOB_NAMES = [
@@ -28,6 +30,7 @@ export const JOB_NAMES = [
   "delete-carts",
   "delete-customer-sessions",
   "delete-abandoned-uploads",
+  "track-shipments",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -54,6 +57,7 @@ export class JobsRunner {
     @Inject(DomainEventHandlerRegistry) private readonly handlers: DomainEventHandlerRegistry,
     @Inject(MEDIA_STORAGE_PORT) private readonly mediaStorage: MediaStoragePort,
     @Inject(MEDIA_CONFIG) private readonly mediaConfig: MediaConfig,
+    @Inject(ShipmentTrackingService) private readonly shipmentTracking: ShipmentTrackingService,
     @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
   ) {
     this.leases = pgEventLeaseSource(databaseUrl);
@@ -62,7 +66,9 @@ export class JobsRunner {
   /**
    * Order, on purpose: the time-critical jobs first, so that nothing slow after them can delay them (ADR 0025): orders
    * (their expiry releases the reservations and writes `order.expired`), then the generic reservation sweep (which now
-   * only finds orphans), then the events (including the ones just written), then the four cleanups (the last one deletes files, so it goes last). Every job gets its
+   * only finds orphans), then the events (including the ones just written), then the four cleanups (the last one deletes
+   * files), then the carrier polls of job 8 (outbound network calls: after everything time-critical, so a slow carrier
+   * delays nothing else; the events it writes are delivered by the next tick). Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -116,6 +122,9 @@ export class JobsRunner {
         ABANDONED_UPLOAD_LIMITS,
         budget,
       ),
+    );
+    await run("track-shipments", (budget) =>
+      trackShipments({ tracking: this.shipmentTracking }, now, { budget }),
     );
     return reports;
   }

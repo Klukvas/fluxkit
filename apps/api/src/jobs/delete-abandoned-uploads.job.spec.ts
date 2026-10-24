@@ -504,7 +504,7 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
   });
 
   describe("through the application", () => {
-    it("is the seventh job of the runner: reported with its counts, and a saved URL of a deleted upload answers 400 upload_not_found", async () => {
+    it("is the seventh job of the runner (before job 8, the shipment tracking): reported with its counts, and a saved URL of a deleted upload answers 400 upload_not_found", async () => {
       const response = await fetch(`${media.baseUrl}/admin/media/uploads`, {
         method: "POST",
         headers: { "content-type": "application/octet-stream", "x-fluxkit-csrf": "1" },
@@ -527,7 +527,11 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
         ok: true,
         result: { deleted: 1, truncated: false, fileErrors: 0 },
       });
-      expect(reports.at(-1)?.name).toBe("delete-abandoned-uploads");
+      // Job 7 is the last cleanup; only the shipment tracking (job 8, outbound calls) runs after it.
+      expect(reports.map((entry) => entry.name).slice(-2)).toEqual([
+        "delete-abandoned-uploads",
+        "track-shipments",
+      ]);
       expect(await fileExists(pathOfKey(key))).toBe(false);
 
       const type = await http<{ id: string }>(media.baseUrl, "POST", "/admin/product-types", {

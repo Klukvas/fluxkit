@@ -14,6 +14,7 @@ import type {
   OrderContact,
   OrderPickupPoint,
   OrderStatus,
+  ShipmentStatus,
   ShippingMethodKind,
   ShippingPayer,
 } from "./types.js";
@@ -334,6 +335,8 @@ export interface AdminOrder {
   adjustments: AdminOrderAdjustment[];
   /** The shipping snapshot of the checkout; `null` for an order placed without a shipping method. */
   shipping: AdminOrderShipping | null;
+  /** The carrier waybills of the order, oldest first (at most one active). */
+  shipments: AdminShipment[];
   history: AdminOrderHistoryEntry[];
   placedAt: string;
   expiresAt: string;
@@ -358,6 +361,76 @@ export interface AdminOrderShipping {
   destination: OrderPickupPoint | null;
   providerService: string | null;
   title: Record<string, string>;
+}
+
+// ----------------------------------------------------------------- shipments
+
+export type ShipmentPayer = "sender" | "recipient";
+export type ShipmentActorType = "admin" | "system";
+
+export interface AdminShipmentHistoryEntry {
+  fromStatus: ShipmentStatus | null;
+  toStatus: ShipmentStatus;
+  /** The raw carrier code that caused the change; null for an admin action without a carrier answer. */
+  carrierStatusCode: string | null;
+  actorType: ShipmentActorType;
+  actorAdminId: string | null;
+  at: string;
+}
+
+/**
+ * A carrier waybill of an order (ADR 0029 decision 10). No recipient name or phone, no carrier text. `unknown`: the
+ * carrier's answer to the creation was lost; never create again, call `reconcileShipment`.
+ */
+export interface AdminShipment {
+  id: string;
+  status: ShipmentStatus;
+  providerCode: string;
+  providerService: string | null;
+  trackingNumber: string | null;
+  carrierStatusCode: string | null;
+  carrierStatusAt: string | null;
+  clientReference: string;
+  declaredValue: Money;
+  /** Informational, never charged. */
+  carrierCost: Money | null;
+  payer: ShipmentPayer;
+  weightGrams: number;
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+  seats: number;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  cancelledAt: string | null;
+  deliveredAt: string | null;
+  nextTrackAt: string | null;
+  history: AdminShipmentHistoryEntry[];
+}
+
+export interface AdminShipmentList {
+  items: AdminShipment[];
+}
+
+/** One parcel per waybill. The recipient is read from the order, never sent. */
+export interface CreateAdminShipmentBody {
+  weightGrams: number;
+  lengthMm: number;
+  widthMm: number;
+  heightMm: number;
+  /** Cargo description for the carrier; trimmed, 1 to 200 characters. */
+  description: string;
+  /** In the order currency; missing means the order subtotal. */
+  declaredValue?: Money;
+  /** Missing: `recipient` for a method paid on delivery, else `sender`. */
+  payer?: ShipmentPayer;
+}
+
+/** The answer of a create: `shipment.status` is `created`, `failed` (see `failure`) or `unknown` (reconcile it). */
+export interface AdminShipmentCreateResult {
+  shipment: AdminShipment;
+  failure: { reason: AdminShippingProviderFailureReason; providerCodes: string[] } | null;
 }
 
 export interface CancelAdminOrderBody {

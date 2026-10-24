@@ -67,6 +67,14 @@ export class PlacedOrders {
     );
     const ids = orders.rows.map((row) => row.id);
     await this.pool.query("delete from domain_event where aggregate_id = any($1::uuid[])", [ids]);
+    // A shipment RESTRICTs its order (and its journal goes with it by cascade); its events are keyed by the shipment id.
+    const shipments = await this.pool.query<{ id: string }>(
+      "delete from shipment where order_id = any($1::uuid[]) returning id",
+      [ids],
+    );
+    await this.pool.query("delete from domain_event where aggregate_id = any($1::uuid[])", [
+      shipments.rows.map((row) => row.id),
+    ]);
     await this.pool.query("delete from sales_order where id = any($1::uuid[])", [ids]);
     this.numbers.clear();
   }

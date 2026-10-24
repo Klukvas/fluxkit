@@ -177,6 +177,7 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
         shippingAddress: ADDRESS,
         billingAddress: null,
         shipping: null,
+        shipments: [],
         history: [{ status: "awaiting_payment", at: expect.any(String) }],
       });
 

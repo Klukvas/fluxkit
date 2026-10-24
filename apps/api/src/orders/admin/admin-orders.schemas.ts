@@ -12,6 +12,7 @@ import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
 import {
   addressOutput,
   adminOrderShippingSchema,
+  adminShipmentSchema,
   moneySchema,
   signedMoneySchema,
   statusSchema,
@@ -42,7 +43,7 @@ function hasControlCharacter(value: string): boolean {
 }
 
 /** A trimmed text of 1 to `max` characters without control characters. */
-function trimmedText(max: number) {
+export function trimmedText(max: number) {
   return z
     .string()
     .transform((value) => value.trim())
@@ -231,6 +232,9 @@ export const adminOrderSchema = z.object({
   shipping: adminOrderShippingSchema.nullable().meta({
     description:
       "The shipping snapshot of the checkout (ADR 0029); null for an order placed without a shipping method.",
+  }),
+  shipments: z.array(adminShipmentSchema).meta({
+    description: "The carrier waybills of the order, oldest first (at most one active).",
   }),
   history: z.array(
     z.object({

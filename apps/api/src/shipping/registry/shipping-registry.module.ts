@@ -2,6 +2,11 @@ import { Module, type DynamicModule } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import type { LoadedShippingProvider } from "./shipping-provider-loader.js";
 import {
+  DEFAULT_SHIPMENT_CALL_TIMEOUTS,
+  SHIPMENT_CALL_TIMEOUTS,
+  type ShipmentCallTimeouts,
+} from "./provider-timeouts.js";
+import {
   LOADED_SHIPPING_PROVIDER_CODES,
   ShippingProviderRegistry,
 } from "./shipping-provider-registry.js";
@@ -12,17 +17,22 @@ import {
  */
 @Module({})
 export class ShippingRegistryModule {
-  static register(providers: readonly LoadedShippingProvider[]): DynamicModule {
+  static register(
+    providers: readonly LoadedShippingProvider[],
+    timeouts: ShipmentCallTimeouts = DEFAULT_SHIPMENT_CALL_TIMEOUTS,
+  ): DynamicModule {
     return {
       module: ShippingRegistryModule,
-      // Global: the admin settings API and the later store and shipment modules read the registry without importing it.
+      // Global: the admin settings API, the store and the shipment module read the registry (and the shipment call
+      // timeouts) without importing it.
       global: true,
       imports: [DiscoveryModule, ...providers.map((provider) => provider.module)],
       providers: [
         { provide: LOADED_SHIPPING_PROVIDER_CODES, useValue: providers.map((p) => p.code) },
         ShippingProviderRegistry,
+        { provide: SHIPMENT_CALL_TIMEOUTS, useValue: timeouts },
       ],
-      exports: [ShippingProviderRegistry],
+      exports: [ShippingProviderRegistry, SHIPMENT_CALL_TIMEOUTS],
     };
   }
 }
