@@ -34,6 +34,19 @@ describe("the media routes in docs/api/openapi.json (ADR 0028)", () => {
       ).toBeDefined();
     }
     expect(operation?.responses["403"]?.description).toContain("application/octet-stream");
+    // Every reason of the upload's own 400 answers is named (output_too_large: step 9 review M-1).
+    for (const reason of [
+      "empty_file",
+      "unsupported_type",
+      "corrupt_image",
+      "animated_not_supported",
+      "dimensions_too_large",
+      "too_many_pixels",
+      "processing_timeout",
+      "output_too_large",
+    ]) {
+      expect(operation?.responses["400"]?.description, reason).toContain(reason);
+    }
     expect(operation?.responses["201"]?.content?.["application/json"]).toBeDefined();
   });
 

@@ -153,6 +153,18 @@ describe("GET and HEAD /media/{key} (real app, temp MEDIA_DIR)", () => {
     expect(result.body.toString(), path).not.toContain("root:");
   });
 
+  it("answers the bare /media and /media/ with the same 404: no-store and nosniff, GET and HEAD (step 9 review)", async () => {
+    for (const method of ["GET", "HEAD"]) {
+      for (const path of ["/media", "/media/", "/MEDIA", "/media?x=1"]) {
+        const result = await rawRequest(media.baseUrl, method, path, {});
+        expect(result.status, `${method} ${path}`).toBe(404);
+        expect(result.headers["cache-control"], `${method} ${path}`).toBe("no-store");
+        expect(result.headers["x-content-type-options"], `${method} ${path}`).toBe("nosniff");
+        expect(result.headers["set-cookie"], `${method} ${path}`).toBeUndefined();
+      }
+    }
+  });
+
   it("does not answer other methods", async () => {
     for (const method of ["POST", "PUT", "DELETE", "PATCH"]) {
       const result = await rawRequest(media.baseUrl, method, `/media/${jpegKey}`, {

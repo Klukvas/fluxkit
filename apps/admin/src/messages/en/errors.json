@@ -81,6 +81,7 @@
   "errors.reason.dimensions_too_large": "The image is too large: one side has too many pixels. Shrink it and upload it again.",
   "errors.reason.too_many_pixels": "The image has too many pixels in total. Shrink it and upload it again.",
   "errors.reason.processing_timeout": "The server could not process the image in time. Use a smaller image.",
+  "errors.reason.output_too_large": "After processing, the image would be larger than the server accepts. Save it as JPEG or WebP, or make it smaller, and upload it again.",
   "errors.reason.file_too_large": "The file is larger than the server accepts.",
   "errors.reason.length_required": "The browser did not send the size of the file, so the server refused it. Try again.",
   "errors.reason.upload_not_found": "This image was not uploaded to this shop (or is gone). Upload the file again.",

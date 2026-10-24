@@ -1,6 +1,7 @@
 /*
  * Reason and problem codes of the media upload (ADR 0028 decisions 3 and 5). Constants only; the API maps them to
- * `validation_failed` errors (`errors[].code`) and to problem codes. Do not add a code here without amending the ADR.
+ * `validation_failed` errors (`errors[].code`) and to problem codes. Do not add a code here without a recorded decision
+ * (ADR 0028, or a refinement recorded in docs/api/media.md and the plan, like `output_too_large` of the step 9 review).
  */
 
 /** `errors[].code` of a `validation_failed` answer about an upload or about a URL that names an upload. */
@@ -12,6 +13,7 @@ export const MEDIA_VALIDATION_REASONS = Object.freeze([
   "dimensions_too_large",
   "too_many_pixels",
   "processing_timeout",
+  "output_too_large",
   "length_required",
   "file_too_large",
   "upload_not_found",

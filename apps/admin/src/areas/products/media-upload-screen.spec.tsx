@@ -166,9 +166,11 @@ describe("Media tab while files upload", () => {
     ],
   });
 
-  it("disables the file input, Save, Add, and every row button; offers to cancel the waiting files", () => {
+  it("locks the file input (aria-disabled, never disabled: it keeps the focus), disables Save, Add, and every row button; offers to cancel the waiting files", () => {
     const html = view({ upload: running });
-    expect(isDisabled(fileInputs(html)[0] as string)).toBe(true);
+    // A disabled input would drop the keyboard focus to <body> (step 9 review L-1).
+    expect(isDisabled(fileInputs(html)[0] as string)).toBe(false);
+    expect(fileInputs(html)[0]).toContain('aria-disabled="true"');
     const submit = buttons(html).filter((button) => button.includes('type="submit"'));
     expect(submit).toHaveLength(1);
     expect(isDisabled(submit[0] as string)).toBe(true);

@@ -15,6 +15,7 @@ const DETAIL: Readonly<Record<MediaValidationReason, string>> = {
   dimensions_too_large: "The image is too large: at most 12000 pixels per side.",
   too_many_pixels: "The image has too many pixels.",
   processing_timeout: "The image took too long to process.",
+  output_too_large: "The processed image would be larger than the upload limit.",
   length_required: "The upload must send Content-Length (no chunked transfer).",
   file_too_large: "The file is larger than the upload limit.",
   upload_not_found: "This media URL names no uploaded file.",

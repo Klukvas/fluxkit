@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { MEDIA_PROBLEM_CODES, MEDIA_VALIDATION_REASONS } from "./reasons.js";
 
 describe("media reason codes (ADR 0028 decision 3 and 5)", () => {
-  it("lists exactly the validation reasons of the ADR", () => {
+  it("lists exactly the validation reasons of the ADR, plus output_too_large (step 9 review M-1)", () => {
     expect([...MEDIA_VALIDATION_REASONS].sort()).toEqual(
       [
         "animated_not_supported",
@@ -11,6 +11,7 @@ describe("media reason codes (ADR 0028 decision 3 and 5)", () => {
         "empty_file",
         "file_too_large",
         "length_required",
+        "output_too_large",
         "processing_timeout",
         "too_many_pixels",
         "unsupported_type",

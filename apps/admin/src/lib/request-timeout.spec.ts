@@ -9,10 +9,10 @@ import {
 } from "./request-timeout";
 
 describe("timeouts", () => {
-  it("bounds reads (15 s) shorter than writes (30 s) and writes shorter than an image upload (60 s)", () => {
+  it("bounds reads (15 s) shorter than writes (30 s) and writes shorter than an image upload (120 s)", () => {
     expect(BROWSER_READ_TIMEOUT_MS).toBe(15_000);
     expect(BROWSER_WRITE_TIMEOUT_MS).toBe(30_000);
-    expect(BROWSER_UPLOAD_TIMEOUT_MS).toBe(60_000);
+    expect(BROWSER_UPLOAD_TIMEOUT_MS).toBe(120_000);
   });
 });
 
