@@ -40,6 +40,11 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "shipment_status_change",
+      "shipment",
+      "order_shipping",
+      "shipping_provider_setting",
+      "shipping_method",
       "media_upload",
       "domain_event",
       "order_item_reservation",
@@ -78,6 +83,8 @@ describe("catalog schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop function if exists "shipment_status_change_append_only"()');
+    await pool.query('drop function if exists "order_shipping_immutable"()');
     await pool.query('drop function if exists "order_status_change_append_only"()');
     await pool.query('drop function if exists "order_adjustment_append_only"()');
     await pool.query('drop function if exists "order_item_immutable"()');
@@ -1424,7 +1431,8 @@ describe("catalog schema (real Postgres)", () => {
           'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
-          'media_upload'
+          'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
+          'shipment_status_change'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1446,7 +1454,8 @@ describe("catalog schema (real Postgres)", () => {
           'price', 'location', 'inventory_level', 'stock_movement', 'reservation',
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
-          'media_upload'
+          'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
+          'shipment_status_change'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.
