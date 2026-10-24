@@ -1,6 +1,6 @@
 # API: checkout and orders
 
-Placing an order (`POST /store/checkout`), the guest's own order (`/store/orders/*`), the signed-in customer's orders (`/store/account/orders*`) and the order domain service behind them (status transitions, payment, cancellation, expiry). Plan steps 5b and 6 of `docs/plans/2026-10-17-cart-and-orders.md`; decisions in `docs/adr/0015-cart-and-checkout.md`, `0017-orders.md`, `0018-scheduler-domain-events-and-ports.md`, `0019-orders-schema.md`, `0020-variants-with-order-lines-are-not-deleted.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: orders are core. The admin order routes (`/admin/orders*`, plan step 6) are described under "Admin endpoints" below. **Not built yet:** payment and shipping providers (an order stays `awaiting_payment` until an admin marks it paid or it expires). The scheduler that expires orders is `docs/api/jobs.md`; the events and ports are `docs/contracts/events.md`.
+Placing an order (`POST /store/checkout`), the guest's own order (`/store/orders/*`), the signed-in customer's orders (`/store/account/orders*`) and the order domain service behind them (status transitions, payment, cancellation, expiry). Plan steps 5b and 6 of `docs/plans/2026-10-17-cart-and-orders.md`; decisions in `docs/adr/0015-cart-and-checkout.md`, `0017-orders.md`, `0018-scheduler-domain-events-and-ports.md`, `0019-orders-schema.md`, `0020-variants-with-order-lines-are-not-deleted.md`. Source of truth for routes and schemas: `docs/api/openapi.json`. No feature flag: orders are core. The admin order routes (`/admin/orders*`, plan step 6) are described under "Admin endpoints" below. **Not built yet:** payment providers and shipments (an order stays `awaiting_payment` until an admin marks it paid or it expires). Shipping methods at checkout exist (`docs/api/shipping.md`, shipping plan step 6). The scheduler that expires orders is `docs/api/jobs.md`; the events and ports are `docs/contracts/events.md`.
 
 Every route sends `Cache-Control: no-store` (errors included). Every `POST` needs `X-Fluxkit-CSRF: 1` and a JSON content type (otherwise `403 forbidden`, before anything else). Money is `{amount, currency}` in minor units of the shop currency (ADR 0011). Texts of an order are resolved to `?locale` (one of `LOCALES`, else `400`), by default the locale the order was placed in (or the default locale if that one is no longer configured), with the usual per-field fallback; the stored snapshot keeps every locale.
 
@@ -8,7 +8,7 @@ Every route sends `Cache-Control: no-store` (errors included). Every `POST` need
 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
-| `POST /store/checkout` | public (a signed-in customer's cart follows the session, everyone else's the `fluxkit_cart` cookie) | Place the order of the cart | header `Idempotency-Key` (a UUID per attempt); body below | `201 {order, accessToken?}`; `200` for a replay of the same checkout (below). `accessToken` only for guests | `400 validation_failed` (fields, `idempotency_key_required`, `invalid_idempotency_key`, `shipping_address_required`), `409` `cart_empty`, `cart_changed` (`cart` in the body), `checkout_refused` (`errors[]`), `idempotency_key_reused`, `too_many_open_orders` (below), `rule_violation` `subtotal_out_of_range`, `429` (limit `checkout`), `503` (below) |
+| `POST /store/checkout` | public (a signed-in customer's cart follows the session, everyone else's the `fluxkit_cart` cookie) | Place the order of the cart | header `Idempotency-Key` (a UUID per attempt); body below | `201 {order, accessToken?}`; `200` for a replay of the same checkout (below). `accessToken` only for guests | `400 validation_failed` (fields, `idempotency_key_required`, `invalid_idempotency_key`, `shipping_address_required`, the shipping member's codes in `docs/api/shipping.md`), `400 shipping_method_required`, `400 shipping_not_applicable`, `409` `cart_empty`, `cart_changed` (`cart` in the body), `shipping_changed` (`shipping` in the body), `checkout_refused` (`errors[]`), `idempotency_key_reused`, `too_many_open_orders` (below), `rule_violation` `subtotal_out_of_range` (and, with shipping, the order total range rule), `429` (limit `checkout`), `503` (below; `shipping_provider_unavailable` for a pickup point that cannot be resolved) |
 | `POST /store/orders/lookup` | guest token | Read one guest order | `?locale`; body `{number, accessToken}` (strict) | `200` order | `400`, `404` for any mismatch (below), `429` (limit `orderLookup`) |
 | `POST /store/orders/cancel` | guest token | Cancel an unpaid guest order | `?locale`; body `{number, accessToken}` | `200` order (status `cancelled`) | `400`, `404` as the lookup, `409 rule_violation` `invalid_transition` (not `awaiting_payment`), `429` (limit `guestCancel`) |
 | `GET /store/account/orders` | customer | Own orders, newest first | `?limit` (1 to 100, default 24), `?offset`, `?locale` | `200 {items: [summary], total, limit, offset}` | `400`, `401` |
@@ -23,13 +23,15 @@ Body (strict; an unknown field is `400 unknown_field`; there is no field for a c
 
 ```
 { email?, phone, firstName, lastName, shippingAddress?, billingAddress?, locale?,
+  shipping?: {methodCode, pickupPointRef?},
   expectedTotal: {amount, currency} }
 ```
 
 - `email`: required for a guest, normalized like admin emails; a signed-in customer may omit it (the account email is used). Never verified. `phone`: optional leading `+`, 7 to 15 digits (spaces, dashes, dots and parentheses allowed), stored as `+digits` or `digits`. `firstName`, `lastName`: 1 to 100 characters. Addresses: `{countryCode (two upper-case letters), region?, city, postalCode?, line1, line2?, recipientFirstName?, recipientLastName?, recipientPhone?}`, `null` means not sent. All content rules are the core rules (`packages/core/src/orders/contact.ts`); every error is reported at once with its path (`shippingAddress.city`, `expectedTotal.amount`, ...).
 - `shippingAddress` is required when any line's product type ships physical goods (`product_type.requires_shipping`); an order of digital goods only needs none (it is stored when sent). Checked after the cart is priced, so a changed cart (`cart_changed`) is answered first.
 - `locale`: one of the configured locales, stored on the order; default `DEFAULT_LOCALE`.
-- `expectedTotal`: the total the shopper saw. A **consent check, never a price**: the server prices the cart itself with core (`priceCart`, `buildOrderLine`, `computeOrderTotals`). A different total, or a line that is unavailable (product unpublished, variant off or without a shop price, or deleted meanwhile), answers `409 cart_changed` with `cart`, the cart exactly as `GET /store/cart` shows it now, and nothing is reserved.
+- `shipping` (shipping plan step 6, ADR 0029 decision 4): the delivery method of `GET /store/shipping/options`. Required (`400 shipping_method_required`) when the cart ships goods AND the shop has at least one active method; refused (`400 shipping_not_applicable`) for a cart that ships nothing. **A shop with no active method keeps the checkout described here unchanged** (no member, shipping 0). Every rule (kinds, pickup points, the address, `409 shipping_changed`, `503 shipping_provider_unavailable`, the snapshot and the shipping adjustment) is in `docs/api/shipping.md`, "The checkout's shipping member". This tightens the validation once a method is active (pre-1.0, `CHANGELOG.md`).
+- `expectedTotal`: the total the shopper saw; with a method, the option's `total` (subtotal plus shipping), which the server computed. A **consent check, never a price**: the server prices the cart itself with core (`priceCart`, `buildOrderLine`, `computeOrderTotals`). A different total, or a line that is unavailable (product unpublished, variant off or without a shop price, or deleted meanwhile), answers `409 cart_changed` with `cart`, the cart exactly as `GET /store/cart` shows it now, and nothing is reserved.
 
 One transaction, all or nothing, lock order **customer row (customers only, `FOR KEY SHARE`) -> cart row `FOR UPDATE` -> advisory lock on the guest email (guests only) -> product rows `FOR SHARE` -> variant rows `FOR SHARE` -> inventory level rows `FOR UPDATE`** (each pass sorted by id), then the inserts:
 
@@ -45,7 +47,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
 
 ### Idempotency
 
-`Idempotency-Key` is required (a UUID, stored lower-case on the order, unique) and kept as long as the order. The order stores a SHA-256 **fingerprint** of the normalized request (email, phone, names, addresses, locale, `expectedTotal`) plus the id of the cart it was made from. Compared in constant time.
+`Idempotency-Key` is required (a UUID, stored lower-case on the order, unique) and kept as long as the order. The order stores a SHA-256 **fingerprint** of the normalized request (email, phone, names, addresses, locale, `expectedTotal`, the `shipping` member) plus the id of the cart it was made from. Compared in constant time. Fingerprint version 2 (shipping plan step 6) added `shipping`: a replay of an order placed before that release answers `idempotency_key_reused`. A replay never prices again and never calls a shipping provider.
 
 - Same key, same fingerprint, same principal and the cart still reachable: `200` with the same order (its current status). A guest gets the **SAME access token** as in the first answer (it is derived from the order id and the key, ADR 0023: nothing is rotated and both answers of a double submit work); the access window is renewed to `ORDER_GUEST_ACCESS_DAYS` from now. A replay changes nothing else: no new reservation, journal row or event, and the cart is not touched.
 - Anything else with that key (another body, another cart, a lost cart cookie, a customer using a guest's key or the other way round) is the same `409 idempotency_key_reused`, which never says which part differed and never returns an order or a token. The cart id in the fingerprint is on purpose: only whoever can still reach the cart can obtain the token again.
@@ -64,10 +66,12 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
   subtotal, shippingTotal, discountTotal, taxTotal, total,
   adjustments: [{kind, code, label, amount, includedInPrice}],
   contact: {email, phone, firstName, lastName}, shippingAddress | null, billingAddress | null,
+  shipping: {methodCode, kind, title, providerCode | null, amount, payer, estimatedCarrierAmount | null,
+             destination: {providerRef, number, kind, cityRef, cityName, description} | null} | null,
   history: [{status, at}] }
 ```
 
-`summary` (list) is `{number, status, placedAt, expiresAt, total, itemCount}` (`itemCount` = units over all lines). No adjustments exist yet, so `shippingTotal`, `discountTotal` and `taxTotal` are 0 and `total` equals `subtotal`; with `PRICES_INCLUDE_TAX=false` no tax is added either (docs warn: tax is not charged until a tax plan exists). Never in a response: ids of orders, items, products, variants, customers or reservations, reservation or stock information, the acting admin, token hashes, the idempotency key, the fingerprint. The reads issue a fixed number of statements whatever the number of lines or orders (tested).
+`summary` (list) is `{number, status, placedAt, expiresAt, total, itemCount}` (`itemCount` = units over all lines). `shipping` is the immutable shipping snapshot of an order placed with a method (title in the read's locale; `destination` only for a pickup point; `payer` is the recipient for a method paid to the carrier on delivery, then `amount` is 0), `null` otherwise; its amount is also the one shipping adjustment and `shippingTotal`. The only adjustment that exists is that shipping line, so `discountTotal` and `taxTotal` are 0 and `total` equals `subtotal` plus `shippingTotal`; with `PRICES_INCLUDE_TAX=false` no tax is added either (docs warn: tax is not charged until a tax plan exists). Never in a response: ids of orders, items, products, variants, customers or reservations, reservation or stock information, the acting admin, token hashes, the idempotency key, the fingerprint. The reads issue a fixed number of statements whatever the number of lines or orders (tested).
 
 ## Statuses and transitions (ADR 0017)
 
@@ -120,11 +124,13 @@ All need an admin session; the permission is the default pair of the controller 
            quantity, lineTotal, requiresShipping, reservations: [{status, quantity}]}],
   subtotal, shippingTotal, discountTotal, taxTotal, total,
   adjustments: [{kind, code, label {locale: text}, amount, includedInPrice, source | null}],
+  shipping: {methodId | null, methodCode, kind, providerCode | null, providerService | null, title {locale: text},
+             amount, payer, estimatedCarrierAmount | null, destination | null} | null,
   history: [{fromStatus | null, toStatus, actorType, actorAdminId | null, reason | null, at}],
   placedAt, expiresAt, paidAt, fulfilledAt, cancelledAt, expiredAt, cancellationReason, paymentReference }
 ```
 
-Texts are the full locale maps of the snapshot (an admin sees every translation). `isGuest` is true for an order placed without an account (an order whose customer account was deleted afterwards has `customerId: null` and `isGuest: false`). A line's `reservations` show the status (`active`, `committed`, `released`, `expired`) and the quantity only. Never in the view, in a list, in a plugin's hands or in a log: the guest access token or its hash, the idempotency key, the request fingerprint, reservation ids, locations and stock figures. The view is read in one repeatable-read, read-only transaction (a consistent snapshot) with a fixed number of statements whatever the number of lines (tested: 1 and 20 lines; the list issues the same number for 1 and 50 orders).
+Texts are the full locale maps of the snapshot (an admin sees every translation). `shipping` is the order's shipping snapshot (shipping plan step 6; `methodId` becomes `null` once the method is deleted, the rest never changes), `null` for an order without a method; the shipments of plan step 8 are not in the view yet. `isGuest` is true for an order placed without an account (an order whose customer account was deleted afterwards has `customerId: null` and `isGuest: false`). A line's `reservations` show the status (`active`, `committed`, `released`, `expired`) and the quantity only. Never in the view, in a list, in a plugin's hands or in a log: the guest access token or its hash, the idempotency key, the request fingerprint, reservation ids, locations and stock figures. The view is read in one repeatable-read, read-only transaction (a consistent snapshot) with a fixed number of statements whatever the number of lines (tested: 1 and 20 lines; the list issues the same number for 1 and 50 orders).
 
 Rules of the actions (all through `OrdersService`, which locks the order row first, so a payment, a cancellation and the expiry job on one order have exactly one winner; tested with many rounds, also from two API instances):
 
@@ -134,6 +140,8 @@ Rules of the actions (all through `OrdersService`, which locks the order row fir
 - Every change writes one journal row (`from`, `to`, `actor_type = admin`, `actor_admin_id`, `reason`) and one outbox event (`order.cancelled`, `order.paid`, `order.fulfilled`; ids and the order number only). A refused action writes nothing.
 
 ## Problem codes of this step (additive)
+
+Shipping (shipping plan step 6, `docs/api/shipping.md`): `400` `shipping_method_required`, `shipping_not_applicable`; `409` `shipping_changed` (`shipping` member); `503` `shipping_provider_unavailable` with `Retry-After`.
 
 `409` `cart_empty`, `cart_changed` (`cart` member), `checkout_refused` (`errors[]` per line), `idempotency_key_reused`, `too_many_open_orders`; `503` `service_unavailable`; `rule_violation` rules `invalid_transition` (owner and admin cancel, mark-paid, mark-fulfilled), `subtotal_out_of_range`, and for the admin routes `order_not_payable`, `amount_mismatch`, `payment_reference_conflict` and `awaiting_stock`.
 
