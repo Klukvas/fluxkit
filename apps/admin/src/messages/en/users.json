@@ -12,6 +12,7 @@
   "user.permission.orders.write": "Mark orders paid or fulfilled, and cancel orders",
   "user.permission.customers.read": "See customer accounts",
   "user.permission.customers.write": "Deactivate, activate and unlock customer accounts",
+  "user.permission.shipping.manage": "Manage shipping methods, rates and carrier settings",
   "user.password.hint": "{min} to {max} characters, not the user's email address. No other rules.",
   "user.password.met": "Met:",
   "user.password.notMet": "Not met:",
