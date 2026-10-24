@@ -8,6 +8,7 @@ export const PERMISSIONS = Object.freeze([
   "orders.write",
   "customers.read",
   "customers.write",
+  "shipping.manage",
 ] as const);
 
 export type AdminRole = (typeof ROLES)[number];
@@ -15,6 +16,7 @@ export type AdminPermission = (typeof PERMISSIONS)[number];
 
 // Fixed in code on purpose (ADR 0009): a new role is a code change plus a test, not data.
 // Orders and customers hold personal data, so the viewer gets neither (ADR 0017); the manager gets all four.
+// Shipping settings (methods, rates, provider profiles) are shop configuration: owner and manager, not the viewer (ADR 0029 decision 13).
 export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermission[]>> =
   Object.freeze({
     owner: Object.freeze([...PERMISSIONS]),
@@ -26,6 +28,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermissi
       "orders.write",
       "customers.read",
       "customers.write",
+      "shipping.manage",
     ] as const),
     viewer: Object.freeze(["catalog.read"] as const),
   });

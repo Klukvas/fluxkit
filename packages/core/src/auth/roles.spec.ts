@@ -21,6 +21,7 @@ describe("role table", () => {
       "orders.write",
       "customers.read",
       "customers.write",
+      "shipping.manage",
     ]);
   });
 
@@ -34,6 +35,7 @@ describe("role table", () => {
       "orders.write",
       "customers.read",
       "customers.write",
+      "shipping.manage",
     ]);
     expect([...ROLE_PERMISSIONS.viewer]).toEqual(["catalog.read"]);
   });
@@ -104,6 +106,7 @@ describe("hasPermission", () => {
       "orders.write",
       "customers.read",
       "customers.write",
+      "shipping.manage",
     ],
     manager: [
       "catalog.read",
@@ -113,6 +116,7 @@ describe("hasPermission", () => {
       "orders.write",
       "customers.read",
       "customers.write",
+      "shipping.manage",
     ],
     viewer: ["catalog.read"],
   };
@@ -183,6 +187,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "orders.write": true,
       "customers.read": true,
       "customers.write": true,
+      "shipping.manage": true,
     },
     manager: {
       "catalog.read": true,
@@ -193,6 +198,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "orders.write": true,
       "customers.read": true,
       "customers.write": true,
+      "shipping.manage": true,
     },
     viewer: {
       "catalog.read": true,
@@ -203,12 +209,13 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "orders.write": false,
       "customers.read": false,
       "customers.write": false,
+      "shipping.manage": false,
     },
   } as const;
 
   const personalData = ["orders.read", "orders.write", "customers.read", "customers.write"];
 
-  it("lists exactly the eight permissions of the matrix", () => {
+  it("lists exactly the nine permissions of the matrix", () => {
     expect([...PERMISSIONS].sort()).toEqual(Object.keys(matrix.owner).sort());
   });
 
@@ -220,6 +227,12 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
         );
       }
     }
+  });
+
+  it("gives shipping.manage to the owner and the manager, never to the viewer (ADR 0029 decision 13)", () => {
+    expect(hasPermission("owner", "shipping.manage")).toBe(true);
+    expect(hasPermission("manager", "shipping.manage")).toBe(true);
+    expect(hasPermission("viewer", "shipping.manage")).toBe(false);
   });
 
   it("keeps personal data away from the viewer: no order and no customer permission", () => {
@@ -234,8 +247,8 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       expect(hasPermission("manager", permission), permission).toBe(true);
       expect(hasPermission("owner", permission), permission).toBe(true);
     }
-    expect(permissionsOf("owner")).toHaveLength(8);
-    expect(permissionsOf("manager")).toHaveLength(7);
+    expect(permissionsOf("owner")).toHaveLength(9);
+    expect(permissionsOf("manager")).toHaveLength(8);
   });
 
   it("recognizes the new names as permissions and nothing close to them", () => {
