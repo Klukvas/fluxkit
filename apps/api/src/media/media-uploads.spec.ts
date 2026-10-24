@@ -556,9 +556,10 @@ describe("upload limits that need their own app", () => {
     // it has stopped, or more decodes than slots could run at once. Sampled until libvips is idle again.
     const unheld: string[] = [];
     const sampler = setInterval(() => {
-      const { queue, process } = sharp.counters();
-      if (queue + process > slots.inUse)
-        unheld.push(`${queue + process} tasks, ${slots.inUse} slots`);
+      // Only `process` (tasks running now): sharp moves a task from `queue` to `process` in two steps on two threads, so a
+      // sample can briefly count one task in both and `queue + process` flaked about once in six runs.
+      const { process } = sharp.counters();
+      if (process > slots.inUse) unheld.push(`${process} tasks, ${slots.inUse} slots`);
     }, 1);
     let result: Answer<ProblemBody>;
     try {
