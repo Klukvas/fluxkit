@@ -30,7 +30,13 @@ import { OrdersModule } from "./orders/orders.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
-import { ShippingRegistryModule, type LoadedShippingProvider } from "./shipping/registry/index.js";
+import {
+  DEFAULT_SHIPMENT_CALL_TIMEOUTS,
+  ShippingRegistryModule,
+  type LoadedShippingProvider,
+  type ShipmentCallTimeouts,
+} from "./shipping/registry/index.js";
+import { ShipmentsModule } from "./shipping/shipments/shipments.module.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
@@ -52,6 +58,8 @@ export interface AppModuleOptions {
   scheduler?: SchedulerConfig;
   /** Defaults to uploads switched off (a caller without an environment needs no media directory); the API passes `MEDIA_*`. */
   media?: MediaConfig;
+  /** Tests only: shorter limits for the shipment provider calls (default `DEFAULT_SHIPMENT_CALL_TIMEOUTS`). */
+  shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
   rateLimits?: RateLimitOverrides;
   /** Tests only: replaces the session-based authenticator. */
@@ -95,8 +103,12 @@ export class AppModule {
           config: options.scheduler ?? DISABLED_SCHEDULER_CONFIG,
           databaseUrl: options.databaseUrl,
         }),
-        ShippingRegistryModule.register(options.shippingProviders ?? []),
+        ShippingRegistryModule.register(options.shippingProviders ?? [], {
+          ...DEFAULT_SHIPMENT_CALL_TIMEOUTS,
+          ...options.shipmentCallTimeouts,
+        }),
         ShippingAdminModule,
+        ShipmentsModule,
         ...options.features.map((feature) => feature.module),
       ],
     };

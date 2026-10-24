@@ -7,6 +7,8 @@ export interface OperationResponseSpec {
   successStatuses: readonly number[];
   /** `METHOD /path/template`, used in error messages. Never include a filled URL or a body. */
   context: string;
+  /** `pdf`: a success carries `application/pdf` and is handed out as a `Blob` (the shipment label). Default `json`. */
+  responseKind?: "json" | "pdf";
 }
 
 export interface StoreSuccess<T> {
@@ -79,6 +81,15 @@ export async function parseResponse<T>(
 
   if (spec.successStatuses.includes(status)) {
     if (status === 204) return { ok: true, status, data: undefined as T };
+    if (spec.responseKind === "pdf") {
+      // The one file answer: anything but a PDF (an HTML error page of a proxy) is not handed out as the file.
+      if (mediaType(response) !== "application/pdf") {
+        throw new InvalidResponseError(`${spec.context}: status ${status} without a PDF body.`, {
+          status,
+        });
+      }
+      return { ok: true, status, data: (await response.blob()) as T };
+    }
     if (mediaType(response) !== "application/json") {
       throw new InvalidResponseError(`${spec.context}: status ${status} without a JSON body.`, {
         status,

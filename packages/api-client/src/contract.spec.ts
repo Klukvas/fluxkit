@@ -19,6 +19,7 @@ import type {
   LoginBody,
   Money,
   Order,
+  OrderShipment,
   OrderAccessBody,
   OrderList,
   ProblemDetails,
@@ -246,6 +247,33 @@ const shippingPickupPointPage: Shape<ShippingPickupPointPage> = lookupPage({
   },
 });
 
+const shipmentStatus = {
+  enum: [
+    "pending",
+    "unknown",
+    "created",
+    "in_transit",
+    "arrived",
+    "delivered",
+    "returning",
+    "returned",
+    "cancelled",
+    "failed",
+  ],
+} as const;
+
+const orderShipment: Shape<OrderShipment> = {
+  object: {
+    providerCode: "string",
+    trackingNumber: "string",
+    status: shipmentStatus,
+    createdAt: "string",
+    updatedAt: "string",
+    deliveredAt: { nullable: "string" },
+    cancelledAt: { nullable: "string" },
+  },
+};
+
 const order: Shape<Order> = {
   object: {
     number: "string",
@@ -290,6 +318,7 @@ const order: Shape<Order> = {
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
     shipping: orderShipping,
+    shipments: { array: orderShipment },
     history: { array: { object: { status: orderStatus, at: "string" } } },
   },
 };
@@ -490,6 +519,10 @@ const problemDetails: Shape<ProblemDetails> = {
     rule: { optional: "string" },
     cart: { optional: cart },
     shipping: { optional: shippingChanged },
+    reason: {
+      optional: { enum: ["unavailable", "rejected", "invalid_credentials", "not_supported"] },
+    },
+    providerCodes: { optional: { array: "string" } },
   },
 };
 

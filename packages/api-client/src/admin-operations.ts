@@ -9,6 +9,9 @@ export type AdminOperationPermission = AdminPermission | "authenticated" | "publ
 
 export type AdminBodyKind = "none" | "json" | "binary";
 
+/** What a success answer carries: JSON (every operation but one), or a PDF file (the shipment label, ADR 0029). */
+export type AdminResponseKind = "json" | "pdf";
+
 /** One row per operation of the admin API: `docs/api/openapi.json`, every path under `/admin`. */
 export interface AdminOperationSpec {
   method: HttpMethod;
@@ -27,6 +30,8 @@ export interface AdminOperationSpec {
   bodyKind: AdminBodyKind;
   /** Query parameter names the document lists. */
   query: readonly string[];
+  /** `pdf`: the success body is the raw file (`application/pdf`), handed out as a `Blob`; `json` otherwise. */
+  responseKind: AdminResponseKind;
 }
 
 interface OperationRow<
@@ -62,7 +67,7 @@ function operation<
   path: Path,
   successStatuses: Statuses,
   permission: Permission,
-  options: { body: Kind; query?: Query },
+  options: { body: Kind; query?: Query; response?: AdminResponseKind },
 ): OperationRow<Method, Path, Statuses, Permission, Kind, Query>;
 function operation<
   const Method extends HttpMethod,
@@ -75,14 +80,14 @@ function operation<
   path: Path,
   successStatuses: Statuses,
   permission: Permission,
-  options?: { query?: Query },
+  options?: { query?: Query; response?: AdminResponseKind },
 ): OperationRow<Method, Path, Statuses, Permission, "none", Query>;
 function operation(
   method: HttpMethod,
   path: string,
   successStatuses: readonly number[],
   permission: AdminOperationPermission,
-  options: { body?: AdminBodyKind; query?: readonly string[] } = {},
+  options: { body?: AdminBodyKind; query?: readonly string[]; response?: AdminResponseKind } = {},
 ): AdminOperationSpec {
   const bodyKind = options.body ?? "none";
   return {
@@ -93,6 +98,7 @@ function operation(
     hasBody: bodyKind !== "none",
     bodyKind,
     query: options.query ?? [],
+    responseKind: options.response ?? "json",
   };
 }
 
@@ -169,6 +175,37 @@ export const ADMIN_OPERATIONS = {
   markOrderPaid: operation("POST", "/admin/orders/{id}/mark-paid", [200], "orders.write", {
     body: "json",
   }),
+  listShipments: operation("GET", "/admin/orders/{id}/shipments", [200], "orders.read"),
+  /** A carrier write: never retried. A `shipment.status` of `unknown` is settled with `reconcileShipment`. */
+  createShipment: operation("POST", "/admin/orders/{id}/shipments", [201], "orders.write", {
+    body: "json",
+  }),
+  reconcileShipment: operation(
+    "POST",
+    "/admin/orders/{id}/shipments/{shipmentId}/reconcile",
+    [200],
+    "orders.write",
+  ),
+  cancelShipment: operation(
+    "POST",
+    "/admin/orders/{id}/shipments/{shipmentId}/cancel",
+    [200],
+    "orders.write",
+  ),
+  refreshShipment: operation(
+    "POST",
+    "/admin/orders/{id}/shipments/{shipmentId}/refresh",
+    [200],
+    "orders.write",
+  ),
+  /** The only file answer: the label PDF (`application/pdf`), a `Blob` in the result. */
+  getShipmentLabel: operation(
+    "GET",
+    "/admin/orders/{id}/shipments/{shipmentId}/label",
+    [200],
+    "orders.read",
+    { response: "pdf" },
+  ),
   markOrderFulfilled: operation("POST", "/admin/orders/{id}/mark-fulfilled", [200], "orders.write"),
   createAttribute: operation("POST", "/admin/attributes", [201], "catalog.write", {
     body: "json",

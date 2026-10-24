@@ -70,6 +70,13 @@ const ORDERS_ROUTES = [
   "POST /admin/orders/:id/cancel",
   "POST /admin/orders/:id/mark-paid",
   "POST /admin/orders/:id/mark-fulfilled",
+  // Shipments (ADR 0029 decision 10): the same pair on their own controller, never `shipping.manage`.
+  "GET /admin/orders/:id/shipments",
+  "POST /admin/orders/:id/shipments",
+  "POST /admin/orders/:id/shipments/:shipmentId/reconcile",
+  "POST /admin/orders/:id/shipments/:shipmentId/cancel",
+  "POST /admin/orders/:id/shipments/:shipmentId/refresh",
+  "GET /admin/orders/:id/shipments/:shipmentId/label",
 ];
 
 /** Shipping settings: declared once on the controllers with their own default pair (`shipping.manage` for reads and writes). */

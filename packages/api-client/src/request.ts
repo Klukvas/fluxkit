@@ -41,6 +41,8 @@ export interface RequestInput {
   signal?: AbortSignal;
   /** Passed to `fetch` first (for example Next's `{ next: { revalidate: 60 } }`); never replaces method, headers, body or credentials. */
   fetchOptions?: Readonly<Record<string, unknown>>;
+  /** `pdf`: the operation answers a PDF file on success (`Accept` names it first). Default `json`. */
+  responseKind?: "json" | "pdf";
 }
 
 export interface BuiltRequest {
@@ -118,7 +120,12 @@ export function buildRequest(input: RequestInput): BuiltRequest {
 
   const headers = new Headers();
   for (const [name, value] of Object.entries(input.headers ?? {})) headers.set(name, value);
-  headers.set("Accept", "application/json, application/problem+json");
+  headers.set(
+    "Accept",
+    input.responseKind === "pdf"
+      ? "application/pdf, application/problem+json"
+      : "application/json, application/problem+json",
+  );
   if (!isSafe) headers.set(CSRF_HEADER, CSRF_HEADER_VALUE);
   else headers.delete(CSRF_HEADER);
   if (input.rawBody !== undefined) headers.set("Content-Type", input.rawBody.contentType);

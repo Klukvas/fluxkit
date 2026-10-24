@@ -4,7 +4,7 @@ import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
-import type { LoadedShippingProvider } from "../shipping/registry/index.js";
+import type { LoadedShippingProvider, ShipmentCallTimeouts } from "../shipping/registry/index.js";
 import type { MediaTuning } from "../media/media-config.js";
 import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
 import { AllowAllAdminAuthenticator } from "./allow-all-admin-authenticator.js";
@@ -40,6 +40,8 @@ export interface StartAppOptions {
   clock?: Clock;
   /** Shipping provider modules mounted as if enabled, for example `testShippingProviders()` (no package under packages/providers is read). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Shorter limits for the shipment provider calls, so a hanging carrier times out quickly in a spec. */
+  shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Extra modules loaded like enabled features, for probe controllers. */
   extraFeatures?: LoadedFeature[];
   adminCookieSecure?: boolean;
@@ -127,6 +129,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       scrypt: TEST_SCRYPT_PARAMS,
       extraFeatures: options.extraFeatures,
       extraShippingProviders: options.extraShippingProviders,
+      shipmentCallTimeouts: options.shipmentCallTimeouts,
       mediaTuning: options.mediaTuning,
     },
   );

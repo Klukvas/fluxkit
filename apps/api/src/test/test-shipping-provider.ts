@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { Injectable, Module, SetMetadata, type Type } from "@nestjs/common";
 import {
   providerFailure,
   providerOk,
   SHIPPING_PROVIDER_METADATA,
   shippingProviderMetadata,
+  type CarrierReportedShipmentStatus,
   type CityResult,
   type EstimateRequest,
   type Money,
@@ -12,12 +14,19 @@ import {
   type ProviderAbortSignal,
   type ProviderFailureReason,
   type ProviderResult,
+  type ShippingCapabilities,
   type ShippingProviderPort,
+  type TrackingUpdate,
+  type WaybillCreated,
+  type WaybillRequest,
 } from "@fluxkit/core";
 import type { LoadedShippingProvider } from "../shipping/registry/index.js";
 
 /** Code of the in-repo test provider. Specs mount it with `startApp({ extraShippingProviders: testShippingProviders() })`. */
 export const TEST_PROVIDER_CODE = "fake";
+
+/** Code of the second test provider (`testShippingProviders({ second: true })`): two carriers in one shop. */
+export const SECOND_TEST_PROVIDER_CODE = "fake_two";
 
 export interface TestProviderFailure {
   reason?: ProviderFailureReason;
@@ -36,6 +45,19 @@ export const TEST_LOOKUP_OPERATIONS = [
 
 export type TestLookupOperation = (typeof TEST_LOOKUP_OPERATIONS)[number];
 
+/** The waybill calls the shipment routes and the tracking job make (plan step 8). */
+export const TEST_WAYBILL_OPERATIONS = [
+  "createWaybill",
+  "findWaybill",
+  "cancelWaybill",
+  "track",
+  "fetchLabel",
+] as const;
+
+export type TestWaybillOperation = (typeof TEST_WAYBILL_OPERATIONS)[number];
+
+export type TestOperation = TestLookupOperation | TestWaybillOperation;
+
 export interface TestLookupFailure {
   /** How many calls fail. Default 1. */
   times?: number;
@@ -50,8 +72,30 @@ export interface TestLookupFailure {
   reason?: ProviderFailureReason;
 }
 
+export interface TestWaybillFailure {
+  /** How many calls fail. Default 1. */
+  times?: number;
+  /** Typed failure (default `unavailable`) with these carrier codes. */
+  reason?: ProviderFailureReason;
+  providerCodes?: readonly string[];
+  /** The call never answers until its abort signal fires, then rejects (a timeout: a lost answer). */
+  hang?: boolean;
+  /** The call throws an error with this text (a provider bug or a network error carrying personal data). */
+  message?: string;
+  /**
+   * `createWaybill` only: the carrier DOES create the waybill (so `findWaybill` finds it), then the answer is lost the way
+   * `hang`, `message` or `reason` say. How a spec reproduces an `unknown` shipment that `reconcile` settles.
+   */
+  afterEffect?: boolean;
+  /** The call answers `{ok: true, value: answer}` with this value as is (an answer that breaks the port). */
+  answer?: unknown;
+}
+
 /** The estimate the test provider quotes for any destination, in the currency of the declared value. */
 export const TEST_ESTIMATE_MINOR_UNITS = 6_000;
+
+/** What the test carrier charges the shop for a waybill (informational, `carrier_cost_amount`). */
+export const TEST_WAYBILL_COST_MINOR_UNITS = 7_500;
 
 export const TEST_CITIES: readonly CityResult[] = Object.freeze([
   Object.freeze({ ref: "test-city-kyiv", name: "Київ", region: "Київська" }),
@@ -83,52 +127,85 @@ export const TEST_POINTS: readonly PickupPoint[] = Object.freeze([
   point("test-city-lviv", "Львів", "1", "branch", "Відділення №1, пл. Тестова, 3"),
 ]);
 
-const unused = (): never => {
-  throw new Error("The test shipping provider does not implement this operation");
-};
+const ALL_CAPABILITIES: ShippingCapabilities = Object.freeze({
+  pickupPoints: true,
+  estimate: true,
+  waybills: true,
+  cancelWaybill: true,
+  tracking: true,
+  labels: true,
+});
 
-interface PlannedLookupFailure extends TestLookupFailure {
+/**
+ * One sequence for every test carrier of the process, behind a prefix of this process: several apps of one spec (one
+ * per role) and earlier spec files share the database, where a waybill number is unique per provider.
+ */
+let waybillSequence = 0;
+const WAYBILL_RUN = randomBytes(3).toString("hex").toUpperCase();
+
+/** A waybill the test carrier holds: what `findWaybill`, `cancelWaybill`, `track` and `fetchLabel` work on. */
+export interface TestWaybill {
+  readonly created: WaybillCreated;
+  readonly clientReference: string;
+  status: CarrierReportedShipmentStatus;
+  carrierStatusCode: string;
+  carrierStatusAt: Date | null;
+  /** `track` leaves this waybill out of its answer (the carrier does not know the number any more). */
+  untracked: boolean;
+}
+
+interface PlannedFailure<F> {
+  failure: F;
   remaining: number;
+}
+
+/** A tiny PDF-looking document: enough for the label route to stream and a spec to sniff. */
+export function testLabelBytes(providerRef: string): Uint8Array {
+  return new TextEncoder().encode(`%PDF-1.4\n% Test label for ${providerRef}\n%%EOF\n`);
 }
 
 /**
  * TEST ONLY. A small provider that lives in apps/api, so core and API specs depend on no package under packages/providers
  * (the CI mode providers-deleted removes them). It serves a fixed directory (two cities, three points, all in `UA`) and a
- * fixed estimate, counts every call, and lets a spec plan failures (`failNext` for `checkConnection`, `failLookup` for the
- * store calls) or hold calls until it releases them (`hold`, for request coalescing). The waybill operations throw: a
- * spec that starts using them has to say what they should answer first.
+ * fixed estimate, keeps the waybills it created in memory (numbers `TEST<run><sequence>`, refs `test-waybill-<run><sequence>`), counts every
+ * call, remembers the last waybill request (so a spec can see what reached the carrier), and lets a spec plan failures
+ * (`failNext` for `checkConnection`, `failLookup` for the store calls, `failWaybill` for the waybill calls) or hold calls
+ * until it releases them (`hold`, for request coalescing and for "the carrier is slow").
  */
 @Injectable()
 @SetMetadata(SHIPPING_PROVIDER_METADATA, shippingProviderMetadata(TEST_PROVIDER_CODE))
 export class TestShippingProvider implements ShippingProviderPort {
-  readonly code = TEST_PROVIDER_CODE;
-  readonly capabilities = Object.freeze({
-    pickupPoints: true,
-    estimate: true,
-    waybills: false,
-    cancelWaybill: false,
-    tracking: false,
-    labels: false,
-  });
+  readonly code: string = TEST_PROVIDER_CODE;
+  /** Every capability by default; a spec may replace it (the registry checks it only at startup). */
+  capabilities: ShippingCapabilities = ALL_CAPABILITIES;
   /** The directory the lookups answer from; a spec may replace it. */
   cities: readonly CityResult[] = TEST_CITIES;
   points: readonly PickupPoint[] = TEST_POINTS;
   estimateAmount = TEST_ESTIMATE_MINOR_UNITS;
-  readonly calls: Record<TestLookupOperation, number> = {
-    searchCities: 0,
-    listPickupPoints: 0,
-    findPickupPoint: 0,
-    estimate: 0,
-  };
+  /** The label `fetchLabel` answers (`null`: `testLabelBytes(providerRef)`), and its declared type. */
+  labelBytes: Uint8Array | null = null;
+  labelContentType = "application/pdf";
+  readonly calls: Record<TestOperation, number> = TestShippingProvider.zeroCalls();
+  /** The arguments of the waybill calls, in call order. */
+  readonly waybillRequests: WaybillRequest[] = [];
+  readonly findRequests: { clientReference: string; createdOn: string }[] = [];
+  readonly trackRequests: { trackingNumbers: readonly string[]; phones: readonly string[] }[] = [];
+  readonly waybills = new Map<string, TestWaybill>();
   private pending: (TestProviderFailure & { remaining: number }) | undefined;
   private readonly lookupFailures = new Map<TestLookupOperation, PlannedLookupFailure>();
-  private readonly held = new Map<TestLookupOperation, Promise<void>>();
+  private readonly waybillFailures = new Map<
+    TestWaybillOperation,
+    PlannedFailure<TestWaybillFailure>
+  >();
+  private readonly held = new Map<TestOperation, Promise<void>>();
 
-  createWaybill = unused;
-  findWaybill = unused;
-  cancelWaybill = unused;
-  track = unused;
-  fetchLabel = unused;
+  private static zeroCalls(): Record<TestOperation, number> {
+    const calls = {} as Record<TestOperation, number>;
+    for (const operation of [...TEST_LOOKUP_OPERATIONS, ...TEST_WAYBILL_OPERATIONS]) {
+      calls[operation] = 0;
+    }
+    return calls;
+  }
 
   failNext(failure: TestProviderFailure = {}): void {
     this.pending = { ...failure, remaining: 1 };
@@ -139,8 +216,13 @@ export class TestShippingProvider implements ShippingProviderPort {
     this.lookupFailures.set(operation, { ...failure, remaining: failure.times ?? 1 });
   }
 
+  /** The next `times` calls of a waybill operation fail as described. Replaces an earlier plan for that operation. */
+  failWaybill(operation: TestWaybillOperation, failure: TestWaybillFailure = {}): void {
+    this.waybillFailures.set(operation, { failure, remaining: failure.times ?? 1 });
+  }
+
   /** Every call of `operation` waits until the returned function is called (then they all go on). */
-  hold(operation: TestLookupOperation): () => void {
+  hold(operation: TestOperation): () => void {
     let release: () => void = () => undefined;
     this.held.set(
       operation,
@@ -154,17 +236,41 @@ export class TestShippingProvider implements ShippingProviderPort {
     };
   }
 
-  /** Forgets planned failures, holds, counts and directory changes. */
+  /** What `track` answers next for the waybill of `trackingNumber`. */
+  setTracking(
+    trackingNumber: string,
+    update: {
+      status: CarrierReportedShipmentStatus;
+      carrierStatusCode: string;
+      carrierStatusAt?: Date | null;
+    },
+  ): void {
+    const waybill = this.byTrackingNumber(trackingNumber);
+    if (waybill === undefined) {
+      throw new RangeError(`Unknown test waybill: ${trackingNumber}`);
+    }
+    waybill.status = update.status;
+    waybill.carrierStatusCode = update.carrierStatusCode;
+    waybill.carrierStatusAt = update.carrierStatusAt ?? null;
+  }
+
+  /** Forgets planned failures, holds, counts, waybills and directory changes. */
   reset(): void {
     this.pending = undefined;
     this.lookupFailures.clear();
+    this.waybillFailures.clear();
     this.held.clear();
     this.cities = TEST_CITIES;
     this.points = TEST_POINTS;
     this.estimateAmount = TEST_ESTIMATE_MINOR_UNITS;
-    for (const operation of TEST_LOOKUP_OPERATIONS) {
-      this.calls[operation] = 0;
-    }
+    this.capabilities = ALL_CAPABILITIES;
+    this.labelBytes = null;
+    this.labelContentType = "application/pdf";
+    this.waybills.clear();
+    this.waybillRequests.length = 0;
+    this.findRequests.length = 0;
+    this.trackRequests.length = 0;
+    Object.assign(this.calls, TestShippingProvider.zeroCalls());
   }
 
   searchCities(
@@ -215,6 +321,108 @@ export class TestShippingProvider implements ShippingProviderPort {
     return providerOk({ amount: this.estimateAmount, currency: input.declaredValue.currency });
   }
 
+  createWaybill(
+    input: WaybillRequest,
+    signal: ProviderAbortSignal,
+  ): Promise<ProviderResult<WaybillCreated>> {
+    this.waybillRequests.push(input);
+    return this.waybillCall("createWaybill", signal, () => {
+      waybillSequence += 1;
+      const number = `${WAYBILL_RUN}${String(waybillSequence).padStart(6, "0")}`;
+      const created: WaybillCreated = Object.freeze({
+        providerRef: `test-waybill-${number}`,
+        trackingNumber: `TEST${number}`,
+        carrierCost: {
+          amount: TEST_WAYBILL_COST_MINOR_UNITS,
+          currency: input.declaredValue.currency,
+        },
+        estimatedDeliveryDate: null,
+      });
+      this.waybills.set(created.providerRef, {
+        created,
+        clientReference: input.clientReference,
+        status: "created",
+        carrierStatusCode: "TEST_CREATED",
+        carrierStatusAt: null,
+        untracked: false,
+      });
+      return created;
+    });
+  }
+
+  findWaybill(
+    input: { readonly clientReference: string; readonly createdOn: string },
+    signal: ProviderAbortSignal,
+  ): Promise<ProviderResult<WaybillCreated | null>> {
+    this.findRequests.push({ ...input });
+    return this.waybillCall("findWaybill", signal, () => {
+      for (const waybill of this.waybills.values()) {
+        if (waybill.clientReference === input.clientReference && waybill.status !== "cancelled") {
+          return waybill.created;
+        }
+      }
+      return null;
+    });
+  }
+
+  cancelWaybill(
+    input: { readonly providerRef: string },
+    signal: ProviderAbortSignal,
+  ): Promise<ProviderResult<void>> {
+    return this.waybillCall("cancelWaybill", signal, () => {
+      const waybill = this.waybills.get(input.providerRef);
+      if (waybill === undefined) {
+        return providerFailure("rejected", ["UNKNOWN_WAYBILL"]);
+      }
+      if (waybill.status !== "created") {
+        return providerFailure("rejected", ["NOT_CANCELLABLE"]);
+      }
+      waybill.status = "cancelled";
+      waybill.carrierStatusCode = "TEST_CANCELLED";
+      return undefined;
+    });
+  }
+
+  track(
+    input: { readonly trackingNumbers: readonly string[]; readonly phones: readonly string[] },
+    signal: ProviderAbortSignal,
+  ): Promise<ProviderResult<TrackingUpdate[]>> {
+    this.trackRequests.push({
+      trackingNumbers: [...input.trackingNumbers],
+      phones: [...input.phones],
+    });
+    return this.waybillCall("track", signal, () => {
+      const updates: TrackingUpdate[] = [];
+      for (const trackingNumber of input.trackingNumbers) {
+        const waybill = this.byTrackingNumber(trackingNumber);
+        if (waybill !== undefined && !waybill.untracked) {
+          updates.push({
+            trackingNumber,
+            status: waybill.status,
+            carrierStatusCode: waybill.carrierStatusCode,
+            carrierStatusAt: waybill.carrierStatusAt,
+          });
+        }
+      }
+      return updates;
+    });
+  }
+
+  fetchLabel(
+    input: { readonly providerRef: string; readonly format: "pdf" },
+    signal: ProviderAbortSignal,
+  ): Promise<ProviderResult<{ bytes: Uint8Array; contentType: "application/pdf" }>> {
+    return this.waybillCall("fetchLabel", signal, () => {
+      if (!this.waybills.has(input.providerRef)) {
+        return providerFailure("rejected", ["UNKNOWN_WAYBILL"]);
+      }
+      return {
+        bytes: this.labelBytes ?? testLabelBytes(input.providerRef),
+        contentType: this.labelContentType as "application/pdf",
+      };
+    });
+  }
+
   checkConnection(signal: ProviderAbortSignal): Promise<ProviderResult<void>> {
     const failure = this.pending;
     this.pending = undefined;
@@ -227,6 +435,54 @@ export class TestShippingProvider implements ShippingProviderPort {
     return Promise.resolve(
       providerFailure(failure.reason ?? "unavailable", failure.providerCodes ?? []),
     );
+  }
+
+  private byTrackingNumber(trackingNumber: string): TestWaybill | undefined {
+    for (const waybill of this.waybills.values()) {
+      if (waybill.created.trackingNumber === trackingNumber) {
+        return waybill;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * A waybill call: counts it, waits while it is held, then either does the work (a value is wrapped in `providerOk`, a
+   * `ProviderResult` the work returns is passed on) or the planned failure. `afterEffect` does the work first.
+   */
+  private async waybillCall<T>(
+    operation: TestWaybillOperation,
+    signal: ProviderAbortSignal,
+    work: () => T | ProviderResult<T>,
+  ): Promise<ProviderResult<T>> {
+    this.calls[operation] += 1;
+    signal.throwIfAborted();
+    const held = this.held.get(operation);
+    if (held !== undefined) {
+      await held;
+    }
+    const planned = this.waybillFailures.get(operation);
+    if (planned === undefined) {
+      return asResult(work());
+    }
+    planned.remaining -= 1;
+    if (planned.remaining <= 0) {
+      this.waybillFailures.delete(operation);
+    }
+    const { failure } = planned;
+    if (failure.afterEffect === true) {
+      work();
+    }
+    if (failure.hang === true) {
+      return hangUntilAborted(signal);
+    }
+    if (failure.message !== undefined) {
+      throw new Error(failure.message);
+    }
+    if ("answer" in failure) {
+      return { ok: true, value: failure.answer as T };
+    }
+    return providerFailure(failure.reason ?? "unavailable", failure.providerCodes ?? []);
   }
 
   private async lookup<T>(
@@ -267,6 +523,23 @@ export class TestShippingProvider implements ShippingProviderPort {
   }
 }
 
+interface PlannedLookupFailure extends TestLookupFailure {
+  remaining: number;
+}
+
+function isProviderResult(value: unknown): value is ProviderResult<never> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "ok" in value &&
+    typeof (value as { ok: unknown }).ok === "boolean"
+  );
+}
+
+function asResult<T>(value: T | ProviderResult<T>): ProviderResult<T> {
+  return isProviderResult(value) ? value : providerOk(value as T);
+}
+
 function hangUntilAborted(signal: ProviderAbortSignal): Promise<never> {
   return new Promise<never>((_resolve, reject) => {
     signal.addEventListener(
@@ -279,9 +552,30 @@ function hangUntilAborted(signal: ProviderAbortSignal): Promise<never> {
   });
 }
 
+/** TEST ONLY. The same test carrier under a second code, so a spec can prove one carrier's failure does not stop another. */
+@Injectable()
+@SetMetadata(SHIPPING_PROVIDER_METADATA, shippingProviderMetadata(SECOND_TEST_PROVIDER_CODE))
+export class SecondTestShippingProvider extends TestShippingProvider {
+  override readonly code: string = SECOND_TEST_PROVIDER_CODE;
+}
+
 @Module({ providers: [TestShippingProvider], exports: [TestShippingProvider] })
 class TestShippingProviderModule {}
 
-export function testShippingProviders(): LoadedShippingProvider[] {
-  return [{ code: TEST_PROVIDER_CODE, module: TestShippingProviderModule as Type<unknown> }];
+@Module({ providers: [SecondTestShippingProvider], exports: [SecondTestShippingProvider] })
+class SecondTestShippingProviderModule {}
+
+export function testShippingProviders(
+  options: { second?: boolean } = {},
+): LoadedShippingProvider[] {
+  const loaded: LoadedShippingProvider[] = [
+    { code: TEST_PROVIDER_CODE, module: TestShippingProviderModule as Type<unknown> },
+  ];
+  if (options.second === true) {
+    loaded.push({
+      code: SECOND_TEST_PROVIDER_CODE,
+      module: SecondTestShippingProviderModule as Type<unknown>,
+    });
+  }
+  return loaded;
 }

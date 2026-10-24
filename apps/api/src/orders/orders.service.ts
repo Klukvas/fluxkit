@@ -76,6 +76,13 @@ class TransitionRefused extends Error {
   }
 }
 
+/** Thrown inside the savepoint of `checkFulfilment` so that whatever the transition wrote is rolled back. */
+class DryRunRolledBack extends Error {
+  constructor() {
+    super("dry run");
+  }
+}
+
 function toStatus(value: string): OrderStatus {
   if (!ORDER_STATUSES.includes(value as OrderStatus)) {
     throw new RangeError(`The order has an unknown status: ${value}`);
@@ -247,6 +254,35 @@ export class OrdersService implements OrderPaymentsPort {
         ? { ok: false, reason: "awaiting_stock" }
         : { ok: false, reason: "invalid_transition" };
     });
+  }
+
+  /**
+   * Whether `paid -> fulfilled` would succeed for a LOCKED order right now, without changing anything (ADR 0029 decision
+   * 10: a waybill needs the mark-fulfilled rule, "read without committing anything"). Runs the real transition, stock
+   * effect included, in a savepoint that is ALWAYS rolled back, so the rule exists once: `ok` when it would succeed,
+   * `awaiting_stock` while a backordered line is not on hand, `invalid_transition` when the order is not `paid`.
+   */
+  async checkFulfilment(
+    tx: Transaction,
+    order: OrderRow,
+    actor: OrderActorRef,
+    now: Date,
+  ): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: TransitionRefusal }> {
+    let outcome: TransitionResult | undefined;
+    try {
+      await tx.transaction(async (savepoint) => {
+        outcome = await this.transition(savepoint, order, "fulfilled", actor, { now });
+        throw new DryRunRolledBack();
+      });
+    } catch (error) {
+      if (!(error instanceof DryRunRolledBack)) {
+        throw error;
+      }
+    }
+    if (outcome === undefined) {
+      throw new Error("The fulfilment check ended without an outcome");
+    }
+    return outcome.ok ? { ok: true } : { ok: false, reason: outcome.reason };
   }
 
   /**

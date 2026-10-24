@@ -8,6 +8,10 @@ import type {
   AdminAttributeOption,
   AdminAttributeWithOptions,
   AdminBrand,
+  AdminShipment,
+  AdminShipmentCreateResult,
+  AdminShipmentList,
+  CreateAdminShipmentBody,
   AdminShippingMethod,
   AdminShippingMethodList,
   AdminShippingProviderCheck,
@@ -225,6 +229,28 @@ export interface AdminClient {
     options?: CallOptions,
   ): Result<AdminOrder>;
   markOrderFulfilled(id: string, options?: CallOptions): Result<AdminOrder>;
+
+  // shipments (ADR 0029 decision 10; `orders.read` to see, `orders.write` to act). Carrier writes are never retried.
+  listShipments(id: string, options?: CallOptions): Result<AdminShipmentList>;
+  /**
+   * `201` whatever the carrier did: `shipment.status` is `created`, `failed` (with `failure`) or `unknown` (the answer was
+   * lost; do NOT call this again, call `reconcileShipment`). `409 rule_violation` for the refusals before the carrier is
+   * asked (`order_not_paid`, `awaiting_stock`, `no_carrier`, `shipment_exists`, ...).
+   */
+  createShipment(
+    id: string,
+    body: CreateAdminShipmentBody,
+    options?: CallOptions,
+  ): Result<AdminShipmentCreateResult>;
+  /** Settles an `unknown` shipment by asking the carrier for the waybill made with our order number. */
+  reconcileShipment(id: string, shipmentId: string, options?: CallOptions): Result<AdminShipment>;
+  cancelShipment(id: string, shipmentId: string, options?: CallOptions): Result<AdminShipment>;
+  refreshShipment(id: string, shipmentId: string, options?: CallOptions): Result<AdminShipment>;
+  /**
+   * The label as a PDF `Blob` (the API checked it is a PDF). A browser can also open the route itself as a download:
+   * it is a `GET` with the session cookie and no CSRF header.
+   */
+  getShipmentLabel(id: string, shipmentId: string, options?: CallOptions): Result<Blob>;
 
   // attributes
   createAttribute(body: CreateAdminAttributeBody, options?: CallOptions): Result<AdminAttribute>;
@@ -493,6 +519,18 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("markOrderPaid", { pathParams: { id }, body, options: opts }),
     markOrderFulfilled: (id, opts) =>
       call("markOrderFulfilled", { pathParams: { id }, options: opts }),
+
+    listShipments: (id, opts) => call("listShipments", { pathParams: { id }, options: opts }),
+    createShipment: (id, body, opts) =>
+      call("createShipment", { pathParams: { id }, body, options: opts }),
+    reconcileShipment: (id, shipmentId, opts) =>
+      call("reconcileShipment", { pathParams: { id, shipmentId }, options: opts }),
+    cancelShipment: (id, shipmentId, opts) =>
+      call("cancelShipment", { pathParams: { id, shipmentId }, options: opts }),
+    refreshShipment: (id, shipmentId, opts) =>
+      call("refreshShipment", { pathParams: { id, shipmentId }, options: opts }),
+    getShipmentLabel: (id, shipmentId, opts) =>
+      call("getShipmentLabel", { pathParams: { id, shipmentId }, options: opts }),
 
     createAttribute: (body, opts) => call("createAttribute", { body, options: opts }),
     listAttributes: (opts) => call("listAttributes", { options: opts }),

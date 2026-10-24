@@ -52,6 +52,7 @@ function anOrder(overrides: Partial<Order> = {}): Order {
     shippingAddress: null,
     billingAddress: null,
     shipping: null,
+    shipments: [],
     history: [{ status: "awaiting_payment", at: "2026-10-19T10:00:00.000Z" }],
     ...overrides,
   };

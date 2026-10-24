@@ -31,6 +31,7 @@ import {
   DEFAULT_SHIPPING_PROVIDERS_DIR,
   loadShippingProviders,
   type LoadedShippingProvider,
+  type ShipmentCallTimeouts,
 } from "./shipping/registry/index.js";
 
 export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "featuresDir"> &
@@ -78,6 +79,8 @@ export interface CreateAppOptions {
   extraFeatures?: LoadedFeature[];
   /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Tests only: shorter limits for the shipment provider calls (production uses the core waybill limit). */
+  shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: where provider packages are looked up (default `<repo>/packages/providers`). */
   shippingProvidersDir?: string;
   /** Default true. `pnpm jobs:run-once` passes false: it changes nothing but the data its jobs handle. */
@@ -156,6 +159,7 @@ export async function createApp(
       },
       media: mediaConfigOf(env, options.mediaTuning),
       rateLimits: options.rateLimits,
+      shipmentCallTimeouts: options.shipmentCallTimeouts,
       adminAuthenticator: options.adminAuthenticator,
       clock: options.clock,
       scrypt: options.scrypt,

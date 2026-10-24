@@ -78,9 +78,14 @@ function expectedUrl(path: string): string {
   return `${BASE}${path.replace(/\{\w+\}/g, () => `p${++index}`)}`;
 }
 
+const PDF_BYTES = new TextEncoder().encode("%PDF-1.4\n%%EOF\n");
+const pdfOk = () =>
+  new Response(PDF_BYTES, { status: 200, headers: { "Content-Type": "application/pdf" } });
+
 function okFor(name: AdminOperationName): Response {
   const status = ADMIN_OPERATIONS[name].successStatuses[0];
   if (status === undefined) throw new Error(`${name} has no success status`);
+  if (ADMIN_OPERATIONS[name].responseKind === "pdf") return pdfOk();
   return status === 204 ? new Response(null, { status }) : jsonOk({ marker: name }, status);
 }
 
@@ -99,6 +104,46 @@ describe("the client has one function per ADMIN_OPERATIONS entry and nothing els
     for (const [, spec] of operations) expect(spec.path.startsWith("/admin/")).toBe(true);
     const keys = operations.map(([, spec]) => `${spec.method} ${spec.path}`);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("getShipmentLabel: the one file answer", () => {
+  it("hands out the PDF as a Blob and asks for a PDF", async () => {
+    const { fetch, calls } = fakeFetch(() => pdfOk());
+    const result = await createAdminClient({ baseUrl: BASE, fetch }).getShipmentLabel("o1", "s1");
+    expect(calls[0]?.url).toBe(`${BASE}/admin/orders/o1/shipments/s1/label`);
+    expect(calls[0]?.init.headers.get("Accept")).toBe("application/pdf, application/problem+json");
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data).toBeInstanceOf(Blob);
+    expect(new Uint8Array(await result.data.arrayBuffer())).toEqual(PDF_BYTES);
+  });
+
+  it("never hands out anything but a PDF as the file (a proxy's HTML page or JSON throws)", async () => {
+    for (const answer of [
+      () =>
+        new Response("<html></html>", { status: 200, headers: { "Content-Type": "text/html" } }),
+      () => jsonOk({ marker: true }),
+    ]) {
+      const { fetch } = fakeFetch(answer);
+      await expect(
+        createAdminClient({ baseUrl: BASE, fetch }).getShipmentLabel("o1", "s1"),
+      ).rejects.toBeInstanceOf(InvalidResponseError);
+    }
+  });
+
+  it("a problem answer is a problem, with Retry-After", async () => {
+    const { fetch } = fakeFetch(() =>
+      problemResponse(503, { code: "shipping_provider_unavailable" }, { "Retry-After": "30" }),
+    );
+    const result = await createAdminClient({ baseUrl: BASE, fetch }).getShipmentLabel("o1", "s1");
+    expect(result).toMatchObject({ ok: false, status: 503, retryAfter: "30" });
+  });
+
+  it("every JSON operation still asks for JSON", async () => {
+    const { fetch, calls } = fakeFetch(() => okFor("getOrder"));
+    await createAdminClient({ baseUrl: BASE, fetch }).getOrder("o1");
+    expect(calls[0]?.init.headers.get("Accept")).toBe("application/json, application/problem+json");
   });
 });
 

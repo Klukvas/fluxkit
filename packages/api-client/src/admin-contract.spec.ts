@@ -46,6 +46,9 @@ import type {
   AdminProductTypeOptionAssignment,
   AdminReservationList,
   AdminSessionUser,
+  AdminShipment,
+  AdminShipmentCreateResult,
+  AdminShipmentList,
   AdminShippingMethod,
   AdminShippingMethodList,
   AdminShippingPricing,
@@ -293,6 +296,72 @@ const orderList: Shape<AdminOrderList> = paginated({
     itemCount: "integer",
   },
 } as const);
+// shipments
+const shipmentStatus = {
+  enum: [
+    "pending",
+    "unknown",
+    "created",
+    "in_transit",
+    "arrived",
+    "delivered",
+    "returning",
+    "returned",
+    "cancelled",
+    "failed",
+  ],
+} as const;
+const providerFailureReason = {
+  enum: ["unavailable", "rejected", "invalid_credentials", "not_supported"],
+} as const;
+const shipment: Shape<AdminShipment> = {
+  object: {
+    id: "string",
+    status: shipmentStatus,
+    providerCode: "string",
+    providerService: { nullable: "string" },
+    trackingNumber: { nullable: "string" },
+    carrierStatusCode: { nullable: "string" },
+    carrierStatusAt: { nullable: "string" },
+    clientReference: "string",
+    declaredValue: money,
+    carrierCost: { nullable: money },
+    payer: { enum: ["sender", "recipient"] },
+    weightGrams: "integer",
+    lengthMm: "integer",
+    widthMm: "integer",
+    heightMm: "integer",
+    seats: "integer",
+    createdBy: { nullable: "string" },
+    createdAt: "string",
+    updatedAt: "string",
+    cancelledAt: { nullable: "string" },
+    deliveredAt: { nullable: "string" },
+    nextTrackAt: { nullable: "string" },
+    history: {
+      array: {
+        object: {
+          fromStatus: { nullable: shipmentStatus },
+          toStatus: shipmentStatus,
+          carrierStatusCode: { nullable: "string" },
+          actorType: { enum: ["admin", "system"] },
+          actorAdminId: { nullable: "string" },
+          at: "string",
+        },
+      },
+    },
+  },
+};
+const shipmentList: Shape<AdminShipmentList> = { object: { items: { array: shipment } } };
+const shipmentCreateResult: Shape<AdminShipmentCreateResult> = {
+  object: {
+    shipment,
+    failure: {
+      nullable: { object: { reason: providerFailureReason, providerCodes: { array: "string" } } },
+    },
+  },
+};
+
 const order: Shape<AdminOrder> = {
   object: {
     id: "string",
@@ -369,6 +438,7 @@ const order: Shape<AdminOrder> = {
         },
       },
     },
+    shipments: { array: shipment },
     history: {
       array: {
         object: {
@@ -712,6 +782,17 @@ const body = {
     },
   } satisfies Shape<Admin.AdjustInventoryBody>,
   cancelOrder: { object: { reason: "string" } } satisfies Shape<Admin.CancelAdminOrderBody>,
+  createShipment: {
+    object: {
+      weightGrams: "integer",
+      lengthMm: "integer",
+      widthMm: "integer",
+      heightMm: "integer",
+      description: "string",
+      declaredValue: { optional: moneyInput },
+      payer: { optional: { enum: ["sender", "recipient"] } },
+    },
+  } satisfies Shape<Admin.CreateAdminShipmentBody>,
   markOrderPaid: {
     object: { reference: "string", amount: moneyInput },
   } satisfies Shape<Admin.MarkAdminOrderPaidBody>,
@@ -971,7 +1052,12 @@ type RequestShapeOf<N extends AdminOperationName> =
       ? "binary"
       : Shape<JsonBodyOf<N>>;
 
-const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
+/** `"pdf"` for the one file answer (the label `Blob`, checked against the `string`/`binary` schema), a `Shape` for JSON. */
+type ResponseShapeOf<N extends AdminOperationName> = N extends "getShipmentLabel"
+  ? "pdf"
+  : Shape<DataOf<N>>;
+
+const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   login: loginResult,
   logout: "none",
   getMe: me,
@@ -998,6 +1084,12 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: Shape<DataOf<N>> } = {
   cancelOrder: order,
   markOrderPaid: order,
   markOrderFulfilled: order,
+  listShipments: shipmentList,
+  createShipment: shipmentCreateResult,
+  reconcileShipment: shipment,
+  cancelShipment: shipment,
+  refreshShipment: shipment,
+  getShipmentLabel: "pdf",
   createAttribute: attribute,
   listAttributes: attributeList,
   getAttribute: attributeWithOptions,
@@ -1096,6 +1188,12 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   cancelOrder: body.cancelOrder,
   markOrderPaid: body.markOrderPaid,
   markOrderFulfilled: null,
+  listShipments: null,
+  createShipment: body.createShipment,
+  reconcileShipment: null,
+  cancelShipment: null,
+  refreshShipment: null,
+  getShipmentLabel: null,
   createAttribute: body.createAttribute,
   listAttributes: null,
   getAttribute: null,
@@ -1229,6 +1327,19 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
     });
   });
 
+  it("only the shipment label answers a file (a PDF), with orders.read; every other success is JSON", () => {
+    const files = names.filter((name) => ADMIN_OPERATIONS[name].responseKind === "pdf");
+    expect(files).toEqual(["getShipmentLabel"]);
+    expect(ADMIN_OPERATIONS.getShipmentLabel).toMatchObject({
+      method: "GET",
+      path: "/admin/orders/{id}/shipments/{shipmentId}/label",
+      successStatuses: [200],
+      permission: "orders.read",
+      bodyKind: "none",
+      responseKind: "pdf",
+    });
+  });
+
   it("shares no operation with the store table and lists no store route", () => {
     const store = new Set(Object.values(OPERATIONS).map((s) => `${s.method} ${s.path}`));
     for (const name of names) {
@@ -1291,7 +1402,8 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
     for (const [status, response] of Object.entries(operation.responses)) {
       const content = Object.keys(response.content ?? {});
       if (status.startsWith("2")) {
-        expect(content, `${name} ${status}`).toEqual(status === "204" ? [] : ["application/json"]);
+        const success = spec.responseKind === "pdf" ? "application/pdf" : "application/json";
+        expect(content, `${name} ${status}`).toEqual(status === "204" ? [] : [success]);
       } else {
         expect(content, `${name} ${status}`).toEqual(["application/problem+json"]);
         expect(response.content?.["application/problem+json"]?.schema?.$ref).toBe(
@@ -1306,9 +1418,16 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
     const operation = operationFor(name);
     for (const status of spec.successStatuses) {
       const schema = operation.responses[String(status)]?.content?.["application/json"]?.schema;
-      const shape = RESPONSE_SHAPES[name] as ShapeNode;
+      const shape = RESPONSE_SHAPES[name] as ShapeNode | "pdf";
       if (status === 204) {
         expect(shape).toBe("none");
+        continue;
+      }
+      if (shape === "pdf") {
+        expect(spec.responseKind).toBe("pdf");
+        expect(
+          operation.responses[String(status)]?.content?.["application/pdf"]?.schema,
+        ).toMatchObject({ type: "string", format: "binary" });
         continue;
       }
       expect(schema, `${name} ${status} schema`).toBeDefined();

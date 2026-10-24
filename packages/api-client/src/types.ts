@@ -76,6 +76,10 @@ export interface ProblemDetails {
   cart?: Cart;
   /** The chosen method's fresh option of a `shipping_changed` answer. */
   shipping?: ShippingChanged;
+  /** A carrier failure of an admin shipment route: the provider's typed reason. */
+  reason?: "unavailable" | "rejected" | "invalid_credentials" | "not_supported";
+  /** A carrier failure of an admin shipment route: raw carrier codes, never message text. */
+  providerCodes?: string[];
 }
 
 // -------------------------------------------------------------------- cart
@@ -257,6 +261,8 @@ export interface Order {
   billingAddress: Address | null;
   /** The shipping method chosen at checkout (immutable snapshot); `null` for an order placed without one. */
   shipping: OrderShipping | null;
+  /** The carrier waybills of the order that have a number, oldest first; empty until the shop created one. */
+  shipments: OrderShipment[];
   history: OrderHistoryEntry[];
 }
 
@@ -309,6 +315,30 @@ export interface CheckoutShipping {
 
 export type ShippingMethodKind = "address" | "pickup_point" | "store_pickup";
 export type ShippingPayer = "shop_charge" | "recipient_on_delivery";
+
+/** The normalized status of a carrier waybill (ADR 0029 decision 7); the carrier's own code is kept beside it. */
+export type ShipmentStatus =
+  | "pending"
+  | "unknown"
+  | "created"
+  | "in_transit"
+  | "arrived"
+  | "delivered"
+  | "returning"
+  | "returned"
+  | "cancelled"
+  | "failed";
+
+/** A carrier waybill of the shopper's order: only one that has a number, with its normalized status. */
+export interface OrderShipment {
+  providerCode: string;
+  trackingNumber: string;
+  status: ShipmentStatus;
+  createdAt: string;
+  updatedAt: string;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+}
 export type PickupPointKind = "branch" | "locker";
 export type ShippingUnavailableReason =
   | "inactive"
