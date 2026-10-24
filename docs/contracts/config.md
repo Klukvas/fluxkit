@@ -10,6 +10,7 @@ Status: draft (first version, introduced in plan step 5). Covered by SemVer (AGE
 | `PORT` | no | 3000 | HTTP port |
 | `FEATURES_ENABLED` | no | empty | Comma-separated optional feature names; unset means none |
 | `FEATURES_DIR` | no | `<repo>/packages/features` | Where feature packages are discovered |
+| `SHIPPING_PROVIDERS_ENABLED` | no | empty | Comma-separated shipping provider codes (lowercase letters, digits, underscores, starting with a letter, at most 64 characters); entries are trimmed, lowercased and de-duplicated; unset or blank means none. A malformed code, or an enabled code with no provider package or a broken one, stops the startup. The only provider in the template is the test-only `fake`; never enable it in a real shop |
 | `DEFAULT_LOCALE` | no | `uk` | Locale every translated text must contain; must be in `LOCALES` |
 | `LOCALES` | no | `uk,en` | Comma-separated locales accepted in translated texts; lowercase codes (2 to 8 letters, optional `-` segments), no duplicates |
 | `ADMIN_COOKIE_SECURE` | no | `true` | `Secure` flag of the admin session cookie. Exactly `true` or `false` (anything else, including an empty value, fails startup); `false` only for local plain-HTTP development |
@@ -60,6 +61,14 @@ The admin SPA is static: the built files read no environment variable and `vite 
 | Variable | Required | Default | Meaning |
 |---|---|---|---|
 | `ADMIN_DEV_API_URL` | no | `http://127.0.0.1:3000` | Target of the dev and preview proxy for `/admin`, `/admin/*` and `/admin?...` and for `/media`, `/media/*` and `/media?...` (never `/admin-ui`). An `http` or `https` origin without path, query, fragment or credentials; anything else stops the dev server with an error naming the variable. Not used in any deployed environment: there the edge proxy routes `/admin/*` and `/media/*` to the API |
+
+## Shipping provider package contract
+- A shipping provider is a package under `packages/providers` whose `package.json` has `"fluxkit": { "provider": "<code>", "kind": "shipping" }` (`provider` without `kind` is an error; other kinds are ignored by the shipping loader). The folder name is irrelevant; the code matches `SHIPPING_PROVIDER_CODE_PATTERN` (`@fluxkit/core`).
+- `main` (default `dist/index.js`) must export `providerModule`, a Nest module. It is imported dynamically and mounted only if `<code>` is in `SHIPPING_PROVIDERS_ENABLED`; with nothing enabled the folder is not even read.
+- Inside the module, a provider class carries `@SetMetadata(SHIPPING_PROVIDER_METADATA, shippingProviderMetadata("<code>"))` and implements `ShippingProviderPort` (`@fluxkit/core`). The API finds it with `DiscoveryService` (`ShippingProviderRegistry`). Startup fails when the class is not a static provider with every port method and capability, when its `code` differs from the metadata, when two classes share a code, when an enabled provider has no marked class, or when a marked class is not enabled.
+- Neither core nor `apps/api` imports a provider (dependency-cruiser `core-must-not-import-providers`, `apps-must-not-import-providers`). A provider imports `@fluxkit/core` for the port and helpers, never `apps/api`. Enabled but missing or broken provider: startup fails loudly. Disabled or deleted provider: no effect.
+- At startup the registry logs one line, `Shipping providers loaded: <codes or none>`, which the CI provider matrix reads. It is a log line, not a contract of the API.
+- Provider variables (an API key and so on) are read by the provider package itself with its own small parser, are secrets in the environment only, and are listed in this file when a real provider exists. The test-only `fake` provider has none.
 
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.

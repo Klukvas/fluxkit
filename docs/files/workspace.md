@@ -9,7 +9,7 @@
 - `pnpm-lock.yaml` - lockfile, always committed.
 - `eslint.config.mjs` - ESLint flat config: strict TS rules, bans `any`, `@ts-ignore`/`@ts-expect-error`, empty `catch`, unused disable directives.
 - `.prettierrc.json`, `.prettierignore` - Prettier for code and config (Markdown is ignored).
-- `.dependency-cruiser.cjs` - module boundary rules (core must not import features, infrastructure clients or provider packages (`packages/providers/*`, `@fluxkit/provider-*`), features isolated, packages must not import apps, no deep imports, no cycles).
+- `.dependency-cruiser.cjs` - module boundary rules (core must not import features, infrastructure clients or provider packages (`packages/providers/*`, `@fluxkit/provider-*`), apps must not import provider packages either, features isolated, packages must not import apps, no deep imports, no cycles).
 - `scripts/check-boundaries.mjs` - runs dependency-cruiser; fails on violations or if zero modules were cruised.
 
 ## Apps
@@ -18,7 +18,7 @@
 ## Packages
 - `packages/core` - catalog domain rules (not a scaffold any more; see `core.md`). `packages/ui` - token-based components. `packages/theme` - design tokens and presets.
 - `packages/config` - feature flags and settings schema. `packages/api-client` - typed client for the store API (hand-written types checked against `docs/api/openapi.json`, `docs/files/api-client.md`).
-- `packages/features/` - one package per optional feature (none yet). `packages/providers/` - one package per payment/shipping provider (none yet).
+- `packages/features/` - one package per optional feature (none yet). `packages/providers/` - one package per payment/shipping provider (only the test-only `_fake` so far, `docs/files/providers.md`).
 
 ## Per package
 - `package.json` (name `@fluxkit/<name>`, scripts `build` and `typecheck`), `tsconfig.json` (extends base, `src` to `dist`), `src/index.ts` (placeholder export), `README.md`.
@@ -30,4 +30,4 @@
 - `.github/workflows/ci.yml` - CI jobs (verify, feature-matrix, policy, docs, compose). `.github/dependabot.yml` - weekly dependency updates.
 - `scripts/license-policy.json` + `scripts/check-licenses.mjs` - license policy and its check (production strict, dev extras, explicit exceptions).
 - `scripts/third-party-notices.mjs` - writes `third-party/THIRD_PARTY_NOTICES.md` for runtime dependencies (git-ignored, CI artifact).
-- `scripts/check-docs.mjs` - docs-with-code rules for PRs. `scripts/feature-matrix.sh` - feature on/off/deleted verification.
+- `scripts/check-docs.mjs` - docs-with-code rules for PRs. `scripts/feature-matrix.sh` - feature on/off/deleted and shipping provider providers-on/providers-off/providers-deleted verification (the provider modes read the registry's startup log line).

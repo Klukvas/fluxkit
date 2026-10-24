@@ -323,7 +323,7 @@ If every owner is locked out or has lost the password, create a new owner with `
 - another owner calls `POST /admin/users/{id}/reset-password` (it also clears the lock and ends the user's sessions);
 - run `pnpm admin:unlock --email owner@example.com` on the server. It sets the failed-login counter to 0 and removes the lock, nothing else (no password, role, active flag or session is touched), and prints `Unlocked owner@example.com` (or `owner@example.com was not locked`). An unknown email exits with code 1. Like `admin:create` it reads `DATABASE_URL` from `.env` and needs no session.
 
-Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`.
+Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`. Shipping provider plugins are enabled the same way with `SHIPPING_PROVIDERS_ENABLED` (a comma-separated list of provider codes; empty by default; the template ships only the test-only `fake`), see `packages/providers/README.md`.
 
 ## Checkout walkthrough
 
@@ -439,7 +439,7 @@ Notes:
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
 | `pnpm check:docs` | docs-with-code rules against `origin/main` |
-| `pnpm feature-matrix on\|off\|deleted` | feature enable/disable/delete verification (`deleted` removes files, CI only) |
+| `pnpm feature-matrix on\|off\|deleted\|providers-on\|providers-off\|providers-deleted` | feature and shipping provider enable/disable/delete verification (the `deleted` modes remove files, CI only) |
 
 ## Repository layout
 
