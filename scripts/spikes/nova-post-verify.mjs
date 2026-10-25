@@ -26,6 +26,10 @@
 //   NOVA_POST_API_KEY                   env only. Never printed, never written; scrubbed from every output (also the JWT).
 //   --out <path>                        findings JSON (default ./nova-post-findings.json, git-ignored).
 //   --city-query <text>                 NP_SPIKE_CITY_QUERY; public settlement name for the searches (default "Київ").
+//   --settlement-id <int>               NP_SPIKE_SETTLEMENT_ID; readonly: the settlement whose divisions are examined.
+//                                       Without it the readonly stage searches --city-query (Accept-language uk), probes
+//                                       up to 5 candidates (exact name matches first, "місто " / "м. " prefixes ignored)
+//                                       and takes the first exact match that has divisions, else the one with the most.
 //   --sender-division-id <int>          NP_SPIKE_SENDER_DIVISION_ID (the division the parcel would be handed in at)
 //   --recipient-division-id <int>       NP_SPIKE_RECIPIENT_DIVISION_ID
 //   NP_SPIKE_SENDER_NAME, NP_SPIKE_SENDER_PHONE (380XXXXXXXXX), NP_SPIKE_SENDER_EMAIL (optional)        env only
@@ -86,6 +90,7 @@ const VALUE_FLAGS = new Map([
   ["env", null],
   ["out", null],
   ["city-query", "NP_SPIKE_CITY_QUERY"],
+  ["settlement-id", "NP_SPIKE_SETTLEMENT_ID"],
   ["sender-division-id", "NP_SPIKE_SENDER_DIVISION_ID"],
   ["recipient-division-id", "NP_SPIKE_RECIPIENT_DIVISION_ID"],
   ["payer-type", null],
@@ -145,6 +150,7 @@ function parseArgs(argv, env) {
     selfTest: flags["self-test"] === true,
     help: flags.help === true,
     cityQuery: flags["city-query"] ?? "Київ",
+    settlementId: optionalId(flags["settlement-id"], "--settlement-id"),
     senderDivisionId: optionalId(flags["sender-division-id"], "--sender-division-id"),
     recipientDivisionId: optionalId(flags["recipient-division-id"], "--recipient-division-id"),
     senderName: env.NP_SPIKE_SENDER_NAME,
@@ -481,7 +487,9 @@ async function call(ctx, label, spec) {
   const location = response.headers.get("location");
   if (location !== null) record.redirectHost = redirectHost(location, url);
   record.startsWithPdf = bytes.subarray(0, 5).toString("latin1") === "%PDF-";
-  const json = spec.binary === true ? undefined : parseJson(bytes);
+  // A binary route that answers JSON instead (an error) is described like any other answer, so a refusal of the label
+  // records its error keys and scrubbed texts.
+  const json = spec.binary === true && record.startsWithPdf ? undefined : parseJson(bytes);
   if (json !== undefined) Object.assign(record, describeJson(json, ctx.secrets));
   else if (spec.binary !== true) record.parseError = bytes.byteLength > 0;
   return { status: response.status, json, bytes, headers: response.headers, record };
@@ -573,6 +581,24 @@ function pick(object, keys) {
   for (const key of keys) if (object[key] !== undefined) result[key] = object[key];
   return result;
 }
+
+/**
+ * GET /shipments/print for a marking label. The parameter is named `type` (no brackets) and the text says `type=marking`
+ * ([marking labels](https://api-portal.novapost.com/methods/methods/shipments/print-documents/marking-labels.md));
+ * its schema says "array", but `type[]=marking` answered 422 {"type": "The type field must be a string."} on
+ * production (2026-10-25). `numbers[]` stays an array parameter: "only one number is allowed per request" for marking.
+ */
+function labelQuery(number) {
+  return { numbers: [number], type: "marking" };
+}
+
+/** Label request variants, tried in order until one answers a PDF: [name, extra query]. */
+const LABEL_VARIANTS = Object.freeze([
+  ["type=marking", {}],
+  // `format` (pdf|zpl, default pdf) is documented on the print-documents overview page
+  // (https://api-portal.novapost.com/methods/methods/shipments/print-documents.md).
+  ["type=marking&format=pdf", { format: "pdf" }],
+]);
 
 function inventedUaNumber() {
   return `20${String(randomInt(10 ** 11, 10 ** 12))}`;
@@ -865,8 +891,9 @@ async function stageReadonly(ctx) {
   });
   facts.settlementsCountryTotal = allSettlements.json?.total ?? null;
 
-  const settlementId = settlementRows[0]?.id;
-  if (settlementId === undefined) throw new Error("no settlement found for --city-query");
+  // The first search hit is often a village of the same name without any division (run of 2026-10-25), so the
+  // settlement for the division calls is chosen on purpose.
+  const settlementId = await chooseSettlement(ctx, facts);
 
   // Divisions of that settlement.
   const page1 = await call(ctx, "divisions settlementIds limit 100 page 1", {
@@ -1090,8 +1117,9 @@ async function stageReadonly(ctx) {
     (
       await call(ctx, "shipments/print marking invented number", {
         path: "/shipments/print",
-        query: { numbers: [invented], type: ["marking"] },
+        query: labelQuery(invented),
         accept: "application/pdf, application/json",
+        binary: true,
       })
     ).record,
   );
@@ -1149,6 +1177,107 @@ async function stageReadonly(ctx) {
   };
 }
 
+/**
+ * The current status row of a GET /shipments/tracking answer: the documented `currentStatus[0]`, else inside the first
+ * of `items` (`items[0].currentStatus[0]` or `items[0]` itself), whichever carries a `statusCode`. {at, row} or undefined.
+ */
+function currentTrackingStatus(json) {
+  const first = (value) => (Array.isArray(value) ? value[0] : value);
+  const item = items(json)[0];
+  const candidates = [
+    ["currentStatus[0]", first(json?.currentStatus)],
+    ["items[0].currentStatus[0]", first(item?.currentStatus)],
+    ["items[0]", item],
+  ];
+  for (const [at, row] of candidates) {
+    if (row !== null && typeof row === "object" && "statusCode" in row) return { at, row };
+  }
+  return undefined;
+}
+
+const SETTLEMENT_CANDIDATES = 5;
+
+/** Lower case, trimmed, without a leading settlement-type word ("місто Київ" and "м. Київ" both become "київ"). */
+function normalizeSettlementName(value) {
+  return typeof value === "string"
+    ? value
+        .trim()
+        .toLowerCase()
+        .replace(/^(місто|м\.|city of|city|misto|m\.)\s*/u, "")
+        .trim()
+    : "";
+}
+
+function isExactSettlementMatch(row, query) {
+  const wanted = normalizeSettlementName(query);
+  if (wanted === "") return false;
+  const names = [row?.name, ...(Array.isArray(row?.alternativeNames) ? row.alternativeNames : [])];
+  return names.some((name) => normalizeSettlementName(name) === wanted);
+}
+
+/**
+ * The settlement whose divisions the readonly stage examines: --settlement-id, else the first exact name match of
+ * --city-query that has divisions, else the probed candidate with the most divisions. Records ids and counts only.
+ */
+async function chooseSettlement(ctx, facts) {
+  const options = ctx.options;
+  const divisionTotal = async (id, label) =>
+    (
+      await call(ctx, label, {
+        path: "/divisions",
+        query: { countryCodes: ["UA"], settlementIds: [id], limit: 1 },
+      })
+    ).json?.total ?? null;
+  if (options.settlementId !== undefined) {
+    facts.settlementChoice = {
+      source: "--settlement-id",
+      id: options.settlementId,
+      divisionsTotal: await divisionTotal(options.settlementId, "divisions of --settlement-id"),
+    };
+    return options.settlementId;
+  }
+  const search = await call(ctx, "settlements textSearch for the division calls (limit 100, uk)", {
+    path: "/settlements",
+    query: { countryCodes: ["UA"], textSearch: options.cityQuery, limit: 100 },
+    headers: { "accept-language": "uk" },
+  });
+  const rows = items(search.json).filter((row) => typeof row?.id === "number");
+  const exact = rows.filter((row) => isExactSettlementMatch(row, options.cityQuery));
+  const candidates = [...exact, ...rows.filter((row) => !exact.includes(row))].slice(
+    0,
+    SETTLEMENT_CANDIDATES,
+  );
+  if (candidates.length === 0) throw new Error("no settlement found for --city-query");
+  const probed = [];
+  for (const [index, row] of candidates.entries()) {
+    const total = await divisionTotal(
+      row.id,
+      `divisions of settlement candidate ${String(index + 1)}`,
+    );
+    probed.push({ id: row.id, exactNameMatch: exact.includes(row), divisionsTotal: total });
+    if (exact.includes(row) && typeof total === "number" && total > 0) break;
+  }
+  const exactWithDivisions = probed.find(
+    (item) =>
+      item.exactNameMatch && typeof item.divisionsTotal === "number" && item.divisionsTotal > 0,
+  );
+  const chosen =
+    exactWithDivisions ??
+    probed.reduce((best, item) =>
+      (item.divisionsTotal ?? -1) > (best.divisionsTotal ?? -1) ? item : best,
+    );
+  facts.settlementChoice = {
+    source: "--city-query",
+    searchTotal: search.json?.total ?? null,
+    exactMatches: exact.length,
+    probed,
+    id: chosen.id,
+    exactNameMatch: chosen.exactNameMatch,
+    divisionsTotal: chosen.divisionsTotal,
+  };
+  return chosen.id;
+}
+
 /** "newest first", "oldest first", "unordered" or "unknown" by `createdAt` (ISO) of the rows. */
 function orderOf(rows) {
   const times = rows
@@ -1177,7 +1306,7 @@ function writePlan(options, target) {
   steps.push(
     "GET /shipments?numbers[]=A, GET /shipments?ids[]=A.id, then up to 5 pages of GET /shipments?limit=100 to find A by clientOrder",
     "GET /shipments/tracking and /shipments/tracking/history for A",
-    "GET /shipments/print?type[]=marking for A (the label; A then counts as printed)",
+    "GET /shipments/print?numbers[]=A&type=marking for A (the label; A then counts as printed); on a refusal once more with &format=pdf",
     "DELETE /shipments/<B number> (expected refusal: UA deletes by id only), DELETE /shipments/<A id>, again (repeat), /shipments/<B id>",
     "DELETE /shipments/<random uuid> (404 sample); GET /shipments and tracking - check A and B are gone",
     "finally: DELETE /shipments/<id> again for any shipment not confirmed gone",
@@ -1363,21 +1492,24 @@ async function stageWrite(ctx) {
         path: "/shipments/tracking",
         query: { numbers: [a.number] },
       });
-      const current = Array.isArray(full.json?.currentStatus)
-        ? full.json.currentStatus[0]
-        : undefined;
+      const current = currentTrackingStatus(full.json);
+      const firstItem = items(full.json)[0];
       facts.tracking = {
         ...brief(full.record),
         topKeys:
           full.json !== null && typeof full.json === "object"
             ? Object.keys(full.json).sort()
             : null,
+        // The documented answer is {currentStatus: [...]}; production answered {items: [...]} (2026-10-25).
+        itemFields: fieldNames(firstItem === undefined ? [] : [firstItem]),
+        itemShape: firstItem === undefined ? null : shapeOf(firstItem),
+        statusCodeFoundAt: current?.at ?? null,
         statusCode:
-          typeof current?.statusCode === "string" || typeof current?.statusCode === "number"
-            ? current.statusCode
+          typeof current?.row.statusCode === "string" || typeof current?.row.statusCode === "number"
+            ? current.row.statusCode
             : null,
-        statusCodeType: typesOf(current === undefined ? [] : [current], "statusCode"),
-        statusDateType: typesOf(current === undefined ? [] : [current], "statusDate"),
+        statusCodeType: typesOf(current === undefined ? [] : [current.row], "statusCode"),
+        statusDateType: typesOf(current === undefined ? [] : [current.row], "statusDate"),
       };
       const history = await call(ctx, "GET /shipments/tracking/history (A)", {
         path: "/shipments/tracking/history",
@@ -1390,22 +1522,34 @@ async function stageWrite(ctx) {
         dateTypes: typesOf(historyRows, "date"),
       };
 
-      // Label.
-      const label = await call(ctx, "GET /shipments/print marking (A)", {
-        path: "/shipments/print",
-        query: { numbers: [a.number], type: ["marking"] },
-        accept: "application/pdf, application/json",
-        binary: true,
-      });
-      a.labelPrinted = label.status === 200;
-      facts.label = pick(label.record, [
-        "httpStatus",
-        "contentType",
-        "responseBytes",
-        "startsWithPdf",
-        "latencyMs",
-        "transportError",
-      ]);
+      // Label: the documented form first; on a refusal one variant with the documented optional `format=pdf`.
+      facts.label = { attempts: [] };
+      for (const [variant, extra] of LABEL_VARIANTS) {
+        const label = await call(ctx, `GET /shipments/print marking (A, ${variant})`, {
+          path: "/shipments/print",
+          query: { ...labelQuery(a.number), ...extra },
+          accept: "application/pdf, application/json",
+          binary: true,
+        });
+        if (label.status === 200 && label.record.startsWithPdf) a.labelPrinted = true;
+        const attempt = {
+          variant,
+          ...pick(label.record, [
+            "httpStatus",
+            "contentType",
+            "responseBytes",
+            "startsWithPdf",
+            "bodyKeys",
+            "errorKeys",
+            "errorMessages",
+            "latencyMs",
+            "transportError",
+          ]),
+        };
+        facts.label.attempts.push(attempt);
+        Object.assign(facts.label, attempt);
+        if (a.labelPrinted) break;
+      }
       facts.label.noKeyInUrl = true;
     }
 
@@ -1523,6 +1667,14 @@ const DOCS = "https://api-portal.novapost.com";
 const NOT_TESTED = (why) => ({ status: "NOT TESTED", fact: why });
 const verdict = (ok, fact) => ({ status: ok ? "CONFIRMED" : "DIFFERENT", fact });
 const statusOf = (record) => String(record?.httpStatus ?? record?.transportError ?? "-");
+
+/** Division facts are only evidence when the chosen settlement has divisions (the run of 2026-10-25 had none). */
+const noDivisions = (f) =>
+  f.readonly?.divisions !== undefined && !(f.readonly.divisions.itemCount > 0)
+    ? NOT_TESTED(
+        `the chosen settlement has no divisions (${JSON.stringify(f.readonly.settlementChoice ?? null)}); rerun with --settlement-id`,
+      )
+    : undefined;
 
 const HYPOTHESES = [
   [
@@ -1686,6 +1838,8 @@ const HYPOTHESES = [
     (f) => {
       const d = f.readonly?.divisions;
       if (d === undefined) return NOT_TESTED("needs a key");
+      const empty = noDivisions(f);
+      if (empty !== undefined) return empty;
       return verdict(
         d.httpStatus === 200 && d.allInSettlement,
         `${statusOf(d)}, page ${JSON.stringify(d.page)}, page 2 ${statusOf(d.page2)} (overlap ${String(d.pagesOverlap)}); categories ${JSON.stringify(d.divisionCategories)}; statuses ${JSON.stringify(d.statuses)}; filter ${JSON.stringify(f.readonly.divisionCategoryFilter)}; country total ${String(f.readonly.divisionsCountryTotal)}; ${String(d.responseBytes)} bytes for ${String(d.itemCount)}`,
@@ -1698,6 +1852,8 @@ const HYPOTHESES = [
     (f) => {
       const d = f.readonly?.divisions;
       if (d === undefined) return NOT_TESTED("needs a key");
+      const empty = noDivisions(f);
+      if (empty !== undefined) return empty;
       const expected = [
         "id",
         "number",
@@ -1724,6 +1880,8 @@ const HYPOTHESES = [
     (f) => {
       const l = f.readonly?.divisionLanguages;
       if (l === undefined) return NOT_TESTED("needs a key");
+      const empty = noDivisions(f);
+      if (empty !== undefined) return empty;
       return verdict(
         l.en?.nameScript === "text(latin)" && l.uk?.nameScript === "text(cyrillic)",
         `en ${JSON.stringify(l.en)}; uk ${JSON.stringify(l.uk)}`,
@@ -1741,7 +1899,7 @@ const HYPOTHESES = [
       const refused101 = r.divisionLimits[101].httpStatus === 422;
       return verdict(
         ok100 && refused101,
-        `divisions 100/101/500: ${statusOf(r.divisionLimits[100])}/${statusOf(r.divisionLimits[101])}/${statusOf(r.divisionLimits[500])} (per_page ${String(r.divisionLimits[500].page?.per_page)}); settlements: ${statusOf(r.settlementLimits[100])}/${statusOf(r.settlementLimits[101])}/${statusOf(r.settlementLimits[500])}; shipments: ${statusOf(r.shipmentListLimits[100])}/${statusOf(r.shipmentListLimits[101])}`,
+        `divisions 100/101/500: ${statusOf(r.divisionLimits[100])}/${statusOf(r.divisionLimits[101])}/${statusOf(r.divisionLimits[500])} (500: ${JSON.stringify(r.divisionLimits[500].errorMessages ?? [])}); settlements: ${statusOf(r.settlementLimits[100])}/${statusOf(r.settlementLimits[101])}/${statusOf(r.settlementLimits[500])}; shipments: ${statusOf(r.shipmentListLimits[100])}/${statusOf(r.shipmentListLimits[101])}`,
       );
     },
   ],
@@ -1750,7 +1908,7 @@ const HYPOTHESES = [
     `One division by id: no documented filter on GET /divisions [${DOCS}/methods/methods/dictionaries.md]`,
     (f) => {
       const d = f.readonly?.divisionById;
-      if (d === undefined) return NOT_TESTED("needs a key");
+      if (d === undefined) return noDivisions(f) ?? NOT_TESTED("needs a key");
       const works = Object.entries(d)
         .filter(([, value]) => value.onlyThatDivision)
         .map(([name]) => name);
@@ -1877,7 +2035,7 @@ const HYPOTHESES = [
         );
       return verdict(
         String(t.statusCode) === "1",
-        `fresh shipment: statusCode ${JSON.stringify(t.statusCode)} ${JSON.stringify(t.statusCodeType)}; history codes ${JSON.stringify(f.write.trackingHistory?.codes)}; after delete ${JSON.stringify(f.write.afterDelete?.trackingCodes)}`,
+        `fresh shipment: statusCode ${JSON.stringify(t.statusCode)} ${JSON.stringify(t.statusCodeType)} at ${String(t.statusCodeFoundAt)} (answer keys ${JSON.stringify(t.topKeys)}, item fields ${JSON.stringify(t.itemFields ?? [])}); history codes ${JSON.stringify(f.write.trackingHistory?.codes)}; after delete ${JSON.stringify(f.write.afterDelete?.trackingCodes)}`,
       );
     },
   ],
@@ -1894,19 +2052,22 @@ const HYPOTHESES = [
   ],
   [
     "H27",
-    `Label: GET /shipments/print?numbers[]=<number>&type[]=marking answers application/pdf with the JWT (no key in a URL; one number per marking request) [${DOCS}/methods/methods/shipments/print-documents/marking-labels.md]`,
+    `Label: GET /shipments/print?numbers[]=<number>&type=marking answers application/pdf with the JWT (no key in a URL; one number per marking request) [${DOCS}/methods/methods/shipments/print-documents/marking-labels.md]`,
     (f) => {
       const l = f.write?.label;
       if (l === undefined)
         return NOT_TESTED(
           f.readonly?.printInvented
-            ? `readonly: invented number ${statusOf(f.readonly.printInvented)}`
+            ? `readonly: invented number ${statusOf(f.readonly.printInvented)} ${JSON.stringify(f.readonly.printInvented.errorKeys ?? [])} ${JSON.stringify(f.readonly.printInvented.errorMessages ?? [])}`
             : "needs the write stage",
         );
-      return verdict(
-        l.startsWithPdf === true,
-        `${statusOf(l)}, ${String(l.contentType)}, ${String(l.responseBytes)} bytes, %PDF- ${String(l.startsWithPdf)}`,
-      );
+      const attempts = (l.attempts ?? [l])
+        .map(
+          (item) =>
+            `${String(item.variant ?? "request")}: ${statusOf(item)} ${String(item.contentType)} ${String(item.responseBytes)} bytes, %PDF- ${String(item.startsWithPdf)}${item.errorKeys ? ` ${JSON.stringify(item.errorKeys)} ${JSON.stringify(item.errorMessages)}` : ""}`,
+        )
+        .join("; ");
+      return verdict(l.startsWithPdf === true, attempts);
     },
   ],
   [
@@ -2206,26 +2367,27 @@ function startStub(behaviour) {
       items: slice,
     };
   };
-  const settlements = [
-    {
-      id: 100_001,
-      name: "Тест",
-      country: { name: "Україна", code: "UA" },
-      region: { id: 1, name: "Тестовий район", parent: { id: 2, name: "Тестова область" } },
-      latitude: 50.4,
-      longitude: 30.5,
-      postCode1: "01001",
-      postCode2: "01999",
-      alternativeNames: [],
-      externalId: randomUUID(),
-      boost: 0,
-      prohibitedIssuance: false,
-      prohibitedSending: false,
-      createdAt: "2026-01-01T00:00:00.000000Z",
-      updatedAt: "2026-01-01T00:00:00.000000Z",
-      deletedAt: null,
-    },
-  ];
+  const settlementRow = (id, name) => ({
+    id,
+    name,
+    country: { name: "Україна", code: "UA" },
+    region: { id: 1, name: "Тестовий район", parent: { id: 2, name: "Тестова область" } },
+    latitude: 50.4,
+    longitude: 30.5,
+    postCode1: "01001",
+    postCode2: "01999",
+    alternativeNames: [],
+    externalId: randomUUID(),
+    boost: 0,
+    prohibitedIssuance: false,
+    prohibitedSending: false,
+    createdAt: "2026-01-01T00:00:00.000000Z",
+    updatedAt: "2026-01-01T00:00:00.000000Z",
+    deletedAt: null,
+  });
+  // Like production: the first search hit is a namesake village without divisions; the city comes later.
+  const city = settlementRow(100_001, "місто Київ");
+  const settlements = [settlementRow(100_002, "село Київське"), city];
   const divisions = [1, 2, 3].map((index) => ({
     id: 4000 + index,
     name: `Відділення №${String(index)}`,
@@ -2233,7 +2395,7 @@ function startStub(behaviour) {
     externalId: randomUUID(),
     source: "NPUA",
     countryCode: "UA",
-    settlement: settlements[0],
+    settlement: city,
     address: "Тестова вул., 1",
     number: String(index),
     status: "Working",
@@ -2422,6 +2584,19 @@ function startStub(behaviour) {
             },
           ];
         }
+        if (behaviour.trackingItems) {
+          // The shape production answered (top key `items`), with the status inside each item.
+          return [
+            200,
+            {
+              items: found.map((item) => ({
+                number: item.number,
+                statusCode: item.status === "Deleted" ? "2" : "1",
+                statusDate: item.createdAt,
+              })),
+            },
+          ];
+        }
         return [
           200,
           {
@@ -2437,6 +2612,13 @@ function startStub(behaviour) {
         ];
       }
       case "/v.1.0/shipments/print": {
+        // Like production (2026-10-25): `type[]=marking` is refused, `type` must be a single string.
+        if (query.getAll("type[]").length > 0)
+          return errors(422, { type: "The type field must be a string." });
+        if (query.get("type") !== "marking")
+          return errors(422, { type: "The selected type is invalid." });
+        if (behaviour.labelRefuses)
+          return errors(422, { "numbers.0": "The shipment cannot be printed: 0501234567." });
         const numbers = query.getAll("numbers[]");
         const found = [...state.shipments.values()].find(
           (item) => item.number === numbers[0] && item.status !== "Deleted",
@@ -2686,6 +2868,58 @@ async function selfTest(io) {
         for (const id of ["H03", "H04", "H09", "H12", "H13", "H14", "H15", "H18"]) {
           assert.equal(status(file, id), "CONFIRMED", id);
         }
+        const choice = file.facts.readonly.settlementChoice;
+        assert.equal(choice.source, "--city-query");
+        assert.equal(choice.id, 100_001, "the exact name match with divisions, not the first hit");
+        assert.equal(choice.exactNameMatch, true);
+        assert.equal(choice.divisionsTotal, 3);
+        assert.equal(file.facts.readonly.divisions.itemCount, 3);
+        assert.equal(
+          file.facts.readonly.printInvented.httpStatus,
+          404,
+          "the label request passes validation (type=marking)",
+        );
+      },
+    );
+    await run(
+      "readonly without an exact name match takes the candidate with the most divisions",
+      ["--stage", "readonly", "--city-query", "Ніде"],
+      { NOVA_POST_API_KEY: key },
+      {},
+      ({ code, file }) => {
+        assert.equal(code, 0);
+        const choice = file.facts.readonly.settlementChoice;
+        assert.equal(choice.exactMatches, 0);
+        assert.equal(choice.probed.length, 2);
+        assert.equal(choice.id, 100_001);
+        assert.equal(status(file, "H12"), "CONFIRMED");
+      },
+    );
+    await run(
+      "readonly with --settlement-id of a settlement without divisions marks H12-H14 NOT TESTED",
+      ["--stage", "readonly", "--settlement-id", "100002"],
+      { NOVA_POST_API_KEY: key },
+      {},
+      ({ code, file }) => {
+        assert.equal(code, 0);
+        assert.deepEqual(file.facts.readonly.settlementChoice, {
+          source: "--settlement-id",
+          id: 100_002,
+          divisionsTotal: 0,
+        });
+        for (const id of ["H12", "H13", "H14", "H16"]) {
+          assert.equal(status(file, id), "NOT TESTED", id);
+        }
+      },
+    );
+    await run(
+      "a non-numeric --settlement-id is a usage error",
+      ["--stage", "readonly", "--settlement-id", "Kyiv"],
+      { NOVA_POST_API_KEY: key },
+      {},
+      ({ code, stub }) => {
+        assert.equal(code, 2);
+        assert.equal(stub.state.requests, 0);
       },
     );
     await run(
@@ -2715,6 +2949,13 @@ async function selfTest(io) {
         assert.equal(file.cleanup.created, 2);
         assert.deepEqual(file.cleanup.leftovers, []);
         assert.equal(file.facts.write.label.startsWithPdf, true);
+        assert.equal(
+          file.facts.write.label.attempts.length,
+          1,
+          "the documented form answers a PDF",
+        );
+        assert.equal(file.facts.write.label.variant, "type=marking");
+        assert.equal(file.facts.write.tracking.statusCodeFoundAt, "currentStatus[0]");
         assert.equal(file.facts.write.repeatCreate.createdAnother, true);
         assert.ok(file.facts.write.reference.startsWith(REFERENCE_PREFIX));
         assert.ok(file.facts.write.referenceLength <= 50);
@@ -2801,6 +3042,43 @@ async function selfTest(io) {
       },
       (label) =>
         label.startsWith("DELETE /shipments/<A id>") || label === "cleanup DELETE /shipments/<id>",
+    );
+    await run(
+      "write records a refused label (error keys, scrubbed text) and still cleans up",
+      ["--stage", "write", "--confirm", ...writeFlags],
+      { NOVA_POST_API_KEY: key, ...personal },
+      { labelRefuses: true },
+      ({ code, file, stub }) => {
+        assert.equal(code, 0);
+        assert.ok([...stub.state.shipments.values()].every((item) => item.status === "Deleted"));
+        assert.deepEqual(file.cleanup.leftovers, []);
+        const label = file.facts.write.label;
+        assert.deepEqual(
+          label.attempts.map((item) => item.variant),
+          ["type=marking", "type=marking&format=pdf"],
+        );
+        assert.equal(label.httpStatus, 422);
+        assert.deepEqual(label.errorKeys, ["numbers.0"]);
+        assert.ok(
+          label.errorMessages[0].includes("[digits]") &&
+            !label.errorMessages[0].includes("0501234567"),
+          "the error text is kept, digit runs are scrubbed",
+        );
+        assert.equal(status(file, "H27"), "DIFFERENT");
+        assert.equal(status(file, "H30"), "NOT TESTED");
+      },
+    );
+    await run(
+      "write reads the tracking status from items[] (the shape production answered)",
+      ["--stage", "write", "--confirm", "--skip-repeat-create", ...writeFlags],
+      { NOVA_POST_API_KEY: key, ...personal },
+      { trackingItems: true },
+      ({ code, file }) => {
+        assert.equal(code, 0);
+        assert.equal(file.facts.write.tracking.statusCodeFoundAt, "items[0]");
+        assert.deepEqual(file.facts.write.tracking.topKeys, ["items"]);
+        assert.equal(status(file, "H25"), "CONFIRMED");
+      },
     );
     await run(
       "write cleans up when tracking answers 500",
