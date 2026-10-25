@@ -1,6 +1,6 @@
 # Plan: Nova Post carrier plugin (shipping plan step 7b)
 
-Status: plan of step 7b of `docs/plans/2026-10-24-shipping.md` (ADR 0029, ADR 0030). Written 2026-10-25 before any code, on `feat/shipping-nova-post`.
+Status: plan of step 7b of `docs/plans/2026-10-24-shipping.md` (ADR 0029, ADR 0030). Written 2026-10-25 before any code, on `feat/shipping-nova-post`. **Built** 2026-10-25 on the same branch (PR not opened; independent review next): see Outcome.
 Roles: Developer (Opus 5.5 high) writes the plan and the code; the orchestrator verifies; an independent reviewer (a different agent) reviews the PR.
 Design basis: the shipping plan, section 8 (8.3 port mapping, 8.4 settings, 8.5 design), its sections "Spike 7a — production run 2026-10-25" and the rerun below; ADR 0029 decisions 8 to 11 and 14; ADR 0030; review `docs/plans/2026-10-24-shipping-review.md` (M-2 window, m-3 signal rule).
 
@@ -124,3 +124,10 @@ None exists (H22: a repeat create makes a second shipment). The plugin never rep
 | Port changes 1 to 3 and the contract check | ADR 0030 Consequences ("Port changes proposed for 7b (internal contract, approval with 7b)"): the orchestrator's 7b assignment of 2026-10-25 names exactly these; the port is internal (not in `docs/contracts/`) |
 | CI matrix mode `providers-nova-post` | "Needs approval" item 7 (the provider matrix job) |
 | AGENTS.md | Not touched; the owner adds the lines listed in HANDOFF (section 1: the variables, the plugin) |
+
+## Outcome (2026-10-25)
+- Built as planned: the package, port changes 1 to 3 with every implementer (core spec, fake, the in-repo test carrier, the registry, the label call site, the admin settings route), the core contract check run by the fake and the plugin, the matrix mode, the docs. No deviation from the mapping above.
+- TDD: the status table spec ran red first (46 of 64 failing against an empty table), then green.
+- Mutation checks (one at a time, restored): `Bearer` header (30 specs fail), `findWaybill` ignoring the window (1 fails), the create retried on `401` (1 fails), code `8` mapped to `in_transit` (2 fail). A deliberate static import of the plugin from `apps/api` and from `packages/core` fails `check:boundaries` (3 violations).
+- Verified locally: install (frozen lockfile), lint, format, typecheck, boundaries, licenses, docs check, production audit, build, full `pnpm test` (the plugin 128 tests; a first run had one storefront spec time out at 5 s under load, unrelated and green alone and on the rerun), `openapi:export` (the settings route description), matrix `on`, `off`, `providers-on`, `providers-off`, `providers-nova-post`, and `providers-deleted` on a throwaway clone, `pnpm test:e2e`.
+- Not verified: anything against the real Nova Post API (no call was made; the key was never asked for). Open for the owner: a live run with a real order (label, estimate, status codes), a Ukrainian sandbox key, billing of production shipments.
