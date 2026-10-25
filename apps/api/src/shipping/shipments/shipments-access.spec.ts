@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { RunningApp } from "../../test/app.js";
 import { http, type HttpResult } from "../../test/http.js";
 import { PARCEL, ShipmentWorld } from "../../test/shipment-world.js";
+import { RECONCILE_NOT_FOUND_MIN_AGE_MS } from "./shipments.service.js";
 
 /**
  * The permission walk of the shipment routes (ADR 0029 decisions 10 and 13): `orders.read` to see (the list and the
@@ -84,6 +85,8 @@ describe("shipments: access (real Postgres)", () => {
           world.provider().failWaybill("createWaybill", { hang: true });
           const lost = await world.create(order.id);
           expect(lost.body.shipment.status).toBe("unknown");
+          // Old enough for a "not found" to settle it (review M-2).
+          world.clock.advanceMinutes(RECONCILE_NOT_FOUND_MIN_AGE_MS / 60_000);
           return http(
             running.baseUrl,
             "POST",

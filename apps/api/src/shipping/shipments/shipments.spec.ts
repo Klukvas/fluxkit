@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ORDER_READ_PORT, type OrderReadPort } from "@fluxkit/core";
 import { SOME_ID } from "../../test/routes.js";
+import { FIND_WAYBILL_MARGIN_MS, RECONCILE_NOT_FOUND_MIN_AGE_MS } from "./shipments.service.js";
 import { captureLogs } from "../../test/shipping-fixtures.js";
 import { PARCEL, ShipmentWorld, TEST_POINT_REF } from "../../test/shipment-world.js";
 import { Shopper } from "../../test/shopper.js";
@@ -308,8 +309,16 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
         trackingNumber: atCarrier?.created.trackingNumber,
         carrierCost: { amount: TEST_WAYBILL_COST_MINOR_UNITS, currency: "UAH" },
       });
+      // An instant window, never a date (review M-2): from the creation minus the margin to now plus the margin.
+      const createdAt = new Date(unknown.createdAt).getTime();
       expect(world.provider().findRequests).toEqual([
-        { clientReference: order.number, createdOn: unknown.createdAt.slice(0, 10) },
+        {
+          clientReference: order.number,
+          createdAfter: new Date(createdAt - FIND_WAYBILL_MARGIN_MS).toISOString(),
+          createdBefore: new Date(
+            world.clock.now().getTime() + FIND_WAYBILL_MARGIN_MS,
+          ).toISOString(),
+        },
       ]);
       expect(world.provider().calls.createWaybill).toBe(1);
       expect(reconciled.body.history.map((entry) => [entry.fromStatus, entry.toStatus])).toEqual([
@@ -346,6 +355,7 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
       const order = await world.paid("pickup");
       world.provider().failWaybill("createWaybill", { hang: true });
       const unknown = (await world.create(order.id)).body.shipment;
+      world.clock.advanceMinutes(RECONCILE_NOT_FOUND_MIN_AGE_MS / 60_000);
       const reconciled = await world.action(order.id, unknown.id, "reconcile");
       expect(reconciled.status).toBe(200);
       expect(reconciled.body.status).toBe("failed");
@@ -355,6 +365,74 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
       ]);
       world.clock.advanceMinutes(1);
       expect((await world.created(order.id)).status).toBe("created");
+    });
+
+    it("review M-2: a 'not found' for a shipment younger than the minimum age is 409 reconcile_too_early; it stays unknown", async () => {
+      const order = await world.paid("pickup");
+      world.provider().failWaybill("createWaybill", { hang: true });
+      const unknown = (await world.create(order.id)).body.shipment;
+      // The carrier's list may lag right after a timed-out save: a negative answer this early proves nothing.
+      world.clock.advanceMinutes(RECONCILE_NOT_FOUND_MIN_AGE_MS / 60_000 - 1);
+      const early = await world.action(order.id, unknown.id, "reconcile");
+      expect(early.status).toBe(409);
+      expect(early.body).toMatchObject({ code: "rule_violation", rule: "reconcile_too_early" });
+      expect(early.headers.get("retry-after")).toBe("60");
+      expect(world.provider().calls.findWaybill).toBe(1);
+      expect((await world.list(order.id)).body.items[0]?.status).toBe("unknown");
+      expect(await world.journal(unknown.id)).toHaveLength(2);
+      // A create is still refused: the shipment may exist at the carrier.
+      expect((await world.create(order.id)).body.rule).toBe("shipment_exists");
+
+      world.clock.advanceMinutes(1);
+      const late = await world.action(order.id, unknown.id, "reconcile");
+      expect(late.status).toBe(200);
+      expect(late.body.status).toBe("failed");
+      // The window reaches past the time of THIS lookup, not only past the creation.
+      expect(world.provider().findRequests.at(-1)).toEqual({
+        clientReference: order.number,
+        createdAfter: new Date(
+          new Date(unknown.createdAt).getTime() - FIND_WAYBILL_MARGIN_MS,
+        ).toISOString(),
+        createdBefore: new Date(world.clock.now().getTime() + FIND_WAYBILL_MARGIN_MS).toISOString(),
+      });
+    });
+
+    it("review M-2: a waybill the carrier dated after UTC midnight is found (a date-only lookup of the creation day would miss it)", async () => {
+      const now = world.clock.now();
+      // The next 23:59:50 UTC (forward only: other specs rely on created_at moving on).
+      const nearMidnight = new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 23, 59, 50),
+      );
+      world.clock.set(nearMidnight);
+      const order = await world.paid("pickup");
+      const provider = world.provider();
+      // The carrier saves the waybill 20 s later, on the next UTC (and Kyiv) day, then the answer is lost.
+      provider.now = () => new Date(nearMidnight.getTime() + 20_000);
+      provider.failWaybill("createWaybill", { afterEffect: true, hang: true });
+      const unknown = (await world.create(order.id)).body.shipment;
+      expect(unknown.status).toBe("unknown");
+      expect(unknown.createdAt.slice(0, 10)).not.toBe(
+        new Date(nearMidnight.getTime() + 20_000).toISOString().slice(0, 10),
+      );
+      world.clock.advanceMinutes(10);
+      const reconciled = await world.action(order.id, unknown.id, "reconcile");
+      expect(reconciled.status).toBe(200);
+      expect(reconciled.body.status).toBe("created");
+      const [request] = provider.findRequests;
+      expect(request?.createdAfter.slice(0, 10)).toBe(nearMidnight.toISOString().slice(0, 10));
+    });
+
+    it("review M-2: the test carrier honours the window: a waybill created outside it is not found", async () => {
+      const order = await world.paid("pickup");
+      const provider = world.provider();
+      // A waybill the carrier dates an hour BEFORE our shipment row (another, older one with our order number).
+      provider.now = () => new Date(world.clock.now().getTime() - 60 * 60_000);
+      provider.failWaybill("createWaybill", { afterEffect: true, hang: true });
+      const unknown = (await world.create(order.id)).body.shipment;
+      world.clock.advanceMinutes(RECONCILE_NOT_FOUND_MIN_AGE_MS / 60_000);
+      const reconciled = await world.action(order.id, unknown.id, "reconcile");
+      expect(reconciled.status).toBe(200);
+      expect(reconciled.body.status).toBe("failed");
     });
 
     it("reconcile while the carrier is down or slow: 503 shipping_provider_unavailable with Retry-After; still unknown", async () => {
@@ -400,6 +478,10 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
         "shipment_not_unknown",
       );
       world.clock.advanceMinutes(3);
+      // Reconcilable now, but a "not found" this young does not settle it (review M-2).
+      const early = await world.action(order.id, unknown.id, "reconcile");
+      expect(early.body.rule).toBe("reconcile_too_early");
+      world.clock.advanceMinutes(RECONCILE_NOT_FOUND_MIN_AGE_MS / 60_000);
       const reconciled = await world.action(order.id, unknown.id, "reconcile");
       expect(reconciled.status).toBe(200);
       expect(reconciled.body.status).toBe("failed");

@@ -23,6 +23,7 @@ export const SHIPMENT_REFUSAL_RULES = [
   "carrier_not_supported",
   "shipment_exists",
   "shipment_not_unknown",
+  "reconcile_too_early",
   "shipment_not_tracked",
   "invalid_transition",
   "label_not_available",

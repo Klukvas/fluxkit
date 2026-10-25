@@ -17,11 +17,13 @@ import {
   type ShippingProviderPort,
   type TrackingUpdate,
   type WaybillCreated,
+  type WaybillLookup,
   type WaybillRequest,
 } from "@fluxkit/core";
 
 /*
- * TEST-ONLY. A deterministic, in-memory shipping provider: no network, no clock, no randomness, no environment variables.
+ * TEST-ONLY. A deterministic, in-memory shipping provider: no network, no randomness, no environment variables; its only
+ * clock is the replaceable `now` hook, which dates the waybills it creates (so `findWaybill` can honour its window).
  * It exists so the shipping module, the provider loader and the e2e suites have a provider that is always available and
  * can be told to fail. It must never be enabled in a real shop: its cities, points, prices and waybills are made up.
  */
@@ -67,6 +69,7 @@ interface PendingFailure extends FakeFailure {
 interface StoredWaybill {
   readonly created: WaybillCreated;
   readonly clientReference: string;
+  readonly createdAt: Date;
   status: CarrierReportedShipmentStatus;
   carrierStatusCode: string;
   cancelled: boolean;
@@ -136,6 +139,9 @@ export class FakeShippingProvider implements ShippingProviderPort {
   private readonly byClientReference = new Map<string, StoredWaybill>();
   private sequence = 0;
 
+  /** Test hook: the fake carrier's clock, which dates the waybills it creates. Not part of ShippingProviderPort. */
+  now: () => Date = () => new Date();
+
   /*
    * Test hooks. Not part of ShippingProviderPort; a test reaches them by `app.get(FakeShippingProvider)` or a cast of the
    * registry's answer. They act inside one process: a separate API process cannot be told to fail.
@@ -173,6 +179,7 @@ export class FakeShippingProvider implements ShippingProviderPort {
     this.waybills.clear();
     this.byClientReference.clear();
     this.sequence = 0;
+    this.now = () => new Date();
   }
 
   /** How many waybills exist (cancelled ones included): lets a test check that a failed call created none. */
@@ -268,6 +275,7 @@ export class FakeShippingProvider implements ShippingProviderPort {
       const stored: StoredWaybill = {
         created,
         clientReference: input.clientReference,
+        createdAt: this.now(),
         status: "created",
         carrierStatusCode: "FAKE_CREATED",
         cancelled: false,
@@ -279,13 +287,23 @@ export class FakeShippingProvider implements ShippingProviderPort {
     });
   }
 
+  /** By client reference, within the window by instant (review M-2); a window that is not two ordered instants is `rejected`. */
   findWaybill(
-    input: { readonly clientReference: string; readonly createdOn: string },
+    input: WaybillLookup,
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<WaybillCreated | null>> {
     return this.runResult("findWaybill", signal, () => {
+      const after = Date.parse(input.createdAfter);
+      const before = Date.parse(input.createdBefore);
+      if (!(after < before)) {
+        return providerFailure("rejected", ["INVALID_WINDOW"]);
+      }
       const found = this.byClientReference.get(input.clientReference);
-      return providerOk(found === undefined || found.cancelled ? null : found.created);
+      if (found === undefined || found.cancelled) {
+        return providerOk(null);
+      }
+      const at = found.createdAt.getTime();
+      return providerOk(at >= after && at <= before ? found.created : null);
     });
   }
 

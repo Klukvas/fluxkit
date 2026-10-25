@@ -75,6 +75,7 @@ describe("describeShipmentProblem", () => {
         "no_carrier",
         "order_not_paid",
         "provider_not_enabled",
+        "reconcile_too_early",
         "shipment_exists",
         "shipment_not_tracked",
         "shipment_not_unknown",
