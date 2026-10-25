@@ -1,6 +1,6 @@
 # @fluxkit/provider-fake
 
-Purpose: a TEST-ONLY shipping provider with code `fake` (ADR 0029, shipping plan step 4). It implements `ShippingProviderPort` deterministically and in memory (three fixed cities, a branch and a locker in each, a fixed estimate, numbered waybills and a tiny PDF label), with no network and no randomness; its only clock is the `now` test hook, which dates the waybills it creates. It is the fixture for the provider enable / disable / delete CI matrix and for the tests and e2e suites of the shipping module. Never enable it in a real shop: its data is made up.
+Purpose: a TEST-ONLY shipping provider with code `fake` (ADR 0029, shipping plan step 4). It implements `ShippingProviderPort` deterministically and in memory (three fixed cities, a branch and a locker in each, a fixed estimate, numbered waybills and a tiny PDF label), with no network and no randomness; its only clock is the `now` test hook, which dates the waybills it creates. It is the fixture for the provider enable / disable / delete CI matrix and for the tests and e2e suites of the shipping module. Never enable it in a real shop: its data is made up. `loadEnv` refuses `SHIPPING_PROVIDERS_ENABLED=fake` when `NODE_ENV=production` (the API does not start).
 
 - Flag: `SHIPPING_PROVIDERS_ENABLED=fake` (comma-separated list of provider codes).
 - Manifest: `"fluxkit": { "provider": "fake", "kind": "shipping" }` in `package.json`.

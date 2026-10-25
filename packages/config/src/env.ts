@@ -2,7 +2,10 @@ import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { parseEnabledFeatures } from "./features.js";
-import { parseEnabledShippingProviders } from "./shipping-providers.js";
+import {
+  parseEnabledShippingProviders,
+  TEST_ONLY_SHIPPING_PROVIDERS,
+} from "./shipping-providers.js";
 
 /** Lowercase letters, 2 to 8, optional `-` segments (`uk`, `en`, `en-us`). */
 const LOCALE_CODE = /^[a-z]{2,8}(-[a-z]{2,8})*$/;
@@ -310,6 +313,18 @@ const envSchema = z
         path: ["ORDER_TOKEN_SECRET"],
         message: `is required when NODE_ENV is production (at least ${ORDER_TOKEN_SECRET_MIN_LENGTH} characters)`,
       });
+    }
+    if (inProduction && env.SHIPPING_PROVIDERS_ENABLED !== undefined) {
+      const enabled = env.SHIPPING_PROVIDERS_ENABLED.split(",").map((part) =>
+        part.trim().toLowerCase(),
+      );
+      for (const code of TEST_ONLY_SHIPPING_PROVIDERS.filter((test) => enabled.includes(test))) {
+        context.addIssue({
+          code: "custom",
+          path: ["SHIPPING_PROVIDERS_ENABLED"],
+          message: `"${code}" is a test-only provider (made-up pickup points and waybills) and is refused when NODE_ENV is production`,
+        });
+      }
     }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
       context.addIssue({
