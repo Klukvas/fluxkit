@@ -19,5 +19,6 @@ blob-report/
 # Local media uploads (MEDIA_DIR default, ADR 0028)
 var/
 
-# Nova Poshta spike findings (scripts/spikes/README.md); may describe the key owner's account
+# Nova Poshta / Nova Post spike findings (scripts/spikes/README.md); may describe the key owner's account
 nova-poshta-findings*.json
+nova-post-findings*.json

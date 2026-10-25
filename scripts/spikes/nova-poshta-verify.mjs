@@ -1,3 +1,6 @@
+// DEPRECATED 2026-10-25 (ADR 0030): this tool checks the LEGACY Nova Poshta JSON-RPC API (api.novaposhta.ua/v2.0). The
+// plugin now targets the new Nova Post REST API; use scripts/spikes/nova-post-verify.mjs. Kept for history; do not extend.
+//
 // Nova Poshta verification spike (shipping plan step 7a, ADR 0029 decision 11). Plain Node 22 ESM, built-in fetch only,
 // no dependencies, not part of any package build. How to run it, what it creates and deletes, and how to read the
 // findings: scripts/spikes/README.md.
