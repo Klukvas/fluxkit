@@ -119,14 +119,16 @@ In-process, per API instance (several instances multiply carrier calls by their 
 | Cache | Key | Fresh | Bound |
 |---|---|---|---|
 | City searches | provider, locale, normalized query (trimmed, single spaces, lower case) | 24 h | 1 000 searches, 100 cities each |
-| Point list of a city | provider, city ref (both kinds fetched once, filtered here) | 12 h | 200 cities, 5 000 points each (a longer list is cut and logged as a warning with the count) |
-| Points by ref (checkout, options) | provider, point ref (`findPickupPoint`; unknown refs are not kept) | 12 h | 2 000 |
+| Point list of a city | provider, city ref (both kinds fetched once, filtered here); an empty list is never kept here | 12 h | 200 cities, 5 000 points each (a longer list is cut and logged as a warning with the count), 100 000 points in all (about 30 MB at worst; LRU by weight) |
+| Empty point lists | provider, city ref the carrier answered with no point (an unknown or random ref) | 10 min, never stale | 1 000 (its own bound: random refs cannot evict a real city) |
+| Points by ref (checkout, options) | provider, point ref (`findPickupPoint`; only found points) | 12 h | 2 000 |
+| Unknown point refs | provider, point ref the carrier does not know | 5 min, never stale (a point opened meanwhile is found after at most 5 minutes) | 1 000 |
 | Estimates | provider, method, city, point, subtotal band | 10 min | 2 000; never stale |
 
 - **Stale-if-error**: when the carrier fails, an expired entry is served for up to **72 h past its expiry** (ADR 0029 open question 3, decided here as the ADR reads it), marked `stale: true` in a lookup answer; after that it is dropped and the answer is `503 shipping_provider_unavailable` with `Retry-After: 30`. A successful refresh replaces a stale entry.
 - **Coalescing**: one in-flight provider call per cache key; concurrent misses share it and its outcome.
-- **Concurrency cap**: at most 4 provider calls in flight per provider and process, 32 more may wait in order; beyond that, or when a waiting call runs out of its time limit, the call fails as the provider being unavailable.
-- **Time limits** (core `SHIPPING_PROVIDER_TIMEOUTS_MS`): 5 s for lookups and estimates, counted from the request (waiting at the gate included). A provider that ignores the abort signal is not waited for.
+- **Concurrency cap**: at most 4 provider calls in flight per provider and process; one of the 4 is reserved for the checkout's pickup point lookup (lookups, options and estimates share the other 3, and a waiting checkout lookup gets the next free slot first), so a flood of anonymous lookups cannot make checkouts answer `503`. Up to 32 more of each kind may wait in order; beyond that, or when a waiting call runs out of its time limit, the call fails as the provider being unavailable. A slot is freed when the provider's call really ends, not when the caller stops waiting: a provider that ignores the abort signal uses its slots up (and its lookups then fail as unavailable) instead of piling more calls on the carrier. A checkout that names a point another request is already looking up shares that lookup.
+- **Time limits** (core `SHIPPING_PROVIDER_TIMEOUTS_MS`): 5 s for lookups and estimates, counted from the request (waiting at the gate included). A provider that ignores the abort signal is not waited for (but keeps its gate slot, above).
 - **What a provider answers** is checked against the port: refs by `CARRIER_REFERENCE_PATTERN`, the point's country by `COUNTRY_CODE_PATTERN`, kinds, and texts (1 to 200 characters, so a point always makes a valid address); an entry that breaks the port is dropped and the count logged.
 - **Logs** carry the provider code, the operation, the kind of failure (`timeout`, `busy`, `error`, a refusal reason and carrier codes) and the duration; never a provider's message, a request value, a name, a phone or a key.
 

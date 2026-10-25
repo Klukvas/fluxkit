@@ -129,7 +129,8 @@ export class ShippingCheckoutService {
       pickup: {
         providerCode: provider.code,
         ref,
-        resolution: await this.directory.resolvePickupPoint(provider, ref),
+        // The reserved gate slot: a flood of store lookups cannot make a checkout wait for its point (review m-2).
+        resolution: await this.directory.resolvePickupPoint(provider, ref, "priority"),
       },
     };
   }

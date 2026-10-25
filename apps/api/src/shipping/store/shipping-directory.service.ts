@@ -15,7 +15,12 @@ import {
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
 import { ShippingProviderRegistry } from "../registry/index.js";
-import { ConcurrencyGate, GateBusyError, ProviderCache } from "./provider-cache.js";
+import {
+  ConcurrencyGate,
+  GateBusyError,
+  ProviderCache,
+  type GatePriority,
+} from "./provider-cache.js";
 import { estimateSubtotalBand, SHIPPING_STORE_LIMITS } from "./shipping-store-limits.js";
 import { ShippingStoreRepository } from "./shipping-store.repository.js";
 
@@ -120,7 +125,8 @@ function untilAborted<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 
 /**
  * Carrier directories and estimates for the store (ADR 0029 decisions 5 and 6): every call goes through the registry with
- * the API's time limit (`SHIPPING_PROVIDER_TIMEOUTS_MS`) and the per-provider gate (at most 4 in flight per process), and
+ * the API's time limit (`SHIPPING_PROVIDER_TIMEOUTS_MS`) and the per-provider gate (at most 4 real calls in flight per
+ * process, one of them reserved for the checkout's pickup point), and
  * its answer through the in-process cache. Never inside a database transaction or under a lock: the callers are the store
  * routes and the checkout's step BEFORE its transaction. Logs carry the provider code, the operation, the kind of failure
  * and the duration only: never a provider's message (it can echo a name, a phone or the key) and never a request value.
@@ -132,7 +138,9 @@ export class ShippingDirectoryService {
   private readonly gates = new Map<string, ConcurrencyGate>();
   private readonly cities: ProviderCache<readonly CityResult[]>;
   private readonly points: ProviderCache<readonly PickupPoint[]>;
+  private readonly emptyPointLists: ProviderCache<true>;
   private readonly pointsByRef: ProviderCache<PickupPoint | null>;
+  private readonly unknownPointRefs: ProviderCache<true>;
   private readonly estimates: ProviderCache<Money>;
 
   constructor(
@@ -142,8 +150,16 @@ export class ShippingDirectoryService {
   ) {
     const now = () => this.clock.now().getTime();
     this.cities = new ProviderCache(SHIPPING_STORE_LIMITS.cities, now);
-    this.points = new ProviderCache(SHIPPING_STORE_LIMITS.points, now);
-    this.pointsByRef = new ProviderCache(SHIPPING_STORE_LIMITS.pointsByRef, now);
+    this.points = new ProviderCache(SHIPPING_STORE_LIMITS.points, now, {
+      keep: (list) => list.length > 0,
+      weight: (list) => list.length,
+      maxWeight: SHIPPING_STORE_LIMITS.maxCachedPoints,
+    });
+    this.emptyPointLists = new ProviderCache(SHIPPING_STORE_LIMITS.emptyPointLists, now);
+    this.pointsByRef = new ProviderCache(SHIPPING_STORE_LIMITS.pointsByRef, now, {
+      keep: (point) => point !== null,
+    });
+    this.unknownPointRefs = new ProviderCache(SHIPPING_STORE_LIMITS.unknownPointRefs, now);
     this.estimates = new ProviderCache(SHIPPING_STORE_LIMITS.estimates, now);
   }
 
@@ -177,12 +193,25 @@ export class ShippingDirectoryService {
     return { items: read.value, stale: read.stale };
   }
 
-  /** The full point list of a city (both kinds), fetched once and filtered by the caller. Throws when unavailable. */
+  /** Calls in flight and waiting at the gate of a provider (diagnostics and specs). */
+  gateState(providerCode: string): { inFlight: number; queued: number } {
+    const gate = this.gates.get(providerCode);
+    return { inFlight: gate?.inFlight() ?? 0, queued: gate?.queued() ?? 0 };
+  }
+
+  /**
+   * The full point list of a city (both kinds), fetched once and filtered by the caller. Throws when unavailable. An empty
+   * answer is remembered in its own small cache (`emptyPointLists`), never in the city cache (review m-2).
+   */
   async listPickupPoints(
     provider: ShippingProviderPort,
     cityRef: string,
   ): Promise<DirectoryPage<PickupPoint>> {
-    const read = await this.points.get([provider.code, cityRef].join(SEPARATOR), async () => {
+    const key = [provider.code, cityRef].join(SEPARATOR);
+    if (this.emptyPointLists.peek(key) !== undefined) {
+      return { items: [], stale: false };
+    }
+    const read = await this.points.get(key, async () => {
       const found = await this.call(provider, "listPickupPoints", "lookup", (signal) =>
         provider.listPickupPoints({ cityRef, kinds: PICKUP_POINT_KINDS }, signal),
       );
@@ -196,26 +225,40 @@ export class ShippingDirectoryService {
       }
       return Object.freeze(valid.slice(0, SHIPPING_STORE_LIMITS.pointsPerCity));
     });
+    if (read.value.length === 0) {
+      this.emptyPointLists.set(key, true);
+    }
     return { items: read.value, stale: read.stale };
   }
 
   /**
    * A point by its ref: from a city list or an earlier resolution when fresh, else ONE `findPickupPoint` call (coalesced);
-   * on a provider failure a stale entry within the window, else `unavailable`. Never throws for a provider failure.
+   * on a provider failure a stale entry within the window, else `unavailable`. Never throws for a provider failure. An
+   * unknown ref is remembered for 5 minutes (`unknownPointRefs`), apart from the found points (review m-2). The checkout
+   * passes `priority` (the reserved gate slot); a lookup of the same point already in flight is shared, whatever its
+   * priority.
    */
   async resolvePickupPoint(
     provider: ShippingProviderPort,
     ref: string,
+    priority: GatePriority = "ordinary",
   ): Promise<PickupPointResolution> {
     const listed = this.findInLists(provider.code, ref, false);
     if (listed !== undefined) {
       return { status: "found", point: listed, stale: false };
     }
     const key = [provider.code, ref].join(SEPARATOR);
+    if (this.unknownPointRefs.peek(key) !== undefined) {
+      return { status: "unknown" };
+    }
     try {
       const read = await this.pointsByRef.get(key, async () => {
-        const found = await this.call(provider, "findPickupPoint", "lookup", (signal) =>
-          provider.findPickupPoint({ ref }, signal),
+        const found = await this.call(
+          provider,
+          "findPickupPoint",
+          "lookup",
+          (signal) => provider.findPickupPoint({ ref }, signal),
+          priority,
         );
         if (found === null) {
           return null;
@@ -229,8 +272,8 @@ export class ShippingDirectoryService {
         return Object.freeze({ ...found });
       });
       if (read.value === null) {
-        // Unknown refs are not kept: a point opened later is found on the next try.
-        this.pointsByRef.delete(key);
+        // Kept apart and briefly: a point opened later is found within 5 minutes.
+        this.unknownPointRefs.set(key, true);
         return { status: "unknown" };
       }
       return { status: "found", point: read.value, stale: read.stale };
@@ -371,18 +414,25 @@ export class ShippingDirectoryService {
       gate = new ConcurrencyGate(
         SHIPPING_STORE_LIMITS.maxCallsInFlight,
         SHIPPING_STORE_LIMITS.maxCallsQueued,
+        SHIPPING_STORE_LIMITS.maxCallsReservedForCheckout,
       );
       this.gates.set(providerCode, gate);
     }
     return gate;
   }
 
-  /** One provider call with the API's time limit, through the gate. Any failure is `ShippingProviderUnavailableError`. */
+  /**
+   * One provider call with the API's time limit, through the gate. Any failure is `ShippingProviderUnavailableError`. The
+   * caller stops waiting when the limit fires, but the gate slot stays taken until the provider's call really ends (review
+   * m-3), so at most `maxCallsInFlight` real calls run per provider: a provider that ignores the abort signal uses its
+   * slots up instead of piling more calls on the carrier (the plugin rule: honour the signal).
+   */
   private async call<T>(
     provider: ShippingProviderPort,
     operation: string,
     timeout: keyof typeof SHIPPING_PROVIDER_TIMEOUTS_MS,
     work: (signal: AbortSignal) => Promise<T>,
+    priority: GatePriority = "ordinary",
   ): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => {
@@ -390,11 +440,13 @@ export class ShippingDirectoryService {
     }, SHIPPING_PROVIDER_TIMEOUTS_MS[timeout]);
     const started = performance.now();
     try {
-      return await this.gateOf(provider.code).run(controller.signal, () =>
-        untilAborted(
-          Promise.resolve().then(() => work(controller.signal)),
+      return await untilAborted(
+        this.gateOf(provider.code).run(
           controller.signal,
+          () => Promise.resolve().then(() => work(controller.signal)),
+          priority,
         ),
+        controller.signal,
       );
     } catch (error) {
       const kind = controller.signal.aborted
