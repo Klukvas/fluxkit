@@ -26,6 +26,7 @@ function portOf(code: string): ShippingProviderPort {
       tracking: false,
       labels: false,
     },
+    validateSettings: () => [],
     searchCities: unused,
     listPickupPoints: unused,
     findPickupPoint: unused,

@@ -196,6 +196,60 @@ describe("admin shipping provider settings and connection check", () => {
         "settings:too_large",
       ]);
     });
+
+    it("applies the provider's own rules after the bounded check (validateSettings, plan step 7b)", async () => {
+      const seen: unknown[] = [];
+      fake().settingsIssues = (settings) => {
+        seen.push(settings);
+        return typeof settings.senderPhone === "string"
+          ? []
+          : [
+              { path: "senderPhone", code: "invalid_type" },
+              { path: "defaultParcel.weightGrams", code: "too_small" },
+            ];
+      };
+      const refused = await http<ProblemBody>(signedIn.baseUrl, "PUT", settingsPath("fake"), {
+        body: { settings: { defaultParcel: { weightGrams: 0 } } },
+      });
+      expect(refused.status).toBe(400);
+      expect((refused.body.errors ?? []).map((e) => `${e.path}:${e.code}`)).toEqual([
+        "settings.senderPhone:invalid_type",
+        "settings.defaultParcel.weightGrams:too_small",
+      ]);
+      // The bounded check comes first: a credential-like key never reaches the provider.
+      const secret = await http<ProblemBody>(signedIn.baseUrl, "PUT", settingsPath("fake"), {
+        body: { settings: { apiKey: "x" } },
+      });
+      expect((secret.body.errors ?? []).map((e) => `${e.path}:${e.code}`)).toEqual([
+        "settings.apiKey:secret_not_allowed",
+      ]);
+      expect(seen).toHaveLength(1);
+      const accepted = await http<Json>(signedIn.baseUrl, "PUT", settingsPath("fake"), {
+        body: { settings: { senderPhone: "380000000000" } },
+      });
+      expect(accepted.status).toBe(200);
+    });
+
+    it("treats a provider validator that breaks the port or throws as a provider bug (500), saving nothing and echoing nothing", async () => {
+      const secret = "+380501234567 sk-live-do-not-echo";
+      for (const answer of [
+        () => [{ path: "senderPhone", code: `The phone ${secret} is wrong` }],
+        () => "not a list",
+        () => {
+          throw new Error(secret);
+        },
+      ]) {
+        fake().settingsIssues = answer;
+        const result = await http<ProblemBody>(signedIn.baseUrl, "PUT", settingsPath("fake"), {
+          body: { settings: { senderName: "A B" } },
+        });
+        expect(result.status).toBe(500);
+        expect(JSON.stringify(result.body)).not.toContain(secret);
+      }
+      expect(
+        await db.$count(shippingProviderSetting, eq(shippingProviderSetting.providerCode, "fake")),
+      ).toBe(0);
+    });
   });
 
   describe("connection check", () => {

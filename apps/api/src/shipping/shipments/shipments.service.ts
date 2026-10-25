@@ -314,16 +314,21 @@ export class ShipmentsService {
 
   async label(orderId: string, shipmentId: string): Promise<ShipmentLabel> {
     const row = await this.requireShipment(orderId, shipmentId);
-    if (row.providerRef === null || !LABEL_STATUSES.has(shipmentStatusOf(row.status))) {
+    if (
+      row.providerRef === null ||
+      row.trackingNumber === null ||
+      !LABEL_STATUSES.has(shipmentStatusOf(row.status))
+    ) {
       throw ruleViolation(
         "This shipment has no waybill to print (not created, failed or cancelled).",
         "label_not_available",
       );
     }
     const provider = this.requireProvider(row.providerCode, "labels");
-    const providerRef = row.providerRef;
+    // The carrier is told the waybill both ways: Nova Post prints by number, others by their own id (plan step 7b).
+    const { providerRef, trackingNumber } = row;
     const outcome = await callProvider(this.timeouts.labelMs, (signal) =>
-      provider.fetchLabel({ providerRef, format: "pdf" }, signal),
+      provider.fetchLabel({ providerRef, trackingNumber, format: "pdf" }, signal),
     );
     if (outcome.kind !== "ok") {
       this.logger.warn(`Shipment ${row.id} fetchLabel: ${describeOutcome(outcome)}`);

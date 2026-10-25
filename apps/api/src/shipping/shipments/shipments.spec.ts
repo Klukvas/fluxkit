@@ -651,6 +651,10 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
       expect(response.headers.get("content-length")).toBe(String(bytes.length));
       const [row] = await world.shipmentRows(order.id);
       expect(bytes).toEqual(testLabelBytes(String(row?.["provider_ref"])));
+      // The carrier is told the waybill by its id AND its number (Nova Post prints by number, plan step 7b).
+      expect(world.provider().labelRequests).toEqual([
+        { providerRef: row?.["provider_ref"], trackingNumber: row?.["tracking_number"] },
+      ]);
     });
 
     it("no waybill yet (unknown) or cancelled: 409 label_not_available, no carrier call", async () => {
