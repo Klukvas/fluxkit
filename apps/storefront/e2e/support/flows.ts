@@ -18,8 +18,8 @@ export const DEFAULT_DETAILS = {
   line1: "1 Example Street",
 } as const;
 
-/** Fills the checkout form by its labels. Skips the address fields when the form shows none (a digital-only cart). */
-export async function fillCheckoutForm(page: Page, details: CheckoutDetails): Promise<void> {
+/** Fills the contact part of the checkout form (email only when given; a prefilled field is kept). */
+export async function fillContactDetails(page: Page, details: CheckoutDetails): Promise<void> {
   const merged = { ...DEFAULT_DETAILS, ...details };
   if (details.email !== undefined)
     await page.getByLabel("Email", { exact: true }).fill(details.email);
@@ -29,6 +29,12 @@ export async function fillCheckoutForm(page: Page, details: CheckoutDetails): Pr
   if ((await first.inputValue()) === "") await first.fill(merged.firstName);
   const last = page.getByLabel("Last name", { exact: true });
   if ((await last.inputValue()) === "") await last.fill(merged.lastName);
+}
+
+/** Fills the checkout form by its labels. Skips the address fields when the form shows none (a digital-only cart). */
+export async function fillCheckoutForm(page: Page, details: CheckoutDetails): Promise<void> {
+  const merged = { ...DEFAULT_DETAILS, ...details };
+  await fillContactDetails(page, details);
   const city = page.getByLabel("City", { exact: true });
   if ((await city.count()) > 0) {
     await city.fill(merged.city);
@@ -103,4 +109,12 @@ export async function storedAttempt(page: Page): Promise<string | null> {
  */
 export async function waitForHydration(page: Page): Promise<void> {
   await expect(page.getByRole("link", { name: /Cart.*\d+ items? in the cart/ })).toBeVisible();
+}
+
+/** The value of a row of the order summary or the totals (`<dt>` label, `<dd>` value next to it). */
+export function rowValue(region: Locator, label: string): Locator {
+  return region
+    .getByRole("term")
+    .filter({ hasText: new RegExp(`^${label}$`) })
+    .locator("xpath=following-sibling::*[1]");
 }

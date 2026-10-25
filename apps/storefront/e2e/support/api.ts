@@ -21,6 +21,12 @@ export interface ProductInfo {
   variants: VariantInfo[];
 }
 
+/** The pricing of a shipping method (docs/api/shipping.md); amounts are minor units. */
+export type ShippingPricing =
+  | { type: "flat"; amount: number }
+  | { type: "free_over"; amount: number; freeFrom: number }
+  | { type: "carrier_on_delivery" };
+
 export interface PlacedOrder {
   number: string;
   /** Guest orders only. */
@@ -172,6 +178,111 @@ export class AdminApi {
     );
     const reserved = stock.levels.reduce((sum, level) => sum + level.reserved, 0);
     await this.setOnHand(productId, variantId, reserved + 1);
+  }
+
+  /**
+   * A shipping method (docs/api/shipping.md), ACTIVE. The `code` must be new in this database. Pricing amounts are minor
+   * units of the shop currency.
+   */
+  async createShippingMethod(input: {
+    code: string;
+    title: string;
+    kind: "address" | "pickup_point" | "store_pickup";
+    pricing: ShippingPricing;
+    providerCode?: string;
+    description?: string;
+    countryCodes?: string[];
+  }): Promise<{ id: string; code: string }> {
+    const text = (value: string) => ({ uk: value, en: value });
+    return json(
+      await this.context.post("/admin/shipping/methods", {
+        headers: CSRF,
+        data: {
+          code: input.code,
+          title: text(input.title),
+          ...(input.description === undefined ? {} : { description: text(input.description) }),
+          kind: input.kind,
+          ...(input.providerCode === undefined ? {} : { providerCode: input.providerCode }),
+          pricing: input.pricing,
+          countryCodes: input.countryCodes ?? ["UA"],
+          isActive: true,
+        },
+      }),
+      201,
+    );
+  }
+
+  /** Changes the price of a method behind the shopper's back (the whole pricing is replaced). */
+  async repriceShippingMethod(id: string, pricing: ShippingPricing): Promise<void> {
+    await json(
+      await this.context.patch(`/admin/shipping/methods/${id}`, {
+        headers: CSRF,
+        data: { pricing },
+      }),
+      200,
+    );
+  }
+
+  /**
+   * Deactivates every active method, so the shop has none again and the other scenarios run as before shipping existed.
+   * Methods stay (an order may link one); the codes are never reused.
+   */
+  async deactivateShippingMethods(): Promise<void> {
+    const page = await json<{ items: { id: string; isActive: boolean }[] }>(
+      await this.context.get("/admin/shipping/methods?limit=100"),
+      200,
+    );
+    for (const method of page.items.filter((item) => item.isActive)) {
+      await json(
+        await this.context.patch(`/admin/shipping/methods/${method.id}`, {
+          headers: CSRF,
+          data: { isActive: false },
+        }),
+        200,
+      );
+    }
+  }
+
+  /** The order a shopper placed with this email: id, number and the total the API stored. */
+  async orderOf(email: string): Promise<{ id: string; number: string; total: Money }> {
+    const page = await json<{
+      items: { id: string; number: string; email: string | null; total: Money }[];
+    }>(await this.context.get(`/admin/orders?q=${encodeURIComponent(email)}&limit=100`), 200);
+    const found = page.items.find((order) => order.email === email);
+    if (found === undefined) throw new Error(`No order for ${email}`);
+    return found;
+  }
+
+  /** Records a payment of the full total received outside the system. */
+  async markPaid(order: { id: string; total: Money }): Promise<void> {
+    await json(
+      await this.context.post(`/admin/orders/${order.id}/mark-paid`, {
+        headers: CSRF,
+        data: { reference: `e2e-${order.id}`, amount: order.total },
+      }),
+      200,
+    );
+  }
+
+  /** Creates the carrier waybill of a paid order (the fake provider answers at once) and returns its tracking number. */
+  async createShipment(orderId: string): Promise<string> {
+    const result = await json<{ shipment: { status: string; trackingNumber: string | null } }>(
+      await this.context.post(`/admin/orders/${orderId}/shipments`, {
+        headers: CSRF,
+        data: {
+          weightGrams: 1000,
+          lengthMm: 300,
+          widthMm: 200,
+          heightMm: 100,
+          description: "E2E parcel",
+        },
+      }),
+      201,
+    );
+    if (result.shipment.status !== "created" || result.shipment.trackingNumber === null) {
+      throw new Error(`The waybill was not created: ${JSON.stringify(result.shipment)}`);
+    }
+    return result.shipment.trackingNumber;
   }
 
   /** The numbers of the orders whose contact email matches `email` (`?q`, docs/api/orders.md). */
