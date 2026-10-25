@@ -23,6 +23,8 @@ const dist = join(import.meta.dirname, "dist");
  * that needs it, with the new measurement. Step 5 (catalog dictionaries): 439 481 bytes raw, 129 557 gzip, because its uk
  * and en messages (47 KB) were merged into the entry. Step 6a loads each area's messages with the area (one small chunk
  * per file and language): 398 093 bytes raw, 121 328 gzip with the same areas; the budget stays, about 10 % above that.
+ * Shipping plan step 11 (the five Shipping routes and their titles; the area itself is a lazy chunk): 412 023 bytes raw, 123 506 gzip
+ * before and 414 174 raw, 123 878 gzip after.
  */
 const INITIAL_JS_BUDGET = { raw: 440_000, gzip: 135_000 };
 

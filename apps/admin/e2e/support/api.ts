@@ -78,6 +78,40 @@ export class AdminApi {
     return page.items;
   }
 
+  /** The id of an order by its number (the store's checkout answer has the number only). */
+  async orderIdByNumber(number: string): Promise<string> {
+    const page = await this.get<{ items: { id: string; number: string }[] }>(
+      `/admin/orders?q=${encodeURIComponent(number)}`,
+    );
+    const found = page.items.find((order) => order.number === number);
+    if (found === undefined) throw new Error(`The admin API lists no order numbered ${number}.`);
+    return found.id;
+  }
+
+  /** Records the payment of an order (the API checks the amount against the total). */
+  async markPaid(orderId: string, reference: string, total: Money): Promise<void> {
+    await this.post(`/admin/orders/${orderId}/mark-paid`, { reference, amount: total }, 200);
+  }
+
+  /** A delivery method made through the API (setup of a scenario that is about something else). */
+  async createShippingMethod(body: Record<string, unknown>): Promise<{ id: string; code: string }> {
+    return this.post<{ id: string; code: string }>("/admin/shipping/methods", body, 201);
+  }
+
+  /**
+   * Switches every delivery method off. While a method is active, a checkout of goods must name one, which would break the
+   * other scenarios' plain checkouts: a scenario that activates a method ends with this, also when it fails.
+   */
+  async deactivateAllShippingMethods(): Promise<void> {
+    const page = await this.get<{ items: { id: string; isActive: boolean }[]; total: number }>(
+      "/admin/shipping/methods?limit=100",
+    );
+    expect(page.total, "the e2e database holds fewer than 100 delivery methods").toBeLessThan(100);
+    for (const method of page.items.filter((item) => item.isActive)) {
+      await this.patch(`/admin/shipping/methods/${method.id}`, { isActive: false });
+    }
+  }
+
   async logout(): Promise<void> {
     await json(await this.context.post("/admin/auth/logout", { headers: CSRF }), 204);
   }
@@ -144,6 +178,42 @@ export class StoreApi {
   /** The status of `GET /store/account/me`: 200 while this cookie jar holds a live customer session, else 401. */
   async me(): Promise<number> {
     return (await this.context.get("/store/account/me")).status();
+  }
+
+  /**
+   * A guest order for one unit of a physical seed product with a delivery method: the method must be active and serve `UA`.
+   * `expectedTotal` is the `total` of the method's option, as the storefront sends it (the browser never adds money).
+   */
+  async placeGuestOrderWithShipping(
+    email: string,
+    slug: string,
+    sku: string,
+    methodCode: string,
+  ): Promise<PlacedOrder> {
+    await this.addToCart(await this.variantIdBySku(slug, sku), 1);
+    const answer = await json<{
+      options: { methodCode: string; available: boolean; total: Money | null }[];
+    }>(await this.context.get("/store/shipping/options?country=UA"), 200);
+    const option = answer.options.find((entry) => entry.methodCode === methodCode);
+    if (option === undefined || !option.available || option.total === null) {
+      throw new Error(`The method ${methodCode} is not offered: ${JSON.stringify(answer.options)}`);
+    }
+    const result = await json<{ order: { id: string; number: string; total: Money } }>(
+      await this.context.post("/store/checkout", {
+        headers: { ...CSRF, "Idempotency-Key": randomUUID() },
+        data: {
+          email,
+          phone: "+380501234567",
+          firstName: "Api",
+          lastName: "Shopper",
+          shippingAddress: { countryCode: "UA", city: "Kyiv", line1: "1 Example Street" },
+          shipping: { methodCode },
+          expectedTotal: option.total,
+        },
+      }),
+      201,
+    );
+    return { ...result.order, email };
   }
 
   /** A guest order for one unit of a physical seed product, shipped to a demo address; a fresh Idempotency-Key each time. */
