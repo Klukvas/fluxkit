@@ -273,9 +273,9 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 ## Seed (`src/seed/`)
 
 - `seed.ts` - entry of `pnpm seed` (built output run by Node); exit code.
-- `seed-command.ts` - production guard (refuses `NODE_ENV=production` without `--allow-production`), standalone Nest context, summary and error output.
+- `seed-command.ts` - production guard (refuses `NODE_ENV=production` without `--allow-production`), loads the providers of `SHIPPING_PROVIDERS_ENABLED` like the API, standalone Nest context, summary (with the skipped demo shipping methods) and error output.
 - `catalog-seeder.ts` - `CatalogSeeder`: creates `@fluxkit/seeds` data through the admin services; idempotent, never updates or deletes. Must not write to the database except through the admin services.
-  Publishing needs a shop-currency price, so before publishing it writes the demo price of every variant (from the seed data, matched by option values, stored in `SHOP_CURRENCY`) through `PricesService`, sets `allowBackorder` through `VariantsService`, and receives the demo stock through `InventoryService.adjust` with a `null` actor (a `receipt` movement, reason "Demo seed", default location). A tracked variant with stock 0 gets no level row.
+  Publishing needs a shop-currency price, so before publishing it writes the demo price of every variant (from the seed data, matched by option values, stored in `SHOP_CURRENCY`) through `PricesService`, sets `allowBackorder` through `VariantsService`, and receives the demo stock through `InventoryService.adjust` with a `null` actor (a `receipt` movement, reason "Demo seed", default location). A tracked variant with stock 0 gets no level row. Demo shipping methods are created INACTIVE through `ShippingMethodsService`; one whose provider is not loaded is skipped and reported.
 - `seed.spec.ts` - runs the seeder on real Postgres and reads the result through the store API (prices, compare-at, every availability state) and the admin inventory routes (levels, journal without an actor); a second run adds no row to any table.
 
 ## Test support (`src/test/`)

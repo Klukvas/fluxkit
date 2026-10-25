@@ -5,6 +5,7 @@ import type {
   SeedAttribute,
   SeedCategory,
   SeedProduct,
+  SeedShippingMethod,
   SeedVariantCommerce,
 } from "@fluxkit/seeds";
 import type { z } from "zod";
@@ -17,6 +18,7 @@ import {
   option,
   product,
   productType,
+  shippingMethod,
 } from "../database/schema/index.js";
 import { AttributesService } from "../catalog/admin/attributes/attributes.service.js";
 import {
@@ -54,6 +56,10 @@ import {
   putProductMediaSchema,
 } from "../catalog/admin/products/products.schemas.js";
 
+import { createShippingMethodSchema } from "../shipping/admin/shipping-methods.schemas.js";
+import { ShippingMethodsService } from "../shipping/admin/shipping-methods.service.js";
+import { ShippingProviderRegistry } from "../shipping/registry/index.js";
+
 /** The demo stock is received at the default location (the `main` location of the migration). */
 const STOCK_REASON = "Demo seed";
 
@@ -64,6 +70,7 @@ export const SEED_ENTITY_KINDS = [
   "brands",
   "categories",
   "products",
+  "shippingMethods",
 ] as const;
 export type SeedEntityKind = (typeof SEED_ENTITY_KINDS)[number];
 
@@ -73,6 +80,8 @@ export interface SeedSummary {
   /** Entities found by code or slug and left exactly as they were (never updated, never deleted). */
   existing: Record<SeedEntityKind, number>;
   variantsCreated: number;
+  /** Demo shipping methods not created because their provider is not loaded (`SHIPPING_PROVIDERS_ENABLED`), by code. */
+  skippedShippingMethods: string[];
 }
 
 function emptyCounts(): Record<SeedEntityKind, number> {
@@ -83,6 +92,7 @@ function emptyCounts(): Record<SeedEntityKind, number> {
     brands: 0,
     categories: 0,
     products: 0,
+    shippingMethods: 0,
   };
 }
 
@@ -110,6 +120,7 @@ export class CatalogSeeder {
     created: emptyCounts(),
     existing: emptyCounts(),
     variantsCreated: 0,
+    skippedShippingMethods: [],
   };
   private readonly attributeIds = new Map<string, string>();
   private readonly optionIds = new Map<string, string>();
@@ -132,6 +143,8 @@ export class CatalogSeeder {
     private readonly variants: VariantsService,
     private readonly inventory: InventoryService,
     private readonly pricing: PricingConfig,
+    private readonly shippingMethods: ShippingMethodsService,
+    private readonly shippingProviders: ShippingProviderRegistry,
   ) {}
 
   static fromContext(app: INestApplicationContext): CatalogSeeder {
@@ -150,6 +163,8 @@ export class CatalogSeeder {
       get(VariantsService),
       get(InventoryService),
       app.get<PricingConfig>(PRICING_CONFIG, { strict: false }),
+      get(ShippingMethodsService),
+      get(ShippingProviderRegistry),
     );
   }
 
@@ -172,7 +187,46 @@ export class CatalogSeeder {
     for (const definition of seed.products) {
       await this.ensureProduct(definition);
     }
+    for (const definition of seed.shippingMethods) {
+      await this.ensureShippingMethod(definition);
+    }
     return this.summary;
+  }
+
+  /**
+   * A demo delivery method, always created INACTIVE (the checkout of a fresh demo stays as it is without methods). A method
+   * of a provider that is not loaded is skipped and reported: the admin service refuses it, and it could never be offered.
+   */
+  private async ensureShippingMethod(definition: SeedShippingMethod): Promise<void> {
+    const [row] = await this.database
+      .select({ id: shippingMethod.id })
+      .from(shippingMethod)
+      .where(eq(shippingMethod.code, definition.code));
+    if (row !== undefined) {
+      this.summary.existing.shippingMethods += 1;
+      return;
+    }
+    if (
+      definition.providerCode !== null &&
+      this.shippingProviders.get(definition.providerCode) === undefined
+    ) {
+      this.summary.skippedShippingMethods.push(definition.code);
+      return;
+    }
+    await this.shippingMethods.create(
+      parse(createShippingMethodSchema, {
+        code: definition.code,
+        title: definition.title,
+        description: definition.description,
+        kind: definition.kind,
+        providerCode: definition.providerCode,
+        pricing: definition.pricing,
+        countryCodes: definition.countryCodes,
+        isActive: false,
+        position: definition.position,
+      }),
+    );
+    this.summary.created.shippingMethods += 1;
   }
 
   // Read-only lookups by the stable code or slug; every write goes through the admin services.
