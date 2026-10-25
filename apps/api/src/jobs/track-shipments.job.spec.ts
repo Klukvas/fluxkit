@@ -164,6 +164,29 @@ describe("track-shipments (job 8; real Postgres, injected time, the in-repo test
     expect(orderAfter.rows).toEqual(orderBefore.rows);
   });
 
+  it("review m-7: a due shipment of a provider that is not loaded is skipped (left as it is), never breaks the job", async () => {
+    const orphan = await shipped();
+    const tracked = await shipped();
+    // The shop stopped running this carrier (SHIPPING_PROVIDERS_ENABLED) after the waybill was made.
+    await world.pool.query("update shipment set provider_code = 'gone_provider' where id = $1", [
+      orphan.shipment.id,
+    ]);
+    const before = await row(orphan.shipment.id);
+    world.provider().setTracking(tracked.shipment.trackingNumber ?? "", {
+      status: "in_transit",
+      carrierStatusCode: "5",
+    });
+
+    const result = await run(later(2 * HOUR));
+
+    expect(result).toMatchObject({ scanned: 1, changed: 1, failures: [], truncated: false });
+    expect(await row(orphan.shipment.id)).toEqual(before);
+    expect((await row(tracked.shipment.id)).status).toBe("in_transit");
+    expect(world.provider().trackRequests.flatMap((request) => request.trackingNumbers)).toEqual([
+      tracked.shipment.trackingNumber,
+    ]);
+  });
+
   it("delivered and arrived: arrived is polled every 6 h, delivered is terminal (no next poll); the order stays paid", async () => {
     const arriving = await shipped();
     const delivering = await shipped();

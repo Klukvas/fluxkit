@@ -198,4 +198,64 @@ describe("checkout with shipping under concurrency (real app, real Postgres)", (
     }
     await expectSnapshotsComplete();
   });
+
+  it("review m-6: a method deleted between the checkout's read and its snapshot insert answers 409 shipping_changed, all rolled back", async () => {
+    const admin = running.app.get(ShippingMethodsService);
+    const method = await methods.create({ pricing: { type: "flat", amount: 500 } });
+    const shopper = new Shopper(running.baseUrl);
+    const { variantId } = await catalog.simple({ trackInventory: true, onHand: 3, price: 1_000 });
+    await add(shopper, variantId);
+    const lockKey = 290_013_006;
+    const holder = await pool.connect();
+    // TEST ONLY: a BEFORE INSERT trigger that waits on an advisory lock this spec holds, so the checkout stops after it read
+    // the method (decide) and before the snapshot's foreign key is checked (an AFTER trigger). Dropped below.
+    await pool.query(`create or replace function test_hold_order_shipping() returns trigger language plpgsql as $$
+      begin perform pg_advisory_xact_lock(${String(lockKey)}); return new; end $$`);
+    await pool.query(
+      "create trigger test_hold_order_shipping before insert on order_shipping for each row execute function test_hold_order_shipping()",
+    );
+    try {
+      await holder.query("select pg_advisory_lock($1)", [lockKey]);
+      const checkout = checkoutAs(
+        shopper,
+        checkoutBody(1_500, { shipping: { methodCode: method.code } }),
+      );
+      // Wait until the checkout's transaction waits on the lock.
+      for (let attempt = 0; attempt < 400; attempt += 1) {
+        const waiting = await pool.query<{ n: number }>(
+          "select count(*)::int as n from pg_locks where locktype = 'advisory' and objid = $1 and not granted",
+          [lockKey],
+        );
+        if ((waiting.rows[0]?.n ?? 0) > 0) {
+          break;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      // The delete sees no order linking the method (the checkout has not inserted its snapshot) and commits.
+      await admin.delete(method.id);
+      await holder.query("select pg_advisory_unlock($1)", [lockKey]);
+      const result = await checkout;
+      track([result]);
+      expect(result.status, JSON.stringify(result.body)).toBe(409);
+      expect(result.body.code).toBe("shipping_changed");
+      expect(result.body.shipping).toEqual({
+        methodCode: method.code,
+        available: false,
+        reason: "inactive",
+      });
+      // Nothing of the order is left: no order, no reservation, the stock untouched.
+      const leftovers = await pool.query<{ reserved: number; orders: number }>(
+        `select (select coalesce(sum(reserved), 0)::int from inventory_level where variant_id = $1) as reserved,
+                (select count(*)::int from order_item where variant_id = $1) as orders`,
+        [variantId],
+      );
+      expect(leftovers.rows[0]).toEqual({ reserved: 0, orders: 0 });
+    } finally {
+      await holder.query("select pg_advisory_unlock_all()");
+      holder.release();
+      await pool.query("drop trigger if exists test_hold_order_shipping on order_shipping");
+      await pool.query("drop function if exists test_hold_order_shipping()");
+    }
+    await expectSnapshotsComplete();
+  });
 });
