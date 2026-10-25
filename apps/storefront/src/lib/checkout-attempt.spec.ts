@@ -12,7 +12,7 @@ import {
   type AttemptCrypto,
   type AttemptStorage,
 } from "./checkout-attempt";
-import { cartLine, cartOf } from "./test-fixtures";
+import { cartLine, cartOf, shippingOption } from "./test-fixtures";
 
 const TOKEN = "tok_ABCdef123-_ABCdef123-_ABCdef123-_ABCdef12";
 
@@ -184,6 +184,40 @@ describe("createAttemptManager", () => {
     expect(otherTotal).not.toBe(otherEmail);
     // Back to the first body: its key was replaced, never reused for a different body later.
     expect(await manager.keyFor(body())).not.toBe(first);
+  });
+
+  it("issues a new key when the delivery choice changes the body (method, pickup point, or the server's total), and the same key when it does not", async () => {
+    const manager = createAttemptManager({
+      storage: memoryStorage().storage,
+      crypto: webAttemptCrypto(globalThis.crypto),
+    });
+    const courier = body({
+      shipping: { methodCode: "courier" },
+      expectedTotal: { amount: 7001, currency: "UAH" },
+    });
+    const first = await manager.keyFor(courier);
+    // Key order inside the body and inside `shipping` never matters.
+    const reordered = Object.fromEntries(Object.entries(courier).reverse()) as CheckoutBody;
+    expect(await manager.keyFor(reordered)).toBe(first);
+    const variants = [
+      body({ shipping: { methodCode: "post" }, expectedTotal: courier.expectedTotal }),
+      body({
+        shipping: { methodCode: "courier" },
+        expectedTotal: { amount: 7002, currency: "UAH" },
+      }),
+      body({
+        shipping: { methodCode: "branch", pickupPointRef: "p1" },
+        expectedTotal: courier.expectedTotal,
+      }),
+      body({
+        shipping: { methodCode: "branch", pickupPointRef: "p2" },
+        expectedTotal: courier.expectedTotal,
+      }),
+      body({ expectedTotal: courier.expectedTotal }),
+    ];
+    const seen = new Set([first]);
+    for (const variant of variants) seen.add(await manager.keyFor(variant));
+    expect(seen.size).toBe(variants.length + 1);
   });
 
   it("starts over after clear()", async () => {
@@ -405,6 +439,62 @@ describe("checkoutOutcome", () => {
       attempt: "keep",
       cart,
       failure: expect.objectContaining({ messageKey: "errors.cart_changed" }),
+    });
+  });
+
+  it("409 shipping_changed hands over the fresh option; the shopper agrees to the new delivery price (key kept, nothing created)", () => {
+    const option = shippingOption("courier", { total: { amount: 8001, currency: "UAH" } });
+    expect(checkoutOutcome(failure(409, "shipping_changed", { shipping: option }), ctx)).toEqual({
+      kind: "shippingChanged",
+      attempt: "keep",
+      shipping: option,
+      failure: expect.objectContaining({ messageKey: "errors.shipping_changed" }),
+    });
+    expect(checkoutOutcome(failure(409, "shipping_changed"), ctx)).toMatchObject({
+      kind: "shippingChanged",
+      shipping: null,
+    });
+  });
+
+  it("503 shipping_provider_unavailable is its own outcome (retry or choose another method); another 503 stays a retry", () => {
+    expect(
+      checkoutOutcome(failure(503, "shipping_provider_unavailable", {}, "30"), ctx),
+    ).toMatchObject({
+      kind: "shippingProviderUnavailable",
+      attempt: "keep",
+      failure: { messageKey: "errors.shipping_provider_unavailable", retryAfterSeconds: 30 },
+    });
+    expect(checkoutOutcome(failure(503, "service_unavailable"), ctx).kind).toBe("retry");
+  });
+
+  it("400 shipping_method_required and shipping_not_applicable keep the key and ask to look at the delivery again", () => {
+    for (const code of ["shipping_method_required", "shipping_not_applicable"]) {
+      expect(checkoutOutcome(failure(400, code), ctx)).toMatchObject({
+        kind: "shippingRejected",
+        attempt: "keep",
+        failure: { messageKey: `errors.${code}` },
+      });
+    }
+  });
+
+  it("400 unknown_pickup_point and not_applicable map to their fields", () => {
+    const outcome = checkoutOutcome(
+      failure(400, "validation_failed", {
+        errors: [
+          { path: "shipping.pickupPointRef", code: "unknown_pickup_point" },
+          { path: "shippingAddress", code: "not_applicable" },
+        ],
+      }),
+      ctx,
+    );
+    expect(outcome).toMatchObject({
+      kind: "invalid",
+      failure: {
+        fieldErrors: [
+          { path: "shipping.pickupPointRef", messageKey: "errors.field.unknown_pickup_point" },
+          { path: "shippingAddress", messageKey: "errors.field.not_applicable" },
+        ],
+      },
     });
   });
 

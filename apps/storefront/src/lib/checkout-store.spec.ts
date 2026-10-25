@@ -2,6 +2,8 @@ import { NetworkError } from "@fluxkit/api-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { checkoutConfig } from "../config/checkout";
 import { createCartStore } from "./cart-store";
+import { createShippingStore } from "./shipping-store";
+import type { ShippingOptions } from "@fluxkit/api-client";
 import {
   ATTEMPT_STORAGE_KEY,
   InsecureContextError,
@@ -11,7 +13,7 @@ import {
 } from "./checkout-attempt";
 import { initialCheckoutValues, type CheckoutValues } from "./checkout-form";
 import { checkoutBlock, createCheckoutStore, initialCheckoutState } from "./checkout-store";
-import { cartLine, cartOf } from "./test-fixtures";
+import { cartLine, cartOf, shippingOption, shippingOptionsOf } from "./test-fixtures";
 import { json, problem, settle, stagedClient, type PendingCall } from "./test-fetch";
 
 afterEach(() => vi.restoreAllMocks());
@@ -48,16 +50,27 @@ function memoryStorage(): { storage: AttemptStorage; map: Map<string, string> } 
   };
 }
 
+const NONE = { kind: "none" } as const;
+const NO_METHODS: ShippingOptions = { subtotal: { amount: 1999, currency: "UAH" }, options: [] };
+
 async function setup(
-  options: { cart?: typeof cartA; storage?: AttemptStorage | null; insecure?: boolean } = {},
+  options: {
+    cart?: typeof cartA;
+    storage?: AttemptStorage | null;
+    insecure?: boolean;
+    /** The answer of `GET /store/shipping/options`; the shop has no active method unless a test says otherwise. */
+    shippingOptions?: ShippingOptions;
+  } = {},
 ) {
   const { client, calls } = stagedClient();
   const cart = createCartStore({ client, locale: "uk", events: new EventTarget() });
+  const shipping = createShippingStore({ client, cart, locale: "uk" });
   const memory = memoryStorage();
   const storage = options.storage === undefined ? memory.storage : options.storage;
   const checkout = createCheckoutStore({
     client,
     cart,
+    shipping,
     locale: "uk",
     config: checkoutConfig,
     attempts: () => {
@@ -68,8 +81,15 @@ async function setup(
   cart.start();
   calls[0]?.answer(json(options.cart ?? cartA));
   await settle();
-  return { client, calls, cart, checkout, map: memory.map };
+  void shipping.read({ country: "UA", cityRef: "", pickupPointRef: "" });
+  await settle();
+  optionCalls(calls)[0]?.answer(json(options.shippingOptions ?? NO_METHODS));
+  await settle();
+  return { client, calls, cart, shipping, checkout, map: memory.map };
 }
+
+const optionCalls = (calls: PendingCall[]) =>
+  calls.filter((call) => call.url.startsWith("/store/shipping/options"));
 
 const checkoutCalls = (calls: PendingCall[]) =>
   calls.filter((call) => call.url.startsWith("/store/checkout"));
@@ -213,7 +233,7 @@ describe("checkout store: the total the shopper sees", () => {
     expect(await first).toMatchObject({ kind: "cartChanged" });
     expect(cart.getState().cart).toEqual(cartB);
     expect(checkout.getState().needsConfirmation).toBe(true);
-    expect(checkoutBlock(cart.getState().cart, checkout.getState())).toBe("confirmTotal");
+    expect(checkoutBlock(cart.getState().cart, checkout.getState(), NONE)).toBe("confirmTotal");
 
     expect(await checkout.submit(values(), { signedIn: false })).toEqual({
       kind: "blocked",
@@ -250,14 +270,14 @@ describe("checkout store: the total the shopper sees", () => {
     ack?.answer(json(cartA));
     await acknowledged;
     expect(cart.getState().cart).toEqual(cartA);
-    expect(checkoutBlock(cart.getState().cart, checkout.getState())).toBeNull();
+    expect(checkoutBlock(cart.getState().cart, checkout.getState(), NONE)).toBeNull();
   });
 
   it("blocks an empty, unpurchasable or still loading cart without a request", async () => {
-    expect(checkoutBlock(null, initialCheckoutState)).toBe("loading");
-    expect(checkoutBlock(cartOf([]), initialCheckoutState)).toBe("empty");
+    expect(checkoutBlock(null, initialCheckoutState, NONE)).toBe("loading");
+    expect(checkoutBlock(cartOf([]), initialCheckoutState, NONE)).toBe("empty");
     expect(
-      checkoutBlock(cartOf([cartLine("a")], { purchasable: false }), initialCheckoutState),
+      checkoutBlock(cartOf([cartLine("a")], { purchasable: false }), initialCheckoutState, NONE),
     ).toBe("notPurchasable");
     const { calls, checkout } = await setup({
       cart: cartOf([cartLine("a")], { purchasable: false }),
@@ -358,5 +378,435 @@ describe("checkout store: the guest token stays a secret", () => {
     for (const call of calls) expect(call.url).not.toContain(TOKEN);
     for (const spy of spies) expect(JSON.stringify(spy.mock.calls)).not.toContain(TOKEN);
     expect(JSON.stringify(checkout.getState())).not.toContain(TOKEN);
+  });
+});
+
+// ------------------------------------------------------------------ shipping (plan step 10)
+
+const COURIER = shippingOption("courier", {
+  title: "Courier",
+  price: { amount: 5000, currency: "UAH" },
+  // Not the sum of anything in this file: the browser must send exactly this.
+  total: { amount: 7001, currency: "UAH" },
+});
+const POINT = shippingOption("branch", {
+  kind: "pickup_point",
+  providerCode: "fake",
+  total: { amount: 6500, currency: "UAH" },
+  price: { amount: 4501, currency: "UAH" },
+});
+const PICKUP = shippingOption("store", {
+  kind: "store_pickup",
+  description: "Open 9 to 18",
+  price: { amount: 0, currency: "UAH" },
+  total: { amount: 1999, currency: "UAH" },
+});
+const withMethods = (...list: ReturnType<typeof shippingOption>[]) => ({
+  shippingOptions: shippingOptionsOf(list),
+});
+const choose = (code: string, extra: Partial<CheckoutValues> = {}) =>
+  values({ "shipping.methodCode": code, ...extra });
+
+describe("checkout store: no active shipping method behaves exactly as before", () => {
+  it("sends the cart's total, no shipping member and today's address", async () => {
+    const { calls, checkout } = await setup();
+    void checkout.submit(values(), { signedIn: false });
+    const [request] = await sentCheckouts(calls, 1);
+    expect(request?.body).toEqual({
+      email: "guest@example.test",
+      phone: "+380441234567",
+      firstName: "Ada",
+      lastName: "Guest",
+      locale: "uk",
+      shippingAddress: { countryCode: "UA", city: "Kyiv", line1: "Street 1" },
+      expectedTotal: { amount: 1999, currency: "UAH" },
+    });
+    expect(request?.body).not.toHaveProperty("shipping");
+  });
+
+  it("is not held up by a newer options read while the shop has no method", async () => {
+    const { calls, checkout, shipping } = await setup();
+    void shipping.refresh();
+    await settle();
+    void checkout.submit(values(), { signedIn: false });
+    expect(await sentCheckouts(calls, 1)).toHaveLength(1);
+  });
+
+  it("a cart that ships nothing sends no shipping member even when the shop has methods", async () => {
+    const digital = cartOf([cartLine("d")], { requiresShipping: false });
+    const { calls, checkout } = await setup({ cart: digital, ...withMethods(COURIER) });
+    void checkout.submit(choose("courier"), { signedIn: false });
+    const [request] = await sentCheckouts(calls, 1);
+    expect(request?.body).not.toHaveProperty("shipping");
+    expect(request?.body).not.toHaveProperty("shippingAddress");
+    expect(request?.body).toMatchObject({ expectedTotal: { amount: 1999, currency: "UAH" } });
+  });
+});
+
+describe("checkout store: the expected total of an order that ships", () => {
+  it("is the SERVER's total of the chosen option, not the cart's total", async () => {
+    const { calls, checkout } = await setup(withMethods(COURIER, POINT));
+    void checkout.submit(choose("courier"), { signedIn: false });
+    const [request] = await sentCheckouts(calls, 1);
+    expect(request?.body).toMatchObject({
+      expectedTotal: { amount: 7001, currency: "UAH" },
+      shipping: { methodCode: "courier" },
+      shippingAddress: { countryCode: "UA", city: "Kyiv", line1: "Street 1" },
+    });
+  });
+
+  it("follows the chosen option: another method sends its own total", async () => {
+    const { calls, checkout } = await setup(withMethods(COURIER, POINT));
+    void checkout.submit(
+      choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": "p1" }),
+      { signedIn: false },
+    );
+    const [request] = await sentCheckouts(calls, 1);
+    expect((request?.body as { expectedTotal: unknown }).expectedTotal).toEqual({
+      amount: 6500,
+      currency: "UAH",
+    });
+  });
+
+  it("a pickup point sends the point's ref and NO address (the API refuses both)", async () => {
+    const { calls, checkout } = await setup(withMethods(POINT));
+    void checkout.submit(
+      choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": "p1" }),
+      { signedIn: false },
+    );
+    const [request] = await sentCheckouts(calls, 1);
+    expect((request?.body as { shipping: unknown }).shipping).toEqual({
+      methodCode: "branch",
+      pickupPointRef: "p1",
+    });
+    expect(request?.body).not.toHaveProperty("shippingAddress");
+  });
+
+  it("a store pickup sends no address and no point", async () => {
+    const { calls, checkout } = await setup(withMethods(PICKUP));
+    void checkout.submit(choose("store"), { signedIn: false });
+    const [request] = await sentCheckouts(calls, 1);
+    expect((request?.body as { shipping: unknown }).shipping).toEqual({ methodCode: "store" });
+    expect(request?.body).not.toHaveProperty("shippingAddress");
+    expect(request?.body).toMatchObject({ expectedTotal: { amount: 1999, currency: "UAH" } });
+  });
+
+  it("a point ref left over from another method is not sent with an address method", async () => {
+    const { calls, checkout } = await setup(withMethods(COURIER, POINT));
+    void checkout.submit(choose("courier", { "shipping.pickupPointRef": "old" }), {
+      signedIn: false,
+    });
+    const [request] = await sentCheckouts(calls, 1);
+    expect((request?.body as { shipping: unknown }).shipping).toEqual({ methodCode: "courier" });
+  });
+});
+
+describe("checkout store: no request until the delivery is known", () => {
+  async function blockedWith(state: Parameters<typeof setup>[0], codes: string) {
+    const { calls, checkout } = await setup(state);
+    const result = await checkout.submit(choose(codes), { signedIn: false });
+    expect(checkoutCalls(calls)).toHaveLength(0);
+    return result;
+  }
+
+  it("blocks without a chosen method", async () => {
+    const { calls, checkout } = await setup(withMethods(COURIER));
+    expect(await checkout.submit(values(), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "shippingMethod",
+    });
+    expect(checkoutCalls(calls)).toHaveLength(0);
+  });
+
+  it("blocks a method the options do not offer, and one that is unavailable", async () => {
+    expect(await blockedWith(withMethods(COURIER), "gone")).toEqual({
+      kind: "blocked",
+      reason: "shippingMethod",
+    });
+    const down = shippingOption("courier", {
+      available: false,
+      reason: "country_not_served",
+      price: null,
+      total: null,
+      payer: null,
+    });
+    expect(await blockedWith(withMethods(down), "courier")).toEqual({
+      kind: "blocked",
+      reason: "shippingMethod",
+    });
+  });
+
+  it("blocks while the options are being read again, then sends the NEW price", async () => {
+    const { calls, checkout, shipping } = await setup(withMethods(COURIER));
+    void shipping.refresh();
+    await settle();
+    expect(await checkout.submit(choose("courier"), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "shippingLoading",
+    });
+    expect(checkoutCalls(calls)).toHaveLength(0);
+    optionCalls(calls)[1]?.answer(
+      json(shippingOptionsOf([{ ...COURIER, total: { amount: 7100, currency: "UAH" } }])),
+    );
+    await settle();
+    void checkout.submit(choose("courier"), { signedIn: false });
+    expect((await sentCheckouts(calls, 1))[0]?.body).toMatchObject({
+      expectedTotal: { amount: 7100, currency: "UAH" },
+    });
+  });
+
+  it("blocks after a failed read of the options (nothing is sent on an old price)", async () => {
+    const { calls, checkout, shipping } = await setup(withMethods(COURIER));
+    void shipping.refresh();
+    await settle();
+    optionCalls(calls)[1]?.fail(new TypeError("offline"));
+    await settle();
+    expect(await checkout.submit(choose("courier"), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "shippingError",
+    });
+    expect(checkoutCalls(calls)).toHaveLength(0);
+  });
+});
+
+describe("checkout store: 409 shipping_changed asks for consent, it never resubmits", () => {
+  const dearer = {
+    ...COURIER,
+    total: { amount: 7501, currency: "UAH" },
+    price: { amount: 5500, currency: "UAH" },
+  };
+
+  async function changed() {
+    const context = await setup(withMethods(COURIER));
+    const first = context.checkout.submit(choose("courier"), { signedIn: false });
+    (await sentCheckouts(context.calls, 1))[0]?.answer(
+      problem(409, "shipping_changed", { shipping: dearer }),
+    );
+    const outcome = await first;
+    return { ...context, outcome };
+  }
+
+  it("re-reads the options, remembers what the shopper agreed to, and blocks the submit", async () => {
+    const { outcome, calls, checkout } = await changed();
+    expect(outcome).toMatchObject({ kind: "shippingChanged", attempt: "keep" });
+    expect(checkout.getState().pending).toBe(false);
+    expect(checkout.getState().shippingConsent).toEqual({
+      methodCode: "courier",
+      previousTotal: { amount: 7001, currency: "UAH" },
+      previousPrice: { amount: 5000, currency: "UAH" },
+    });
+    // The options were read again at once.
+    expect(optionCalls(calls)).toHaveLength(2);
+    // Nothing is resubmitted while the new price is unknown or unconfirmed.
+    expect(await checkout.submit(choose("courier"), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "shippingLoading",
+    });
+    expect(checkoutCalls(calls)).toHaveLength(1);
+  });
+
+  it("after the fresh price arrives it still waits for the shopper's confirmation", async () => {
+    const { calls, checkout, shipping } = await changed();
+    optionCalls(calls)[1]?.answer(json(shippingOptionsOf([dearer])));
+    await settle();
+    expect(shipping.getState().answer?.options[0]?.total).toEqual({
+      amount: 7501,
+      currency: "UAH",
+    });
+    expect(await checkout.submit(choose("courier"), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "confirmShipping",
+    });
+    expect(checkoutCalls(calls)).toHaveLength(1);
+  });
+
+  it("after the confirmation it sends the NEW total with a NEW key", async () => {
+    const { calls, checkout } = await changed();
+    optionCalls(calls)[1]?.answer(json(shippingOptionsOf([dearer])));
+    await settle();
+    checkout.confirmShipping();
+    expect(checkout.getState().shippingConsent).toBeNull();
+    void checkout.submit(choose("courier"), { signedIn: false });
+    const sent = await sentCheckouts(calls, 2);
+    expect(sent[1]?.body).toMatchObject({ expectedTotal: { amount: 7501, currency: "UAH" } });
+    expect(keyOf(sent[1])).not.toBe(keyOf(sent[0]));
+  });
+
+  it("when the method is not offered any more there is nothing to confirm: choose another", async () => {
+    const { calls, checkout } = await changed();
+    optionCalls(calls)[1]?.answer(
+      json(
+        shippingOptionsOf([
+          shippingOption("courier", {
+            available: false,
+            reason: "inactive",
+            price: null,
+            total: null,
+            payer: null,
+          }),
+          POINT,
+        ]),
+      ),
+    );
+    await settle();
+    expect(await checkout.submit(choose("courier"), { signedIn: false })).toEqual({
+      kind: "blocked",
+      reason: "shippingMethod",
+    });
+    // Another method can be ordered at once; the old consent is not asked about it.
+    void checkout.submit(
+      choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": "p1" }),
+      { signedIn: false },
+    );
+    const sent = await sentCheckouts(calls, 2);
+    expect(sent[1]?.body).toMatchObject({ expectedTotal: { amount: 6500, currency: "UAH" } });
+  });
+
+  it("a consent for one method is not asked again for another one the shopper switches to", async () => {
+    const { calls, checkout } = await changed();
+    optionCalls(calls)[1]?.answer(json(shippingOptionsOf([dearer, POINT])));
+    await settle();
+    checkout.forgetShippingConsent();
+    expect(checkout.getState().shippingConsent).toBeNull();
+    void checkout.submit(
+      choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": "p1" }),
+      { signedIn: false },
+    );
+    expect(await sentCheckouts(calls, 2)).toHaveLength(2);
+  });
+
+  it("a second change after the confirmation asks again", async () => {
+    const { calls, checkout } = await changed();
+    optionCalls(calls)[1]?.answer(json(shippingOptionsOf([dearer])));
+    await settle();
+    checkout.confirmShipping();
+    const second = checkout.submit(choose("courier"), { signedIn: false });
+    const evenDearer = { ...dearer, total: { amount: 8000, currency: "UAH" } };
+    (await sentCheckouts(calls, 2))[1]?.answer(
+      problem(409, "shipping_changed", { shipping: evenDearer }),
+    );
+    expect((await second).kind).toBe("shippingChanged");
+    expect(checkout.getState().shippingConsent).toMatchObject({
+      previousTotal: { amount: 7501, currency: "UAH" },
+    });
+  });
+});
+
+describe("checkout store: the other answers of a delivery checkout", () => {
+  it("409 cart_changed keeps today's handling and also reads the options again", async () => {
+    const { calls, cart, checkout } = await setup(withMethods(COURIER));
+    const first = checkout.submit(choose("courier"), { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(problem(409, "cart_changed", { cart: cartB }));
+    expect(await first).toMatchObject({ kind: "cartChanged" });
+    expect(cart.getState().cart).toEqual(cartB);
+    expect(checkout.getState().needsConfirmation).toBe(true);
+    expect(optionCalls(calls)).toHaveLength(2);
+  });
+
+  it("503 shipping_provider_unavailable keeps the key: the same body can be sent again, or another method chosen", async () => {
+    const { calls, checkout } = await setup(withMethods(POINT, COURIER));
+    const pointValues = choose("branch", {
+      "shipping.cityRef": "c1",
+      "shipping.pickupPointRef": "p1",
+    });
+    const first = checkout.submit(pointValues, { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(
+      problem(503, "shipping_provider_unavailable", {}, { "Retry-After": "30" }),
+    );
+    expect(await first).toMatchObject({
+      kind: "shippingProviderUnavailable",
+      attempt: "keep",
+      failure: { messageKey: "errors.shipping_provider_unavailable", retryAfterSeconds: 30 },
+    });
+    expect(checkout.getState().pending).toBe(false);
+    void checkout.submit(pointValues, { signedIn: false });
+    void (await sentCheckouts(calls, 2));
+    const [one, two] = checkoutCalls(calls);
+    expect(keyOf(two)).toBe(keyOf(one));
+  });
+
+  it("400 shipping_method_required and shipping_not_applicable read the options again", async () => {
+    for (const code of ["shipping_method_required", "shipping_not_applicable"]) {
+      const { calls, checkout } = await setup();
+      const first = checkout.submit(values(), { signedIn: false });
+      (await sentCheckouts(calls, 1))[0]?.answer(problem(400, code));
+      expect(await first).toMatchObject({ kind: "shippingRejected", attempt: "keep" });
+      expect(optionCalls(calls)).toHaveLength(2);
+    }
+  });
+
+  it("400 unknown_pickup_point lands on the point field and keeps the key", async () => {
+    const { calls, checkout } = await setup(withMethods(POINT));
+    const first = checkout.submit(
+      choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": "p1" }),
+      { signedIn: false },
+    );
+    (await sentCheckouts(calls, 1))[0]?.answer(
+      problem(400, "validation_failed", {
+        errors: [{ path: "shipping.pickupPointRef", code: "unknown_pickup_point" }],
+      }),
+    );
+    expect(await first).toMatchObject({
+      kind: "invalid",
+      failure: {
+        fieldErrors: [
+          {
+            path: "shipping.pickupPointRef",
+            code: "unknown_pickup_point",
+            messageKey: "errors.field.unknown_pickup_point",
+          },
+        ],
+      },
+    });
+  });
+});
+
+describe("checkout store: the attempt key follows the whole body, shipping included", () => {
+  async function keys(...submits: CheckoutValues[]) {
+    const { calls, checkout } = await setup(withMethods(COURIER, POINT, PICKUP));
+    const found: (string | null | undefined)[] = [];
+    for (const [index, submit] of submits.entries()) {
+      const outcome = checkout.submit(submit, { signedIn: false });
+      const sent = await sentCheckouts(calls, index + 1);
+      found.push(keyOf(sent[index]));
+      sent[index]?.fail(new TypeError("offline"));
+      await outcome;
+    }
+    return found;
+  }
+  const point = (ref: string) =>
+    choose("branch", { "shipping.cityRef": "c1", "shipping.pickupPointRef": ref });
+
+  it("reuses the key for the same delivery choice (a retry is one attempt)", async () => {
+    const [one, two] = await keys(choose("courier"), choose("courier"));
+    expect(one).toBeDefined();
+    expect(two).toBe(one);
+  });
+
+  it("uses a new key when the method, the point or the total changes", async () => {
+    const [courier, branch1, branch2, store] = await keys(
+      choose("courier"),
+      point("p1"),
+      point("p2"),
+      choose("store"),
+    );
+    expect(new Set([courier, branch1, branch2, store]).size).toBe(4);
+  });
+
+  it("uses a new key when only the price of the same method changed", async () => {
+    const { calls, checkout, shipping } = await setup(withMethods(COURIER));
+    const first = checkout.submit(choose("courier"), { signedIn: false });
+    const [one] = await sentCheckouts(calls, 1);
+    one?.fail(new TypeError("offline"));
+    await first;
+    void shipping.refresh();
+    await settle();
+    optionCalls(calls)[1]?.answer(
+      json(shippingOptionsOf([{ ...COURIER, total: { amount: 7002, currency: "UAH" } }])),
+    );
+    await settle();
+    void checkout.submit(choose("courier"), { signedIn: false });
+    const sent = await sentCheckouts(calls, 2);
+    expect(keyOf(sent[1])).not.toBe(keyOf(sent[0]));
   });
 });
