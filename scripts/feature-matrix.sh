@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -9,11 +9,15 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, reinstall, then lint, typecheck, boundaries and tests must pass, and
-#                     an API told to load fake must refuse to start, loudly (destructive: CI only)
+#   providers-deleted remove packages/providers/_fake and packages/providers/nova-post, reinstall, then lint, typecheck,
+#                     boundaries and tests must pass, and an API told to load fake or nova_post must refuse to start,
+#                     loudly (destructive: CI only)
+#   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
+#                     start naming the variable; with an invented key it must start and report nova_post, never print the
+#                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use)
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -71,19 +75,42 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake
+    rm -rf packages/providers/_fake packages/providers/nova-post
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
     pnpm check:boundaries
     pnpm test
     # A provider that is enabled but gone must stop the startup, not be skipped. The check runs before any connection.
-    if SHIPPING_PROVIDERS_ENABLED=fake PORT="$port" timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
-      echo "the API started although the enabled fake provider is deleted" >&2
+    for code in fake nova_post; do
+      if SHIPPING_PROVIDERS_ENABLED="$code" NOVA_POST_API_KEY=matrix-invented-key-0000000000000000 PORT="$port" \
+        timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+        echo "the API started although the enabled $code provider is deleted" >&2
+        exit 1
+      fi
+      grep -F "Shipping provider \"$code\" is enabled" /tmp/fluxkit-matrix-api.log \
+        || { echo "expected a loud startup error naming the missing provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    done
+    ;;
+  providers-nova-post)
+    pnpm build
+    # Without the key: a loud refusal that names the variable, before anything listens.
+    if env -u NOVA_POST_API_KEY SHIPPING_PROVIDERS_ENABLED=nova_post PORT="$port" \
+      timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started with nova_post enabled and no NOVA_POST_API_KEY" >&2
       exit 1
     fi
-    grep -F 'Shipping provider "fake" is enabled' /tmp/fluxkit-matrix-api.log \
-      || { echo "expected a loud startup error naming the missing provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    grep -F "NOVA_POST_API_KEY is required" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a startup error naming NOVA_POST_API_KEY" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # With an invented key: it starts, reports nova_post and the sandbox, never prints the key. No call is made at startup.
+    invented_key="matrix-invented-key-$(date +%s)-0000000000"
+    NOVA_POST_API_KEY="$invented_key" run_api "" "nova_post"
+    grep -F "Shipping providers loaded: nova_post" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the registry to report nova_post" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    grep -F "Nova Post environment: sandbox" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the sandbox environment by default" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the Nova Post key" >&2; exit 1; }
     ;;
   *)
     echo "unknown mode: $mode" >&2
