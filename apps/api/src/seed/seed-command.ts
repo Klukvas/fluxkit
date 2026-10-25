@@ -4,6 +4,11 @@ import { catalogSeed, type CatalogSeed } from "@fluxkit/seeds";
 import { AppModule } from "../app.module.js";
 import { toPricingConfig } from "../common/pricing-config.js";
 import { ProblemException } from "../common/problem.js";
+import {
+  DEFAULT_SHIPPING_PROVIDERS_DIR,
+  loadShippingProviders,
+  type LoadedShippingProvider,
+} from "../shipping/registry/index.js";
 import { CatalogSeeder, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
 
 export const ALLOW_PRODUCTION_FLAG = "--allow-production";
@@ -63,6 +68,12 @@ export function formatSummary(summary: SeedSummary): string {
     "Seed finished.",
     ...lines,
     `  variants      created ${String(summary.variantsCreated).padStart(3)} (with new products)`,
+    "  shipping methods are created inactive; activate them in the admin (Shipping).",
+    ...(summary.skippedShippingMethods.length === 0
+      ? []
+      : [
+          `  skipped (provider not loaded, SHIPPING_PROVIDERS_ENABLED): ${summary.skippedShippingMethods.join(", ")}`,
+        ]),
   ].join("\n");
 }
 
@@ -77,6 +88,8 @@ export function describeError(error: unknown): string {
 export interface RunSeedCommandOptions {
   /** Tests only: replaces the demo catalog. */
   seed?: CatalogSeed;
+  /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
+  extraShippingProviders?: LoadedShippingProvider[];
 }
 
 /**
@@ -90,6 +103,11 @@ export async function runSeedCommand(
 ): Promise<SeedSummary> {
   assertSeedAllowed(env, argv);
   const config = loadEnv(env);
+  // The enabled providers, as the API loads them: a demo method of a provider is created only when it is loaded.
+  const shippingProviders = await loadShippingProviders({
+    enabled: config.enabledShippingProviders,
+    providersDir: DEFAULT_SHIPPING_PROVIDERS_DIR,
+  });
   const app = await NestFactory.createApplicationContext(
     AppModule.register({
       databaseUrl: config.databaseUrl,
@@ -97,6 +115,7 @@ export async function runSeedCommand(
       features: [],
       locale: { defaultLocale: config.defaultLocale, locales: config.locales },
       pricing: toPricingConfig(config),
+      shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
     }),
     { logger: ["error", "warn"] },
   );

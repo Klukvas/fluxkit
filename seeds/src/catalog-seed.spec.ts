@@ -3,6 +3,8 @@ import {
   MAX_ON_HAND,
   isValidCode,
   isValidValueCode,
+  validateCountryCodes,
+  validateShippingPricing,
   validateSlug,
   type I18nText,
 } from "@fluxkit/core";
@@ -264,6 +266,37 @@ describe("catalog seed data", () => {
           (product) => typeByCode.get(product.productTypeCode)?.requiresShipping === false,
         ),
       ).toBe(true);
+    });
+  });
+
+  describe("demo shipping methods (review m-9)", () => {
+    const { shippingMethods } = catalogSeed;
+
+    it("has the three documented demo methods with valid codes, uk and en texts, pricing and countries", () => {
+      expect(
+        shippingMethods.map((method) => [method.code, method.kind, method.providerCode]),
+      ).toEqual([
+        ["demo_courier", "address", null],
+        ["demo_pickup_point", "pickup_point", "fake"],
+        ["demo_store_pickup", "store_pickup", null],
+      ]);
+      for (const method of shippingMethods) {
+        expect(isValidCode(method.code), method.code).toBe(true);
+        expectBothLocales(method.title, `${method.code}.title`);
+        expectBothLocales(method.description, `${method.code}.description`);
+        expect(method.title.en, method.code).toMatch(/\(demo\)$/);
+        expect(validateShippingPricing(method.pricing).ok, method.code).toBe(true);
+        expect(validateCountryCodes(method.countryCodes).ok, method.code).toBe(true);
+      }
+      expect(unique(shippingMethods.map((method) => method.code))).toBe(true);
+    });
+
+    it("names no real carrier: the only provider is the test-only fake", () => {
+      expect(
+        shippingMethods.flatMap((method) =>
+          method.providerCode === null ? [] : [method.providerCode],
+        ),
+      ).toEqual(["fake"]);
     });
   });
 

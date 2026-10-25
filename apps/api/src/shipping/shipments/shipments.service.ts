@@ -14,6 +14,7 @@ import {
   type ShippingDestination,
   type ShippingProviderPort,
   type WaybillCreated,
+  type WaybillLookup,
   type WaybillRequest,
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
@@ -59,6 +60,20 @@ export const SHIPMENT_RETRY_AFTER_SECONDS = 30;
 /** A `pending` row older than this was left by a crash between the two transactions of a create: reconcile may settle it. */
 export const STALE_PENDING_MS = 2 * 60_000;
 
+/**
+ * How far `findWaybill`'s window reaches past our own times on both sides (review M-2): before the shipment row's
+ * `created_at` (clock skew between us and the carrier) and after the lookup (a save the carrier finished late).
+ */
+export const FIND_WAYBILL_MARGIN_MS = 5 * 60_000;
+
+/**
+ * The youngest an `unknown` or `pending` shipment may be for a "not found" of `reconcile` to make it `failed` (review M-2).
+ * A carrier's list may lag right after a timed-out save; `failed` re-allows a create, so settling a young one on a negative
+ * answer risks a duplicate waybill. A younger one answers `409 reconcile_too_early` and stays as it is; a FOUND waybill
+ * settles at any age.
+ */
+export const RECONCILE_NOT_FOUND_MIN_AGE_MS = 5 * 60_000;
+
 /** The largest label the API passes on (a carrier label is a page or two). */
 export const LABEL_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -85,10 +100,6 @@ interface CheckedWaybill {
   readonly trackingNumber: string;
   /** `null` also when the carrier's cost was malformed or in another currency (logged; the waybill is still stored). */
   readonly carrierCostAmount: number | null;
-}
-
-function isoDate(value: Date): string {
-  return value.toISOString().slice(0, 10);
 }
 
 /**
@@ -195,11 +206,13 @@ export class ShipmentsService {
       );
     }
     const provider = this.requireProvider(row.providerCode, "waybills");
+    const lookup: WaybillLookup = {
+      clientReference: row.clientReference,
+      createdAfter: new Date(row.createdAt.getTime() - FIND_WAYBILL_MARGIN_MS).toISOString(),
+      createdBefore: new Date(now.getTime() + FIND_WAYBILL_MARGIN_MS).toISOString(),
+    };
     const outcome = await callProvider(this.timeouts.waybillMs, (signal) =>
-      provider.findWaybill(
-        { clientReference: row.clientReference, createdOn: isoDate(row.createdAt) },
-        signal,
-      ),
+      provider.findWaybill(lookup, signal),
     );
     if (outcome.kind !== "ok") {
       this.logger.warn(`Shipment ${row.id} findWaybill: ${describeOutcome(outcome)}`);
@@ -212,6 +225,13 @@ export class ShipmentsService {
         this.logger.warn(`Shipment ${row.id} findWaybill: answer breaks the port`);
         throw shipmentProviderUnavailable();
       }
+    }
+    const age = now.getTime() - row.createdAt.getTime();
+    if (waybill === undefined && age < RECONCILE_NOT_FOUND_MIN_AGE_MS) {
+      this.logger.warn(
+        `Shipment ${row.id} findWaybill: not found yet; too young to settle as failed`,
+      );
+      throw reconcileTooEarly(RECONCILE_NOT_FOUND_MIN_AGE_MS - age);
     }
     const settled = await this.settle(
       row.id,
@@ -547,6 +567,17 @@ function activeShipmentExists(): ProblemException {
     "The order already has a shipment that is not cancelled or failed (an unknown one may exist at the carrier: reconcile it).",
     "shipment_exists",
   );
+}
+
+/** A "not found" too soon after the create (review M-2): nothing changes; ask again after `Retry-After`. */
+function reconcileTooEarly(remainingMs: number): ProblemException {
+  return new ProblemException({
+    code: "rule_violation",
+    detail:
+      "The carrier does not list this waybill yet, which is normal right after a lost answer. Nothing changed; check again in a few minutes.",
+    extensions: { rule: "reconcile_too_early" },
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(remainingMs / 1000))) },
+  });
 }
 
 function invalidShipmentTransition(): ProblemException {

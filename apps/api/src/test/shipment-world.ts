@@ -120,7 +120,10 @@ export class ShipmentWorld {
 
   resetProviders(): void {
     for (const running of [this.orders.owner, this.orders.manager, this.orders.viewer]) {
-      this.provider(running).reset();
+      const provider = this.provider(running);
+      provider.reset();
+      // The test carrier dates its waybills by the API's clock, so `findWaybill`'s window lines up with the rows.
+      provider.now = () => this.clock.now();
     }
   }
 

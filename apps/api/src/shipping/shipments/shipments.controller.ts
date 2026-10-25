@@ -79,7 +79,7 @@ export class ShipmentsController {
   @ApiOperation({
     summary: "Settle an unknown shipment with the carrier",
     description:
-      "Asks the carrier for the waybill created with our order number: found makes the shipment `created`, none makes it `failed` (then a new create is allowed). For an `unknown` shipment, or a `pending` one older than 2 minutes (left by a crash). A carrier failure changes nothing (503 `shipping_provider_unavailable` or 409 `carrier_*`).",
+      "Asks the carrier for the waybill created with our order number within an instant window (the shipment's creation minus 5 minutes to now plus 5 minutes): found makes the shipment `created`, none makes it `failed` (then a new create is allowed) once the shipment is at least 5 minutes old; a younger one stays as it is and answers 409 `reconcile_too_early` with `Retry-After`. For an `unknown` shipment, or a `pending` one older than 2 minutes (left by a crash). A carrier failure changes nothing (503 `shipping_provider_unavailable` or 409 `carrier_*`).",
   })
   @ApiParam(ID_PARAM)
   @ApiParam(SHIPMENT_PARAM)

@@ -1,6 +1,9 @@
 import pg from "pg";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ShippingProviderRegistry } from "../registry/index.js";
+import { ShippingCheckoutService } from "./shipping-checkout.service.js";
+import { ShippingDirectoryService } from "./shipping-directory.service.js";
+import { SHIPPING_STORE_LIMITS } from "./shipping-store-limits.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { CartCatalog } from "../../test/cart-fixtures.js";
 import { requireTestDatabaseUrl } from "../../test/env.js";
@@ -170,14 +173,17 @@ describe("store shipping routes (ADR 0029 decisions 5 and 6; real app, real Post
       );
     });
 
-    it("a pickup point method of a provider the shop does not run is provider_not_enabled", async () => {
+    it("a pickup point method of a provider the shop does not run is not listed (review M-1)", async () => {
       const method = await methods.create({ kind: "pickup_point", providerCode: "gone_provider" });
+      const courier = await methods.create({ kind: "address", providerCode: "gone_provider" });
       const made = await catalog.simple({ price: 2_000 });
       await add(made.variantId);
       const result = await shippingOptions(shopper, { country: "UA" });
-      expect(result.body.options.find((o) => o.methodCode === method.code)).toMatchObject({
-        available: false,
-        reason: "provider_not_enabled",
+      expect(result.body.options.find((o) => o.methodCode === method.code)).toBeUndefined();
+      // An address method's provider only estimates: it is still offered.
+      expect(result.body.options.find((o) => o.methodCode === courier.code)).toMatchObject({
+        available: true,
+        estimate: null,
       });
     });
 
@@ -323,6 +329,107 @@ describe("store shipping routes (ADR 0029 decisions 5 and 6; real app, real Post
       expect((await guest.get(path)).status).toBe(200);
       expect((await guest.get(path)).status).toBe(200);
       expect((await guest.get(path)).status).toBe(429);
+    });
+  });
+
+  describe("review m-2 / m-3: directory bounds against a flood", () => {
+    const directory = () => running.app.get(ShippingDirectoryService);
+    const until = async (condition: () => boolean) => {
+      for (let attempt = 0; attempt < 200 && !condition(); attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      }
+    };
+
+    it("empty point lists of unknown city refs never evict a real city's list, and are cached briefly on their own", async () => {
+      await directory().listPickupPoints(provider, "test-city-kyiv");
+      expect(provider.calls.listPickupPoints).toBe(1);
+      for (let index = 0; index < SHIPPING_STORE_LIMITS.points.maxEntries + 50; index += 1) {
+        expect((await directory().listPickupPoints(provider, `r${String(index)}`)).items).toEqual(
+          [],
+        );
+      }
+      const calls = provider.calls.listPickupPoints;
+      expect((await directory().listPickupPoints(provider, "test-city-kyiv")).items).toHaveLength(
+        2,
+      );
+      expect(provider.calls.listPickupPoints).toBe(calls);
+      // The same unknown ref again within its short TTL: no call; after it: one call.
+      await directory().listPickupPoints(provider, "r0");
+      expect(provider.calls.listPickupPoints).toBe(calls);
+      clock.set(new Date(clock.now().getTime() + SHIPPING_STORE_LIMITS.emptyPointLists.ttlMs));
+      await directory().listPickupPoints(provider, "r0");
+      expect(provider.calls.listPickupPoints).toBe(calls + 1);
+    });
+
+    it("an unknown pickup ref is remembered briefly (no call per repeat) and never evicts a resolved point", async () => {
+      const real = "test-city-lviv-point-1";
+      expect((await directory().resolvePickupPoint(provider, real)).status).toBe("found");
+      expect(provider.calls.findPickupPoint).toBe(1);
+      for (let index = 0; index < SHIPPING_STORE_LIMITS.pointsByRef.maxEntries + 50; index += 1) {
+        expect(
+          (await directory().resolvePickupPoint(provider, `nope-${String(index)}`)).status,
+        ).toBe("unknown");
+      }
+      const calls = provider.calls.findPickupPoint;
+      // The newest unknown ref is still remembered (its own bound of 1 000 evicted the oldest ones).
+      const latest = `nope-${String(SHIPPING_STORE_LIMITS.pointsByRef.maxEntries + 49)}`;
+      expect(directory().peekPickupPoint("fake", real)?.ref).toBe(real);
+      expect((await directory().resolvePickupPoint(provider, real)).status).toBe("found");
+      expect((await directory().resolvePickupPoint(provider, latest)).status).toBe("unknown");
+      expect(provider.calls.findPickupPoint).toBe(calls);
+      clock.set(new Date(clock.now().getTime() + SHIPPING_STORE_LIMITS.unknownPointRefs.ttlMs));
+      expect((await directory().resolvePickupPoint(provider, latest)).status).toBe("unknown");
+      expect(provider.calls.findPickupPoint).toBe(calls + 1);
+    });
+
+    it("the checkout's point lookup has a reserved slot: a flood of lookups that fills the ordinary slots does not block it", async () => {
+      const method = await methods.create({ kind: "pickup_point" });
+      const release = provider.hold("listPickupPoints");
+      try {
+        const ordinarySlots =
+          SHIPPING_STORE_LIMITS.maxCallsInFlight -
+          SHIPPING_STORE_LIMITS.maxCallsReservedForCheckout;
+        const flood = Array.from({ length: ordinarySlots + 3 }, (_, index) =>
+          directory()
+            .listPickupPoints(provider, `flood-${String(index)}`)
+            .catch(() => undefined),
+        );
+        await until(() => provider.calls.listPickupPoints === ordinarySlots);
+        expect(directory().gateState("fake")).toEqual({ inFlight: ordinarySlots, queued: 3 });
+        const prepared = await running.app.get(ShippingCheckoutService).prepare({
+          methodCode: method.code,
+          pickupPointRef: "test-city-kyiv-point-2",
+        });
+        expect(prepared.pickup?.resolution.status).toBe("found");
+        release();
+        await Promise.all(flood);
+      } finally {
+        release();
+      }
+    });
+
+    it("a provider call that outlives its time limit keeps its gate slot until it really ends (at most 4 real calls)", async () => {
+      const release = provider.hold("listPickupPoints");
+      try {
+        const ordinarySlots =
+          SHIPPING_STORE_LIMITS.maxCallsInFlight -
+          SHIPPING_STORE_LIMITS.maxCallsReservedForCheckout;
+        // The test carrier's hold ignores the abort signal: these calls never end on their own.
+        const timedOut = await Promise.allSettled(
+          Array.from({ length: ordinarySlots }, (_, index) =>
+            directory().listPickupPoints(provider, `slow-${String(index)}`),
+          ),
+        );
+        expect(timedOut.map((result) => result.status)).toEqual(
+          Array.from({ length: ordinarySlots }, () => "rejected"),
+        );
+        expect(directory().gateState("fake").inFlight).toBe(ordinarySlots);
+        release();
+        await until(() => directory().gateState("fake").inFlight === 0);
+        expect(directory().gateState("fake")).toEqual({ inFlight: 0, queued: 0 });
+      } finally {
+        release();
+      }
     });
   });
 });

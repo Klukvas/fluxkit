@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import {
@@ -31,16 +31,6 @@ export class ShippingStoreRepository {
       .where(eq(shippingMethod.isActive, true))
       .orderBy(asc(shippingMethod.position), asc(shippingMethod.code), asc(shippingMethod.id))
       .limit(limit);
-  }
-
-  /** Whether the shop has at least one active method (the switch of `shipping_method_required`). */
-  async activeExists(db: DbExecutor): Promise<boolean> {
-    const rows = await db
-      .select({ one: sql<number>`1` })
-      .from(shippingMethod)
-      .where(eq(shippingMethod.isActive, true))
-      .limit(1);
-    return rows.length > 0;
   }
 
   async findByCode(

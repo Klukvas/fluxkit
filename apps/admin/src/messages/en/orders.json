@@ -291,6 +291,7 @@
   "shipment.refusal.carrier_not_supported": "This carrier does not support this action. Nothing was changed.",
   "shipment.refusal.shipment_exists": "This order already has an active waybill (a waybill with an unknown result counts). The order was read again: use “Check with the carrier” or cancel it, do not create another.",
   "shipment.refusal.shipment_not_unknown": "This waybill is not waiting for a check any more (someone may have settled it). Nothing was sent to the carrier. The order was read again.",
+  "shipment.refusal.reconcile_too_early": "The carrier does not list this waybill yet, which is normal in the first minutes after a lost answer. Nothing was changed and the waybill stays “result unknown”: check with the carrier again in a few minutes. Do not create another waybill.",
   "shipment.refusal.shipment_not_tracked": "This waybill cannot be tracked: it has no number yet, or it is over. The order was read again.",
   "shipment.refusal.invalid_transition": "The waybill's status does not allow this any more (someone may have changed it). Nothing was sent to the carrier. The order was read again.",
   "shipment.refusal.label_not_available": "There is no label for this waybill (it has no number at the carrier, or it was cancelled).",

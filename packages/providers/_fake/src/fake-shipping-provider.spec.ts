@@ -9,6 +9,11 @@ import { FAKE_ESTIMATE_MINOR_UNITS, FakeShippingProvider, providerModule } from 
 
 const signal = new AbortController().signal;
 const uah = (amount: number) => ({ amount, currency: "UAH" as const });
+/** A window wide enough for any waybill these specs create. */
+const window = {
+  createdAfter: "2000-01-01T00:00:00.000Z",
+  createdBefore: "2100-01-01T00:00:00.000Z",
+};
 
 function waybillRequest(clientReference: string, pickupPointRef: string): WaybillRequest {
   return {
@@ -151,15 +156,13 @@ describe("FakeShippingProvider", () => {
         value: { providerRef: "fake-waybill-000001", trackingNumber: "FAKE000001" },
       });
       expect(second).toMatchObject({ ok: true, value: { trackingNumber: "FAKE000002" } });
-      expect(
-        await fake.findWaybill({ clientReference: "ORD-2", createdOn: "2026-10-24" }, signal),
-      ).toMatchObject({
-        ok: true,
-        value: { trackingNumber: "FAKE000002" },
-      });
-      expect(
-        await fake.findWaybill({ clientReference: "none", createdOn: "2026-10-24" }, signal),
-      ).toEqual({
+      expect(await fake.findWaybill({ clientReference: "ORD-2", ...window }, signal)).toMatchObject(
+        {
+          ok: true,
+          value: { trackingNumber: "FAKE000002" },
+        },
+      );
+      expect(await fake.findWaybill({ clientReference: "none", ...window }, signal)).toEqual({
         ok: true,
         value: null,
       });
@@ -178,6 +181,50 @@ describe("FakeShippingProvider", () => {
           },
         ],
       });
+    });
+
+    it("findWaybill honours the window by instant, across a UTC midnight (review M-2)", async () => {
+      fake.now = () => new Date("2026-10-25T00:00:10.000Z");
+      await fake.createWaybill(waybillRequest("ORD-1", point), signal);
+      // A window that starts on the day before still finds a waybill saved just after midnight.
+      expect(
+        await fake.findWaybill(
+          {
+            clientReference: "ORD-1",
+            createdAfter: "2026-10-24T23:54:50.000Z",
+            createdBefore: "2026-10-25T00:10:00.000Z",
+          },
+          signal,
+        ),
+      ).toMatchObject({ ok: true, value: { trackingNumber: "FAKE000001" } });
+      // Outside the window on either side: not found.
+      expect(
+        await fake.findWaybill(
+          {
+            clientReference: "ORD-1",
+            createdAfter: "2026-10-24T00:00:00.000Z",
+            createdBefore: "2026-10-25T00:00:09.999Z",
+          },
+          signal,
+        ),
+      ).toEqual({ ok: true, value: null });
+      expect(
+        await fake.findWaybill(
+          {
+            clientReference: "ORD-1",
+            createdAfter: "2026-10-25T00:00:10.001Z",
+            createdBefore: "2026-10-26T00:00:00.000Z",
+          },
+          signal,
+        ),
+      ).toEqual({ ok: true, value: null });
+      // A window that is not two ordered instants is a refusal, never "not found".
+      expect(
+        await fake.findWaybill(
+          { clientReference: "ORD-1", createdAfter: "2026-10-25", createdBefore: "yesterday" },
+          signal,
+        ),
+      ).toMatchObject({ ok: false, reason: "rejected", providerCodes: ["INVALID_WINDOW"] });
     });
 
     it("refuses a second waybill for one client reference and an unknown pickup point", async () => {
@@ -209,9 +256,7 @@ describe("FakeShippingProvider", () => {
         ok: false,
         providerCodes: ["UNKNOWN_WAYBILL"],
       });
-      expect(
-        await fake.findWaybill({ clientReference: "ORD-1", createdOn: "2026-10-24" }, signal),
-      ).toEqual({
+      expect(await fake.findWaybill({ clientReference: "ORD-1", ...window }, signal)).toEqual({
         ok: true,
         value: null,
       });
@@ -301,12 +346,12 @@ describe("FakeShippingProvider", () => {
       );
       expect(lost).toMatchObject({ ok: false, reason: "unavailable" });
       expect(fake.waybillCount()).toBe(1);
-      expect(
-        await fake.findWaybill({ clientReference: "ORD-1", createdOn: "2026-10-24" }, signal),
-      ).toMatchObject({
-        ok: true,
-        value: { trackingNumber: "FAKE000001" },
-      });
+      expect(await fake.findWaybill({ clientReference: "ORD-1", ...window }, signal)).toMatchObject(
+        {
+          ok: true,
+          value: { trackingNumber: "FAKE000001" },
+        },
+      );
     });
 
     it("a plain createWaybill failure creates nothing", async () => {

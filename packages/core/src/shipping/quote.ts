@@ -58,6 +58,29 @@ function unavailable(reason: ShippingQuoteUnavailableReason): ShippingQuote {
   return Object.freeze({ available: false as const, reason });
 }
 
+export interface ShippingOfferInput {
+  readonly method: Pick<ShippingQuoteMethod, "kind" | "isActive" | "currency">;
+  /** Whether the method's provider is loaded (`true` for a method without a provider). */
+  readonly providerEnabled: boolean;
+  readonly shopCurrency: SupportedCurrency;
+}
+
+/**
+ * Whether the shop offers the method at all, independent of the cart and the destination: active, in the shop currency
+ * (ADR 0029 decision 3), and for kind `pickup_point` with its provider loaded. These are exactly the first three reasons of
+ * `quoteShippingMethod` (`inactive`, `currency_not_offered`, `provider_not_enabled`). The options endpoint lists only
+ * offered methods and the checkout's "a method is required" switch (ADR 0029 decision 4, "at least one active method
+ * exists") counts only offered methods, so a method no shopper can use never locks the checkout (review M-1). A method that
+ * is offered but does not serve the destination country still counts: the shop chose not to ship there.
+ */
+export function isShippingMethodOffered(input: ShippingOfferInput): boolean {
+  const { method } = input;
+  if (method.isActive !== true || method.currency !== input.shopCurrency) {
+    return false;
+  }
+  return method.kind !== "pickup_point" || input.providerEnabled === true;
+}
+
 /**
  * Reasons in this order: `inactive`, `currency_not_offered`, `provider_not_enabled` (kind `pickup_point` only: an address
  * method's provider only estimates), `country_required`, `country_not_served`, `pricing_invalid`, `total_out_of_range`.

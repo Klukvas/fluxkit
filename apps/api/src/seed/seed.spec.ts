@@ -13,6 +13,7 @@ import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
+import { testShippingProviders } from "../test/test-shipping-provider.js";
 import type { ProductDetailResponse } from "../catalog/admin/products/products.schemas.js";
 import type { InventoryResponse, MovementResponse } from "../inventory/admin/inventory.schemas.js";
 import type {
@@ -29,7 +30,11 @@ import {
   runSeedCommand,
 } from "./seed-command.js";
 
-const { attributes, options, productTypes, brands, categories, products } = catalogSeed;
+const { attributes, options, productTypes, brands, categories, products, shippingMethods } =
+  catalogSeed;
+
+/** The demo methods without a provider: the spec's runs load no provider unless they mount the test carrier. */
+const methodsWithoutProvider = shippingMethods.filter((method) => method.providerCode === null);
 
 function allCategories(tree: readonly SeedCategory[]): SeedCategory[] {
   return tree.flatMap((node) => [node, ...allCategories(node.children ?? [])]);
@@ -98,6 +103,7 @@ function expectedCounts(): Record<(typeof SEED_ENTITY_KINDS)[number], number> {
     brands: brands.length,
     categories: allCategories(categories).length,
     products: products.length,
+    shippingMethods: methodsWithoutProvider.length,
   };
 }
 
@@ -160,6 +166,9 @@ describe("catalog seed (real app, real Postgres)", () => {
     await pool.query('delete from "option" where code = any($1)', [
       options.map((option) => option.code),
     ]);
+    await pool.query("delete from shipping_method where code = any($1)", [
+      shippingMethods.map((method) => method.code),
+    ]);
   }
 
   beforeAll(async () => {
@@ -186,7 +195,11 @@ describe("catalog seed (real app, real Postgres)", () => {
       brands: 0,
       categories: 0,
       products: 0,
+      shippingMethods: 0,
     });
+    // The pickup point demo method needs the test-only fake provider, which this run does not load.
+    expect(firstRun.skippedShippingMethods).toEqual(["demo_pickup_point"]);
+    expect(formatSummary(firstRun)).toContain("skipped (provider not loaded");
     // 3 + 8 + 4 clothing variants, one default variant for each of the 5 products without options.
     expect(firstRun.variantsCreated).toBe(9 + 8 + 4 + 5);
     expect(formatSummary(firstRun)).toContain("products      created   8");
@@ -557,9 +570,39 @@ describe("catalog seed (real app, real Postgres)", () => {
         brands: 0,
         categories: 0,
         products: 0,
+        shippingMethods: 0,
       });
       expect(second.existing).toEqual(expectedCounts());
       expect(second.variantsCreated).toBe(0);
+    });
+
+    it("review m-9: creates the demo delivery methods INACTIVE (the pickup point one only with its provider loaded), once", async () => {
+      const withCarrier = await runSeedCommand([], env, {
+        extraShippingProviders: testShippingProviders(),
+      });
+      expect(withCarrier.created.shippingMethods).toBe(1);
+      expect(withCarrier.skippedShippingMethods).toEqual([]);
+      const rows = await pool.query<{
+        code: string;
+        kind: string;
+        is_active: boolean;
+        currency: string;
+      }>(
+        "select code, kind, is_active, currency from shipping_method where code = any($1) order by position",
+        [shippingMethods.map((method) => method.code)],
+      );
+      expect(rows.rows).toEqual([
+        { code: "demo_courier", kind: "address", is_active: false, currency: "UAH" },
+        { code: "demo_pickup_point", kind: "pickup_point", is_active: false, currency: "UAH" },
+        { code: "demo_store_pickup", kind: "store_pickup", is_active: false, currency: "UAH" },
+      ]);
+      const before = await tableCounts();
+      const again = await runSeedCommand([], env, {
+        extraShippingProviders: testShippingProviders(),
+      });
+      expect(again.created.shippingMethods).toBe(0);
+      expect(again.existing.shippingMethods).toBe(shippingMethods.length);
+      expect(await tableCounts()).toEqual(before);
     });
 
     it("leaves an entity that exists alone, even when its content differs from the seed", async () => {

@@ -244,7 +244,7 @@ export class CheckoutService {
       // Only asked when it decides something: a cart that ships, without a method in the request.
       activeMethodExists:
         requiresShipping && input.shipping === undefined
-          ? await this.shipping.activeMethodExists(tx)
+          ? await this.shipping.offeredMethodExists(tx)
           : false,
       selection: input.shipping,
     });

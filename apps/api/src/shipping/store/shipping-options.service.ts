@@ -1,6 +1,7 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
   createMoney,
+  isShippingMethodOffered,
   quoteShippingMethod,
   resolveTextWithFallback,
   SHIPPING_METHOD_KINDS,
@@ -79,6 +80,25 @@ export function toShippingOption(
       };
 }
 
+/**
+ * The methods the shop offers (core `isShippingMethodOffered`): active, in the shop currency, and a `pickup_point` only with
+ * its provider loaded. ONE filter for the options list and the checkout's "a method is required" switch (review M-1), so a
+ * method no shopper can use is neither listed nor required.
+ */
+export function offeredMethods(
+  rows: readonly StoreShippingMethodRow[],
+  shopCurrency: PricingConfig["shopCurrency"],
+  isProviderLoaded: (code: string) => boolean,
+): StoreShippingMethodRow[] {
+  return rows.filter((row) =>
+    isShippingMethodOffered({
+      method: { kind: methodKind(row), isActive: row.isActive, currency: row.currency },
+      providerEnabled: row.providerCode === null || isProviderLoaded(row.providerCode),
+      shopCurrency,
+    }),
+  );
+}
+
 /** The `shipping` member of `shipping_changed` for a method that is gone, inactive or in another currency. */
 export function notOffered(
   methodCode: string,
@@ -111,9 +131,12 @@ export class ShippingOptionsService {
     if (cart.lines.length === 0 || !cart.requiresShipping) {
       return { subtotal, options: [] };
     }
-    // A method in another currency than the shop's is never offered (ADR 0029 decision 3): not even as unavailable.
-    const methods = (await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods)).filter(
-      (row) => row.currency === this.pricing.shopCurrency,
+    // A method in another currency than the shop's (ADR 0029 decision 3) or a pickup point method of a provider that is
+    // not loaded is never offered: not even as unavailable (review M-1; the checkout's switch uses the same filter).
+    const methods = offeredMethods(
+      await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods),
+      this.pricing.shopCurrency,
+      (code) => this.directory.provider(code) !== undefined,
     );
     const points = await this.pointsOf(methods, query.pickupPointRef);
     const options = await Promise.all(

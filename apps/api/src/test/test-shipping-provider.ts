@@ -18,6 +18,7 @@ import {
   type ShippingProviderPort,
   type TrackingUpdate,
   type WaybillCreated,
+  type WaybillLookup,
   type WaybillRequest,
 } from "@fluxkit/core";
 import type { LoadedShippingProvider } from "../shipping/registry/index.js";
@@ -147,6 +148,8 @@ const WAYBILL_RUN = randomBytes(3).toString("hex").toUpperCase();
 export interface TestWaybill {
   readonly created: WaybillCreated;
   readonly clientReference: string;
+  /** When the carrier saved it (`now()` at the create): what `findWaybill`'s window is checked against. */
+  readonly createdAt: Date;
   status: CarrierReportedShipmentStatus;
   carrierStatusCode: string;
   carrierStatusAt: Date | null;
@@ -188,7 +191,9 @@ export class TestShippingProvider implements ShippingProviderPort {
   readonly calls: Record<TestOperation, number> = TestShippingProvider.zeroCalls();
   /** The arguments of the waybill calls, in call order. */
   readonly waybillRequests: WaybillRequest[] = [];
-  readonly findRequests: { clientReference: string; createdOn: string }[] = [];
+  readonly findRequests: WaybillLookup[] = [];
+  /** The carrier's clock: dates the waybills it creates (a spec may replace it, e.g. with the API's fake clock). */
+  now: () => Date = () => new Date();
   readonly trackRequests: { trackingNumbers: readonly string[]; phones: readonly string[] }[] = [];
   readonly waybills = new Map<string, TestWaybill>();
   private pending: (TestProviderFailure & { remaining: number }) | undefined;
@@ -267,6 +272,7 @@ export class TestShippingProvider implements ShippingProviderPort {
     this.labelBytes = null;
     this.labelContentType = "application/pdf";
     this.waybills.clear();
+    this.now = () => new Date();
     this.waybillRequests.length = 0;
     this.findRequests.length = 0;
     this.trackRequests.length = 0;
@@ -341,6 +347,7 @@ export class TestShippingProvider implements ShippingProviderPort {
       this.waybills.set(created.providerRef, {
         created,
         clientReference: input.clientReference,
+        createdAt: this.now(),
         status: "created",
         carrierStatusCode: "TEST_CREATED",
         carrierStatusAt: null,
@@ -350,14 +357,26 @@ export class TestShippingProvider implements ShippingProviderPort {
     });
   }
 
+  /** Honours the window by instant (review M-2): a waybill saved outside `[createdAfter, createdBefore]` is not found. */
   findWaybill(
-    input: { readonly clientReference: string; readonly createdOn: string },
+    input: WaybillLookup,
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<WaybillCreated | null>> {
     this.findRequests.push({ ...input });
+    const after = Date.parse(input.createdAfter);
+    const before = Date.parse(input.createdBefore);
+    if (!(after < before)) {
+      throw new RangeError("findWaybill: the window must be two ISO instants, after < before");
+    }
     return this.waybillCall("findWaybill", signal, () => {
       for (const waybill of this.waybills.values()) {
-        if (waybill.clientReference === input.clientReference && waybill.status !== "cancelled") {
+        const at = waybill.createdAt.getTime();
+        if (
+          waybill.clientReference === input.clientReference &&
+          waybill.status !== "cancelled" &&
+          at >= after &&
+          at <= before
+        ) {
           return waybill.created;
         }
       }

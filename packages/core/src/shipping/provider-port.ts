@@ -207,6 +207,25 @@ export interface WaybillCreated {
   readonly estimatedDeliveryDate: string | null;
 }
 
+/**
+ * What `findWaybill` looks for (review M-2). The window is two INSTANTS, ISO 8601 in UTC (`Date.prototype.toISOString`,
+ * e.g. `2026-10-24T21:58:00.000Z`), never a calendar date: the waybill, if it exists, was created at or after
+ * `createdAfter` and at or before `createdBefore`. The API widens it on both sides (our shipment row's creation minus a
+ * margin, the time of the lookup plus a margin), so clock skew and a slow save stay inside it. A provider whose carrier
+ * files documents by its own calendar (Nova Poshta: Kyiv local dates, unverified until plan step 7a) maps the window to
+ * EVERY local date it touches and filters by instant when the carrier gives one; it must never narrow the window to one
+ * date (a waybill saved at 23:59 UTC carries the next Kyiv date). A `null` answer must mean "no such waybill in the
+ * window", never "could not look": a failed or partial lookup is a failure result.
+ */
+export interface WaybillLookup {
+  /** Our order number, as sent in `WaybillRequest.clientReference`. */
+  readonly clientReference: string;
+  /** ISO 8601 instant in UTC: the earliest creation time to consider. */
+  readonly createdAfter: string;
+  /** ISO 8601 instant in UTC, later than `createdAfter`: the latest creation time to consider. */
+  readonly createdBefore: string;
+}
+
 export interface TrackingUpdate {
   readonly trackingNumber: string;
   /** The provider's mapping of its code; `null` when the code has no normalized status (the shipment keeps its status). */
@@ -244,12 +263,13 @@ export interface ShippingProviderPort {
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<WaybillCreated>>;
   /**
-   * The waybill created with `clientReference`, or `null` when the carrier has none: how the API settles an `unknown`
-   * shipment instead of a blind retry (ADR 0029 decision 10, `reconcile`). Added to the ADR's proposed shape in plan
-   * step 2, because decision 10 needs it and decision 9 has no method for it.
+   * The waybill created with `clientReference` within the window, or `null` when the carrier has none: how the API settles
+   * an `unknown` shipment instead of a blind retry (ADR 0029 decision 10, `reconcile`). Added to the ADR's proposed shape in
+   * plan step 2, because decision 10 needs it and decision 9 has no method for it; the window replaced a UTC date in the
+   * step 13 review fixes (M-2). See `WaybillLookup`.
    */
   findWaybill(
-    input: { readonly clientReference: string; readonly createdOn: string },
+    input: WaybillLookup,
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<WaybillCreated | null>>;
   cancelWaybill(

@@ -153,6 +153,43 @@ describe("ProviderCache (ADR 0029 decision 6)", () => {
     expect(cache.peek("k", { allowStale: true })).toEqual({ value: "v", stale: true });
   });
 
+  it("review m-2: a value the keep rule refuses is answered but never stored, so it evicts nothing", async () => {
+    const cache = new ProviderCache<string[]>(policy, clock().now, {
+      keep: (value) => value.length > 0,
+    });
+    for (const key of ["a", "b", "c"]) {
+      await cache.get(key, () => Promise.resolve([key]));
+    }
+    for (let index = 0; index < 10; index += 1) {
+      expect(await cache.get(`empty${String(index)}`, () => Promise.resolve([]))).toEqual({
+        value: [],
+        stale: false,
+      });
+    }
+    expect(cache.size()).toBe(3);
+    for (const key of ["a", "b", "c"]) {
+      expect(cache.peek(key)?.value).toEqual([key]);
+    }
+  });
+
+  it("review m-2: is bounded by total weight too, evicting the least recently used entries", async () => {
+    const cache = new ProviderCache<string[]>({ ...policy, maxEntries: 100 }, clock().now, {
+      weight: (value) => value.length,
+      maxWeight: 10,
+    });
+    await cache.get("a", () => Promise.resolve(Array.from({ length: 4 }, () => "x")));
+    await cache.get("b", () => Promise.resolve(Array.from({ length: 4 }, () => "x")));
+    expect(cache.weight()).toBe(8);
+    await cache.get("c", () => Promise.resolve(Array.from({ length: 4 }, () => "x")));
+    expect(cache.peek("a")).toBeUndefined();
+    expect(cache.weight()).toBe(8);
+    // A replaced entry's old weight is not counted twice.
+    cache.set("b", ["x"]);
+    expect(cache.weight()).toBe(5);
+    cache.delete("c");
+    expect(cache.weight()).toBe(1);
+  });
+
   it("refuses a policy without bounds", () => {
     expect(() => new ProviderCache<string>({ ...policy, maxEntries: 0 }, clock().now)).toThrow(
       RangeError,
@@ -227,5 +264,64 @@ describe("ConcurrencyGate (at most N provider calls in flight per provider)", ()
     ).rejects.toThrow("x");
     expect(gate.inFlight()).toBe(0);
     expect(await gate.run(new AbortController().signal, () => Promise.resolve(7))).toBe(7);
+  });
+
+  it("review m-2: reserved slots are for priority calls only; ordinary calls use the rest", async () => {
+    const gate = new ConcurrencyGate(2, 10, 1);
+    const block = deferred<undefined>();
+    const started: string[] = [];
+    const ordinary = ["n1", "n2"].map((name) =>
+      gate.run(new AbortController().signal, async () => {
+        started.push(name);
+        await block.promise;
+      }),
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    // One ordinary call runs, the second waits although a slot is free: that slot is reserved.
+    expect(started).toEqual(["n1"]);
+    const priority = gate.run(
+      new AbortController().signal,
+      async () => {
+        started.push("p1");
+        await Promise.resolve();
+        return "p1";
+      },
+      "priority",
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(started).toEqual(["n1", "p1"]);
+    expect(await priority).toBe("p1");
+    block.resolve(undefined);
+    await Promise.all(ordinary);
+    expect(started).toEqual(["n1", "p1", "n2"]);
+    expect(gate.inFlight()).toBe(0);
+  });
+
+  it("review m-2: a waiting priority call gets the next free slot before waiting ordinary calls", async () => {
+    const gate = new ConcurrencyGate(1, 10, 0);
+    const block = deferred<undefined>();
+    const order: string[] = [];
+    const first = gate.run(new AbortController().signal, () => block.promise);
+    const ordinary = gate.run(new AbortController().signal, () => {
+      order.push("ordinary");
+      return Promise.resolve();
+    });
+    const priority = gate.run(
+      new AbortController().signal,
+      () => {
+        order.push("priority");
+        return Promise.resolve();
+      },
+      "priority",
+    );
+    block.resolve(undefined);
+    await Promise.all([first, ordinary, priority]);
+    expect(order).toEqual(["priority", "ordinary"]);
+  });
+
+  it("refuses reserved slots that leave no ordinary slot", () => {
+    expect(() => new ConcurrencyGate(2, 1, 2)).toThrow(RangeError);
   });
 });

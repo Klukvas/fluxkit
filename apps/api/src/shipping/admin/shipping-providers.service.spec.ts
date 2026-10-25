@@ -1,5 +1,6 @@
-import type { ShippingProviderPort } from "@fluxkit/core";
-import { describe, expect, it } from "vitest";
+import { SHIPPING_PROVIDER_TIMEOUTS_MS, type ShippingProviderPort } from "@fluxkit/core";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { captureLogs } from "../../test/shipping-fixtures.js";
 import type { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
 import type { ShippingProviderSettingsRepository } from "./shipping-provider-settings.repository.js";
 import { ShippingProvidersService } from "./shipping-providers.service.js";
@@ -15,20 +16,64 @@ function serviceWith(checkConnection: ShippingProviderPort["checkConnection"]) {
 }
 
 describe("ShippingProvidersService.check", () => {
-  it("does not let a carrier message pass as a code: the failure is re-checked and surfaces as an error", async () => {
-    const service = serviceWith(() =>
-      Promise.resolve({
-        ok: false,
-        reason: "rejected",
-        providerCodes: ["Invalid API key for sender Ivan Petrenko +380501234567"],
-      } as never),
-    );
-    await expect(service.check("stub")).rejects.toThrow(RangeError);
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
-  it("does not turn a provider's own throw into a friendly answer: it is a bug and surfaces", async () => {
-    const service = serviceWith(() => Promise.reject(new Error("boom")));
-    await expect(service.check("stub")).rejects.toThrow("boom");
+  /** Review m-1: the check goes through the guarded `callProvider` like every other provider call. */
+  it("a carrier message passed as a code is never answered or logged: unavailable, the class name only", async () => {
+    const logs = captureLogs();
+    try {
+      const service = serviceWith(() =>
+        Promise.resolve({
+          ok: false,
+          reason: "rejected",
+          providerCodes: ["Invalid API key for sender Ivan Petrenko +380501234567"],
+        } as never),
+      );
+      const answer = await service.check("stub");
+      expect(answer).toEqual({ ok: false, reason: "unavailable", providerCodes: [] });
+      expect(JSON.stringify(answer)).not.toContain("Petrenko");
+      expect(logs.text()).toContain("threw error=RangeError");
+      expect(logs.text()).not.toContain("Petrenko");
+    } finally {
+      logs.stop();
+    }
+  });
+
+  it("a provider's throw is unavailable, never a 500 whose log echoes the provider's text", async () => {
+    const logs = captureLogs();
+    try {
+      const service = serviceWith(() => Promise.reject(new Error("apiKey=XYZ refused")));
+      expect(await service.check("stub")).toEqual({
+        ok: false,
+        reason: "unavailable",
+        providerCodes: [],
+      });
+      expect(logs.text()).toContain("threw error=Error");
+      expect(logs.text()).not.toContain("apiKey=XYZ");
+    } finally {
+      logs.stop();
+    }
+  });
+
+  it("a provider that ignores the abort signal is not waited for: unavailable after the lookup limit", async () => {
+    vi.useFakeTimers();
+    const service = serviceWith(() => new Promise(() => undefined));
+    const answer = service.check("stub");
+    await vi.advanceTimersByTimeAsync(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup);
+    expect(await answer).toEqual({ ok: false, reason: "unavailable", providerCodes: [] });
+  });
+
+  it("a typed failure keeps its reason and carrier codes", async () => {
+    const service = serviceWith(() =>
+      Promise.resolve({ ok: false, reason: "invalid_credentials", providerCodes: ["E_401"] }),
+    );
+    expect(await service.check("stub")).toEqual({
+      ok: false,
+      reason: "invalid_credentials",
+      providerCodes: ["E_401"],
+    });
   });
 
   it("passes the API's abort signal to the provider, with a time limit", async () => {

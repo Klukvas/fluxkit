@@ -25,7 +25,11 @@ export {
   type MediaStorageDriver,
 } from "./env.js";
 export { parseEnabledFeatures } from "./features.js";
-export { parseEnabledShippingProviders, SHIPPING_PROVIDER_CODE } from "./shipping-providers.js";
+export {
+  parseEnabledShippingProviders,
+  SHIPPING_PROVIDER_CODE,
+  TEST_ONLY_SHIPPING_PROVIDERS,
+} from "./shipping-providers.js";
 export {
   DEFAULT_STOREFRONT_PUBLIC_URL,
   loadStorefrontEnv,

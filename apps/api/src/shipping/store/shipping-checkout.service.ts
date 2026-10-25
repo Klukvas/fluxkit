@@ -25,7 +25,12 @@ import {
   ShippingDirectoryService,
   type PickupPointResolution,
 } from "./shipping-directory.service.js";
-import { methodKind, notOffered, toShippingOption } from "./shipping-options.service.js";
+import {
+  methodKind,
+  notOffered,
+  offeredMethods,
+  toShippingOption,
+} from "./shipping-options.service.js";
 import { SHIPPING_STORE_LIMITS } from "./shipping-store-limits.js";
 import type { ShippingChanged, ShippingOption } from "./shipping-store.schemas.js";
 import {
@@ -90,9 +95,20 @@ export class ShippingCheckoutService {
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
-  /** Whether the shop has at least one active method (`shipping_method_required`). */
-  activeMethodExists(tx: Transaction): Promise<boolean> {
-    return this.repository.activeExists(tx);
+  /**
+   * Whether the shop offers at least one method (`shipping_method_required`, ADR 0029 decision 4): the methods the options
+   * endpoint lists, by the same filter (`offeredMethods`, review M-1). Active methods in another currency or pickup point
+   * methods of a provider that is not loaded do not count, so they cannot lock every checkout out.
+   */
+  async offeredMethodExists(tx: Transaction): Promise<boolean> {
+    const rows = await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods, tx);
+    return (
+      offeredMethods(
+        rows,
+        this.pricing.shopCurrency,
+        (code) => this.directory.provider(code) !== undefined,
+      ).length > 0
+    );
   }
 
   /** BEFORE the transaction, outside every lock. Only a pickup point of an enabled provider needs anything. */
@@ -113,15 +129,16 @@ export class ShippingCheckoutService {
       pickup: {
         providerCode: provider.code,
         ref,
-        resolution: await this.directory.resolvePickupPoint(provider, ref),
+        // The reserved gate slot: a flood of store lookups cannot make a checkout wait for its point (review m-2).
+        resolution: await this.directory.resolvePickupPoint(provider, ref, "priority"),
       },
     };
   }
 
   /**
-   * Inside the transaction, from the database and memory only. Throws the 400s of the selection (`shipping.pickupPointRef`
-   * `required` / `not_applicable` / `unknown_pickup_point`, `shippingAddress` `shipping_address_required` /
-   * `not_applicable`), `503 shipping_provider_unavailable` and `409 rule_violation total_out_of_range`.
+   * Inside the transaction, from the database and memory only. A request that does not fit the method's current kind is
+   * `unavailable` (the consent check answers `shipping_changed`, review m-4). Throws `400` `shipping.pickupPointRef`
+   * `unknown_pickup_point`, `503 shipping_provider_unavailable` and `409 rule_violation total_out_of_range`.
    */
   async decide(tx: Transaction, input: ShippingDecisionInput): Promise<ShippingDecision> {
     const { selection, locale } = input;
@@ -136,20 +153,35 @@ export class ShippingCheckoutService {
       };
     }
     const kind = methodKind(method);
-    const forKind = checkSelectionForKind(kind, selection);
-    if (!forKind.ok) {
-      throw validationFailed([{ path: "shipping.pickupPointRef", code: forKind.reason }]);
-    }
-    if (kind === "address" && input.shippingAddress === null) {
-      throw validationFailed([{ path: "shippingAddress", code: "shipping_address_required" }]);
-    }
-    if (kind === "pickup_point" && input.shippingAddress !== null) {
-      // The address of a pickup point order is the point's; a sent address would be silently replaced.
-      throw validationFailed([{ path: "shippingAddress", code: "not_applicable" }]);
-    }
-
     const provider =
       method.providerCode === null ? undefined : this.directory.provider(method.providerCode);
+    // A request shaped for another kind (a pickup point ref for an address method, none for a pickup point, an address for
+    // a pickup point, no address for an address method) means the shopper's page shows the method as it was before an
+    // admin changed its kind: `shipping_changed` with the fresh option (ADR 0029 decision 4, review m-4), never a field
+    // error for a field the page did not offer. A pickup point order's address is the point's, so a sent one is refused
+    // too (it would be silently replaced).
+    if (
+      !checkSelectionForKind(kind, selection).ok ||
+      (kind === "address" && input.shippingAddress === null) ||
+      (kind === "pickup_point" && input.shippingAddress !== null)
+    ) {
+      const fresh = quoteShippingMethod({
+        method: {
+          kind,
+          isActive: method.isActive,
+          currency: method.currency,
+          countryCodes: method.countryCodes,
+          providerCode: method.providerCode,
+          pricing: method.pricing,
+        },
+        providerEnabled: method.providerCode === null || provider !== undefined,
+        shopCurrency: this.pricing.shopCurrency,
+        countryCode: input.shippingAddress?.countryCode,
+        subtotal: input.subtotal,
+      });
+      return { kind: "unavailable", changed: toShippingOption(method, fresh, locale, null) };
+    }
+
     let point: PickupPoint | null = null;
     if (kind === "pickup_point" && provider !== undefined) {
       point = this.pickupPoint(provider.code, selection.pickupPointRef ?? "", input.prepared);

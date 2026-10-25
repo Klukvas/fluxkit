@@ -1,12 +1,14 @@
 import { demoAttributes, demoOptions } from "./dictionaries.js";
 import { productTypePresets } from "./presets.js";
 import { demoProducts } from "./products.js";
+import { demoShippingMethods } from "./shipping.js";
 import { demoBrands, demoCategories } from "./taxonomy.js";
 import type { CatalogSeed } from "./types.js";
 
 export { demoAttributes, demoOptions } from "./dictionaries.js";
 export { productTypePresets } from "./presets.js";
 export { INTERNAL_SUPPLIER_MARKER, demoProducts } from "./products.js";
+export { demoShippingMethods } from "./shipping.js";
 export { demoBrands, demoCategories } from "./taxonomy.js";
 export type * from "./types.js";
 
@@ -18,4 +20,5 @@ export const catalogSeed: CatalogSeed = {
   brands: demoBrands,
   categories: demoCategories,
   products: demoProducts,
+  shippingMethods: demoShippingMethods,
 };

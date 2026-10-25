@@ -1,6 +1,5 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
-  providerFailure,
   SHIPPING_PROVIDER_CODE_PATTERN,
   SHIPPING_PROVIDER_TIMEOUTS_MS,
   type ShippingProviderPort,
@@ -8,6 +7,7 @@ import {
 import { translatePostgresError } from "../../common/postgres-errors.js";
 import { notFound, validationFailed } from "../../common/problem.js";
 import { ShippingProviderRegistry } from "../registry/shipping-provider-registry.js";
+import { callProvider, describeOutcome } from "../shipments/provider-call.js";
 import { providerSettingsErrors } from "./provider-settings.js";
 import {
   ShippingProviderSettingsRepository,
@@ -20,6 +20,8 @@ import type {
 
 @Injectable()
 export class ShippingProvidersService {
+  private readonly logger = new Logger("ShippingProviders");
+
   constructor(
     @Inject(ShippingProviderRegistry) private readonly providers: ShippingProviderRegistry,
     @Inject(ShippingProviderSettingsRepository)
@@ -53,30 +55,26 @@ export class ShippingProvidersService {
 
   /**
    * Asks the provider whether the shop's credentials work. The answer is the provider's typed reason and carrier codes,
-   * nothing else: no message text, no key. The API sets the time limit (ADR 0029 decision 9); a call that runs out of time
-   * is `unavailable`. Any other throw is a provider bug and surfaces as a logged 500.
+   * nothing else: no message text, no key. The call goes through `callProvider` like every other provider call (review
+   * m-1): the API's time limit (ADR 0029 decision 9) is enforced even when the provider ignores the abort signal, and a
+   * timeout, a throw or an answer that breaks the port (a message passed off as a code) is `unavailable`, logged with the
+   * outcome kind and the error's class name only.
    */
   async check(code: string): Promise<ProviderCheckResponse> {
     const provider = this.provider(code);
-    const signal = AbortSignal.timeout(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup);
-    let result: Awaited<ReturnType<ShippingProviderPort["checkConnection"]>>;
-    try {
-      result = await provider.checkConnection(signal);
-    } catch (error) {
-      if (signal.aborted) {
-        return { ok: false, reason: "unavailable", providerCodes: [] };
-      }
-      throw error;
-    }
-    if (result.ok) {
+    const outcome = await callProvider(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup, (signal) =>
+      provider.checkConnection(signal),
+    );
+    if (outcome.kind === "ok") {
       return { ok: true };
     }
-    // Re-checks reason and codes (a RangeError for a message passed as a code): a plugin cannot smuggle text through.
-    const checked = providerFailure(result.reason, result.providerCodes);
-    if (checked.ok) {
-      throw new Error("providerFailure returned a success");
+    if (outcome.kind === "failed") {
+      return { ok: false, reason: outcome.reason, providerCodes: [...outcome.providerCodes] };
     }
-    return { ok: false, reason: checked.reason, providerCodes: [...checked.providerCodes] };
+    this.logger.warn(
+      `Shipping provider "${provider.code}" checkConnection: ${describeOutcome(outcome)}`,
+    );
+    return { ok: false, reason: "unavailable", providerCodes: [] };
   }
 
   /** A provider the shop runs, or 404. A code that is not even a code is the controller's 400. */
