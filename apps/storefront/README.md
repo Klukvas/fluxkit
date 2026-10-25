@@ -329,6 +329,10 @@ NOT checked (no browser or screen reader here): a real keyboard walk, focus orde
 
 `.next/diagnostics/route-bundle-stats.json` after `next build` (no API running), first-load JS uncompressed and gzip (sum of the gzipped chunks): `/[locale]/checkout` 520,339 (154.1 KB), `/[locale]/order/[number]` 512,244 (151.0 KB), `/[locale]/account/orders` and `/account/orders/[number]` 521,609 (153.3 KB), `/[locale]/cart` 524,297 (155.3 KB) against 523,252 in step 6, `/[locale]` 513,259 (152.4 KB) against 512,433, `/_not-found` unchanged at 456,219. The shared layout grew by about 1 KB (the store client context and the fragment in the locale switcher). `@fluxkit/core`, `@fluxkit/config` and zod are still in no client chunk (all `.next/static/chunks/*.js` searched); the checkout validates nothing with the core rules on the client (HTML constraints and blank checks only, the API judges).
 
+### Step 10 (shipping) measurement
+
+`.next/diagnostics/route-bundle-stats.json` after `next build`: first-load JS `/[locale]/checkout` 543,501 bytes uncompressed (161.3 KB gzip) against 520,339 (154.1 KB) in step 7 (the delivery section, the two pickers, the shipping stores and the `checkout.shipping.*` messages), `/[locale]/order/[number]` 520,968 (153.4 KB) against 512,244 (151.0 KB). `@fluxkit/core`, `@fluxkit/config` and zod are still in no client chunk.
+
 ## Known limits and TODOs
 
 - `TODO(fluxkit)` the product page shows the product-level attributes only; the attributes of the selected variant (`variant.attributes`) are not shown.

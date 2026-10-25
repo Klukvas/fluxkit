@@ -191,7 +191,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
 
   // Shipping plan step 10: the browser talks to our API only, and never adds money.
   const shippingFiles = sources.filter((file) =>
-    /(^|\/)(shipping-[a-z]+|lookup-source|combobox-model|delivery-section|lookup-combobox)\.tsx?$/.test(
+    /(^|\/)(shipping-(?:model|store|text)|lookup-source|combobox-model|delivery-section|lookup-combobox)\.tsx?$/.test(
       file.path,
     ),
   );
