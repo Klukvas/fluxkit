@@ -1,8 +1,10 @@
 import { Test } from "@nestjs/testing";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  checkShippingProviderContract,
   SHIPPING_PROVIDER_METADATA,
   SHIPPING_CAPABILITIES,
+  type ShippingProviderPort,
   type WaybillRequest,
 } from "@fluxkit/core";
 import { FAKE_ESTIMATE_MINOR_UNITS, FakeShippingProvider, providerModule } from "./index.js";
@@ -283,21 +285,32 @@ describe("FakeShippingProvider", () => {
     it("returns a PDF label for a known waybill only", async () => {
       await fake.createWaybill(waybillRequest("ORD-1", point), signal);
       const label = await fake.fetchLabel(
-        { providerRef: "fake-waybill-000001", format: "pdf" },
+        { providerRef: "fake-waybill-000001", trackingNumber: "FAKE000001", format: "pdf" },
         signal,
       );
       expect(label.ok && label.value.contentType).toBe("application/pdf");
       expect(label.ok && new TextDecoder().decode(label.value.bytes).startsWith("%PDF-")).toBe(
         true,
       );
-      expect(await fake.fetchLabel({ providerRef: "ghost", format: "pdf" }, signal)).toMatchObject({
-        ok: false,
-        providerCodes: ["UNKNOWN_WAYBILL"],
-      });
+      for (const input of [
+        { providerRef: "ghost", trackingNumber: "FAKE000001" },
+        { providerRef: "fake-waybill-000001", trackingNumber: "FAKE000002" },
+      ]) {
+        expect(await fake.fetchLabel({ ...input, format: "pdf" }, signal)).toMatchObject({
+          ok: false,
+          providerCodes: ["UNKNOWN_WAYBILL"],
+        });
+      }
     });
 
     it("reports a healthy connection", async () => {
       expect(await fake.checkConnection(signal)).toEqual({ ok: true, value: undefined });
+    });
+
+    it("accepts any settings object (it has no settings of its own)", () => {
+      const port: ShippingProviderPort = fake;
+      expect(port.validateSettings({})).toEqual([]);
+      expect(port.validateSettings({ anything: 1 })).toEqual([]);
     });
   });
 
@@ -400,5 +413,25 @@ describe("FakeShippingProvider", () => {
       );
       expect(again).toMatchObject({ ok: true, value: { trackingNumber: "FAKE000001" } });
     });
+  });
+});
+
+describe("FakeShippingProvider keeps the provider contract (the same check as every provider)", () => {
+  it("breaks no rule of ShippingProviderPort", async () => {
+    const aborted = new AbortController();
+    aborted.abort(new Error("aborted"));
+    const violations = await checkShippingProviderContract(new FakeShippingProvider(), {
+      cityQuery: { query: "Ки", locale: "uk" },
+      cityRef: "fake-city-kyiv",
+      pickupPointRef: "fake-city-kyiv-point-1",
+      unknownPickupPointRef: "fake-city-kyiv-point-9",
+      waybill: waybillRequest("ORD-CONTRACT", "fake-city-kyiv-point-1"),
+      validSettings: {},
+      // The fake has no settings of its own and refuses none.
+      invalidSettings: null,
+      liveSignal: () => new AbortController().signal,
+      abortedSignal: () => aborted.signal,
+    });
+    expect(violations).toEqual([]);
   });
 });

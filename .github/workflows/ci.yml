@@ -81,7 +81,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [on, off, deleted, providers-on, providers-off, providers-deleted]
+        mode:
+          [on, off, deleted, providers-on, providers-off, providers-deleted, providers-nova-post]
     services:
       postgres:
         image: postgres:17-alpine

@@ -12,6 +12,7 @@ export const LOADED_SHIPPING_PROVIDER_CODES = Symbol("fluxkit:loaded-shipping-pr
 
 /** Every method of `ShippingProviderPort` the API calls; a marked class that lacks one stops the startup. */
 const PORT_METHODS = [
+  "validateSettings",
   "searchCities",
   "listPickupPoints",
   "findPickupPoint",

@@ -3,6 +3,7 @@ export * from "./availability.js";
 export * from "./events.js";
 export * from "./limits.js";
 export * from "./pricing.js";
+export * from "./provider-contract.js";
 export * from "./provider-port.js";
 export * from "./quote.js";
 export * from "./reasons.js";

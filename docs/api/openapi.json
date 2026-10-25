@@ -15510,7 +15510,7 @@
         "x-fluxkit-permission": "shipping.manage"
       },
       "put": {
-        "description": "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused.",
+        "description": "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
         "operationId": "ShippingProvidersController_putSettings",
         "parameters": [
           {

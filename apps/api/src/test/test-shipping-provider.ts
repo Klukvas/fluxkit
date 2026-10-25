@@ -14,6 +14,7 @@ import {
   type ProviderAbortSignal,
   type ProviderFailureReason,
   type ProviderResult,
+  type ProviderSettingsIssue,
   type ShippingCapabilities,
   type ShippingProviderPort,
   type TrackingUpdate,
@@ -188,6 +189,13 @@ export class TestShippingProvider implements ShippingProviderPort {
   /** The label `fetchLabel` answers (`null`: `testLabelBytes(providerRef)`), and its declared type. */
   labelBytes: Uint8Array | null = null;
   labelContentType = "application/pdf";
+  /**
+   * What `validateSettings` answers (default: every object is accepted). A function so a spec can refuse by content, or
+   * answer something that breaks the port (a provider bug) or throw.
+   */
+  settingsIssues: (settings: Readonly<Record<string, unknown>>) => unknown = () => [];
+  /** The arguments of the label calls, in call order. */
+  readonly labelRequests: { providerRef: string; trackingNumber: string }[] = [];
   readonly calls: Record<TestOperation, number> = TestShippingProvider.zeroCalls();
   /** The arguments of the waybill calls, in call order. */
   readonly waybillRequests: WaybillRequest[] = [];
@@ -271,12 +279,18 @@ export class TestShippingProvider implements ShippingProviderPort {
     this.capabilities = ALL_CAPABILITIES;
     this.labelBytes = null;
     this.labelContentType = "application/pdf";
+    this.settingsIssues = () => [];
+    this.labelRequests.length = 0;
     this.waybills.clear();
     this.now = () => new Date();
     this.waybillRequests.length = 0;
     this.findRequests.length = 0;
     this.trackRequests.length = 0;
     Object.assign(this.calls, TestShippingProvider.zeroCalls());
+  }
+
+  validateSettings(settings: Readonly<Record<string, unknown>>): readonly ProviderSettingsIssue[] {
+    return this.settingsIssues(settings) as readonly ProviderSettingsIssue[];
   }
 
   searchCities(
@@ -427,12 +441,21 @@ export class TestShippingProvider implements ShippingProviderPort {
     });
   }
 
+  /** A label for a known waybill whose number matches its ref (the port names the waybill both ways). */
   fetchLabel(
-    input: { readonly providerRef: string; readonly format: "pdf" },
+    input: {
+      readonly providerRef: string;
+      readonly trackingNumber: string;
+      readonly format: "pdf";
+    },
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<{ bytes: Uint8Array; contentType: "application/pdf" }>> {
+    this.labelRequests.push({
+      providerRef: input.providerRef,
+      trackingNumber: input.trackingNumber,
+    });
     return this.waybillCall("fetchLabel", signal, () => {
-      if (!this.waybills.has(input.providerRef)) {
+      if (this.waybills.get(input.providerRef)?.created.trackingNumber !== input.trackingNumber) {
         return providerFailure("rejected", ["UNKNOWN_WAYBILL"]);
       }
       return {

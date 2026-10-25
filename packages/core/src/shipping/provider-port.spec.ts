@@ -3,7 +3,10 @@ import * as core from "../index.js";
 import { DOMAIN_EVENT_HANDLER_METADATA } from "../orders/events.js";
 import type { Money } from "../pricing/money.js";
 import {
+  isProviderSettingsIssueList,
   MAX_PROVIDER_CODES,
+  MAX_PROVIDER_SETTINGS_ISSUES,
+  PROVIDER_SETTINGS_ISSUE_PATH_PATTERN,
   PROVIDER_FAILURE_REASONS,
   SHIPPING_CAPABILITIES,
   SHIPPING_PROVIDER_METADATA,
@@ -104,6 +107,8 @@ describe("the shipping provider port (ADR 0029 decision 9)", () => {
         tracking: false,
         labels: false,
       },
+      validateSettings: (settings) =>
+        typeof settings.senderName === "string" ? [] : [{ path: "senderName", code: "required" }],
       searchCities: () => Promise.resolve([{ ref: "city-1", name: "Місто", region: null }]),
       listPickupPoints: () => Promise.resolve([]),
       findPickupPoint: ({ ref }) =>
@@ -147,5 +152,35 @@ describe("the shipping provider port (ADR 0029 decision 9)", () => {
       providerCodes: [],
     });
     expect((await port.checkConnection(signal)).ok).toBe(true);
+    expect(port.validateSettings({ senderName: "A B" })).toEqual([]);
+    expect(isProviderSettingsIssueList(port.validateSettings({}))).toBe(true);
+  });
+
+  it("tells a well-formed settings issue list from a provider bug", () => {
+    expect(isProviderSettingsIssueList([])).toBe(true);
+    expect(
+      isProviderSettingsIssueList([
+        { path: "", code: "not_an_object" },
+        { path: "defaultParcel.weightGrams", code: "too_small" },
+        { path: "parcels.0.width", code: "invalid_type" },
+      ]),
+    ).toBe(true);
+    for (const bad of [
+      undefined,
+      null,
+      "senderName",
+      {},
+      [null],
+      [{ path: "senderName" }],
+      [{ code: "required" }],
+      [{ path: "sender name", code: "required" }],
+      [{ path: "a".repeat(201), code: "required" }],
+      [{ path: "senderPhone", code: "The phone +380501234567 is invalid" }],
+      [{ path: 1, code: "required" }],
+      Array.from({ length: MAX_PROVIDER_SETTINGS_ISSUES + 1 }, () => ({ path: "a", code: "b" })),
+    ]) {
+      expect(isProviderSettingsIssueList(bad), JSON.stringify(bad)).toBe(false);
+    }
+    expect(PROVIDER_SETTINGS_ISSUE_PATH_PATTERN.test("")).toBe(true);
   });
 });

@@ -68,7 +68,14 @@ The admin SPA is static: the built files read no environment variable and `vite 
 - Inside the module, a provider class carries `@SetMetadata(SHIPPING_PROVIDER_METADATA, shippingProviderMetadata("<code>"))` and implements `ShippingProviderPort` (`@fluxkit/core`). The API finds it with `DiscoveryService` (`ShippingProviderRegistry`). Startup fails when the class is not a static provider with every port method and capability, when its `code` differs from the metadata, when two classes share a code, when an enabled provider has no marked class, or when a marked class is not enabled.
 - Neither core nor `apps/api` imports a provider (dependency-cruiser `core-must-not-import-providers`, `apps-must-not-import-providers`). A provider imports `@fluxkit/core` for the port and helpers, never `apps/api`. Enabled but missing or broken provider: startup fails loudly. Disabled or deleted provider: no effect.
 - At startup the registry logs one line, `Shipping providers loaded: <codes or none>`, which the CI provider matrix reads. It is a log line, not a contract of the API.
-- Provider variables (an API key and so on) are read by the provider package itself with its own small parser, are secrets in the environment only, and are listed in this file when a real provider exists. The test-only `fake` provider has none.
+- Provider variables (an API key and so on) are read by the provider package itself with its own small parser (when its module is created, so a missing or malformed value stops the startup, naming the variable and never the value), are secrets in the environment only, and are listed below. They are not part of `loadEnv`. The test-only `fake` provider has none.
+- The provider class also implements `validateSettings` (the port, plan step 7b): the admin settings route applies it after its bounded check.
+
+### Variables of the shipping provider packages
+| Variable | Package (code) | Required | Default | Meaning |
+|---|---|---|---|---|
+| `NOVA_POST_API_KEY` | `packages/providers/nova-post` (`nova_post`) | yes, when `nova_post` is enabled | none | The Nova Post API key (business cabinet `new.novaposhta.ua`, "Settings - Security"). 16 to 512 visible ASCII characters without spaces; missing or malformed stops the startup (`NovaPostConfigError`, the variable named, the value never shown). A secret: never logged, stored or returned; it travels only in the query of `GET /clients/authorization` (whose URL is never logged). Rotating it needs a restart |
+| `NOVA_POST_ENVIRONMENT` | `packages/providers/nova-post` (`nova_post`) | no | `sandbox` | `sandbox` (`https://api-stage.novapost.com/v.1.0`) or `production` (`https://api.novapost.com/v.1.0`); unset or empty is `sandbox`, anything else stops the startup. Production must be written explicitly. No URL variable exists (no SSRF) |
 
 ## Feature package contract
 - A feature is a package under the features directory whose `package.json` has `"fluxkit": { "feature": "<name>" }`. The folder name is irrelevant.

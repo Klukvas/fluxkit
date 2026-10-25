@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
+  isProviderSettingsIssueList,
   SHIPPING_PROVIDER_CODE_PATTERN,
   SHIPPING_PROVIDER_TIMEOUTS_MS,
+  type ProviderSettingsIssue,
   type ShippingProviderPort,
 } from "@fluxkit/core";
 import { translatePostgresError } from "../../common/postgres-errors.js";
@@ -38,11 +40,15 @@ export class ShippingProvidersService {
     settings: Record<string, unknown>,
     adminUserId: string,
   ): Promise<ProviderSettingsResponse> {
-    this.provider(code);
-    const errors = providerSettingsErrors(settings).map((error) => ({
-      path: error.path === "" ? "settings" : `settings.${error.path}`,
-      code: error.code,
-    }));
+    const provider = this.provider(code);
+    // The bounded check every provider gets first, then the provider's own rules (plan step 7b).
+    const generic = providerSettingsErrors(settings);
+    const errors = (generic.length > 0 ? generic : this.providerIssues(provider, settings)).map(
+      (error) => ({
+        path: error.path === "" ? "settings" : `settings.${error.path}`,
+        code: error.code,
+      }),
+    );
     if (errors.length > 0) {
       throw validationFailed(errors);
     }
@@ -75,6 +81,36 @@ export class ShippingProvidersService {
       `Shipping provider "${provider.code}" checkConnection: ${describeOutcome(outcome)}`,
     );
     return { ok: false, reason: "unavailable", providerCodes: [] };
+  }
+
+  /**
+   * The provider's own verdict on the settings (`validateSettings`). An answer that breaks the port (not a list of short
+   * codes and plain paths) or a throw is a bug in the provider: it is logged by class name only (a provider's text could
+   * echo a value) and answered as a 500, never as a validation result the admin would trust.
+   */
+  private providerIssues(
+    provider: ShippingProviderPort,
+    settings: Record<string, unknown>,
+  ): readonly ProviderSettingsIssue[] {
+    let issues: unknown;
+    // The thrown error is not attached as a cause: its message is the provider's text, which may echo a value.
+    let thrown: string | undefined;
+    try {
+      issues = provider.validateSettings(settings);
+    } catch (error) {
+      thrown = error instanceof Error ? error.constructor.name : typeof error;
+    }
+    if (thrown !== undefined) {
+      this.logger.error(`Shipping provider "${provider.code}" validateSettings threw ${thrown}`);
+      throw new Error(`Shipping provider "${provider.code}" validateSettings failed (${thrown})`);
+    }
+    if (!isProviderSettingsIssueList(issues)) {
+      this.logger.error(
+        `Shipping provider "${provider.code}" validateSettings answered something that breaks the port`,
+      );
+      throw new Error(`Shipping provider "${provider.code}" validateSettings broke the port`);
+    }
+    return issues;
   }
 
   /** A provider the shop runs, or 404. A code that is not even a code is the controller's 400. */

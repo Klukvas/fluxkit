@@ -13,6 +13,7 @@ import {
   type ProviderAbortSignal,
   type ProviderFailureReason,
   type ProviderResult,
+  type ProviderSettingsIssue,
   type ShippingCapabilities,
   type ShippingProviderPort,
   type TrackingUpdate,
@@ -187,6 +188,11 @@ export class FakeShippingProvider implements ShippingProviderPort {
     return this.waybills.size;
   }
 
+  /** The fake has no settings of its own: every object is accepted (the API's bounded check still applies). */
+  validateSettings(): readonly ProviderSettingsIssue[] {
+    return [];
+  }
+
   searchCities(
     input: { readonly query: string; readonly locale: string; readonly limit: number },
     signal: ProviderAbortSignal,
@@ -347,12 +353,17 @@ export class FakeShippingProvider implements ShippingProviderPort {
     });
   }
 
+  /** A label for a known waybill whose number matches its ref (the port names the waybill both ways). */
   fetchLabel(
-    input: { readonly providerRef: string; readonly format: "pdf" },
+    input: {
+      readonly providerRef: string;
+      readonly trackingNumber: string;
+      readonly format: "pdf";
+    },
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<{ bytes: Uint8Array; contentType: "application/pdf" }>> {
     return this.runResult("fetchLabel", signal, () => {
-      if (!this.waybills.has(input.providerRef)) {
+      if (this.waybills.get(input.providerRef)?.created.trackingNumber !== input.trackingNumber) {
         return providerFailure("rejected", ["UNKNOWN_WAYBILL"]);
       }
       return providerOk({

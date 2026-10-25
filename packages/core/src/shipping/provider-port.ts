@@ -7,7 +7,8 @@ import type { CarrierReportedShipmentStatus, ShipmentPayer } from "./shipment-st
  * The shipping provider port (ADR 0029 decisions 8 and 9; the ADR 0018 / 0028 pattern). Types and constants only, so a
  * carrier package in `packages/providers/<code>` implements it without importing `apps/api`, and core never imports a
  * provider (dependency-cruiser `core-must-not-import-providers`). Internal until the first external plugin, then listed
- * in `docs/contracts/`. The Nova Poshta check (plan step 7a) may change it; that supersedes ADR 0029 decision 9 in part.
+ * in `docs/contracts/`. Plan step 7b (the Nova Post plugin, `docs/plans/2026-10-25-nova-post-plugin.md`) added
+ * `validateSettings`, the label's `trackingNumber` and the rule that `track` may ignore phones.
  *
  * Rules every provider follows:
  * - Money crosses the port in minor units with a currency; a carrier decimal is converted with `parseDecimalString`, and a
@@ -212,7 +213,7 @@ export interface WaybillCreated {
  * e.g. `2026-10-24T21:58:00.000Z`), never a calendar date: the waybill, if it exists, was created at or after
  * `createdAfter` and at or before `createdBefore`. The API widens it on both sides (our shipment row's creation minus a
  * margin, the time of the lookup plus a margin), so clock skew and a slow save stay inside it. A provider whose carrier
- * files documents by its own calendar (Nova Poshta: Kyiv local dates, unverified until plan step 7a) maps the window to
+ * files documents by its own calendar (the legacy Nova Poshta API used Kyiv dates; the Nova Post API gives UTC instants) maps the window to
  * EVERY local date it touches and filters by instant when the carrier gives one; it must never narrow the window to one
  * date (a waybill saved at 23:59 UTC carries the next Kyiv date). A `null` answer must mean "no such waybill in the
  * window", never "could not look": a failed or partial lookup is a failure result.
@@ -226,6 +227,43 @@ export interface WaybillLookup {
   readonly createdBefore: string;
 }
 
+/**
+ * One problem `validateSettings` finds in a provider's settings. `path` is relative to the settings object (dot-separated
+ * keys and array indexes, `""` for the object itself); `code` is a short code (`CARRIER_CODE_PATTERN`), never text.
+ */
+export interface ProviderSettingsIssue {
+  readonly path: string;
+  readonly code: string;
+}
+
+/** The shape of `ProviderSettingsIssue.path`: letters, digits, `_` and `.`, at most 200 characters. */
+export const PROVIDER_SETTINGS_ISSUE_PATH_PATTERN = /^[A-Za-z0-9_.]{0,200}$/;
+
+/** Most issues the API accepts from one `validateSettings` answer. */
+export const MAX_PROVIDER_SETTINGS_ISSUES = 50;
+
+/**
+ * Whether `value` is a well-formed `validateSettings` answer: an array of at most `MAX_PROVIDER_SETTINGS_ISSUES` issues with
+ * a path by `PROVIDER_SETTINGS_ISSUE_PATH_PATTERN` and a code by `CARRIER_CODE_PATTERN`. Anything else is a provider bug.
+ */
+export function isProviderSettingsIssueList(value: unknown): value is ProviderSettingsIssue[] {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_PROVIDER_SETTINGS_ISSUES &&
+    value.every((entry: unknown) => {
+      const issue = entry as Partial<ProviderSettingsIssue> | null;
+      return (
+        typeof issue === "object" &&
+        issue !== null &&
+        typeof issue.path === "string" &&
+        PROVIDER_SETTINGS_ISSUE_PATH_PATTERN.test(issue.path) &&
+        typeof issue.code === "string" &&
+        CARRIER_CODE_PATTERN.test(issue.code)
+      );
+    })
+  );
+}
+
 export interface TrackingUpdate {
   readonly trackingNumber: string;
   /** The provider's mapping of its code; `null` when the code has no normalized status (the shipment keeps its status). */
@@ -236,9 +274,16 @@ export interface TrackingUpdate {
 }
 
 export interface ShippingProviderPort {
-  /** Matches `SHIPPING_PROVIDER_CODE_PATTERN`, e.g. `nova_poshta`. */
+  /** Matches `SHIPPING_PROVIDER_CODE_PATTERN`, e.g. `nova_post`. */
   readonly code: string;
   readonly capabilities: ShippingCapabilities;
+  /**
+   * The problems of the shop's non-secret settings for this provider (`shipping_provider_setting.settings`), empty when it
+   * accepts them. Synchronous and pure (no network). The admin settings route calls it after its own bounded check and
+   * refuses the settings with `400 validation_failed` at `settings.<path>`; a provider still re-checks the settings when it
+   * uses them (stored settings may predate it). Added in plan step 7b.
+   */
+  validateSettings(settings: Readonly<Record<string, unknown>>): readonly ProviderSettingsIssue[];
   /** Directory lookups throw on failure (the API caches them and serves stale entries on errors). */
   searchCities(
     input: { readonly query: string; readonly locale: string; readonly limit: number },
@@ -276,14 +321,24 @@ export interface ShippingProviderPort {
     input: { readonly providerRef: string },
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<void>>;
-  /** At most `SHIPPING_LIMITS.maxTrackingNumbersPerCall` numbers; `phones` (the recipients') widen the carrier's answer. */
+  /**
+   * At most `SHIPPING_LIMITS.maxTrackingNumbersPerCall` numbers. `phones` (the recipients') widen the answer of a carrier
+   * that uses them; a provider whose carrier tracks by number only ignores them (Nova Post, plan step 7b).
+   */
   track(
     input: { readonly trackingNumbers: readonly string[]; readonly phones: readonly string[] },
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<TrackingUpdate[]>>;
-  /** The label bytes, streamed by our API; a carrier label URL never reaches a browser. */
+  /**
+   * The label bytes, streamed by our API; a carrier label URL never reaches a browser. The input names the waybill both by
+   * the carrier's id and by its number (a carrier may print by either; Nova Post prints by number, plan step 7b).
+   */
   fetchLabel(
-    input: { readonly providerRef: string; readonly format: "pdf" },
+    input: {
+      readonly providerRef: string;
+      readonly trackingNumber: string;
+      readonly format: "pdf";
+    },
     signal: ProviderAbortSignal,
   ): Promise<ProviderResult<{ bytes: Uint8Array; contentType: "application/pdf" }>>;
   checkConnection(signal: ProviderAbortSignal): Promise<ProviderResult<void>>;
