@@ -1,0 +1,82 @@
+# Shipping plan step 13: independent review
+
+Reviewer: an agent that wrote none of steps 1 to 11 (Claude Opus 5.5). Scope: `main` at `f5df590` (ADR 0029, core `src/shipping`, migration `0006_shipping`, provider loader and registry, admin settings API, store options, lookups and checkout, shipments and job 8, storefront step 10, admin step 11). Read-only on source: nothing below is fixed here.
+
+## Verdict
+
+- **No BLOCKER.** Money logic (rates, consent order, totals, fingerprint v2, replay, snapshot triggers, lock order) holds under everything I tried.
+- **Two MAJOR** to fix before a client goes live: M-1 before any shop activates methods in a non-trivial setup, M-2 before plan step 7b (Nova Poshta) codes `findWaybill`.
+
+## Findings
+
+| ID | Sev | Where | What and why | Reproduction / scenario | Suggested fix |
+|---|---|---|---|---|---|
+| M-1 | MAJOR | `apps/api/src/shipping/store/shipping-store.repository.ts:37` (`activeExists`), used by `apps/api/src/orders/checkout.service.ts:245`; options filter `shipping-options.service.ts:116` | The checkout's "a method exists, so a method is required" switch counts EVERY active method, while the options endpoint lists only methods in `SHOP_CURRENCY` and core marks a `pickup_point` of a disabled provider unavailable. Result: a shop can get into a state where no checkout of a shippable cart can succeed, and the storefront loops on `shippingRejected` with no message. ADR 0029 decision 3 ("a method whose currency is not `SHOP_CURRENCY` is not offered") is applied in one place and not the other. | Ran in a scratch clone (spec kept in the reviewer's scratchpad, not committed): (a) only active method has `currency = EUR`, shop UAH: `GET /store/shipping/options` -> `options: []`; checkout without `shipping` -> `400 shipping_method_required`; with it -> `409 shipping_changed`. (b) only active method is `pickup_point` with `provider_code = 'ghost'` (not in `SHIPPING_PROVIDERS_ENABLED`): options -> one option `available: false, reason: provider_not_enabled`; checkout without `shipping` -> `400 shipping_method_required`. Both assertions passed. Realistic triggers: `SHOP_CURRENCY` changed in a fork; `SHIPPING_PROVIDERS_ENABLED` emptied during a carrier incident in a shop whose only method is a Nova Poshta branch. | Make `activeExists` use the same rule as the options list (active AND `currency = SHOP_CURRENCY`; decide explicitly whether a method of a disabled provider counts). Log a startup warning for active methods naming a provider that is not loaded. Add both cases to `checkout-no-shipping-method.spec.ts`. |
+| M-2 | MAJOR | `apps/api/src/shipping/shipments/shipments.service.ts:191` and `:200`; port `packages/core/src/shipping/provider-port.ts:252` | `reconcile` turns an `unknown` shipment into `failed` (which re-allows a create) as soon as `findWaybill` answers `null`, and it may be called at once after the timeout. `createdOn` is the **UTC** date of `created_at` (documented in `docs/api/shipping.md`), but the port does not say UTC, and Ukrainian carriers date documents in Kyiv time (UTC+2/+3). A waybill created 21:00 to 24:00 UTC carries the next local date; a plugin that filters by that date finds nothing, the shipment becomes `failed`, the admin creates again: a duplicate waybill (carrier cost, two parcels labels). Same outcome if the carrier's list is eventually consistent right after a timed-out save. The fake provider ignores `createdOn`, so no test can see it. | Scenario: create at 22:30 UTC, carrier answer lost -> `unknown`; reconcile immediately with a plugin that queries `DateTime = createdOn` in local time -> `null` -> `failed` -> second create succeeds. | Change the port before 7b: pass the instant (`createdAt` ISO timestamp) or a range (`createdFrom/createdTo`, e.g. +-1 day) and document the time zone; require a minimum age (like `STALE_PENDING_MS`) before an `unknown` may be settled as `failed`; have the fake honour the date so a spec covers it. |
+| m-1 | MINOR | `apps/api/src/shipping/admin/shipping-providers.service.ts:64`; `apps/api/src/common/problem.filter.ts:250` | `check` calls `provider.checkConnection` directly instead of `callProvider`: (1) a provider that ignores the abort signal hangs the admin request forever (every other call path races the timeout); (2) any non-abort throw becomes a 500 whose log line is `${error.name}: ${error.message}` plus the cause message, i.e. the provider's text, which ADR 0029 decision 9 and the shipping docs say is never logged (it can echo the key). | Fake `checkConnection` that throws `new Error("apiKey=XYZ refused")` -> the problem filter logs the message. | Use `callProvider(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup, ...)` and map `threw`/`timed_out` to `unavailable` (log the class name only). |
+| m-2 | MINOR | `apps/api/src/shipping/store/shipping-directory.service.ts:189`, `shipping-store-limits.ts:16-20`, `provider-cache.ts` | Lookup proxy bounds are weak against an anonymous client: an unknown `cityRef` is answered by the carrier with an empty list that is cached 12 h, so 200 random refs (about 4 minutes at 60/min from one address) evict every real city and turn each real lookup into a carrier call under the shop key; unknown pickup refs are never cached, so `GET /store/shipping/options?pickupPointRef=<random>` (30/min) costs one `findPickupPoint` per request plus one estimate per method for a random `cityRef`. All of it shares one 4-slot gate with the checkout's pre-transaction point lookup, so a flood makes real checkouts answer `503 shipping_provider_unavailable`. Worst-case memory of the point cache is about 200 x 5 000 x 300 B = 300 MB. | Loop `GET .../pickup-points?cityRef=r<n>` for n = 1..200, then a real city lookup misses the cache. | Do not cache empty point lists (or cache them in a small separate negative cache); bound bytes, not only entries; give the checkout its own gate slot or priority; consider a per-address limit on estimate-producing options requests. |
+| m-3 | MINOR | `shipping-directory.service.ts:394` (`untilAborted` inside the gate) | The gate frees its slot when the timeout fires, not when the provider's call ends; a provider that ignores the signal can have more than 4 real requests in flight (the docs promise "at most 4"). | Fake provider with `hang: true` that ignores the signal: after N timeouts, N calls are still open. | Keep the slot until the underlying promise settles (or document the limit as "4 waited for"). |
+| m-4 | MINOR | `apps/api/src/shipping/store/shipping-checkout.service.ts:141-149` | An admin can PATCH a method's `kind` (it is patchable). A shopper whose page still shows the old kind gets `400 validation_failed` (`shipping.pickupPointRef required`, `shippingAddress not_applicable`) instead of `409 shipping_changed`, which ADR 0029 decision 4 prescribes for a changed method; the storefront shows a field error for a field it never offered. | Method `address` -> PATCH `kind: pickup_point` while a shopper submits with an address. | Answer a kind mismatch as `shipping_changed` with the fresh option, or forbid changing `kind` of a method (create a new one). |
+| m-5 | MINOR | `packages/providers/_fake`, `apps/api/src/shipping/registry/shipping-provider-loader.ts` | The TEST-ONLY `fake` provider loads in production if `SHIPPING_PROVIDERS_ENABLED=fake` (only the docs forbid it); a shop would accept made-up pickup points and create fake waybills. `pnpm seed` refuses `NODE_ENV=production`, the fake does not. | `NODE_ENV=production SHIPPING_PROVIDERS_ENABLED=fake` starts. | Refuse `fake` when `NODE_ENV=production` (loud startup error). |
+| m-6 | MINOR | `apps/api/src/shipping/store/shipping-checkout.service.ts:246` | The `order_shipping_method_id_fkey` translation (method deleted between the read and the insert -> `409 shipping_changed`) is documented but no spec reaches it: the race spec in `shipping-checkout-concurrency.spec.ts:170` always lets the delete finish before the read. | Mutation R4 below survives. | Deterministic spec: hold the checkout between `decide` and `write` (a test seam or an advisory lock), delete the method, release. |
+| m-7 | MINOR | `apps/api/src/shipping/shipments/shipments.repository.ts:161`, `apps/api/src/jobs/track-shipments.job.ts:117` | No spec has a due shipment of a provider that is not loaded. Without the `providerCode IN (...)` filter the job throws on line 117 and the whole job 8 fails every tick. | Mutation R10 below survives. | Add a job spec with a due shipment of a disabled provider (skipped, no throw). |
+| m-8 | MINOR | `README.md:30`; `docs/HANDOFF.md:6`, `:53`; `docs/plans/2026-10-24-shipping.md:3`, `:250-251` | Docs describe a past state: README still says "the storefront has no delivery step yet (plan step 10)" and lists no shipments or admin shipping screens; HANDOFF "Last updated" and the plan status say steps 5, 6, 8, 10, 11 are "PR not opened" although #122 to #126 are merged. AGENTS.md section 8: docs describe what exists. | Read the lines. | Refresh README "what exists", HANDOFF and the plan status table in the step 13 PR. |
+| m-9 | MINOR | `seeds/` | The plan's documentation list asks for demo methods ("Courier (demo)" flat, "Carrier pickup point (demo)" with the fake provider); none exist, so a fresh `pnpm seed` demo has no delivery step. | `grep -ri shipping_method seeds` finds nothing. | Add inactive demo methods to the seed (inactive so plain checkouts keep working), or record the decision not to. |
+| m-10 | MINOR | `docs/api/shipping.md`, "Known gaps (step 8)" | An admin can cancel a paid order whose waybill is `created` (`paid -> cancelled`, stock effect `release_unsold`): the order is cancelled while the parcel can still ship and job 8 keeps polling it. Documented, but it is a money/stock risk with no guard. | `POST /admin/orders/{id}/cancel` on a paid order with an active shipment -> 200. | Refuse cancel (`409 rule_violation shipment_active`) while a shipment is active, or warn in the admin UI. |
+| n-1 | NIT | `shipping-directory.service.ts:267` | Coalesced estimate calls of one subtotal band all use the first caller's `declaredValue`. Informational only. | - | Note in the docs, or key by subtotal. |
+| n-2 | NIT | `shipping-store.controller.ts:108`, `:147` | A `stale: true` lookup answer is sent with `public, max-age=300`. | - | `max-age` shorter (or `no-store`) when stale. |
+| n-3 | NIT | `apps/api/drizzle/0006_shipping.sql` | No CHECK ties `order_shipping.currency` to `sales_order.currency`, nor `shipment.status = 'created'` to a non-null `tracking_number`; the application guarantees both. `returned` counts as active in `shipment_order_id_active_key`, so an order can never be re-shipped after a return (ADR-consistent: returns are out of scope). | - | Record as known limits; revisit with the returns plan. |
+| n-4 | NIT | `track-shipments.job.ts` | A row whose transaction fails every tick (damaged data) stays due with the oldest `next_track_at` and is re-polled first on every run; 500 such rows would starve the rest. | - | Push `next_track_at` out on a write failure too. |
+
+## ADR 0029 vs implementation (deviations; none supersedes the ADR yet)
+
+| Decision | ADR | Built |
+|---|---|---|
+| 5 | options `{options: [...]}` | `{subtotal, options}`; unavailable options have `price`, `payer`, `total`, `estimate` = `null`; `countryCodes` added |
+| 6 | at most 4 provider calls in flight per process | 4 per provider per process plus a queue of 32 (and see m-3) |
+| 9 | port shape | added `findPickupPoint`, `findWaybill`, `PickupPoint.countryCode`; lookups throw instead of returning `ProviderResult` (documented in `docs/api/shipping.md`) |
+| 10 | a failed tracking call leaves rows due for the next tick | per-shipment backoff 5 min doubling to 6 h; `returning` polled every 6 h (not in the ADR) |
+| 10 / open q. 1 | `OrderFulfilmentPort` | not added (decided at step 2/8) |
+| 13 | settings routes | `POST .../check` rate limited (`shippingCheck`, 30 per 10 min per admin), additive |
+| 7 | columns | `shipment.updated_at`, `order_shipping.created_at` added |
+| 3 | currency rule | applied by options and checkout pricing, NOT by the "method required" switch (M-1) |
+
+Each needs a line in a superseding ADR (or an ADR note) when 7a/7b change the port anyway.
+
+## What was checked without findings
+
+- **Money:** `decideShippingPrice` (inclusive thresholds, tiers from 0, no rounding, `MAX_AMOUNT`, `-0`), `quoteShippingMethod` order of reasons, `computeOrderTotals` with the adjustment, consent (`cart_changed` before `shipping_changed`, `total: null` path), fingerprint v2 (shipping in, v1 replays refused), replay first in the transaction and no provider call on replay (pre-check outside the transaction), no network inside the checkout transaction or any shipment/job transaction, lock order (snapshot FK share lock after inventory locks; admin delete `FOR UPDATE` vs PATCH `FOR NO KEY UPDATE`).
+- **Migration 0006:** CHECKs (country list length trick, payer/amount, destination by kind, NULL handling), partial indexes match the queries, both triggers (depth-1 refusal, FK action exceptions), down script order without CASCADE and the journal row.
+- **Security:** every new admin route is default-deny through `@AdminController` (`shipping.manage` for settings, `orders.read`/`orders.write` for shipments), CSRF via the existing guard, label scoped to `(orderId, shipmentId)` (another order's shipment is 404), label headers, PDF magic and 10 MiB cap, provider settings key pattern (`__proto__` cannot match) and secret-like keys, carrier refs validated before any provider call (no SSRF surface in core/API), store order view carries no provider ref, phone or name, events carry ids and status only.
+- **Robustness:** shipment state machine table, pending/unknown/reconcile and the late-answer guard in `settle`, double create (unique index plus order lock), double cancel (second gets `invalid_transition`), job 8 cursor, budget checks, give-up after 30 days, loader/registry failure modes (missing, broken, duplicate, unmarked, not enabled), zero-method shop unchanged (`checkout-no-shipping-method.spec.ts`).
+- **UI:** no hex colours, pixel values or inline styles, and no literal user-facing strings in the new `.tsx` files (grep); no client data in fixtures.
+
+## What I ran (scratch clone of `f5df590`, database `fluxkit_rv13_test`, dropped afterwards)
+
+- `pnpm install --frozen-lockfile && pnpm build`: ok.
+- Shipping-related API specs (18 files, 257 tests): passed. Full `pnpm test` (17 tasks: core 59 files, api 173, admin 110, storefront 54, others): passed, including the OpenAPI freshness test.
+- Reproduction spec for M-1 (two cases): both reproduced.
+- Mutations (one at a time, reverted with `git checkout`):
+
+| ID | Mutation | Result |
+|---|---|---|
+| R1 | consent: `shipping_changed` even when a line price changed | killed (`consent.spec.ts`) |
+| R2 | `free_over`/tiers threshold `>=` -> `>` | killed (12 tests) |
+| R3 | checkout calls the provider on a replay | killed (`shipping-checkout.spec.ts`) |
+| R4 | method FK violation not translated to `shipping_changed` | **survived** (m-6) |
+| R5 | shipment lookup ignores the order id | killed (`shipments.spec.ts`) |
+| R6 | label PDF magic check removed | killed |
+| R7 | method delete takes `FOR NO KEY UPDATE` | killed (`shipping-methods.spec.ts`) |
+| R8 | tracking backoff constant | killed (`track-shipments.job.spec.ts`) |
+| R9 | `pickup_point` accepts a shipping address | killed |
+| R10 | job lists shipments of providers that are not loaded | **survived** (m-7) |
+| R11 | down script keeps the `__drizzle_migrations` row | killed (6 tests) |
+| R12 | stale window boundary `>=` -> `>` | killed |
+| R13 | gate queue bound `>=` -> `>` | killed |
+
+## Not verified
+
+- The e2e suites (`pnpm test:e2e`), lint, format, typecheck, boundaries and the provider matrix: not run by me (CI on `main`).
+- Anything about the real Nova Poshta API (no key; plan step 7a). M-2 is a contract risk inferred from the port and the docs, not observed against a carrier.
+- m-1, m-3 and m-10 were checked by reading the code, not by a running reproduction.
+- Behaviour with several API instances (per-process caches and limits are documented as such).
