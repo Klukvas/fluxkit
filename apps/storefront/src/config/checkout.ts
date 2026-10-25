@@ -4,9 +4,8 @@
  */
 
 /**
- * `Address` members of `POST /store/checkout` the form can show. `countryCode` is always shown (a select of
- * `allowedShippingCountries`); the `recipient*` members are not sent: the order's contact is the recipient
- * (`lib/checkout-form.ts`).
+ * `Address` members of `POST /store/checkout` the form can show. `countryCode` is always shown with an address (a select);
+ * the `recipient*` members are not sent: the order's contact is the recipient (`lib/checkout-form.ts`).
  */
 export type AddressFieldName = "region" | "city" | "postalCode" | "line1" | "line2";
 
@@ -16,9 +15,13 @@ export interface AddressFieldConfig {
 }
 
 export interface CheckoutConfig {
-  /** ISO 3166-1 alpha-2 codes a shopper can ship to; the country select lists these. */
+  /**
+   * ISO 3166-1 alpha-2 codes the country select lists ONLY when the shop has no active shipping method (the checkout
+   * without delivery). With methods, the select lists the countries the methods serve (`servedCountries`, from
+   * `GET /store/shipping/options`) and this list is not used.
+   */
   allowedShippingCountries: readonly string[];
-  /** Preselected country; must be one of `allowedShippingCountries`. */
+  /** Preselected country; must be one of `allowedShippingCountries`. With methods it is kept when some method serves it. */
   defaultCountry: string;
   /** Address fields shown under the country, in order. */
   addressFields: readonly AddressFieldConfig[];

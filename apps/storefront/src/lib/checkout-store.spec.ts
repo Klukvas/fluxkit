@@ -408,8 +408,13 @@ const choose = (code: string, extra: Partial<CheckoutValues> = {}) =>
   values({ "shipping.methodCode": code, ...extra });
 
 describe("checkout store: no active shipping method behaves exactly as before", () => {
-  it("sends the cart's total, no shipping member and today's address", async () => {
-    const { calls, checkout } = await setup();
+  it("sends the cart's TOTAL (not its subtotal), no shipping member and today's address", async () => {
+    // total and subtotal differ, so only the cart's own total passes.
+    const cart = cartOf([cartLine("a")], {
+      subtotal: { amount: 1999, currency: "UAH" },
+      total: { amount: 2005, currency: "UAH" },
+    });
+    const { calls, checkout } = await setup({ cart });
     void checkout.submit(values(), { signedIn: false });
     const [request] = await sentCheckouts(calls, 1);
     expect(request?.body).toEqual({
@@ -419,7 +424,7 @@ describe("checkout store: no active shipping method behaves exactly as before", 
       lastName: "Guest",
       locale: "uk",
       shippingAddress: { countryCode: "UA", city: "Kyiv", line1: "Street 1" },
-      expectedTotal: { amount: 1999, currency: "UAH" },
+      expectedTotal: { amount: 2005, currency: "UAH" },
     });
     expect(request?.body).not.toHaveProperty("shipping");
   });
