@@ -47,6 +47,7 @@ import {
   useOrderConfig,
 } from "./order-parts";
 import { historyActor, moneyText, wantsAdminEmails } from "./order-view";
+import { ShipmentSection } from "./shipment-section";
 
 /** What the status line says after an action; the order on screen is always the server's (reloaded). */
 export type OrderNotice =
@@ -300,6 +301,17 @@ function OrderDetail({ orderId, config }: { orderId: string; config: AdminConfig
         actions={offeredActions(order.status, permissions)}
         onAction={open}
         busy={busy || resource.refreshing}
+        delivery={
+          <ShipmentSection
+            key={order.id}
+            order={order}
+            config={config}
+            permissions={permissions}
+            meId={meId}
+            emails={emails}
+            onChanged={resource.reload}
+          />
+        }
         statusLine={
           <StatusLine innerRef={statusRef}>
             {notice === null ? null : <OrderNoticeView t={t} notice={notice.value} />}

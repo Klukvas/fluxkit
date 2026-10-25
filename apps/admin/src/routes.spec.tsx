@@ -47,6 +47,7 @@ describe("route table", () => {
       "customers.read",
       "customers.write",
       "users.manage",
+      "shipping.manage",
     ]);
     for (const route of ROUTES) {
       expect(allowed.has(route.permission), `${route.id}: ${route.permission}`).toBe(true);
@@ -83,6 +84,11 @@ describe("route table", () => {
       orderDetail: "orders.read",
       customers: "customers.read",
       customerDetail: "customers.read",
+      shipping: "shipping.manage",
+      shippingMethodNew: "shipping.manage",
+      shippingMethodDetail: "shipping.manage",
+      shippingProviders: "shipping.manage",
+      shippingProviderDetail: "shipping.manage",
       users: "users.manage",
       userNew: "users.manage",
       userDetail: "users.manage",
@@ -139,6 +145,15 @@ describe("lazy pages and their message files", () => {
     expect(declared.users).toEqual(["users"]);
     expect(declared.userNew).toEqual(["users"]);
     expect(declared.userDetail).toEqual(["users"]);
+    for (const id of [
+      "shipping",
+      "shippingMethodNew",
+      "shippingMethodDetail",
+      "shippingProviders",
+      "shippingProviderDetail",
+    ]) {
+      expect(declared[id], id).toEqual(["catalog-dictionaries", "shipping"]);
+    }
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });

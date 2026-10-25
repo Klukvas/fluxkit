@@ -115,6 +115,8 @@ export function apiEnvironment(env: Env = process.env): Env {
     ADMIN_COOKIE_SECURE: "false",
     TRUST_PROXY: "1",
     FEATURES_ENABLED: "",
+    // The test-only carrier of the template (packages/providers/_fake): shipping settings and waybills need one provider.
+    SHIPPING_PROVIDERS_ENABLED: "fake",
     // No background timers: nothing in the suite depends on expiry, and a sweep must not race a test.
     SCHEDULER_ENABLED: "false",
     DEFAULT_LOCALE: "uk",

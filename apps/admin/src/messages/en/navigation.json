@@ -30,5 +30,10 @@
   "page.categoryNew.title": "New category",
   "page.categoryDetail.title": "Category",
   "page.productNew.title": "New product",
-  "page.productDetail.title": "Product"
+  "page.productDetail.title": "Product",
+  "page.shipping.title": "Shipping",
+  "page.shippingMethodNew.title": "New delivery method",
+  "page.shippingMethodDetail.title": "Delivery method",
+  "page.shippingProviders.title": "Carriers",
+  "page.shippingProviderDetail.title": "Carrier"
 }

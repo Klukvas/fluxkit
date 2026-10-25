@@ -19,6 +19,7 @@ describe("navigation configuration", () => {
       "categories",
       "orders",
       "customers",
+      "shipping",
       "users",
     ]);
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {
@@ -44,10 +45,19 @@ describe("navigation configuration", () => {
     expect(ids([...ROLE_PERMISSIONS.manager])).not.toContain("users");
     expect(ids([...ROLE_PERMISSIONS.manager])).toContain("orders");
     expect(ids([...ROLE_PERMISSIONS.manager])).toContain("customers");
+    expect(ids([...ROLE_PERMISSIONS.manager])).toContain("shipping");
+  });
+
+  it("shows the Shipping area to a session with shipping.manage only: never to the viewer, never through orders.write", () => {
+    expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("shipping");
+    expect(ids(["orders.read", "orders.write", "customers.read"])).not.toContain("shipping");
+    expect(ids(["shipping.manage"])).toEqual(["shipping"]);
+    expect(visibleNavigation(["shipping.manage"]).map((group) => group.id)).toEqual(["settings"]);
   });
 
   it("shows the owner everything, and drops groups that end up empty", () => {
     expect(ids([...ROLE_PERMISSIONS.owner])).toContain("users");
+    expect(ids([...ROLE_PERMISSIONS.owner])).toContain("shipping");
     expect(visibleNavigation([]).length).toBe(0);
     expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales"]);
   });

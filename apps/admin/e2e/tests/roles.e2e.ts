@@ -19,7 +19,7 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Categories" })).toBeVisible();
-  for (const hidden of ["Orders", "Customers", "Admin users"]) {
+  for (const hidden of ["Orders", "Customers", "Admin users", "Shipping"]) {
     await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
   }
 
@@ -78,17 +78,21 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   await expectNotAllowed(page, "/orders");
   await expectNotAllowed(page, "/catalog/attributes/new");
   await expectNotAllowed(page, "/users");
+  await expectNotAllowed(page, "/shipping");
+  await expectNotAllowed(page, "/shipping/methods/new");
+  await expectNotAllowed(page, "/shipping/providers/fake");
 
   expect(guard.writes(), "the viewer's pages send no write").toEqual([]);
   const forbiddenReads = guard.requests.filter((request) =>
-    /^\/admin\/(orders|customers|users)/.test(new URL(request.url).pathname),
+    /^\/admin\/(orders|customers|users|shipping)/.test(new URL(request.url).pathname),
   );
   expect(forbiddenReads, "no request for data the role cannot read").toEqual([]);
 });
 
-test("the manager has no users area", async ({ page, signIn, guard }) => {
+test("the manager has no users area but manages shipping", async ({ page, signIn, guard }) => {
   await signIn("manager");
   const nav = page.getByRole("navigation", { name: "Admin sections" });
+  await expect(nav.getByRole("link", { name: "Shipping" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Orders" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Customers" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
