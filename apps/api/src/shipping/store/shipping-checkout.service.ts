@@ -136,9 +136,9 @@ export class ShippingCheckoutService {
   }
 
   /**
-   * Inside the transaction, from the database and memory only. Throws the 400s of the selection (`shipping.pickupPointRef`
-   * `required` / `not_applicable` / `unknown_pickup_point`, `shippingAddress` `shipping_address_required` /
-   * `not_applicable`), `503 shipping_provider_unavailable` and `409 rule_violation total_out_of_range`.
+   * Inside the transaction, from the database and memory only. A request that does not fit the method's current kind is
+   * `unavailable` (the consent check answers `shipping_changed`, review m-4). Throws `400` `shipping.pickupPointRef`
+   * `unknown_pickup_point`, `503 shipping_provider_unavailable` and `409 rule_violation total_out_of_range`.
    */
   async decide(tx: Transaction, input: ShippingDecisionInput): Promise<ShippingDecision> {
     const { selection, locale } = input;
@@ -153,20 +153,35 @@ export class ShippingCheckoutService {
       };
     }
     const kind = methodKind(method);
-    const forKind = checkSelectionForKind(kind, selection);
-    if (!forKind.ok) {
-      throw validationFailed([{ path: "shipping.pickupPointRef", code: forKind.reason }]);
-    }
-    if (kind === "address" && input.shippingAddress === null) {
-      throw validationFailed([{ path: "shippingAddress", code: "shipping_address_required" }]);
-    }
-    if (kind === "pickup_point" && input.shippingAddress !== null) {
-      // The address of a pickup point order is the point's; a sent address would be silently replaced.
-      throw validationFailed([{ path: "shippingAddress", code: "not_applicable" }]);
-    }
-
     const provider =
       method.providerCode === null ? undefined : this.directory.provider(method.providerCode);
+    // A request shaped for another kind (a pickup point ref for an address method, none for a pickup point, an address for
+    // a pickup point, no address for an address method) means the shopper's page shows the method as it was before an
+    // admin changed its kind: `shipping_changed` with the fresh option (ADR 0029 decision 4, review m-4), never a field
+    // error for a field the page did not offer. A pickup point order's address is the point's, so a sent one is refused
+    // too (it would be silently replaced).
+    if (
+      !checkSelectionForKind(kind, selection).ok ||
+      (kind === "address" && input.shippingAddress === null) ||
+      (kind === "pickup_point" && input.shippingAddress !== null)
+    ) {
+      const fresh = quoteShippingMethod({
+        method: {
+          kind,
+          isActive: method.isActive,
+          currency: method.currency,
+          countryCodes: method.countryCodes,
+          providerCode: method.providerCode,
+          pricing: method.pricing,
+        },
+        providerEnabled: method.providerCode === null || provider !== undefined,
+        shopCurrency: this.pricing.shopCurrency,
+        countryCode: input.shippingAddress?.countryCode,
+        subtotal: input.subtotal,
+      });
+      return { kind: "unavailable", changed: toShippingOption(method, fresh, locale, null) };
+    }
+
     let point: PickupPoint | null = null;
     if (kind === "pickup_point" && provider !== undefined) {
       point = this.pickupPoint(provider.code, selection.pickupPointRef ?? "", input.prepared);

@@ -416,36 +416,41 @@ describe("checkout with a shipping method (ADR 0029 decision 4; real app, real P
       expect(result.body.code).toBe("shipping_method_required");
     });
 
-    it("the kind decides the address and the pickup point", async () => {
+    it("review m-4: a request that does not fit the method's CURRENT kind is 409 shipping_changed with the fresh option", async () => {
       const address = await methods.create({ kind: "address" });
       const point = await methods.create({ kind: "pickup_point" });
       await cartWith(2_000);
-      const noAddress = await place(2_500, {
-        shippingAddress: undefined,
-        shipping: { methodCode: address.code },
-      });
-      expect(noAddress.body.errors).toEqual([
-        { path: "shippingAddress", code: "shipping_address_required" },
-      ]);
-      const refNotApplicable = await place(2_500, {
-        shipping: { methodCode: address.code, pickupPointRef: POINT },
-      });
-      expect(refNotApplicable.body.errors).toEqual([
-        { path: "shipping.pickupPointRef", code: "not_applicable" },
-      ]);
-      const refRequired = await place(2_500, {
-        shippingAddress: undefined,
-        shipping: { methodCode: point.code },
-      });
-      expect(refRequired.body.errors).toEqual([
-        { path: "shipping.pickupPointRef", code: "required" },
-      ]);
-      const addressNotApplicable = await place(2_500, {
-        shipping: { methodCode: point.code, pickupPointRef: POINT },
-      });
-      expect(addressNotApplicable.body.errors).toEqual([
-        { path: "shippingAddress", code: "not_applicable" },
-      ]);
+      const cases = [
+        // The shopper's page shows another kind than the method has now (an admin changed it): never a field error.
+        { shippingAddress: undefined, shipping: { methodCode: address.code } },
+        { shipping: { methodCode: address.code, pickupPointRef: POINT } },
+        { shippingAddress: undefined, shipping: { methodCode: point.code } },
+        { shipping: { methodCode: point.code, pickupPointRef: POINT } },
+      ];
+      for (const overrides of cases) {
+        const result = await place(2_500, overrides);
+        expect(result.status, JSON.stringify(overrides)).toBe(409);
+        expect(result.body.code).toBe("shipping_changed");
+        expect(result.body.shipping).toMatchObject({
+          methodCode: overrides.shipping.methodCode,
+          kind: overrides.shipping.methodCode === point.code ? "pickup_point" : "address",
+        });
+      }
+    });
+
+    it("review m-4: a method PATCHed from address to pickup_point while the shopper submits an address: 409, nothing reserved", async () => {
+      const method = await methods.create({ kind: "address" });
+      const { variantId } = await cartWith(2_000);
+      await pool.query(
+        "update shipping_method set kind = 'pickup_point', provider_code = 'fake' where id = $1",
+        [method.id],
+      );
+      const before = await orderTableCounts(pool, [variantId]);
+      const result = await place(2_500, { shipping: { methodCode: method.code } });
+      expect(result.status).toBe(409);
+      expect(result.body.code).toBe("shipping_changed");
+      expect(result.body.shipping).toMatchObject({ methodCode: method.code, kind: "pickup_point" });
+      expect(await orderTableCounts(pool, [variantId])).toEqual(before);
     });
 
     it("the member is strict and judged by core", async () => {
