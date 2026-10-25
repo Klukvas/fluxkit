@@ -66,6 +66,8 @@ export const FIELD_ERROR_CODES = [
   "idempotency_key_required",
   "invalid_idempotency_key",
   "shipping_address_required",
+  "unknown_pickup_point",
+  "not_applicable",
   "insufficient_stock",
   "variant_not_sellable",
   "reserved_out_of_range",
