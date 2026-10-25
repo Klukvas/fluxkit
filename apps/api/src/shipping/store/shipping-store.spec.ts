@@ -170,14 +170,17 @@ describe("store shipping routes (ADR 0029 decisions 5 and 6; real app, real Post
       );
     });
 
-    it("a pickup point method of a provider the shop does not run is provider_not_enabled", async () => {
+    it("a pickup point method of a provider the shop does not run is not listed (review M-1)", async () => {
       const method = await methods.create({ kind: "pickup_point", providerCode: "gone_provider" });
+      const courier = await methods.create({ kind: "address", providerCode: "gone_provider" });
       const made = await catalog.simple({ price: 2_000 });
       await add(made.variantId);
       const result = await shippingOptions(shopper, { country: "UA" });
-      expect(result.body.options.find((o) => o.methodCode === method.code)).toMatchObject({
-        available: false,
-        reason: "provider_not_enabled",
+      expect(result.body.options.find((o) => o.methodCode === method.code)).toBeUndefined();
+      // An address method's provider only estimates: it is still offered.
+      expect(result.body.options.find((o) => o.methodCode === courier.code)).toMatchObject({
+        available: true,
+        estimate: null,
       });
     });
 

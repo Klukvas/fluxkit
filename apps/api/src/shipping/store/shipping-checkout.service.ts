@@ -25,7 +25,12 @@ import {
   ShippingDirectoryService,
   type PickupPointResolution,
 } from "./shipping-directory.service.js";
-import { methodKind, notOffered, toShippingOption } from "./shipping-options.service.js";
+import {
+  methodKind,
+  notOffered,
+  offeredMethods,
+  toShippingOption,
+} from "./shipping-options.service.js";
 import { SHIPPING_STORE_LIMITS } from "./shipping-store-limits.js";
 import type { ShippingChanged, ShippingOption } from "./shipping-store.schemas.js";
 import {
@@ -90,9 +95,20 @@ export class ShippingCheckoutService {
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
   ) {}
 
-  /** Whether the shop has at least one active method (`shipping_method_required`). */
-  activeMethodExists(tx: Transaction): Promise<boolean> {
-    return this.repository.activeExists(tx);
+  /**
+   * Whether the shop offers at least one method (`shipping_method_required`, ADR 0029 decision 4): the methods the options
+   * endpoint lists, by the same filter (`offeredMethods`, review M-1). Active methods in another currency or pickup point
+   * methods of a provider that is not loaded do not count, so they cannot lock every checkout out.
+   */
+  async offeredMethodExists(tx: Transaction): Promise<boolean> {
+    const rows = await this.repository.listActive(SHIPPING_STORE_LIMITS.maxMethods, tx);
+    return (
+      offeredMethods(
+        rows,
+        this.pricing.shopCurrency,
+        (code) => this.directory.provider(code) !== undefined,
+      ).length > 0
+    );
   }
 
   /** BEFORE the transaction, outside every lock. Only a pickup point of an enabled provider needs anything. */

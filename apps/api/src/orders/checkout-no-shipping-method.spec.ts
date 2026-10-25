@@ -13,6 +13,7 @@ import {
   ShippingMethods,
   shippingOptions,
 } from "../test/shipping-fixtures.js";
+import { ShippingStartupCheck } from "../shipping/store/shipping-startup-check.js";
 import { Shopper } from "../test/shopper.js";
 import { testShippingProviders } from "../test/test-shipping-provider.js";
 
@@ -128,6 +129,65 @@ describe("checkout of a shop without an active shipping method (the storefront v
     // A changed total is answered first, as before shipping existed.
     const changed = await checkoutAs(shopper, storefrontBody(1, null), randomUUID());
     expect(changed.body.code).toBe("cart_changed");
+  });
+
+  /*
+   * Review M-1 (docs/plans/2026-10-24-shipping-review.md): the "a method is required" switch counts only the methods the
+   * options endpoint offers. An active method no checkout can use (another currency, a pickup point of a provider this
+   * process does not load) must not lock every shopper out with `shipping_method_required` while the options are empty.
+   */
+  it("M-1: an active method in another currency than the shop's does not make a method required", async () => {
+    await methods.create({ currency: "EUR" });
+    const { variantId } = await catalog.simple({ price: 2_500 });
+    await shopper.post("/store/cart/items", { variantId, quantity: 1 });
+    const options = await shippingOptions(shopper, { country: "UA" });
+    expect(options.body.options).toEqual([]);
+    const result = await checkoutAs(shopper, storefrontBody(2_500), randomUUID());
+    expect(result.status, JSON.stringify(result.body)).toBe(201);
+    placedOrders.track(result.body.order?.number ?? "");
+    expect(result.body.order).toMatchObject({ shipping: null, adjustments: [] });
+  });
+
+  it("M-1: an active pickup point method of a provider that is not loaded is not offered and not required", async () => {
+    await methods.create({ kind: "pickup_point", providerCode: "ghost" });
+    const { variantId } = await catalog.simple({ price: 2_500 });
+    await shopper.post("/store/cart/items", { variantId, quantity: 1 });
+    const options = await shippingOptions(shopper, { country: "UA" });
+    expect(options.body.options).toEqual([]);
+    const result = await checkoutAs(shopper, storefrontBody(2_500), randomUUID());
+    expect(result.status, JSON.stringify(result.body)).toBe(201);
+    placedOrders.track(result.body.order?.number ?? "");
+    expect(result.body.order).toMatchObject({ shipping: null, adjustments: [] });
+  });
+
+  it("M-1: a usable method still makes a method required (an address method of an unloaded provider counts)", async () => {
+    const { variantId } = await catalog.simple({ price: 2_500 });
+    await shopper.post("/store/cart/items", { variantId, quantity: 1 });
+    // An address method's provider only estimates: the method is offered without it, so it counts.
+    const courier = await methods.create({ kind: "address", providerCode: "ghost" });
+    const withCourier = await checkoutAs(shopper, storefrontBody(2_500), randomUUID());
+    expect(withCourier.status).toBe(400);
+    expect(withCourier.body.code).toBe("shipping_method_required");
+    await methods.update(courier.id, { isActive: false });
+    // A pickup point method of the loaded provider counts as well.
+    await methods.create({ kind: "pickup_point" });
+    const withPickup = await checkoutAs(shopper, storefrontBody(2_500), randomUUID());
+    expect(withPickup.status).toBe(400);
+    expect(withPickup.body.code).toBe("shipping_method_required");
+  });
+
+  it("M-1: the startup check warns about active methods of an unloaded provider or in another currency", async () => {
+    const check = running.app.get(ShippingStartupCheck);
+    expect(await check.run()).toEqual([]);
+    const ghost = await methods.create({ kind: "pickup_point", providerCode: "ghost" });
+    const euro = await methods.create({ currency: "EUR" });
+    // A method of the loaded provider is no reason to warn.
+    await methods.create({ kind: "pickup_point" });
+    const warnings = await check.run();
+    expect(warnings).toHaveLength(2);
+    expect(warnings[0]).toContain(`${ghost.code} (pickup_point, provider ghost)`);
+    expect(warnings[0]).not.toContain(`provider fake`);
+    expect(warnings[1]).toContain(`${euro.code} (EUR)`);
   });
 
   it("a digital order needs no address, and a replay answers the same order", async () => {

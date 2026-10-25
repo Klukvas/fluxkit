@@ -6,6 +6,7 @@ import { ShippingCheckoutService } from "./shipping-checkout.service.js";
 import { ShippingDirectoryService } from "./shipping-directory.service.js";
 import { ShippingLookupService } from "./shipping-lookup.service.js";
 import { ShippingOptionsService } from "./shipping-options.service.js";
+import { ShippingStartupCheck } from "./shipping-startup-check.js";
 import { ShippingStoreController } from "./shipping-store.controller.js";
 import { ShippingStoreRepository } from "./shipping-store.repository.js";
 
@@ -34,6 +35,7 @@ function storeShippingNoStore(request: Request, response: Response, next: NextFu
     ShippingOptionsService,
     ShippingLookupService,
     ShippingCheckoutService,
+    ShippingStartupCheck,
   ],
   exports: [ShippingCheckoutService],
 })
