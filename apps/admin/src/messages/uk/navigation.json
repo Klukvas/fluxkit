@@ -30,5 +30,10 @@
   "page.categoryNew.title": "Нова категорія",
   "page.categoryDetail.title": "Категорія",
   "page.productNew.title": "Новий товар",
-  "page.productDetail.title": "Товар"
+  "page.productDetail.title": "Товар",
+  "page.shipping.title": "Доставка",
+  "page.shippingMethodNew.title": "Новий спосіб доставки",
+  "page.shippingMethodDetail.title": "Спосіб доставки",
+  "page.shippingProviders.title": "Перевізники",
+  "page.shippingProviderDetail.title": "Перевізник"
 }

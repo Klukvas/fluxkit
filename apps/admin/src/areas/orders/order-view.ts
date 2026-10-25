@@ -9,6 +9,7 @@ import type {
 } from "@fluxkit/api-client";
 import type { StatusTone } from "@fluxkit/ui";
 import { actorLabel, type ActorLabel } from "../../lib/actor-label";
+import { exponentOf } from "../../lib/currency-exponent";
 import { formatMoney } from "../../lib/format";
 import { safeHttpUrl } from "../../lib/safe-http-url";
 import { canRun } from "../../permissions";
@@ -55,17 +56,8 @@ export interface MoneyContext {
   config: AdminConfig;
 }
 
-/**
- * The exponent of `currency` from the admin config (`supportedCurrencies`, the shop currency). An order keeps the
- * currency it was placed in; if the config no longer lists it, the ISO exponent that `Intl` knows is used.
- */
-export function exponentOf(config: AdminConfig, currency: string): number {
-  const listed = config.supportedCurrencies.find((entry) => entry.code === currency);
-  if (listed !== undefined) return listed.exponent;
-  if (currency === config.shopCurrency) return config.currencyExponent;
-  return new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions()
-    .maximumFractionDigits as number;
-}
+/** Moved to `lib/currency-exponent.ts` (the shipping area needs it too); kept here for the orders screens and specs. */
+export { exponentOf };
 
 export function moneyText(money: Money, context: MoneyContext): string {
   return formatMoney(money, exponentOf(context.config, money.currency), context.locale);

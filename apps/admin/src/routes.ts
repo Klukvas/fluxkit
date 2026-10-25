@@ -273,6 +273,51 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "shipping",
+    "listShippingMethods",
+    "page.shipping.title",
+    areaPage(
+      () => import("./areas/shipping"),
+      (module) => module.ShippingPage,
+    ),
+  ),
+  route(
+    "shippingMethodNew",
+    "createShippingMethod",
+    "page.shippingMethodNew.title",
+    areaPage(
+      () => import("./areas/shipping"),
+      (module) => module.ShippingMethodNewPage,
+    ),
+  ),
+  route(
+    "shippingMethodDetail",
+    "getShippingMethod",
+    "page.shippingMethodDetail.title",
+    areaPage(
+      () => import("./areas/shipping"),
+      (module) => module.ShippingMethodDetailPage,
+    ),
+  ),
+  route(
+    "shippingProviders",
+    "getShippingProviderSettings",
+    "page.shippingProviders.title",
+    areaPage(
+      () => import("./areas/shipping"),
+      (module) => module.ShippingProvidersPage,
+    ),
+  ),
+  route(
+    "shippingProviderDetail",
+    "getShippingProviderSettings",
+    "page.shippingProviderDetail.title",
+    areaPage(
+      () => import("./areas/shipping"),
+      (module) => module.ShippingProviderDetailPage,
+    ),
+  ),
+  route(
     "users",
     "listUsers",
     "page.users.title",

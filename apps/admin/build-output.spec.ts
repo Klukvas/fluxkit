@@ -34,6 +34,7 @@ const AREA_MODULES = [
   "src/areas/orders/index.tsx",
   "src/areas/customers/index.tsx",
   "src/areas/users/index.tsx",
+  "src/areas/shipping/index.tsx",
 ];
 
 interface ManifestChunk {

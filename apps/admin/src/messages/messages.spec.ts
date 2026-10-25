@@ -7,6 +7,7 @@ import * as catalogDictionaries from "../areas/catalog-dictionaries";
 import * as customers from "../areas/customers";
 import * as orders from "../areas/orders";
 import * as products from "../areas/products";
+import * as shipping from "../areas/shipping";
 import * as users from "../areas/users";
 import {
   EAGER_FILES,
@@ -174,6 +175,7 @@ describe("the lazy file loader", () => {
       orders: { uk: unused, en: unused },
       customers: { uk: unused, en: unused },
       users: { uk: unused, en: unused },
+      shipping: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
@@ -212,6 +214,7 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   home: [],
   orders: orders.MESSAGE_FILES,
   products: products.MESSAGE_FILES,
+  shipping: shipping.MESSAGE_FILES,
   users: users.MESSAGE_FILES,
 };
 
