@@ -8,6 +8,8 @@ import type {
   ProductOption,
   ProductSummary,
   ProductVariant,
+  ShippingOption,
+  ShippingOptions,
 } from "@fluxkit/api-client";
 
 /**
@@ -142,4 +144,35 @@ export function customer(overrides: Partial<Customer> = {}): Customer {
     createdAt: "2026-10-01T10:00:00.000Z",
     ...overrides,
   };
+}
+
+/**
+ * A shipping option as `GET /store/shipping/options` returns it: the amounts are GIVEN here (never computed), so a test can
+ * make `total` differ from anything the code under test could add up.
+ */
+export function shippingOption(
+  methodCode: string,
+  overrides: Partial<ShippingOption> = {},
+): ShippingOption {
+  return {
+    methodCode,
+    kind: "address",
+    title: `Title of ${methodCode}`,
+    description: null,
+    providerCode: null,
+    countryCodes: ["UA"],
+    available: true,
+    price: { amount: 5000, currency: "UAH" },
+    payer: "shop_charge",
+    total: { amount: 6999, currency: "UAH" },
+    estimate: null,
+    ...overrides,
+  };
+}
+
+export function shippingOptionsOf(
+  options: ShippingOption[],
+  subtotal: ShippingOptions["subtotal"] = { amount: 1999, currency: "UAH" },
+): ShippingOptions {
+  return { subtotal, options };
 }

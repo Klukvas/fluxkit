@@ -2,6 +2,7 @@ import type {
   Cart,
   CheckoutBody,
   CheckoutResult,
+  ShippingChanged,
   StoreFailure,
   StoreResult,
 } from "@fluxkit/api-client";
@@ -221,6 +222,15 @@ export type CheckoutOutcome =
   | { kind: "rateLimited"; attempt: "keep"; failure: Failure }
   | { kind: "cartChanged"; attempt: "keep"; cart: Cart; failure: Failure }
   | { kind: "refused"; attempt: "keep"; lineErrors: LineError[]; failure: Failure }
+  /**
+   * `409 shipping_changed`: only the delivery price or the method's availability changed. Nothing was reserved. The shopper
+   * sees the fresh option and agrees again; the key is kept because the next body (the new total) hashes to a new key.
+   */
+  | { kind: "shippingChanged"; attempt: "keep"; shipping: ShippingChanged | null; failure: Failure }
+  /** `503 shipping_provider_unavailable`: the carrier cannot be reached. The same body may be sent again, or another method chosen. */
+  | { kind: "shippingProviderUnavailable"; attempt: "keep"; failure: Failure }
+  /** `400 shipping_method_required` / `shipping_not_applicable`: the form and the shop disagree about delivery; read the options again. */
+  | { kind: "shippingRejected"; attempt: "keep"; failure: Failure }
   | { kind: "cartEmpty"; attempt: "clear"; refreshCart: true; href: string; failure: Failure }
   | { kind: "tooManyOpenOrders"; attempt: "keep"; ordersHref: string | null; failure: Failure }
   | { kind: "keyReused"; attempt: "clear"; failure: Failure }
@@ -255,10 +265,27 @@ function problemOutcome(result: StoreFailure, context: OutcomeContext): Checkout
   const failure = failureFromResult(result);
   const { code } = result.problem;
   if (result.status === 429) return { kind: "rateLimited", attempt: "keep", failure };
+  // The carrier is unreachable and the point is not cached: nothing was written (the call happens before the transaction).
+  if (result.status === 503 && code === "shipping_provider_unavailable") {
+    return { kind: "shippingProviderUnavailable", attempt: "keep", failure };
+  }
   // A 5xx (503 deadlock retry, 500) may or may not have committed: only the same key can find out, so keep it.
   if (result.status >= 500) return { kind: "retry", attempt: "keep", failure };
-  if (result.status === 400) return { kind: "invalid", attempt: "keep", failure };
+  if (result.status === 400) {
+    if (code === "shipping_method_required" || code === "shipping_not_applicable") {
+      return { kind: "shippingRejected", attempt: "keep", failure };
+    }
+    return { kind: "invalid", attempt: "keep", failure };
+  }
   if (result.status === 409) {
+    if (code === "shipping_changed") {
+      return {
+        kind: "shippingChanged",
+        attempt: "keep",
+        shipping: result.problem.shipping ?? null,
+        failure,
+      };
+    }
     if (code === "cart_changed" && result.problem.cart !== undefined) {
       return { kind: "cartChanged", attempt: "keep", cart: result.problem.cart, failure };
     }

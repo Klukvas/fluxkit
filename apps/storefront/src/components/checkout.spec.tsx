@@ -6,6 +6,7 @@ import uk from "../messages/uk.json";
 import en from "../messages/en.json";
 import { createTranslator } from "@fluxkit/ui";
 import { initialCartState, type CartState } from "../lib/cart-store";
+import { initialShippingState, type ShippingState } from "../lib/shipping-model";
 import { initialCheckoutValues } from "../lib/checkout-form";
 import { initialCheckoutState, type CheckoutState } from "../lib/checkout-store";
 import { clientFailure, failureFromResult } from "../lib/failure";
@@ -35,6 +36,14 @@ function ready(value = cart): CartState {
   return { ...initialCartState, status: "ready", cart: value };
 }
 
+/** The shop has no active shipping method: the options answer is empty, the checkout is the one without delivery. */
+const noMethods: ShippingState = {
+  ...initialShippingState,
+  started: true,
+  answer: { subtotal: { amount: 4321, currency: "UAH" }, options: [] },
+  appliedSeq: 1,
+};
+
 function props(overrides: Partial<CheckoutPageViewProps> = {}): CheckoutPageViewProps {
   return {
     t,
@@ -43,6 +52,8 @@ function props(overrides: Partial<CheckoutPageViewProps> = {}): CheckoutPageView
     config: checkoutConfig,
     cartState: ready(),
     checkout: initialCheckoutState,
+    shipping: noMethods,
+    pickup: null,
     signedIn: false,
     values: initialCheckoutValues(checkoutConfig),
     failure: null,
@@ -54,6 +65,9 @@ function props(overrides: Partial<CheckoutPageViewProps> = {}): CheckoutPageView
     onSubmit: vi.fn(),
     onAcknowledge: vi.fn(),
     onConfirmTotal: vi.fn(),
+    onConfirmShipping: vi.fn(),
+    onSelectMethod: vi.fn(),
+    onRetryShipping: vi.fn(),
     onRetryCart: vi.fn(),
     ...overrides,
   };

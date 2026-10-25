@@ -350,3 +350,218 @@ describe("AccountOrdersView", () => {
     expect(leftoverText(error)).toBe("");
   });
 });
+
+// ------------------------------------------------------------------ shipping (plan step 10)
+
+describe("OrderDetailsView: delivery and tracking", () => {
+  const money = (amount: number) => ({ amount, currency: "UAH" });
+  const courier = {
+    methodCode: "courier",
+    kind: "address" as const,
+    providerCode: null,
+    amount: money(5000),
+    payer: "shop_charge" as const,
+    estimatedCarrierAmount: null,
+    destination: null,
+    title: "§courier-title",
+  };
+  const point = {
+    providerRef: "p1",
+    number: "12",
+    kind: "locker" as const,
+    cityRef: "c1",
+    cityName: "§city-name",
+    description: "§point-description",
+  };
+
+  it("shows nothing about delivery for an order placed without a method (as before shipping existed)", () => {
+    const html = renderToStaticMarkup(details(anOrder()));
+    expect(html).not.toContain("§order.shipping.title");
+    expect(html).not.toContain("§order.shipments.title");
+  });
+
+  it("shows the method title, the price the shop charged and the delivery row of the totals", () => {
+    const html = renderToStaticMarkup(
+      details(anOrder({ shipping: courier, shippingTotal: money(5000) })),
+    );
+    expect(html).toContain("§courier-title");
+    expect(html).toContain("§order.shipping.price");
+    expect(html).toContain(formatMoney(money(5000), 2, "uk"));
+    expect(html).toContain("§order.totals.shipping");
+    expect(html).toContain("<address");
+  });
+
+  it("says Free for a free method and keeps its row in the totals, and says who pays on delivery", () => {
+    const free = renderToStaticMarkup(
+      details(anOrder({ shipping: { ...courier, amount: money(0) } })),
+    );
+    expect(free).toContain("§order.shipping.free");
+    expect(free).toContain("§order.totals.shipping");
+    const onDelivery = renderToStaticMarkup(
+      details(
+        anOrder({
+          shipping: {
+            ...courier,
+            amount: money(0),
+            payer: "recipient_on_delivery",
+            estimatedCarrierAmount: money(8800),
+          },
+        }),
+      ),
+    );
+    expect(onDelivery).toContain("§order.shipping.onDeliveryEstimate");
+    expect(onDelivery).not.toContain("§order.shipping.free");
+  });
+
+  it("shows the pickup point with its kind, number, city and the carrier's text as sent, once (no duplicate address)", () => {
+    const html = renderToStaticMarkup(
+      details(
+        anOrder({
+          shipping: { ...courier, kind: "pickup_point", providerCode: "fake", destination: point },
+          shippingAddress: { countryCode: "UA", city: "§city-name", line1: "§point-description" },
+        }),
+      ),
+    );
+    expect(html).toContain("§order.shipping.point");
+    expect(html).toContain("§order.shipping.pointValue");
+    expect(html).not.toContain("<address");
+    expect(html).not.toContain("§order.address.title");
+    const real = renderToStaticMarkup(
+      OrderDetailsView({
+        order: anOrder({
+          shipping: { ...courier, kind: "pickup_point", providerCode: "fake", destination: point },
+        }),
+        t: createTranslator(en, "en"),
+        locale: "en",
+        shop,
+        cancel: idle,
+        onAskCancel: vi.fn(),
+        onKeepOrder: vi.fn(),
+        onConfirmCancel: vi.fn(),
+      }),
+    );
+    expect(real).toContain("Parcel locker 12, §city-name: §point-description");
+  });
+
+  it("lists the tracking number and a translated status for every status of a shipment", () => {
+    const statuses = [
+      "pending",
+      "unknown",
+      "created",
+      "in_transit",
+      "arrived",
+      "delivered",
+      "returning",
+      "returned",
+      "cancelled",
+      "failed",
+    ] as const;
+    for (const status of statuses) {
+      const html = renderToStaticMarkup(
+        details(
+          anOrder({
+            shipping: courier,
+            shipments: [
+              {
+                providerCode: "fake",
+                trackingNumber: "FAKE000001",
+                status,
+                createdAt: "2026-10-19T11:00:00.000Z",
+                updatedAt: "2026-10-19T12:00:00.000Z",
+                deliveredAt: null,
+                cancelledAt: null,
+              },
+            ],
+          }),
+        ),
+      );
+      expect(html, status).toContain("FAKE000001");
+      expect(html, status).toContain(`§order.shipment.status.${status}`);
+      for (const messages of [uk, en] as Record<string, string>[]) {
+        expect(messages[`order.shipment.status.${status}`], status).toBeTruthy();
+      }
+    }
+  });
+
+  it("shows no tracking section until the shop created a waybill, and survives a status it does not know", () => {
+    expect(renderToStaticMarkup(details(anOrder({ shipping: courier })))).not.toContain(
+      "§order.shipments.title",
+    );
+    const html = renderToStaticMarkup(
+      details(
+        anOrder({
+          shipping: courier,
+          shipments: [
+            {
+              providerCode: "fake",
+              trackingNumber: "FAKE000002",
+              status: "teleported" as never,
+              createdAt: "2026-10-19T11:00:00.000Z",
+              updatedAt: "2026-10-19T12:00:00.000Z",
+              deliveredAt: null,
+              cancelledAt: null,
+            },
+          ],
+        }),
+      ),
+    );
+    expect(html).toContain("§order.shipment.status.fallback");
+  });
+
+  it("renders carrier text as text, never as markup", () => {
+    const html = renderToStaticMarkup(
+      OrderDetailsView({
+        order: anOrder({
+          shipping: {
+            ...courier,
+            title: "<b>x</b>",
+            kind: "pickup_point",
+            providerCode: "fake",
+            destination: { ...point, description: "<script>alert(1)</script>" },
+          },
+        }),
+        t: createTranslator(en, "en"),
+        locale: "en",
+        shop,
+        cancel: idle,
+        onAskCancel: vi.fn(),
+        onKeepOrder: vi.fn(),
+        onConfirmCancel: vi.fn(),
+      }),
+    );
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).not.toContain("<b>x</b>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("has no hardcoded words around the delivery data", () => {
+    const html = renderToStaticMarkup(
+      details(
+        anOrder({
+          shipping: {
+            ...courier,
+            kind: "pickup_point",
+            providerCode: "fake",
+            destination: point,
+          },
+          shipments: [
+            {
+              providerCode: "fake",
+              trackingNumber: "000003",
+              status: "in_transit",
+              createdAt: "2026-10-19T11:00:00.000Z",
+              updatedAt: "2026-10-19T12:00:00.000Z",
+              deliveredAt: null,
+              cancelledAt: null,
+            },
+          ],
+        }),
+      ),
+    );
+    const rest = withoutData(html)
+      .split(formatMoney(money(5000), 2, "uk"))
+      .join(" ");
+    expect(leftoverText(rest)).toBe("");
+    for (const attribute of textAttributes(html)) expect(leftoverText(attribute)).toBe("");
+  });
+});

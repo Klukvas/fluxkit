@@ -24,6 +24,7 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type ReactNode,
   type Ref,
 } from "react";
 import { checkoutConfig, type AddressFieldName, type CheckoutConfig } from "../config/checkout";
@@ -38,11 +39,17 @@ import {
   addressPath,
   checkoutFieldIds,
   checkoutFieldOrder,
+  countryNames,
   countryOptions,
   initialCheckoutValues,
   prefillFromCustomer,
   requiredCheckoutFields,
   COUNTRY_FIELD,
+  SHIPPING_CITY_FIELD,
+  SHIPPING_CITY_NAME_FIELD,
+  SHIPPING_METHOD_FIELD,
+  SHIPPING_POINT_FIELD,
+  SHIPPING_POINT_TEXT_FIELD,
   type CheckoutValues,
 } from "../lib/checkout-form";
 import {
@@ -56,6 +63,20 @@ import { clientFailure, failureText, type Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { loginHref } from "../lib/safe-next";
+import {
+  deliveryMode,
+  deliveryPlan,
+  initialShippingState,
+  isDeliveryActive,
+  countryToChoose,
+  isOrderable,
+  methodToChoose,
+  servedCountries,
+  type ShippingState,
+} from "../lib/shipping-model";
+import { createShippingStore } from "../lib/shipping-store";
+import { shippingPriceText } from "../lib/shipping-text";
+import { DeliverySectionView, PickupPointFields } from "./delivery-section";
 import { FormErrorSummary, TextField, fieldMessage } from "./form-parts";
 import { useI18n } from "./i18n-provider";
 import { useAccount, useCart, useStoreClient } from "./session-provider";
@@ -76,6 +97,10 @@ const BLOCK_KEYS: Record<Exclude<CheckoutBlock, "empty">, string> = {
   notPurchasable: "checkout.blocked.notPurchasable",
   pricesChanged: "checkout.blocked.pricesChanged",
   confirmTotal: "checkout.blocked.confirmTotal",
+  shippingLoading: "checkout.blocked.shippingLoading",
+  shippingError: "checkout.blocked.shippingError",
+  confirmShipping: "checkout.blocked.confirmShipping",
+  shippingMethod: "checkout.blocked.shippingMethod",
 };
 
 export function checkoutLabels(t: Translator, config: CheckoutConfig): Record<string, string> {
@@ -86,6 +111,9 @@ export function checkoutLabels(t: Translator, config: CheckoutConfig): Record<st
     lastName: t("checkout.field.lastName"),
     [COUNTRY_FIELD]: t("checkout.field.countryCode"),
     shippingAddress: t("checkout.address.title"),
+    [SHIPPING_METHOD_FIELD]: t("checkout.shipping.title"),
+    [SHIPPING_CITY_FIELD]: t("checkout.shipping.city.label"),
+    [SHIPPING_POINT_FIELD]: t("checkout.shipping.point.label"),
   };
   for (const field of config.addressFields) {
     const label = t(`checkout.field.${field.name}`);
@@ -171,6 +199,8 @@ export interface CheckoutPageViewProps {
   config: CheckoutConfig;
   cartState: CartState;
   checkout: CheckoutState;
+  /** The shipping options of the cart (`GET /store/shipping/options`), as the shipping store holds them. */
+  shipping: ShippingState;
   signedIn: boolean;
   values: CheckoutValues;
   failure: Failure | null;
@@ -183,7 +213,12 @@ export interface CheckoutPageViewProps {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onAcknowledge: () => void;
   onConfirmTotal: () => void;
+  onConfirmShipping: () => void;
+  onSelectMethod: (methodCode: string) => void;
+  onRetryShipping: () => void;
   onRetryCart: () => void;
+  /** The city and pickup point pickers of a pickup point method (they own the carrier lookups). */
+  pickup: ReactNode;
 }
 
 /**
@@ -193,7 +228,8 @@ export interface CheckoutPageViewProps {
  * and handlers in.
  */
 export function CheckoutPageView(props: CheckoutPageViewProps) {
-  const { t, locale, exponent, config, cartState, checkout, signedIn, values, failure } = props;
+  const { t, locale, exponent, config, cartState, checkout, shipping, signedIn, values, failure } =
+    props;
   const cart = cartState.cart;
 
   if (cart === null && cartState.status === "error") {
@@ -233,8 +269,21 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
     );
   }
 
-  const block = checkoutBlock(cart, checkout);
+  const methodCode = values[SHIPPING_METHOD_FIELD] ?? "";
+  const plan = deliveryPlan(cart, shipping, methodCode);
+  const mode = deliveryMode(cart, shipping, methodCode);
+  const block = checkoutBlock(cart, checkout, plan);
   const requiresShipping = cart.requiresShipping;
+  const deliveryActive = isDeliveryActive(cart, shipping);
+  const deliveryOptions = shipping.answer?.options ?? [];
+  // Until the first answer (or its failure) we do not know whether the shop has methods: show neither form.
+  const deliveryUnknown = requiresShipping && shipping.answer === null && shipping.failure === null;
+  // The chosen option for DISPLAY, also while a newer read runs (no flicker); only the submit waits for the new price.
+  const shownOption = deliveryOptions.find((option) => option.methodCode === methodCode);
+  const shown = isOrderable(shownOption) ? shownOption : null;
+  const money = (value: Parameters<typeof formatMoney>[0]) => formatMoney(value, exponent, locale);
+  // The total of the cart without any delivery. With delivery in the shop the order total is the option's (below).
+  const itemsTotal = deliveryActive ? cart.subtotal : cart.total;
   const labels = checkoutLabels(t, config);
   const ids = checkoutFieldIds(config);
   const refusals =
@@ -317,7 +366,31 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             <TextField {...field("lastName")} autoComplete="family-name" maxLength={100} />
           </fieldset>
 
-          {requiresShipping ? (
+          {deliveryUnknown ? (
+            <div className="flex flex-col gap-3" aria-busy="true">
+              <h2 className="text-xl font-semibold text-foreground">
+                {t("checkout.shipping.title")}
+              </h2>
+              <Spinner label={t("checkout.shipping.loading")} />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : null}
+          {requiresShipping && (deliveryActive || shipping.failure !== null) ? (
+            <DeliverySectionView
+              t={t}
+              locale={locale}
+              exponent={exponent}
+              shipping={shipping}
+              options={deliveryOptions}
+              methodCode={methodCode}
+              methodId={ids[SHIPPING_METHOD_FIELD] as string}
+              failure={failure}
+              onSelectMethod={props.onSelectMethod}
+              onRetry={props.onRetryShipping}
+              pickup={props.pickup}
+            />
+          ) : null}
+          {requiresShipping && !deliveryUnknown && (mode === "none" || mode === "address") ? (
             <fieldset className="flex flex-col gap-4">
               <legend className="mb-2 text-xl font-semibold text-foreground">
                 <h2>{t("checkout.address.title")}</h2>
@@ -338,7 +411,10 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
                       props.onValueChange(COUNTRY_FIELD, event.currentTarget.value)
                     }
                   >
-                    {countryOptions(config, locale).map((country) => (
+                    {(deliveryActive
+                      ? countryNames(servedCountries(deliveryOptions), locale)
+                      : countryOptions(config, locale)
+                    ).map((country) => (
                       <option key={country.code} value={country.code}>
                         {country.name}
                       </option>
@@ -356,7 +432,8 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
                 />
               ))}
             </fieldset>
-          ) : (
+          ) : null}
+          {requiresShipping ? null : (
             <p className="text-muted-foreground">{t("checkout.address.none")}</p>
           )}
 
@@ -400,11 +477,44 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           {block === "confirmTotal" ? (
             <Alert variant="warning" title={t("checkout.confirm.title")}>
               <p>
-                {t("checkout.confirm.total", { total: formatMoney(cart.total, exponent, locale) })}
+                {t("checkout.confirm.total", {
+                  total: money(plan.kind === "ship" ? plan.total : itemsTotal),
+                })}
               </p>
               <Button className="mt-3" onClick={props.onConfirmTotal}>
                 {t("checkout.confirm.button")}
               </Button>
+            </Alert>
+          ) : null}
+          {block === "confirmShipping" &&
+          plan.kind === "ship" &&
+          checkout.shippingConsent !== null ? (
+            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
+              <p>
+                {t("checkout.shippingChanged.body", {
+                  method: plan.option.title,
+                  price: shippingPriceText(t, plan.option, money),
+                  total: money(plan.total),
+                  previousTotal: money(checkout.shippingConsent.previousTotal),
+                })}
+              </p>
+              <Button className="mt-3" onClick={props.onConfirmShipping}>
+                {t("checkout.shippingChanged.button")}
+              </Button>
+            </Alert>
+          ) : null}
+          {checkout.shippingConsent !== null &&
+          plan.kind === "blocked" &&
+          plan.reason === "unavailable" ? (
+            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
+              <p>
+                {t("checkout.shippingChanged.unavailable", {
+                  method:
+                    deliveryOptions.find(
+                      (option) => option.methodCode === checkout.shippingConsent?.methodCode,
+                    )?.title ?? checkout.shippingConsent.methodCode,
+                })}
+              </p>
             </Alert>
           ) : null}
           {block === "notPurchasable" ? (
@@ -436,11 +546,33 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             </div>
             <div className="flex justify-between gap-6">
               <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
-              <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
+              <dd>
+                {money(
+                  deliveryActive && shipping.answer !== null
+                    ? shipping.answer.subtotal
+                    : cart.subtotal,
+                )}
+              </dd>
             </div>
+            {deliveryActive ? (
+              <div className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{t("checkout.summary.shipping")}</dt>
+                <dd className="text-end">
+                  {shown === null
+                    ? t("checkout.summary.shipping.notChosen")
+                    : shippingPriceText(t, shown, money)}
+                </dd>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-6 font-semibold">
               <dt>{t("cart.summary.total")}</dt>
-              <dd>{formatMoney(cart.total, exponent, locale)}</dd>
+              <dd className="text-end">
+                {!deliveryActive
+                  ? money(cart.total)
+                  : shown === null
+                    ? t("checkout.summary.total.pending")
+                    : money(shown.total)}
+              </dd>
             </div>
           </dl>
           <Link
@@ -466,10 +598,17 @@ export function CheckoutPage({ exponent }: { exponent: number }) {
   const { state: cartState, store: cartStore } = useCart();
   const { state: account } = useAccount();
   const router = useRouter();
+  const [shipping] = useState(() => createShippingStore({ client, cart: cartStore, locale }));
+  const shippingState = useSyncExternalStore(
+    shipping.subscribe,
+    shipping.getState,
+    () => initialShippingState,
+  );
   const [checkout] = useState(() =>
     createCheckoutStore({
       client,
       cart: cartStore,
+      shipping,
       locale,
       config: checkoutConfig,
       attempts: () =>
@@ -486,17 +625,25 @@ export function CheckoutPage({ exponent }: { exponent: number }) {
   );
   const [ordersHref, setOrdersHref] = useState<string | null>(null);
   const signedIn = account.session.status === "signedIn";
-  const requiresShipping = cartState.cart?.requiresShipping ?? true;
-  const fieldOrder = useMemo(
-    () => checkoutFieldOrder(requiresShipping, checkoutConfig),
-    [requiresShipping],
-  );
+  const cart = cartState.cart;
+  const requiresShipping = cart?.requiresShipping ?? true;
   const fieldIds = useMemo(() => checkoutFieldIds(checkoutConfig), []);
+  // The chosen method is kept beside the form values (the form's field order depends on it) and joined to them below.
+  const [methodCode, setMethodCode] = useState("");
+  const mode = cart === null ? "none" : deliveryMode(cart, shippingState, methodCode);
+  const fieldOrder = useMemo(
+    () => checkoutFieldOrder(requiresShipping, checkoutConfig, mode),
+    [requiresShipping, mode],
+  );
   const form = useForm<CheckoutValues>({
     initial: initialCheckoutValues(checkoutConfig),
     fieldOrder,
     fieldIds,
   });
+  const values = useMemo(
+    () => ({ ...form.values, [SHIPPING_METHOD_FIELD]: methodCode }),
+    [form.values, methodCode],
+  );
   const prefilled = useRef(false);
   const { setValues } = form;
 
@@ -506,12 +653,41 @@ export function CheckoutPage({ exponent }: { exponent: number }) {
     if (cartStore.getState().status !== "loading") void cartStore.refresh();
   }, [checkout, cartStore]);
 
+  // The delivery options depend on the destination the shopper typed and on the pickup point they chose (for the carrier's
+  // estimate). A cart change is followed by the shipping store itself.
+  const wantsDelivery = cart !== null && cart.lines.length > 0 && cart.requiresShipping;
+  const country = form.values[COUNTRY_FIELD] ?? "";
+  const cityRef = form.values[SHIPPING_CITY_FIELD] ?? "";
+  const pointRef = form.values[SHIPPING_POINT_FIELD] ?? "";
+  useEffect(() => {
+    if (!wantsDelivery) return;
+    void shipping.read({ country, cityRef, pickupPointRef: pointRef });
+  }, [shipping, wantsDelivery, country, cityRef, pointRef]);
+  useEffect(() => () => shipping.dispose(), [shipping]);
+
+  // A new answer: choose the first available method when none is chosen, and a country some method serves.
+  const answer = shippingState.answer;
+  useEffect(() => {
+    if (answer === null) return;
+    setMethodCode((current) => methodToChoose(answer.options, current) ?? current);
+    setValues((current) => {
+      const next = countryToChoose(
+        answer.options,
+        current[COUNTRY_FIELD] ?? "",
+        checkoutConfig.defaultCountry,
+      );
+      return next === null ? current : { ...current, [COUNTRY_FIELD]: next };
+    });
+  }, [answer, setValues]);
+
   useEffect(() => {
     if (account.session.status !== "signedIn" || prefilled.current) return;
     prefilled.current = true;
     const { customer } = account.session;
     setValues((current) => prefillFromCustomer(current, customer));
   }, [account.session, setValues]);
+
+  const chosen = answer?.options.find((option) => option.methodCode === methodCode);
 
   return (
     <CheckoutPageView
@@ -521,24 +697,61 @@ export function CheckoutPage({ exponent }: { exponent: number }) {
       config={checkoutConfig}
       cartState={cartState}
       checkout={checkoutState}
+      shipping={shippingState}
       signedIn={signedIn}
-      values={form.values}
+      values={values}
       failure={form.failure}
       pending={form.pending || checkoutState.pending}
       summaryRef={form.summaryRef}
       ordersHref={ordersHref}
       signInHref={loginHref(locale, `/${locale}/checkout`)}
+      pickup={
+        chosen?.providerCode == null ? null : (
+          <PickupPointFields
+            // A new method (maybe another carrier) starts its pickers over.
+            key={chosen.methodCode}
+            t={t}
+            locale={locale}
+            providerCode={chosen.providerCode}
+            values={values}
+            failure={form.failure}
+            ids={fieldIds}
+            onValueChange={form.setValue}
+          />
+        )
+      }
       onValueChange={form.setValue}
+      onSelectMethod={(code) => {
+        if (code === methodCode) return;
+        checkout.forgetShippingConsent();
+        // The city and the point belong to the method (and its carrier): a new method starts without them.
+        setMethodCode(code);
+        setValues((current) => ({
+          ...current,
+          [SHIPPING_CITY_FIELD]: "",
+          [SHIPPING_CITY_NAME_FIELD]: "",
+          [SHIPPING_POINT_FIELD]: "",
+          [SHIPPING_POINT_TEXT_FIELD]: "",
+        }));
+      }}
       onAcknowledge={() => void checkout.acknowledge()}
       onConfirmTotal={() => checkout.confirmTotal()}
+      onConfirmShipping={() => checkout.confirmShipping()}
+      onRetryShipping={() => void shipping.refresh()}
       onRetryCart={() => void cartStore.refresh()}
       onSubmit={(event) =>
         form.submit(event, {
-          required: requiredCheckoutFields({ signedIn, requiresShipping }, checkoutConfig),
+          required: requiredCheckoutFields(
+            { signedIn, requiresShipping, delivery: mode },
+            checkoutConfig,
+          ),
           leaves: true,
-          run: async (values) => {
+          run: async (submitted) => {
             setOrdersHref(null);
-            const result = await checkout.submit(values, { signedIn });
+            const result = await checkout.submit(
+              { ...submitted, [SHIPPING_METHOD_FIELD]: methodCode },
+              { signedIn },
+            );
             if (result.kind === "placed" || result.kind === "cartEmpty") {
               router.replace(result.href);
               return null;

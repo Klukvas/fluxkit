@@ -1,4 +1,4 @@
-import type { Cart, StoreClient } from "@fluxkit/api-client";
+import type { Cart, Money, StoreClient } from "@fluxkit/api-client";
 import type { Locale } from "@fluxkit/ui";
 import type { CheckoutConfig } from "../config/checkout";
 import { hasPriceChange } from "./cart-model";
@@ -11,13 +11,27 @@ import {
   type CheckoutOutcome,
   type LineError,
 } from "./checkout-attempt";
-import { buildCheckoutBody, type CheckoutValues } from "./checkout-form";
+import {
+  SHIPPING_METHOD_FIELD,
+  SHIPPING_POINT_FIELD,
+  buildCheckoutBody,
+  type CheckoutValues,
+  type DeliverySelection,
+} from "./checkout-form";
 import { clientFailure, type Failure } from "./failure";
+import { deliveryPlan, type DeliveryPlan } from "./shipping-model";
+import type { ShippingStore } from "./shipping-store";
 
 /**
  * The checkout page's state and its one action, submitting (plan step 7). The cart is the shared cart store's
  * (`lib/cart-store.ts`): the page shows it, and `expectedTotal` is the total of the cart in the store AT SUBMIT TIME,
  * so it is always the most recent cart the shopper sees. Money is never computed here.
+ *
+ * Shipping (shipping plan step 10): when the shop has an active method and the cart ships goods, the order is delivered
+ * with the chosen option of `GET /store/shipping/options` and `expectedTotal` is that option's own server `total` (NEVER the
+ * cart's total plus a price, never a sum). With no method in the shop the submit is exactly the one without shipping. A
+ * `409 shipping_changed` re-reads the options and waits for the shopper to agree to the new price (`shippingConsent`); it
+ * is never resubmitted by itself.
  *
  * - A submit while one is in flight returns the same promise (one request); the key makes a repeat harmless anyway.
  * - Blocked without a request: the cart is loading, empty or not purchasable, a line shows a price change that was not
@@ -26,12 +40,29 @@ import { clientFailure, type Failure } from "./failure";
  */
 
 export type CheckoutBlock =
-  "loading" | "empty" | "notPurchasable" | "pricesChanged" | "confirmTotal";
+  | "loading"
+  | "empty"
+  | "notPurchasable"
+  | "pricesChanged"
+  | "confirmTotal"
+  | "shippingLoading"
+  | "shippingError"
+  | "confirmShipping"
+  | "shippingMethod";
+
+/** What the shopper agreed to before a `409 shipping_changed`: the method and the price and total they had seen. */
+export interface ShippingConsent {
+  methodCode: string;
+  previousTotal: Money;
+  previousPrice: Money;
+}
 
 export interface CheckoutState {
   pending: boolean;
   /** Set by a `409 cart_changed`: the cart (and total) changed and the shopper must confirm it before the next submit. */
   needsConfirmation: boolean;
+  /** Set by a `409 shipping_changed`: the delivery price changed and the shopper must agree to the new one first. */
+  shippingConsent: ShippingConsent | null;
   /** Lines refused by `checkout_refused`, for the cart they were refused in (another cart shows none). */
   lineErrors: { cart: Cart | null; errors: readonly LineError[] } | null;
   /** False once the attempt could not be kept in `sessionStorage`; the page warns that a reload loses it. */
@@ -43,6 +74,7 @@ export interface CheckoutState {
 export const initialCheckoutState: CheckoutState = {
   pending: false,
   needsConfirmation: false,
+  shippingConsent: null,
   lineErrors: null,
   attemptPersistent: true,
   insecure: false,
@@ -53,19 +85,37 @@ export type SubmitResult =
   | { kind: "blocked"; reason: CheckoutBlock }
   | { kind: "insecure"; failure: Failure };
 
-/** Why the order cannot be submitted now, or `null`. Flags of the API only; nothing about money is compared. */
-export function checkoutBlock(cart: Cart | null, state: CheckoutState): CheckoutBlock | null {
+/**
+ * Why the order cannot be submitted now, or `null`. Flags of the API and the delivery plan only; nothing about money is
+ * compared or added.
+ */
+export function checkoutBlock(
+  cart: Cart | null,
+  state: CheckoutState,
+  delivery: DeliveryPlan,
+): CheckoutBlock | null {
   if (cart === null) return "loading";
   if (cart.lines.length === 0) return "empty";
   if (!cart.purchasable) return "notPurchasable";
   if (hasPriceChange(cart)) return "pricesChanged";
+  if (delivery.kind === "blocked" && delivery.reason === "loading") return "shippingLoading";
+  if (delivery.kind === "blocked" && delivery.reason === "error") return "shippingError";
   if (state.needsConfirmation) return "confirmTotal";
+  // The consent belongs to the method it was asked for; a method that is not orderable any more has nothing to confirm.
+  if (
+    delivery.kind === "ship" &&
+    state.shippingConsent?.methodCode === delivery.option.methodCode
+  ) {
+    return "confirmShipping";
+  }
+  if (delivery.kind === "blocked") return "shippingMethod";
   return null;
 }
 
 export interface CheckoutStoreOptions {
   client: Pick<StoreClient, "checkout">;
   cart: CartStore;
+  shipping: ShippingStore;
   locale: Locale;
   config: CheckoutConfig;
   /** Creates the attempt manager on the first submit (browser only); throws `InsecureContextError` without Web Crypto. */
@@ -80,6 +130,10 @@ export interface CheckoutStore {
   submit(values: CheckoutValues, context: { signedIn: boolean }): Promise<SubmitResult>;
   /** The shopper accepts the cart and total shown after a `cart_changed`. */
   confirmTotal(): void;
+  /** The shopper accepts the delivery price shown after a `shipping_changed`. */
+  confirmShipping(): void;
+  /** The shopper chose another method: the consent that was asked for the old one is moot. */
+  forgetShippingConsent(): void;
   /** `POST /store/cart/acknowledge` through the cart store; an acknowledged cart is also a confirmed one. */
   acknowledge(): Promise<void>;
 }
@@ -87,7 +141,7 @@ export interface CheckoutStore {
 const NO_STORE = { cache: "no-store" } as const;
 
 export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStore {
-  const { client, cart, locale, config } = options;
+  const { client, cart, shipping, locale, config } = options;
   let state = initialCheckoutState;
   let manager: AttemptManager | null = null;
   let inFlight: Promise<SubmitResult> | null = null;
@@ -112,7 +166,11 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
     }
   }
 
-  function apply(outcome: CheckoutOutcome, attempt: AttemptManager): void {
+  function apply(
+    outcome: CheckoutOutcome,
+    attempt: AttemptManager,
+    consent: ShippingConsent | null,
+  ): void {
     if (outcome.attempt === "clear") attempt.clear();
     const persistent = attempt.isPersistent();
     switch (outcome.kind) {
@@ -130,6 +188,21 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
           lineErrors: null,
         });
         return;
+      case "shippingChanged":
+        // The price the shopper agreed to is gone: read the options again and ask. Nothing is sent by itself.
+        void shipping.refresh();
+        set({
+          pending: false,
+          attemptPersistent: persistent,
+          shippingConsent: consent,
+          lineErrors: null,
+        });
+        return;
+      case "shippingRejected":
+        // The shop and the form disagree about delivery (a method was added or removed meanwhile): show what is true now.
+        void shipping.refresh();
+        set({ pending: false, attemptPersistent: persistent });
+        return;
       case "refused":
         set({
           pending: false,
@@ -146,9 +219,22 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
     }
   }
 
+  /** The delivery the form's values choose, for a plan that can be ordered. */
+  function selectionOf(values: CheckoutValues, plan: DeliveryPlan): DeliverySelection | null {
+    if (plan.kind !== "ship") return null;
+    return {
+      methodCode: plan.option.methodCode,
+      kind: plan.option.kind,
+      pickupPointRef: (values[SHIPPING_POINT_FIELD] ?? "").trim(),
+    };
+  }
+
   async function run(values: CheckoutValues, signedIn: boolean): Promise<SubmitResult> {
     const current = cart.getState().cart;
-    const block = checkoutBlock(current, state);
+    const methodCode = (values[SHIPPING_METHOD_FIELD] ?? "").trim();
+    const plan: DeliveryPlan =
+      current === null ? { kind: "none" } : deliveryPlan(current, shipping.getState(), methodCode);
+    const block = checkoutBlock(current, state, plan);
     if (block !== null || current === null) return { kind: "blocked", reason: block ?? "loading" };
     const attempt = attempts();
     if (attempt === null) {
@@ -162,7 +248,9 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
           signedIn,
           requiresShipping: current.requiresShipping,
           locale,
-          expectedTotal: current.total,
+          // The server's total of the chosen option; the cart's total only when there is no delivery to choose.
+          expectedTotal: plan.kind === "ship" ? plan.total : current.total,
+          delivery: selectionOf(values, plan),
         },
         config,
       );
@@ -175,7 +263,17 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
         answer = { thrown };
       }
       const outcome = checkoutOutcome(answer, { locale, signedIn });
-      apply(outcome, attempt);
+      apply(
+        outcome,
+        attempt,
+        plan.kind === "ship" && plan.option.price !== null
+          ? {
+              methodCode: plan.option.methodCode,
+              previousTotal: plan.total,
+              previousPrice: plan.option.price,
+            }
+          : null,
+      );
       return outcome;
     } catch (error) {
       // A bug or an abort: free the form and stay loud.
@@ -206,6 +304,12 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
     },
     confirmTotal() {
       if (state.needsConfirmation) set({ needsConfirmation: false });
+    },
+    confirmShipping() {
+      if (state.shippingConsent !== null) set({ shippingConsent: null });
+    },
+    forgetShippingConsent() {
+      if (state.shippingConsent !== null) set({ shippingConsent: null });
     },
     async acknowledge() {
       const outcome = await cart.acknowledge();

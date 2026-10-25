@@ -5,6 +5,7 @@ import {
   buildCheckoutBody,
   checkoutFieldIds,
   checkoutFieldOrder,
+  countryNames,
   countryOptions,
   initialCheckoutValues,
   prefillFromCustomer,
@@ -167,5 +168,115 @@ describe("countryOptions", () => {
       { code: "PL", name: "Poland" },
     ]);
     expect(countryOptions(config, "uk")[0]).toEqual({ code: "UA", name: "Україна" });
+  });
+});
+
+describe("delivery fields (shipping plan step 10)", () => {
+  const guest = { signedIn: false, requiresShipping: true, locale: "uk", expectedTotal: total };
+  const contact = ["email", "phone", "firstName", "lastName"];
+
+  it("orders the fields by what the chosen method needs", () => {
+    expect(checkoutFieldOrder(true, checkoutConfig, "none")).toEqual(
+      checkoutFieldOrder(true, checkoutConfig),
+    );
+    expect(checkoutFieldOrder(true, checkoutConfig, "unchosen")).toEqual([
+      ...contact,
+      "shipping.methodCode",
+    ]);
+    expect(checkoutFieldOrder(true, checkoutConfig, "store_pickup")).toEqual([
+      ...contact,
+      "shipping.methodCode",
+    ]);
+    expect(checkoutFieldOrder(true, checkoutConfig, "pickup_point")).toEqual([
+      ...contact,
+      "shipping.methodCode",
+      "shipping.cityRef",
+      "shipping.pickupPointRef",
+    ]);
+    expect(checkoutFieldOrder(true, checkoutConfig, "address").slice(0, 6)).toEqual([
+      ...contact,
+      "shipping.methodCode",
+      "shippingAddress.countryCode",
+    ]);
+    // A cart that ships nothing has no delivery fields, whatever the mode says.
+    expect(checkoutFieldOrder(false, checkoutConfig, "address")).toEqual(contact);
+  });
+
+  it("requires the address for an address method, the city and the point for a pickup point, nothing for a store pickup", () => {
+    const required = (delivery: Parameters<typeof checkoutFieldOrder>[2]) =>
+      requiredCheckoutFields({ signedIn: true, requiresShipping: true, delivery }, checkoutConfig);
+    const base = ["phone", "firstName", "lastName"];
+    expect(required("none")).toEqual([
+      ...base,
+      "shippingAddress.countryCode",
+      "shippingAddress.city",
+      "shippingAddress.line1",
+    ]);
+    expect(required("address")).toEqual(required("none"));
+    expect(required("pickup_point")).toEqual([
+      ...base,
+      "shipping.cityRef",
+      "shipping.pickupPointRef",
+    ]);
+    expect(required("store_pickup")).toEqual(base);
+    expect(required("unchosen")).toEqual(base);
+  });
+
+  it("gives the delivery fields ids for the error summary and the focus", () => {
+    const ids = checkoutFieldIds(checkoutConfig);
+    expect(ids["shipping.methodCode"]).toBe("checkout-shipping-methodCode");
+    expect(ids["shipping.cityRef"]).toBe("checkout-shipping-cityRef");
+    expect(ids["shipping.pickupPointRef"]).toBe("checkout-shipping-pickupPointRef");
+  });
+
+  it("sends the method with the address for an address method, the point alone for a pickup point, the method alone for a store pickup", () => {
+    const address = buildCheckoutBody(
+      filled(),
+      {
+        ...guest,
+        delivery: { methodCode: "courier", kind: "address", pickupPointRef: "leftover" },
+      },
+      checkoutConfig,
+    );
+    expect(address.shipping).toEqual({ methodCode: "courier" });
+    expect(address.shippingAddress).toBeDefined();
+    const point = buildCheckoutBody(
+      filled(),
+      { ...guest, delivery: { methodCode: "branch", kind: "pickup_point", pickupPointRef: "p1" } },
+      checkoutConfig,
+    );
+    expect(point.shipping).toEqual({ methodCode: "branch", pickupPointRef: "p1" });
+    expect("shippingAddress" in point).toBe(false);
+    const store = buildCheckoutBody(
+      filled(),
+      { ...guest, delivery: { methodCode: "store", kind: "store_pickup", pickupPointRef: "" } },
+      checkoutConfig,
+    );
+    expect(store.shipping).toEqual({ methodCode: "store" });
+    expect("shippingAddress" in store).toBe(false);
+  });
+
+  it("sends no shipping member without a delivery, and none for a cart that ships nothing", () => {
+    expect("shipping" in buildCheckoutBody(filled(), guest, checkoutConfig)).toBe(false);
+    const digital = buildCheckoutBody(
+      filled(),
+      {
+        ...guest,
+        requiresShipping: false,
+        delivery: { methodCode: "courier", kind: "address", pickupPointRef: "" },
+      },
+      checkoutConfig,
+    );
+    expect("shipping" in digital).toBe(false);
+    expect("shippingAddress" in digital).toBe(false);
+  });
+});
+
+describe("countryNames", () => {
+  it("names any list of country codes in the page's locale", () => {
+    expect(countryNames(["PL", "DE"], "en")).toEqual([
+      { code: "PL", name: "Poland" },
+      { code: "DE", name: "Germany" },
+    ]);
   });
 });

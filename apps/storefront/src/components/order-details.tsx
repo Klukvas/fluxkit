@@ -13,6 +13,7 @@ import { formatDateTime } from "../lib/date";
 import { failureText } from "../lib/failure";
 import { canCancel, orderMoney, orderStatusKey, type ShopMoney } from "../lib/order-model";
 import type { CancelState } from "../lib/order-store";
+import { orderShippingPriceText, pickupKindKey, shipmentStatusKey } from "../lib/shipping-text";
 
 /**
  * One order as the guest order page and the customer's order page show it: status (text and badge, never colour alone),
@@ -27,6 +28,16 @@ const STATUS_BADGE: Record<string, BadgeVariant> = {
   fulfilled: "success",
   cancelled: "neutral",
   expired: "neutral",
+};
+
+/** The status of a carrier waybill is always text; the badge colour is only a hint. */
+const SHIPMENT_BADGE: Record<string, BadgeVariant> = {
+  delivered: "success",
+  arrived: "success",
+  returning: "warning",
+  returned: "warning",
+  cancelled: "neutral",
+  failed: "danger",
 };
 
 function countryName(code: string, locale: string): string {
@@ -73,19 +84,28 @@ export function OrderDetailsView({
 }: OrderDetailsViewProps) {
   const money = (value: Order["total"]) => orderMoney(value, shop, locale);
   const status = t(orderStatusKey(order.status));
-  const totals: [string, Order["total"]][] = [
-    ["order.totals.subtotal", order.subtotal],
-    // Zero lines are left out: no shipping, discount or tax exists yet (docs/api/orders.md). Not money math, a display rule.
-    ...(order.shippingTotal.amount === 0
-      ? []
-      : [["order.totals.shipping", order.shippingTotal] as [string, Order["total"]]]),
+  // The delivery row shows the snapshot's own wording (Free, or paid to the carrier on delivery); without a snapshot (an order
+  // placed before shipping existed) a zero is left out as before. Not money math, a display rule.
+  const totals: [string, string][] = [
+    ["order.totals.subtotal", money(order.subtotal)],
+    ...(order.shipping !== null
+      ? [
+          ["order.totals.shipping", orderShippingPriceText(t, order.shipping, money)] as [
+            string,
+            string,
+          ],
+        ]
+      : order.shippingTotal.amount === 0
+        ? []
+        : [["order.totals.shipping", money(order.shippingTotal)] as [string, string]]),
     ...(order.discountTotal.amount === 0
       ? []
-      : [["order.totals.discount", order.discountTotal] as [string, Order["total"]]]),
+      : [["order.totals.discount", money(order.discountTotal)] as [string, string]]),
     ...(order.taxTotal.amount === 0
       ? []
-      : [["order.totals.tax", order.taxTotal] as [string, Order["total"]]]),
+      : [["order.totals.tax", money(order.taxTotal)] as [string, string]]),
   ];
+  const point = order.shipping?.destination ?? null;
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-foreground">
@@ -217,7 +237,7 @@ export function OrderDetailsView({
           {totals.map(([key, value]) => (
             <div key={key} className="flex justify-between gap-6">
               <dt className="text-muted-foreground">{t(key)}</dt>
-              <dd>{money(value)}</dd>
+              <dd className="text-end">{value}</dd>
             </div>
           ))}
           <div className="flex justify-between gap-6 font-semibold">
@@ -226,6 +246,71 @@ export function OrderDetailsView({
           </div>
         </dl>
       </section>
+
+      {order.shipping === null ? null : (
+        <section aria-labelledby="order-shipping-heading" className="flex flex-col gap-3">
+          <h2 id="order-shipping-heading" className="text-xl font-semibold text-foreground">
+            {t("order.shipping.title")}
+          </h2>
+          <dl className="flex max-w-xl flex-col gap-2 text-foreground">
+            <div className="flex flex-wrap gap-x-6">
+              <dt className="w-40 text-muted-foreground">{t("order.shipping.method")}</dt>
+              <dd>{order.shipping.title}</dd>
+            </div>
+            <div className="flex flex-wrap gap-x-6">
+              <dt className="w-40 text-muted-foreground">{t("order.shipping.price")}</dt>
+              <dd>{orderShippingPriceText(t, order.shipping, money)}</dd>
+            </div>
+            {point === null ? null : (
+              <div className="flex flex-wrap gap-x-6">
+                <dt className="w-40 text-muted-foreground">{t("order.shipping.point")}</dt>
+                <dd className="min-w-0 break-words">
+                  {t("order.shipping.pointValue", {
+                    kind: t(pickupKindKey(point.kind)),
+                    number: point.number,
+                    city: point.cityName,
+                    description: point.description,
+                  })}
+                </dd>
+              </div>
+            )}
+          </dl>
+          {order.shipments.length === 0 ? null : (
+            <section aria-labelledby="order-shipments-heading" className="flex flex-col gap-2">
+              <h3 id="order-shipments-heading" className="font-semibold text-foreground">
+                {t("order.shipments.title")}
+              </h3>
+              <ul aria-label={t("order.shipments.label")} className="flex flex-col gap-2">
+                {order.shipments.map((shipment, index) => (
+                  <li key={`${shipment.trackingNumber}-${String(index)}`}>
+                    <Card className="p-4">
+                      <dl className="flex flex-col gap-2 text-foreground">
+                        <div className="flex flex-wrap gap-x-6">
+                          <dt className="w-40 text-muted-foreground">
+                            {t("order.shipment.tracking")}
+                          </dt>
+                          {/* The number as the carrier gave it: a code, never translated. */}
+                          <dd className="break-all">{shipment.trackingNumber}</dd>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-6">
+                          <dt className="w-40 text-muted-foreground">
+                            {t("order.shipment.status")}
+                          </dt>
+                          <dd>
+                            <Badge variant={SHIPMENT_BADGE[shipment.status] ?? "neutral"}>
+                              {t(shipmentStatusKey(shipment.status))}
+                            </Badge>
+                          </dd>
+                        </div>
+                      </dl>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="order-contact-heading" className="flex flex-col gap-2">
         <h2 id="order-contact-heading" className="text-xl font-semibold text-foreground">
@@ -238,7 +323,7 @@ export function OrderDetailsView({
         <p className="text-foreground">{order.contact.phone}</p>
       </section>
 
-      {order.shippingAddress === null ? null : (
+      {order.shippingAddress === null || point !== null ? null : (
         <section aria-labelledby="order-address-heading" className="flex flex-col gap-2">
           <h2 id="order-address-heading" className="text-xl font-semibold text-foreground">
             {t("order.address.title")}

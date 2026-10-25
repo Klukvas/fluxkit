@@ -189,6 +189,70 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     }
   });
 
+  // Shipping plan step 10: the browser talks to our API only, and never adds money.
+  const shippingFiles = sources.filter((file) =>
+    /(^|\/)(shipping-(?:model|store|text)|lookup-source|combobox-model|delivery-section|lookup-combobox)\.tsx?$/.test(
+      file.path,
+    ),
+  );
+
+  it("finds the delivery sources it guards", () => {
+    expect(shippingFiles.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "delivery-section.tsx"),
+        join("components", "lookup-combobox.tsx"),
+        join("lib", "combobox-model.ts"),
+        join("lib", "lookup-source.ts"),
+        join("lib", "shipping-model.ts"),
+        join("lib", "shipping-store.ts"),
+        join("lib", "shipping-text.ts"),
+      ].sort(),
+    );
+  });
+
+  it("reaches carriers through our API and the typed client only: no fetch, no absolute URL, no other transport in the delivery code", () => {
+    for (const file of shippingFiles) {
+      const text = code(file.text);
+      expect(text, file.path).not.toMatch(
+        /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
+      );
+    }
+  });
+
+  it("calls the options read from the shipping store and the carrier lookups from the pickers, nowhere else", () => {
+    const callers = (name: string) =>
+      sources
+        .filter((file) => new RegExp(`\\.${name}\\(`).test(code(file.text)))
+        .map((file) => file.path);
+    expect(callers("getShippingOptions")).toEqual([join("lib", "shipping-store.ts")]);
+    expect(callers("listShippingCities")).toEqual([join("components", "delivery-section.tsx")]);
+    expect(callers("listShippingPickupPoints")).toEqual([
+      join("components", "delivery-section.tsx"),
+    ]);
+  });
+
+  it("never does arithmetic on an amount: the expected total is the server's or the cart's, copied", () => {
+    const arithmetic = /\.amount\s*[-+*/%]|[-+*/%]\s*[\w.]+\.amount\b/;
+    for (const file of sources) {
+      expect(arithmetic.test(code(file.text)), `${file.path} computes with an amount`).toBe(false);
+    }
+  });
+
+  it("chooses the expected total in the checkout store only (the form and the attempt hash just copy it)", () => {
+    const setters = sources.filter((file) => /\bexpectedTotal\s*:/.test(code(file.text)));
+    expect(setters.map((file) => file.path).sort()).toEqual(
+      [
+        join("lib", "checkout-attempt.ts"),
+        join("lib", "checkout-form.ts"),
+        join("lib", "checkout-store.ts"),
+      ].sort(),
+    );
+    const store = sources.find((file) => file.path === join("lib", "checkout-store.ts"));
+    expect(code(store?.text ?? "")).toMatch(
+      /expectedTotal:\s*plan\.kind === "ship" \? plan\.total : current\.total/,
+    );
+  });
+
   it("never logs a token, a link, a body or form values in the checkout and order code", () => {
     const files = sources.filter((file) =>
       /(^|\/)(checkout|order|guest-order|account-orders|locale-switcher)[^/]*\.tsx?$/.test(
