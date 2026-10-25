@@ -16,6 +16,8 @@ Purpose: a TEST-ONLY shipping provider with code `fake` (ADR 0029, shipping plan
 - `setTrackingStatus(trackingNumber, status, carrierStatusCode)`: what `track` answers next for that waybill (default `created` / `FAKE_CREATED`).
 - `reset()` forgets waybills and planned failures, restores `now` and restarts the numbering (`FAKE000001`); `waybillCount()` counts waybills.
 
+Settings: none of its own; `validateSettings` accepts any object (the API's bounded check still applies). `fetchLabel` answers only when the tracking number belongs to the ref. Its spec runs the core contract check `checkShippingProviderContract`.
+
 Fixed data: cities `fake-city-kyiv`, `fake-city-lviv`, `fake-city-odesa`; points `<city ref>-point-1` (branch) and `-point-2` (locker), all in `UA`, also found one by one with `findPickupPoint`; estimate `FAKE_ESTIMATE_MINOR_UNITS` (7500) in the currency of the declared value; waybills `fake-waybill-NNNNNN` with tracking number `FAKENNNNNN`.
 
 How to remove: delete `packages/providers/_fake` and remove `fake` from `SHIPPING_PROVIDERS_ENABLED`. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted`).

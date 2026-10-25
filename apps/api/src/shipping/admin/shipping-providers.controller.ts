@@ -53,7 +53,7 @@ export class ShippingProvidersController {
   @ApiOperation({
     summary: "Replace the non-secret settings of a shipping provider",
     description:
-      "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused.",
+      "Records who saved them. Credentials never belong here: they are read from the environment, and a key named like a credential is refused. A bounded check first, then the provider's own rules (`validateSettings`): their issues are `400 validation_failed` at `settings.<path>`.",
   })
   @ApiParam(CODE_PARAM)
   @ApiZodBody(putProviderSettingsSchema)

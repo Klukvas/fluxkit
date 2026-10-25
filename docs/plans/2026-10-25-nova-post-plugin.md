@@ -20,7 +20,7 @@ A shop that sets `SHIPPING_PROVIDERS_ENABLED=nova_post` and `NOVA_POST_API_KEY` 
 - zod `4.6.7` is pinned in `packages/core` and `packages/config`: the plugin uses exactly that version (no new package in the lockfile; a new importer only).
 
 ## Evidence used (besides the shipping plan's section 8 and its production run)
-**Rerun on production, 2026-10-25 21:50 UTC** (the owner's go; findings files kept outside the repository, facts copied here; recorded in the shipping plan with this step):
+**Rerun on production, 2026-10-25 21:50 UTC** (run by the orchestrator; findings files kept outside the repository, facts copied here and into the shipping plan, section "Rerun 2026-10-25 21:50 UTC"):
 | H | Result |
 |---|---|
 | H12 | `GET /divisions?settlementIds[]=` works: Kyiv (settlement `118064` in the run) has 8 031 working divisions: `Postomat` 7 387, `PostBranch` 393, `CargoBranch` 35, `PUDO` 211; pages do not overlap |

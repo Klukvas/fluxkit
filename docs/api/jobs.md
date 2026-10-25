@@ -49,7 +49,7 @@ An upload (`POST /admin/media/uploads`) that no product media list or brand logo
 
 ## Shipment tracking (job 8, ADR 0029 decision 10)
 
-Carriers offer no webhooks (as far as known for Nova Poshta), so the scheduler polls. The job runs LAST in the tick: it makes outbound network calls, so a slow carrier delays nothing time-critical; the events it writes are delivered by the next tick's dispatcher.
+Tracking is by polling (Nova Post offers webhooks, but they are not used in v1: ADR 0030 decision 5). The job runs LAST in the tick: it makes outbound network calls, so a slow carrier delays nothing time-critical; the events it writes are delivered by the next tick's dispatcher.
 
 - **Which shipments.** Polled statuses only (a waybill exists and the status is not terminal), `next_track_at <= now`, a provider that is loaded and has the `tracking` capability (a shipment of a disabled provider is not polled and not counted), ordered by `(next_track_at, id)`, through the partial index `shipment_next_track_at_idx`. The page query takes no lock and is continued by a `(next_track_at, id)` cursor, so a row that could not be written is not read again in the same run.
 - **Per page and provider:** ONE `track({trackingNumbers, phones})` call (the phones are the orders' recipient phones, which the carrier may need for a full answer; they go to the carrier only, never into a log), with the API's limit of 15 s (`SHIPMENT_CALL_TIMEOUTS.trackingMs`, core `SHIPPING_PROVIDER_TIMEOUTS_MS.waybill`). No transaction or lock is held during the call. An answer entry that breaks the port (a number not asked for, a code that is not `CARRIER_CODE_PATTERN`, a status that is not a carrier status) is dropped and counted in a warning.
