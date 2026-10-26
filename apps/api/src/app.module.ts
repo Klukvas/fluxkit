@@ -19,6 +19,7 @@ import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
+import { EmailTemplatesModule } from "./email/templates/index.js";
 import { EmailRegistryModule, type LoadedEmailProvider } from "./email/registry/index.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
@@ -113,6 +114,7 @@ export class AppModule {
         ShippingAdminModule,
         ShipmentsModule,
         EmailRegistryModule.register(options.emailProviders ?? []),
+        EmailTemplatesModule,
         ...options.features.map((feature) => feature.module),
       ],
     };
