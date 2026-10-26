@@ -45,7 +45,25 @@ export class BackInStockTemplate {
 | `customer.password_changed` | account | `{}` | none | a successful reset confirmation |
 | `customer.verify_email` | account | `{tokenId}` | `{STOREFRONT_PUBLIC_URL}/{locale}/account/verify-email#t=<token>` | registration and `POST /store/account/verify-email/resend` |
 
-An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`. Reserved for step 8 (core `EMAIL_TEMPLATE_KEYS`): `order.placed`, `order.paid`, `order.cancelled`, `order.expired`, `shipment.created`.
+An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`.
+
+### Order and shipment mails (email plan step 8)
+
+Category `order`. The variables are frozen when the mail is enqueued: ids, the order number, minor units with the currency code, and texts already resolved for the order's locale (cut to 100 code points). Money is formatted at render time (`1234.56 UAH`, `1500 JPY`, `12.345 KWD`: the exact decimal of the currency's exponent plus the ISO code, no symbol, no float math); times as `YYYY-MM-DD HH:mm UTC`. An override keeps the variable shape (the same schema) and may restyle or reword everything else.
+
+| Key | Variables | Link (`context.links.action`) | Sent when |
+|---|---|---|---|
+| `order.placed` | `orderNumber`, `currency`, `lines` (at most 12 of `{title, variantTitle, quantity, lineTotal}`), `moreLines`, `subtotal`, `shipping`, `discount` (the amount taken off, 0 when none), `total`, `delivery` `{methodTitle, pickupPoint {number, city, description}, city}`, `payBefore` (ISO instant while the order awaits payment, else `null`) | guest: `{STOREFRONT_PUBLIC_URL}/{locale}/order/{number}#t=<token>`, the token derived at render time from `ORDER_TOKEN_SECRET`, the order id and the order's stored idempotency key (ADR 0023; never stored in the outbox); customer: `{STOREFRONT_PUBLIC_URL}/{locale}/account/orders/{number}`; `null` for an order whose account was deleted | domain event `order.placed` |
+| `order.paid` | `orderNumber`, `currency`, `total` | as `order.placed` | `order.paid` |
+| `order.cancelled` | `orderNumber` | none | `order.cancelled` |
+| `order.expired` | `orderNumber` | none | `order.expired` |
+| `shipment.created` | `orderNumber`, `carrierTitle` (the shipping method's title of the order snapshot, or `null`), `trackingNumber` | as `order.placed` | `shipment.created` (the carrier accepted the waybill) |
+
+Rules for all of them:
+- **One row per event and template:** `dedupe_key = <eventId>:<template key>`, so a redelivered event makes no second mail. `order.fulfilled`, `shipment.status_changed` and `shipment.cancelled` send nothing in v1.
+- **Recipient** is the order's contact email (a guest's or a customer's; an order of a deactivated or deleted account still gets its mails), `recipient_kind` is `guest` when the order has a guest token and `customer` otherwise, the locale is the order's. An order without an address, an address no mail header can carry (non-ASCII) and `EMAIL_PROVIDER=none` enqueue nothing (a code-only log).
+- **Guest link:** the API derives it while rendering and checks that the derived token's hash equals the order's stored hash; a mismatch (the secret changed since checkout) fails the mail `render_failed` instead of sending a link that opens nothing. A temporary database failure while reading the order retries the mail (it is not recorded `failed`).
+- An override of an order template must print `context.links.action` when it is not `null` and must not print any variable the schema does not list.
 
 ## Not part of the contract
 
