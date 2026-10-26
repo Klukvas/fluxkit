@@ -105,21 +105,29 @@ describe("dispatchDomainEvents and the handler discovery (real Postgres, injecte
   describe("discovery", () => {
     it("finds the marked providers at startup by the event types they declare", () => {
       const registry = deps.handlers as DomainEventHandlerRegistry;
-      expect(registry.handlersFor("order.expired").map((entry) => entry.name)).toEqual([
+      // `OrderMailHandler` is the core handler that enqueues the order mails (email plan step 8); a fixture's own
+      // providers are found next to it, in discovery order.
+      const names = (type: string) => registry.handlersFor(type).map((entry) => entry.name);
+      expect(names("order.expired").filter((name) => name !== "OrderMailHandler")).toEqual([
         "FixtureHandlerA",
         "FixtureHandlerB",
       ]);
-      expect(registry.handlersFor("order.paid").map((entry) => entry.name)).toEqual([
+      expect(names("order.paid").filter((name) => name !== "OrderMailHandler")).toEqual([
         "FixtureHandlerA",
       ]);
-      expect(registry.handlersFor("order.cancelled")).toEqual([]);
-      expect(registry.names().sort()).toEqual(["FixtureHandlerA", "FixtureHandlerB"]);
+      expect(names("order.cancelled")).toEqual(["OrderMailHandler"]);
+      expect(names("order.fulfilled")).toEqual([]);
+      expect(registry.names().sort()).toEqual([
+        "FixtureHandlerA",
+        "FixtureHandlerB",
+        "OrderMailHandler",
+      ]);
     });
 
-    it("an application without a marked provider has no handlers", async () => {
+    it("an application without a plugin's marked provider has only the core handlers", async () => {
       const plain = await startApp();
       try {
-        expect(plain.app.get(DomainEventHandlerRegistry).names()).toEqual([]);
+        expect(plain.app.get(DomainEventHandlerRegistry).names()).toEqual(["OrderMailHandler"]);
       } finally {
         await plain.app.close();
       }
