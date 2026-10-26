@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { exponentOf, type StoreLocale } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
+import { EmailProviderRegistry, type EmailProviderSource } from "../../email/registry/index.js";
 import { toPage, type Page } from "../../common/pagination.js";
 import { notFound, validationFailed } from "../../common/problem.js";
 import {
@@ -89,6 +90,7 @@ export class StoreService {
     private readonly store: StoreRepository,
     @Inject(LOCALE_CONFIG) private readonly config: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(EmailProviderRegistry) private readonly email: EmailProviderSource,
   ) {}
 
   /** What the storefront needs to format money and pick a language; nothing else (no thresholds, no internals). */
@@ -99,6 +101,7 @@ export class StoreService {
       pricesIncludeTax: this.pricing.pricesIncludeTax,
       defaultLocale: this.config.defaultLocale,
       locales: [...this.config.locales],
+      emailDelivery: this.email.deliveryEnabled(),
     };
   }
 

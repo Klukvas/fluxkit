@@ -117,6 +117,8 @@ export interface AdminConfig {
   supportedCurrencies: AdminSupportedCurrency[];
   pricesIncludeTax: boolean;
   lowStockThreshold: number;
+  /** False when no email provider is configured (`EMAIL_PROVIDER=none`): the Email area shows setup steps, no actions. */
+  emailDelivery: boolean;
   media: AdminMediaConfig;
 }
 

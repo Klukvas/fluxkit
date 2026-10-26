@@ -45,6 +45,8 @@ describe("GET /admin/config (real app, real Postgres)", () => {
       supportedCurrencies: CURRENCY_CODES.map((code) => ({ code, exponent: CURRENCIES[code] })),
       pricesIncludeTax: true,
       lowStockThreshold: 5,
+      // The specs run without an email provider (EMAIL_PROVIDER=none).
+      emailDelivery: false,
       // The specs run without a media driver (an environment-less app has uploads switched off).
       media: {
         uploadsEnabled: false,

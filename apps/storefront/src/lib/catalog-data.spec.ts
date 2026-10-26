@@ -18,6 +18,7 @@ const config = {
   pricesIncludeTax: true,
   defaultLocale: "uk",
   locales: ["uk", "en"],
+  emailDelivery: false,
 };
 
 function problem(status: number, code: ProblemDetails["code"]): CatalogOutcome<never> {

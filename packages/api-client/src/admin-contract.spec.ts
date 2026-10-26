@@ -176,6 +176,7 @@ const config: Shape<AdminConfig> = {
     supportedCurrencies: { array: { object: { code: "string", exponent: "integer" } } },
     pricesIncludeTax: "boolean",
     lowStockThreshold: "integer",
+    emailDelivery: "boolean",
     media: {
       object: {
         uploadsEnabled: "boolean",

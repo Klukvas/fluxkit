@@ -1362,6 +1362,10 @@
                       "maximum": 9007199254740991,
                       "description": "`LOW_STOCK_THRESHOLD`."
                     },
+                    "emailDelivery": {
+                      "type": "boolean",
+                      "description": "False when `EMAIL_PROVIDER=none`: no mail is sent, so the admin Email area shows the setup steps and no actions."
+                    },
                     "media": {
                       "type": "object",
                       "properties": {
@@ -1396,6 +1400,7 @@
                     "supportedCurrencies",
                     "pricesIncludeTax",
                     "lowStockThreshold",
+                    "emailDelivery",
                     "media"
                   ],
                   "additionalProperties": false
@@ -1434,7 +1439,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies, stock threshold and upload limits, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail is configured, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -17965,6 +17970,10 @@
                       "items": {
                         "type": "string"
                       }
+                    },
+                    "emailDelivery": {
+                      "type": "boolean",
+                      "description": "False when `EMAIL_PROVIDER=none` (no mail is sent): hide \"forgot password\" and the verification prompts. True when a mail provider is configured."
                     }
                   },
                   "required": [
@@ -17972,7 +17981,8 @@
                     "currencyExponent",
                     "pricesIncludeTax",
                     "defaultLocale",
-                    "locales"
+                    "locales",
+                    "emailDelivery"
                   ],
                   "additionalProperties": false
                 }

@@ -49,6 +49,7 @@ const config: AdminConfig = {
   supportedCurrencies: [{ code: "UAH", exponent: 2 }],
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  emailDelivery: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,

@@ -29,6 +29,7 @@ const config: AdminConfig = {
   ],
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  emailDelivery: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,
