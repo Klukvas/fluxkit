@@ -29,6 +29,8 @@ export const RATE_LIMITS = Object.freeze({
   passwordResetEmail: { maxAttempts: 5, windowMinutes: 15 },
   passwordResetConfirm: { maxAttempts: 10, windowMinutes: 10 },
   verificationResend: { maxAttempts: 3, windowMinutes: 60 },
+  // ADR 0031 decision 15: the admin test send goes through the real provider (quota and reputation); per signed-in admin user.
+  emailTest: { maxAttempts: 5, windowMinutes: 60 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -60,6 +62,7 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     passwordResetEmail: "account",
     passwordResetConfirm: "clientAddress",
     verificationResend: "account",
+    emailTest: "adminUser",
   },
 );
 

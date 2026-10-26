@@ -243,7 +243,8 @@
                           "orders.write",
                           "customers.read",
                           "customers.write",
-                          "shipping.manage"
+                          "shipping.manage",
+                          "email.manage"
                         ]
                       }
                     }
@@ -18181,6 +18182,1406 @@
         "summary": "Download the printable label of a waybill (PDF)",
         "tags": ["admin-orders"],
         "x-fluxkit-permission": "orders.read"
+      }
+    },
+    "/admin/email/status": {
+      "get": {
+        "description": "Works with `EMAIL_PROVIDER=none` too (`configured: false`). Counts of the last 24 hours by status, the open queue, the oldest pending mail and the most common error codes. Never the provider key.",
+        "operationId": "EmailMessagesController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "configured": {
+                      "type": "boolean",
+                      "description": "`false` with `EMAIL_PROVIDER=none`: nothing is sent and test send and resend answer 409."
+                    },
+                    "providerCode": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "from": {
+                      "nullable": true,
+                      "description": "`EMAIL_FROM`.",
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": ["address", "displayName"],
+                      "additionalProperties": false
+                    },
+                    "replyTo": {
+                      "nullable": true,
+                      "description": "`EMAIL_REPLY_TO`.",
+                      "type": "object",
+                      "properties": {
+                        "address": {
+                          "type": "string"
+                        },
+                        "displayName": {
+                          "nullable": true,
+                          "type": "string"
+                        }
+                      },
+                      "required": ["address", "displayName"],
+                      "additionalProperties": false
+                    },
+                    "since": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "Start of the 24 hour window of `counts` and `errorCodes`."
+                    },
+                    "counts": {
+                      "type": "object",
+                      "properties": {
+                        "pending": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sending": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "sent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "failed": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "unknown": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "cancelled": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["pending", "sending", "sent", "failed", "unknown", "cancelled"],
+                      "additionalProperties": false,
+                      "description": "Mails whose last change is inside the window, by status."
+                    },
+                    "queueDepth": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Mails pending or sending now, whatever their age."
+                    },
+                    "oldestPendingAt": {
+                      "nullable": true,
+                      "description": "Creation time of the oldest pending mail.",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "errorCodes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "required": ["code", "count"],
+                        "additionalProperties": false
+                      },
+                      "description": "The most common `lastErrorCode` of the window (codes only; at most 10)."
+                    }
+                  },
+                  "required": [
+                    "configured",
+                    "providerCode",
+                    "from",
+                    "replyTo",
+                    "since",
+                    "counts",
+                    "queueDepth",
+                    "oldestPendingAt",
+                    "errorCodes"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Mail delivery status",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/test": {
+      "post": {
+        "description": "Queues the `admin.test` mail through the configured provider and starts the first attempt after the answer; follow it in the list. The recipient is the caller's own email, there is no address in the body. 5 per hour per admin user. 409 `rule_violation` `email_not_configured` without a provider, `address_undeliverable` when the admin's address cannot go into a mail header.",
+        "operationId": "EmailMessagesController_sendTest",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "locale": {
+                    "description": "Language of the test mail (one of `LOCALES`). Default: `DEFAULT_LOCALE`.",
+                    "type": "string",
+                    "pattern": "^[a-z]{2,8}(-[a-z]{2,8})*$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The queued test mail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messageId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The new outbox row. The attempt to send it starts after the answer."
+                    }
+                  },
+                  "required": ["messageId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a test mail to the signed-in admin's own address",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/messages": {
+      "get": {
+        "description": "The outbox with the recipient address (personal data, never logged) and the delivery codes; no rendered body exists. Filters combine with AND. `recipient` is a case-insensitive substring of the address. `createdFrom` is inclusive, `createdTo` exclusive.",
+        "operationId": "EmailMessagesController_list",
+        "parameters": [
+          {
+            "name": "createdTo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "createdFrom",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "customerId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "orderId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "recipient",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 254
+            }
+          },
+          {
+            "name": "template",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "sending", "sent", "failed", "unknown", "cancelled"]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of messages.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "templateKey": {
+                            "type": "string"
+                          },
+                          "templateVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "to": {
+                            "type": "string",
+                            "description": "The recipient address (personal data; never logged)."
+                          },
+                          "recipientKind": {
+                            "type": "string",
+                            "enum": ["customer", "guest", "admin"]
+                          },
+                          "customerId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "orderId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "adminUserId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["pending", "sending", "sent", "failed", "unknown", "cancelled"]
+                          },
+                          "attempts": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "nextAttemptAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "leaseUntil": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "deadlineAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "providerCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "providerMessageId": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "lastErrorCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "resendOf": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdByAdminId": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "sentAt": {
+                            "nullable": true,
+                            "description": "Accepted by the provider (not necessarily delivered).",
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "canCancel": {
+                            "type": "boolean",
+                            "description": "`true` while the mail is pending."
+                          },
+                          "canResend": {
+                            "type": "boolean",
+                            "description": "`true` for a final mail that is not an account mail of a customer. Does not look at the provider."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "templateKey",
+                          "templateVersion",
+                          "locale",
+                          "to",
+                          "recipientKind",
+                          "customerId",
+                          "orderId",
+                          "adminUserId",
+                          "status",
+                          "attempts",
+                          "nextAttemptAt",
+                          "leaseUntil",
+                          "deadlineAt",
+                          "providerCode",
+                          "providerMessageId",
+                          "lastErrorCode",
+                          "resendOf",
+                          "createdByAdminId",
+                          "createdAt",
+                          "sentAt",
+                          "updatedAt",
+                          "canCancel",
+                          "canResend"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "Default 50."
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List mail messages, newest first",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/messages/{id}": {
+      "get": {
+        "description": "The journal fields, codes and the deadline, and the frozen template variables redacted (`[redacted]`: every value of a `customer.*` mail, any value under a key that names a token, secret, password or link).",
+        "operationId": "EmailMessagesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Email message (outbox row) id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "templateKey": {
+                      "type": "string"
+                    },
+                    "templateVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "The recipient address (personal data; never logged)."
+                    },
+                    "recipientKind": {
+                      "type": "string",
+                      "enum": ["customer", "guest", "admin"]
+                    },
+                    "customerId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "adminUserId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "sending", "sent", "failed", "unknown", "cancelled"]
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "nextAttemptAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "leaseUntil": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "deadlineAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "providerCode": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "providerMessageId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "lastErrorCode": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "resendOf": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdByAdminId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "sentAt": {
+                      "nullable": true,
+                      "description": "Accepted by the provider (not necessarily delivered).",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "canCancel": {
+                      "type": "boolean",
+                      "description": "`true` while the mail is pending."
+                    },
+                    "canResend": {
+                      "type": "boolean",
+                      "description": "`true` for a final mail that is not an account mail of a customer. Does not look at the provider."
+                    },
+                    "variables": {
+                      "type": "object",
+                      "additionalProperties": {},
+                      "description": "The frozen template input, redacted: every value of a `customer.*` mail and any value under a key that names a token, secret, password, key or link is `[redacted]`."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "templateKey",
+                    "templateVersion",
+                    "locale",
+                    "to",
+                    "recipientKind",
+                    "customerId",
+                    "orderId",
+                    "adminUserId",
+                    "status",
+                    "attempts",
+                    "nextAttemptAt",
+                    "leaseUntil",
+                    "deadlineAt",
+                    "providerCode",
+                    "providerMessageId",
+                    "lastErrorCode",
+                    "resendOf",
+                    "createdByAdminId",
+                    "createdAt",
+                    "sentAt",
+                    "updatedAt",
+                    "canCancel",
+                    "canResend",
+                    "variables"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one mail message",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/messages/{id}/resend": {
+      "post": {
+        "description": "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it.",
+        "operationId": "EmailMessagesController_resend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Email message (outbox row) id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The new message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "messageId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The new outbox row. The attempt to send it starts after the answer."
+                    }
+                  },
+                  "required": ["messageId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send a message again as a new message",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/messages/{id}/cancel": {
+      "post": {
+        "description": "`pending` -> `cancelled`, decided under the row lock: of two cancels, or of a cancel and the sender's claim, exactly one wins. Any other status answers 409 `invalid_transition` (a message being sent or already final cannot be cancelled). Works with `EMAIL_PROVIDER=none` too.",
+        "operationId": "EmailMessagesController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Email message (outbox row) id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The cancelled message.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "templateKey": {
+                      "type": "string"
+                    },
+                    "templateVersion": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "to": {
+                      "type": "string",
+                      "description": "The recipient address (personal data; never logged)."
+                    },
+                    "recipientKind": {
+                      "type": "string",
+                      "enum": ["customer", "guest", "admin"]
+                    },
+                    "customerId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "orderId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "adminUserId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["pending", "sending", "sent", "failed", "unknown", "cancelled"]
+                    },
+                    "attempts": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "nextAttemptAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "leaseUntil": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "deadlineAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "providerCode": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "providerMessageId": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "lastErrorCode": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "resendOf": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdByAdminId": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "sentAt": {
+                      "nullable": true,
+                      "description": "Accepted by the provider (not necessarily delivered).",
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "canCancel": {
+                      "type": "boolean",
+                      "description": "`true` while the mail is pending."
+                    },
+                    "canResend": {
+                      "type": "boolean",
+                      "description": "`true` for a final mail that is not an account mail of a customer. Does not look at the provider."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "templateKey",
+                    "templateVersion",
+                    "locale",
+                    "to",
+                    "recipientKind",
+                    "customerId",
+                    "orderId",
+                    "adminUserId",
+                    "status",
+                    "attempts",
+                    "nextAttemptAt",
+                    "leaseUntil",
+                    "deadlineAt",
+                    "providerCode",
+                    "providerMessageId",
+                    "lastErrorCode",
+                    "resendOf",
+                    "createdByAdminId",
+                    "createdAt",
+                    "sentAt",
+                    "updatedAt",
+                    "canCancel",
+                    "canResend"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Cancel a pending message",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/templates": {
+      "get": {
+        "description": "Key, version, category and the locales with their own texts, sorted by key. Works with `EMAIL_PROVIDER=none`.",
+        "operationId": "EmailTemplatesAdminController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The templates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "category": {
+                            "type": "string",
+                            "enum": ["account", "order"]
+                          },
+                          "locales": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "description": "Locales the template has its own texts for."
+                          }
+                        },
+                        "required": ["key", "version", "category", "locales"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List the registered mail templates",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
+      }
+    },
+    "/admin/email/templates/{key}/preview": {
+      "get": {
+        "description": "Renders the template's own sample variables (never real customer data, no database read, nothing sent) with placeholder links. `html` is a JSON string: show it only in a sandboxed `iframe srcdoc`. The answer is `no-store`, `nosniff` and carries a CSP that allows nothing. Works with `EMAIL_PROVIDER=none`.",
+        "operationId": "EmailTemplatesAdminController_preview",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "description": "A registered template key, for example `order.placed`.",
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+            }
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "description": "One of `LOCALES`. Default: `DEFAULT_LOCALE`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rendered preview.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": ["account", "order"]
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "subject": {
+                      "type": "string"
+                    },
+                    "html": {
+                      "type": "string",
+                      "description": "The HTML part as a JSON string, rendered from the template's sample variables. Show it only in a sandboxed `iframe srcdoc` (`sandbox=\"\"`), never inline."
+                    },
+                    "text": {
+                      "type": "string",
+                      "description": "The plain-text part."
+                    }
+                  },
+                  "required": ["key", "version", "category", "locale", "subject", "html", "text"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Preview a template with its sample variables",
+        "tags": ["admin-email"],
+        "x-fluxkit-permission": "email.manage"
       }
     },
     "/store/categories": {

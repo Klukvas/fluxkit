@@ -22,6 +22,13 @@ import type {
   AdminCustomer,
   AdminCustomerList,
   AdminCustomerSummary,
+  AdminEmailMessage,
+  AdminEmailMessageDetail,
+  AdminEmailMessageId,
+  AdminEmailMessageList,
+  AdminEmailPreview,
+  AdminEmailStatus,
+  AdminEmailTemplateList,
   AdminInventoryLevel,
   AdminLocationList,
   AdminLoginResult,
@@ -148,6 +155,7 @@ const me: Shape<AdminMe> = {
           "customers.read",
           "customers.write",
           "shipping.manage",
+          "email.manage",
         ],
       },
     },
@@ -555,6 +563,94 @@ const shippingProviderCheck: Shape<AdminShippingProviderCheck> = {
   ],
 };
 
+// email
+const emailStatus = {
+  enum: ["pending", "sending", "sent", "failed", "unknown", "cancelled"],
+} as const;
+const emailMailbox: Shape<Admin.AdminEmailMailbox> = {
+  object: { address: "string", displayName: { nullable: "string" } },
+};
+const emailStatusResult: Shape<AdminEmailStatus> = {
+  object: {
+    configured: "boolean",
+    providerCode: { nullable: "string" },
+    from: { nullable: emailMailbox },
+    replyTo: { nullable: emailMailbox },
+    since: "string",
+    counts: {
+      object: {
+        pending: "integer",
+        sending: "integer",
+        sent: "integer",
+        failed: "integer",
+        unknown: "integer",
+        cancelled: "integer",
+      },
+    },
+    queueDepth: "integer",
+    oldestPendingAt: { nullable: "string" },
+    errorCodes: { array: { object: { code: "string", count: "integer" } } },
+  },
+};
+const emailMessage: Shape<AdminEmailMessage> = {
+  object: {
+    id: "string",
+    templateKey: "string",
+    templateVersion: "integer",
+    locale: "string",
+    to: "string",
+    recipientKind: { enum: ["customer", "guest", "admin"] },
+    customerId: { nullable: "string" },
+    orderId: { nullable: "string" },
+    adminUserId: { nullable: "string" },
+    status: emailStatus,
+    attempts: "integer",
+    nextAttemptAt: "string",
+    leaseUntil: { nullable: "string" },
+    deadlineAt: "string",
+    providerCode: { nullable: "string" },
+    providerMessageId: { nullable: "string" },
+    lastErrorCode: { nullable: "string" },
+    resendOf: { nullable: "string" },
+    createdByAdminId: { nullable: "string" },
+    createdAt: "string",
+    sentAt: { nullable: "string" },
+    updatedAt: "string",
+    canCancel: "boolean",
+    canResend: "boolean",
+  },
+};
+const emailMessageDetail: Shape<AdminEmailMessageDetail> = {
+  object: { ...emailMessage.object, variables: json },
+};
+const emailMessageList: Shape<AdminEmailMessageList> = paginated(emailMessage);
+const emailMessageId: Shape<AdminEmailMessageId> = { object: { messageId: "string" } };
+const emailTemplateList: Shape<AdminEmailTemplateList> = {
+  object: {
+    items: {
+      array: {
+        object: {
+          key: "string",
+          version: "integer",
+          category: { enum: ["account", "order"] },
+          locales: { array: "string" },
+        },
+      },
+    },
+  },
+};
+const emailPreview: Shape<AdminEmailPreview> = {
+  object: {
+    key: "string",
+    version: "integer",
+    category: { enum: ["account", "order"] },
+    locale: "string",
+    subject: "string",
+    html: "string",
+    text: "string",
+  },
+};
+
 // brands, categories
 const brand: Shape<AdminBrand> = {
   object: {
@@ -866,6 +962,9 @@ const body = {
   putShippingProviderSettings: {
     object: { settings: json },
   } satisfies Shape<Admin.PutAdminShippingProviderSettingsBody>,
+  sendTestEmail: {
+    object: { locale: { optional: "string" } },
+  } satisfies Shape<Admin.SendAdminTestEmailBody>,
   createBrand: {
     object: {
       name: localized,
@@ -1107,6 +1206,14 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getShippingProviderSettings: shippingProviderSettings,
   putShippingProviderSettings: shippingProviderSettings,
   checkShippingProvider: shippingProviderCheck,
+  getEmailStatus: emailStatusResult,
+  sendTestEmail: emailMessageId,
+  listEmailMessages: emailMessageList,
+  getEmailMessage: emailMessageDetail,
+  resendEmailMessage: emailMessageId,
+  cancelEmailMessage: emailMessage,
+  listEmailTemplates: emailTemplateList,
+  previewEmailTemplate: emailPreview,
   createBrand: brand,
   listBrands: brandList,
   getBrand: brand,
@@ -1211,6 +1318,14 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getShippingProviderSettings: null,
   putShippingProviderSettings: body.putShippingProviderSettings,
   checkShippingProvider: null,
+  getEmailStatus: null,
+  sendTestEmail: body.sendTestEmail,
+  listEmailMessages: null,
+  getEmailMessage: null,
+  resendEmailMessage: null,
+  cancelEmailMessage: null,
+  listEmailTemplates: null,
+  previewEmailTemplate: null,
   createBrand: body.createBrand,
   listBrands: null,
   getBrand: null,
@@ -1300,6 +1415,7 @@ const KNOWN_PERMISSIONS: readonly AdminOperationPermission[] = [
   "customers.read",
   "customers.write",
   "shipping.manage",
+  "email.manage",
   "authenticated",
   "public",
   "denied",

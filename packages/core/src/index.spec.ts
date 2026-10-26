@@ -272,6 +272,7 @@ describe("public entry point", () => {
       "customers.read",
       "customers.write",
       "shipping.manage",
+      "email.manage",
     ]) {
       expect(core.PERMISSIONS, permission).toContain(permission);
     }

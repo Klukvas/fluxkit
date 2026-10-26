@@ -19,6 +19,7 @@ import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
+import { EmailAdminModule } from "./email/admin/index.js";
 import { EmailHandlersModule } from "./email/handlers/index.js";
 import {
   DEFAULT_EMAIL_DELIVERY_TUNING,
@@ -135,6 +136,7 @@ export class AppModule {
           (options.emailProviders ?? []).length > 0,
         ),
         EmailHandlersModule,
+        EmailAdminModule,
         ...options.features.map((feature) => feature.module),
       ],
     };

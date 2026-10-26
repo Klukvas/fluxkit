@@ -28,35 +28,35 @@ export type GreetingVariables = z.infer<typeof greetingSchema>;
 
 const KEY = "fixture.greeting";
 
-function catalogs(version: string): Readonly<Record<string, EmailMessages>> {
+function catalogs(version: string, key = KEY): Readonly<Record<string, EmailMessages>> {
   return {
     uk: {
-      [`${KEY}.subject`]: `Вітаємо, {name}${version}`,
-      [`${KEY}.line`]: "{title} x {quantity}",
+      [`${key}.subject`]: `Вітаємо, {name}${version}`,
+      [`${key}.line`]: "{title} x {quantity}",
     },
     en: {
-      [`${KEY}.subject`]: `Hello, {name}${version}`,
-      [`${KEY}.line`]: "{title} x {quantity}",
+      [`${key}.subject`]: `Hello, {name}${version}`,
+      [`${key}.line`]: "{title} x {quantity}",
     },
   };
 }
 
-function greeting(version: number, suffix: string): EmailTemplate<GreetingVariables> {
+function greeting(version: number, suffix: string, key = KEY): EmailTemplate<GreetingVariables> {
   return {
-    key: KEY,
+    key,
     version,
     category: "order",
     variablesSchema: greetingSchema,
     sampleVariables: { name: "Olena", lines: [{ title: "Mug", quantity: 2 }] },
     render(variables: GreetingVariables, context: EmailRenderContext) {
       const lines = variables.lines.map((line) =>
-        formatMessage(context.messages, `${KEY}.line`, {
+        formatMessage(context.messages, `${key}.line`, {
           title: line.title,
           quantity: String(line.quantity),
         }),
       );
       return {
-        subject: formatMessage(context.messages, `${KEY}.subject`, { name: variables.name }),
+        subject: formatMessage(context.messages, `${key}.subject`, { name: variables.name }),
         html: html`<p data-name="${variables.name}">${variables.name}</p>
           <ul>
             ${lines.map((line) => html`<li>${line}</li>`)}
@@ -91,8 +91,30 @@ export class FixtureGreetingDuplicate {
   readonly catalogs = catalogs("");
 }
 
+/**
+ * A template whose SAMPLE variables are hostile markup: the preview must print them escaped (ADR 0031 decision 14, plan
+ * step 9). The fixture is wrong on purpose only in its sample; its render uses the `html` tag like every template.
+ */
+export const HOSTILE_SAMPLE_NAME = `<script>alert("x")</script><img src=x onerror=alert(1)>"'&`;
+
+@Injectable()
+@SetMetadata(EMAIL_TEMPLATE_METADATA, emailTemplateMetadata("fixture.hostile"))
+export class FixtureHostileTemplate {
+  readonly template: EmailTemplate<GreetingVariables> = {
+    ...greeting(1, "", "fixture.hostile"),
+    sampleVariables: {
+      name: HOSTILE_SAMPLE_NAME,
+      lines: [{ title: HOSTILE_SAMPLE_NAME, quantity: 1 }],
+    },
+  };
+  readonly catalogs = catalogs("", "fixture.hostile");
+}
+
 @Module({ providers: [FixtureGreetingTemplate] })
 class FixtureGreetingModule {}
+
+@Module({ providers: [FixtureHostileTemplate] })
+class FixtureHostileModule {}
 
 @Module({ providers: [FixtureGreetingTemplate, FixtureGreetingOverride] })
 class FixtureGreetingOverrideModule {}
@@ -101,11 +123,14 @@ class FixtureGreetingOverrideModule {}
 class FixtureGreetingDuplicateModule {}
 
 /** Loaded like an enabled feature: `startApp({ extraFeatures: [fixtureEmailTemplates("plain")] })`. */
-export function fixtureEmailTemplates(kind: "plain" | "override" | "duplicate"): LoadedFeature {
+export function fixtureEmailTemplates(
+  kind: "plain" | "override" | "duplicate" | "hostile",
+): LoadedFeature {
   const modules: Record<typeof kind, Type<unknown>> = {
     plain: FixtureGreetingModule,
     override: FixtureGreetingOverrideModule,
     duplicate: FixtureGreetingDuplicateModule,
+    hostile: FixtureHostileModule,
   };
   return { name: `fixture-email-${kind}`, module: modules[kind] };
 }

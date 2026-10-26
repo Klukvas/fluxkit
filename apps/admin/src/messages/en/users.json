@@ -13,6 +13,7 @@
   "user.permission.customers.read": "See customer accounts",
   "user.permission.customers.write": "Deactivate, activate and unlock customer accounts",
   "user.permission.shipping.manage": "Manage shipping methods, rates and carrier settings",
+  "user.permission.email.manage": "Manage email delivery: see the status and sent mails with their recipients, send a test, resend or cancel a mail, preview templates",
   "user.password.hint": "{min} to {max} characters, not the user's email address. No other rules.",
   "user.password.met": "Met:",
   "user.password.notMet": "Not met:",
