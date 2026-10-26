@@ -119,6 +119,7 @@ describe("logout, me and change-password", () => {
           "customers.read",
           "customers.write",
           "shipping.manage",
+          "email.manage",
         ],
       });
       await db.update(adminUser).set({ isActive: false }).where(eq(adminUser.id, user.id));
