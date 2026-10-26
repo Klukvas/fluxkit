@@ -85,7 +85,7 @@ export const emailMessage = pgTable(
   {
     id: id(),
     templateKey: text("template_key").notNull(),
-    // The version the template had at enqueue; a different version at render ends the mail `unknown` or `failed`.
+    // The version the template had at enqueue (ADR 0031 decision 7: rendering must give the same bytes on every attempt).
     templateVersion: integer("template_version").notNull(),
     locale: text("locale").notNull(),
     // The one recipient, normalized; validated by core before the insert and again here.
