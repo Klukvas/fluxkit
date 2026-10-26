@@ -2,7 +2,9 @@
 
 - `src/tokens.css` - the design tokens for the `light` and `dark` themes (the one place to rebrand). Colors are 6-digit hex (the contrast test requires it).
 - `src/tailwind.css` - maps tokens to Tailwind semantic utilities (`success`, `warning` and `ring` included).
-- `src/index.ts` - theme names and default.
+- `src/index.ts` - theme names and default; re-exports `emailTheme`.
+- `src/email-theme.ts` - `emailTheme` (ADR 0031 decision 14, email plan step 2): deeply frozen email-safe values for inline styles in mail (mail clients do not support CSS variables): the light colors, font stacks and radii of `tokens.css` (radii in px), plus mail-only spacing, font sizes, line height and content width (600). Contract: `docs/contracts/theme-tokens.md`, "Email theme". Must not hold a value that is not a token's light value except the mail-only groups.
+- `src/email-theme.spec.ts` - guard: every `emailTheme` color, font and radius equals the light token of the same name (rem to px), every light token is in `emailTheme` or listed as not used in mail with a reason (`border-input`, `ring`, `shadow-card`), only 6-digit hex colors and px sizes, no CSS variables, no characters that could leave a `style` attribute, deeply frozen.
 - `src/theme.spec.ts` - tokens are identical across themes, every mapped token exists, every color token is mapped.
 - `src/contrast.spec.ts` - WCAG 2.x contrast of the documented token pairs in both themes (`docs/contracts/theme-tokens.md`), including `border-input` (3:1), and a scan of the class strings of `packages/ui`, `apps/storefront` and `apps/admin/src` (one list of scanned roots; each must hold at least one source file) that fails when a component uses a color pair that is neither listed nor declared decorative.
 - `src/design-guard.spec.ts` - fails if `packages/ui`, `apps/storefront` or `apps/admin` contain hex/rgb colors, Tailwind palette colors, color utilities that are not token names, arbitrary values or inline styles; also checks that every scanned root holds files (the admin app and the admin components of `packages/ui` included) and that its own patterns catch known violations.
