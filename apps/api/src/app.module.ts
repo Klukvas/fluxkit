@@ -19,7 +19,11 @@ import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
-import { EmailTemplatesModule } from "./email/templates/index.js";
+import {
+  DEFAULT_EMAIL_DELIVERY_TUNING,
+  EmailOutboxModule,
+  type EmailDeliveryConfig,
+} from "./email/outbox/index.js";
 import { EmailRegistryModule, type LoadedEmailProvider } from "./email/registry/index.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
@@ -47,6 +51,8 @@ export interface AppModuleOptions {
   shippingProviders?: LoadedShippingProvider[];
   /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
   emailProviders?: LoadedEmailProvider[];
+  /** `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL` and the sender tuning; defaults to none of them (no provider). */
+  emailDelivery?: EmailDeliveryConfig;
   locale: LocaleConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (UAH, prices include tax, threshold 5). */
   pricing?: PricingConfig;
@@ -75,6 +81,14 @@ export interface AppModuleOptions {
   /** Default true. Command-line tools pass false so they change nothing but their own target. */
   cleanExpiredSessionsOnBootstrap?: boolean;
 }
+
+/** A caller without an environment (tests, the OpenAPI export, the commands) and no provider: nothing to send from. */
+const DISABLED_EMAIL_DELIVERY: EmailDeliveryConfig = Object.freeze({
+  from: null,
+  replyTo: null,
+  storefrontPublicUrl: null,
+  tuning: DEFAULT_EMAIL_DELIVERY_TUNING,
+});
 
 @Module({})
 export class AppModule {
@@ -114,7 +128,10 @@ export class AppModule {
         ShippingAdminModule,
         ShipmentsModule,
         EmailRegistryModule.register(options.emailProviders ?? []),
-        EmailTemplatesModule,
+        EmailOutboxModule.register(
+          options.emailDelivery ?? DISABLED_EMAIL_DELIVERY,
+          (options.emailProviders ?? []).length > 0,
+        ),
         ...options.features.map((feature) => feature.module),
       ],
     };

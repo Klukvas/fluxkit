@@ -27,6 +27,7 @@ import {
   loadFeatures,
   type LoadedFeature,
 } from "./features/feature-loader.js";
+import { DEFAULT_EMAIL_DELIVERY_TUNING, type EmailDeliveryTuning } from "./email/outbox/index.js";
 import {
   DEFAULT_EMAIL_PROVIDERS_DIR,
   loadEmailProvider,
@@ -45,6 +46,9 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       AppEnv,
       | "defaultLocale"
       | "emailProvider"
+      | "emailFrom"
+      | "emailReplyTo"
+      | "storefrontPublicUrl"
       | "enabledShippingProviders"
       | "locales"
       | "adminCookieSecure"
@@ -89,6 +93,8 @@ export interface CreateAppOptions {
   extraEmailProviders?: LoadedEmailProvider[];
   /** Tests only: where provider packages are looked up for the email provider (default `<repo>/packages/providers`). */
   emailProvidersDir?: string;
+  /** Tests only: a shorter send timeout, another pacing (default `DEFAULT_EMAIL_DELIVERY_TUNING`). */
+  emailDeliveryTuning?: Partial<EmailDeliveryTuning>;
   /** Tests only: shorter limits for the shipment provider calls (production uses the core waybill limit). */
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: where provider packages are looked up (default `<repo>/packages/providers`). */
@@ -141,6 +147,12 @@ export async function createApp(
       features: [...features, ...(options.extraFeatures ?? [])],
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
       emailProviders: [...emailProviders, ...(options.extraEmailProviders ?? [])],
+      emailDelivery: {
+        from: env.emailFrom ?? null,
+        replyTo: env.emailReplyTo ?? null,
+        storefrontPublicUrl: env.storefrontPublicUrl ?? null,
+        tuning: { ...DEFAULT_EMAIL_DELIVERY_TUNING, ...options.emailDeliveryTuning },
+      },
       locale: {
         defaultLocale: env.defaultLocale ?? DEFAULT_LOCALE,
         locales: env.locales ?? DEFAULT_LOCALES,
