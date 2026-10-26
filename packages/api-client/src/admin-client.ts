@@ -12,12 +12,21 @@ import type {
   AdminShipmentCreateResult,
   AdminShipmentList,
   CreateAdminShipmentBody,
+  AdminEmailMessage,
+  AdminEmailMessageDetail,
+  AdminEmailMessageId,
+  AdminEmailMessageList,
+  AdminEmailMessageStatus,
+  AdminEmailPreview,
+  AdminEmailStatus,
+  AdminEmailTemplateList,
   AdminShippingMethod,
   AdminShippingMethodList,
   AdminShippingProviderCheck,
   AdminShippingProviderSettings,
   CreateAdminShippingMethodBody,
   PutAdminShippingProviderSettingsBody,
+  SendAdminTestEmailBody,
   UpdateAdminShippingMethodBody,
   AdminBrandList,
   AdminCategory,
@@ -144,6 +153,25 @@ export interface AdminListCategoriesOptions extends AdminPageOptions {
 
 export interface AdminListReservationsOptions extends AdminPageOptions {
   status?: ReservationStatus;
+}
+
+export interface AdminListEmailMessagesOptions extends AdminPageOptions {
+  status?: AdminEmailMessageStatus;
+  /** An exact template key, for example `order.placed`. */
+  template?: string;
+  /** A case-insensitive substring of the recipient address; `%` and `_` are literal. */
+  recipient?: string;
+  orderId?: string;
+  customerId?: string;
+  /** ISO 8601 instant, inclusive. */
+  createdFrom?: string;
+  /** ISO 8601 instant, exclusive. */
+  createdTo?: string;
+}
+
+export interface AdminPreviewEmailTemplateOptions extends CallOptions {
+  /** One of `LOCALES`. Default: `DEFAULT_LOCALE`. */
+  locale?: string;
 }
 
 type Result<T> = Promise<AdminResult<T>>;
@@ -300,6 +328,22 @@ export interface AdminClient {
   ): Result<AdminShippingProviderSettings>;
   /** A failed check is still a `200` with `{ok: false, reason, providerCodes}`. */
   checkShippingProvider(code: string, options?: CallOptions): Result<AdminShippingProviderCheck>;
+
+  // email (ADR 0031 decision 15; every operation needs `email.manage`)
+  getEmailStatus(options?: CallOptions): Result<AdminEmailStatus>;
+  /** To the signed-in admin's own address (no recipient in the body). `409 rule_violation` `email_not_configured` without a provider. */
+  sendTestEmail(body: SendAdminTestEmailBody, options?: CallOptions): Result<AdminEmailMessageId>;
+  listEmailMessages(options?: AdminListEmailMessagesOptions): Result<AdminEmailMessageList>;
+  getEmailMessage(id: string, options?: CallOptions): Result<AdminEmailMessageDetail>;
+  /** A NEW message; `409 rule_violation` `message_open`, `not_resendable`, `template_unavailable`, `variables_invalid`, `email_not_configured`. */
+  resendEmailMessage(id: string, options?: CallOptions): Result<AdminEmailMessageId>;
+  /** `pending` to `cancelled`; `409 invalid_transition` for any other status. */
+  cancelEmailMessage(id: string, options?: CallOptions): Result<AdminEmailMessage>;
+  listEmailTemplates(options?: CallOptions): Result<AdminEmailTemplateList>;
+  previewEmailTemplate(
+    key: string,
+    options?: AdminPreviewEmailTemplateOptions,
+  ): Result<AdminEmailPreview>;
 
   // brands
   createBrand(body: CreateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
@@ -559,6 +603,18 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("putShippingProviderSettings", { pathParams: { code }, body, options: opts }),
     checkShippingProvider: (code, opts) =>
       call("checkShippingProvider", { pathParams: { code }, options: opts }),
+
+    getEmailStatus: (opts) => call("getEmailStatus", { options: opts }),
+    sendTestEmail: (body, opts) => call("sendTestEmail", { body, options: opts }),
+    listEmailMessages: (opts) => call("listEmailMessages", { options: opts }),
+    getEmailMessage: (id, opts) => call("getEmailMessage", { pathParams: { id }, options: opts }),
+    resendEmailMessage: (id, opts) =>
+      call("resendEmailMessage", { pathParams: { id }, options: opts }),
+    cancelEmailMessage: (id, opts) =>
+      call("cancelEmailMessage", { pathParams: { id }, options: opts }),
+    listEmailTemplates: (opts) => call("listEmailTemplates", { options: opts }),
+    previewEmailTemplate: (key, opts) =>
+      call("previewEmailTemplate", { pathParams: { key }, options: opts }),
 
     createBrand: (body, opts) => call("createBrand", { body, options: opts }),
     listBrands: (opts) => call("listBrands", { options: opts }),

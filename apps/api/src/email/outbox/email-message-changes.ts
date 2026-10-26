@@ -66,6 +66,12 @@ export type EmailRecordResult =
    */
   | { readonly kind: "lost" };
 
+export type EmailCancelResult =
+  | { readonly kind: "cancelled"; readonly row: EmailMessageRow }
+  | { readonly kind: "not_found" }
+  /** The mail is not `pending` (claimed by a sender, or already final): nothing written. */
+  | { readonly kind: "refused"; readonly status: EmailMessageStatus };
+
 function assertTransition(
   from: EmailMessageStatus | null,
   to: EmailMessageStatus,
@@ -168,6 +174,39 @@ export class EmailMessageChanges {
           updatedAt: now,
         });
         return { kind: "expired", status: decision.to };
+      },
+      limits,
+    );
+  }
+
+  /**
+   * `pending -> cancelled` by an admin (ADR 0031 decision 5). Locks the row and waits for a sender that holds it right now,
+   * then decides on the status it finds: a claim that committed first left `sending` (refused), a cancel that committed
+   * first makes the claim skip the row (`lockClaimable`). So exactly one of cancel and claim wins, and two cancels at once
+   * give one `cancelled` and one `refused`.
+   */
+  cancel(
+    id: string,
+    now: Date,
+    limits: JobLimits = DEFAULT_JOB_LIMITS,
+  ): Promise<EmailCancelResult> {
+    return withJobTransaction(
+      this.database,
+      async (tx): Promise<EmailCancelResult> => {
+        const row = await this.outbox.lock(tx, id);
+        if (row === undefined) {
+          return { kind: "not_found" };
+        }
+        const status = row.status as EmailMessageStatus;
+        if (!decideEmailTransition(status, "cancelled", "admin").ok) {
+          return { kind: "refused", status };
+        }
+        const cancelled = await this.outbox.update(tx, id, {
+          status: "cancelled",
+          leaseUntil: null,
+          updatedAt: now,
+        });
+        return { kind: "cancelled", row: cancelled };
       },
       limits,
     );

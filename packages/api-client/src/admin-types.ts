@@ -49,7 +49,8 @@ export type AdminPermission =
   | "orders.write"
   | "customers.read"
   | "customers.write"
-  | "shipping.manage";
+  | "shipping.manage"
+  | "email.manage";
 
 export interface AdminLoginBody {
   email: string;
@@ -634,6 +635,109 @@ export type AdminShippingProviderFailureReason =
 /** The result of a connection check: a typed reason and raw carrier codes, never a message or a key. */
 export type AdminShippingProviderCheck =
   { ok: true } | { ok: false; reason: AdminShippingProviderFailureReason; providerCodes: string[] };
+
+// -------------------------------------------------------------------- email
+// ADR 0031 decision 15; every operation needs `email.manage`.
+
+export type AdminEmailMessageStatus =
+  "pending" | "sending" | "sent" | "failed" | "unknown" | "cancelled";
+
+export type AdminEmailRecipientKind = "customer" | "guest" | "admin";
+
+export type AdminEmailTemplateCategory = "account" | "order";
+
+/** `EMAIL_FROM` or `EMAIL_REPLY_TO` as configured. */
+export interface AdminEmailMailbox {
+  address: string;
+  displayName: string | null;
+}
+
+export interface AdminEmailStatus {
+  /** `false` with `EMAIL_PROVIDER=none`: nothing is sent, test send and resend answer 409 `email_not_configured`. */
+  configured: boolean;
+  providerCode: string | null;
+  from: AdminEmailMailbox | null;
+  replyTo: AdminEmailMailbox | null;
+  /** Start of the 24 hour window of `counts` and `errorCodes`. */
+  since: string;
+  counts: Record<AdminEmailMessageStatus, number>;
+  /** Mails pending or sending now, whatever their age. */
+  queueDepth: number;
+  oldestPendingAt: string | null;
+  /** The most common `lastErrorCode` of the window (codes only). */
+  errorCodes: { code: string; count: number }[];
+}
+
+export interface AdminEmailMessage {
+  id: string;
+  templateKey: string;
+  templateVersion: number;
+  locale: string;
+  /** The recipient address: personal data, show it with care. */
+  to: string;
+  recipientKind: AdminEmailRecipientKind;
+  customerId: string | null;
+  orderId: string | null;
+  adminUserId: string | null;
+  status: AdminEmailMessageStatus;
+  attempts: number;
+  nextAttemptAt: string;
+  leaseUntil: string | null;
+  deadlineAt: string;
+  providerCode: string | null;
+  providerMessageId: string | null;
+  lastErrorCode: string | null;
+  resendOf: string | null;
+  createdByAdminId: string | null;
+  createdAt: string;
+  /** Accepted by the provider (not necessarily delivered). */
+  sentAt: string | null;
+  updatedAt: string;
+  /** `true` while the mail is pending. */
+  canCancel: boolean;
+  /** `true` for a final mail that is not an account mail of a customer (the provider is not looked at). */
+  canResend: boolean;
+}
+
+/** The frozen template input, redacted by the API (`[redacted]` for account mails and secret-like keys). */
+export interface AdminEmailMessageDetail extends AdminEmailMessage {
+  variables: JsonObject;
+}
+
+export type AdminEmailMessageList = Paginated<AdminEmailMessage>;
+
+/** There is no recipient: the test goes to the signed-in admin's own address. */
+export interface SendAdminTestEmailBody {
+  /** One of `LOCALES`. Default: `DEFAULT_LOCALE`. */
+  locale?: string;
+}
+
+/** The new outbox row of a test send or a resend; the first attempt starts after the answer. */
+export interface AdminEmailMessageId {
+  messageId: string;
+}
+
+export interface AdminEmailTemplate {
+  key: string;
+  version: number;
+  category: AdminEmailTemplateCategory;
+  locales: string[];
+}
+
+export interface AdminEmailTemplateList {
+  items: AdminEmailTemplate[];
+}
+
+/** `html` is a string for a sandboxed `iframe srcdoc` (`sandbox=""`), never for inline rendering. */
+export interface AdminEmailPreview {
+  key: string;
+  version: number;
+  category: AdminEmailTemplateCategory;
+  locale: string;
+  subject: string;
+  html: string;
+  text: string;
+}
 
 // --------------------------------------------------------------- categories
 

@@ -16,10 +16,12 @@ export {
   type AdminClientOptions,
   type AdminListCategoriesOptions,
   type AdminListCustomersOptions,
+  type AdminListEmailMessagesOptions,
   type AdminListOrdersOptions,
   type AdminListProductsOptions,
   type AdminListReservationsOptions,
   type AdminPageOptions,
+  type AdminPreviewEmailTemplateOptions,
   type AdminResult,
 } from "./admin-client.js";
 export type { CallOptions, FetchLike } from "./transport.js";

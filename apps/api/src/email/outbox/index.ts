@@ -20,6 +20,7 @@ export { DatabaseGuestOrderAccess } from "./guest-order-access.js";
 export {
   EmailMessageChanges,
   type ClaimedEmailMessage,
+  type EmailCancelResult,
   type EmailClaimResult,
   type EmailRecordResult,
 } from "./email-message-changes.js";

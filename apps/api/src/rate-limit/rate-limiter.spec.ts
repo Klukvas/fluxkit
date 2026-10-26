@@ -21,11 +21,12 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       passwordResetEmail: { maxAttempts: 5, windowMinutes: 15 },
       passwordResetConfirm: { maxAttempts: 10, windowMinutes: 10 },
       verificationResend: { maxAttempts: 3, windowMinutes: 60 },
+      emailTest: { maxAttempts: 5, windowMinutes: 60 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
   });
 
-  it("counts every limit per client address, except mediaUpload and shippingCheck (per admin user, ADR 0028, ADR 0029) and the per-email and per-customer limits of ADR 0031 (counted by their service)", () => {
+  it("counts every limit per client address, except mediaUpload, shippingCheck and emailTest (per admin user, ADR 0028, ADR 0029, ADR 0031) and the per-email and per-customer limits of ADR 0031 (counted by their service)", () => {
     expect(RATE_LIMIT_SUBJECTS).toEqual({
       login: "clientAddress",
       registration: "clientAddress",
@@ -41,6 +42,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       passwordResetEmail: "account",
       passwordResetConfirm: "clientAddress",
       verificationResend: "account",
+      emailTest: "adminUser",
     });
     expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });
