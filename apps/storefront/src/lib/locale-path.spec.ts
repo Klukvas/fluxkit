@@ -34,6 +34,21 @@ describe("switchLocalePath", () => {
     expect(switchLocalePath("/uk/catalog", "en", "", "t=abc")).toBe("/en/catalog");
   });
 
+  it("never copies the fragment of an emailed-link page into the other locale's link (the page scrubs its token from the address bar, a stale copy in a link would keep it in the page)", () => {
+    for (const page of ["reset-password", "verify-email"]) {
+      expect(switchLocalePath(`/uk/account/${page}`, "en", "", "#t=abc_DEF-123456789012")).toBe(
+        `/en/account/${page}`,
+      );
+      expect(switchLocalePath(`/en/account/${page}`, "uk", "?a=1", "#t=abc_DEF-123456789012")).toBe(
+        `/uk/account/${page}?a=1`,
+      );
+    }
+    // Other account pages keep a fragment like any page.
+    expect(switchLocalePath("/uk/account/forgot-password", "en", "", "#x")).toBe(
+      "/en/account/forgot-password#x",
+    );
+  });
+
   it("falls back to the locale's home for a path without a known locale", () => {
     expect(switchLocalePath("/", "en")).toBe("/en");
     expect(switchLocalePath("/fr/catalog", "en")).toBe("/en");
