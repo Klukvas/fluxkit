@@ -138,6 +138,7 @@ export function customer(overrides: Partial<Customer> = {}): Customer {
   return {
     id: "customer-1",
     email: "shopper@example.test",
+    emailVerified: false,
     firstName: "Ada",
     lastName: "Shopper",
     phone: null,

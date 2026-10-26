@@ -13,6 +13,10 @@ import type {
   CartLineNotice,
   CategoryList,
   ChangePasswordBody,
+  PasswordResetAccepted,
+  PasswordResetConfirmBody,
+  PasswordResetRequestBody,
+  VerifyEmailBody,
   CheckoutBody,
   CheckoutResult,
   Customer,
@@ -105,6 +109,7 @@ const customer: Shape<Customer> = {
   object: {
     id: "string",
     email: "string",
+    emailVerified: "boolean",
     firstName: "string",
     lastName: "string",
     phone: { nullable: "string" },
@@ -548,6 +553,14 @@ const updateAccountBody: Shape<UpdateAccountBody> = {
 const changePasswordBody: Shape<ChangePasswordBody> = {
   object: { currentPassword: "string", newPassword: "string" },
 };
+const passwordResetRequestBody: Shape<PasswordResetRequestBody> = {
+  object: { email: "string", locale: "string" },
+};
+const passwordResetAccepted: Shape<PasswordResetAccepted> = { object: {} };
+const passwordResetConfirmBody: Shape<PasswordResetConfirmBody> = {
+  object: { token: "string", newPassword: "string" },
+};
+const verifyEmailBody: Shape<VerifyEmailBody> = { object: { token: "string" } };
 const addCartItemBody: Shape<AddCartItemBody> = {
   object: { variantId: "string", quantity: "integer" },
 };
@@ -586,6 +599,10 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getAccount: accountResult,
   updateAccount: accountResult,
   changePassword: "none",
+  requestPasswordReset: passwordResetAccepted,
+  confirmPasswordReset: "none",
+  confirmEmailVerification: "none",
+  requestEmailVerification: "none",
   getCart: cart,
   clearCart: "none",
   addCartItem: cart,
@@ -615,6 +632,10 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getAccount: null,
   updateAccount: updateAccountBody,
   changePassword: changePasswordBody,
+  requestPasswordReset: passwordResetRequestBody,
+  confirmPasswordReset: passwordResetConfirmBody,
+  confirmEmailVerification: verifyEmailBody,
+  requestEmailVerification: null,
   getCart: null,
   clearCart: null,
   addCartItem: addCartItemBody,
