@@ -1,6 +1,6 @@
 # Plan: online payments (core port, payment attempts, webhooks and reconcile; Monobank acquiring "Plata by mono" first)
 
-Status: draft, written 2026-10-26 on `chore/payments-plan`; waits for the owner's quiz answers (section "Open questions"). Nothing is built.
+Status: approved by the owner's quiz answers on 2026-10-26 (section "Owner answers"); nothing is built yet. Next: step 1 (the payments ADR).
 Roles: Architect (this plan, the ADR in step 1), Orchestrator (task split, path ownership, verification, mutation checks), Developers (Sonnet 5.5; **Opus 5.5 high for every money, order-status, migration, webhook and provider-network step**), independent Reviewer (a different agent and ideally a different model than each step's author), Docs inside each step.
 Follows: `docs/HANDOFF.md` Next steps 2 ("payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank ...); orders are marked paid by hand until then") and "Where we are" ("No online payment: orders stay `awaiting_payment` until an admin marks them paid or they expire"); ADR 0017 ("The payment plan may split [the status] in its own ADR"; "A payment plan must keep its provider session shorter than `ORDER_PAYMENT_TTL_MINUTES`"); ADR 0018 ("A payment plugin registers its own routes, reads the order through `OrderReadPort`, verifies the provider signature and calls `OrderPaymentsPort.markPaid`").
 Design basis: AGENTS.md sections 1 (payment providers are core abstractions, first market Ukraine), 2.1, 2.3 (money in minor units), 3, 9, 11 ("Payment webhooks: verify signatures, be idempotent"; rate limits on checkout), 13 (money logic is TDD), 14, 16, 17; ADR 0004, 0011, 0015, 0017, 0018, 0019, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0029 (provider port, loader, `ProviderResult`, contract suite, no-network guard), 0030, 0031 (outbox pattern, one provider by config, plugin rules).
@@ -290,6 +290,17 @@ ADR 0032 and `docs/adr/README.md`; `docs/api/payments.md` (new), `docs/api/order
 - Section 5: `/packages/providers` holds `_fake-payment` and `monobank` too.
 - Section 11: "Payment webhooks: verify the signature over the raw body before parsing; bind provider id, reference, amount and currency; never mark paid from a redirect or client input; refunds are never retried after a lost answer without reading the provider's state."
 - Section 18: the CI matrix modes `providers-payment-fake`, `providers-payment-none`, `providers-payment-monobank`.
+
+## Owner answers (quiz 2026-10-26)
+All three answers were the recommended options; every other open question is taken as recommended by the orchestrator (the owner may revisit any of them).
+
+| Question | Answer |
+|---|---|
+| 1. v1 scope | Card payment by redirect (debit), webhook, reconcile job, automatic and admin refunds; hold/capture, saved cards, LiqPay and WayForPay later |
+| 2. Payment after expiry or cancel | Expiry waits in 10-minute steps for up to 30 minutes while a payment is processing; later successes are refunded automatically with an admin alert |
+| 3. Refunds and manual 'mark paid' | Full and partial refunds by an admin with the new permission `payments.refund`; a refund never changes the order status; manual 'mark paid' stays for offline payments (refused while an online payment is processing; an online success after a manual payment is refunded) |
+
+Live checks need the owner's Monobank token (`MONOBANK_TOKEN`, environment secret, never in chat), a public https staging URL for the webhook and, for production, a merchant contract (steps S1 and S2). Steps up to the plugin run against a stub and need none of that.
 
 ## Open questions (owner quiz; recommended option first; ordered by importance)
 Marked **[OWNER]** where the owner's own judgement, money or legal duty is involved; the orchestrator may take the others as recommended.
