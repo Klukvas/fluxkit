@@ -87,6 +87,7 @@ const DISABLED_EMAIL_DELIVERY: EmailDeliveryConfig = Object.freeze({
   from: null,
   replyTo: null,
   storefrontPublicUrl: null,
+  tokenSecret: null,
   tuning: DEFAULT_EMAIL_DELIVERY_TUNING,
 });
 

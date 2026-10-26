@@ -18,12 +18,17 @@ export const DEFAULT_EMAIL_DELIVERY_TUNING: Readonly<EmailDeliveryTuning> = Obje
   maxWaitingImmediate: 50,
 });
 
-/** From `EMAIL_FROM`, `EMAIL_REPLY_TO` and `STOREFRONT_PUBLIC_URL` (docs/contracts/config.md). */
+/** From `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL` and `ORDER_TOKEN_SECRET` (docs/contracts/config.md). */
 export interface EmailDeliveryConfig {
   /** The sender; its display name is the shop name in mail. Required whenever a provider is loaded. */
   readonly from: EmailAddress | null;
   readonly replyTo: EmailAddress | null;
   /** The only origin of links in mail, without a trailing slash; never a request's `Host`. */
   readonly storefrontPublicUrl: string | null;
+  /**
+   * `ORDER_TOKEN_SECRET`: the key customer auth tokens are derived with, under their own label (ADR 0031 decision 9).
+   * `null` only for callers that never issue or render one. Never logged.
+   */
+  readonly tokenSecret: string | null;
   readonly tuning: EmailDeliveryTuning;
 }

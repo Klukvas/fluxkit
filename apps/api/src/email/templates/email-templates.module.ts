@@ -1,6 +1,9 @@
 import { Module } from "@nestjs/common";
 import { DiscoveryModule } from "@nestjs/core";
 import { AdminTestEmailTemplate } from "./admin-test.template.js";
+import { PasswordChangedEmailTemplate } from "./customer-password-changed.template.js";
+import { PasswordResetEmailTemplate } from "./customer-password-reset.template.js";
+import { VerifyEmailEmailTemplate } from "./customer-verify-email.template.js";
 import { EmailTemplateRegistry } from "./email-template-registry.js";
 
 /**
@@ -10,7 +13,13 @@ import { EmailTemplateRegistry } from "./email-template-registry.js";
  */
 @Module({
   imports: [DiscoveryModule],
-  providers: [AdminTestEmailTemplate, EmailTemplateRegistry],
+  providers: [
+    AdminTestEmailTemplate,
+    PasswordResetEmailTemplate,
+    PasswordChangedEmailTemplate,
+    VerifyEmailEmailTemplate,
+    EmailTemplateRegistry,
+  ],
   exports: [EmailTemplateRegistry],
 })
 export class EmailTemplatesModule {}

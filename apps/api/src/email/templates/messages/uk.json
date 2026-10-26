@@ -6,5 +6,21 @@
   "admin.test.subject": "Тестовий лист від {shop}",
   "admin.test.heading": "Тестовий лист",
   "admin.test.body": "Надсилання пошти працює: цей лист передано провайдеру {provider}.",
-  "admin.test.note": "Ви запросили цю перевірку в адмін-панелі. Нічого робити не потрібно."
+  "admin.test.note": "Ви запросили цю перевірку в адмін-панелі. Нічого робити не потрібно.",
+  "customer.password_reset.subject": "Відновлення пароля в {shop}",
+  "customer.password_reset.heading": "Відновлення пароля",
+  "customer.password_reset.body": "Ми отримали запит на відновлення пароля вашого облікового запису в {shop}. Натисніть кнопку нижче, щоб задати новий пароль. Посилання діє один раз і протягом {minutes} хвилин.",
+  "customer.password_reset.button": "Задати новий пароль",
+  "customer.password_reset.link_hint": "Якщо кнопка не працює, відкрийте це посилання:",
+  "customer.password_reset.ignore": "Якщо ви не надсилали цей запит, просто ігноруйте лист: ваш пароль не зміниться.",
+  "customer.password_changed.subject": "Ваш пароль у {shop} змінено",
+  "customer.password_changed.heading": "Ваш пароль змінено",
+  "customer.password_changed.body": "Пароль вашого облікового запису в {shop} щойно змінено за посиланням для відновлення. Усі пристрої, на яких ви були в обліковому записі, вийшли з нього.",
+  "customer.password_changed.warning": "Якщо це були не ви, негайно зверніться до {shop}.",
+  "customer.verify_email.subject": "Підтвердіть адресу електронної пошти в {shop}",
+  "customer.verify_email.heading": "Підтвердіть адресу електронної пошти",
+  "customer.verify_email.body": "Підтвердіть, що ця адреса належить вашому обліковому запису в {shop}. Посилання діє {hours} годин.",
+  "customer.verify_email.button": "Підтвердити адресу",
+  "customer.verify_email.link_hint": "Якщо кнопка не працює, відкрийте це посилання:",
+  "customer.verify_email.ignore": "Якщо ви не створювали обліковий запис у {shop}, просто ігноруйте лист."
 }
