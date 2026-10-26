@@ -4,6 +4,7 @@ import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
 import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
+import type { EmailDeliveryTuning } from "../email/outbox/index.js";
 import type { LoadedEmailProvider } from "../email/registry/index.js";
 import type { LoadedShippingProvider, ShipmentCallTimeouts } from "../shipping/registry/index.js";
 import type { MediaTuning } from "../media/media-config.js";
@@ -25,6 +26,15 @@ export const TEST_ORDER_TOKEN_SECRET = "test-order-token-secret-0123456789-abcde
 /** The open-order limit of specs that do not test it: out of reach, so they can place as many orders as they like. */
 export const TEST_MAX_OPEN_ORDERS = 1_000_000;
 
+/** The sender of every spec's mail (a reserved example domain). */
+export const TEST_EMAIL_FROM = Object.freeze({
+  address: "shop@example.com",
+  displayName: "Fluxkit Test Shop",
+});
+
+/** The link origin of every spec's mail. */
+export const TEST_STOREFRONT_PUBLIC_URL = "https://shop.example.com";
+
 export interface StartAppOptions {
   enabledFeatures?: string[];
   featuresDir?: string;
@@ -43,6 +53,14 @@ export interface StartAppOptions {
   extraShippingProviders?: LoadedShippingProvider[];
   /** Email provider module mounted as if `EMAIL_PROVIDER` named it, for example `testEmailProviders()` (no package under packages/providers is read). */
   extraEmailProviders?: LoadedEmailProvider[];
+  /** `EMAIL_FROM`; defaults to `TEST_EMAIL_FROM` (`null`: unset). */
+  emailFrom?: { address: string; displayName: string | null } | null;
+  /** `EMAIL_REPLY_TO`; defaults to unset. */
+  emailReplyTo?: { address: string; displayName: string | null } | null;
+  /** `STOREFRONT_PUBLIC_URL` as the API reads it; defaults to `TEST_STOREFRONT_PUBLIC_URL` (`null`: unset). */
+  storefrontPublicUrl?: string | null;
+  /** A shorter send timeout or another pacing of the email sender. */
+  emailDeliveryTuning?: Partial<EmailDeliveryTuning>;
   /** Shorter limits for the shipment provider calls, so a hanging carrier times out quickly in a spec. */
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Extra modules loaded like enabled features, for probe controllers. */
@@ -110,6 +128,12 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       orderPaymentTtlMinutes: options.orderPaymentTtlMinutes,
       orderGuestAccessDays: options.orderGuestAccessDays,
       orderTokenSecret: options.orderTokenSecret ?? TEST_ORDER_TOKEN_SECRET,
+      emailFrom: options.emailFrom === null ? undefined : (options.emailFrom ?? TEST_EMAIL_FROM),
+      emailReplyTo: options.emailReplyTo ?? undefined,
+      storefrontPublicUrl:
+        options.storefrontPublicUrl === null
+          ? undefined
+          : (options.storefrontPublicUrl ?? TEST_STOREFRONT_PUBLIC_URL),
       maxOpenOrders: options.maxOpenOrders ?? TEST_MAX_OPEN_ORDERS,
       trustProxy: options.trustProxy,
       schedulerEnabled: options.schedulerEnabled ?? false,
@@ -133,6 +157,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       extraFeatures: options.extraFeatures,
       extraShippingProviders: options.extraShippingProviders,
       extraEmailProviders: options.extraEmailProviders,
+      emailDeliveryTuning: options.emailDeliveryTuning,
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       mediaTuning: options.mediaTuning,
     },

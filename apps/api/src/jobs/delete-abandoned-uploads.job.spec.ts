@@ -527,10 +527,12 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
         ok: true,
         result: { deleted: 1, truncated: false, fileErrors: 0 },
       });
-      // Job 7 is the last cleanup; only the shipment tracking (job 8, outbound calls) runs after it.
-      expect(reports.map((entry) => entry.name).slice(-2)).toEqual([
+      // Job 7 is the last cleanup before the outbound calls: the shipment tracking (job 8), then the mail jobs (9, 10).
+      expect(reports.map((entry) => entry.name).slice(-4)).toEqual([
         "delete-abandoned-uploads",
         "track-shipments",
+        "send-emails",
+        "purge-email-messages",
       ]);
       expect(await fileExists(pathOfKey(key))).toBe(false);
 

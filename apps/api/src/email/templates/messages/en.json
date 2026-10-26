@@ -1,0 +1,10 @@
+{
+  "layout.shop_fallback": "Online shop",
+  "layout.footer.account": "You received this email because of an action on your {shop} account. If it was not you, contact the shop.",
+  "layout.footer.order": "You received this email because of your order at {shop}.",
+  "layout.open_shop": "Go to {shop}",
+  "admin.test.subject": "Test email from {shop}",
+  "admin.test.heading": "Test email",
+  "admin.test.body": "Email delivery works: this message was handed to the provider {provider}.",
+  "admin.test.note": "You asked for this test in the admin. No action is needed."
+}

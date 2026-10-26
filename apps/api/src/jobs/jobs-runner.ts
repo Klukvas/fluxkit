@@ -20,6 +20,9 @@ import { SCHEDULER_DATABASE_URL } from "./scheduler-config.js";
 import { sweepReservations } from "./sweep-reservations.job.js";
 import { ShipmentTrackingService } from "../shipping/shipments/shipment-tracking.service.js";
 import { trackShipments } from "./track-shipments.job.js";
+import { EmailOutboxRepository, EmailSender } from "../email/outbox/index.js";
+import { sendEmails } from "./send-emails.job.js";
+import { purgeEmailMessages } from "./purge-email-messages.job.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
 export const JOB_NAMES = [
@@ -31,6 +34,8 @@ export const JOB_NAMES = [
   "delete-customer-sessions",
   "delete-abandoned-uploads",
   "track-shipments",
+  "send-emails",
+  "purge-email-messages",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -58,6 +63,8 @@ export class JobsRunner {
     @Inject(MEDIA_STORAGE_PORT) private readonly mediaStorage: MediaStoragePort,
     @Inject(MEDIA_CONFIG) private readonly mediaConfig: MediaConfig,
     @Inject(ShipmentTrackingService) private readonly shipmentTracking: ShipmentTrackingService,
+    @Inject(EmailSender) private readonly emailSender: EmailSender,
+    @Inject(EmailOutboxRepository) private readonly emailOutbox: EmailOutboxRepository,
     @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
   ) {
     this.leases = pgEventLeaseSource(databaseUrl);
@@ -68,7 +75,9 @@ export class JobsRunner {
    * (their expiry releases the reservations and writes `order.expired`), then the generic reservation sweep (which now
    * only finds orphans), then the events (including the ones just written), then the four cleanups (the last one deletes
    * files), then the carrier polls of job 8 (outbound network calls: after everything time-critical, so a slow carrier
-   * delays nothing else; the events it writes are delivered by the next tick). Every job gets its
+   * delays nothing else; the events it writes are delivered by the next tick), then the mail of job 9 (outbound calls
+   * too, after the dispatcher so a mail a handler enqueued goes out in the same tick; latency-critical auth mail does not
+   * wait for it, the request makes an immediate attempt) and the mail purge of job 10. Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -125,6 +134,17 @@ export class JobsRunner {
     );
     await run("track-shipments", (budget) =>
       trackShipments({ tracking: this.shipmentTracking }, now, { budget }),
+    );
+    await run("send-emails", (budget) =>
+      sendEmails({ database, outbox: this.emailOutbox, sender: this.emailSender }, now, { budget }),
+    );
+    await run("purge-email-messages", (budget) =>
+      purgeEmailMessages(
+        { database, outbox: this.emailOutbox },
+        now,
+        DEFAULT_CLEANUP_LIMITS,
+        budget,
+      ),
     );
     return reports;
   }
