@@ -1,0 +1,360 @@
+# Plan: online payments (core port, payment attempts, webhooks and reconcile; Monobank acquiring "Plata by mono" first)
+
+Status: draft, written 2026-10-26 on `chore/payments-plan`; waits for the owner's quiz answers (section "Open questions"). Nothing is built.
+Roles: Architect (this plan, the ADR in step 1), Orchestrator (task split, path ownership, verification, mutation checks), Developers (Sonnet 5.5; **Opus 5.5 high for every money, order-status, migration, webhook and provider-network step**), independent Reviewer (a different agent and ideally a different model than each step's author), Docs inside each step.
+Follows: `docs/HANDOFF.md` Next steps 2 ("payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank ...); orders are marked paid by hand until then") and "Where we are" ("No online payment: orders stay `awaiting_payment` until an admin marks them paid or they expire"); ADR 0017 ("The payment plan may split [the status] in its own ADR"; "A payment plan must keep its provider session shorter than `ORDER_PAYMENT_TTL_MINUTES`"); ADR 0018 ("A payment plugin registers its own routes, reads the order through `OrderReadPort`, verifies the provider signature and calls `OrderPaymentsPort.markPaid`").
+Design basis: AGENTS.md sections 1 (payment providers are core abstractions, first market Ukraine), 2.1, 2.3 (money in minor units), 3, 9, 11 ("Payment webhooks: verify signatures, be idempotent"; rate limits on checkout), 13 (money logic is TDD), 14, 16, 17; ADR 0004, 0011, 0015, 0017, 0018, 0019, 0021, 0022, 0023, 0024, 0025, 0026, 0027, 0029 (provider port, loader, `ProviderResult`, contract suite, no-network guard), 0030, 0031 (outbox pattern, one provider by config, plugin rules).
+
+## Goal
+A shopper who placed an order pays it online by card, Apple Pay, Google Pay or the monobank app on Monobank's hosted payment page (redirect; no card data ever touches the shop), comes back to the shop and sees the true payment state. The order becomes `paid` only from a provider fact the API verified itself (a signed webhook or a status read by the API with the shop's token), never from the browser, a query parameter or a client-sent amount; the amount and currency must equal the order total. Lost webhooks are recovered by a bounded reconcile job; a payment that lands on an order that can no longer be paid (expired, cancelled, already paid) is refunded automatically and shown to an admin. Admins see every payment attempt of an order, refund fully or partly with a permission, and resync a payment. With no provider configured the shop behaves exactly as today (manual mark paid).
+
+## Scope (proposed v1; the owner fixes it with questions 1 to 5)
+**In v1:**
+- Core `PaymentProviderPort` (types, typed result, no I/O), contract suite, and pure rules (attempt and refund statuses and transitions as data, provider-fact normalisation and ordering, amount/currency/reference binding, refund limits, invoice validity window, expiry-vs-payment decision, retry/backoff) in `packages/core/src/payments/`, TDD.
+- Provider loader with `kind: "payment"` over the shared manifest scan (`apps/api/src/common/provider-package-loader.ts`); test-only `packages/providers/_fake-payment`; `packages/providers/monobank` (Node `fetch`, `node:crypto`, zod 4.6.7 already pinned; **no new dependency**).
+- Migration `0008_payments`: `payment` (one row per attempt), `payment_event` (append-only journal with a dedupe key), `payment_refund`.
+- Store: create a payment attempt for an own unpaid order (customer session or guest token), redirect, return page with server-read status, retry after failure. Webhook route (raw body, signature, idempotent). Reconcile job. Order integration: `markPaid` from a verified success, expiry grace while a payment is unconfirmed, cancel guards, automatic refund of late or duplicate payments.
+- Admin: payments panel on the order (attempts, events, refunds), refund (full and partial, question 3), resync, "needs attention" list; new permission (question 13).
+
+**Later (each its own plan or step):** hold/capture (`paymentType: hold`, 9 days, UAH only), card tokenization and recurring payments, a custom "Pay with mono" button (`withAppUrl`), iframe widget, split payments, PRRO fiscal items on refunds (question 5), LiqPay and WayForPay, cash on delivery and the order status split (question 8), payment emails beyond `order.paid` (refund mail), multi-currency, a payments report or statement import.
+
+**Non-goals:** any card data, PAN, CVV or provider token in our database, logs or browser code (PCI scope stays the hosted redirect, SAQ A in spirit); trusting the return URL; changing order totals (payments never influence a total, ADR 0029 decision 1); editing orders after payment.
+
+## Existing functionality found (verified 2026-10-26 on `origin/main` at `8ce6d5e`)
+
+### Orders, payment entry point, expiry
+- **`OrdersService.markPaid(orderId, {amount, providerReference, source}, actor = system)`** (`apps/api/src/orders/orders.service.ts` lines 181-243) implements core `OrderPaymentsPort` (`packages/core/src/orders/events.ts` lines 81-160, token `fluxkit:order-payments-port`): locks the order row first; `order_not_payable` for `expired`/`cancelled`; same reference on a paid/fulfilled order is `ok alreadyPaid`, another reference `payment_reference_conflict`; amount must equal the total (`amount_mismatch`); transition `awaiting_payment -> paid` with stock effect `commit`. **The commit refuses `order_not_payable` when any reservation is no longer `active`** (lines 436-444), so an order past `expires_at` that the job has not expired yet is payable only while its reservations are still held (reservations live until `expires_at + 10 min`, core `RESERVATION_GRACE_MINUTES`). `source` is accepted but **not stored** (only `sales_order.payment_reference`, max 255, and `paid_at`).
+- **Status machine** (core `packages/core/src/orders/status.ts`): `awaiting_payment -> paid` by `admin` or `system` (commit), `awaiting_payment -> cancelled` by customer, guest, admin (release), `-> expired` by system (release), `paid -> cancelled` admin only (`release_unsold`, ADR 0022), `paid -> fulfilled`. One explicit status (ADR 0017); ADR 0004 decision 4 wanted a separate `payment` entity with its own machine and a derived order status; ADR 0017 and 0029 note cash on delivery needs a split.
+- **Expiry**: job 1 lists `awaiting_payment` orders with `expires_at <= now` and calls `OrdersService.expireOne` per order under the order row lock (`orders.service.ts` lines 350-368; `apps/api/src/jobs/expire-due-orders.job.ts`). `ORDER_PAYMENT_TTL_MINUTES` default 30, 5 to 1440 (`packages/core/src/orders/expiry.ts`). `decideExtend` exists for reservations (only active, never shortens; ADR 0017 backorder hold).
+- **Admin mark paid** `POST /admin/orders/{id}/mark-paid {reference, amount}` (`orders.write`, `docs/api/orders.md` line 113) goes through the same `markPaid`; the admin UI has a mark-paid form (`apps/admin/src/areas/orders/mark-paid-form.ts`, `order-dialogs.tsx`); known gap: "Mark paid records the full total only" (HANDOFF).
+- **Events** (`docs/contracts/events.md`): `order.placed|paid|cancelled|expired|fulfilled`, `shipment.*`; ids-only payloads; at-least-once; handlers idempotent by event id; no `payment.*` event exists.
+- **Guest access** (ADR 0017, 0023): token derived from `ORDER_TOKEN_SECRET`, kept in the URL fragment, lookup and cancel by `POST /store/orders/lookup|cancel {number, accessToken}`; customers use `/store/account/orders/{number}`.
+
+### Checkout and storefront today
+- `POST /store/checkout` (ADR 0015, 0024, 0029) places an `awaiting_payment` order and returns `{order, accessToken?}`; the storefront then `router.replace`s to the order page (`apps/storefront/src/components/checkout-page.tsx` line 756).
+- Texts say no money is taken: `checkout.payment.note` "No payment is taken on this site. After you place the order, the shop will contact you to arrange payment ..." and `order.payment.awaiting` (`apps/storefront/src/messages/en.json` lines 293-294, 369-370).
+- Storefront CSP: `connect-src` own origin, `form-action 'self'` (`apps/storefront/next.config.ts` lines 106-109): a redirect by `window.location` to the provider page is a navigation and is not blocked; a `<form>` POST to the provider would be.
+
+### Providers, jobs, config, platform
+- **Provider pattern** (ADR 0029, 0031): shared manifest scan `loadProviderPackages({kind, enabled, providersDir, codePattern, variable})`; registries by Nest discovery and metadata; plugins `packages/providers/{_fake,_fake-email,nova-post,resend}`; `ProviderResult` with codes not messages (`packages/core/src/shipping/provider-port.ts`), `ProviderAbortSignal`; plugin rules: constant base URL, `redirect: "error"`, size cap before parsing, zod-validated answers, no secret or body in logs, stub server and no-network guard (`packages/providers/nova-post`, `resend`), contract suites in core; CI matrix modes `providers-*` in `scripts/feature-matrix.sh`; test-only providers refused in production.
+- **Jobs** (`apps/api/src/jobs/`, ADR 0021, 0025): one advisory lock per tick, 30 s budget per job, network calls outside transactions (job 8 `track-shipments`, job 9 `send-emails`); the email outbox (ADR 0031) is the claim/lease/record precedent.
+- **Config**: `STOREFRONT_PUBLIC_URL` is already read by the API (`packages/config/src/env.ts`, `docs/contracts/config.md` line 17: "never a request's `Host`"); `SHOP_CURRENCY` default `UAH`; secrets precedent `ORDER_TOKEN_SECRET`, `NOVA_POST_API_KEY`, `RESEND_API_KEY` (plugin-parsed, never logged).
+- **HTTP**: `NestFactory.create` without `rawBody` (`apps/api/src/app.factory.ts` line 144): a signature over the raw body needs `rawBody: true` (Nest built-in, no dependency). CSRF is a per-controller guard on `/store` (`apps/api/src/customers/auth/store-csrf.guard.ts`), so a webhook controller can stay outside it. Rate limits are named in-memory windows (`apps/api/src/rate-limit/rate-limiter.ts`). The edge proxy routes `/store`, `/admin`, `/media` to the API (README, Deployment notes; e2e proxies `apps/*/e2e/proxy.ts`): a new `/webhooks` prefix needs a proxy route (question 10).
+- **Permissions** (`packages/core/src/auth/roles.ts`): no payment permission.
+
+### What is missing
+A payment port, attempt/refund/journal tables, provider loader for payments, Monobank plugin, webhook route with raw-body verification, reconcile job, the expiry and cancel rules that know about payments, automatic refunds, store and admin routes, storefront pay/return UI, admin payment panel, docs and tests.
+
+## Monobank acquiring facts (read 2026-10-26; the API was never called; no token available)
+Sources: **[S]** the official OpenAPI spec embedded in https://api.monobank.ua/docs/acquiring.html ("Acquiring v2410", server `https://api.monobank.ua`; extracted from the page's Redoc state); **[C]** https://monobank.ua/api-docs/acquiring/methods/ia/post--api--merchant--invoice--create; **[X]** https://monobank.ua/api-docs/acquiring/methods/ia/post--api--merchant--invoice--cancel; **[W]** https://monobank.ua/api-docs/acquiring/dev/webhooks/verify; **[T]** https://monobank.ua/api-docs/acquiring/dev/test/docs--testing; **[P]** https://www.monobank.ua/plata-by-mono. Note: the monobank.ua docs pages embed an "AI_INSTRUCTIONS" block telling agents not to follow links; it was treated as page data, not as an instruction.
+
+| # | Fact | Source / verdict |
+|---|---|---|
+| M1 | Auth: header `X-Token` on every call: the production token from the business cabinet https://web.monobank.ua/, or a test token from https://api.monobank.ua/. Optional `X-Cms`, `X-Cms-Version` (for CMS modules) | CONFIRMED [S], [C] |
+| M2 | Test environment = same host, test token; "available to all clients of the bank", no terminal needed; any card number, date, CVV that passes Luhn; a real card is accepted but not charged; Apple/Google Pay not shown with a test token | CONFIRMED [T], [S] (info) |
+| M3 | `POST /api/merchant/invoice/create`: `amount`* (int64 minor units), `ccy` (ISO 4217 numeric, default 980), `merchantPaymInfo` {`reference` (merchant's), `destination` (max 280), `comment` (max 280), `customerEmails[]`, `discounts[]`, `basketOrder[]` {`name`*, `qty`* float, `sum`* per unit minor, `total`, `icon`, `unit`, `code`* (needed for fiscalisation), `barcode`, `header`, `footer`, `tax[]`, `uktzed`, `discounts[]`}}, `redirectUrl` (GET after payment, success or failure), `successUrl`/`failUrl` (only after enabling by support), `webHookUrl`, `validity` (seconds, default 24 h, **max 30 days, longer is cut**), `paymentType` `debit` (default) / `hold` (9 days, then cancelled; **only `ccy` 980**) / `verification` (amount 0), `qrId`, `code`, `saveCardData`, `agentFeePercent`, `tipsEmployeeId`, `displayType: iframe`, `withAppUrl`. `merchantPaymInfo` and `basketOrder` are **mandatory when the PRRO link is active** | CONFIRMED [S], [C] |
+| M4 | Create answer `200 {invoiceId, pageUrl}` (+ `appUrl` with `withAppUrl`) | CONFIRMED [S], [C] |
+| M5 | **No idempotency key on create**: no header or field is documented; `reference` is informational | CONFIRMED absent [S]; dedupe by `reference` UNKNOWN (assume none) |
+| M6 | `GET /api/merchant/invoice/status?invoiceId=`: `invoiceId`, `status` (`created`, `processing`, `hold`, `success`, `failure`, `reversed` = "returned after success", `expired`), `failureReason`, `errCode`, `amount`, `ccy`, `finalAmount` ("changes after payment and refunds"), `createdDate`, `modifiedDate`, `reference`, `destination`, `cancelList[]` {`status` processing/success/failure, `amount`, `ccy`, `createdDate`, `modifiedDate`, `approvalCode`, `rrn`, `extRef`}, `paymentInfo` {`maskedPan`, `approvalCode`, `rrn`, `tranId`, `terminal`, `bank`, `paymentSystem` visa/mastercard, `paymentMethod` pan/apple/google/monobank/wallet/direct, `fee`, `country`, `agentFee`}, `walletData`, `tipsInfo` | CONFIRMED [S] |
+| M7 | Payment error codes (`errCode` in webhook and status), e.g. `59` insufficient funds, `8001` link expired, `8002` customer cancelled, `8005`/`8006` merchant limits, `1077` amount below the minimum, many "merchant settings" codes (55, 57, 67, 74, 98 ...) | CONFIRMED [S] (table "Помилки в процесі оплати"); map to a few shopper categories, never show bank text |
+| M8 | Webhook: POST to `webHookUrl` on every invoice status change **except `expired`**; body identical to the status answer; `Content-Type: application/json`; header `X-Sign` | CONFIRMED [S], [C], [W] |
+| M9 | Webhook retries: "up to 3" further attempts until the answer is HTTP `200 OK`; intervals and timeout not documented | CONFIRMED count [S], [W]; intervals and timeout UNKNOWN; whether other 2xx count: UNKNOWN (answer exactly `200`) |
+| M10 | **No ordering guarantee**: `success` may arrive before `processing`; "the webhook with the greater `modifiedDate` is current" | CONFIRMED [S], [C] |
+| M11 | Webhooks are also sent for card-token status changes when `saveCardData` was used | CONFIRMED [C] (not used in v1) |
+| M12 | Signature: `X-Sign` = base64 DER ECDSA signature over SHA-256 of the **raw body bytes**; key = `GET /api/merchant/pubkey` → `{key}` = base64 of a PEM X.509 public key; "cache the key and fetch a new one when verification with the current key stops working; do not fetch it every time" | CONFIRMED [S], [W]. **Verified locally 2026-10-26**: the documented example key is EC `prime256v1` (P-256) and the documented example `X-Sign` verifies with Node `crypto.verify('sha256', body, key, sig)` over the exact example body (a one-digit change fails), so `node:crypto` suffices |
+| M13 | `POST /api/merchant/invoice/cancel` {`invoiceId`*, `extRef`, `amount` (partial), `items[]` (required when fiscalisation is on)} → `200 {status: processing/success/failure, createdDate, modifiedDate}`; `500 CANCEL_NOT_AVAILABLE` when it cannot be cancelled | CONFIRMED [S], [X]. Whether `extRef` is deduplicated (an idempotency key): **UNKNOWN**; several partial refunds per invoice: likely (`cancelList[]`), UNKNOWN in detail |
+| M14 | `POST /api/merchant/invoice/remove` {`invoiceId`}: invalidates an invoice "if it has not been paid yet"; `200` empty | CONFIRMED [S] |
+| M15 | `POST /api/merchant/invoice/finalize` {`invoiceId`, `amount`, `items`} for holds → `{status: success}` | CONFIRMED [S] (later, not v1) |
+| M16 | Errors: `{errCode, errText}`; `400` `BAD_REQUEST`/`1001`/`INVALID_MERCHANT_PAYM_INFO`, `403 FORBIDDEN` (invalid token), `404 NOT_FOUND`/`1004`, `405 METHOD_NOT_ALLOWED`, `429 TMR` (too many requests), `500 INTERNAL_ERROR`/`CANCEL_NOT_AVAILABLE`; "`errText` is informative only, do not use it in business logic" | CONFIRMED [S] |
+| M17 | Rate limits: only `429 TMR` is documented; numbers and any `Retry-After` header | UNKNOWN |
+| M18 | Currencies: `ccy` is any ISO 4217 numeric code, default 980; whether a merchant can take USD/EUR invoices | UNKNOWN (hold is UAH only, [C]); v1 assumes UAH only (question 6) |
+| M19 | Minimum `validity`; whether a `processing` payment can still finish after `validity` ends | UNKNOWN |
+| M20 | Amount limits: error `1077` "amount below the allowed minimum"; the minimum and maximum | UNKNOWN |
+| M21 | Receipts: `GET /api/merchant/invoice/receipt?invoiceId=&email=` (base64 PDF, optionally emailed); fiscal checks `GET /api/merchant/invoice/fiscal-checks` (`checkbox` or `monopay` PRRO, `sale`/`return`) | CONFIRMED [S] (not used in v1) |
+| M22 | `GET /api/merchant/details` → `{merchantId, merchantName, edrpou}` | CONFIRMED [S] (used for the admin status and S1) |
+| M23 | The hosted payment page host(s) in `pageUrl` | UNKNOWN (the plugin checks `https` and a host allow-list fixed at S1) |
+| M24 | Commission 1.3 % per transaction, 2 % for foreign cards; accounts for FOP and legal entities | CONFIRMED [P] (commercial terms may change; the owner's contract rules) |
+| M25 | Settlement/payout timing, website requirements for connection (offer, contacts, refund terms), webhook HTTPS requirement, source IPs of webhooks | UNKNOWN (the owner asks the bank; we require `https` ourselves) |
+
+## Proposal
+
+### 1. Architecture and boundaries
+| Piece | Where | Why there |
+|---|---|---|
+| `PaymentProviderPort`, `PaymentProviderResult`, metadata key `fluxkit:payment-provider`, package kind `"payment"`, contract suite `checkPaymentProviderContract` | `packages/core/src/payments/provider-port.ts`, `provider-contract.ts` | Same pattern as shipping and email; a plugin implements it without importing `apps/api` |
+| Pure rules (TDD): attempt statuses and transitions as data; refund statuses; `normalizeProviderFact` ordering by `modifiedAt`; `bindFact` (provider id, our reference, amount, currency equal to the attempt); `decideOrderOutcome` (apply markPaid, refund, ignore, alert); `remainingRefundable` and refund limits; `invoiceValidity(orderExpiresAt, now)`; `decideExpiry(order, attempts, now)` (expire or defer, bounded grace); reconcile backoff; idempotency/dedupe key builders | `packages/core/src/payments/` | Money and state logic in tested pure code; core stays I/O-free (dependency-cruiser) |
+| Payments module: loader and registry, `PaymentAttempts` (the one status writer, over core transitions), webhook controller, store and admin controllers, job 11 `reconcile-payments`, `PaymentActions` (post-commit invoice invalidation and automatic refunds) | `apps/api/src/payments/` (core module, no feature flag: question 7 selects providers) | I/O, database and network live in the API |
+| Order integration (expiry deferral, cancel guards, mark-paid guard) | `apps/api/src/orders/` (small, reviewed diff) | `OrdersService` stays the only status writer; payments call `markPaid` through the port |
+| Providers | `packages/providers/monobank` (code `monobank`), `packages/providers/_fake-payment` (code `fake`, test only) | AGENTS.md section 5 |
+| Clients and pages | `packages/api-client`, `apps/storefront` (pay, return, order page), `apps/admin` (payments panel) | Existing apps |
+
+**`PaymentProviderPort` (proposed; internal until the first external plugin):**
+```ts
+interface PaymentProviderPort {
+  readonly code: string;                                   // "monobank"
+  readonly capabilities: { currencies: readonly string[]; partialRefunds: boolean; multipleRefunds: boolean;
+                           invalidateUnpaid: boolean; webhooks: boolean };
+  createPayment(input: { paymentId: string; orderNumber: string; amount: Money; description: string;
+      lines: readonly PaymentLine[]; returnUrl: string; webhookUrl: string; expiresAt: Date },
+    signal: ProviderAbortSignal): Promise<PaymentProviderResult<{ providerPaymentId: string; redirectUrl: string }>>;
+  getPayment(providerPaymentId: string, signal): Promise<PaymentProviderResult<ProviderPaymentFact>>;
+  invalidatePayment(providerPaymentId: string, signal): Promise<PaymentProviderResult<{ invalidated: boolean }>>;
+  refund(input: { providerPaymentId: string; refundId: string; amount: Money; full: boolean }, signal):
+    Promise<PaymentProviderResult<{ status: "processing" | "succeeded" | "failed" }>>;
+  verifyWebhook(input: { headers: Readonly<Record<string, string>>; rawBody: Uint8Array }, signal):
+    Promise<PaymentProviderResult<ProviderPaymentFact>>;    // "invalid_signature" is a failure reason
+}
+// ProviderPaymentFact = {providerPaymentId, reference, status: "created"|"processing"|"authorized"|"succeeded"|"failed"|"reversed"|"expired",
+//   providerStatus, amount: Money, finalAmount: Money | null, modifiedAt: Date, failureCode: string | null,
+//   refunds: {refundId: string | null, status, amount: Money, modifiedAt}[], card: {system, last4} | null}
+// PaymentProviderResult = {ok: true, value} | {ok: false, reason: "unavailable" | "rate_limited" | "rejected" | "misconfigured"
+//   | "not_found" | "not_cancellable" | "invalid_signature" | "not_sent", retryAfterSeconds?, providerCodes: string[]}
+```
+`not_sent` proves nothing left the process; `unavailable` and timeouts may have reached the provider (create and refund become `unknown`, never retried blindly: M5, M13). Codes only, never `errText` (M16). The API owns timeouts (10 s per call), logging, retries. Core maps provider statuses to attempt statuses; the plugin only normalises fields.
+
+### 2. Data model (red zone: migration `0008_payments` with a hand-written `.down.sql` that also deletes its `drizzle.__drizzle_migrations` row; up, down, up, down tested)
+**`payment`** (one row per attempt; ADR 0004's `payment_attempt`; the order keeps its single status)
+| Column | Rule |
+|---|---|
+| `id` uuid PK | also sent as Monobank `merchantPaymInfo.reference` (binds facts to the attempt) |
+| `order_id` -> `sales_order` RESTRICT | an order with payments is never deleted (orders are not deleted anyway) |
+| `provider_code`, `provider_payment_id` | `invoiceId`; UNIQUE `(provider_code, provider_payment_id)`; NULL until the create answered |
+| `amount`, `currency` | minor units, equal to the order total at creation (CHECK `amount > 0`, currency pattern) |
+| `status` | `creating`, `awaiting_customer`, `processing`, `succeeded`, `failed`, `expired`, `invalidated`, `create_unknown`; CHECK list; transitions are core data |
+| `provider_status`, `provider_modified_at` | last applied provider status and its `modifiedDate` (monotonic: an older fact never overwrites, M10) |
+| `final_amount` | provider `finalAmount` (minor), NULL until known |
+| `refunded_amount` | sum of succeeded refunds, CHECK `0 <= refunded_amount <= amount`, written in the refund's transaction |
+| `redirect_url` | `pageUrl` (https, host allow-list), kept until the attempt is final so "continue payment" reopens it; cleared when final |
+| `expires_at` | invoice validity end (section 4) |
+| `order_outcome` | NULL, `applied`, `already_paid`, `order_not_payable`, `amount_mismatch`, `reference_conflict` (what `markPaid` answered) |
+| `needs_attention` boolean, `attention_code` | set for every case an admin must see (late or duplicate success, refund failed or unknown, amount mismatch, unknown status) |
+| `failure_code` | provider `errCode` pattern-checked (`^[A-Za-z0-9_.:-]{1,64}$`) |
+| `card_system`, `card_last4` | question 12 (no BIN, no full mask) |
+| `next_check_at`, `check_attempts` | reconcile schedule; partial index `(next_check_at) WHERE status IN ('creating','awaiting_customer','processing','create_unknown') OR needs refund work` |
+| `idempotency_key` | the client's `Idempotency-Key` of the create route, UNIQUE per order |
+| `created_by` | `customer`, `guest`, `admin` (admin-created link is later) ; `created_at`, `updated_at` |
+Partial unique index: at most one attempt per order in `creating`, `awaiting_customer`, `processing` or `create_unknown` (one live attempt; section 4).
+
+**`payment_event`** (append-only journal; trigger rejects UPDATE/DELETE as `order_status_change`)
+`id`, `payment_id` -> `payment` CASCADE, `source` (`webhook`, `poll`, `create`, `admin`, `system`), `dedupe_key` UNIQUE (`webhook:<sha256 of raw body>`, `poll:<status>:<modifiedAt>:<finalAmount>:<cancelList hash>`), `provider_status`, `provider_modified_at`, `amount`, `final_amount`, `failure_code`, `applied` boolean (false when older than the current state), `from_status`, `to_status`, `actor_admin_id` SET NULL, `created_at`. No raw body, no `maskedPan`, no `errText`, no `rrn`/`approvalCode` (not needed; question 12 covers the card).
+
+**`payment_refund`**
+`id` uuid PK (sent as `extRef`), `payment_id` -> `payment` RESTRICT, `amount` > 0, `currency`, `status` (`requested`, `processing`, `succeeded`, `failed`, `unknown`), `reason` (`admin`, `late_payment`, `duplicate_payment`, `amount_mismatch`), `note` (admin text, 1 to 500), `actor_admin_id` SET NULL, `idempotency_key` UNIQUE NULL (admin route), `provider_modified_at`, `failure_code`, `created_at`, `updated_at`. CHECK in core and in the service: the sum of `requested|processing|succeeded|unknown` refunds never exceeds `payment.amount` (taken under the payment row lock).
+
+**Not stored:** card numbers or masks beyond question 12, provider token, raw webhook bodies, `errText`, `pageUrl` after the attempt is final, IP addresses.
+
+### 3. Payment flow (store)
+1. **Create attempt** `POST /store/orders/payments` (guest: `{number, accessToken, provider?, locale}`) or `POST /store/account/orders/{number}/payments` (customer session); header `Idempotency-Key` (UUID). Ownership exactly as lookup/cancel (identical `404` for unknown number, wrong token, foreign order). Refusals: `409 rule_violation` `order_not_payable` (not `awaiting_payment`), `payment_in_progress` (a `processing` or `create_unknown` attempt exists), `payment_window_too_short` (section 4), `payment_not_available` (no provider, currency not supported). A replay with the same key answers the same attempt (`200`).
+2. In one short transaction (order row lock, then payment rows): re-check status and total, close an `awaiting_customer` attempt of the same order as `invalidated` (its Monobank invoice is invalidated after commit, best effort, M14; if it was paid meanwhile its success lands as a duplicate and is refunded automatically), insert the new attempt `creating` with `expires_at`. Commit.
+3. **Provider call with no transaction open**: `createPayment` with `amount`, `ccy` 980, `merchantPaymInfo` {`reference` = attempt id, `destination` = localized "Order 7K3M-9QX2" (max 280), `basketOrder` = the order snapshot lines (title in the order locale, `qty`, unit `sum`, `total`, `code` = SKU) plus the shipping line, sum checked equal to `amount` in core}, `redirectUrl` = `STOREFRONT_PUBLIC_URL/{locale}/payment/return?payment=<id>`, `webHookUrl` = `STOREFRONT_PUBLIC_URL/webhooks/payments/monobank` (question 10), `validity`, `paymentType: debit`. No `X-Cms` header (white-label).
+4. **Record** (short transaction): `ok` -> `awaiting_customer` with `provider_payment_id` and `redirect_url`; `rejected`/`misconfigured`/`not_sent` -> `failed` (code), the shopper may try again; timeout/`unavailable` -> `create_unknown` (Monobank has no create idempotency, M5: never retried with the same attempt; a later webhook carrying our `reference` binds the invoice; otherwise job 11 closes it `failed` `create_unknown` after `expires_at`, since nobody received its `pageUrl`). Answer `201 {paymentId, redirectUrl, expiresAt}` or `503 payment_provider_unavailable`.
+5. The browser navigates to `redirectUrl` (`window.location.assign`, allowed by the CSP). It never sends an amount.
+6. **Return page** `/{locale}/payment/return?payment=<id>`: the query parameter is only a hint of WHICH attempt to show; state comes from `POST /store/orders/payments/status {number, accessToken, paymentId}` (guest; the token is read from `sessionStorage`, saved before the redirect in the same tab; never sent to Monobank) or `GET /store/account/orders/{number}/payments/{paymentId}`. When the attempt is not final and the last provider read is older than 10 s, the route reads the status from the provider once (bounded, per-attempt single flight, rate limited) before answering. The page polls every 3 s for at most 2 minutes, then shows "still processing, we will update the order". Without the token in this tab (another device) it says to open the order link from the confirmation.
+
+### 4. Order interplay (red zone: order status logic; ADR to record)
+- **Only a verified fact pays.** A fact comes from `verifyWebhook` (signature over the raw body) or from `getPayment` called by the API with the shop's token. It must bind: provider id equals the attempt's, `reference` equals the attempt id, `amount` and currency equal the attempt (and the attempt equals the order total), and for `succeeded` `finalAmount` (when present) equals `amount`. A fact that does not bind is journaled `applied = false` with `attention_code` and never pays.
+- **Applying `succeeded`** (one transaction, lock order: `sales_order` -> `payment` -> reservations, the existing ADR 0015 order): attempt -> `succeeded`; then `OrdersService.markPaid(orderId, {amount, providerReference: "monobank:<invoiceId>", source: "monobank"}, system)` inside the same transaction (a `markPaidIn(tx, ...)` variant of the existing method, so the attempt and the order commit together). Outcomes: `ok` -> `order_outcome = applied`; `alreadyPaid` with the same reference -> `already_paid`; `order_not_payable` (expired, cancelled, reservation gone) or `payment_reference_conflict` (paid by another attempt or by hand) -> `needs_attention` and an automatic full refund queued (question 2); `amount_mismatch` -> `needs_attention`, NO automatic refund (an admin decides: it means our data and the provider's disagree).
+- **Unordered facts** (M10): a fact older than `provider_modified_at` is journaled and ignored; core's transition table decides the rest (`succeeded` is never moved back to `processing`; `reversed` after `succeeded` records a full refund made outside the shop, attention flag).
+- **Invoice validity** (ADR 0017: the provider session must be shorter than the order TTL): `expires_at = order.expires_at - 3 minutes`; refused with `payment_window_too_short` when less than 5 minutes remain (`ORDER_PAYMENT_TTL_MINUTES` minimum is 5; question 11). Monobank's minimum `validity` is UNKNOWN (M19, S1).
+- **Expiry vs a payment in flight** (question 2, recommended): `expireOne` asks core `decideExpiry` under the order lock. If an attempt is `processing`, or `awaiting_customer`/`create_unknown` without a final provider read after its `expires_at` (Monobank sends no `expired` webhook, M8), the order is NOT expired: its `expires_at` and its active reservations are extended by 10 minutes (`decideExtend`; journal `payment_event` `system`), at most until `placed_at + TTL + 30 minutes`, and job 11 is made due for those attempts. After the cap the order expires anyway; any later success is refunded automatically.
+- **Cancel while paying**: the owner's or an admin's cancel of an `awaiting_payment` order is refused with `409 rule_violation payment_in_progress` while an attempt is `processing`; an `awaiting_customer` attempt is closed `invalidated` in the cancel transaction and its invoice invalidated after commit (best effort); a success that still lands is refunded.
+- **Double payment**: one live attempt per order (partial unique index) plus invalidation of the previous invoice; a second success anyway is `payment_reference_conflict` -> automatic refund.
+- **Manual mark paid** (question 4, recommended): kept for offline methods (bank transfer); refused with `payment_in_progress` while an attempt is `processing`; an `awaiting_customer` attempt is invalidated; a later online success is refunded automatically.
+- **Paid-order cancel and refunds**: independent. A refund never changes the order status; cancelling a paid order (admin, ADR 0022) does not refund by itself; the admin UI offers "refund" next to it (question 3). A full refund of a `fulfilled` order is allowed (returns).
+- **Status split** (question 8): not in v1. The `payment` table is the separate payment entity ADR 0004 asked for; the order keeps one status, `paid` set only through `markPaid`. Cash on delivery (needs `fulfilled` before `paid`) and a derived status get their own ADR later.
+
+### 5. Webhook (red zone: unauthenticated public route)
+`POST /webhooks/payments/{provider}`: no session, no CSRF (provider calls), JSON only, **raw body kept** (`rawBody: true` in `NestFactory.create`, scoped use), body cap 64 KiB, limit `paymentWebhook` per address (300 per minute; generous because Monobank's addresses are unknown, M25). Steps: provider loaded? (else `404`) -> `verifyWebhook` (the plugin verifies `X-Sign` with the cached key; on failure it refetches the key at most once per 60 s per process, then fails) -> invalid signature: `401`, a warning with no body, nothing stored -> find the attempt by provider id, else by `reference` (binds a `create_unknown` attempt) -> unknown attempt: `200` (logged; retries would not help) -> one transaction: journal insert `ON CONFLICT (dedupe_key) DO NOTHING` (a duplicate answers `200` at once), apply (section 4) -> `200` with an empty body. A database failure answers `503` so Monobank retries (M9). No outbound call on this path except the rare key refetch; automatic refunds run after commit in job 11 (or a post-commit attempt).
+
+### 6. Reconcile, invalidation and automatic refunds (job 11 `reconcile-payments`)
+Bounded like ADR 0025 (30 s budget, pages of 50, provider calls outside transactions, one short transaction per attempt): (a) attempts `processing`, `awaiting_customer` past `expires_at`, `create_unknown` and attempts with an unfinished refund: `getPayment`, apply as a `poll` fact; backoff 1, 2, 5, 10, 30 minutes, then hourly for 48 h, then `needs_attention` `reconcile_gave_up`; (b) invoices to invalidate (closed attempts with a provider id): `invalidatePayment` once, failures retried twice; (c) queued automatic refunds: `refund` with `extRef` = refund id; a timeout makes the refund `unknown` and the next run reads `cancelList` for that `extRef` instead of calling again (M13 dedupe UNKNOWN). Runs after job 8 and before jobs 9 and 10 (exact place in step 5). Admin "resync" calls (a) for one attempt.
+
+### 7. Refunds (question 3)
+Admin `POST /admin/orders/{id}/payments/{paymentId}/refunds {amount, note}` with `Idempotency-Key`: core `decideRefund` (attempt `succeeded`, currency equal, `0 < amount <= amount - refunded - in flight`, a partial amount only when the provider allows it and fiscal items are not required, question 5); row `requested` under the payment lock; provider call outside the transaction; result `processing`/`succeeded`/`failed`/`unknown`; `refunded_amount` updated on `succeeded`; `payment.refund_status_changed` event. Automatic refunds (late, duplicate) use the same path with reason codes and the full amount. Never retried blindly after a lost answer.
+
+### 8. API surface (red zone: public contract; exact shapes in the ADR and `docs/api/payments.md`)
+| Route | Auth | Purpose |
+|---|---|---|
+| `POST /store/orders/payments` | guest token, CSRF, limit `paymentCreate` (10 per 10 min per address) | create an attempt, `201 {paymentId, redirectUrl, expiresAt}` |
+| `POST /store/account/orders/{number}/payments` | customer, CSRF, same limit | same for a customer order |
+| `POST /store/orders/payments/status` | guest token, CSRF, limit `paymentStatus` (60 per 10 min) | one attempt's shopper view `{paymentId, status, failureCategory?, expiresAt, orderStatus, canRetry}` |
+| `GET /store/account/orders/{number}/payments/{paymentId}` | customer | same |
+| store order views (lookup, account order) | as today | additive `payment: {canPay, providers[], latest: {...} \| null}` |
+| `POST /webhooks/payments/{provider}` | provider signature | section 5 |
+| `GET /store/config`, `GET /admin/config` | as today | additive `onlinePayments: {enabled, providers[]}` |
+| `GET /admin/orders/{id}` (and `OrderReadPort`) | `orders.read` | additive `payments[]` (attempts, events summary, refunds; no redirect URL) |
+| `POST /admin/orders/{id}/payments/{paymentId}/resync` | `orders.write` | read the provider status now |
+| `POST /admin/orders/{id}/payments/{paymentId}/refunds` | `payments.refund` (question 13), limit per admin | refund |
+| `GET /admin/payments?needsAttention=true` | `orders.read` | the attention list (cursor paging) |
+| `POST /admin/payments/{paymentId}/attention/clear {note}` | `payments.refund` | an admin closes an attention item (journaled) |
+| `POST /admin/orders/{id}/mark-paid` | as today | + `409 payment_in_progress` |
+Problem codes: `payment_provider_unavailable` (503), `rule_violation` rules `payment_in_progress`, `payment_window_too_short`, `payment_not_available`, `refund_not_allowed`, `refund_exceeds_remaining`, `partial_refund_not_supported`; existing `order_not_payable`, `idempotency_key_reused`. Events: `payment.status_changed`, `payment.refund_status_changed` (ids only), `order.paid` unchanged.
+
+### 9. Storefront and admin UI
+- **Storefront** (question 9, recommended): after a successful checkout with online payment enabled, the checkout creates the attempt and redirects at once; if that fails, the order page shows "Pay now". Order page payment section: awaiting (with deadline), processing, paid, failed with a category ("declined by the bank", "payment cancelled", "link expired", "technical problem"; never the bank text), retry button while `canPay`; return page as section 3; texts uk/en; empty/loading/error states; keyboard and live regions; the "no payment is taken on this site" texts change only when `onlinePayments.enabled`.
+- **Admin**: payment panel in the order detail (attempts with status badges, amounts, provider id, card system and last 4, events timeline, refunds, "Resync", "Refund" dialog with amount prefilled to the remaining amount and a note, attention banner); attention list page; mark-paid dialog explains the online-payment guard; permission table entry; writes never retried (ADR 0027).
+
+### 10. Configuration (red zone: config schema)
+| Variable | Read by | Required | Default | Rule |
+|---|---|---|---|---|
+| `PAYMENT_PROVIDERS_ENABLED` | `loadEnv` | no | empty (none) | comma list of codes (`monobank`, `fake`); `fake` refused when `NODE_ENV=production`; a provider whose `capabilities.currencies` lacks `SHOP_CURRENCY` refuses startup (question 6) |
+| `MONOBANK_TOKEN` | `packages/providers/monobank` | when `monobank` is enabled | none | visible ASCII, 20 to 256 characters (format UNKNOWN; widened if S1 shows otherwise); never logged, stored or returned; the error names the variable only |
+| `STOREFRONT_PUBLIC_URL` | `loadEnv` (exists) | with a payment provider in production | as today | the ONLY base of `redirectUrl` and `webHookUrl`; `https` required in production with a provider |
+| `FAKE_PAYMENT_*` | `_fake-payment` | no | none | test hooks only (e2e) |
+No Monobank base-URL variable: `https://api.monobank.ua` is a constant (test and production use the same host, M1, M2); tests inject a stub origin through the module's test factory only. The token decides test vs production; the admin status shows `merchantName` from `GET /api/merchant/details` so an operator sees which merchant is connected (S1 checks whether a test token answers it).
+
+### 11. Security
+- **Signature**: ECDSA P-256 over SHA-256 of the raw bytes (M12, verified locally with `node:crypto`); the parsed JSON is never re-serialized for verification; key cached in memory per process, refetched only on a failed verification and at most once per 60 s (an attacker cannot make us call Monobank per request); the key is checked to be EC P-256 before use.
+- **Replay and duplicates**: a replayed genuine webhook is harmless (dedupe key, monotonic `modifiedAt`, idempotent `markPaid` by reference). No timestamp in the signature (M12), so replays cannot be refused by age; they cannot change state either.
+- **Binding**: provider id, our reference, amount, currency, order total (section 4); never a client amount; the return page's query parameter is only an id to look up under ownership checks.
+- **SSRF and redirects**: constant API base URL, `redirect: "error"`, 64 KiB answer cap, zod schemas; `pageUrl` must be `https` on an allow-listed host (M23) before it reaches a browser.
+- **Secrets and data**: `MONOBANK_TOKEN` only in the environment, never logged (log capture spec); no card data beyond question 12; no `errText` stored or shown; the storefront never sees provider ids it does not need.
+- **Rate limits**: `paymentCreate`, `paymentStatus`, `paymentWebhook`, admin `paymentRefund` (per admin user); provider reads on the status route single-flight per attempt.
+- **URLs from config only**: `redirectUrl` and `webHookUrl` from `STOREFRONT_PUBLIC_URL`; a spec sends a forged `Host` and `X-Forwarded-Host` and asserts they are ignored.
+- **Authorization**: store routes use the lookup/cancel ownership rules (identical `404`); admin refunds need `payments.refund`; every refund and attention clear is journaled with the admin id.
+
+### 12. Failure handling
+| Situation | Behaviour |
+|---|---|
+| Provider down at create | attempt `failed` (`not_sent`, `rejected`) or `create_unknown` (timeout); order stays `awaiting_payment`; shopper sees "try again" (`503`); a new attempt is allowed at once after `failed`, after `create_unknown` only when job 11 closed it (or at once if the owner prefers, question 2 note) |
+| Webhook lost or never sent (`expired`) | job 11 polls by backoff; the expiry grace (section 4) keeps stock while unconfirmed |
+| Success after expiry, cancel or another payment | automatic full refund, attention item, `order.paid` not emitted |
+| Amount or currency mismatch | not paid, attention item, no automatic refund |
+| Unknown provider status or malformed answer | journaled `applied = false`, attention item, reconcile retries |
+| Refund answer lost | refund `unknown`, reconcile reads `cancelList` by `extRef`; never resent blindly |
+| Invalid signature flood | `401` without storage; key refetch throttled; rate limit |
+| `429 TMR` | job pauses the run; store route `503` with `Retry-After` from config, not from Monobank (M17 UNKNOWN) |
+| Wrong or revoked token (`403`) | `misconfigured`, one error log per process, admin status shows it; creates answer `503` |
+
+### 13. Testing
+- **TDD (money and state, failing-then-passing evidence in each report):** core transitions, `normalizeProviderFact` ordering, `bindFact` (each field), `decideOrderOutcome` (every `markPaid` answer), `decideRefund` (zero, negative, over remaining, in-flight sum, currency, partial not supported, 1 kopiyka edges), `invoiceValidity` (boundaries 5 min and 3 min margin), `decideExpiry` (each attempt status, cap), basket sum equals amount (shipping line, rounding none).
+- **Contract suite** `checkPaymentProviderContract` run by `_fake-payment` and `monobank`.
+- **Monobank plugin**: stub server `test-support/stub-monobank.ts` with its own P-256 key pair (signs webhooks like M12), every documented status and error (M6, M16), `429`, `CANCEL_NOT_AVAILABLE`, malformed and oversized answers; the documented example key and signature as a fixed vector; no-network guard; token never in logs or errors.
+- **API integration (real Postgres, Redis, Meilisearch, no network):** webhook signature (valid, tampered byte, wrong key, missing header), duplicates and out-of-order facts, success after expiry/cancel/manual pay -> refund queued, concurrent webhook and expiry job (one outcome), concurrent webhook and customer cancel, two attempts, create timeout -> `create_unknown` -> late webhook binds by reference, expiry grace and cap, reconcile backoff and budget, refund limits under concurrency (two admins), permission walk, log capture, forged `Host`, migration up/down/up/down and CHECK specs.
+- **Mutation targets:** remove the amount bind, the reference bind, the `modifiedAt` monotonic check, the signature check, the dedupe insert, the expiry deferral, the refund limit, the `payment_in_progress` guards; each must fail a test.
+- **e2e** with `fake`: checkout -> fake hosted page (a test-only route the fake registers) -> success -> return page -> order paid; failure and retry; admin refund.
+- **CI:** matrix modes `providers-payment-fake`, `providers-payment-none`, `providers-payment-monobank` (refuses to start without `MONOBANK_TOKEN`, no request to Monobank at startup); `providers-deleted` also removes `_fake-payment` and `monobank`.
+
+### 14. Steps (one branch and PR each; merge only on the owner's word)
+| Step | What | Owner / model | Paths | Verification | Approval |
+|---|---|---|---|---|---|
+| 0 | This plan; quiz answers recorded | Architect | `docs/plans/`, `docs/HANDOFF.md` | `format:check`, `check:docs` | owner merges |
+| 1 | ADR 0032 "Online payments": port, payment entity next to the single order status (refines ADR 0004 decision 4 and ADR 0017), verified facts only, expiry grace, automatic refunds, webhook, reconcile, config | Architect (Opus 5.5 high) | `docs/adr/` | review | owner |
+| 2 | Core `src/payments/`: port, results, contract suite, statuses, fact normalisation and binding, refund rules, validity, expiry decision, basket building | Developer, Opus 5.5 high | `packages/core/src/payments/` | TDD evidence, mutation checks, `check:boundaries` | contract (port) |
+| 3 | Migration `0008_payments` + down, Drizzle schema, schema specs, journal trigger | Developer, Opus 5.5 high | `apps/api/drizzle/`, `apps/api/src/database/schema/payments.ts` | up/down/up/down, `db:drift`, CHECK mutations | schema |
+| 4 | Config (`PAYMENT_PROVIDERS_ENABLED`), loader `kind: "payment"`, registry, `_fake-payment` (signed webhooks, test-only hosted page route, hooks), matrix modes, `onlinePayments` config flags | Developer, Sonnet 5.5 | `packages/config/`, `apps/api/src/payments/registry/`, `packages/providers/_fake-payment/`, `scripts/feature-matrix.sh`, `.github/workflows/ci.yml` | matrix locally | config schema, CI |
+| 5 | Payment service: attempts writer, create flow, webhook route with raw body, fact application with `markPaidIn`, job 11 (reconcile, invalidation, automatic refunds) | Developer, Opus 5.5 high | `apps/api/src/payments/`, `apps/api/src/jobs/`, `apps/api/src/app.factory.ts` (rawBody only), `orders.service.ts` (`markPaidIn` only) | concurrency, crash and budget specs, log capture | payments, contract |
+| 6 | Order integration: expiry deferral, cancel and mark-paid guards | Developer, Opus 5.5 high | `apps/api/src/orders/`, `packages/core/src/orders/` (if a rule moves) | race specs (webhook vs expiry vs cancel), mutation checks | order status logic |
+| 7 | Monobank plugin with stub server, no-network guard, S1 tool `scripts/spikes/monobank-verify.mjs` (`readonly`, `invoice`, `pay` stages; self-test) | Developer, Opus 5.5 high | `packages/providers/monobank/`, `scripts/spikes/` | contract suite, stub specs, the M12 vector | new package (no new dependency) |
+| S1 | **Owner live test with a TEST token** (section 15) | owner (+ Orchestrator watching) | none | findings written into this plan | owner's token and go |
+| 8 | Store routes, admin routes (resync, refunds, attention), `payments.refund`, OpenAPI, `docs/api/payments.md`, api-client | Developer, Opus 5.5 high (refunds), Sonnet 5.5 (reads) | `apps/api/src/payments/*controller*`, `packages/core/src/auth/roles.ts`, `packages/api-client/` | permission walk, contract tests, `openapi:export` | auth, contract |
+| 9 | Storefront: pay redirect, return page, order page payment section, texts | Developer, Sonnet 5.5 | `apps/storefront/` | Vitest, keyboard, i18n parity | - |
+| 10 | Admin: payment panel, refund dialog, attention list, mark-paid guard text | Developer, Sonnet 5.5 | `apps/admin/src/areas/orders/`, `apps/admin/src/areas/payments/` | Vitest, permission table | - |
+| 11 | e2e with the fake (both suites), proxies (`/webhooks` route in e2e proxies and README examples), docs sweep, HANDOFF | Developer + Docs (Haiku 5.5 for the sweep) | `apps/*/e2e/`, `README.md`, `docs/` | `pnpm test:e2e` | - |
+| 12 | Independent review (security, money, races, contracts); fixes in a separate PR | Reviewer, a different model than the authors | - | findings file | owner |
+| S2 | **Owner production check**: real token, one small real payment (e.g. 1 to 10 UAH) and its refund on the deployed shop | owner | none | findings in this plan | owner's go |
+Steps 2 and 3 in parallel; 4 after 2; 5 needs 2 to 4; 6 needs 5; 7 needs 2 and 4 (parallel with 5); S1 after 7; 8 after 5 and 6; 9 and 10 in parallel after 8; 11 after 9 and 10; 12 before S2. Release 8, 9 and 10 together.
+
+### 15. What the owner prepares
+- **For S1 (test environment):** a monobank personal account; the test token from https://api.monobank.ua/ (M1, M2) set as `MONOBANK_TOKEN` in a local `.env` (never in chat); a public `https` URL that reaches a running API for the webhook stage (a staging host behind the edge proxy; the tool needs it only for stage `pay`); 20 minutes to open the test payment page and pay with a Luhn-valid test card number. S1 verifies: create answer and `pageUrl` host (M23), minimum `validity` (M19), webhook delivery and `X-Sign` against the live key (M12), whether `created` is sent as a webhook, ordering in practice (M10), what a test token answers on `details` and `pubkey`, the error shapes (M16), partial and repeated refunds and `extRef` dedupe (M13), `remove` on an unpaid and a paid invoice (M14), `429` (M17) if seen.
+- **Before production (S2):** a FOP or legal-entity account with Plata by mono internet acquiring enabled in https://web.monobank.ua/ and the production token from the cabinet (M1, M24); the merchant agreement and the bank's website requirements (offer, contacts, delivery and refund terms: UNKNOWN, ask the manager, M25); the PRRO/fiscalisation decision with the accountant (question 5, M21); the commission (1.3 % / 2 %, M24) and settlement timing (M25); `STOREFRONT_PUBLIC_URL` with `https`; the edge proxy route for `/webhooks/payments/*` (question 10); the refund and cancellation policy text for the storefront.
+
+## Risks
+- **Money moves on facts we did not see before** (unknown statuses, ordering, partial refund behaviour): mitigated by binding checks, attention items, automatic refunds only for the clear cases, S1 before any production use, TDD and the independent review.
+- **No create idempotency at Monobank** (M5): a lost answer leaves an invoice nobody can pay (no `pageUrl` reached a browser); bound by `reference` if a webhook arrives.
+- **Refund idempotency unknown** (M13): a lost refund answer must never be resent blindly; reconcile by `extRef`. A double refund would lose money.
+- **Late success after the grace cap** refunds automatically: a shopper paid and gets the money back; communication text needed (refund mail later).
+- **Single process limits** (rate limits, key cache) multiply with instances; harmless for correctness.
+- **Order status remains single**: cash on delivery still cannot be modelled (question 8).
+- **Webhook route is a new public, unauthenticated surface**: raw-body parsing, size caps, rate limit, signature first.
+- **Deployment coupling**: `/webhooks` needs an edge proxy route in every environment; without it no webhook arrives (reconcile still pays orders, slower).
+- **Fiscal law** (PRRO) is the owner's legal duty; the template cannot decide it.
+
+## Docs to update (in the steps above)
+ADR 0032 and `docs/adr/README.md`; `docs/api/payments.md` (new), `docs/api/orders.md` (order views `payment`, mark-paid guard, cancel guard, expiry grace), `docs/api/catalog.md` and the admin config doc (`onlinePayments`), `docs/api/jobs.md` (job 11, job 1 deferral), `docs/api/openapi.json`; `docs/contracts/api.md`, `events.md` (`payment.*` events, `OrderPaymentsPort` notes), `config.md` (`PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`, `STOREFRONT_PUBLIC_URL` rule), a payment provider package contract in `packages/providers/README.md`; `docs/files/*.md` for `apps/api/src/payments/`, `packages/core/src/payments/`, both provider packages; `docs/dependencies.md` (Monobank as an external service and processor of payment data); `.env.example`; `CHANGELOG.md` (schema, routes, config, events); `README.md` (payments setup, proxy route); `apps/storefront/README.md`, `apps/admin/README.md`; `docs/HANDOFF.md`.
+
+## Needs approval (red zones)
+1. **Payments**: the whole flow, automatic refunds, admin refunds (questions 1 to 3).
+2. **Order status and total logic**: `markPaidIn`, the expiry deferral and grace cap, cancel and mark-paid guards (questions 2 and 4); no change to totals.
+3. **Schema**: migration `0008_payments` (`payment`, `payment_event`, `payment_refund`, journal trigger) with its down script.
+4. **Auth and public surface**: the unauthenticated webhook route, raw body, new rate limits, the new permission `payments.refund` (question 13).
+5. **Public contracts**: store and admin routes, additive order view and config fields, `payment.*` events, `PaymentProviderPort`, problem rules.
+6. **Config schema**: `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`, the production `https` rule of `STOREFRONT_PUBLIC_URL` with a payment provider.
+7. **CI**: matrix modes `providers-payment-*`; job 11 in the tick; `rawBody` in the app factory.
+8. **External service**: Monobank as a processor (`docs/dependencies.md` decision); S1 and S2 with the owner's tokens.
+9. **Dependencies**: none (Node `fetch`, `node:crypto`, zod 4.6.7 already pinned).
+
+## AGENTS.md edits the owner makes (after the steps merge)
+- Section 1, Stack: "Online payments: core `PaymentProviderPort`; providers selected by `PAYMENT_PROVIDERS_ENABLED` (`monobank` first, `fake` for tests); orders become `paid` only from a verified provider fact; see ADR 0032."
+- Section 1, configuration: `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN` (required with `monobank`, never logged).
+- Section 5: `/packages/providers` holds `_fake-payment` and `monobank` too.
+- Section 11: "Payment webhooks: verify the signature over the raw body before parsing; bind provider id, reference, amount and currency; never mark paid from a redirect or client input; refunds are never retried after a lost answer without reading the provider's state."
+- Section 18: the CI matrix modes `providers-payment-fake`, `providers-payment-none`, `providers-payment-monobank`.
+
+## Open questions (owner quiz; recommended option first; ordered by importance)
+Marked **[OWNER]** where the owner's own judgement, money or legal duty is involved; the orchestrator may take the others as recommended.
+
+1. **[OWNER] v1 scope?**
+   - **(Recommended) Redirect card payment (`debit`) through Monobank's page, webhook + reconcile, automatic refunds of late or duplicate payments, admin full and partial refunds; hold/capture, tokenization, the app button, iframe and LiqPay/WayForPay later.** The smallest flow that takes money safely.
+   - Same without any refund through the API (refunds only in the Monobank cabinet; we only record `reversed`). Less money code; late payments then need manual refunds.
+   - Option 1 plus hold/capture (`paymentType: hold`, capture at fulfilment). Fits "pay on dispatch"; 9-day limit, UAH only, more states.
+2. **[OWNER] A payment that succeeds after the order expired or was cancelled?**
+   - **(Recommended) While a payment is processing or unconfirmed, expiry waits in 10-minute steps up to 30 minutes past the normal deadline (stock stays held); after that the order expires and any later success is refunded in full automatically, with an admin alert.** Few lost sales, never paid-without-stock.
+   - No grace: expire on time, refund every late success automatically. Simplest; more refunds for slow 3-D Secure.
+   - No automatic refund: alert only, an admin refunds or contacts the shopper. Human judgement; money sits on a dead order until someone acts.
+3. **[OWNER] Refunds in v1?**
+   - **(Recommended) Admin full and partial refunds from the order page (permission `payments.refund`), never more than paid; the order status is not changed by a refund.** Covers returns and missing items.
+   - Full refunds only. Simpler limits; a missing item needs the cabinet.
+   - None in the shop (cabinet only). Least code; the shop's records drift from the bank's.
+4. **[OWNER] Manual "mark paid" when online payment is on?**
+   - **(Recommended) Keep it for offline payments, refused while an online payment is processing; an online success after a manual payment is refunded automatically.** Bank transfers keep working.
+   - Hide it when a provider is enabled. No mixing; offline payers cannot be served.
+   - Keep it unchanged. Risk of double payment.
+5. **[OWNER] Fiscal receipts (PRRO)?** (ask the accountant)
+   - **(Recommended) v1 assumes PRRO is NOT linked in the Monobank cabinet (the shop fiscalises elsewhere or is exempt); we still send `basketOrder` for display; PRRO items on refunds come in a later step.** Keeps refunds simple.
+   - Support Monobank PRRO in v1 (items with codes on every refund and partial refund). Compliant out of the box if the shop uses monopay PRRO; more fields and rules.
+   - Do not send a basket at all. Least data; the payment page shows no order content and PRRO cannot be enabled.
+6. **Currency?**
+   - **(Recommended) UAH only: `monobank` refuses to start unless `SHOP_CURRENCY=UAH`.** M18 unknown for other currencies.
+   - Allow any currency and let Monobank refuse. Untested path.
+   - Ask the bank first and decide at S1.
+7. **Provider selection?**
+   - **(Recommended) A list `PAYMENT_PROVIDERS_ENABLED` (shipping precedent); the storefront shows a choice only with more than one.** Ukrainian shops often offer two providers.
+   - One `PAYMENT_PROVIDER` (email precedent). Simpler; LiqPay next to Monobank needs a change.
+   - Monobank wired directly. Contradicts AGENTS.md section 1.
+8. **Order status split?**
+   - **(Recommended) Not in v1: a separate `payment` entity, the order keeps one status; cash on delivery and the split get their own ADR.** No change to the status machine.
+   - Split now (`payment_status`, `fulfilment_status`). Enables cash on delivery; touches every order route and view.
+   - Derive the order status from payments and shipments (ADR 0004 as written). Largest change.
+9. **When does the shopper go to Monobank?**
+   - **(Recommended) Right after placing the order (automatic redirect); "Pay now" on the order page as fallback and for retries.** One click.
+   - Only from the order page button. One more click; clearer review step.
+   - Choose at checkout between online and "pay later". More UI; useful with offline methods.
+10. **Webhook path?**
+    - **(Recommended) `/webhooks/payments/{provider}` with a new edge proxy route.** Clear separation from shopper routes.
+    - `/store/payments/webhooks/{provider}`: no proxy change. Mixes a provider route into the shopper prefix.
+    - A per-shop secret path segment as well. Defence in depth; one more secret.
+11. **Payment time window?**
+    - **(Recommended) Keep `ORDER_PAYMENT_TTL_MINUTES` (default 30); the invoice is valid until 3 minutes before the order deadline, at least 5 minutes.** No config change.
+    - Raise the default to 60 when a provider is enabled. Fewer expiries; stock held longer.
+    - A separate `PAYMENT_INVOICE_VALIDITY_MINUTES`. Flexible; one more variable.
+12. **Card data shown to admins?**
+    - **(Recommended) Card system and last 4 digits only.** Enough for disputes; no BIN.
+    - Nothing. Least data; harder support.
+    - The provider's full mask (BIN + last 4). More data, still not PCI-sensitive storage, but more than needed.
+13. **Refund permission?**
+    - **(Recommended) New `payments.refund` for owner and manager; payments visible with `orders.read`.** Refunds move money.
+    - Owner only. Strict.
+    - Reuse `orders.write`. No new permission; anyone who cancels can refund.
+
+**[OWNER] actions outside the quiz:** the test token and an `https` staging URL for S1; the merchant contract, production token, website requirements and settlement terms for S2; the PRRO/fiscal decision with the accountant; the processor entry for the privacy plan.
+
+## Assumptions to confirm (approving the plan approves them)
+- Payments are core (providers are plugins); no feature flag beyond an empty `PAYMENT_PROVIDERS_ENABLED`.
+- One live attempt per order; a new attempt invalidates the previous unpaid invoice.
+- The webhook and the status read are equally trusted (both verified by us); the redirect is never trusted.
+- `order.paid` stays the only paid event for emails; refund mails come later.
+- Monobank's statement and receipt endpoints are not used in v1.
+
+## Not verified (UNKNOWN)
+M5 (create dedupe by `reference`), M9 (retry intervals, timeout, non-200 success codes), M13 (`extRef` dedupe, several partial refunds), M17 (rate limits), M18 (non-UAH invoices), M19 (minimum validity; payments finishing after validity), M20 (amount limits), M23 (payment page hosts), M25 (settlement, website requirements, webhook source addresses, HTTPS requirement); whether a test token answers `details` and `pubkey`; whether `created` produces a webhook; whether `api.monobank.ua` is reachable from non-Ukrainian hosting. Nothing in this plan was run against Monobank; only the documented signature example was verified locally.
