@@ -72,7 +72,7 @@ Not contract (internal, may change in a minor release): the scrypt parameters an
 
 ## Customer authentication and the store (ADR 0016, `docs/api/customers.md`)
 
-Plan steps 3a and 3b. Endpoints: `POST /store/account/register`, `POST /store/account/login`, `POST /store/account/logout`, `GET` and `PATCH /store/account/me`, `POST /store/account/change-password` (shapes, errors and rules in `docs/api/customers.md`). Register and login are the only public routes under `/store/account`. The rows below are the rules every customer route follows.
+Plan steps 3a and 3b. Endpoints: `POST /store/account/register`, `POST /store/account/login`, `POST /store/account/logout`, `GET` and `PATCH /store/account/me`, `POST /store/account/change-password`, and (email plan step 7, ADR 0031) `POST /store/account/password-reset`, `POST /store/account/password-reset/confirm`, `POST /store/account/verify-email`, `POST /store/account/verify-email/resend` (shapes, errors and rules in `docs/api/customers.md`). Register, login and the three mail-link routes (reset request, reset confirmation, verification) are the only public routes under `/store/account`. The rows below are the rules every customer route follows.
 
 | Item | Rule |
 |---|---|
@@ -80,8 +80,9 @@ Plan steps 3a and 3b. Endpoints: `POST /store/account/register`, `POST /store/ac
 | Customer cookie | `fluxkit_customer_session`: `HttpOnly`, `SameSite=Lax`, `Path=/store`, `Secure` unless `STORE_COOKIE_SECURE=false`; idle and absolute lifetimes from `CUSTOMER_SESSION_IDLE_MINUTES` and `CUSTOMER_SESSION_MAX_HOURS` (`docs/contracts/config.md`). A separate principal from the admin: an admin cookie never authenticates a customer route and a customer cookie never authenticates an `/admin` route (`401`); only the cookie is read |
 | Public by default | A `/store` route is public unless it is marked customer-authenticated; a customer-authenticated route answers `401 unauthorized` (identical for every cause) and carries `Cache-Control: no-store` |
 | Rate limit | A limited store route answers `429 too_many_requests` with `Retry-After`; register and login are limited |
-| Account responses | `{customer: {id, email, firstName, lastName, phone, createdAt}}` (register and login add `cartNotices`, see Cart) and nothing else: never the hash, lockout state or flags. Every response under `/store/account` is `Cache-Control: no-store` |
+| Account responses | `{customer: {id, email, emailVerified, firstName, lastName, phone, createdAt}}` (register and login add `cartNotices`, see Cart) and nothing else: never the hash, lockout state or other flags. `emailVerified` (boolean) is additive (email plan step 7). Every response under `/store/account` is `Cache-Control: no-store` |
 | Sign-in failures | Unknown email, wrong password, locked and inactive account answer the identical `401` (status, headers, body) with no cookie. Registration with a taken email is `409 conflict` on `email` (accepted trade-off, ADR 0016) |
+| Password reset and verification (ADR 0031, new in this release, additive) | `POST /store/account/password-reset` `{email, locale}` answers `202 {}` for every address (identical body and headers, no sooner than 400 ms; `400` for a malformed email or a locale not in `LOCALES`, `429`); `password-reset/confirm` `{token, newPassword}` and `verify-email` `{token}` answer `204`, and every token problem is `400 validation_failed` with one error at `token`, code `invalid_or_expired` (a new validation code; `newPassword` errors use the registration codes); `verify-email` answers `204` again for a verified customer's used link; `verify-email/resend` (customer, no body) answers `204` or `409 rule_violation` `already_verified` (a new rule). All four answer `404` like an unknown route when `GET /store/config` says `emailDelivery: false` (`EMAIL_PROVIDER=none`). A successful reset ends every session of the customer and signs nobody in. Links in mail are `{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>` and `.../account/verify-email#t=<token>`: the paths and the `t` fragment parameter are contract for a storefront; the token format is not |
 
 Not contract (internal): the cookie name, the token format and how sessions are stored, the rate-limit numbers.
 
@@ -106,7 +107,7 @@ Known limits:
 
 - The IP login limit is in memory, per API process: it resets on restart and is not shared between instances. The account lockout is in the database and does span instances.
 - `request.ip` is the socket address unless `TRUST_PROXY` (the number of trusted proxy hops, `docs/contracts/config.md`) is set. Behind a reverse proxy or a server-side storefront, set it to the exact hop count, or all clients share one IP window; a value that is too high lets a client choose its address with `X-Forwarded-For` (ADR 0024).
-- No password reset by email, no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in is described in the Cart section.
+- Password reset and verification by mail exist (above; ADR 0031); no two-factor authentication, no audit log of sign-ins (follow-ups in `docs/plans/2026-10-16-auth-and-roles.md`). The reset request's per-email and per-address limits are in memory per process; the 3 tokens per customer per hour are counted in the database. Customer accounts are built in the cart and orders plan (`docs/api/customers.md`); the guest-cart merge at sign-in is described in the Cart section.
 
 ## Checkout and orders (ADR 0015, 0017, `docs/api/orders.md`)
 

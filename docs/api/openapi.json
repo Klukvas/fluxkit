@@ -1512,6 +1512,9 @@
                         "email": {
                           "type": "string"
                         },
+                        "emailVerified": {
+                          "type": "boolean"
+                        },
                         "firstName": {
                           "type": "string"
                         },
@@ -1528,7 +1531,15 @@
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "required": [
+                        "id",
+                        "email",
+                        "emailVerified",
+                        "firstName",
+                        "lastName",
+                        "phone",
+                        "createdAt"
+                      ],
                       "additionalProperties": false
                     },
                     "cartNotices": {
@@ -1663,6 +1674,9 @@
                         "email": {
                           "type": "string"
                         },
+                        "emailVerified": {
+                          "type": "boolean"
+                        },
                         "firstName": {
                           "type": "string"
                         },
@@ -1679,7 +1693,15 @@
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "required": [
+                        "id",
+                        "email",
+                        "emailVerified",
+                        "firstName",
+                        "lastName",
+                        "phone",
+                        "createdAt"
+                      ],
                       "additionalProperties": false
                     },
                     "cartNotices": {
@@ -1844,6 +1866,9 @@
                         "email": {
                           "type": "string"
                         },
+                        "emailVerified": {
+                          "type": "boolean"
+                        },
                         "firstName": {
                           "type": "string"
                         },
@@ -1860,7 +1885,15 @@
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "required": [
+                        "id",
+                        "email",
+                        "emailVerified",
+                        "firstName",
+                        "lastName",
+                        "phone",
+                        "createdAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -1963,6 +1996,9 @@
                         "email": {
                           "type": "string"
                         },
+                        "emailVerified": {
+                          "type": "boolean"
+                        },
                         "firstName": {
                           "type": "string"
                         },
@@ -1979,7 +2015,15 @@
                           "description": "ISO 8601, UTC."
                         }
                       },
-                      "required": ["id", "email", "firstName", "lastName", "phone", "createdAt"],
+                      "required": [
+                        "id",
+                        "email",
+                        "emailVerified",
+                        "firstName",
+                        "lastName",
+                        "phone",
+                        "createdAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
@@ -2117,6 +2161,397 @@
           }
         },
         "summary": "Change the own password; all other sessions end",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/password-reset": {
+      "post": {
+        "description": "Always the same `202 {}`, with the same headers and no sooner than 400 ms after the request arrived, whether or not an account has this email, is active or is locked: an active account gets a mail with a link valid 60 minutes (`{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>`), an unknown address gets nothing. At most 3 links per account per hour (over it: the same answer, no mail). `locale` (one of `LOCALES`) is the language of the mail. 400 only for a malformed email or locale; 429 per client address and per requested email. Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
+        "operationId": "AccountEmailController_requestPasswordReset",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "locale": {
+                    "type": "string",
+                    "maxLength": 35
+                  }
+                },
+                "required": ["email", "locale"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted; says nothing about the account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Ask for a password reset link by email",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/password-reset/confirm": {
+      "post": {
+        "description": "Every token problem (unknown, used, expired, replaced by a newer link, another purpose, the account deactivated) is the same 400 `validation_failed` at `token` with code `invalid_or_expired`. The new password follows the registration policy (400 at `newPassword`). On success every session of the customer ends, a lockout is cleared, the link stops working and a \"password changed\" mail is sent; nobody is signed in. Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
+        "operationId": "AccountEmailController_confirmPasswordReset",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "maxLength": 128
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": ["token", "newPassword"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password changed; sign in with it."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Set a new password with the token of a reset link",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/verify-email": {
+      "post": {
+        "description": "Sets `emailVerified`. Every token problem is the same 400 `validation_failed` at `token` with code `invalid_or_expired`; a link of a customer who is already verified answers 204 again. Shares the per-address limit with the reset confirmation. Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
+        "operationId": "AccountEmailController_verifyEmail",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                },
+                "required": ["token"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The email address is verified."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm the account's email address with the token of a verification link",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/verify-email/resend": {
+      "post": {
+        "description": "The mail is in `DEFAULT_LOCALE`; the link is valid 48 hours and the older link stops working. 409 `rule_violation` `already_verified` for a verified address; at most 3 per customer per hour (429). Takes no body members. Anonymous callers get 401; Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
+        "operationId": "AccountEmailController_resendVerification",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "A new verification mail is on its way."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Send the signed-in customer a new verification link",
         "tags": ["store"]
       }
     },

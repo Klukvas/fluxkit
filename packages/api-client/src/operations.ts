@@ -45,6 +45,16 @@ export const OPERATIONS = {
   getAccount: operation("GET", "/store/account/me", [200]),
   updateAccount: operation("PATCH", "/store/account/me", [200], { hasBody: true }),
   changePassword: operation("POST", "/store/account/change-password", [204], { hasBody: true }),
+  requestPasswordReset: operation("POST", "/store/account/password-reset", [202], {
+    hasBody: true,
+  }),
+  confirmPasswordReset: operation("POST", "/store/account/password-reset/confirm", [204], {
+    hasBody: true,
+  }),
+  confirmEmailVerification: operation("POST", "/store/account/verify-email", [204], {
+    hasBody: true,
+  }),
+  requestEmailVerification: operation("POST", "/store/account/verify-email/resend", [204]),
   getCart: operation("GET", "/store/cart", [200], { query: LOCALE }),
   clearCart: operation("DELETE", "/store/cart", [204]),
   addCartItem: operation("POST", "/store/cart/items", [200], { hasBody: true, query: LOCALE }),

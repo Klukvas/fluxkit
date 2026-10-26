@@ -5,6 +5,7 @@ import { toPage, type Page } from "../../common/pagination.js";
 import { notFound } from "../../common/problem.js";
 import { withTransaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
+import { CustomerAuthTokens } from "../../email/auth/index.js";
 import { CustomerSessionService } from "../auth/customer-session.service.js";
 import { CustomerRepository, type CustomerRow } from "../customer.repository.js";
 import type {
@@ -38,6 +39,7 @@ export class AdminCustomersService {
     @Inject(CustomerRepository) private readonly customers: CustomerRepository,
     @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(CustomerAuthTokens) private readonly authTokens: CustomerAuthTokens,
   ) {}
 
   async list(query: ListCustomersQuery): Promise<Page<CustomerSummary>> {
@@ -54,6 +56,8 @@ export class AdminCustomersService {
    * Activity. Deactivating deletes every session of the customer in the same transaction that clears the flag. The
    * row lock is the one a login takes before it creates a session, so a login either finished first (and its
    * session is deleted here) or waits and then sees the customer inactive: no session can outlive the deactivation.
+   * Deactivating also ends the reset and verification links still out (ADR 0031 decision 9), so activating the
+   * customer again does not revive them.
    */
   async update(id: string, body: UpdateCustomerBody): Promise<CustomerDetail> {
     await withTransaction(this.db, async (transaction) => {
@@ -64,6 +68,7 @@ export class AdminCustomersService {
       await this.customers.update(id, { isActive: body.isActive }, transaction);
       if (!body.isActive) {
         await this.sessions.revokeAllForCustomer(id, undefined, transaction);
+        await this.authTokens.invalidate(transaction, id, undefined, this.clock.now());
       }
     });
     return this.detail(id);

@@ -151,6 +151,7 @@ export async function createApp(
         from: env.emailFrom ?? null,
         replyTo: env.emailReplyTo ?? null,
         storefrontPublicUrl: env.storefrontPublicUrl ?? null,
+        tokenSecret: env.orderTokenSecret ?? null,
         tuning: { ...DEFAULT_EMAIL_DELIVERY_TUNING, ...options.emailDeliveryTuning },
       },
       locale: {

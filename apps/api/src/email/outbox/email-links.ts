@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { EmailLinks, EmailRecipientKind } from "@fluxkit/core";
+import type { AuthTokenPurpose, EmailLinks, EmailRecipientKind } from "@fluxkit/core";
+import { deriveAuthToken } from "../auth/auth-token-crypto.js";
 import { EMAIL_DELIVERY_CONFIG, type EmailDeliveryConfig } from "./email-delivery-config.js";
 
 /** Injection token of the `EmailLinkSource` the sender renders with (a spec may provide its own). */
@@ -32,9 +33,43 @@ export function storefrontHomeLink(base: string, locale: string): string {
 }
 
 /**
- * The link source of this step: the storefront home and no action link.
- * TODO(fluxkit): email plan steps 7 and 8 derive the action links (reset and verification tokens from the token row id,
- * the guest order link from `order_id` and `idempotency_key`, ADR 0023) and register them by template key here.
+ * The storefront page each auth mail links to, and the purpose its token was issued for. The token travels in the URL
+ * FRAGMENT (`#t=`): never in access logs, a `Referer` or the Next.js server (ADR 0031 decision 13, as ADR 0023).
+ */
+export const AUTH_LINK_PAGES = Object.freeze({
+  "customer.password_reset": { purpose: "password_reset", path: "account/reset-password" },
+  "customer.verify_email": { purpose: "email_verification", path: "account/verify-email" },
+} as const satisfies Record<string, { purpose: AuthTokenPurpose; path: string }>);
+
+const TOKEN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/**
+ * `<base>/<locale>/<page>#t=<token>` for an auth mail. The token is derived from the row id of `variables.tokenId` and the
+ * secret (core `deriveCustomerAuthToken`, its 43 characters need no encoding). A missing secret or token id is a bug or a
+ * misconfiguration: it throws, and the sender records the mail `failed` `render_failed`.
+ */
+export function authActionLink(
+  base: string,
+  locale: string,
+  page: (typeof AUTH_LINK_PAGES)[keyof typeof AUTH_LINK_PAGES],
+  tokenId: unknown,
+  secret: string | null,
+): string {
+  if (secret === null) {
+    throw new Error("ORDER_TOKEN_SECRET is needed to build the link of an auth mail");
+  }
+  if (typeof tokenId !== "string" || !TOKEN_ID.test(tokenId)) {
+    throw new Error("An auth mail needs the token row id in its variables");
+  }
+  const token = deriveAuthToken(secret, page.purpose, tokenId);
+  return `${storefrontHomeLink(base, locale)}/${page.path}#t=${token}`;
+}
+
+/**
+ * The link source of the API: the storefront home in the mail's locale, and the action link of the auth mails
+ * (password reset, email verification) with the token derived at render time.
+ * TODO(fluxkit): email plan step 8 adds the order links (the guest order link from `order_id` and `idempotency_key`,
+ * ADR 0023; the account order link) by template key here.
  */
 @Injectable()
 export class StorefrontEmailLinks implements EmailLinkSource {
@@ -45,6 +80,21 @@ export class StorefrontEmailLinks implements EmailLinkSource {
     if (base === null) {
       throw new Error("STOREFRONT_PUBLIC_URL is needed to build the links of a mail");
     }
-    return Object.freeze({ storefront: storefrontHomeLink(base, input.locale), action: null });
+    const page = Object.hasOwn(AUTH_LINK_PAGES, input.templateKey)
+      ? AUTH_LINK_PAGES[input.templateKey as keyof typeof AUTH_LINK_PAGES]
+      : undefined;
+    return Object.freeze({
+      storefront: storefrontHomeLink(base, input.locale),
+      action:
+        page === undefined
+          ? null
+          : authActionLink(
+              base,
+              input.locale,
+              page,
+              input.variables["tokenId"],
+              this.config.tokenSecret,
+            ),
+    });
   }
 }

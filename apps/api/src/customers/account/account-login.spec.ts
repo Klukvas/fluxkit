@@ -81,7 +81,7 @@ describe("POST /store/account/login", () => {
       expect(Object.keys(result.body)).toEqual(["customer", "cartNotices"]);
       expect(result.body.cartNotices).toEqual([]);
       expect(Object.keys(result.body.customer).sort()).toEqual(
-        ["createdAt", "email", "firstName", "id", "lastName", "phone"].sort(),
+        ["createdAt", "email", "emailVerified", "firstName", "id", "lastName", "phone"].sort(),
       );
       expect(result.body.customer).toMatchObject({ id: shopper.id, email: shopper.email });
       expect(result.headers.get("cache-control")).toBe("no-store");

@@ -6,6 +6,9 @@ import {
   type GreetingVariables,
 } from "../../test/email-template-fixture.js";
 import { AdminTestEmailTemplate } from "./admin-test.template.js";
+import { PasswordChangedEmailTemplate } from "./customer-password-changed.template.js";
+import { PasswordResetEmailTemplate } from "./customer-password-reset.template.js";
+import { VerifyEmailEmailTemplate } from "./customer-verify-email.template.js";
 import { BUILT_IN_EMAIL_CATALOGS, formatMessage, LAYOUT_CATALOGS } from "./email-messages.js";
 import { renderEmail, type RegisteredEmailTemplate } from "./email-renderer.js";
 import { EMAIL_THEME } from "./email-theme.js";
@@ -52,6 +55,9 @@ function entryOf(provider: {
 
 const TEMPLATES: [string, RegisteredEmailTemplate][] = [
   ["admin.test", entryOf(new AdminTestEmailTemplate() as never)],
+  ["customer.password_reset", entryOf(new PasswordResetEmailTemplate() as never)],
+  ["customer.password_changed", entryOf(new PasswordChangedEmailTemplate() as never)],
+  ["customer.verify_email", entryOf(new VerifyEmailEmailTemplate() as never)],
   ["fixture.greeting (a feature's template)", entryOf(new FixtureGreetingTemplate() as never)],
 ];
 
@@ -132,6 +138,64 @@ describe("rendering with hostile values (ADR 0031 decision 14)", () => {
   });
 });
 
+describe("the account mails (ADR 0031 decision 10)", () => {
+  const links = (locale: string) => ({
+    storefront: `https://shop.example.com/${locale}`,
+    action: `https://shop.example.com/${locale}/account/reset-password#t=${"T".repeat(43)}`,
+  });
+
+  it.each([
+    ["customer.password_reset", new PasswordResetEmailTemplate()],
+    ["customer.verify_email", new VerifyEmailEmailTemplate()],
+  ] as const)(
+    "%s prints the action link in the button, as text and in the plain-text part",
+    (_key, provider) => {
+      const entry = entryOf(provider as never);
+      for (const locale of ["uk", "en"]) {
+        const mail = renderEmail(entry, entry.template.sampleVariables, {
+          ...options(locale),
+          shopName: "Shop",
+          links: links(locale),
+        });
+        const action = links(locale).action;
+        expect(
+          mail.html.match(new RegExp(`href="${action.replace(/[.#/]/g, "\\$&")}"`, "g")),
+        ).toHaveLength(2);
+        expect(mail.text).toContain(action);
+        expect(mail.category).toBe("account");
+      }
+    },
+  );
+
+  it("customer.password_changed carries no link but the shop's", () => {
+    const entry = entryOf(new PasswordChangedEmailTemplate() as never);
+    const mail = renderEmail(entry, {}, { ...options("en"), shopName: "Shop", links: links("en") });
+    expect(mail.html).not.toContain("#t=");
+    expect(mail.text).not.toContain("#t=");
+    expect(mail.subject).toBe("Your password at Shop was changed");
+  });
+
+  it("an auth mail without its action link does not render (render_failed), and the token id is the only variable", () => {
+    const entry = entryOf(new PasswordResetEmailTemplate() as never);
+    expect(() =>
+      renderEmail(entry, entry.template.sampleVariables, {
+        ...options("en"),
+        links: { storefront: "https://shop.example.com/en", action: null },
+      }),
+    ).toThrow(expect.objectContaining({ code: "render_failed" }));
+    expect(() =>
+      renderEmail(entry, { tokenId: "not-a-uuid" }, { ...options("en"), links: links("en") }),
+    ).toThrow(expect.objectContaining({ code: "variables_invalid" }));
+    expect(() =>
+      renderEmail(
+        entry,
+        { tokenId: "00000000-0000-4000-8000-000000000001", token: "x" },
+        { ...options("en"), links: links("en") },
+      ),
+    ).toThrow(expect.objectContaining({ code: "variables_invalid" }));
+  });
+});
+
 describe("the layout and the texts", () => {
   it("styles mail with the email theme only (a rebrand changes the tokens, not a template)", () => {
     const entry = entryOf(new AdminTestEmailTemplate() as never);
@@ -165,7 +229,9 @@ describe("the layout and the texts", () => {
     expect(uk).toEqual(en);
     expect(Object.keys(BUILT_IN_EMAIL_CATALOGS).sort()).toEqual(["en", "uk"]);
     for (const key of uk) {
-      expect(key).toMatch(/^(layout|admin\.test)\.[a-z0-9_.]+$/);
+      expect(key).toMatch(
+        /^(layout|admin\.test|customer\.password_reset|customer\.password_changed|customer\.verify_email)\.[a-z0-9_.]+$/,
+      );
     }
     for (const catalog of Object.values(BUILT_IN_EMAIL_CATALOGS)) {
       for (const text of Object.values(catalog)) {

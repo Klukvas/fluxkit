@@ -67,7 +67,7 @@ Tracking is by polling (Nova Post offers webhooks, but they are not used in v1: 
 
 ## Mail delivery (job 9, ADR 0031 decision 6)
 
-Mail is written to the outbox `email_message` by the code that causes it (in its own transaction; nothing does so before email plan steps 7 to 9) and handed to the provider here, or at once by the request that wrote it (the immediate attempt of latency-critical mail, below). The job runs after job 8 in the tick, so a mail an event handler enqueued in job 3 goes out in the same tick.
+Mail is written to the outbox `email_message` by the code that causes it (in its own transaction: since email plan step 7 the password reset, verification and "password changed" mails of `docs/api/customers.md`; order mails come with step 8) and handed to the provider here, or at once by the request that wrote it (the immediate attempt of latency-critical mail, below). The job runs after job 8 in the tick, so a mail an event handler enqueued in job 3 goes out in the same tick.
 
 - **Which mails.** `pending` with `next_attempt_at <= now`, and `sending` whose lease ended (`lease_until < now`; a claimed row's `next_attempt_at` is its lease end), oldest due first by `(next_attempt_at, id)`, through the partial index `email_message_next_attempt_at_idx`. The page query takes no lock and is continued by the cursor, so a mail that fails is not read again in the run and never holds up the ones behind it.
 - **Per mail** (`EmailSender.attempt`):

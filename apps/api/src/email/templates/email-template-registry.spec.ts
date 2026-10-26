@@ -229,7 +229,13 @@ describe("EmailTemplateRegistry (discovery in the application)", () => {
     const plain = await startApp({ extraFeatures: [fixtureEmailTemplates("plain")] });
     apps.push(plain);
     const registry = plain.app.get(EmailTemplateRegistry);
-    expect(registry.keys()).toEqual(["admin.test", "fixture.greeting"]);
+    expect(registry.keys()).toEqual([
+      "admin.test",
+      "customer.password_changed",
+      "customer.password_reset",
+      "customer.verify_email",
+      "fixture.greeting",
+    ]);
     expect(registry.get("fixture.greeting")?.template.version).toBe(1);
     const overridden = await startApp({ extraFeatures: [fixtureEmailTemplates("override")] });
     apps.push(overridden);
@@ -247,6 +253,11 @@ describe("EmailTemplateRegistry (discovery in the application)", () => {
   it("registers nothing a feature does not bring: without the feature, only the built-ins", async () => {
     const running = await startApp();
     apps.push(running);
-    expect(running.app.get(EmailTemplateRegistry).keys()).toEqual(["admin.test"]);
+    expect(running.app.get(EmailTemplateRegistry).keys()).toEqual([
+      "admin.test",
+      "customer.password_changed",
+      "customer.password_reset",
+      "customer.verify_email",
+    ]);
   });
 });

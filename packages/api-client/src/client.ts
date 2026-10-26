@@ -15,6 +15,9 @@ import type {
   Order,
   OrderAccessBody,
   OrderList,
+  PasswordResetAccepted,
+  PasswordResetConfirmBody,
+  PasswordResetRequestBody,
   ProductDetail,
   ProductList,
   PickupPointKind,
@@ -25,6 +28,7 @@ import type {
   ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
+  VerifyEmailBody,
 } from "./types.js";
 
 export interface StoreClientOptions {
@@ -88,6 +92,20 @@ export interface StoreClient {
   getAccount(options?: CallOptions): Result<AccountResult>;
   updateAccount(body: UpdateAccountBody, options?: CallOptions): Result<AccountResult>;
   changePassword(body: ChangePasswordBody, options?: CallOptions): Result<undefined>;
+  /**
+   * Asks for a reset link by mail. Always `202 {}` for any address (no account enumeration); `404` without a mail
+   * provider (`getConfig().emailDelivery` is false then).
+   */
+  requestPasswordReset(
+    body: PasswordResetRequestBody,
+    options?: CallOptions,
+  ): Result<PasswordResetAccepted>;
+  /** Sets a new password with the link's token; every token problem is one `400` at `token` (`invalid_or_expired`). */
+  confirmPasswordReset(body: PasswordResetConfirmBody, options?: CallOptions): Result<undefined>;
+  /** Confirms the account's address with the link's token (`204`, also again for a verified customer). */
+  confirmEmailVerification(body: VerifyEmailBody, options?: CallOptions): Result<undefined>;
+  /** Sends the signed-in customer a new verification link (`409 already_verified` when verified). */
+  requestEmailVerification(options?: CallOptions): Result<undefined>;
   getCart(options?: LocaleOptions): Result<Cart>;
   clearCart(options?: CallOptions): Result<undefined>;
   addCartItem(body: AddCartItemBody, options?: LocaleOptions): Result<Cart>;
@@ -144,6 +162,11 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     getAccount: (opts) => call("getAccount", { options: opts }),
     updateAccount: (body, opts) => call("updateAccount", { body, options: opts }),
     changePassword: (body, opts) => call("changePassword", { body, options: opts }),
+    requestPasswordReset: (body, opts) => call("requestPasswordReset", { body, options: opts }),
+    confirmPasswordReset: (body, opts) => call("confirmPasswordReset", { body, options: opts }),
+    confirmEmailVerification: (body, opts) =>
+      call("confirmEmailVerification", { body, options: opts }),
+    requestEmailVerification: (opts) => call("requestEmailVerification", { options: opts }),
     getCart: (opts) => call("getCart", { options: opts }),
     clearCart: (opts) => call("clearCart", { options: opts }),
     addCartItem: (body, opts) => call("addCartItem", { body, options: opts }),

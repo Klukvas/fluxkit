@@ -143,6 +143,8 @@ export interface SetCartItemQuantityBody {
 export interface Customer {
   id: string;
   email: string;
+  /** Whether the address was confirmed with a verification link (ADR 0031). Unlocks nothing in v1. */
+  emailVerified: boolean;
   firstName: string;
   lastName: string;
   phone: string | null;
@@ -171,6 +173,29 @@ export interface UpdateAccountBody {
 export interface ChangePasswordBody {
   currentPassword: string;
   newPassword: string;
+}
+
+/**
+ * `POST /store/account/password-reset`: the address to send a link to and the language of the mail (one of `LOCALES`).
+ * The answer is the same empty object whether or not an account exists.
+ */
+export interface PasswordResetRequestBody {
+  email: string;
+  locale: string;
+}
+
+/** The empty answer of the reset request (`202 {}`): it says nothing about the account. */
+export type PasswordResetAccepted = Record<never, never>;
+
+/** `POST /store/account/password-reset/confirm`: the token from the link's `#t=` fragment and the new password. */
+export interface PasswordResetConfirmBody {
+  token: string;
+  newPassword: string;
+}
+
+/** `POST /store/account/verify-email`: the token from the link's `#t=` fragment. */
+export interface VerifyEmailBody {
+  token: string;
 }
 
 /** Answer of register and login: the signed-in customer and what happened to the guest cart that was merged. */

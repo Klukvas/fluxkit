@@ -31,10 +31,12 @@ export const updateProfileSchema = z.strictObject({
   phone: boundedText.nullable().optional(),
 });
 
-/** A customer as the store shows them to themselves: no hash, no lockout state, no flags. */
+/** A customer as the store shows them to themselves: no hash, no lockout state, no activity flag. */
 export const customerResponseSchema = z.object({
   id: uuidSchema,
   email: z.string(),
+  /** Whether the address was confirmed with a verification link (ADR 0031). Unlocks nothing in v1. */
+  emailVerified: z.boolean(),
   firstName: z.string(),
   lastName: z.string(),
   phone: z.string().nullable(),
