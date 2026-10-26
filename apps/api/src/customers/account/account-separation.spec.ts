@@ -89,6 +89,7 @@ describe("customer and admin principals are separate on the real routes", () => 
       "POST /store/account/change-password",
       "POST /store/account/logout",
       "POST /store/account/orders/:number/cancel",
+      "POST /store/account/verify-email/resend",
     ]);
     for (const { method, path } of routes) {
       const result = await http<ProblemBody>(running.baseUrl, method as "GET", path, {

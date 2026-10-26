@@ -12,6 +12,10 @@ import {
 
 /** The key a request is counted under for the named limit (see `RATE_LIMIT_SUBJECTS`). */
 function clientKeyOf(name: RateLimitName, request: Request): string {
+  if (RATE_LIMIT_SUBJECTS[name] === "account") {
+    // A programming error: such a limit is counted by its service with a key from the body or the principal.
+    throw new Error(`The rate limit "${name}" is counted by its service, not by @RateLimit`);
+  }
   if (RATE_LIMIT_SUBJECTS[name] === "adminUser") {
     const principal = getCurrentAdmin(request);
     if (principal === undefined) {

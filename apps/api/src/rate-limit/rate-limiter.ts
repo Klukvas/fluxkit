@@ -22,12 +22,23 @@ export const RATE_LIMITS = Object.freeze({
   // estimate; the lookups proxy anonymous requests to a carrier under the shop's key (a picker types, debounced 300 ms).
   shippingOptions: { maxAttempts: 30, windowMinutes: 1 },
   shippingLookup: { maxAttempts: 60, windowMinutes: 1 },
+  // ADR 0031 decision 16: the reset request per address and, counted by the service, per requested email (a mail bomb
+  // against one inbox from many addresses); the token confirmations (reset and verify share one window); a new
+  // verification mail per signed-in customer. The per-email database count of reset tokens spans instances.
+  passwordReset: { maxAttempts: 5, windowMinutes: 15 },
+  passwordResetEmail: { maxAttempts: 5, windowMinutes: 15 },
+  passwordResetConfirm: { maxAttempts: 10, windowMinutes: 10 },
+  verificationResend: { maxAttempts: 3, windowMinutes: 60 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
 
-/** Who a limit counts: the client address (`request.ip`) or the signed-in admin user of an `/admin` route. */
-export type RateLimitSubject = "clientAddress" | "adminUser";
+/**
+ * Who a limit counts: the client address (`request.ip`), the signed-in admin user of an `/admin` route, or a key the
+ * service chooses (`account`: a requested email, a customer id), counted by the service itself with
+ * `RateLimiter.attempt` because the guard cannot know the key before the body is read.
+ */
+export type RateLimitSubject = "clientAddress" | "adminUser" | "account";
 
 /**
  * The subject of each named limit. It belongs to the limit, not to the route, so a route cannot count an upload by address
@@ -45,6 +56,10 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     shippingCheck: "adminUser",
     shippingOptions: "clientAddress",
     shippingLookup: "clientAddress",
+    passwordReset: "clientAddress",
+    passwordResetEmail: "account",
+    passwordResetConfirm: "clientAddress",
+    verificationResend: "account",
   },
 );
 

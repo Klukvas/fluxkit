@@ -136,7 +136,7 @@ describe("the signed-in customer account: logout, me, profile, change-password",
       expect(result.status).toBe(200);
       expect(Object.keys(result.body)).toEqual(["customer"]);
       expect(Object.keys(result.body.customer).sort()).toEqual(
-        ["createdAt", "email", "firstName", "id", "lastName", "phone"].sort(),
+        ["createdAt", "email", "emailVerified", "firstName", "id", "lastName", "phone"].sort(),
       );
       expect(result.body.customer).toMatchObject({
         id: shopper.id,

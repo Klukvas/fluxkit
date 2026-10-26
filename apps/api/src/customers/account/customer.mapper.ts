@@ -9,6 +9,7 @@ export function toCustomerResponse(row: CustomerRow): CustomerResponse {
   return {
     id: row.id,
     email: row.email,
+    emailVerified: row.emailVerifiedAt !== null,
     firstName: row.firstName,
     lastName: row.lastName,
     phone: row.phone,
