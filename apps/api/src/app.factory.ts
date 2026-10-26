@@ -28,6 +28,11 @@ import {
   type LoadedFeature,
 } from "./features/feature-loader.js";
 import {
+  DEFAULT_EMAIL_PROVIDERS_DIR,
+  loadEmailProvider,
+  type LoadedEmailProvider,
+} from "./email/registry/index.js";
+import {
   DEFAULT_SHIPPING_PROVIDERS_DIR,
   loadShippingProviders,
   type LoadedShippingProvider,
@@ -39,6 +44,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
     Pick<
       AppEnv,
       | "defaultLocale"
+      | "emailProvider"
       | "enabledShippingProviders"
       | "locales"
       | "adminCookieSecure"
@@ -79,6 +85,10 @@ export interface CreateAppOptions {
   extraFeatures?: LoadedFeature[];
   /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Tests only: email provider modules mounted as if one was configured (no package on disk is read for them). */
+  extraEmailProviders?: LoadedEmailProvider[];
+  /** Tests only: where provider packages are looked up for the email provider (default `<repo>/packages/providers`). */
+  emailProvidersDir?: string;
   /** Tests only: shorter limits for the shipment provider calls (production uses the core waybill limit). */
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: where provider packages are looked up (default `<repo>/packages/providers`). */
@@ -121,11 +131,16 @@ export async function createApp(
     enabled: env.enabledShippingProviders ?? [],
     providersDir: options.shippingProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
   });
+  const emailProviders = await loadEmailProvider({
+    provider: env.emailProvider ?? "none",
+    providersDir: options.emailProvidersDir ?? DEFAULT_EMAIL_PROVIDERS_DIR,
+  });
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register({
       databaseUrl: env.databaseUrl,
       features: [...features, ...(options.extraFeatures ?? [])],
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
+      emailProviders: [...emailProviders, ...(options.extraEmailProviders ?? [])],
       locale: {
         defaultLocale: env.defaultLocale ?? DEFAULT_LOCALE,
         locales: env.locales ?? DEFAULT_LOCALES,

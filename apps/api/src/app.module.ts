@@ -19,6 +19,7 @@ import type { LocaleConfig } from "./common/locale.js";
 import { DEFAULT_PRICING_CONFIG, type PricingConfig } from "./common/pricing-config.js";
 import { DatabaseModule } from "./database/database.module.js";
 import type { LoadedFeature } from "./features/feature-loader.js";
+import { EmailRegistryModule, type LoadedEmailProvider } from "./email/registry/index.js";
 import { HealthModule } from "./health/health.module.js";
 import { InventoryModule } from "./inventory/inventory.module.js";
 import { JobsModule } from "./jobs/jobs.module.js";
@@ -43,6 +44,8 @@ export interface AppModuleOptions {
   features: LoadedFeature[];
   /** The enabled shipping provider packages (`SHIPPING_PROVIDERS_ENABLED`); defaults to none. */
   shippingProviders?: LoadedShippingProvider[];
+  /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
+  emailProviders?: LoadedEmailProvider[];
   locale: LocaleConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (UAH, prices include tax, threshold 5). */
   pricing?: PricingConfig;
@@ -109,6 +112,7 @@ export class AppModule {
         }),
         ShippingAdminModule,
         ShipmentsModule,
+        EmailRegistryModule.register(options.emailProviders ?? []),
         ...options.features.map((feature) => feature.module),
       ],
     };
