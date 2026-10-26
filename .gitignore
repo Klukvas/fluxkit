@@ -22,3 +22,5 @@ var/
 # Nova Poshta / Nova Post spike findings (scripts/spikes/README.md); may describe the key owner's account
 nova-poshta-findings*.json
 nova-post-findings*.json
+# Resend spike findings (scripts/spikes/README.md); may describe the key owner's account
+resend-findings*.json

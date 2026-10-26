@@ -74,6 +74,52 @@ unset NOVA_POST_API_KEY NP_SPIKE_SENDER_NAME NP_SPIKE_SENDER_PHONE NP_SPIKE_SEND
 
 `--self-test` starts a local stub of the API on `127.0.0.1` (it echoes the key, and its rows carry phones and names on purpose) and runs: refusal without a key, refusal of `write` without `--confirm`, on production without `--allow-production-write`, or with missing inputs (no request reaches the stub), usage errors, `keyless` (the real key is never sent), `readonly` with a key (creates and deletes nothing; the stub's first settlement has no divisions, so the choice of the exact name match is asserted, and the label request must pass the stub's `type` validation) and with a rejected key (the echoed key is scrubbed), the settlement choice without an exact match (the most divisions), `--settlement-id` of a settlement without divisions (H12 to H14 and H16 `NOT TESTED`), a non-numeric `--settlement-id` (usage error), `write` end to end on the sandbox and, with the extra flag, on the production target, failing deletes retried in `finally`, a thrown error mid-stage (cleanup still deletes), a cleanup that cannot delete (exit 3 with the leftovers named), a refused label (both attempts recorded with error keys, a phone-like digit run in the error text scrubbed, H27 `DIFFERENT`, H30 `NOT TESTED`, cleanup still complete), a tracking answer shaped `{items: [...]}`, a tracking route that answers `500`. After each run it asserts that no key, JWT or personal value appears in the terminal output or the findings file.
 
+## `resend-verify.mjs` (email plan step 6, check S1, ADR 0031 decision 17)
+
+Checks the documented Resend facts that `packages/providers/resend` codes against (plan `docs/plans/2026-10-26-email.md`, section 2, R1 to R9) with ONE real mail to the owner's own address. Plain Node 22 ESM, built-in `fetch`, no dependencies. The endpoint `https://api.resend.com/emails` is a constant; redirects are refused. **Not run against Resend yet** (built 2026-10-26 without a key; only its self-test has run).
+
+| Stage | Needs | What it sends | Mail delivered |
+|---|---|---|---|
+| `keyless` | nothing | `POST /emails` without a key, with an invented `re_` key, and with an invented key and an empty `User-Agent` (R8, R9, R6) | none (no valid key) |
+| `send` (default) | `RESEND_API_KEY`, `RESEND_SPIKE_FROM`, `RESEND_SPIKE_TO`, `--confirm` | `keyless` first, then: the key with an empty `User-Agent` and an empty recipient list (R6); ONE test mail shaped exactly like the plugin's request (`"Name" <from>`, `to` array, `subject`, `html`, `text`, `reply_to`, `tags`, `User-Agent`, a random `Idempotency-Key`; R1, R2, R3, R5, R7); the same key and body again (R4: same id); the same key with another subject (R4: `409 invalid_idempotent_request`); a 257-character key with an empty recipient list (R4: `400 invalid_idempotency_key`) | ONE, if R4 holds (the replay and the changed subject must not deliver; check the inbox) |
+
+Without `--confirm` the `send` stage prints its plan and exits 2 before any call; a missing input or a malformed address also exits 2 with nothing sent.
+
+### How the owner runs it (S1, with the owner's go)
+
+The packaged steps (domain, sending-only key, the header checks) are in `packages/providers/resend/README.md`, "Plan S1". The commands:
+
+```bash
+# 0. Self-test (local stub on 127.0.0.1, no network): gating and redaction.
+node scripts/spikes/resend-verify.mjs --self-test
+
+# 1. Inputs from a hidden prompt (never as flags, never in a file in the repository).
+read -rs RESEND_API_KEY && export RESEND_API_KEY              # a sending-only key
+read -r RESEND_SPIKE_FROM && export RESEND_SPIKE_FROM          # "Shop Name <noreply@mail.your-domain>" on the verified domain
+read -r RESEND_SPIKE_TO && export RESEND_SPIKE_TO              # the owner's own address (testing mode allows only that, R8)
+read -r RESEND_SPIKE_REPLY_TO && export RESEND_SPIKE_REPLY_TO  # optional; default: the sender's address
+
+# 2. The plan without sending (exits 2), then the send.
+node scripts/spikes/resend-verify.mjs
+node scripts/spikes/resend-verify.mjs --confirm --out resend-findings.json
+
+unset RESEND_API_KEY RESEND_SPIKE_FROM RESEND_SPIKE_TO RESEND_SPIKE_REPLY_TO
+```
+
+- `--stage keyless` alone sends no valid key and can run without inputs.
+- Exit codes: `0` done; `1` a call failed in transport or a stage threw (findings still written); `2` usage error or refusal, nothing sent.
+- Behind an HTTPS proxy, Node's `fetch` may need `NODE_USE_ENV_PROXY=1` (Node 22.21 or later).
+
+### Reading the findings
+
+- The terminal ends with `R1` to `R9` (R4 and R8 split into `a`, `b`, `c`), each `CONFIRMED`, `DIFFERENT`, `NOT TESTED`, `RECORDED` (R7: the rate-limit headers seen) or `MANUAL` (R3: open the received mail's headers; `Reply-To` must be `RESEND_SPIKE_REPLY_TO`, else Resend ignored the `reply_to` member and the plugin must change). `DIFFERENT` items go into the plan's step 6 row and change the plugin before production. R8b records whether an invented key is `400` or `401` (the plugin reads `400 validation_error` as `rejected`, `401` as `misconfigured`).
+- The findings JSON (`--out`, default `./resend-findings.json`, mode 600, git-ignored by `resend-findings*.json`) holds `hypotheses`, `facts` per stage and `calls`: per call the label, which key was sent (`none`, `invented`, `key`), the `User-Agent` form, the idempotency key's length, a short hash of the body, the HTTP status, content type, latency, header names, rate-limit headers (numeric values only), the answer's keys, the error `name` when it is a code, the message's length and whether it echoes an address, and the id's shape (`uuid`).
+- Never recorded: the key (scrubbed from every output, a fragment too), the sender, recipient and reply-to addresses and names, any address-like or `re_`-like text, request bodies, Resend's message texts, the mail's id value.
+
+### Self-test
+
+`--self-test` starts a local stub of Resend on `127.0.0.1` (it echoes the key and the recipient in its texts on purpose) and runs: refusal without a key, without a recipient, without `--confirm` (plan printed, no request), with a malformed sender, an unknown flag (no request in each), `keyless` (three requests, the key never sent, R8a and R9 confirmed), and `send` end to end (exactly one mail accepted by the stub, the replay and the changed body answered as R4 says, the body's members and the `User-Agent` pinned, R1 to R9 as expected, R3 `MANUAL`). After each run it asserts that no key, key fragment, address or name appears in the terminal output or the findings file.
+
 ## `nova-poshta-verify.mjs` (deprecated, legacy API 2.0)
 
 **Deprecated 2026-10-25 (ADR 0030).** It checks the legacy Nova Poshta JSON-RPC API (`https://api.novaposhta.ua/v2.0/json/`), which the plugin no longer targets; the owner's key belongs to the new API. Kept for history (its key-less findings are in the shipping plan, section "Spike 7a — key-less findings (legacy API 2.0, superseded)"); do not extend it. Its usage, unchanged:
