@@ -6,6 +6,7 @@ import { AuthenticatedAdminRoute } from "../auth/route-access.js";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import { ApiZodResponse } from "../common/openapi.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
+import { EmailProviderRegistry } from "../email/registry/index.js";
 import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { adminConfigResponseSchema, type AdminConfigResponse } from "./admin-config.schemas.js";
 
@@ -19,13 +20,14 @@ export class AdminConfigController {
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(MEDIA_CONFIG) private readonly media: MediaConfig,
+    @Inject(EmailProviderRegistry) private readonly email: EmailProviderRegistry,
   ) {}
 
   @Get()
   @AuthenticatedAdminRoute()
   @ApiOperation({
     summary:
-      "Locales, shop currency, supported currencies, stock threshold and upload limits, for the admin UI",
+      "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail is configured, for the admin UI",
   })
   @ApiZodResponse(200, adminConfigResponseSchema, "The shop settings.")
   get(): AdminConfigResponse {
@@ -37,6 +39,7 @@ export class AdminConfigController {
       supportedCurrencies: CURRENCY_CODES.map((code) => ({ code, exponent: CURRENCIES[code] })),
       pricesIncludeTax: this.pricing.pricesIncludeTax,
       lowStockThreshold: this.pricing.lowStockThreshold,
+      emailDelivery: this.email.deliveryEnabled(),
       media: {
         uploadsEnabled: this.media.driver !== "none",
         maxBytes: this.media.maxBytes,

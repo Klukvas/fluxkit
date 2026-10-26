@@ -354,6 +354,7 @@ const storeConfig: Shape<StoreConfig> = {
     pricesIncludeTax: "boolean",
     defaultLocale: "string",
     locales: { array: "string" },
+    emailDelivery: "boolean",
   },
 };
 

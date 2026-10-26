@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -9,17 +9,22 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake and packages/providers/nova-post, reinstall, then lint, typecheck,
-#                     boundaries and tests must pass, and an API told to load fake or nova_post must refuse to start,
-#                     loudly (destructive: CI only)
+#   providers-deleted remove packages/providers/_fake, _fake-email and nova-post, reinstall, then lint, typecheck,
+#                     boundaries and tests must pass, and an API told to load fake or nova_post (shipping), or started with
+#                     EMAIL_PROVIDER=fake, must refuse to start, loudly (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
 #                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
 #                     preloaded fetch wrapper that logs and refuses any request to a Nova Post host, and the log must show
 #                     the wrapper active and no such request
+# The email provider (ADR 0031 decision 4) has the same kind of observable, "Email provider loaded: <code|none>", and the
+# public flag `emailDelivery` of GET /store/config:
+#   providers-email-none start the API without EMAIL_PROVIDER (none), expect "none", emailDelivery false and no mention of fake
+#   providers-email-fake start the API with EMAIL_PROVIDER=fake (and EMAIL_FROM, STOREFRONT_PUBLIC_URL), expect "fake" and
+#                     emailDelivery true
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -28,9 +33,11 @@ export ORDER_TOKEN_SECRET="${ORDER_TOKEN_SECRET:-feature-matrix-throwaway-secret
 run_api() {
   local features="$1"
   local providers="${2:-}"
+  # EMAIL_FROM and STOREFRONT_PUBLIC_URL are only read with a provider; a mode that needs them sets them for the call.
+  local email="${3:-none}"
   pnpm build
   # MATRIX_NODE_IMPORT: an optional module preloaded into the API process only (not into the build).
-  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" PORT="$port" \
+  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" EMAIL_PROVIDER="$email" PORT="$port" \
     node ${MATRIX_NODE_IMPORT:+--import "$MATRIX_NODE_IMPORT"} apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
   api_pid=$!
   trap 'kill "$api_pid" 2>/dev/null || true' EXIT
@@ -79,7 +86,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/nova-post
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/nova-post
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -95,6 +102,14 @@ case "$mode" in
       grep -F "Shipping provider \"$code\" is enabled" /tmp/fluxkit-matrix-api.log \
         || { echo "expected a loud startup error naming the missing provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
+    # The same for the email provider: `fake` is named by EMAIL_PROVIDER and its package is gone.
+    if EMAIL_PROVIDER=fake EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+      PORT="$port" timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started although the selected email provider fake is deleted" >&2
+      exit 1
+    fi
+    grep -F "Email provider \"fake\" is enabled in EMAIL_PROVIDER" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a loud startup error naming the missing email provider fake" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ;;
   providers-nova-post)
     pnpm build
@@ -137,6 +152,24 @@ GUARD
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Nova Post at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
+    ;;
+  providers-email-none)
+    run_api "" "" "none"
+    grep -F "Email provider loaded: none" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the email registry to report no provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -qi "fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fake email provider must leave no trace when EMAIL_PROVIDER is none" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"emailDelivery":false' || { echo "expected emailDelivery false with no email provider" >&2; exit 1; }
+    ;;
+  providers-email-fake)
+    EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 run_api "" "" "fake"
+    grep -F "Email provider loaded: fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the email registry to report the fake provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"emailDelivery":true' || { echo "expected emailDelivery true with the email provider loaded" >&2; exit 1; }
     ;;
   *)
     echo "unknown mode: $mode" >&2

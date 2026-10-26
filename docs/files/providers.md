@@ -1,6 +1,6 @@
 # packages/providers
 
-Payment and shipping provider plugins, one package per provider. Each provider's specs run the core contract check `checkShippingProviderContract`. A shipping provider declares `"fluxkit": {"provider": "<code>", "kind": "shipping"}`, exports `providerModule` and is loaded by `apps/api` only when its code is in `SHIPPING_PROVIDERS_ENABLED` (`docs/contracts/config.md`, "Shipping provider package contract"). Core and apps never import a provider (`core-must-not-import-providers`, `apps-must-not-import-providers`).
+Payment, shipping and email provider plugins, one package per provider. Each provider's specs run the core contract check (`checkShippingProviderContract`, `checkEmailProviderContract`). A shipping provider declares `"fluxkit": {"provider": "<code>", "kind": "shipping"}`, exports `providerModule` and is loaded by `apps/api` only when its code is in `SHIPPING_PROVIDERS_ENABLED` (`docs/contracts/config.md`, "Shipping provider package contract"). Core and apps never import a provider (`core-must-not-import-providers`, `apps-must-not-import-providers`).
 
 - `README.md` - rules for provider packages.
 - `_fake/` - `@fluxkit/provider-fake`, shipping provider `fake`. TEST-ONLY: deterministic, in-memory, no network; never enable it in a real shop. Fixture for the provider matrix (`scripts/feature-matrix.sh providers-*`) and for tests of the shipping module; safe to delete.
@@ -9,6 +9,12 @@ Payment and shipping provider plugins, one package per provider. Each provider's
   - `src/fake-shipping-provider.ts` - `FakeShippingProvider`: implements `ShippingProviderPort` with fixed cities and pickup points (all in `UA`, also found by ref with `findPickupPoint`), a fixed estimate, numbered waybills kept in memory, and the test hooks `failNext`, `setTrackingStatus`, `reset`, `waybillCount`; `validateSettings` accepts any object; a label needs the waybill's matching number. Must NOT read the environment, the clock, a random source or the network.
   - `src/index.ts` - `FakeShippingProviderModule` and the entry export `providerModule`.
   - `src/fake-shipping-provider.spec.ts` - unit tests of the provider and the hooks (they disappear with the package).
+- `_fake-email/` - `@fluxkit/provider-fake-email`, email provider `fake` (the code exists once per kind). TEST-ONLY: in memory, no network, no clock, no randomness; never enable it in a real shop (`loadEnv` refuses `EMAIL_PROVIDER=fake` in production). Fixture for the email matrix modes (`providers-email-fake`, `providers-email-none`, `providers-deleted`) and for tests of the email module; safe to delete.
+  - `README.md` - purpose, variable (`FAKE_EMAIL_CAPTURE_FILE`), the capture mailbox and failure hooks, how to remove it.
+  - `package.json` - the manifest (`fluxkit.provider` = `fake`, `fluxkit.kind` = `email`); depends on `@fluxkit/core` only.
+  - `src/fake-email-provider.ts` - `FakeEmailProvider`: implements `EmailProviderPort`; deduplicates by idempotency key like Resend (same body replays the first answer, another body is `idempotency_conflict`), refuses the recipient `refused@...`, answers `not_sent` for an aborted signal or a message that fails `validateOutgoingEmail`; hooks `failNext`, `mailbox`, `requests`, `reset`. Must NOT read the environment, the clock, a random source or the network.
+  - `src/index.ts` - `FakeEmailProviderModule` (its factory reads `FAKE_EMAIL_CAPTURE_FILE`), `parseFakeEmailCaptureFile` and the entry export `providerModule`.
+  - `src/fake-email-provider.spec.ts` - runs `checkEmailProviderContract`, the hooks and the capture file (they disappear with the package).
 - `nova-post/` - `@fluxkit/provider-nova-post`, shipping provider `nova_post`: the Nova Post REST API `v.1.0` (JWT; ADR 0030, plan `docs/plans/2026-10-25-nova-post-plugin.md`). Safe to delete (`scripts/feature-matrix.sh providers-deleted`).
   - `README.md` - purpose, flag, variables (`NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`), settings, the operation mapping, limits, tests, how to remove it.
   - `package.json` - the manifest (`fluxkit.provider` = `nova_post`, `fluxkit.kind` = `shipping`); depends on `@fluxkit/core` and `zod` 4.6.7 only.

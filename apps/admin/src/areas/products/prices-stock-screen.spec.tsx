@@ -57,6 +57,7 @@ const config = {
   supportedCurrencies: Object.entries(CURRENCIES).map(([code, exponent]) => ({ code, exponent })),
   pricesIncludeTax: true,
   lowStockThreshold: 5,
+  emailDelivery: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,

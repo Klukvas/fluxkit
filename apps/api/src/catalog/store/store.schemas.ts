@@ -125,6 +125,10 @@ export const storeConfigSchema = z.object({
   pricesIncludeTax: z.boolean(),
   defaultLocale: z.string(),
   locales: z.array(z.string()),
+  emailDelivery: z.boolean().meta({
+    description:
+      'False when `EMAIL_PROVIDER=none` (no mail is sent): hide "forgot password" and the verification prompts. True when a mail provider is configured.',
+  }),
 });
 
 export type StoreConfig = z.output<typeof storeConfigSchema>;

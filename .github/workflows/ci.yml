@@ -82,7 +82,17 @@ jobs:
       fail-fast: false
       matrix:
         mode:
-          [on, off, deleted, providers-on, providers-off, providers-deleted, providers-nova-post]
+          [
+            on,
+            off,
+            deleted,
+            providers-on,
+            providers-off,
+            providers-deleted,
+            providers-nova-post,
+            providers-email-fake,
+            providers-email-none,
+          ]
     services:
       postgres:
         image: postgres:17-alpine

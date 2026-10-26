@@ -1681,6 +1681,7 @@ describe("store API (public, real app, real Postgres)", () => {
           pricesIncludeTax: true,
           defaultLocale: "uk",
           locales: ["uk", "en"],
+          emailDelivery: false,
         });
       });
 
@@ -1695,6 +1696,7 @@ describe("store API (public, real app, real Postgres)", () => {
             pricesIncludeTax: false,
             defaultLocale: "uk",
             locales: ["uk", "en"],
+            emailDelivery: false,
           });
         } finally {
           await jpy.app.close();

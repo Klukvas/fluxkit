@@ -441,7 +441,7 @@ Notes:
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
 | `pnpm check:docs` | docs-with-code rules against `origin/main` |
-| `pnpm feature-matrix on\|off\|deleted\|providers-on\|providers-off\|providers-deleted` | feature and shipping provider enable/disable/delete verification (the `deleted` modes remove files, CI only) |
+| `pnpm feature-matrix on\|off\|deleted\|providers-on\|providers-off\|providers-deleted\|providers-nova-post\|providers-email-fake\|providers-email-none` | feature, shipping provider and email provider enable/disable/delete verification (the `deleted` modes remove files, CI only) |
 
 ## Repository layout
 

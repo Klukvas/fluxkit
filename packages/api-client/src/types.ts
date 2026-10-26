@@ -464,6 +464,8 @@ export interface StoreConfig {
   pricesIncludeTax: boolean;
   defaultLocale: string;
   locales: string[];
+  /** False when no email provider is configured (`EMAIL_PROVIDER=none`): hide "forgot password" and verification prompts. */
+  emailDelivery: boolean;
 }
 
 export interface PriceRange {

@@ -21,6 +21,10 @@ export const adminConfigResponseSchema = z.object({
     }),
   pricesIncludeTax: z.boolean().meta({ description: "`PRICES_INCLUDE_TAX`." }),
   lowStockThreshold: z.number().int().min(0).meta({ description: "`LOW_STOCK_THRESHOLD`." }),
+  emailDelivery: z.boolean().meta({
+    description:
+      "False when `EMAIL_PROVIDER=none`: no mail is sent, so the admin Email area shows the setup steps and no actions.",
+  }),
   media: z
     .object({
       uploadsEnabled: z.boolean().meta({
