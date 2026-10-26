@@ -174,8 +174,9 @@ describe("send-emails pacing (real time)", () => {
       expect(result.sent).toBe(5);
       const gaps = times.slice(1).map((time, index) => time - (times[index] ?? 0));
       for (const gap of gaps) {
-        // Timers fire late, never early; a millisecond of slack for clock rounding.
-        expect(gap).toBeGreaterThanOrEqual(124);
+        // Node timers can fire a few milliseconds early against performance.now() under load (this spec failed once
+        // in a full run at ~123 ms); 120 ms still proves the 125 ms pacing, unpaced sends are well under 20 ms apart.
+        expect(gap).toBeGreaterThanOrEqual(120);
       }
     } finally {
       await world.stop();
