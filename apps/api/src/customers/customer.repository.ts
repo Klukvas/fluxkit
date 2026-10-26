@@ -22,6 +22,7 @@ export type CustomerChanges = Partial<
     | "failedLoginCount"
     | "lockedUntil"
     | "lastLoginAt"
+    | "emailVerifiedAt"
   >
 >;
 

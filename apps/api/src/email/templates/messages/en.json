@@ -6,5 +6,21 @@
   "admin.test.subject": "Test email from {shop}",
   "admin.test.heading": "Test email",
   "admin.test.body": "Email delivery works: this message was handed to the provider {provider}.",
-  "admin.test.note": "You asked for this test in the admin. No action is needed."
+  "admin.test.note": "You asked for this test in the admin. No action is needed.",
+  "customer.password_reset.subject": "Reset your password at {shop}",
+  "customer.password_reset.heading": "Reset your password",
+  "customer.password_reset.body": "We received a request to reset the password of your account at {shop}. Use the button below to choose a new one. The link works once and for {minutes} minutes.",
+  "customer.password_reset.button": "Choose a new password",
+  "customer.password_reset.link_hint": "If the button does not work, open this link:",
+  "customer.password_reset.ignore": "If you did not ask for this, ignore this email: your password stays as it is.",
+  "customer.password_changed.subject": "Your password at {shop} was changed",
+  "customer.password_changed.heading": "Your password was changed",
+  "customer.password_changed.body": "The password of your account at {shop} was just changed with a reset link. Every device that was signed in has been signed out.",
+  "customer.password_changed.warning": "If it was not you, contact {shop} at once.",
+  "customer.verify_email.subject": "Confirm your email address at {shop}",
+  "customer.verify_email.heading": "Confirm your email address",
+  "customer.verify_email.body": "Confirm that this address belongs to your account at {shop}. The link works for {hours} hours.",
+  "customer.verify_email.button": "Confirm email address",
+  "customer.verify_email.link_hint": "If the button does not work, open this link:",
+  "customer.verify_email.ignore": "If you did not create an account at {shop}, ignore this email."
 }

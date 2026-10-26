@@ -43,6 +43,7 @@ const NOT_ERROR_CODES = new Set([
   "content_type",
   "created_at",
   "created_by",
+  "customer_auth_token",
   "customer_session",
   "expires_at",
   "first_attached_at",

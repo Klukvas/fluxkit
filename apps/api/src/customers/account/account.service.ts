@@ -10,6 +10,7 @@ import {
 } from "@fluxkit/core";
 import { CLOCK, type Clock } from "../../auth/clock.js";
 import { CartMergeService } from "../../cart/cart-merge.service.js";
+import type { IssueAuthTokenResult } from "../../email/auth/index.js";
 import type { CartNoticeResponse } from "../../cart/cart.schemas.js";
 import { PasswordHasher } from "../../auth/password-hasher.js";
 import { passwordPolicyErrors } from "../../auth/password-policy-errors.js";
@@ -39,6 +40,7 @@ import type {
   RegisterBody,
   UpdateProfileBody,
 } from "./account.schemas.js";
+import { AccountEmailService } from "./account-email.service.js";
 import { toCustomerResponse } from "./customer.mapper.js";
 
 /** The one answer to every failed login, whatever the reason (ADR 0016: no account enumeration at login). */
@@ -86,14 +88,16 @@ export class CustomerAccountService {
     @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(CartMergeService) private readonly cartMerge: CartMergeService,
+    @Inject(AccountEmailService) private readonly accountEmail: AccountEmailService,
   ) {}
 
   /**
    * Creates the account and signs it in with a NEW session. `previousToken` is the session cookie the request
    * carried, if any: it is revoked, so a token planted before registration never survives (no fixation).
-   * A taken email is `409 conflict` on `email` (accepted trade-off while no email can be sent, ADR 0016).
+   * A taken email is `409 conflict` on `email` (ADR 0016; kept by ADR 0031, owner answer 2: verification is optional).
    * `guestCartToken` is the `fluxkit_cart` cookie of the request: that cart is merged into the new account's cart in
-   * the same transaction.
+   * the same transaction. With a mail provider the same transaction issues the first verification token and its mail
+   * (`DEFAULT_LOCALE`); the immediate send attempt starts after the commit and never changes the answer.
    */
   async register(
     body: RegisterBody,
@@ -120,6 +124,7 @@ export class CustomerAccountService {
       row: CustomerRow;
       session: CreatedCustomerSession;
       cartNotices: CartNoticeResponse[];
+      verification: IssueAuthTokenResult;
     };
     try {
       created = await withTransaction(this.db, async (transaction) => {
@@ -129,7 +134,8 @@ export class CustomerAccountService {
         );
         const cartNotices = await this.afterSignIn(transaction, row.id, guestCartToken, now);
         const session = await this.sessions.create(row.id, now, transaction);
-        return { row, session, cartNotices };
+        const verification = await this.accountEmail.issueVerification(transaction, row, now);
+        return { row, session, cartNotices, verification };
       });
     } catch (error) {
       if (isUniqueViolation(error, "customer_email_key")) {
@@ -138,6 +144,7 @@ export class CustomerAccountService {
       throw error;
     }
     await this.revokePrevious(previousToken);
+    this.accountEmail.afterIssue("registration", created.verification);
     return this.signedIn(created.row, created.session, created.cartNotices, now);
   }
 
@@ -228,7 +235,8 @@ export class CustomerAccountService {
   /**
    * The caller proves the current password (one scrypt; a wrong one counts toward the lockout like a failed
    * login, and a locked account cannot be used to guess passwords here either: both exactly as the admin
-   * `change-password`), then every OTHER session of the customer ends.
+   * `change-password`), then every OTHER session of the customer ends and the reset links still out stop working
+   * (ADR 0031 decision 9).
    */
   async changePassword(principal: CustomerPrincipal, body: ChangePasswordBody): Promise<void> {
     const now = this.clock.now();
@@ -272,6 +280,7 @@ export class CustomerAccountService {
         transaction,
       );
       await this.sessions.revokeAllForCustomer(row.id, principal.sessionId, transaction);
+      await this.accountEmail.invalidateResetTokens(transaction, row.id, now);
     });
   }
 
