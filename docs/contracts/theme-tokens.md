@@ -49,7 +49,7 @@ Status colors (`danger`, `success`, `warning`) are documented and tested for tex
 
 Status: contract since email plan step 2 (ADR 0031 open question 7: it joins this contract because its values follow the tokens). Renaming or removing a member is a breaking change; adding one is additive.
 
-Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `docs/contracts/email-templates.md` once listed) style inline with `emailTheme` from `@fluxkit/theme`; its shape is the `EmailTheme` interface of `@fluxkit/core`.
+Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `docs/contracts/email-templates.md`) style inline with `emailTheme` from `@fluxkit/theme`; its shape is the `EmailTheme` interface of `@fluxkit/core`.
 
 | Member | Source | Value today |
 |---|---|---|
