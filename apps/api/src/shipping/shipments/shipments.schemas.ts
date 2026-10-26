@@ -86,10 +86,11 @@ export const providerFailureSchema = z.object({
 export const createShipmentResultSchema = z.object({
   shipment: adminShipmentSchema.meta({
     description:
-      "`created`: the carrier accepted the waybill. `failed`: it refused (see `failure`). `unknown`: the answer was lost (timeout, network) and whether a waybill exists is not known: do NOT create again, call `POST .../reconcile`.",
+      "`created`: the carrier accepted the waybill. `failed`: it refused, or the provider proves the request never reached it (`failure` with reason `unavailable` and code `not_sent`): a new create is allowed. `unknown`: the answer was lost (timeout, network) and whether a waybill exists is not known: do NOT create again, call `POST .../reconcile`.",
   }),
   failure: providerFailureSchema.nullable().meta({
-    description: "The carrier's typed refusal of a `failed` shipment; null otherwise.",
+    description:
+      "The typed failure of a `failed` shipment (a refusal, or `unavailable` with `not_sent`); null otherwise.",
   }),
 });
 

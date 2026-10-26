@@ -5,6 +5,7 @@ import {
   decideShipmentTransition,
   isTrackedShipmentStatus,
   MAX_AMOUNT,
+  PROVIDER_CODE_NOT_SENT,
   SHIPPING_LIMITS,
   type Money,
   type ProviderFailureReason,
@@ -108,7 +109,8 @@ interface CheckedWaybill {
  * - Every carrier call runs OUTSIDE any database transaction and lock, with the API's time limit
  *   (`SHIPMENT_CALL_TIMEOUTS`). A create first commits the `pending` row (under the order lock, after the checks), then
  *   asks the carrier, then records the answer in a second short transaction that locks the shipment row only.
- * - A lost answer (timeout, network failure, a thrown error, an answer that breaks the port) makes the shipment `unknown`;
+ * - A lost answer (timeout, network failure, a thrown error, an answer that breaks the port, `unavailable` without the
+ *   provider's proof `not_sent`) makes the shipment `unknown`;
  *   the admin settles it with `reconcile`, which asks the carrier for the waybill by our order number (`findWaybill`).
  *   Nothing here retries a carrier write.
  * - Status changes go through `ShipmentChanges` only. The order itself never changes here: fulfilment stays manual.
@@ -171,8 +173,11 @@ export class ShipmentsService {
     let failure: CreateShipmentResult["failure"] = null;
     if (waybill !== undefined) {
       to = "created";
-    } else if (outcome.kind === "failed" && outcome.reason !== "unavailable") {
-      // The carrier refused: no waybill exists.
+    } else if (
+      outcome.kind === "failed" &&
+      (outcome.reason !== "unavailable" || outcome.providerCodes.includes(PROVIDER_CODE_NOT_SENT))
+    ) {
+      // The carrier refused, or the provider proves the request never left (`not_sent`): no waybill exists.
       to = "failed";
       failure = { reason: outcome.reason, providerCodes: [...outcome.providerCodes] };
     } else {

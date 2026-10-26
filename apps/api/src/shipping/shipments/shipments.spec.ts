@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ORDER_READ_PORT, type OrderReadPort } from "@fluxkit/core";
+import { ORDER_READ_PORT, PROVIDER_CODE_NOT_SENT, type OrderReadPort } from "@fluxkit/core";
 import { SOME_ID } from "../../test/routes.js";
 import { FIND_WAYBILL_MARGIN_MS, RECONCILE_NOT_FOUND_MIN_AGE_MS } from "./shipments.service.js";
 import { captureLogs } from "../../test/shipping-fixtures.js";
@@ -340,6 +340,23 @@ describe("shipments: create, reconcile, cancel, refresh, label (ADR 0029 decisio
       const thrown = await world.paid("pickup");
       world.provider().failWaybill("createWaybill", { message: "socket hang up" });
       expect((await world.create(thrown.id)).body.shipment.status).toBe("unknown");
+    });
+
+    it("an 'unavailable' the provider proves was never sent (not_sent) is failed: nothing to reconcile, a new create is allowed", async () => {
+      const order = await world.paid("pickup");
+      world.provider().failWaybill("createWaybill", {
+        reason: "unavailable",
+        providerCodes: ["503", PROVIDER_CODE_NOT_SENT],
+      });
+      const result = await world.create(order.id);
+      expect(result.status).toBe(201);
+      expect(result.body.shipment.status).toBe("failed");
+      expect(result.body.failure).toEqual({
+        reason: "unavailable",
+        providerCodes: ["503", PROVIDER_CODE_NOT_SENT],
+      });
+      world.clock.advanceMinutes(1);
+      expect((await world.created(order.id)).status).toBe("created");
     });
 
     it("an answer that breaks the port is not stored: unknown", async () => {

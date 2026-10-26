@@ -91,6 +91,14 @@ export type ProviderResult<T> =
 /** Most codes one failure carries. */
 export const MAX_PROVIDER_CODES = 10;
 
+/**
+ * The code a provider adds to a `createWaybill` failure when it can PROVE that no create request left (for example its
+ * own authorization call failed first). The API then settles the shipment `failed` (a new create is allowed) instead of
+ * `unknown`. A provider adds it only when that is certain: a wrong `not_sent` can lead to a second real shipment.
+ * Added by the Nova Post review fixes (`docs/plans/2026-10-25-nova-post-plugin-review.md`, finding 8).
+ */
+export const PROVIDER_CODE_NOT_SENT = "not_sent";
+
 export function providerOk<T>(value: T): ProviderResult<T> {
   return Object.freeze({ ok: true as const, value });
 }
@@ -303,6 +311,10 @@ export interface ShippingProviderPort {
     signal: ProviderAbortSignal,
   ): Promise<PickupPoint | null>;
   estimate(input: EstimateRequest, signal: ProviderAbortSignal): Promise<ProviderResult<Money>>;
+  /**
+   * Never repeated by the API. An `unavailable` answer means a waybill may exist (the API's `unknown` + reconcile), unless
+   * its codes contain `PROVIDER_CODE_NOT_SENT`: the provider proves no create request reached the carrier.
+   */
   createWaybill(
     input: WaybillRequest,
     signal: ProviderAbortSignal,
