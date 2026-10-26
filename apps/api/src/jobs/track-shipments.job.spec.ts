@@ -351,7 +351,7 @@ describe("track-shipments (job 8; real Postgres, injected time, the in-repo test
     );
   });
 
-  it("is job 8 of the tick, after the cleanups, and its log has codes only (no phone, no carrier text)", async () => {
+  it("is job 8 of the tick, after the cleanups and before the mail jobs, and its log has codes only (no phone, no carrier text)", async () => {
     await shipped();
     world.provider().failWaybill("track", { message: "Іван +380501234567 apiKey=SECRET-KEY" });
     const logs = captureLogs();
@@ -370,8 +370,10 @@ describe("track-shipments (job 8; real Postgres, injected time, the in-repo test
       "delete-customer-sessions",
       "delete-abandoned-uploads",
       "track-shipments",
+      "send-emails",
+      "purge-email-messages",
     ]);
-    expect(reports.at(-1)).toMatchObject({
+    expect(reports.find((report) => report.name === "track-shipments")).toMatchObject({
       name: "track-shipments",
       ok: true,
       result: { scanned: 1, providerFailures: 1 },
