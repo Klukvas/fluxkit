@@ -18,7 +18,11 @@ import {
   type EmailTemplateSource,
 } from "../templates/index.js";
 import { EMAIL_DELIVERY_CONFIG, type EmailDeliveryConfig } from "./email-delivery-config.js";
-import { EMAIL_LINK_SOURCE, type EmailLinkSource } from "./email-links.js";
+import {
+  EMAIL_LINK_SOURCE,
+  EmailLinkUnavailableError,
+  type EmailLinkSource,
+} from "./email-links.js";
 import { EmailMessageChanges, type ClaimedEmailMessage } from "./email-message-changes.js";
 import type { EmailAttemptOutcome, NotRenderableCode } from "./email-outcome.js";
 import { callEmailProvider, failureOfCall } from "./email-provider-call.js";
@@ -110,7 +114,7 @@ export class EmailSender {
       return claim;
     }
     const message = claim.message;
-    const prepared = this.prepare(message);
+    const prepared = await this.prepare(message);
     let outcome: EmailAttemptOutcome;
     let reason: EmailProviderFailureReason | undefined;
     let durationMs = 0;
@@ -196,7 +200,7 @@ export class EmailSender {
     );
   }
 
-  private prepare(message: ClaimedEmailMessage): Prepared {
+  private async prepare(message: ClaimedEmailMessage): Promise<Prepared> {
     const from = this.config.from;
     if (from === null) {
       // EmailOutboxModule refuses to start with a provider and no EMAIL_FROM.
@@ -214,7 +218,7 @@ export class EmailSender {
         locale: message.locale,
         defaultLocale: this.locale.defaultLocale,
         theme: EMAIL_THEME,
-        links: this.links.linksFor({
+        links: await this.links.linksFor({
           messageId: message.id,
           templateKey: message.templateKey,
           locale: message.locale,
@@ -226,6 +230,11 @@ export class EmailSender {
         shopName: from.displayName,
       });
     } catch (error) {
+      if (error instanceof EmailLinkUnavailableError) {
+        // A temporary read failure is not the mail's fault: no status is recorded, the lease runs out and the next claim
+        // tries again (the caller logs the class and code like any failed claim or record).
+        throw error;
+      }
       return {
         kind: "not_renderable",
         code: error instanceof EmailRenderError ? error.code : "render_failed",

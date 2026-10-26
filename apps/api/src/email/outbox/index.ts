@@ -6,11 +6,17 @@ export {
 } from "./email-delivery-config.js";
 export {
   EMAIL_LINK_SOURCE,
+  EmailLinkUnavailableError,
+  GUEST_ORDER_ACCESS,
+  ORDER_LINK_TEMPLATES,
   StorefrontEmailLinks,
   storefrontHomeLink,
   type EmailLinkInput,
   type EmailLinkSource,
+  type GuestOrderAccess,
+  type GuestOrderAccessSource,
 } from "./email-links.js";
+export { DatabaseGuestOrderAccess } from "./guest-order-access.js";
 export {
   EmailMessageChanges,
   type ClaimedEmailMessage,

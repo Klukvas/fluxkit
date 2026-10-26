@@ -9,6 +9,11 @@ import { AdminTestEmailTemplate } from "./admin-test.template.js";
 import { PasswordChangedEmailTemplate } from "./customer-password-changed.template.js";
 import { PasswordResetEmailTemplate } from "./customer-password-reset.template.js";
 import { VerifyEmailEmailTemplate } from "./customer-verify-email.template.js";
+import { OrderCancelledEmailTemplate } from "./order-cancelled.template.js";
+import { OrderExpiredEmailTemplate } from "./order-expired.template.js";
+import { OrderPaidEmailTemplate } from "./order-paid.template.js";
+import { OrderPlacedEmailTemplate } from "./order-placed.template.js";
+import { ShipmentCreatedEmailTemplate } from "./shipment-created.template.js";
 import { BUILT_IN_EMAIL_CATALOGS, formatMessage, LAYOUT_CATALOGS } from "./email-messages.js";
 import { renderEmail, type RegisteredEmailTemplate } from "./email-renderer.js";
 import { EMAIL_THEME } from "./email-theme.js";
@@ -17,16 +22,24 @@ const HOSTILE = `<script>alert(1)</script>"><img src=x onerror=alert(2)>'&javasc
 const ESCAPED_SCRIPT =
   "&lt;script&gt;alert(1)&lt;/script&gt;&quot;&gt;&lt;img src=x onerror=alert(2)&gt;&#39;&amp;";
 
-/** Every string leaf of `value` replaced by `HOSTILE`. */
-function hostile(value: unknown): unknown {
+/**
+ * Values the schemas bind to a closed set or a pattern (an order number, a currency code, a tracking number, an instant):
+ * hostile text cannot be stored there, and the money and time formatters refuse it (a bug, never printed).
+ */
+const PATTERN_BOUND = new Set(["orderNumber", "currency", "trackingNumber", "payBefore"]);
+
+/** Every string leaf of `value` replaced by `HOSTILE`, except the pattern-bound ones. */
+function hostile(value: unknown, key = ""): unknown {
   if (typeof value === "string") {
-    return HOSTILE;
+    return PATTERN_BOUND.has(key) ? value : HOSTILE;
   }
   if (Array.isArray(value)) {
-    return value.map(hostile);
+    return value.map((entry) => hostile(entry, key));
   }
   if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, hostile(entry)]));
+    return Object.fromEntries(
+      Object.entries(value).map(([name, entry]) => [name, hostile(entry, name)]),
+    );
   }
   return value;
 }
@@ -58,6 +71,11 @@ const TEMPLATES: [string, RegisteredEmailTemplate][] = [
   ["customer.password_reset", entryOf(new PasswordResetEmailTemplate() as never)],
   ["customer.password_changed", entryOf(new PasswordChangedEmailTemplate() as never)],
   ["customer.verify_email", entryOf(new VerifyEmailEmailTemplate() as never)],
+  ["order.placed", entryOf(new OrderPlacedEmailTemplate() as never)],
+  ["order.paid", entryOf(new OrderPaidEmailTemplate() as never)],
+  ["order.cancelled", entryOf(new OrderCancelledEmailTemplate() as never)],
+  ["order.expired", entryOf(new OrderExpiredEmailTemplate() as never)],
+  ["shipment.created", entryOf(new ShipmentCreatedEmailTemplate() as never)],
   ["fixture.greeting (a feature's template)", entryOf(new FixtureGreetingTemplate() as never)],
 ];
 
@@ -100,6 +118,7 @@ describe("rendering with hostile values (ADR 0031 decision 14)", () => {
           "p",
           "ul",
           "li",
+          "span",
         ]).toContain(tag);
       }
     }
@@ -230,7 +249,7 @@ describe("the layout and the texts", () => {
     expect(Object.keys(BUILT_IN_EMAIL_CATALOGS).sort()).toEqual(["en", "uk"]);
     for (const key of uk) {
       expect(key).toMatch(
-        /^(layout|admin\.test|customer\.password_reset|customer\.password_changed|customer\.verify_email)\.[a-z0-9_.]+$/,
+        /^(layout|admin\.test|customer\.password_reset|customer\.password_changed|customer\.verify_email|order\.placed|order\.paid|order\.cancelled|order\.expired|shipment\.created)\.[a-z0-9_.]+$/,
       );
     }
     for (const catalog of Object.values(BUILT_IN_EMAIL_CATALOGS)) {

@@ -1,10 +1,11 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import { EmailTemplatesModule } from "../templates/index.js";
 import { EMAIL_DELIVERY_CONFIG, type EmailDeliveryConfig } from "./email-delivery-config.js";
-import { EMAIL_LINK_SOURCE, StorefrontEmailLinks } from "./email-links.js";
+import { EMAIL_LINK_SOURCE, GUEST_ORDER_ACCESS, StorefrontEmailLinks } from "./email-links.js";
 import { EmailMessageChanges } from "./email-message-changes.js";
 import { EmailOutboxRepository } from "./email-outbox.repository.js";
 import { EmailOutbox } from "./email-outbox.service.js";
+import { DatabaseGuestOrderAccess } from "./guest-order-access.js";
 import { EMAIL_SEND_PACER, EmailSender } from "./email-sender.js";
 import { SendPacer } from "./send-pacer.js";
 
@@ -37,6 +38,7 @@ export class EmailOutboxModule {
           provide: EMAIL_SEND_PACER,
           useFactory: () => new SendPacer(config.tuning.sendsPerSecond),
         },
+        { provide: GUEST_ORDER_ACCESS, useClass: DatabaseGuestOrderAccess },
         { provide: EMAIL_LINK_SOURCE, useClass: StorefrontEmailLinks },
         EmailOutboxRepository,
         EmailMessageChanges,
