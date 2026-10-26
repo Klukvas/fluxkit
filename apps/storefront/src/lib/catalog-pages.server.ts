@@ -2,6 +2,7 @@ import { cache } from "react";
 import { homeSections } from "../layout/home";
 import {
   loadCatalogListing,
+  loadEmailDelivery,
   loadHomeData,
   loadProductPage,
   loadShopExponent,
@@ -33,3 +34,6 @@ export const getShopExponent = cache(() => loadShopExponent(storeData));
 
 /** The shop currency and its digits, for the order pages (an order may be in an older currency). */
 export const getShopMoney = cache(() => loadShopMoney(storeData));
+
+/** Whether the shop has an email provider: the pages of the emailed links and their entry points depend on it. */
+export const getEmailDelivery = cache(() => loadEmailDelivery(storeData));

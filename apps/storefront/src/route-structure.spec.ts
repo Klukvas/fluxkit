@@ -65,12 +65,15 @@ describe("route structure", () => {
         /^\(site\)\/(cart|checkout|account|order)$/.test(dirname(relative(localeRoot, page))),
     );
     expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
+      "(site)/account/forgot-password/page.tsx",
       "(site)/account/login/page.tsx",
       "(site)/account/orders/[number]/page.tsx",
       "(site)/account/orders/page.tsx",
       "(site)/account/page.tsx",
       "(site)/account/profile/page.tsx",
       "(site)/account/register/page.tsx",
+      "(site)/account/reset-password/page.tsx",
+      "(site)/account/verify-email/page.tsx",
       "(site)/cart/page.tsx",
       "(site)/checkout/page.tsx",
       "(site)/order/[number]/page.tsx",
@@ -79,6 +82,17 @@ describe("route structure", () => {
       const source = readFileSync(page, "utf8");
       expect(source, relative(localeRoot, page)).toMatch(/return privateMetadata\(/);
       expect(source, relative(localeRoot, page)).not.toMatch(/robots:/);
+    }
+  });
+
+  it("reads nothing from the request in the three emailed-link pages (no searchParams, headers or cookies), sets no-referrer metadata and reads emailDelivery", () => {
+    for (const name of ["forgot-password", "reset-password", "verify-email"]) {
+      const page = join(localeRoot, "(site)", "account", name, "page.tsx");
+      const source = readFileSync(page, "utf8");
+      // The fragment is unknown to the server; nothing else a link could carry (a query, a header) is read either.
+      expect(source, name).not.toMatch(/searchParams|headers\(|cookies\(/);
+      expect(source, name).toMatch(/noReferrer: true/);
+      expect(source, name).toMatch(/emailDelivery=\{await getEmailDelivery\(\)\}/);
     }
   });
 });

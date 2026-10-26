@@ -10,6 +10,7 @@ import { resolve } from "node:path";
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
+  E2E_MAIL_FILE,
   E2E_MEDIA_DIR,
   apiEnvironment,
   databaseNameOf,
@@ -52,6 +53,9 @@ console.log(`e2e: wiped database ${String(name)}`);
 rmSync(E2E_MEDIA_DIR, { recursive: true, force: true });
 mkdirSync(E2E_MEDIA_DIR, { recursive: true, mode: 0o750 });
 console.log(`e2e: upload directory ${E2E_MEDIA_DIR}`);
+
+// A fresh mailbox: the fake email provider appends to this file, and a mail of an earlier run must never be found.
+rmSync(E2E_MAIL_FILE, { force: true });
 
 const env = apiEnvironment();
 const run = (script: string, args: string[] = [], extra: Env = {}) =>

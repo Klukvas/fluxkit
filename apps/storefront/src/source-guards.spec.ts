@@ -162,7 +162,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     for (const file of sources) expect(code(file.text), file.path).not.toMatch(/document\.title/);
   });
 
-  it("reads the fragment only in the guest order page and the locale switcher, inside effects", () => {
+  it("reads the fragment only in the guest order page, the locale switcher and the fragment-token hook, inside effects", () => {
     const readers = sources.filter((file) => /location\.hash/.test(code(file.text)));
     expect(readers.map((file) => file.path).sort()).toEqual(
       [
@@ -266,6 +266,117 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
           /token|hash|href|link|body|values|email|phone/i,
         );
       }
+    }
+  });
+
+  // Email plan step 10: the emailed-link pages (forgot password, reset password, verify email).
+  const emailFiles = sources.filter((file) =>
+    /(^|\/)(account-(?:email-parts|forgot-password|reset-password|verify-email|verify-notice|email-flows)|use-fragment-token|fragment-token|reset-password-form)\.tsx?$/.test(
+      file.path,
+    ),
+  );
+  const tokenFiles = emailFiles.filter((file) =>
+    /(reset-password|verify-email|fragment-token|email-flows)/.test(file.path),
+  );
+
+  it("finds the emailed-link sources it guards", () => {
+    expect(emailFiles.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "account-email-parts.tsx"),
+        join("components", "account-forgot-password.tsx"),
+        join("components", "account-reset-password.tsx"),
+        join("components", "account-verify-email.tsx"),
+        join("components", "account-verify-notice.tsx"),
+        join("components", "use-fragment-token.ts"),
+        join("lib", "account-email-flows.ts"),
+        join("lib", "fragment-token.ts"),
+        join("lib", "reset-password-form.ts"),
+      ].sort(),
+    );
+  });
+
+  it("reads and removes the link's fragment in one place: takeFragmentToken, called by the hook only, which only the two token pages use", () => {
+    const callers = sources.filter((file) => /\btakeFragmentToken\(/.test(code(file.text)));
+    expect(callers.map((file) => file.path).sort()).toEqual(
+      [join("components", "use-fragment-token.ts"), join("lib", "fragment-token.ts")].sort(),
+    );
+    const hookUsers = sources.filter((file) => /\buseFragmentToken\(/.test(code(file.text)));
+    expect(hookUsers.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "account-reset-password.tsx"),
+        join("components", "account-verify-email.tsx"),
+        join("components", "use-fragment-token.ts"),
+      ].sort(),
+    );
+    // The scrub keeps the history entry's own state and never writes the fragment back.
+    const lib = sources.find((file) => file.path === join("lib", "fragment-token.ts"));
+    expect(code(lib?.text ?? "")).toMatch(
+      /replaceState\(win\.history\.state, "", `\$\{pathname\}\$\{search\}`\)/,
+    );
+  });
+
+  it("sends a link's token only through the confirm calls of one module, in the body (never in a URL)", () => {
+    for (const name of [
+      "confirmPasswordReset",
+      "confirmEmailVerification",
+      "requestPasswordReset",
+      "requestEmailVerification",
+    ]) {
+      const callers = sources.filter((file) =>
+        new RegExp(`\\bclient\\.${name}\\(`).test(code(file.text)),
+      );
+      expect(
+        callers.map((file) => file.path),
+        name,
+      ).toEqual([join("lib", "account-email-flows.ts")]);
+    }
+    // The only template literal that holds a token is the in-memory map key of the settled confirmations.
+    const templates = tokenFiles.flatMap((file) =>
+      [...code(file.text).matchAll(/`[^`]*\$\{token\}[^`]*`/g)].map(
+        (match) => `${file.path}: ${match[0]}`,
+      ),
+    );
+    expect(templates).toEqual([
+      `${join("lib", "account-email-flows.ts")}: \`confirmEmail:\${token}\``,
+    ]);
+    for (const file of tokenFiles) {
+      // No navigation, link or history call may take the token.
+      expect(code(file.text), file.path).not.toMatch(
+        /(router\.\w+|history\.\w+|href=|localizedHref|authHref|loginHref)\([^;]*token/i,
+      );
+    }
+  });
+
+  it("shows 'Forgot password?' only through forgotPasswordHref(locale, emailDelivery), so no link exists without a mail provider", () => {
+    const login = sources.find((file) => file.path === join("components", "login-form.tsx"));
+    expect(code(login?.text ?? "")).toMatch(
+      /forgotHref=\{forgotPasswordHref\(locale, emailDelivery\)\}/,
+    );
+    const hrefs = sources.filter((file) => /account\/forgot-password/.test(code(file.text)));
+    expect(hrefs.map((file) => file.path).sort()).toEqual(
+      [join("components", "account-reset-password.tsx"), join("lib", "email-links.ts")].sort(),
+    );
+  });
+
+  it("uses no transport of its own, browser storage or console in the emailed-link code: the typed client only, nothing logged", () => {
+    for (const file of emailFiles) {
+      const text = code(file.text);
+      expect(text, file.path).not.toMatch(
+        /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
+      );
+      expect(text, file.path).not.toMatch(
+        /\b(localStorage|sessionStorage|indexedDB)\b|document\.cookie/,
+      );
+      expect(text, file.path).not.toMatch(/\bconsole\./);
+      expect(text, file.path).not.toMatch(/document\.title|\.innerHTML/);
+    }
+  });
+
+  it("puts no token, password or address into the title or the metadata of the three pages", () => {
+    for (const name of ["forgot-password", "reset-password", "verify-email"]) {
+      const route = sources.find((file) => file.path.includes(join("account", name, "page.tsx")));
+      expect(route, name).toBeDefined();
+      expect(code(route?.text ?? ""), name).not.toMatch(/token|password\b.*params|email.*params/i);
     }
   });
 });

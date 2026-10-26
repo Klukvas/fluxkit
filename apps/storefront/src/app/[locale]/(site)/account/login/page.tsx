@@ -1,6 +1,7 @@
 import { Container, createTranslator } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { LoginForm } from "../../../../../components/login-form";
+import { getEmailDelivery } from "../../../../../lib/catalog-pages.server";
 import { privateMetadata } from "../../../../../lib/page-metadata";
 import { routeLocale } from "../../../../../lib/route-locale";
 import { messagesByLocale } from "../../../../../messages";
@@ -25,7 +26,10 @@ export default async function LoginRoute({ params, searchParams }: LoginRoutePro
   return (
     <Container className="py-8">
       <div className="max-w-md">
-        <LoginForm next={typeof next === "string" ? next : undefined} />
+        <LoginForm
+          next={typeof next === "string" ? next : undefined}
+          emailDelivery={await getEmailDelivery()}
+        />
       </div>
     </Container>
   );
