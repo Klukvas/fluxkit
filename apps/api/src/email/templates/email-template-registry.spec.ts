@@ -235,6 +235,11 @@ describe("EmailTemplateRegistry (discovery in the application)", () => {
       "customer.password_reset",
       "customer.verify_email",
       "fixture.greeting",
+      "order.cancelled",
+      "order.expired",
+      "order.paid",
+      "order.placed",
+      "shipment.created",
     ]);
     expect(registry.get("fixture.greeting")?.template.version).toBe(1);
     const overridden = await startApp({ extraFeatures: [fixtureEmailTemplates("override")] });
@@ -258,6 +263,11 @@ describe("EmailTemplateRegistry (discovery in the application)", () => {
       "customer.password_changed",
       "customer.password_reset",
       "customer.verify_email",
+      "order.cancelled",
+      "order.expired",
+      "order.paid",
+      "order.placed",
+      "shipment.created",
     ]);
   });
 });
