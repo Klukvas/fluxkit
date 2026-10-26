@@ -44,3 +44,22 @@ The test parses `tokens.css` (6-digit hex values only; another color format fail
 The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
 
 Status colors (`danger`, `success`, `warning`) are documented and tested for text on `background` and on `muted` (4.5:1 in both themes). The light `danger` was darkened from `#dc2626` to `#b91c1c` (4.41:1 on `muted` before). The `Alert` uses the status colors for borders only.
+
+## Email theme (`emailTheme`, ADR 0031 decision 14)
+
+Status: contract since email plan step 2 (ADR 0031 open question 7: it joins this contract because its values follow the tokens). Renaming or removing a member is a breaking change; adding one is additive.
+
+Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `docs/contracts/email-templates.md` once listed) style inline with `emailTheme` from `@fluxkit/theme`; its shape is the `EmailTheme` interface of `@fluxkit/core`.
+
+| Member | Source | Value today |
+|---|---|---|
+| `color.background`, `foreground`, `muted`, `mutedForeground`, `border`, `primary`, `primaryForeground`, `danger`, `success`, `warning` | the light value of `--fk-color-<kebab name>` | 6-digit hex |
+| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` | the token stacks |
+| `radius.sm`, `md`, `lg` | `--fk-radius-*`, rem to px (16px per rem) | `4px`, `8px`, `16px` |
+| `space.xs` to `space.xl` | mail only | `4px`, `8px`, `16px`, `24px`, `32px` |
+| `fontSize.small`, `body`, `heading` | mail only | `13px`, `15px`, `20px` |
+| `lineHeight` | mail only | `1.5` |
+| `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
+
+Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card` (box-shadow is poorly supported). Dark mode is not attempted in mail.
+`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
