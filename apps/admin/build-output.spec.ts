@@ -25,6 +25,8 @@ const dist = join(import.meta.dirname, "dist");
  * per file and language): 398 093 bytes raw, 121 328 gzip with the same areas; the budget stays, about 10 % above that.
  * Shipping plan step 11 (the five Shipping routes and their titles; the area itself is a lazy chunk): 412 023 bytes raw, 123 506 gzip
  * before and 414 174 raw, 123 878 gzip after.
+ * Email plan step 11 (the five Email routes, their titles and the email client methods; the area itself is a lazy chunk of
+ * 31 404 bytes raw, 8 074 gzip): 415 472 raw, 123 830 gzip before and 417 312 raw, 124 169 gzip after.
  */
 const INITIAL_JS_BUDGET = { raw: 440_000, gzip: 135_000 };
 
@@ -37,6 +39,7 @@ const AREA_MODULES = [
   "src/areas/customers/index.tsx",
   "src/areas/users/index.tsx",
   "src/areas/shipping/index.tsx",
+  "src/areas/email/index.tsx",
 ];
 
 interface ManifestChunk {
