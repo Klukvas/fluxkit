@@ -28,9 +28,26 @@ describe("admin security headers (ADR 0027 decision 3)", () => {
     expect(policy.get("form-action")).toEqual(["'self'"]);
     expect(policy.get("frame-ancestors")).toEqual(["'none'"]);
     expect(policy.get("img-src")).toEqual(["'self'", "data:"]);
-    expect(ADMIN_SECURITY_HEADERS["Content-Security-Policy"]).not.toMatch(
-      /unsafe-inline|unsafe-eval|\*|http:/,
-    );
+    expect(ADMIN_SECURITY_HEADERS["Content-Security-Policy"]).not.toMatch(/unsafe-eval|\*|http:/);
+  });
+
+  it("allows inline style ATTRIBUTES for the mail preview and nothing else inline (step 11 decision)", () => {
+    const policy = directives(ADMIN_SECURITY_HEADERS["Content-Security-Policy"] as string);
+    expect(policy.get("style-src-attr")).toEqual(["'unsafe-inline'"]);
+    // `unsafe-inline` appears in no other directive: scripts, style elements and the rest stay strict.
+    for (const [name, sources] of policy) {
+      if (name !== "style-src-attr") expect(sources, name).not.toContain("'unsafe-inline'");
+    }
+    // No directive that would allow an inline script, a style element, a frame or a sandboxed child to load something.
+    for (const absent of [
+      "script-src-elem",
+      "script-src-attr",
+      "style-src-elem",
+      "frame-src",
+      "child-src",
+    ]) {
+      expect(policy.has(absent), absent).toBe(false);
+    }
   });
 
   it("forbids framing, sniffing and the referrer", () => {
