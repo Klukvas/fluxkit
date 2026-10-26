@@ -40,6 +40,9 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "payment_refund",
+      "payment_event",
+      "payment",
       "email_message",
       "customer_auth_token",
       "shipment_status_change",
@@ -85,6 +88,7 @@ describe("catalog schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop function if exists "payment_event_append_only"()');
     await pool.query('drop function if exists "shipment_status_change_append_only"()');
     await pool.query('drop function if exists "order_shipping_immutable"()');
     await pool.query('drop function if exists "order_status_change_append_only"()');
@@ -1434,7 +1438,8 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message'
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'payment', 'payment_event',
+          'payment_refund'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1457,7 +1462,8 @@ describe("catalog schema (real Postgres)", () => {
           'customer', 'customer_session', 'cart', 'cart_item', 'sales_order', 'order_item',
           'order_adjustment', 'order_status_change', 'order_item_reservation', 'domain_event',
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
-          'shipment_status_change', 'customer_auth_token', 'email_message'
+          'shipment_status_change', 'customer_auth_token', 'email_message', 'payment', 'payment_event',
+          'payment_refund'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.
