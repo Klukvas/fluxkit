@@ -22,7 +22,7 @@ import {
   ResourceFallback,
   type ResourceFallbackState,
 } from "../../views/status-views";
-import type { DayRangeFailure } from "./date-range";
+import type { DayRangeFailure } from "../../lib/date-range";
 import {
   ORDER_SEARCH_MAX_LENGTH,
   ORDER_STATUS_FILTERS,
