@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { FormEvent, Ref } from "react";
 import type { SessionState } from "../lib/account-store";
 import { authHref, safeNextPath } from "../lib/safe-next";
+import { forgotPasswordHref } from "../lib/email-links";
 import { localizedHref } from "../lib/locale-path";
 import type { Failure } from "../lib/failure";
 import { FormErrorSummary, TextField } from "./form-parts";
@@ -26,6 +27,8 @@ export interface LoginFormViewProps {
   failure: Failure | null;
   summaryRef: Ref<HTMLDivElement>;
   registerHref: string;
+  /** The "Forgot password?" page; absent when the shop sends no email (`emailDelivery` false), so no link is shown. */
+  forgotHref?: string | undefined;
 }
 
 /** Markup of the sign-in form. The password input is `current-password`, the email `email` (password managers rely on it). */
@@ -38,6 +41,7 @@ export function LoginFormView({
   failure,
   summaryRef,
   registerHref,
+  forgotHref,
 }: LoginFormViewProps) {
   const labels = {
     email: t("account.field.email"),
@@ -82,6 +86,11 @@ export function LoginFormView({
         value={values.password}
         onValueChange={(value) => onValueChange("password", value)}
       />
+      {forgotHref === undefined ? null : (
+        <Link href={forgotHref} className="self-start underline underline-offset-4">
+          {t("account.login.forgot")}
+        </Link>
+      )}
       <Button type="submit" disabled={pending}>
         {pending ? t("account.login.submitting") : t("account.login.submit")}
       </Button>
@@ -118,7 +127,13 @@ export function AlreadySignedInView({
   );
 }
 
-export function LoginForm({ next }: { next: string | undefined }) {
+export function LoginForm({
+  next,
+  emailDelivery,
+}: {
+  next: string | undefined;
+  emailDelivery: boolean;
+}) {
   const { locale, t } = useI18n();
   const { state, store } = useAccount();
   const router = useRouter();
@@ -140,6 +155,7 @@ export function LoginForm({ next }: { next: string | undefined }) {
       failure={form.failure}
       summaryRef={form.summaryRef}
       registerHref={authHref(locale, "register", next)}
+      forgotHref={forgotPasswordHref(locale, emailDelivery)}
       onSubmit={(event) =>
         form.submit(event, {
           required: LOGIN_FIELDS,

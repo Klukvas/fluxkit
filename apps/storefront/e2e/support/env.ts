@@ -16,6 +16,16 @@ export const E2E_ORIGIN = `http://127.0.0.1:${E2E_PORT}`;
  */
 export const E2E_MEDIA_DIR = join(tmpdir(), `fluxkit-storefront-e2e-media-${String(E2E_PORT)}`);
 
+/**
+ * The JSON Lines file the API's test-only `fake` email provider appends every accepted mail to (`FAKE_EMAIL_CAPTURE_FILE`).
+ * Under the system temp directory, fixed per proxy port, wiped by `prepare-database.ts` and removed by `global-teardown.ts`;
+ * `support/mailbox.ts` reads it. It holds real-looking links with live tokens of a throwaway database, nothing else.
+ */
+export const E2E_MAIL_FILE = join(
+  tmpdir(),
+  `fluxkit-storefront-e2e-mail-${String(E2E_PORT)}.jsonl`,
+);
+
 export const ADMIN_EMAIL = "e2e-owner@example.com";
 export const ADMIN_PASSWORD = "e2e-owner-password-0123456789";
 
@@ -120,6 +130,14 @@ export function apiEnvironment(env: Env = process.env): Env {
     MEDIA_PUBLIC_BASE_URL: `${E2E_ORIGIN}/media`,
     MEDIA_MAX_BYTES: "10485760",
     MEDIA_MAX_PIXELS: "50000000",
+    // Transactional email (ADR 0031) with the test-only `fake` provider: nothing leaves the machine, every accepted mail is
+    // appended to `E2E_MAIL_FILE`, and the links in it point at the proxy origin (`STOREFRONT_PUBLIC_URL`, the only base of
+    // links in mail). With a provider the storefront shows "Forgot password?" and the verification notice, and registration
+    // sends one verification mail; no other scenario depends on mail, so they run as before.
+    EMAIL_PROVIDER: "fake",
+    EMAIL_FROM: "Fluxkit E2E <shop@example.com>",
+    STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
+    FAKE_EMAIL_CAPTURE_FILE: E2E_MAIL_FILE,
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];

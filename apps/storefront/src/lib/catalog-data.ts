@@ -44,6 +44,15 @@ export async function loadShopMoney(data: StoreData): Promise<ShopMoney> {
   return { currency: config.currency, exponent: config.currencyExponent };
 }
 
+/**
+ * Whether the shop sends email (`emailDelivery` of `GET /store/config`, false without a provider). Decides whether the
+ * storefront shows "Forgot password?" and the verification prompts. Read through the same data cache as the rest of the
+ * config, so a change shows within the cache's minute; the routes still answer `404` meanwhile, and the pages handle that.
+ */
+export async function loadEmailDelivery(data: StoreData): Promise<boolean> {
+  return unwrap("GET /store/config", await data.getConfig()).emailDelivery;
+}
+
 export interface HomeData {
   newProducts?: ProductSummary[];
   categories?: CategoryNode[];

@@ -4,11 +4,12 @@ import type { Customer } from "@fluxkit/api-client";
 import { Alert, Button, Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { failureText, type Failure } from "../lib/failure";
 import { formatDate } from "../lib/date";
 import { localizedHref } from "../lib/locale-path";
 import { AccountGate } from "./account-gate";
+import { VerifyEmailNotice } from "./account-verify-notice";
 import { useI18n } from "./i18n-provider";
 import { useAccount } from "./session-provider";
 import { linkButton } from "./styles";
@@ -21,6 +22,8 @@ export function AccountOverviewView({
   pending,
   failure,
   onLogout,
+  emailDelivery = false,
+  emailNotice = null,
 }: {
   customer: Customer;
   t: Translator;
@@ -28,10 +31,15 @@ export function AccountOverviewView({
   pending: boolean;
   failure: Failure | null;
   onLogout: () => void;
+  /** The shop sends email: the address shows whether it is confirmed. */
+  emailDelivery?: boolean;
+  /** The "confirm your address" notice with its "send again" control (a client island, so the caller builds it). */
+  emailNotice?: ReactNode;
 }) {
   return (
     <Container className="flex flex-col gap-6 py-8">
       <h1 className="text-3xl font-bold text-foreground">{t("account.title")}</h1>
+      {emailNotice}
       <h2 className="text-xl font-semibold text-foreground">{t("account.overview.profile")}</h2>
       <dl className="flex max-w-md flex-col gap-2 text-foreground">
         <div className="flex flex-wrap gap-x-6">
@@ -44,7 +52,14 @@ export function AccountOverviewView({
         </div>
         <div className="flex flex-wrap gap-x-6">
           <dt className="w-40 text-muted-foreground">{t("account.field.email")}</dt>
-          <dd className="min-w-0 break-all">{customer.email}</dd>
+          <dd className="min-w-0 break-all">
+            {customer.email}
+            {emailDelivery && customer.emailVerified ? (
+              <span className="ms-2 text-sm text-muted-foreground">
+                {t("account.verifyNotice.verified")}
+              </span>
+            ) : null}
+          </dd>
         </div>
         <div className="flex flex-wrap gap-x-6">
           <dt className="w-40 text-muted-foreground">{t("account.field.phone")}</dt>
@@ -71,7 +86,7 @@ export function AccountOverviewView({
   );
 }
 
-export function AccountOverview() {
+export function AccountOverview({ emailDelivery }: { emailDelivery: boolean }) {
   const { locale, t } = useI18n();
   const { store } = useAccount();
   const router = useRouter();
@@ -106,6 +121,8 @@ export function AccountOverview() {
           pending={pending}
           failure={failure}
           onLogout={() => void logout()}
+          emailDelivery={emailDelivery}
+          emailNotice={<VerifyEmailNotice customer={customer} emailDelivery={emailDelivery} />}
         />
       )}
     </AccountGate>

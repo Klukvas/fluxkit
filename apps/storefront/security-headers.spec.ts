@@ -135,6 +135,18 @@ describe("headerRules: Referrer-Policy per page (Next's own matcher, last matchi
     }
   });
 
+  it("sends no Referer from the pages of the emailed links (forgot password, reset password, verify email), in both locales", () => {
+    for (const page of ["forgot-password", "reset-password", "verify-email"]) {
+      for (const locale of ["uk", "en"]) {
+        const headers = headersFor(`/${locale}/account/${page}`);
+        expect(headers.get("Referrer-Policy"), `${locale} ${page}`).toBe("no-referrer");
+        expect(headers.get("Content-Security-Policy"), `${locale} ${page}`).toContain(
+          "default-src 'self'",
+        );
+      }
+    }
+  });
+
   it("keeps the site-wide policy everywhere else, the checkout and the account orders included", () => {
     for (const path of [
       "/uk",
@@ -142,6 +154,10 @@ describe("headerRules: Referrer-Policy per page (Next's own matcher, last matchi
       "/en/account/orders/7K3M-9QX2",
       "/uk/p/order",
       "/uk/orders",
+      "/uk/account",
+      "/uk/account/login",
+      "/uk/account/profile",
+      "/uk/account/reset-password/extra",
     ]) {
       expect(headersFor(path).get("Referrer-Policy"), path).toBe("strict-origin-when-cross-origin");
     }
