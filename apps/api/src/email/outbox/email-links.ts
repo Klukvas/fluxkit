@@ -1,5 +1,11 @@
 import { Inject, Injectable } from "@nestjs/common";
-import type { AuthTokenPurpose, EmailLinks, EmailRecipientKind } from "@fluxkit/core";
+import {
+  ORDER_NUMBER_PATTERN,
+  type AuthTokenPurpose,
+  type EmailLinks,
+  type EmailRecipientKind,
+} from "@fluxkit/core";
+import { accessTokenMatches, deriveAccessToken } from "../../orders/access-token.js";
 import { deriveAuthToken } from "../auth/auth-token-crypto.js";
 import { EMAIL_DELIVERY_CONFIG, type EmailDeliveryConfig } from "./email-delivery-config.js";
 
@@ -24,7 +30,33 @@ export interface EmailLinkInput {
  * the stored ids and the secret, never stored. Must be deterministic: the same row gives the same links on every attempt.
  */
 export interface EmailLinkSource {
-  linksFor(input: EmailLinkInput): EmailLinks;
+  /** May be asynchronous: the guest order link reads the order's stored data (the idempotency key) at render time. */
+  linksFor(input: EmailLinkInput): EmailLinks | Promise<EmailLinks>;
+}
+
+/** Injection token of the `GuestOrderAccessSource` the order links are derived with. */
+export const GUEST_ORDER_ACCESS = Symbol("fluxkit:guest-order-access");
+
+/** What the guest order link needs from `sales_order` (ADR 0023): the two inputs of the derivation and the stored hash. */
+export interface GuestOrderAccess {
+  readonly idempotencyKey: string;
+  readonly accessTokenHash: string | null;
+}
+
+/** Reads the stored data of one order for the guest link. Reads only; the key and the token never leave the link source. */
+export interface GuestOrderAccessSource {
+  find(orderId: string): Promise<GuestOrderAccess | undefined>;
+}
+
+/**
+ * The link could not be derived NOW because something temporary failed (the database), not because the mail is wrong:
+ * the sender does not record the mail `failed`; it stays leased and the next claim tries again (ADR 0031 decision 6).
+ */
+export class EmailLinkUnavailableError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("The mail link could not be derived right now", options);
+    this.name = "EmailLinkUnavailableError";
+  }
 }
 
 /** The storefront home in a locale: `<STOREFRONT_PUBLIC_URL>/<locale>`. */
@@ -40,6 +72,13 @@ export const AUTH_LINK_PAGES = Object.freeze({
   "customer.password_reset": { purpose: "password_reset", path: "account/reset-password" },
   "customer.verify_email": { purpose: "email_verification", path: "account/verify-email" },
 } as const satisfies Record<string, { purpose: AuthTokenPurpose; path: string }>);
+
+/** The order mails that carry a link to the order (placed, paid, shipped); the others (cancelled, expired) have none. */
+export const ORDER_LINK_TEMPLATES: ReadonlySet<string> = new Set([
+  "order.placed",
+  "order.paid",
+  "shipment.created",
+]);
 
 const TOKEN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -65,36 +104,100 @@ export function authActionLink(
   return `${storefrontHomeLink(base, locale)}/${page.path}#t=${token}`;
 }
 
+/** `<base>/<locale>/account/orders/<number>`: the customer's own order page (the session decides who may read it). */
+export function accountOrderLink(base: string, locale: string, orderNumber: unknown): string {
+  return `${storefrontHomeLink(base, locale)}/account/orders/${checkedOrderNumber(orderNumber)}`;
+}
+
+/** `<base>/<locale>/order/<number>#t=<token>`: the guest's order page; the bearer token stays in the fragment. */
+export function guestOrderLink(
+  base: string,
+  locale: string,
+  orderNumber: unknown,
+  token: string,
+): string {
+  return `${storefrontHomeLink(base, locale)}/order/${checkedOrderNumber(orderNumber)}#t=${token}`;
+}
+
+function checkedOrderNumber(orderNumber: unknown): string {
+  if (typeof orderNumber !== "string" || !ORDER_NUMBER_PATTERN.test(orderNumber)) {
+    throw new Error("An order mail needs the order number in its variables");
+  }
+  return encodeURIComponent(orderNumber);
+}
+
 /**
- * The link source of the API: the storefront home in the mail's locale, and the action link of the auth mails
- * (password reset, email verification) with the token derived at render time.
- * TODO(fluxkit): email plan step 8 adds the order links (the guest order link from `order_id` and `idempotency_key`,
- * ADR 0023; the account order link) by template key here.
+ * The link source of the API: the storefront home in the mail's locale, the action link of the auth mails (password
+ * reset, email verification) with the token derived at render time, and the order link of the order mails (ADR 0023,
+ * ADR 0031 decision 13): for a guest the access token DERIVED from `ORDER_TOKEN_SECRET`, the order id and the order's
+ * stored idempotency key (never stored in the outbox, checked against the order's stored hash so a dead link is never
+ * sent), for a customer the account order page. A missing order, secret or number throws (the mail fails `render_failed`);
+ * a failing database read throws `EmailLinkUnavailableError` (the mail is tried again).
  */
 @Injectable()
 export class StorefrontEmailLinks implements EmailLinkSource {
-  constructor(@Inject(EMAIL_DELIVERY_CONFIG) private readonly config: EmailDeliveryConfig) {}
+  constructor(
+    @Inject(EMAIL_DELIVERY_CONFIG) private readonly config: EmailDeliveryConfig,
+    @Inject(GUEST_ORDER_ACCESS) private readonly orderAccess: GuestOrderAccessSource,
+  ) {}
 
-  linksFor(input: EmailLinkInput): EmailLinks {
+  async linksFor(input: EmailLinkInput): Promise<EmailLinks> {
     const base = this.config.storefrontPublicUrl;
     if (base === null) {
       throw new Error("STOREFRONT_PUBLIC_URL is needed to build the links of a mail");
     }
-    const page = Object.hasOwn(AUTH_LINK_PAGES, input.templateKey)
-      ? AUTH_LINK_PAGES[input.templateKey as keyof typeof AUTH_LINK_PAGES]
-      : undefined;
     return Object.freeze({
       storefront: storefrontHomeLink(base, input.locale),
-      action:
-        page === undefined
-          ? null
-          : authActionLink(
-              base,
-              input.locale,
-              page,
-              input.variables["tokenId"],
-              this.config.tokenSecret,
-            ),
+      action: await this.actionLink(base, input),
     });
+  }
+
+  private async actionLink(base: string, input: EmailLinkInput): Promise<string | null> {
+    if (Object.hasOwn(AUTH_LINK_PAGES, input.templateKey)) {
+      return authActionLink(
+        base,
+        input.locale,
+        AUTH_LINK_PAGES[input.templateKey as keyof typeof AUTH_LINK_PAGES],
+        input.variables["tokenId"],
+        this.config.tokenSecret,
+      );
+    }
+    if (!ORDER_LINK_TEMPLATES.has(input.templateKey)) {
+      return null;
+    }
+    const orderNumber = input.variables["orderNumber"];
+    if (input.recipientKind === "customer") {
+      // An order whose account was deleted afterwards has no page to go to.
+      return input.customerId === null ? null : accountOrderLink(base, input.locale, orderNumber);
+    }
+    if (input.recipientKind !== "guest") {
+      return null;
+    }
+    return this.guestLink(base, input, orderNumber);
+  }
+
+  private async guestLink(
+    base: string,
+    input: EmailLinkInput,
+    orderNumber: unknown,
+  ): Promise<string> {
+    const secret = this.config.tokenSecret;
+    if (secret === null) {
+      throw new Error("ORDER_TOKEN_SECRET is needed to build the guest order link");
+    }
+    if (input.orderId === null) {
+      throw new Error("A guest order mail needs its order id");
+    }
+    const access = await this.orderAccess.find(input.orderId);
+    if (access === undefined) {
+      throw new Error("The order of a guest mail does not exist");
+    }
+    const { token } = deriveAccessToken(secret, input.orderId, access.idempotencyKey);
+    // The derivation is the one ADR 0023 stores a hash of; a different hash means the secret changed since checkout
+    // (a replay under the new secret rewrote or will rewrite the hash): a link that opens nothing must not be sent.
+    if (!accessTokenMatches(token, access.accessTokenHash)) {
+      throw new Error("The derived guest token does not match the order's stored token hash");
+    }
+    return guestOrderLink(base, input.locale, orderNumber, token);
   }
 }
