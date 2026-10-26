@@ -34,3 +34,4 @@
 | [0028](0028-media-upload-and-storage.md) | Media upload and storage | accepted (2026-10-23, owner's quiz answers on the media upload plan); builds on ADR 0004, 0006, 0007, 0009, 0018, 0025, 0026 and 0027, changes none of them |
 | [0029](0029-shipping.md) | Shipping | accepted (2026-10-24, owner's quiz answers on the shipping plan); builds on ADR 0004, 0015, 0017, 0018, 0019, 0025 and 0028, refines one sentence of ADR 0018 (the shipping adjustment comes from core rules, not a plugin) |
 | [0030](0030-nova-post-api.md) | Nova Post API for the first carrier plugin | accepted (2026-10-25, owner decision); supersedes in part ADR 0029 (decision 11 and the Nova Poshta specific parts of decisions 7 and 8) |
+| [0031](0031-transactional-email.md) | Transactional email | accepted (2026-10-26, owner's quiz answers on the email plan); builds on ADR 0016, 0018, 0023, 0025, 0028 and 0029, changes none of them |
