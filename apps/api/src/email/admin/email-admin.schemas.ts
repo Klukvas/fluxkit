@@ -20,11 +20,9 @@ const localeSchema = z
 
 /** `POST /admin/email/test`. There is no recipient: the test goes to the signed-in admin's own address (ADR 0031 decision 15). */
 export const sendTestEmailSchema = z.strictObject({
-  locale: localeSchema
-    .optional()
-    .meta({
-      description: "Language of the test mail (one of `LOCALES`). Default: `DEFAULT_LOCALE`.",
-    }),
+  locale: localeSchema.optional().meta({
+    description: "Language of the test mail (one of `LOCALES`). Default: `DEFAULT_LOCALE`.",
+  }),
 });
 
 const templateKeySchema = z
@@ -106,11 +104,9 @@ export const emailStatusResponseSchema = z.object({
   oldestPendingAt: timestampSchema
     .nullable()
     .meta({ description: "Creation time of the oldest pending mail." }),
-  errorCodes: z
-    .array(z.object({ code: z.string(), count: z.number().int().min(1) }))
-    .meta({
-      description: "The most common `lastErrorCode` of the window (codes only; at most 10).",
-    }),
+  errorCodes: z.array(z.object({ code: z.string(), count: z.number().int().min(1) })).meta({
+    description: "The most common `lastErrorCode` of the window (codes only; at most 10).",
+  }),
 });
 
 export const emailMessageResponseSchema = z.object({
