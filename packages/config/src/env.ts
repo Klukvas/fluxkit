@@ -1,11 +1,20 @@
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import {
+  DEFAULT_EMAIL_PROVIDER,
+  EMAIL_PROVIDER_CHOICES,
+  parseMailboxVariable,
+  TEST_ONLY_EMAIL_PROVIDERS,
+  type EmailMailbox,
+  type EmailProviderChoice,
+} from "./email.js";
 import { parseEnabledFeatures } from "./features.js";
 import {
   parseEnabledShippingProviders,
   TEST_ONLY_SHIPPING_PROVIDERS,
 } from "./shipping-providers.js";
+import { blankToUndefined, DEFAULT_STOREFRONT_PUBLIC_URL, originUrl } from "./storefront-env.js";
 
 /** Lowercase letters, 2 to 8, optional `-` segments (`uk`, `en`, `en-us`). */
 const LOCALE_CODE = /^[a-z]{2,8}(-[a-z]{2,8})*$/;
@@ -126,6 +135,21 @@ function defaultMediaDirectory(): string {
 /** Exactly `true` or `false`: a typo in a security flag must fail loudly, not fall back to a default. */
 const strictBoolean = z.enum(["true", "false"]).transform((value) => value === "true");
 
+/** The mailbox of `EMAIL_FROM` / `EMAIL_REPLY_TO`: the rules of core `parseMailbox`. The message never contains the value. */
+function mailboxVariable(variable: string) {
+  return z.string().transform((value, context): EmailMailbox => {
+    const mailbox = parseMailboxVariable(value);
+    if (mailbox === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: `${variable} must be one address or "Display Name <address>" (ASCII address, at most 200 characters, no control characters, no quotes or angle brackets inside the name)`,
+      });
+      return z.NEVER;
+    }
+    return mailbox;
+  });
+}
+
 /** Plain decimal digits only (no sign, exponent, hex, spaces or decimals), within 1..max. */
 function positiveInteger(max: number) {
   return z
@@ -201,6 +225,21 @@ const envSchema = z
     FEATURES_ENABLED: z.string().optional(),
     FEATURES_DIR: z.string().min(1).optional(),
     SHIPPING_PROVIDERS_ENABLED: z.string().optional(),
+    // Blank counts as unset, like the storefront variables. Exact values only: a typo must not silently mean `none`.
+    EMAIL_PROVIDER: z.preprocess(
+      (value) => (typeof value === "string" ? blankToUndefined(value.trim()) : value),
+      z
+        .enum(EMAIL_PROVIDER_CHOICES, {
+          error: `must be one of ${EMAIL_PROVIDER_CHOICES.join(", ")} (lower case, exact)`,
+        })
+        .optional(),
+    ),
+    EMAIL_FROM: z.preprocess(blankToUndefined, mailboxVariable("EMAIL_FROM").optional()),
+    EMAIL_REPLY_TO: z.preprocess(blankToUndefined, mailboxVariable("EMAIL_REPLY_TO").optional()),
+    STOREFRONT_PUBLIC_URL: z.preprocess(
+      blankToUndefined,
+      originUrl("STOREFRONT_PUBLIC_URL").optional(),
+    ),
     DEFAULT_LOCALE: localeCode.default(DEFAULT_LOCALE),
     LOCALES: z
       .string()
@@ -326,6 +365,37 @@ const envSchema = z
         });
       }
     }
+    const emailProvider = env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER;
+    if (inProduction && TEST_ONLY_EMAIL_PROVIDERS.includes(emailProvider)) {
+      context.addIssue({
+        code: "custom",
+        path: ["EMAIL_PROVIDER"],
+        message: `"${emailProvider}" is a test-only provider (it delivers nothing) and is refused when NODE_ENV is production`,
+      });
+    }
+    if (emailProvider !== DEFAULT_EMAIL_PROVIDER) {
+      if (env.EMAIL_FROM === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["EMAIL_FROM"],
+          message: `is required when EMAIL_PROVIDER is not ${DEFAULT_EMAIL_PROVIDER} (the sender address, for example Shop Name <orders@shop.example>)`,
+        });
+      }
+      if (inProduction && env.STOREFRONT_PUBLIC_URL === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["STOREFRONT_PUBLIC_URL"],
+          message: `is required when EMAIL_PROVIDER is not ${DEFAULT_EMAIL_PROVIDER} and NODE_ENV is production (the origin every link in a mail starts with, for example https://shop.example)`,
+        });
+      }
+      if (inProduction && env.STOREFRONT_PUBLIC_URL?.startsWith("https://") === false) {
+        context.addIssue({
+          code: "custom",
+          path: ["STOREFRONT_PUBLIC_URL"],
+          message: `must use https when EMAIL_PROVIDER is not ${DEFAULT_EMAIL_PROVIDER} and NODE_ENV is production (links in mail carry reset and verification tokens)`,
+        });
+      }
+    }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
       context.addIssue({
         code: "custom",
@@ -350,6 +420,21 @@ export interface AppEnv {
   featuresDir: string | undefined;
   /** Codes from `SHIPPING_PROVIDERS_ENABLED`; the API loads exactly these provider packages (ADR 0029 decision 8). */
   enabledShippingProviders: string[];
+  /**
+   * `EMAIL_PROVIDER` (ADR 0031): `none` (default) loads no provider and no mail is sent; `resend` or `fake` names the one
+   * provider package the API loads. `fake` is test-only and refused in production.
+   */
+  emailProvider: EmailProviderChoice;
+  /** `EMAIL_FROM`; set whenever `emailProvider` is not `none`. The display name is the shop name in mail. */
+  emailFrom: EmailMailbox | undefined;
+  /** `EMAIL_REPLY_TO`, optional. */
+  emailReplyTo: EmailMailbox | undefined;
+  /**
+   * `STOREFRONT_PUBLIC_URL` as the API reads it: the ONLY origin of links in mail (never a request header), without a
+   * trailing slash. Outside production it defaults to the storefront's dev origin; in production it is undefined only
+   * when `emailProvider` is `none` and the variable is unset, and `https` is required once a provider is configured.
+   */
+  storefrontPublicUrl: string | undefined;
   /** Locale that every translated text must contain (ADR 0006 decision 1). */
   defaultLocale: string;
   /** Locales accepted in translated texts; contains `defaultLocale`. */
@@ -435,6 +520,11 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     enabledFeatures: parseEnabledFeatures(env.FEATURES_ENABLED),
     featuresDir: env.FEATURES_DIR,
     enabledShippingProviders: parseEnabledShippingProviders(env.SHIPPING_PROVIDERS_ENABLED),
+    emailProvider: env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
+    emailFrom: env.EMAIL_FROM,
+    emailReplyTo: env.EMAIL_REPLY_TO,
+    storefrontPublicUrl:
+      env.STOREFRONT_PUBLIC_URL ?? (inProduction ? undefined : DEFAULT_STOREFRONT_PUBLIC_URL),
     defaultLocale: env.DEFAULT_LOCALE,
     locales: env.LOCALES,
     adminCookieSecure: env.ADMIN_COOKIE_SECURE,

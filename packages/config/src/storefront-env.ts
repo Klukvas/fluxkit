@@ -4,7 +4,7 @@ import { z } from "zod";
 export const DEFAULT_STOREFRONT_PUBLIC_URL = "http://localhost:3001";
 
 /** Blank counts as unset, so `FOO=` in a `.env` file behaves like no line at all. */
-function blankToUndefined(value: unknown): unknown {
+export function blankToUndefined(value: unknown): unknown {
   return typeof value === "string" && value.trim() === "" ? undefined : value;
 }
 
@@ -12,7 +12,7 @@ function blankToUndefined(value: unknown): unknown {
  * An `http(s)` origin: no path, query, fragment or credentials. Returns it without a trailing slash. The messages never
  * include the value, because a URL may carry a password.
  */
-function originUrl(variable: string) {
+export function originUrl(variable: string) {
   return z.string().transform((value, context) => {
     const trimmed = value.trim();
     let url: URL | undefined;

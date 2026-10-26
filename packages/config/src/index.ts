@@ -24,6 +24,14 @@ export {
   type AppEnv,
   type MediaStorageDriver,
 } from "./env.js";
+export {
+  DEFAULT_EMAIL_PROVIDER,
+  EMAIL_PROVIDER_CHOICES,
+  parseMailboxVariable,
+  TEST_ONLY_EMAIL_PROVIDERS,
+  type EmailMailbox,
+  type EmailProviderChoice,
+} from "./email.js";
 export { parseEnabledFeatures } from "./features.js";
 export {
   parseEnabledShippingProviders,
