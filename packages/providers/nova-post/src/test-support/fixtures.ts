@@ -22,12 +22,12 @@ export const VALID_SETTINGS = Object.freeze({
 
 export function waybillRequest(overrides: Partial<WaybillRequest> = {}): WaybillRequest {
   return {
-    clientReference: "FK-000123",
+    clientReference: "7K3M-9QX2",
     service: null,
     payer: "recipient",
     declaredValue: { amount: 125_050, currency: "UAH" },
     parcel: { weightGrams: 500, lengthMm: 200, widthMm: 150, heightMm: 100, seats: 1 },
-    description: "Order FK-000123",
+    description: "Order 7K3M-9QX2",
     recipient: {
       firstName: STUB_PERSONAL.recipientFirstName,
       lastName: STUB_PERSONAL.recipientLastName,

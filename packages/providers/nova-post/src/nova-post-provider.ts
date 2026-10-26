@@ -1,7 +1,9 @@
 import { Inject, Injectable, SetMetadata } from "@nestjs/common";
 import {
   CARRIER_REFERENCE_PATTERN,
+  MAX_PROVIDER_CODES,
   parseDecimalString,
+  PROVIDER_CODE_NOT_SENT,
   providerFailure,
   providerOk,
   SHIPPING_LIMITS,
@@ -25,6 +27,7 @@ import {
 import {
   carrierCodesOf,
   hasCarrierCode,
+  namesRequestField,
   NOVA_POST_SIZE_CAPS,
   NovaPostCallError,
   NovaPostHttp,
@@ -87,6 +90,15 @@ export const NOVA_POST_PAGE_LIMIT = 100;
 /** Most pages one city list reads (branches first, then lockers), and how many are in flight at once. */
 export const NOVA_POST_LIST_MAX_PAGES = 15;
 export const NOVA_POST_LIST_PARALLEL_PAGES = 4;
+
+/**
+ * The time budget of one city list, from its start (a JWT on a cold cache included), below the API's single lookup limit
+ * (`SHIPPING_PROVIDER_TIMEOUTS_MS.lookup`, 5 s) so a slow carrier cuts the list instead of losing all of it (review
+ * finding 2). After the deadline no further page is started; a page still in flight at the stop is abandoned. The
+ * first branch and locker pages are not cut: without them there is nothing to answer, and the caller's signal bounds them.
+ */
+export const NOVA_POST_LIST_DEADLINE_MS = 3_500;
+export const NOVA_POST_LIST_STOP_MS = 4_500;
 
 /** Most pages of `GET /shipments` one `findWaybill` reads before it answers "could not tell" (never `null`). */
 export const NOVA_POST_FIND_MAX_PAGES = 10;
@@ -222,57 +234,93 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
     if (!DIGITS_REF.test(input.cityRef)) {
       return [];
     }
-    const points = new Map<string, PickupPoint>();
-    let budget = NOVA_POST_LIST_MAX_PAGES;
+    // The budget starts now, so a JWT on a cold cache counts too (review finding 2).
+    const started = performance.now();
+    const elapsed = () => performance.now() - started;
+    const stop = AbortSignal.any([signal, AbortSignal.timeout(NOVA_POST_LIST_STOP_MS)]);
+    const fetchPage = async (kind: PickupPointKind, page: number, pageSignal: AbortSignal) =>
+      this.page(
+        operation,
+        await this.http.request(
+          this.lookup(operation, "/divisions", NOVA_POST_SIZE_CAPS.divisions, {
+            query: {
+              countryCodes: ["UA"],
+              settlementIds: [input.cityRef],
+              divisionCategories: [...NOVA_POST_CATEGORIES[kind]],
+              limit: NOVA_POST_PAGE_LIMIT,
+              page,
+            },
+            language: "uk",
+          }),
+          pageSignal,
+        ),
+      );
+    // Branches first: in the largest cities the lockers are what a budget cuts (Kyiv: 7 387 of 8 031 points).
+    const kinds = (["branch", "locker"] as const).filter((kind) => input.kinds.includes(kind));
+    // The first page of each kind together (each tells how many pages its kind has). Not cut by the budget: without them
+    // there is nothing to answer; the caller's signal bounds them.
+    const firsts = await Promise.all(kinds.map((kind) => fetchPage(kind, 1, signal)));
+    // The items of every page read, per kind and page number.
+    const read = new Map<PickupPointKind, Map<number, readonly unknown[]>>();
     let total = 0;
-    let truncated = false;
-    // Branches first: in the largest cities the lockers are what a page budget cuts (Kyiv: 7 387 of 8 031 points).
-    for (const kind of (["branch", "locker"] as const).filter((k) => input.kinds.includes(k))) {
-      if (budget === 0) {
-        truncated = true;
-        break;
-      }
-      const fetchPage = async (page: number) =>
-        this.page(
-          operation,
-          await this.http.request(
-            this.lookup(operation, "/divisions", NOVA_POST_SIZE_CAPS.divisions, {
-              query: {
-                countryCodes: ["UA"],
-                settlementIds: [input.cityRef],
-                divisionCategories: [...NOVA_POST_CATEGORIES[kind]],
-                limit: NOVA_POST_PAGE_LIMIT,
-                page,
-              },
-              language: "uk",
-            }),
-            signal,
-          ),
-        );
-      const first = await fetchPage(1);
-      budget -= 1;
+    const queue: { kind: PickupPointKind; page: number }[] = [];
+    let budget = NOVA_POST_LIST_MAX_PAGES - firsts.length;
+    let cutBy: "page budget" | "time budget" | undefined;
+    kinds.forEach((kind, index) => {
+      const first = firsts[index];
+      if (first === undefined) return;
       total += first.total ?? first.items.length;
-      this.collect(first.items, kind, input.cityRef, points);
-      const lastPage = first.last_page;
-      const wanted = Math.min(lastPage, 1 + budget);
-      for (let page = 2; page <= wanted; page += NOVA_POST_LIST_PARALLEL_PAGES) {
-        const batch = Array.from(
-          { length: Math.min(NOVA_POST_LIST_PARALLEL_PAGES, wanted - page + 1) },
-          (_, index) => page + index,
-        );
-        const answers = await Promise.all(batch.map(fetchPage));
-        budget -= batch.length;
-        for (const answer of answers) {
-          this.collect(answer.items, kind, input.cityRef, points);
+      read.set(kind, new Map([[1, first.items]]));
+      for (let page = 2; page <= first.last_page; page += 1) {
+        if (budget === 0) {
+          cutBy = "page budget";
+          break;
+        }
+        queue.push({ kind, page });
+        budget -= 1;
+      }
+    });
+    const worker = async () => {
+      for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+        if (elapsed() >= NOVA_POST_LIST_DEADLINE_MS) {
+          cutBy = "time budget";
+          queue.length = 0;
+          return;
+        }
+        try {
+          const answer = await fetchPage(next.kind, next.page, stop);
+          read.get(next.kind)?.set(next.page, answer.items);
+        } catch (error) {
+          if (error instanceof NovaPostCallError && stop.aborted && !signal.aborted) {
+            // Abandoned at the stop: the pages read so far are the answer.
+            cutBy = "time budget";
+            queue.length = 0;
+            return;
+          }
+          // A failed page fails the list (lookups throw): the other workers start no further page.
+          queue.length = 0;
+          throw error;
         }
       }
-      if (lastPage > wanted) {
-        truncated = true;
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(NOVA_POST_LIST_PARALLEL_PAGES, queue.length) }, worker),
+    );
+    // Collected in page order per kind, so the answer does not depend on which page came back first.
+    const points = new Map<string, PickupPoint>();
+    for (const kind of kinds) {
+      const pages = read.get(kind) ?? new Map<number, readonly unknown[]>();
+      for (const page of [...pages.keys()].sort((a, b) => a - b)) {
+        this.collect(pages.get(page) ?? [], kind, input.cityRef, points);
       }
     }
-    if (truncated) {
+    if (cutBy !== undefined) {
+      const limit =
+        cutBy === "page budget"
+          ? `page budget ${String(NOVA_POST_LIST_MAX_PAGES)}`
+          : `time budget ${String(NOVA_POST_LIST_DEADLINE_MS)} ms`;
       this.logger.warn(
-        `${operation}: a city lists ${String(total)} points; kept ${String(points.size)} (page budget ${String(NOVA_POST_LIST_MAX_PAGES)})`,
+        `${operation}: a city lists ${String(total)} points; kept ${String(points.size)} (${limit})`,
       );
     }
     return [...points.values()];
@@ -407,7 +455,9 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
       return providerFailure("rejected", ["recipient_phone"]);
     }
     const name = `${input.recipient.firstName.trim()} ${input.recipient.lastName.trim()}`.trim();
-    if (name === "" || [...name].length > 100) {
+    // Two words at least: the carrier refused a one-word contact (H18, "Contact Sender contains less than 2 words";
+    // the same rule for the recipient is assumed). Refused here, before a create whose 422 could not be read as a refusal.
+    if (name.split(/\s+/).length < 2 || [...name].length > 100) {
       return providerFailure("rejected", ["recipient_name"]);
     }
     const description = cut(input.description, 100);
@@ -453,6 +503,19 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
       body.payerContractNumber = settings.payerContractNumber;
     }
     try {
+      // The JWT first, on its own: when the authorization fails, provably no create left, so the API may settle the
+      // shipment `failed` instead of `unknown` (nothing to reconcile; review finding 8).
+      await this.http.jwt(signal, operation);
+    } catch (error) {
+      if (error instanceof NovaPostCallError) {
+        return providerFailure(error.reason, [
+          ...error.codes.slice(0, MAX_PROVIDER_CODES - 1),
+          PROVIDER_CODE_NOT_SENT,
+        ]);
+      }
+      throw error;
+    }
+    try {
       const answer = await this.http.request(
         {
           operation,
@@ -466,6 +529,10 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
         },
         signal,
       );
+      if (answer.status === 422 && !namesRequestField(answer.json)) {
+        // A 422 that names no field of ours: production dresses server errors so (H27). The shipment may exist.
+        return providerFailure("unavailable", carrierCodesOf(answer.status, answer.json));
+      }
       if (answer.status !== 200 && answer.status !== 201) {
         return failureOf(answer);
       }
@@ -502,6 +569,8 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
       return providerFailure("rejected", ["invalid_window"]);
     }
     const matches = new Map<string, WaybillCreated>();
+    const seen = new Set<string>();
+    let shape: { readonly total: number | undefined; readonly lastPage: number } | undefined;
     let certain = false;
     try {
       for (let page = 1; page <= NOVA_POST_FIND_MAX_PAGES; page += 1) {
@@ -524,6 +593,18 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
         if (!envelope.success) {
           return providerFailure("unavailable", ["malformed_answer"]);
         }
+        // Offset paging over a live list (review finding 1): a shipment deleted or created while the pages are read
+        // moves every later row, so a row can slip onto a page already read. A changed `total` or `last_page`, another
+        // page than asked for, or a row seen twice means the scan cannot be sure: no answer, never `null`.
+        const current = { total: envelope.data.total, lastPage: envelope.data.last_page };
+        shape ??= current;
+        if (
+          envelope.data.current_page !== page ||
+          current.total !== shape.total ||
+          current.lastPage !== shape.lastPage
+        ) {
+          return providerFailure("unavailable", ["list_changed"]);
+        }
         const times: number[] = [];
         for (const item of envelope.data.items) {
           const row = shipmentRowSchema.safeParse(item);
@@ -531,6 +612,10 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
             // One unreadable row could be ours: the scan cannot be sure, so it is no answer at all.
             return providerFailure("unavailable", ["malformed_answer"]);
           }
+          if (seen.has(row.data.id)) {
+            return providerFailure("unavailable", ["list_changed"]);
+          }
+          seen.add(row.data.id);
           const at = Date.parse(row.data.createdAt);
           times.push(at);
           if (row.data.clientOrder === input.clientReference && at >= after && at <= before) {
@@ -714,8 +799,8 @@ export class NovaPostShippingProvider implements ShippingProviderPort {
           ? providerOk({ bytes: answer.bytes, contentType: "application/pdf" as const })
           : providerFailure("unavailable", ["not_pdf"]);
       }
-      if (answer.status === 422) {
-        // A server error dressed as 422: try again later, nothing is wrong with the request we know of.
+      if (answer.status === 422 && !namesRequestField(answer.json)) {
+        // A server error dressed as 422 (H27): try again later. A 422 naming a field of ours is a refusal (below).
         return providerFailure("unavailable", carrierCodesOf(answer.status, answer.json));
       }
       return failureOf(answer);

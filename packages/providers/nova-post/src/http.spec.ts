@@ -186,6 +186,41 @@ describe("the JWT of the process (single flight, expiry, one retry on 401)", () 
     expect(stub.of("createShipment")).toHaveLength(1);
   });
 
+  it("marks a create whose authorization failed as not sent: no POST left (review R3)", async () => {
+    const { provider } = providerOn(stub);
+    for (const [answer, codes] of [
+      [
+        { status: 503, json: { errors: { errorMessage: "Service Unavailable" } } },
+        ["503", "errorMessage", "not_sent"],
+      ],
+      [
+        { status: 429, json: { errors: { errorMessage: "Too Many Attempts." } } },
+        ["429", "errorMessage", "not_sent"],
+      ],
+      [
+        { status: 502, body: "bad gateway", headers: { "content-type": "text/plain" } },
+        ["502", "not_sent"],
+      ],
+    ] as const) {
+      stub.override("authorization", () => answer);
+      expect(await provider.createWaybill(waybillRequest(), live())).toEqual({
+        ok: false,
+        reason: "unavailable",
+        providerCodes: codes,
+      });
+    }
+    expect(stub.of("createShipment")).toHaveLength(0);
+    // A failure after the POST left is never "not sent".
+    stub.override("authorization", undefined);
+    stub.override("createShipment", () => ({ status: 503, json: { errors: {} } }));
+    expect(await provider.createWaybill(waybillRequest(), live())).toEqual({
+      ok: false,
+      reason: "unavailable",
+      providerCodes: ["503"],
+    });
+    expect(stub.of("createShipment")).toHaveLength(1);
+  });
+
   it("maps a refused key to invalid_credentials without the carrier's text", async () => {
     const { provider } = providerOn(stub, { apiKey: "wrong-key-0123456789abcdef" });
     expect(await provider.checkConnection(live())).toEqual({
@@ -373,6 +408,30 @@ describe("transport failures, statuses and size caps", () => {
       }),
     ).toEqual(["422", "errorMessage", "sender.phone"]);
     expect(carrierCodesOf(503, undefined)).toEqual(["503"]);
+    // Only keys that look like a field path: a key that echoes a value (a phone, a key or JWT fragment) is never kept.
+    expect(
+      carrierCodesOf(422, {
+        errors: {
+          "stub-key-0123456789a": "x",
+          "380501234567": "x",
+          eyJhbGciOiJIUzI1NiIs: "x",
+          "0123456789abcdef0123": "x",
+          sender_phone_380501234567: "x",
+          "parcels.0.actualWeight": "x",
+          "items[1].name": "x",
+          divisionId: "x",
+          client_order: "x",
+          errorMessage: "stub_key_0123456789",
+        },
+      }),
+    ).toEqual([
+      "422",
+      "parcels.0.actualWeight",
+      "items.1.name",
+      "divisionId",
+      "client_order",
+      "errorMessage",
+    ]);
     expect(
       carrierCodesOf(422, {
         errors: Object.fromEntries(Array.from({ length: 20 }, (_, i) => [`f${String(i)}`, "x"])),

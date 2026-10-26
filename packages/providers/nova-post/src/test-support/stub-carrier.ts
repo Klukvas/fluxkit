@@ -160,6 +160,58 @@ function error(status: number, errors: Record<string, string>): StubAnswer {
   return { status, json: { errors } };
 }
 
+function words(value: unknown): number {
+  return typeof value === "string" ? value.trim().split(/\s+/).filter(Boolean).length : 0;
+}
+
+/**
+ * The create body checks of the stub, stricter than accepting anything (review finding 6). Only what production showed
+ * is modelled: a contact name of fewer than two words is `422 "Contact Sender contains less than 2 words"` (H18, seen on
+ * the calculation with the sender; the recipient text is the same rule by analogy, UNVERIFIED), and a missing field is a
+ * field-keyed `422` in the Laravel form the API uses elsewhere (`{"phone": "The phone field is required."}`, H07). The
+ * required list is the spike's verified body (`scripts/spikes/nova-post-verify.mjs`), not a documented minimum.
+ */
+function createBodyProblem(body: unknown): StubAnswer | undefined {
+  const root = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const parcel = (Array.isArray(root.parcels) ? root.parcels[0] : undefined) as
+    Record<string, unknown> | undefined;
+  const sender = (root.sender ?? {}) as Record<string, unknown>;
+  const recipient = (root.recipient ?? {}) as Record<string, unknown>;
+  const required: [string, unknown][] = [
+    ["status", root.status],
+    ["clientOrder", root.clientOrder],
+    ["payerType", root.payerType],
+    ["parcels", parcel],
+    ["parcels.0.cargoCategory", parcel?.cargoCategory],
+    ["parcels.0.insuranceCost", parcel?.insuranceCost],
+    ["parcels.0.actualWeight", parcel?.actualWeight],
+    ["parcels.0.width", parcel?.width],
+    ["parcels.0.length", parcel?.length],
+    ["parcels.0.height", parcel?.height],
+    ["sender.name", sender.name],
+    ["sender.phone", sender.phone],
+    ["sender.countryCode", sender.countryCode],
+    ["sender.divisionId", sender.divisionId],
+    ["recipient.name", recipient.name],
+    ["recipient.phone", recipient.phone],
+    ["recipient.countryCode", recipient.countryCode],
+    ["recipient.divisionId", recipient.divisionId],
+  ];
+  const missing = required.find(
+    ([, value]) => value === undefined || value === null || value === "",
+  );
+  if (missing !== undefined) {
+    return error(422, { [missing[0]]: `The ${missing[0]} field is required.` });
+  }
+  if (words(sender.name) < 2) {
+    return error(422, { errorMessage: "Contact Sender contains less than 2 words" });
+  }
+  if (words(recipient.name) < 2) {
+    return error(422, { errorMessage: "Contact Recipient contains less than 2 words" });
+  }
+  return undefined;
+}
+
 export interface StubCarrier {
   /** `http://127.0.0.1:<port>/v.1.0` */
   readonly baseUrl: string;
@@ -175,6 +227,8 @@ export interface StubCarrier {
   ): StoredShipment;
   /** The `exp` of the next issued JWT (seconds; `undefined`: no `exp` claim). */
   nextJwtExp: number | undefined;
+  /** A delay before EVERY answer (the authorization too) that sets no `delayMs` of its own: a slow carrier. */
+  latencyMs: number;
   readonly issued: string[];
   close(): Promise<void>;
 }
@@ -214,6 +268,7 @@ export async function startStubCarrier(): Promise<StubCarrier> {
   let sequence = 0;
   const carrier = {
     nextJwtExp: (Math.floor(Date.now() / 1000) + 3600) as number | undefined,
+    latencyMs: 0,
   };
 
   const addShipment = (
@@ -255,6 +310,11 @@ export async function startStubCarrier(): Promise<StubCarrier> {
     const page = Number(request.query.get("page") ?? "1");
     switch (route) {
       case "settlements": {
+        // H09: `countryCodes[]=uk` is `422 validation.country_code` (only the status and the text were recorded; the key
+        // here is the stub's own).
+        const countries = request.query.getAll("countryCodes[]");
+        if (countries.length === 0 || countries.some((code) => !/^[A-Z]{2}$/.test(code)))
+          return error(422, { "countryCodes.0": "validation.country_code" });
         if (limit > 100)
           return error(422, { limit: "The limit field must not be greater than 100." });
         const language = request.headers["accept-language"] === "uk" ? "uk" : "en";
@@ -296,6 +356,8 @@ export async function startStubCarrier(): Promise<StubCarrier> {
           },
         };
       case "createShipment": {
+        const problem = createBodyProblem(request.body);
+        if (problem !== undefined) return problem;
         const body = request.body as { clientOrder?: string };
         const stored = addShipment({
           clientOrder: String(body.clientOrder),
@@ -353,6 +415,8 @@ export async function startStubCarrier(): Promise<StubCarrier> {
         return { status: 200, json: { success: true } };
       }
       case "tracking": {
+        // Production answered `404 "Shipments not found"` for unknown-only batches (rerun). A MIXED batch (known and
+        // unknown numbers) was NOT observed: the stub answers the known part, which is an assumption (plugin README).
         const numbers = request.query.getAll("numbers[]");
         const found = shipments.filter((entry) => numbers.includes(entry.number));
         if (found.length === 0) return error(404, { errorMessage: "Shipments not found" });
@@ -373,8 +437,14 @@ export async function startStubCarrier(): Promise<StubCarrier> {
         };
       }
       case "print": {
+        // `type[]` was refused on production ("The type field must be a string.", spike 7a). A missing or other `type`
+        // was not observed: the stub refuses it so the plugin must send `type=marking` (the documented label type).
         if (request.query.getAll("type[]").length > 0)
           return error(422, { type: "The type field must be a string." });
+        if (request.query.get("type") === null)
+          return error(422, { type: "The type field is required." });
+        if (request.query.get("type") !== "marking")
+          return error(422, { type: "The selected type is invalid." });
         const number = request.query.getAll("numbers[]")[0];
         if (!shipments.some((entry) => entry.number === number)) {
           return error(404, { errorMessage: "shipments not found" });
@@ -439,7 +509,8 @@ export async function startStubCarrier(): Promise<StubCarrier> {
         });
         response.end(answer.json === undefined ? "" : JSON.stringify(answer.json));
       };
-      if (answer.delayMs !== undefined) setTimeout(send, answer.delayMs);
+      const delay = answer.delayMs ?? carrier.latencyMs;
+      if (delay > 0) setTimeout(send, delay);
       else send();
     });
   });
@@ -460,6 +531,12 @@ export async function startStubCarrier(): Promise<StubCarrier> {
     },
     set nextJwtExp(value: number | undefined) {
       carrier.nextJwtExp = value;
+    },
+    get latencyMs() {
+      return carrier.latencyMs;
+    },
+    set latencyMs(value: number) {
+      carrier.latencyMs = value;
     },
     issued,
     close: () =>

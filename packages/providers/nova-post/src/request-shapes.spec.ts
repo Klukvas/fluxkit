@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { ORDER_NUMBER_PATTERN } from "@fluxkit/core";
 import { live, providerOn, VALID_SETTINGS, waybillRequest } from "./test-support/fixtures.js";
 import {
   STUB_API_KEY,
@@ -6,6 +7,7 @@ import {
   STUB_PERSONAL,
   STUB_SENDER_DIVISION_ID,
   startStubCarrier,
+  stubDivisions,
   type StubCarrier,
 } from "./test-support/stub-carrier.js";
 
@@ -155,6 +157,23 @@ describe("Nova Post request shapes (the spike's verified forms)", () => {
     });
   });
 
+  it("never takes a one-item answer that holds another division (review R6)", async () => {
+    const { provider } = providerOn(stub);
+    stub.override("divisions", () => ({
+      status: 200,
+      json: {
+        current_page: 1,
+        last_page: 1,
+        total: 1,
+        items: stubDivisions().filter((entry) => entry.id === 700006),
+      },
+    }));
+    await expect(provider.findPickupPoint({ ref: "700005" }, live())).rejects.toMatchObject({
+      reason: "unavailable",
+      codes: ["malformed_answer"],
+    });
+  });
+
   it("creates a shipment with the spike's inline body and never sends it twice", async () => {
     const { provider } = providerOn(stub);
     const result = await provider.createWaybill(waybillRequest(), live());
@@ -169,16 +188,18 @@ describe("Nova Post request shapes (the spike's verified forms)", () => {
     });
     const [create] = stub.of("createShipment");
     expect(stub.of("createShipment")).toHaveLength(1);
+    // The fixture's reference is a real order number shape (what the API sends as `clientOrder`).
+    expect(waybillRequest().clientReference).toMatch(ORDER_NUMBER_PATTERN);
     expect(create?.headers["content-type"]).toBe("application/json");
     expect(create?.body).toEqual({
       status: "ReadyToShip",
-      clientOrder: "FK-000123",
-      note: "Order FK-000123",
+      clientOrder: "7K3M-9QX2",
+      note: "Order 7K3M-9QX2",
       payerType: "Recipient",
       parcels: [
         {
           cargoCategory: "parcel",
-          parcelDescription: "Order FK-000123",
+          parcelDescription: "Order 7K3M-9QX2",
           // 1 250.50 UAH declared: whole hryvnias, rounded up.
           insuranceCost: 1251,
           rowNumber: 1,
@@ -222,7 +243,7 @@ describe("Nova Post request shapes (the spike's verified forms)", () => {
     };
     await provider.createWaybill(waybillRequest({ payer: "sender", settings }), live());
     await provider.createWaybill(
-      waybillRequest({ clientReference: "FK-000124", payer: "recipient", settings }),
+      waybillRequest({ clientReference: "7K3M-9QX3", payer: "recipient", settings }),
       live(),
     );
     const [bySender, byRecipient] = stub

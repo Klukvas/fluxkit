@@ -1,11 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { SHIPPING_PROVIDER_TIMEOUTS_MS } from "@fluxkit/core";
 import {
+  NOVA_POST_LIST_DEADLINE_MS,
   NOVA_POST_LIST_MAX_PAGES,
   NOVA_POST_LIST_PARALLEL_PAGES,
+  NOVA_POST_LIST_STOP_MS,
   novaPostPhone,
 } from "./nova-post-provider.js";
 import { live, providerOn, VALID_SETTINGS, waybillRequest } from "./test-support/fixtures.js";
-import { STUB_CITY_ID, startStubCarrier, type StubCarrier } from "./test-support/stub-carrier.js";
+import {
+  STUB_CITY_ID,
+  startStubCarrier,
+  stubDivisions,
+  type RecordedRequest,
+  type StubCarrier,
+} from "./test-support/stub-carrier.js";
 
 async function created(stub: StubCarrier) {
   const { provider } = providerOn(stub);
@@ -175,6 +184,24 @@ describe("Nova Post operations", () => {
       }
     });
 
+    it("answers a 422 that names a field of our request as rejected (a broken request shape; review R5)", async () => {
+      const { provider, waybill } = await created(stub);
+      stub.override("print", () => ({
+        status: 422,
+        json: { errors: { type: "The type field must be a string." } },
+      }));
+      expect(
+        await provider.fetchLabel(
+          {
+            providerRef: waybill.providerRef,
+            trackingNumber: waybill.trackingNumber,
+            format: "pdf",
+          },
+          live(),
+        ),
+      ).toEqual({ ok: false, reason: "rejected", providerCodes: ["422", "type"] });
+    });
+
     it("refuses a number that is not one without a call", async () => {
       const { provider } = providerOn(stub);
       expect(
@@ -250,6 +277,51 @@ describe("Nova Post operations", () => {
         providerCodes: ["settings_invalid"],
       });
       expect(stub.of("calculations")).toHaveLength(0);
+    });
+
+    it("refuses a recipient name of one word without a call (the carrier wants two words, H18)", async () => {
+      const { provider } = providerOn(stub);
+      for (const recipient of [
+        { firstName: "Ярина", lastName: " ", phone: "0500000002" },
+        { firstName: " ", lastName: "Вигаданенко", phone: "0500000002" },
+      ]) {
+        expect(await provider.createWaybill(waybillRequest({ recipient }), live())).toEqual({
+          ok: false,
+          reason: "rejected",
+          providerCodes: ["recipient_name"],
+        });
+      }
+      expect(stub.of("createShipment")).toHaveLength(0);
+    });
+
+    it("answers a create's 422 that names no field as unavailable (a server error dressed as 422; review R2)", async () => {
+      const { provider } = providerOn(stub);
+      stub.override("createShipment", () => ({
+        status: 422,
+        json: { errors: { errorMessage: "Internal Server Error" } },
+      }));
+      // `unavailable`: the shipment may exist, so the API makes it `unknown` and reconciles; never `failed`.
+      expect(await provider.createWaybill(waybillRequest(), live())).toEqual({
+        ok: false,
+        reason: "unavailable",
+        providerCodes: ["422", "errorMessage"],
+      });
+      stub.override("createShipment", () => ({ status: 422, body: "" }));
+      expect(await provider.createWaybill(waybillRequest(), live())).toMatchObject({
+        ok: false,
+        reason: "unavailable",
+      });
+      // A 422 naming a field of our request stays a refusal.
+      stub.override("createShipment", () => ({
+        status: 422,
+        json: { errors: { "recipient.phone": "The recipient.phone format is invalid." } },
+      }));
+      expect(await provider.createWaybill(waybillRequest(), live())).toEqual({
+        ok: false,
+        reason: "rejected",
+        providerCodes: ["422", "recipient.phone"],
+      });
+      expect(stub.of("createShipment")).toHaveLength(3);
     });
 
     it("refuses a carrier amount with more than two decimals instead of rounding it", async () => {
@@ -341,6 +413,125 @@ describe("Nova Post operations", () => {
       expect(logger.lines.join("\n")).toMatch(
         /listPickupPoints: a city lists \d+ points; kept 1500/,
       );
+    });
+
+    /** Kyiv-sized answers (5 branch pages, 74 locker pages of 100; spike 7a rerun H12) with no delay of their own. */
+    const kyivSized = (request: RecordedRequest) => {
+      const category = request.query.getAll("divisionCategories[]")[0] ?? "";
+      const page = Number(request.query.get("page"));
+      const lastPage = category === "Postomat" ? 74 : 5;
+      const kindBase = category === "Postomat" ? 2_000_000 : 1_000_000;
+      return {
+        status: 200,
+        json: {
+          current_page: page,
+          last_page: lastPage,
+          total: lastPage * 100,
+          items: Array.from({ length: 100 }, (_, i) => ({
+            id: kindBase + page * 1000 + i,
+            number: `1/${String(page * 1000 + i)}`,
+            name: "Пункт",
+            address: "вул. Вигадана",
+            divisionCategory: category === "Postomat" ? "Postomat" : "PostBranch",
+            countryCode: "UA",
+            settlement: { id: STUB_CITY_ID, name: "Тестове Місто" },
+          })),
+        },
+      };
+    };
+
+    it("keeps its own time budget below the API's lookup limit", () => {
+      expect(NOVA_POST_LIST_DEADLINE_MS).toBeLessThan(NOVA_POST_LIST_STOP_MS);
+      expect(NOVA_POST_LIST_STOP_MS).toBeLessThan(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup);
+    });
+
+    it("reads the whole page budget of a Kyiv-sized city at 400 ms a call, JWT on a cold cache included (review R7)", async () => {
+      stub.latencyMs = 400;
+      const arrivals: [string, number][] = [];
+      stub.override("divisions", (request) => {
+        arrivals.push([
+          `${request.query.getAll("divisionCategories[]")[0] ?? ""}:${request.query.get("page") ?? ""}`,
+          performance.now(),
+        ]);
+        return kyivSized(request);
+      });
+      const { provider } = providerOn(stub);
+      const started = performance.now();
+      const points = await provider.listPickupPoints(
+        { cityRef: String(STUB_CITY_ID), kinds: ["branch", "locker"] },
+        AbortSignal.timeout(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup),
+      );
+      expect(points).toHaveLength(1500);
+      expect(performance.now() - started).toBeLessThan(NOVA_POST_LIST_DEADLINE_MS);
+      // The first branch and locker pages are asked for together, not one after the other.
+      const firstPages = new Map(arrivals.slice(0, 2));
+      expect([...firstPages.keys()].sort()).toEqual(["PostBranch:1", "Postomat:1"]);
+      const [branchAt, lockerAt] = [firstPages.get("PostBranch:1"), firstPages.get("Postomat:1")];
+      expect(Math.abs((branchAt ?? 0) - (lockerAt ?? Infinity))).toBeLessThan(200);
+    }, 10_000);
+
+    it("answers what it read at 850 ms a call instead of losing every point to the API's limit (review R7)", async () => {
+      stub.latencyMs = 850;
+      const arrivals: number[] = [];
+      stub.override("divisions", (request) => {
+        arrivals.push(performance.now());
+        return kyivSized(request);
+      });
+      const { provider, logger } = providerOn(stub);
+      const started = performance.now();
+      const points = await provider.listPickupPoints(
+        { cityRef: String(STUB_CITY_ID), kinds: ["branch", "locker"] },
+        AbortSignal.timeout(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup),
+      );
+      expect(performance.now() - started).toBeLessThan(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup);
+      expect(points.filter((point) => point.kind === "branch")).toHaveLength(500);
+      expect(points.filter((point) => point.kind === "locker").length).toBeGreaterThanOrEqual(100);
+      expect(points.length).toBeLessThan(1500);
+      expect(logger.lines.join("\n")).toMatch(
+        /listPickupPoints: a city lists 7900 points; kept \d+ \(time budget 3500 ms\)/,
+      );
+      // No page is started after the deadline (a little slack for the way to the stub).
+      for (const at of arrivals) {
+        expect(at - started).toBeLessThan(NOVA_POST_LIST_DEADLINE_MS + 200);
+      }
+    }, 10_000);
+
+    it("abandons pages still in flight at its stop and answers the pages it has", async () => {
+      stub.override("divisions", (request) =>
+        request.query.get("page") === "1" ? kyivSized(request) : { status: 200, hang: true },
+      );
+      const { provider, logger } = providerOn(stub);
+      const started = performance.now();
+      const points = await provider.listPickupPoints(
+        { cityRef: String(STUB_CITY_ID), kinds: ["branch", "locker"] },
+        AbortSignal.timeout(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup),
+      );
+      expect(performance.now() - started).toBeLessThan(SHIPPING_PROVIDER_TIMEOUTS_MS.lookup);
+      expect(points).toHaveLength(200);
+      expect(logger.lines.join("\n")).toMatch(/kept 200 \(time budget 3500 ms\)/);
+    }, 10_000);
+
+    it("drops a division of another settlement that the answer carries (the filter ignored)", async () => {
+      stub.override("divisions", (request) => {
+        if (request.query.getAll("divisionCategories[]")[0] !== "PostBranch") return undefined;
+        const own = stubDivisions().filter((entry) => entry.id === 700001);
+        const foreign = {
+          ...own[0],
+          id: 799999,
+          settlement: { id: STUB_CITY_ID + 5, name: "Інше Місто" },
+        };
+        return {
+          status: 200,
+          json: { current_page: 1, last_page: 1, total: 2, items: [...own, foreign] },
+        };
+      });
+      const { provider, logger } = providerOn(stub);
+      const points = await provider.listPickupPoints(
+        { cityRef: String(STUB_CITY_ID), kinds: ["branch"] },
+        live(),
+      );
+      expect(points.map((point) => point.ref)).toEqual(["700001"]);
+      expect(logger.lines.join("\n")).toMatch(/1 answer entries break the expected shape/);
     });
 
     it("throws when a page fails (lookups throw; the API serves its stale cache)", async () => {

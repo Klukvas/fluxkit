@@ -48,9 +48,19 @@ describe("no secret or personal value in logs, errors or codes", () => {
 
     // Then the carrier echoes everything back in its error texts, under every status.
     for (const status of [400, 401, 403, 404, 422, 429, 500, 503]) {
+      // Keys that echo values (fragments of the key and the JWT, a phone) next to the free text.
       const answer = {
         status,
-        json: { errors: { errorMessage: echo, [echo.slice(0, 20)]: echo } },
+        json: {
+          errors: {
+            errorMessage: echo,
+            [echo.slice(0, 20)]: echo,
+            [STUB_API_KEY.slice(9, 29)]: echo,
+            [(stub.issued[0] ?? "").slice(0, 20)]: echo,
+            [STUB_PERSONAL.recipientPhoneNormalized]: echo,
+            [`phone_${STUB_PERSONAL.recipientPhoneNormalized}`]: echo,
+          },
+        },
       };
       for (const route of [
         "settlements",
@@ -78,7 +88,7 @@ describe("no secret or personal value in logs, errors or codes", () => {
       await capture(() =>
         provider.findWaybill(
           {
-            clientReference: "FK-000123",
+            clientReference: "7K3M-9QX2",
             createdAfter: "2026-01-01T00:00:00Z",
             createdBefore: "2027-01-01T00:00:00Z",
           },
@@ -133,6 +143,13 @@ describe("no secret or personal value in logs, errors or codes", () => {
     ];
     for (const value of forbidden) {
       expect(everything, value).not.toContain(value);
+    }
+    // Not even a fragment: every 8-character piece of the key and of each issued JWT.
+    for (const secret of [STUB_API_KEY, ...stub.issued]) {
+      for (let start = 0; start + 8 <= secret.length; start += 1) {
+        const fragment = secret.slice(start, start + 8);
+        expect(everything, `fragment ${fragment}`).not.toContain(fragment);
+      }
     }
     expect(stub.issued.length).toBeGreaterThan(0);
     expect(logger.lines.length).toBeGreaterThan(10);

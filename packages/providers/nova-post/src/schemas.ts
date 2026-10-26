@@ -51,7 +51,11 @@ export const createdShipmentSchema = z.looseObject({
   scheduledDeliveryDate: z.string().nullable().optional(),
 });
 
-/** A row of `GET /shipments` (spike 7a: `id`, `number`, `clientOrder`, `createdAt` ISO UTC, `totalCost`, ...). */
+/**
+ * A row of `GET /shipments`. Spike 7a recorded `id` (uuid), `number`, `clientOrder` and `createdAt` (ISO UTC, H23, H31).
+ * `totalCost` and `scheduledDeliveryDate` are NOT recorded on list rows (the create answer has `cost` and
+ * `scheduledDeliveryDate`, H19): read when present, and a reconciled waybill without them has no carrier cost or date.
+ */
 export const shipmentRowSchema = z.looseObject({
   id: z.string().min(1).max(64),
   number: z.string().regex(/^\d{1,20}$/),

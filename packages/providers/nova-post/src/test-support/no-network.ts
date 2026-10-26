@@ -23,7 +23,7 @@ function hostOf(input: Parameters<typeof fetch>[0]): string {
   }
 }
 
-globalThis.fetch = (input, init) => {
+const guardedFetch: typeof fetch = (input, init) => {
   const host = hostOf(input);
   if (!ALLOWED_HOSTS.has(host)) {
     refused.push(host);
@@ -31,6 +31,9 @@ globalThis.fetch = (input, init) => {
   }
   return realFetch(input, init);
 };
+// The marker `no-network-wired.spec.ts` checks without importing this module (so it sees whether the setup file ran).
+Object.defineProperty(guardedFetch, Symbol.for("fluxkit.no-network-guard"), { value: true });
+globalThis.fetch = guardedFetch;
 
 /** Hosts refused so far in this spec file (a spec of the guard itself reads and clears it). */
 export function refusedHosts(): string[] {
