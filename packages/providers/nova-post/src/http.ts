@@ -85,24 +85,66 @@ const authorizationAnswerSchema = z.looseObject({ jwt: z.string().min(10).max(16
 const SNAKE_CODE = /^[a-z][a-z0-9]*(_[a-z0-9]+)+$/;
 
 /**
- * The carrier codes of an error answer: the HTTP status, then the error KEYS that are short codes (field names such as
- * `parcels.0.actualWeight`), then `errorMessage`-like values only when they are snake_case codes (`shipment_was_deleted`).
+ * A field path as validation errors name them (`phone`, `parcels.0.actualWeight`, `sender.divisionId`, `client_order`;
+ * `items[1].name` is kept as `items.1.name`). A name is lower camelCase (every capital starts a word of at least one more
+ * letter or digit) or snake_case; an index has 1 to 3 digits. A key that only fits `CARRIER_CODE_PATTERN` is not enough:
+ * the carrier may echo a value as a key (a phone, a fragment of the key or the JWT), and a code is logged and returned.
+ */
+const FIELD_NAME = "[a-z][a-z0-9]*(?:[A-Z][a-z0-9]+)*(?:_[a-z0-9]+)*";
+const FIELD_PATH = new RegExp(`^${FIELD_NAME}(?:\\.(?:${FIELD_NAME}|\\d{1,3}))*$`);
+const LONG_DIGIT_RUN = /\d{4,}/;
+const FIELD_PATH_MAX = 32;
+
+/** The key as a field-path code, or `undefined` when it does not look like one (never echoed then). */
+export function fieldPathOf(key: string): string | undefined {
+  const dotted = key.replace(/\[(\d{1,3})\]/g, ".$1");
+  return dotted.length <= FIELD_PATH_MAX &&
+    FIELD_PATH.test(dotted) &&
+    !LONG_DIGIT_RUN.test(dotted) &&
+    CARRIER_CODE_PATTERN.test(dotted)
+    ? dotted
+    : undefined;
+}
+
+function errorsOf(json: unknown): Record<string, unknown> | undefined {
+  const errors = (json as { errors?: unknown } | null | undefined)?.errors;
+  return typeof errors === "object" && errors !== null && !Array.isArray(errors)
+    ? (errors as Record<string, unknown>)
+    : undefined;
+}
+
+/**
+ * The carrier codes of an error answer: the HTTP status, then the error KEYS that are field paths (`fieldPathOf`), then
+ * `errorMessage`-like values only when they are snake_case codes (`shipment_was_deleted`) without a long digit run.
  * Free text ("Invalid token", "Contact Sender contains ...") is never kept: it can echo a name, a phone or the key.
  */
 export function carrierCodesOf(status: number | string, json: unknown): string[] {
   const codes = [String(status)];
-  const errors = (json as { errors?: unknown } | null | undefined)?.errors;
-  if (typeof errors === "object" && errors !== null && !Array.isArray(errors)) {
-    for (const [key, value] of Object.entries(errors as Record<string, unknown>)) {
-      if (CARRIER_CODE_PATTERN.test(key)) {
-        codes.push(key);
-      }
-      if (typeof value === "string" && SNAKE_CODE.test(value) && CARRIER_CODE_PATTERN.test(value)) {
-        codes.push(value);
-      }
+  for (const [key, value] of Object.entries(errorsOf(json) ?? {})) {
+    const path = fieldPathOf(key);
+    if (path !== undefined) {
+      codes.push(path);
+    }
+    if (
+      typeof value === "string" &&
+      SNAKE_CODE.test(value) &&
+      !LONG_DIGIT_RUN.test(value) &&
+      CARRIER_CODE_PATTERN.test(value)
+    ) {
+      codes.push(value);
     }
   }
   return [...new Set(codes)].slice(0, MAX_PROVIDER_CODES);
+}
+
+/**
+ * Whether an error answer names a field of the request (a key other than `errorMessage` that is a field path): a
+ * validation refusal of what we sent. A `422` that names no field is how production dressed a server error (H27).
+ */
+export function namesRequestField(json: unknown): boolean {
+  return Object.keys(errorsOf(json) ?? {}).some(
+    (key) => key !== "errorMessage" && fieldPathOf(key) !== undefined,
+  );
 }
 
 /** Whether the error answer carries this snake_case code (`shipment_was_deleted`, ...). */

@@ -59,7 +59,10 @@ describe("Nova Post tracking status mapping", () => {
     expect(mapNovaPostStatus(code)).toBe(status);
   });
 
+  // The documented table has no row for 124 or 129 (it lists 123, then 125, and 128, then 130; checked 2026-10-25).
   it.each([
+    "124",
+    "129",
     "99",
     "105",
     "106",

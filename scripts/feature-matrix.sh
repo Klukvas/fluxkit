@@ -14,7 +14,9 @@
 #                     loudly (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
-#                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use)
+#                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
+#                     preloaded fetch wrapper that logs and refuses any request to a Nova Post host, and the log must show
+#                     the wrapper active and no such request
 set -euo pipefail
 
 mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post}"
@@ -27,7 +29,9 @@ run_api() {
   local features="$1"
   local providers="${2:-}"
   pnpm build
-  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" PORT="$port" node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
+  # MATRIX_NODE_IMPORT: an optional module preloaded into the API process only (not into the build).
+  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" PORT="$port" \
+    node ${MATRIX_NODE_IMPORT:+--import "$MATRIX_NODE_IMPORT"} apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
   api_pid=$!
   trap 'kill "$api_pid" 2>/dev/null || true' EXIT
   for _ in $(seq 1 30); do
@@ -102,15 +106,37 @@ case "$mode" in
     fi
     grep -F "NOVA_POST_API_KEY is required" /tmp/fluxkit-matrix-api.log \
       || { echo "expected a startup error naming NOVA_POST_API_KEY" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
-    # With an invented key: it starts, reports nova_post and the sandbox, never prints the key. No call is made at startup.
+    # With an invented key: it starts, reports nova_post and the sandbox, never prints the key. No call is made at startup:
+    # a preloaded wrapper of fetch (the plugin's only way to the network) logs and refuses any request to a Nova Post host.
+    guard_dir="$(mktemp -d)"
+    cat > "$guard_dir/no-nova-post.mjs" <<'GUARD'
+const realFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const host = new URL(url).hostname;
+  if (host.endsWith("novapost.com")) {
+    console.log(`matrix-guard: refused a request to ${host}`);
+    return Promise.reject(new TypeError("matrix-guard: no Nova Post request at startup"));
+  }
+  return realFetch(input, init);
+};
+console.log("matrix-guard: active");
+GUARD
     invented_key="matrix-invented-key-$(date +%s)-0000000000"
-    NOVA_POST_API_KEY="$invented_key" run_api "" "nova_post"
+    NOVA_POST_API_KEY="$invented_key" MATRIX_NODE_IMPORT="$guard_dir/no-nova-post.mjs" run_api "" "nova_post"
+    # Give anything started in the background at boot a moment to run before the log is read.
+    sleep 3
     grep -F "Shipping providers loaded: nova_post" /tmp/fluxkit-matrix-api.log \
       || { echo "expected the registry to report nova_post" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     grep -F "Nova Post environment: sandbox" /tmp/fluxkit-matrix-api.log \
       || { echo "expected the sandbox environment by default" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
       || { echo "the API log contains the Nova Post key" >&2; exit 1; }
+    grep -F "matrix-guard: active" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API sent a request to Nova Post at startup" >&2; exit 1; }
+    rm -rf "$guard_dir"
     ;;
   *)
     echo "unknown mode: $mode" >&2
