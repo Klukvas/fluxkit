@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as auth from "./auth/index.js";
 import * as cart from "./cart/index.js";
 import * as catalog from "./catalog/index.js";
+import * as email from "./email/index.js";
 import * as core from "./index.js";
 import * as inventory from "./inventory/index.js";
 import * as media from "./media/index.js";
@@ -152,6 +153,60 @@ describe("public entry point", () => {
     expect(core.SHIPPING_LIMITS.maxTiers).toBe(20);
   });
 
+  it("exports the email rules, port constants and limits", () => {
+    for (const name of [
+      "validateEmailAddress",
+      "validateDisplayName",
+      "parseMailbox",
+      "formatMailbox",
+      "hasHeaderUnsafeCharacter",
+      "validateSubject",
+      "sanitizeSubject",
+      "escapeHtml",
+      "html",
+      "unsafeRawHtml",
+      "isSafeHtml",
+      "authTokenExpiresAt",
+      "customerAuthTokenMessage",
+      "deriveCustomerAuthToken",
+      "isCustomerAuthTokenFormat",
+      "evaluateAuthToken",
+      "decideEmailTransition",
+      "isFinalEmailStatus",
+      "emailRetentionDays",
+      "nextEmailAttempt",
+      "emailDeadlineAt",
+      "isPastEmailDeadline",
+      "emailProviderMetadata",
+      "emailProviderOk",
+      "emailProviderFailure",
+      "validateOutgoingEmail",
+      "checkEmailProviderContract",
+      "emailTemplateMetadata",
+      "isEmailTemplateKey",
+      "isEmailLocale",
+      "checkEmailTemplateDefinition",
+      "checkEmailRenderOutput",
+      "buildEmailDedupeKey",
+    ] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.EMAIL_PROVIDER_METADATA).toBe("fluxkit:email-provider");
+    expect(core.EMAIL_PROVIDER_PACKAGE_KIND).toBe("email");
+    expect(core.EMAIL_TEMPLATE_METADATA).toBe("fluxkit:email-template");
+    expect(core.EMAIL_MESSAGE_STATUSES).toHaveLength(6);
+    expect(core.EMAIL_TEMPLATE_KEYS).toHaveLength(9);
+    expect(core.EMAIL_LIMITS.subjectMaxLength).toBe(200);
+    expect(core.EMAIL_DEADLINE_HOURS).toBe(12);
+    expect(core.EMAIL_SEND_TIMEOUT_MS).toBe(10_000);
+    expect(core.CUSTOMER_AUTH_TOKEN_LABEL).toBe("fluxkit:customer-auth-token:v1");
+  });
+
+  it("does not export the internal helpers of the email rules", () => {
+    expect("codePointLengthUpTo" in core).toBe(false);
+    expect("toBase64Url" in core).toBe(false);
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of [
       "orders.read",
@@ -165,7 +220,7 @@ describe("public entry point", () => {
   });
 
   it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
-    const parts = [auth, cart, catalog, inventory, media, orders, pricing, shipping];
+    const parts = [auth, cart, catalog, email, inventory, media, orders, pricing, shipping];
     const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);
     expect(Object.keys(core).length).toBe(total);
   });
