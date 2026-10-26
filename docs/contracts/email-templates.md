@@ -38,7 +38,14 @@ export class BackInStockTemplate {
 
 ## Built-in keys
 
-`admin.test` (variables `{providerCode}`; the admin test send, plan step 9). Reserved for later steps (core `EMAIL_TEMPLATE_KEYS`): `customer.password_reset`, `customer.password_changed`, `customer.verify_email` (step 7), `order.placed`, `order.paid`, `order.cancelled`, `order.expired`, `shipment.created` (step 8).
+| Key | Category | Variables | Link (`context.links.action`) | Sent when |
+|---|---|---|---|---|
+| `admin.test` | account | `{providerCode}` | none | the admin test send (plan step 9) |
+| `customer.password_reset` | account | `{tokenId}` (the token row id; never the token) | `{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>`, the token derived at render time | `POST /store/account/password-reset` for an active account (email plan step 7) |
+| `customer.password_changed` | account | `{}` | none | a successful reset confirmation |
+| `customer.verify_email` | account | `{tokenId}` | `{STOREFRONT_PUBLIC_URL}/{locale}/account/verify-email#t=<token>` | registration and `POST /store/account/verify-email/resend` |
+
+An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`. Reserved for step 8 (core `EMAIL_TEMPLATE_KEYS`): `order.placed`, `order.paid`, `order.cancelled`, `order.expired`, `shipment.created`.
 
 ## Not part of the contract
 
