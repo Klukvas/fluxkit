@@ -7,6 +7,7 @@ import * as core from "./index.js";
 import * as inventory from "./inventory/index.js";
 import * as media from "./media/index.js";
 import * as orders from "./orders/index.js";
+import * as payments from "./payments/index.js";
 import * as pricing from "./pricing/index.js";
 import * as shipping from "./shipping/index.js";
 
@@ -202,6 +203,63 @@ describe("public entry point", () => {
     expect(core.CUSTOMER_AUTH_TOKEN_LABEL).toBe("fluxkit:customer-auth-token:v1");
   });
 
+  it("exports the payment rules, port constants and limits", () => {
+    for (const name of [
+      "paymentProviderMetadata",
+      "paymentProviderOk",
+      "paymentProviderFailure",
+      "checkPaymentProviderContract",
+      "providerPaymentFactProblems",
+      "isProviderPaymentFact",
+      "bindFact",
+      "normalizeProviderFact",
+      "decideOrderOutcome",
+      "decidePaymentTransition",
+      "decideRefundTransition",
+      "isLivePaymentStatus",
+      "isTerminalPaymentStatus",
+      "isTerminalRefundStatus",
+      "decideNewPaymentAttempt",
+      "decideOrderPaymentGuard",
+      "paymentStatusAfterCreate",
+      "invoiceValidity",
+      "decideExpiry",
+      "remainingRefundable",
+      "decideRefund",
+      "refundStatusAfterCall",
+      "decideRefundFromFact",
+      "nextPaymentCheck",
+      "buildProviderReference",
+      "buildWebhookDedupeKey",
+      "buildPollDedupeKey",
+      "refundListCanonicalText",
+      "buildPaymentLines",
+      "buildPaymentEventPayload",
+      "buildRefundEventPayload",
+    ] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.PAYMENT_PROVIDER_METADATA).toBe("fluxkit:payment-provider");
+    expect(core.PAYMENT_PROVIDER_PACKAGE_KIND).toBe("payment");
+    expect(core.PAYMENT_STATUSES).toHaveLength(8);
+    expect(core.REFUND_STATUSES).toHaveLength(5);
+    expect(core.PAYMENT_PROVIDER_TIMEOUT_MS).toBe(10_000);
+    expect(core.PAYMENT_EXPIRY_DEFERRAL.capMinutes).toBe(30);
+    expect(core.PAYMENT_INVOICE_WINDOW.minimumMinutes).toBe(5);
+  });
+
+  it("does not export the internal guards of the payment rules", () => {
+    for (const name of [
+      "assertUuid",
+      "assertPositiveMoney",
+      "isPositiveMoney",
+      "isUuid",
+      "assertDate",
+    ]) {
+      expect(name in core, name).toBe(false);
+    }
+  });
+
   it("does not export the internal helpers of the email rules", () => {
     expect("codePointLengthUpTo" in core).toBe(false);
     expect("toBase64Url" in core).toBe(false);
@@ -220,7 +278,18 @@ describe("public entry point", () => {
   });
 
   it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
-    const parts = [auth, cart, catalog, email, inventory, media, orders, pricing, shipping];
+    const parts = [
+      auth,
+      cart,
+      catalog,
+      email,
+      inventory,
+      media,
+      orders,
+      payments,
+      pricing,
+      shipping,
+    ];
     const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);
     expect(Object.keys(core).length).toBe(total);
   });

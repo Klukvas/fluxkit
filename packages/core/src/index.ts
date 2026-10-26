@@ -5,5 +5,6 @@ export * from "./email/index.js";
 export * from "./inventory/index.js";
 export * from "./media/index.js";
 export * from "./orders/index.js";
+export * from "./payments/index.js";
 export * from "./pricing/index.js";
 export * from "./shipping/index.js";
