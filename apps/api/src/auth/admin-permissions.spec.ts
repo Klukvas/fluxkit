@@ -91,6 +91,18 @@ const SHIPPING_ROUTES = [
   "POST /admin/shipping/providers/:code/check",
 ];
 
+/** Mail delivery (ADR 0031 decision 15): declared once on the controllers with their own default pair (`email.manage` for reads and writes). */
+const EMAIL_ROUTES = [
+  "GET /admin/email/status",
+  "POST /admin/email/test",
+  "GET /admin/email/messages",
+  "GET /admin/email/messages/:id",
+  "POST /admin/email/messages/:id/resend",
+  "POST /admin/email/messages/:id/cancel",
+  "GET /admin/email/templates",
+  "GET /admin/email/templates/:key/preview",
+];
+
 /** The one route under /admin/products that needs an order permission: it links the orders that hold a variant's units. */
 const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventory/reservations";
 
@@ -101,6 +113,7 @@ function expectedPermission(method: string, pattern: string): AdminPermission {
     return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";
   }
   if (SHIPPING_ROUTES.includes(`${method} ${pattern}`)) return "shipping.manage";
+  if (EMAIL_ROUTES.includes(`${method} ${pattern}`)) return "email.manage";
   if (CUSTOMERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "customers.read" : "customers.write";
   }
@@ -271,6 +284,22 @@ describe("admin route permissions", () => {
       }
     });
 
+    it("gives the email routes email.manage by the controller default, reads included", () => {
+      const email = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
+        pattern.startsWith("/admin/email"),
+      );
+      expect(email.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...EMAIL_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of email) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: "email.manage",
+          source: "default",
+        });
+      }
+    });
+
     it("keeps every other controller on the catalog pair: no catalog route changed its permission", () => {
       const others = declaredAdminRoutes(manager.app).filter(
         ({ method, pattern, access }) =>
@@ -278,6 +307,7 @@ describe("admin route permissions", () => {
           access.source === "default" &&
           !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`) &&
           !SHIPPING_ROUTES.includes(`${method} ${pattern}`) &&
+          !EMAIL_ROUTES.includes(`${method} ${pattern}`) &&
           !ORDERS_ROUTES.includes(`${method} ${pattern}`),
       );
       expect(others.length).toBeGreaterThan(30);
@@ -333,6 +363,7 @@ describe("admin route permissions", () => {
         "catalog.write",
         "customers.read",
         "customers.write",
+        "email.manage",
         "orders.read",
         "orders.write",
         "shipping.manage",
@@ -346,6 +377,9 @@ describe("admin route permissions", () => {
       // Shipping settings are shop configuration: owner and manager, not the viewer.
       expect(permissionsOf("manager")).toContain("shipping.manage");
       expect(permissionsOf("viewer")).not.toContain("shipping.manage");
+      // Mail delivery shows recipient addresses: owner and manager, not the viewer.
+      expect(permissionsOf("manager")).toContain("email.manage");
+      expect(permissionsOf("viewer")).not.toContain("email.manage");
       // The customer permissions hold personal data: manager and owner have them, the viewer has neither.
       for (const permission of [
         "customers.read",
@@ -431,6 +465,21 @@ describe("admin route permissions", () => {
         expect(result.status, route).toBe(403);
         expect(result.body, route).toMatchObject({ code: "forbidden" });
         expect(result.body.detail, route).toContain("shipping.manage");
+      }
+    });
+
+    it("is forbidden on every email route, reads included", async () => {
+      for (const route of EMAIL_ROUTES) {
+        const [method, pattern] = route.split(" ") as ["GET", string];
+        const result = await http<ProblemBody>(
+          viewer.baseUrl,
+          method,
+          pattern.replace(":id", SOME_ID).replace(":key", "admin.test"),
+          method === "GET" ? {} : { body: {} },
+        );
+        expect(result.status, route).toBe(403);
+        expect(result.body, route).toMatchObject({ code: "forbidden" });
+        expect(result.body.detail, route).toContain("email.manage");
       }
     });
 
@@ -610,6 +659,54 @@ describe("admin route permissions", () => {
         permission: "shipping.manage",
         call: (url) => http(url, "POST", "/admin/shipping/providers/nowhere/check"),
         allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/email/status",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", "/admin/email/status"),
+        allowedStatus: 200,
+      },
+      {
+        name: "POST /admin/email/test (no provider in this app)",
+        permission: "email.manage",
+        call: (url) => http(url, "POST", "/admin/email/test", { body: {} }),
+        allowedStatus: 409,
+      },
+      {
+        name: "GET /admin/email/messages",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", "/admin/email/messages"),
+        allowedStatus: 200,
+      },
+      {
+        name: "GET /admin/email/messages/:id",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", `/admin/email/messages/${SOME_ID}`),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/email/messages/:id/resend",
+        permission: "email.manage",
+        call: (url) => http(url, "POST", `/admin/email/messages/${SOME_ID}/resend`),
+        allowedStatus: 404,
+      },
+      {
+        name: "POST /admin/email/messages/:id/cancel",
+        permission: "email.manage",
+        call: (url) => http(url, "POST", `/admin/email/messages/${SOME_ID}/cancel`),
+        allowedStatus: 404,
+      },
+      {
+        name: "GET /admin/email/templates",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", "/admin/email/templates"),
+        allowedStatus: 200,
+      },
+      {
+        name: "GET /admin/email/templates/:key/preview",
+        permission: "email.manage",
+        call: (url) => http(url, "GET", "/admin/email/templates/admin.test/preview"),
+        allowedStatus: 200,
       },
       {
         name: "POST /admin/products/:id/publish (lifecycle override)",
