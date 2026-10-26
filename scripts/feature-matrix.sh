@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -9,9 +9,9 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, _fake-email and nova-post, reinstall, then lint, typecheck,
+#   providers-deleted remove packages/providers/_fake, _fake-email, nova-post and resend, reinstall, then lint, typecheck,
 #                     boundaries and tests must pass, and an API told to load fake or nova_post (shipping), or started with
-#                     EMAIL_PROVIDER=fake, must refuse to start, loudly (destructive: CI only)
+#                     EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, must refuse to start, loudly (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
 #                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
@@ -22,9 +22,14 @@
 #   providers-email-none start the API without EMAIL_PROVIDER (none), expect "none", emailDelivery false and no mention of fake
 #   providers-email-fake start the API with EMAIL_PROVIDER=fake (and EMAIL_FROM, STOREFRONT_PUBLIC_URL), expect "fake" and
 #                     emailDelivery true
+#   providers-email-resend build; an API with EMAIL_PROVIDER=resend and no RESEND_API_KEY must refuse to start naming the
+#                     variable; with an invented key it must start, report resend and emailDelivery true, never print the
+#                     key, and send nothing to Resend at startup: the API runs with a preloaded fetch wrapper that logs and
+#                     refuses any request to a *.resend.com host, and the log must show the wrapper active and no such
+#                     request (run it on a database without queued mail: job 9 would otherwise try to send it)
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -86,7 +91,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/nova-post
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/nova-post packages/providers/resend
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -102,14 +107,17 @@ case "$mode" in
       grep -F "Shipping provider \"$code\" is enabled" /tmp/fluxkit-matrix-api.log \
         || { echo "expected a loud startup error naming the missing provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
-    # The same for the email provider: `fake` is named by EMAIL_PROVIDER and its package is gone.
-    if EMAIL_PROVIDER=fake EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
-      PORT="$port" timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
-      echo "the API started although the selected email provider fake is deleted" >&2
-      exit 1
-    fi
-    grep -F "Email provider \"fake\" is enabled in EMAIL_PROVIDER" /tmp/fluxkit-matrix-api.log \
-      || { echo "expected a loud startup error naming the missing email provider fake" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # The same for the email providers: the one EMAIL_PROVIDER names is gone.
+    for code in fake resend; do
+      if EMAIL_PROVIDER="$code" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+        RESEND_API_KEY=re_matrix_invented_key_0000000000 PORT="$port" \
+        timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+        echo "the API started although the selected email provider $code is deleted" >&2
+        exit 1
+      fi
+      grep -F "Email provider \"$code\" is enabled in EMAIL_PROVIDER" /tmp/fluxkit-matrix-api.log \
+        || { echo "expected a loud startup error naming the missing email provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    done
     ;;
   providers-nova-post)
     pnpm build
@@ -170,6 +178,51 @@ GUARD
     config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
     echo "store/config -> $config"
     echo "$config" | grep -q '"emailDelivery":true' || { echo "expected emailDelivery true with the email provider loaded" >&2; exit 1; }
+    ;;
+  providers-email-resend)
+    pnpm build
+    # Without the key: a loud refusal that names the variable, before anything listens.
+    if env -u RESEND_API_KEY EMAIL_PROVIDER=resend EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 PORT="$port" \
+      timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started with EMAIL_PROVIDER=resend and no RESEND_API_KEY" >&2
+      exit 1
+    fi
+    grep -F "RESEND_API_KEY is required when EMAIL_PROVIDER=resend" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a startup error naming RESEND_API_KEY" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # With an invented key: it starts, reports resend, never prints the key. No call is made at startup: a preloaded
+    # wrapper of fetch (the plugin's only way to the network) logs and refuses any request to a Resend host.
+    guard_dir="$(mktemp -d)"
+    cat > "$guard_dir/no-resend.mjs" <<'GUARD'
+const realFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const host = new URL(url).hostname;
+  if (host === "resend.com" || host.endsWith(".resend.com")) {
+    console.log(`matrix-guard: refused a request to ${host}`);
+    return Promise.reject(new TypeError("matrix-guard: no Resend request at startup"));
+  }
+  return realFetch(input, init);
+};
+console.log("matrix-guard: active");
+GUARD
+    invented_key="re_matrix_invented_$(date +%s)_0000000000"
+    RESEND_API_KEY="$invented_key" EMAIL_FROM="Fluxkit Demo Shop <shop@mail.example>" \
+      STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 MATRIX_NODE_IMPORT="$guard_dir/no-resend.mjs" run_api "" "" "resend"
+    # Give anything started in the background at boot (the scheduler's first tick) a moment to run.
+    sleep 3
+    grep -F "Email provider loaded: resend" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the email registry to report resend" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"emailDelivery":true' || { echo "expected emailDelivery true with resend loaded" >&2; exit 1; }
+    ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the Resend key" >&2; exit 1; }
+    grep -F "matrix-guard: active" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API sent a request to Resend at startup" >&2; exit 1; }
+    rm -rf "$guard_dir"
     ;;
   *)
     echo "unknown mode: $mode" >&2

@@ -92,6 +92,7 @@ jobs:
             providers-nova-post,
             providers-email-fake,
             providers-email-none,
+            providers-email-resend,
           ]
     services:
       postgres:
