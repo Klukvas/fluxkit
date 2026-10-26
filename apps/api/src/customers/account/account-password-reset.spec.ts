@@ -150,9 +150,6 @@ describe("customer password reset (ADR 0031 decision 10)", () => {
       }
       // The floor hides the extra work (lock, count, two inserts) of the existing account.
       expect(Math.abs(median(timings.known) - median(timings.unknown))).toBeLessThan(60);
-      console.info(
-        `password-reset timing (ms): known ${timings.known.map(Math.round).join(",")} unknown ${timings.unknown.map(Math.round).join(",")}`,
-      );
     });
 
     it("gives one customer at most 3 links an hour (counted in the database): the 4th request answers the same 202 and sends nothing", async () => {
