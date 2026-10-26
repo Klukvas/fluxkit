@@ -119,8 +119,16 @@ export function buildContentSecurityPolicy(options: SecurityHeadersOptions): str
 export const TOKEN_PAGE_SOURCE = "/:locale/order/:path*";
 
 /**
+ * The three pages of the emailed links (email plan step 10): forgot password, reset password and verify email. The last two
+ * read a bearer token from their URL fragment; all three send no `Referer`, so nothing about the visit (the address, that
+ * a reset was asked for) reaches another site.
+ */
+export const ACCOUNT_EMAIL_PAGE_SOURCE =
+  "/:locale/account/:page(forgot-password|reset-password|verify-email)";
+
+/**
  * Every header rule, in order. Next applies all rules that match a path and the LAST one wins for a repeated key, so the
- * order page's `no-referrer` comes after the site-wide policy.
+ * `no-referrer` rules (the order page, the emailed-link pages) come after the site-wide policy.
  */
 export function headerRules(
   options: SecurityHeadersOptions,
@@ -128,6 +136,10 @@ export function headerRules(
   return [
     { source: "/:path*", headers: securityHeaders(options) },
     { source: TOKEN_PAGE_SOURCE, headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+    {
+      source: ACCOUNT_EMAIL_PAGE_SOURCE,
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    },
   ];
 }
 
@@ -135,7 +147,8 @@ export function securityHeaders(options: SecurityHeadersOptions): HeaderEntry[] 
   return [
     { key: "Content-Security-Policy", value: buildContentSecurityPolicy(options) },
     { key: "X-Content-Type-Options", value: "nosniff" },
-    // The guest order page overrides this with `no-referrer` (its URL fragment never leaves the browser, but be strict).
+    // The guest order page and the emailed-link pages override this with `no-referrer` (their URL fragments never leave the
+    // browser, but be strict).
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
     // Only where HTTPS is certain: a browser would otherwise pin http://localhost for a year. Browsers ignore it over HTTP.

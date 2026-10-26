@@ -99,11 +99,18 @@ export function productMetadata(input: {
 /**
  * Metadata of a page that belongs to one shopper (cart, checkout, account): a title and `noindex, nofollow`. No canonical
  * and no alternates: the page is not a search result in any language. `robots.txt` keeps crawlers out as well
- * (`lib/robots.ts`); this tag covers a crawler that follows a link anyway.
+ * (`lib/robots.ts`); this tag covers a crawler that follows a link anyway. `noReferrer` adds the referrer meta tag.
  */
-export function privateMetadata(t: Translator, titleKey: string): Metadata {
+export function privateMetadata(
+  t: Translator,
+  titleKey: string,
+  options: { noReferrer?: boolean } = {},
+): Metadata {
   return {
     title: pageTitle(t, t(titleKey)),
     robots: { index: false, follow: false },
+    // The pages of emailed links (`<meta name="referrer" content="no-referrer">`): the header says the same, this is the
+    // second line for a browser or proxy that drops it. The token is in the fragment, which a Referer never holds, anyway.
+    ...(options.noReferrer === true ? { referrer: "no-referrer" as const } : {}),
   };
 }
