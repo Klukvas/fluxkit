@@ -35,6 +35,10 @@ import {
 } from "./email/registry/index.js";
 import { DEFAULT_PAYMENTS_CONFIG } from "./payments/payments-config.js";
 import {
+  PAYMENT_WEBHOOK_PATH,
+  paymentWebhookRawBody,
+} from "./payments/webhook/webhook-raw-body.js";
+import {
   DEFAULT_PAYMENT_PROVIDERS_DIR,
   loadPaymentProviders,
   type LoadedPaymentProvider,
@@ -218,6 +222,9 @@ export async function createApp(
     }),
     { logger: options.logLevels ?? ["error", "warn", "log"] },
   );
+  // The payment webhook keeps its exact body bytes (ADR 0032 decision 12): mounted before Nest registers its JSON parser
+  // at init, on this path only, so no other route's raw body is kept and the signature is checked over what arrived.
+  app.use(PAYMENT_WEBHOOK_PATH, paymentWebhookRawBody());
   // The one place Express is configured, so the API, the specs and the OpenAPI export all see the same `request.ip`.
   // 0 (the default) trusts no proxy: the client is the socket address and `X-Forwarded-For` is ignored.
   app.set("trust proxy", env.trustProxy ?? DEFAULT_TRUST_PROXY);

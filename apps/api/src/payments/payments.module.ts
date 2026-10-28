@@ -2,7 +2,10 @@ import { Global, Module, type DynamicModule } from "@nestjs/common";
 import { PaymentAttemptsModule } from "./attempts/payment-attempts.module.js";
 import { PaymentCreateService } from "./payment-create.service.js";
 import { PaymentFactsService } from "./payment-facts.service.js";
+import { PaymentReconcileService } from "./payment-reconcile.service.js";
+import { PaymentRefundsService } from "./payment-refunds.service.js";
 import { PAYMENTS_CONFIG, type PaymentsConfig } from "./payments-config.js";
+import { PaymentWebhookController } from "./webhook/payment-webhook.controller.js";
 
 /**
  * Online payments (ADR 0032, payments plan step 5): the create flow, the application of verified provider facts
@@ -19,12 +22,21 @@ export class PaymentsModule {
     return {
       module: PaymentsModule,
       imports: [PaymentAttemptsModule],
+      controllers: [PaymentWebhookController],
       providers: [
         { provide: PAYMENTS_CONFIG, useValue: config },
         PaymentFactsService,
         PaymentCreateService,
+        PaymentRefundsService,
+        PaymentReconcileService,
       ],
-      exports: [PAYMENTS_CONFIG, PaymentFactsService, PaymentCreateService],
+      exports: [
+        PAYMENTS_CONFIG,
+        PaymentFactsService,
+        PaymentCreateService,
+        PaymentRefundsService,
+        PaymentReconcileService,
+      ],
     };
   }
 }
