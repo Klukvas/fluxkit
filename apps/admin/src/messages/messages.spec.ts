@@ -5,6 +5,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import * as account from "../areas/account/account-page";
 import * as catalogDictionaries from "../areas/catalog-dictionaries";
 import * as customers from "../areas/customers";
+import * as email from "../areas/email";
 import * as orders from "../areas/orders";
 import * as products from "../areas/products";
 import * as shipping from "../areas/shipping";
@@ -176,6 +177,7 @@ describe("the lazy file loader", () => {
       customers: { uk: unused, en: unused },
       users: { uk: unused, en: unused },
       shipping: { uk: unused, en: unused },
+      email: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
@@ -211,6 +213,7 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   auth: [],
   "catalog-dictionaries": catalogDictionaries.MESSAGE_FILES,
   customers: customers.MESSAGE_FILES,
+  email: email.MESSAGE_FILES,
   home: [],
   orders: orders.MESSAGE_FILES,
   products: products.MESSAGE_FILES,

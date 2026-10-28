@@ -16,7 +16,11 @@ function expectStrictHeaders(
   }
   // The values themselves, not only "the same as the file": a weakened file must fail here too.
   expect(headers["content-security-policy"]).toContain("script-src 'self';");
-  expect(headers["content-security-policy"]).not.toContain("unsafe-inline");
+  // The one inline allowance is for style ATTRIBUTES (the mail preview, email plan step 11): nowhere else, no script.
+  expect(headers["content-security-policy"]).toContain("style-src-attr 'unsafe-inline';");
+  expect(
+    (headers["content-security-policy"] ?? "").replace("style-src-attr 'unsafe-inline'", ""),
+  ).not.toContain("unsafe-inline");
   expect(headers["content-security-policy"]).toContain("frame-ancestors 'none'");
   expect(headers["x-frame-options"]).toBe("DENY");
   expect(headers["cache-control"]).toBe(cacheControl);

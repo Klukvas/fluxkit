@@ -20,6 +20,7 @@ describe("navigation configuration", () => {
       "orders",
       "customers",
       "shipping",
+      "email",
       "users",
     ]);
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {
@@ -53,6 +54,17 @@ describe("navigation configuration", () => {
     expect(ids(["orders.read", "orders.write", "customers.read"])).not.toContain("shipping");
     expect(ids(["shipping.manage"])).toEqual(["shipping"]);
     expect(visibleNavigation(["shipping.manage"]).map((group) => group.id)).toEqual(["settings"]);
+  });
+
+  it("shows the Email area to a session with email.manage only: owner and manager, never the viewer, never through shipping.manage or orders", () => {
+    expect(ids([...ROLE_PERMISSIONS.owner])).toContain("email");
+    expect(ids([...ROLE_PERMISSIONS.manager])).toContain("email");
+    expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("email");
+    expect(ids(["shipping.manage", "orders.read", "orders.write", "users.manage"])).not.toContain(
+      "email",
+    );
+    expect(ids(["email.manage"])).toEqual(["email"]);
+    expect(visibleNavigation(["email.manage"]).map((group) => group.id)).toEqual(["settings"]);
   });
 
   it("shows the owner everything, and drops groups that end up empty", () => {

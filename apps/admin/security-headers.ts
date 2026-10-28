@@ -30,6 +30,12 @@ export function adminContentSecurityPolicy(options: AdminSecurityHeadersOptions 
     ["default-src", ["'self'"]],
     ["script-src", ["'self'"]],
     ["style-src", ["'self'"]],
+    // ONLY inline style ATTRIBUTES, there for the mail preview (it applies to the whole SPA, a CSP is per response): a template's HTML carries its styles in `style="..."`
+    // attributes (mail clients ignore stylesheets), and a `srcdoc` iframe inherits this policy even when it is sandboxed,
+    // so without this directive the preview would show unstyled mail. It allows no `<style>` element, no script and no
+    // event handler (`script-src` is untouched), so it opens no script path; it lets an injected element be restyled at
+    // most. Decision in docs/plans/2026-10-26-email.md, step 11 row; ADR 0027 decision 3 is otherwise unchanged.
+    ["style-src-attr", ["'unsafe-inline'"]],
     ["img-src", ["'self'", "data:", ...imageHosts.map((host) => `https://${host}`)]],
     ["connect-src", ["'self'"]],
     ["font-src", ["'self'"]],

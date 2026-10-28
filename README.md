@@ -128,12 +128,14 @@ Headers, from `apps/admin/security-headers.ts` (the CSP shown has no image hosts
 
 | Header | Value |
 |---|---|
-| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'` |
 | `X-Frame-Options` | `DENY` |
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `no-referrer` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
 | `Cross-Origin-Opener-Policy` | `same-origin` |
+
+`style-src-attr 'unsafe-inline'` (email plan step 11) allows inline style ATTRIBUTES and nothing else inline: the Email area previews a mail template in a sandboxed `srcdoc` iframe, the iframe inherits this policy, and a mail's styles are `style="..."` attributes. It allows no `<style>` element, no script and no event handler (`script-src 'self'` is unchanged). Keep it when you copy the policy to the edge proxy; without it the preview shows unstyled mail.
 
 HSTS is set by the TLS proxy, as for the storefront.
 
@@ -141,7 +143,7 @@ Caddy 2 (`Caddyfile`):
 
 ```
 (admin_security) {
-	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
 	header X-Frame-Options DENY
 	header X-Content-Type-Options nosniff
 	header Referrer-Policy no-referrer
@@ -237,7 +239,7 @@ server {
         # A location with its own add_header inherits NONE of the server-level add_header lines: repeat your
         # Strict-Transport-Security here and in the next location, for example:
         # add_header Strict-Transport-Security "max-age=31536000" always;
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "no-referrer" always;
@@ -251,7 +253,7 @@ server {
         try_files $uri /admin-ui/index.html;
         add_header Cache-Control "no-cache" always;
         # add_header Strict-Transport-Security "max-age=31536000" always;   (repeat the server-level HSTS, see above)
-        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
         add_header X-Frame-Options "DENY" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header Referrer-Policy "no-referrer" always;

@@ -119,6 +119,12 @@ export function apiEnvironment(env: Env = process.env): Env {
     SHIPPING_PROVIDERS_ENABLED: "fake",
     // No online payment in these suites (payments plan step 4: an empty list loads no provider); a value in the developer's shell must not change the run.
     PAYMENT_PROVIDERS_ENABLED: "",
+    // The test-only email provider (packages/providers/_fake-email): the Email area needs a provider to send a test mail, and
+    // the fake delivers nothing. No capture file: the scenarios read the outbox through the admin API. The scheduler is off
+    // (below), so only the immediate attempt of a test send or a resend runs; order mails stay pending.
+    EMAIL_PROVIDER: "fake",
+    EMAIL_FROM: "Fluxkit E2E <shop@example.com>",
+    STOREFRONT_PUBLIC_URL: ADMIN_E2E_ORIGIN,
     // No background timers: nothing in the suite depends on expiry, and a sweep must not race a test.
     SCHEDULER_ENABLED: "false",
     DEFAULT_LOCALE: "uk",

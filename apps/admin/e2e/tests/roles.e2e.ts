@@ -19,7 +19,7 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Categories" })).toBeVisible();
-  for (const hidden of ["Orders", "Customers", "Admin users", "Shipping"]) {
+  for (const hidden of ["Orders", "Customers", "Admin users", "Shipping", "Email"]) {
     await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
   }
 
@@ -81,18 +81,28 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   await expectNotAllowed(page, "/shipping");
   await expectNotAllowed(page, "/shipping/methods/new");
   await expectNotAllowed(page, "/shipping/providers/fake");
+  await expectNotAllowed(page, "/email");
+  await expectNotAllowed(page, "/email/messages");
+  await expectNotAllowed(page, "/email/messages/0b5f8a52-7a9e-4c7a-9d0e-1a2b3c4d5e6f");
+  await expectNotAllowed(page, "/email/templates");
+  await expectNotAllowed(page, "/email/templates/order.placed");
 
   expect(guard.writes(), "the viewer's pages send no write").toEqual([]);
   const forbiddenReads = guard.requests.filter((request) =>
-    /^\/admin\/(orders|customers|users|shipping)/.test(new URL(request.url).pathname),
+    /^\/admin\/(orders|customers|users|shipping|email)/.test(new URL(request.url).pathname),
   );
   expect(forbiddenReads, "no request for data the role cannot read").toEqual([]);
 });
 
-test("the manager has no users area but manages shipping", async ({ page, signIn, guard }) => {
+test("the manager has no users area but manages shipping and email", async ({
+  page,
+  signIn,
+  guard,
+}) => {
   await signIn("manager");
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Shipping" })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Email" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Orders" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Customers" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
