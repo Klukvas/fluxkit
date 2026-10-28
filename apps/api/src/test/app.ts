@@ -6,6 +6,7 @@ import type { Clock } from "../auth/clock.js";
 import type { LoadedFeature } from "../features/feature-loader.js";
 import type { EmailDeliveryTuning } from "../email/outbox/index.js";
 import type { LoadedEmailProvider } from "../email/registry/index.js";
+import type { LoadedPaymentProvider } from "../payments/registry/index.js";
 import type { LoadedShippingProvider, ShipmentCallTimeouts } from "../shipping/registry/index.js";
 import type { MediaTuning } from "../media/media-config.js";
 import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
@@ -51,6 +52,8 @@ export interface StartAppOptions {
   clock?: Clock;
   /** Shipping provider modules mounted as if enabled, for example `testShippingProviders()` (no package under packages/providers is read). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Payment provider modules mounted as if `PAYMENT_PROVIDERS_ENABLED` named them, for example `testPaymentProviders()` (no package under packages/providers is read). */
+  extraPaymentProviders?: LoadedPaymentProvider[];
   /** Email provider module mounted as if `EMAIL_PROVIDER` named it, for example `testEmailProviders()` (no package under packages/providers is read). */
   extraEmailProviders?: LoadedEmailProvider[];
   /** `EMAIL_FROM`; defaults to `TEST_EMAIL_FROM` (`null`: unset). */
@@ -157,6 +160,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       extraFeatures: options.extraFeatures,
       extraShippingProviders: options.extraShippingProviders,
       extraEmailProviders: options.extraEmailProviders,
+      extraPaymentProviders: options.extraPaymentProviders,
       emailDeliveryTuning: options.emailDeliveryTuning,
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       mediaTuning: options.mediaTuning,

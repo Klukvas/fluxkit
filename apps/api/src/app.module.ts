@@ -35,6 +35,7 @@ import { MediaModule } from "./media/media.module.js";
 import { DISABLED_SCHEDULER_CONFIG, type SchedulerConfig } from "./jobs/scheduler-config.js";
 import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config.js";
 import { OrdersModule } from "./orders/orders.module.js";
+import { PaymentRegistryModule, type LoadedPaymentProvider } from "./payments/registry/index.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
@@ -51,6 +52,8 @@ export interface AppModuleOptions {
   features: LoadedFeature[];
   /** The enabled shipping provider packages (`SHIPPING_PROVIDERS_ENABLED`); defaults to none. */
   shippingProviders?: LoadedShippingProvider[];
+  /** The enabled payment provider packages (`PAYMENT_PROVIDERS_ENABLED`); defaults to none (no online payment). */
+  paymentProviders?: LoadedPaymentProvider[];
   /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
   emailProviders?: LoadedEmailProvider[];
   /** `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL` and the sender tuning; defaults to none of them (no provider). */
@@ -130,6 +133,7 @@ export class AppModule {
         }),
         ShippingAdminModule,
         ShipmentsModule,
+        PaymentRegistryModule.register(options.paymentProviders ?? []),
         EmailRegistryModule.register(options.emailProviders ?? []),
         EmailOutboxModule.register(
           options.emailDelivery ?? DISABLED_EMAIL_DELIVERY,
