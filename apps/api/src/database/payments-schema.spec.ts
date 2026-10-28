@@ -1104,10 +1104,11 @@ describe("payments schema (migration 0008, real Postgres)", () => {
                 }),
                 sha256Hex,
               );
-        for (const missing of [
+        const missingParts: readonly Row[] = [
           { provider_status: null, provider_modified_at: null },
           { amount: null, final_amount: null, currency: null },
-        ]) {
+        ];
+        for (const missing of missingParts) {
           await expectViolation(
             () =>
               insert(
@@ -1391,11 +1392,12 @@ describe("payments schema (migration 0008, real Postgres)", () => {
         [0, -1, 2501],
       );
       // The copy of the payment's amount and currency must be the payment's own (composite foreign key).
-      for (const extra of [
+      const foreignCopies: readonly Row[] = [
         { payment_amount: 2600, amount: 2600 },
         { payment_amount: 2400 },
         { currency: "EUR" },
-      ]) {
+      ];
+      for (const extra of foreignCopies) {
         await expectViolation(
           () => insert("payment_refund", refundRow(paymentId, extra)),
           FOREIGN_KEY_VIOLATION,
@@ -1428,11 +1430,12 @@ describe("payments schema (migration 0008, real Postgres)", () => {
         await expectAccepted(() =>
           insert("payment_refund", refundRow(paymentId, { reason, amount: 2500 })),
         );
-        for (const extra of [
+        const manualParts: readonly Row[] = [
           { actor_admin_id: adminId },
           { note: "x" },
           { idempotency_key: randomUUID() },
-        ]) {
+        ];
+        for (const extra of manualParts) {
           await expectViolation(
             () => insert("payment_refund", refundRow(paymentId, { reason, ...extra })),
             CHECK_VIOLATION,
