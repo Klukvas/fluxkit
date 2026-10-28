@@ -34,6 +34,11 @@ import {
   type LoadedEmailProvider,
 } from "./email/registry/index.js";
 import {
+  DEFAULT_PAYMENT_PROVIDERS_DIR,
+  loadPaymentProviders,
+  type LoadedPaymentProvider,
+} from "./payments/registry/index.js";
+import {
   DEFAULT_SHIPPING_PROVIDERS_DIR,
   loadShippingProviders,
   type LoadedShippingProvider,
@@ -50,6 +55,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "emailReplyTo"
       | "storefrontPublicUrl"
       | "enabledShippingProviders"
+      | "enabledPaymentProviders"
       | "locales"
       | "adminCookieSecure"
       | "adminSessionIdleMinutes"
@@ -89,6 +95,10 @@ export interface CreateAppOptions {
   extraFeatures?: LoadedFeature[];
   /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Tests only: payment provider modules mounted as if they were enabled (no package on disk is read for them). */
+  extraPaymentProviders?: LoadedPaymentProvider[];
+  /** Tests only: where provider packages are looked up for the payment providers (default `<repo>/packages/providers`). */
+  paymentProvidersDir?: string;
   /** Tests only: email provider modules mounted as if one was configured (no package on disk is read for them). */
   extraEmailProviders?: LoadedEmailProvider[];
   /** Tests only: where provider packages are looked up for the email provider (default `<repo>/packages/providers`). */
@@ -137,6 +147,10 @@ export async function createApp(
     enabled: env.enabledShippingProviders ?? [],
     providersDir: options.shippingProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
   });
+  const paymentProviders = await loadPaymentProviders({
+    enabled: env.enabledPaymentProviders ?? [],
+    providersDir: options.paymentProvidersDir ?? DEFAULT_PAYMENT_PROVIDERS_DIR,
+  });
   const emailProviders = await loadEmailProvider({
     provider: env.emailProvider ?? "none",
     providersDir: options.emailProvidersDir ?? DEFAULT_EMAIL_PROVIDERS_DIR,
@@ -146,6 +160,7 @@ export async function createApp(
       databaseUrl: env.databaseUrl,
       features: [...features, ...(options.extraFeatures ?? [])],
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
+      paymentProviders: [...paymentProviders, ...(options.extraPaymentProviders ?? [])],
       emailProviders: [...emailProviders, ...(options.extraEmailProviders ?? [])],
       emailDelivery: {
         from: env.emailFrom ?? null,

@@ -185,6 +185,7 @@ const config: Shape<AdminConfig> = {
     pricesIncludeTax: "boolean",
     lowStockThreshold: "integer",
     emailDelivery: "boolean",
+    onlinePayment: "boolean",
     media: {
       object: {
         uploadsEnabled: "boolean",

@@ -360,6 +360,7 @@ const storeConfig: Shape<StoreConfig> = {
     defaultLocale: "string",
     locales: { array: "string" },
     emailDelivery: "boolean",
+    onlinePayment: "boolean",
   },
 };
 

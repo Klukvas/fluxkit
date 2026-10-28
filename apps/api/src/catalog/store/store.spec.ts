@@ -1682,6 +1682,7 @@ describe("store API (public, real app, real Postgres)", () => {
           defaultLocale: "uk",
           locales: ["uk", "en"],
           emailDelivery: false,
+          onlinePayment: false,
         });
       });
 
@@ -1697,6 +1698,7 @@ describe("store API (public, real app, real Postgres)", () => {
             defaultLocale: "uk",
             locales: ["uk", "en"],
             emailDelivery: false,
+            onlinePayment: false,
           });
         } finally {
           await jpy.app.close();

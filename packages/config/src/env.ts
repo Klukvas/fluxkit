@@ -11,6 +11,11 @@ import {
 } from "./email.js";
 import { parseEnabledFeatures } from "./features.js";
 import {
+  MIN_ORDER_PAYMENT_TTL_MINUTES_WITH_PAYMENT_PROVIDER,
+  parsePaymentProvidersVariable,
+  TEST_ONLY_PAYMENT_PROVIDERS,
+} from "./payments.js";
+import {
   parseEnabledShippingProviders,
   TEST_ONLY_SHIPPING_PROVIDERS,
 } from "./shipping-providers.js";
@@ -225,6 +230,8 @@ const envSchema = z
     FEATURES_ENABLED: z.string().optional(),
     FEATURES_DIR: z.string().min(1).optional(),
     SHIPPING_PROVIDERS_ENABLED: z.string().optional(),
+    // The list is checked in `superRefine` (a problem names the rule, never an entry); no value means no online payment.
+    PAYMENT_PROVIDERS_ENABLED: z.string().optional(),
     // Blank counts as unset, like the storefront variables. Exact values only: a typo must not silently mean `none`.
     EMAIL_PROVIDER: z.preprocess(
       (value) => (typeof value === "string" ? blankToUndefined(value.trim()) : value),
@@ -365,6 +372,49 @@ const envSchema = z
         });
       }
     }
+    const payments = parsePaymentProvidersVariable(env.PAYMENT_PROVIDERS_ENABLED);
+    if (!payments.ok) {
+      context.addIssue({
+        code: "custom",
+        path: ["PAYMENT_PROVIDERS_ENABLED"],
+        message: payments.problem,
+      });
+    } else if (payments.codes.length > 0) {
+      for (const code of TEST_ONLY_PAYMENT_PROVIDERS.filter((test) =>
+        payments.codes.includes(test),
+      )) {
+        if (inProduction) {
+          context.addIssue({
+            code: "custom",
+            path: ["PAYMENT_PROVIDERS_ENABLED"],
+            message: `"${code}" is a test-only provider (it charges nothing) and is refused when NODE_ENV is production`,
+          });
+        }
+      }
+      if (env.ORDER_PAYMENT_TTL_MINUTES < MIN_ORDER_PAYMENT_TTL_MINUTES_WITH_PAYMENT_PROVIDER) {
+        context.addIssue({
+          code: "custom",
+          path: ["ORDER_PAYMENT_TTL_MINUTES"],
+          message: `must be at least ${MIN_ORDER_PAYMENT_TTL_MINUTES_WITH_PAYMENT_PROVIDER} when PAYMENT_PROVIDERS_ENABLED names a provider (the invoice ends 3 minutes before the order and must leave 5 minutes to pay, so no order could be paid online with a shorter time)`,
+        });
+      }
+      if (inProduction && env.STOREFRONT_PUBLIC_URL === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["STOREFRONT_PUBLIC_URL"],
+          message:
+            "is required when PAYMENT_PROVIDERS_ENABLED names a provider and NODE_ENV is production (the origin of the return and webhook addresses, for example https://shop.example)",
+        });
+      }
+      if (inProduction && env.STOREFRONT_PUBLIC_URL?.startsWith("https://") === false) {
+        context.addIssue({
+          code: "custom",
+          path: ["STOREFRONT_PUBLIC_URL"],
+          message:
+            "must use https when PAYMENT_PROVIDERS_ENABLED names a provider and NODE_ENV is production (the return and webhook addresses are built from it)",
+        });
+      }
+    }
     const emailProvider = env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER;
     if (inProduction && TEST_ONLY_EMAIL_PROVIDERS.includes(emailProvider)) {
       context.addIssue({
@@ -420,6 +470,12 @@ export interface AppEnv {
   featuresDir: string | undefined;
   /** Codes from `SHIPPING_PROVIDERS_ENABLED`; the API loads exactly these provider packages (ADR 0029 decision 8). */
   enabledShippingProviders: string[];
+  /**
+   * Codes from `PAYMENT_PROVIDERS_ENABLED` (ADR 0032 decision 16); the API loads exactly these provider packages. Empty
+   * (the default) means no online payment: orders are paid by hand as before. `fake` is test-only and refused in
+   * production; with a provider `ORDER_PAYMENT_TTL_MINUTES` is at least 8.
+   */
+  enabledPaymentProviders: string[];
   /**
    * `EMAIL_PROVIDER` (ADR 0031): `none` (default) loads no provider and no mail is sent; `resend` or `fake` names the one
    * provider package the API loads. `fake` is test-only and refused in production.
@@ -499,6 +555,12 @@ export interface AppEnv {
   mediaMaxPixels: number;
 }
 
+/** The list was validated by the schema; an invalid one cannot get here. */
+function enabledPaymentProviders(raw: string | undefined): string[] {
+  const parsed = parsePaymentProvidersVariable(raw);
+  return parsed.ok ? parsed.codes : [];
+}
+
 /** Validates and normalizes process environment variables. Throws with a readable message on invalid input. */
 export function loadEnv(source: Record<string, string | undefined>): AppEnv {
   const parsed = envSchema.safeParse(source);
@@ -520,6 +582,7 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     enabledFeatures: parseEnabledFeatures(env.FEATURES_ENABLED),
     featuresDir: env.FEATURES_DIR,
     enabledShippingProviders: parseEnabledShippingProviders(env.SHIPPING_PROVIDERS_ENABLED),
+    enabledPaymentProviders: enabledPaymentProviders(env.PAYMENT_PROVIDERS_ENABLED),
     emailProvider: env.EMAIL_PROVIDER ?? DEFAULT_EMAIL_PROVIDER,
     emailFrom: env.EMAIL_FROM,
     emailReplyTo: env.EMAIL_REPLY_TO,

@@ -93,6 +93,8 @@ jobs:
             providers-email-fake,
             providers-email-none,
             providers-email-resend,
+            providers-payment-fake,
+            providers-payment-none,
           ]
     services:
       postgres:

@@ -19,6 +19,7 @@ const config = {
   defaultLocale: "uk",
   locales: ["uk", "en"],
   emailDelivery: false,
+  onlinePayment: false,
 };
 
 function problem(status: number, code: ProblemDetails["code"]): CatalogOutcome<never> {

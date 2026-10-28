@@ -19,3 +19,11 @@ Added by email plan step 4 (ADR 0031 decision 4).
 - Its key (for example `RESEND_API_KEY`) is read by the provider's own parser, never logged, stored or returned. Its specs run `checkEmailProviderContract` and never reach the network.
 - Removal = delete the folder and set `EMAIL_PROVIDER=none` (CI: `scripts/feature-matrix.sh providers-deleted`).
 - Packages: `_fake-email` (test-only, code `fake`; variable `FAKE_EMAIL_CAPTURE_FILE`), `resend` (code `resend`, Resend `POST /emails`; variable `RESEND_API_KEY`; tested against a local stub only until the live check S1). Details of the contract: `docs/contracts/config.md`.
+
+## Payment provider convention
+Added by payments plan step 4 (ADR 0032 decision 3).
+- `package.json` declares `"fluxkit": { "provider": "<code>", "kind": "payment" }`. Codes are unique per kind, so `fake` exists once for shipping (`_fake`), once for email (`_fake-email`) and once for payment (`_fake-payment`). Any number of payment providers may be active: the codes `PAYMENT_PROVIDERS_ENABLED` names (empty loads nothing and reads no folder).
+- `main` (default `dist/index.js`) exports `providerModule`, a Nest module; the module provides one class marked `@SetMetadata(PAYMENT_PROVIDER_METADATA, paymentProviderMetadata("<code>"))` that implements `PaymentProviderPort` from `@fluxkit/core` (`code`, `capabilities` with `currencies` that must include `SHOP_CURRENCY`, `createPayment`, `getPayment`, `invalidatePayment`, `refund`, `verifyWebhook`). It answers typed results with codes only (never a provider's message text), honours the abort signal and answers `not_sent` only when it can prove nothing left the process; the API decides timeout, logging and retries. A repeat of a create is never sent with the same attempt (no create idempotency at Monobank).
+- Its token (`MONOBANK_TOKEN`) is read by the provider's own parser, never logged, stored or returned. Its specs run `checkPaymentProviderContract` and never reach the network.
+- Removal = delete the folder and take its code out of `PAYMENT_PROVIDERS_ENABLED` (CI: `scripts/feature-matrix.sh providers-deleted`).
+- Packages: `_fake-payment` (test-only, code `fake`; no variable). The Monobank plugin (`monobank`, variable `MONOBANK_TOKEN`) arrives with payments plan step 7. Details of the contract: `docs/contracts/config.md`.

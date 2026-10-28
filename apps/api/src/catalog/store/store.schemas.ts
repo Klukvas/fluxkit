@@ -129,6 +129,10 @@ export const storeConfigSchema = z.object({
     description:
       'False when `EMAIL_PROVIDER=none` (no mail is sent): hide "forgot password" and the verification prompts. True when a mail provider is configured.',
   }),
+  onlinePayment: z.boolean().meta({
+    description:
+      "False when `PAYMENT_PROVIDERS_ENABLED` is empty (no online payment; orders are paid by hand): show no pay button. True when at least one payment provider is enabled. Says nothing about which provider.",
+  }),
 });
 
 export type StoreConfig = z.output<typeof storeConfigSchema>;

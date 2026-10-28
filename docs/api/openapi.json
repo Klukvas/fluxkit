@@ -1367,6 +1367,10 @@
                       "type": "boolean",
                       "description": "False when `EMAIL_PROVIDER=none`: no mail is sent, so the admin Email area shows the setup steps and no actions."
                     },
+                    "onlinePayment": {
+                      "type": "boolean",
+                      "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty: no online payment, orders are paid by hand. True when at least one payment provider is enabled."
+                    },
                     "media": {
                       "type": "object",
                       "properties": {
@@ -1402,6 +1406,7 @@
                     "pricesIncludeTax",
                     "lowStockThreshold",
                     "emailDelivery",
+                    "onlinePayment",
                     "media"
                   ],
                   "additionalProperties": false
@@ -1440,7 +1445,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail is configured, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail and online payment are configured, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -19810,6 +19815,10 @@
                     "emailDelivery": {
                       "type": "boolean",
                       "description": "False when `EMAIL_PROVIDER=none` (no mail is sent): hide \"forgot password\" and the verification prompts. True when a mail provider is configured."
+                    },
+                    "onlinePayment": {
+                      "type": "boolean",
+                      "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty (no online payment; orders are paid by hand): show no pay button. True when at least one payment provider is enabled. Says nothing about which provider."
                     }
                   },
                   "required": [
@@ -19818,7 +19827,8 @@
                     "pricesIncludeTax",
                     "defaultLocale",
                     "locales",
-                    "emailDelivery"
+                    "emailDelivery",
+                    "onlinePayment"
                   ],
                   "additionalProperties": false
                 }

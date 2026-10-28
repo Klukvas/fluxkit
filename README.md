@@ -327,7 +327,7 @@ If every owner is locked out or has lost the password, create a new owner with `
 - another owner calls `POST /admin/users/{id}/reset-password` (it also clears the lock and ends the user's sessions);
 - run `pnpm admin:unlock --email owner@example.com` on the server. It sets the failed-login counter to 0 and removes the lock, nothing else (no password, role, active flag or session is touched), and prints `Unlocked owner@example.com` (or `owner@example.com was not locked`). An unknown email exits with code 1. Like `admin:create` it reads `DATABASE_URL` from `.env` and needs no session.
 
-Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`. Shipping provider plugins are enabled the same way with `SHIPPING_PROVIDERS_ENABLED` (a comma-separated list of provider codes; empty by default; the template ships only the test-only `fake`), see `packages/providers/README.md`.
+Enable optional features with `FEATURES_ENABLED=example` (comma-separated) in `.env`; see `docs/contracts/config.md`. Shipping provider plugins are enabled the same way with `SHIPPING_PROVIDERS_ENABLED` (a comma-separated list of provider codes; empty by default; the template ships only the test-only `fake`), see `packages/providers/README.md`. Online payment providers are a list too: `PAYMENT_PROVIDERS_ENABLED` (empty by default: no online payment, orders are paid by hand; the template ships only the test-only `fake`, refused in production; with a provider `ORDER_PAYMENT_TTL_MINUTES` must be at least 8).
 
 ## Checkout walkthrough
 
@@ -443,7 +443,7 @@ Notes:
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
 | `pnpm check:docs` | docs-with-code rules against `origin/main` |
-| `pnpm feature-matrix on\|off\|deleted\|providers-on\|providers-off\|providers-deleted\|providers-nova-post\|providers-email-fake\|providers-email-none\|providers-email-resend` | feature, shipping provider and email provider enable/disable/delete verification (the `deleted` modes remove files, CI only) |
+| `pnpm feature-matrix on\|off\|deleted\|providers-on\|providers-off\|providers-deleted\|providers-nova-post\|providers-email-fake\|providers-email-none\|providers-email-resend\|providers-payment-fake\|providers-payment-none` | feature, shipping provider, email provider and payment provider enable/disable/delete verification (the `deleted` modes remove files, CI only) |
 
 ## Repository layout
 
@@ -453,7 +453,7 @@ apps/storefront     Next.js storefront (App Router, Tailwind, tokens, uk/en)
 apps/admin          React + Vite admin SPA, static, served under `/admin-ui` (ADR 0027)
 packages/core       domain rules, pure TypeScript: catalog, money, pricing, stock, auth, cart, orders and shipping (discounts and tax not yet)
 packages/features   optional feature modules (sample: _example)
-packages/providers  payment and shipping provider plugins (only the test-only shipping provider `_fake`)
+packages/providers  payment, shipping and email provider plugins (test-only `_fake`, `_fake-email`, `_fake-payment`, and the real ones)
 packages/ui         token-based components and i18n helpers
 packages/theme      design tokens and their guard tests
 packages/config     env parsing (API and storefront) and feature flags

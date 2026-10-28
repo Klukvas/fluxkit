@@ -26,6 +26,7 @@ const config: AdminConfig = {
   pricesIncludeTax: true,
   lowStockThreshold: 5,
   emailDelivery: false,
+  onlinePayment: false,
   media: { uploadsEnabled: true, maxBytes: 10485760, contentTypes: ["image/jpeg"] },
 };
 const content = { defaultLocale: "uk", locales: ["uk", "en"] } as const;

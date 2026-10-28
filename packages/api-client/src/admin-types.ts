@@ -120,6 +120,8 @@ export interface AdminConfig {
   lowStockThreshold: number;
   /** False when no email provider is configured (`EMAIL_PROVIDER=none`): the Email area shows setup steps, no actions. */
   emailDelivery: boolean;
+  /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): no online payment, orders are paid by hand. */
+  onlinePayment: boolean;
   media: AdminMediaConfig;
 }
 
