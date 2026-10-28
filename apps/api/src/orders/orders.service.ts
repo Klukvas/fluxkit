@@ -90,6 +90,12 @@ function toStatus(value: string): OrderStatus {
   return value as OrderStatus;
 }
 
+function assertPaymentReference(reference: unknown): asserts reference is string {
+  if (typeof reference !== "string" || reference.length < 1 || reference.length > REFERENCE_MAX) {
+    throw new RangeError(`A payment reference is 1 to ${String(REFERENCE_MAX)} characters`);
+  }
+}
+
 function statusColumnsFor(
   to: OrderStatus,
   options: TransitionOptions,
@@ -191,48 +197,60 @@ export class OrdersService implements OrderPaymentsPort {
     request: MarkPaidRequest,
     actor: OrderActorRef = { type: "system" },
   ): Promise<MarkPaidOutcome> {
+    assertPaymentReference(request.providerReference);
+    return this.inTransaction((tx) => this.markPaidIn(tx, orderId, request, actor));
+  }
+
+  /**
+   * `markPaid` inside the CALLER's transaction (ADR 0032 decision 7): the payments module applies a verified success in
+   * one transaction, so the payment attempt, its journal and the order commit or roll back together. Same rules and
+   * answers as `markPaid`; it locks the order row (a no-op when the caller already holds it, which the lock order of
+   * ADR 0015 requires: `sales_order` -> `payment` -> reservations). No deadlock retry here: the caller owns the
+   * transaction and retries it as a whole.
+   */
+  async markPaidIn(
+    tx: Transaction,
+    orderId: string,
+    request: MarkPaidRequest,
+    actor: OrderActorRef = { type: "system" },
+  ): Promise<MarkPaidOutcome> {
     const reference = request.providerReference;
-    if (typeof reference !== "string" || reference.length < 1 || reference.length > REFERENCE_MAX) {
-      throw new RangeError(`A payment reference is 1 to ${String(REFERENCE_MAX)} characters`);
-    }
+    assertPaymentReference(reference);
     const now = this.clock.now();
-    return this.inTransaction(async (tx) => {
-      const order = await this.orders.lockById(tx, orderId);
-      if (order === undefined) {
-        return { ok: false, reason: "order_not_found" };
-      }
-      const status = toStatus(order.status);
-      if (status === "cancelled" || status === "expired") {
-        return { ok: false, reason: "order_not_payable" };
-      }
-      const sameReference = order.paymentReference === reference;
-      if ((status === "paid" || status === "fulfilled") && !sameReference) {
-        return { ok: false, reason: "payment_reference_conflict" };
-      }
-      const total = createMoney(order.totalAmount, order.currency);
-      if (!total.ok) {
-        throw new RangeError(`Order ${order.number} has a total core rejects: ${total.reason}`);
-      }
-      const compared = compareMoney(request.amount, total.money);
-      if (!compared.ok || compared.ordering !== 0) {
-        return { ok: false, reason: "amount_mismatch" };
-      }
-      if (status === "paid" || status === "fulfilled") {
-        return { ok: true, orderId: order.id, alreadyPaid: true };
-      }
-      const result = await this.transition(tx, order, "paid", actor, {
-        now,
-        paymentReference: reference,
-      });
-      if (!result.ok) {
-        return {
-          ok: false,
-          reason:
-            result.reason === "order_not_payable" ? "order_not_payable" : "invalid_transition",
-        };
-      }
-      return { ok: true, orderId: order.id, alreadyPaid: false };
+    const order = await this.orders.lockById(tx, orderId);
+    if (order === undefined) {
+      return { ok: false, reason: "order_not_found" };
+    }
+    const status = toStatus(order.status);
+    if (status === "cancelled" || status === "expired") {
+      return { ok: false, reason: "order_not_payable" };
+    }
+    const sameReference = order.paymentReference === reference;
+    if ((status === "paid" || status === "fulfilled") && !sameReference) {
+      return { ok: false, reason: "payment_reference_conflict" };
+    }
+    const total = createMoney(order.totalAmount, order.currency);
+    if (!total.ok) {
+      throw new RangeError(`Order ${order.number} has a total core rejects: ${total.reason}`);
+    }
+    const compared = compareMoney(request.amount, total.money);
+    if (!compared.ok || compared.ordering !== 0) {
+      return { ok: false, reason: "amount_mismatch" };
+    }
+    if (status === "paid" || status === "fulfilled") {
+      return { ok: true, orderId: order.id, alreadyPaid: true };
+    }
+    const result = await this.transition(tx, order, "paid", actor, {
+      now,
+      paymentReference: reference,
     });
+    if (!result.ok) {
+      return {
+        ok: false,
+        reason: result.reason === "order_not_payable" ? "order_not_payable" : "invalid_transition",
+      };
+    }
+    return { ok: true, orderId: order.id, alreadyPaid: false };
   }
 
   /** `paid -> fulfilled` (admin by hand now, a shipping plugin later): commits the backordered lines or answers `awaiting_stock`. */
