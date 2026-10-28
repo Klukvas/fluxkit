@@ -138,7 +138,8 @@ describe("safeNextPath, whatever it returns stays on the storefront (property)",
       );
       expect(result.includes("\\"), value).toBe(false);
     }
-  });
+    // 20 000 rounds with several expectations each take about 5 s on a busy CI runner; the default limit is 5 s.
+  }, 30_000);
 });
 
 describe("currentPath", () => {
