@@ -198,6 +198,19 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
 
   it.each([
     ["amount", { amount: { amount: 1_999, currency: "UAH" as const } }, "amount_mismatch"],
+    [
+      "amount (with the same final amount)",
+      {
+        amount: { amount: 1_999, currency: "UAH" as const },
+        finalAmount: { amount: 1_999, currency: "UAH" as const },
+      },
+      "amount_mismatch",
+    ],
+    [
+      "amount (without a final amount)",
+      { amount: { amount: 2_001, currency: "UAH" as const }, finalAmount: null },
+      "amount_mismatch",
+    ],
     ["currency", { amount: { amount: 2_000, currency: "EUR" as const } }, "amount_mismatch"],
     [
       "final amount",

@@ -50,6 +50,34 @@ describe("payments: races on one order (real Postgres)", () => {
     return { placed, ...attempt };
   }
 
+  it("a webhook waits for the order row before it locks the attempt (lock order, decided without a race)", async () => {
+    const { placed, paymentId, invoiceId } = await succeededAt();
+    const holder = await world.pool.connect();
+    try {
+      await holder.query("begin");
+      await holder.query("select id from sales_order where id = $1 for update", [placed.id]);
+      const delivery = world.webhook(world.provider().webhookFor(invoiceId));
+      // Wait until the webhook's transaction is blocked on a lock the holder has.
+      const deadline = Date.now() + 5_000;
+      for (;;) {
+        const waiting = await world.pool.query<{ count: string }>(
+          "select count(*) from pg_locks where not granted and pid <> pg_backend_pid()",
+        );
+        if (Number(waiting.rows[0]?.count) > 0) break;
+        if (Date.now() > deadline) throw new Error("the webhook never waited for the order row");
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      }
+      // Correct order: the webhook holds nothing of the attempt yet, so this does not wait.
+      await holder.query("select id from payment where id = $1 for update nowait", [paymentId]);
+      await holder.query("rollback");
+      expect((await delivery).status).toBe(200);
+    } finally {
+      // Destroyed, not returned to the pool: a failed assertion leaves its transaction open.
+      holder.release(true);
+    }
+    expect((await world.orderStatus(placed.id)).status).toBe("paid");
+  });
+
   it("two webhooks (different bodies) and job 11's read at once: exactly one paid, one order.paid, no failure", async () => {
     for (let round = 0; round < 3; round += 1) {
       const { placed, paymentId, invoiceId } = await succeededAt();
