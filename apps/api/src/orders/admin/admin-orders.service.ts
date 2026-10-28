@@ -47,13 +47,13 @@ export class AdminOrdersService {
     if (!result.ok) {
       throw result.reason === "not_found"
         ? notFound("Order")
-        : ruleViolation("The order can not be cancelled in its current status.", result.reason);
+        : ruleViolation(CANCEL_REFUSALS[result.reason], result.reason);
     }
     return this.require(orderId);
   }
 
   async markPaid(orderId: string, adminId: string, body: MarkPaidBody): Promise<AdminOrderDetail> {
-    const outcome = await this.service.markPaid(
+    const outcome = await this.service.markPaidManually(
       orderId,
       { amount: body.amount, providerReference: body.reference, source: MANUAL_SOURCE },
       { type: "admin", adminId },
@@ -99,7 +99,15 @@ export class AdminOrdersService {
   }
 }
 
+const CANCEL_REFUSALS = {
+  invalid_transition: "The order can not be cancelled in its current status.",
+  payment_in_progress:
+    "An online payment of this order is in progress. Wait until the payment provider confirms or declines it.",
+} as const;
+
 const PAYMENT_REFUSALS = {
+  payment_in_progress:
+    "An online payment of this order is in progress. Wait until the payment provider confirms or declines it.",
   order_not_payable: "The order is expired or cancelled, or its stock is no longer held.",
   amount_mismatch: "The amount does not equal the order total in the order currency.",
   payment_reference_conflict: "The order is already paid with another payment reference.",

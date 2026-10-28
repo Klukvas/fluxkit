@@ -20,6 +20,8 @@ export interface ExpireOrdersResult {
   /** Due orders looked at. */
   scanned: number;
   expired: number;
+  /** An online payment is in flight: the deadline moved on (ADR 0032 decision 8). */
+  deferred: number;
   /** A payment or a cancellation got there first (the order lock decides), or the order is not due any more. */
   notDue: number;
   /** One order failed; the others were still processed. Order number and error class only, never personal data. */
@@ -62,6 +64,7 @@ export async function expireDueOrders(
   const result: ExpireOrdersResult = {
     scanned: 0,
     expired: 0,
+    deferred: 0,
     notDue: 0,
     failures: [],
     truncated: false,
@@ -83,6 +86,8 @@ export async function expireDueOrders(
         const outcome = await deps.orders.expireOne(order.id, now, limits);
         if (outcome === "expired") {
           result.expired += 1;
+        } else if (outcome === "deferred") {
+          result.deferred += 1;
         } else {
           result.notDue += 1;
         }

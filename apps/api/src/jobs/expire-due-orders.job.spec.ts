@@ -71,6 +71,7 @@ describe("expireDueOrders (real Postgres, injected time)", () => {
     expect(await expireDueOrders(deps, START)).toEqual({
       scanned: 0,
       expired: 0,
+      deferred: 0,
       notDue: 0,
       failures: [],
       truncated: false,
@@ -90,7 +91,14 @@ describe("expireDueOrders (real Postgres, injected time)", () => {
     }
 
     const result = await expireDueOrders(deps, row.expires_at);
-    expect(result).toEqual({ scanned: 1, expired: 1, notDue: 0, failures: [], truncated: false });
+    expect(result).toEqual({
+      scanned: 1,
+      expired: 1,
+      deferred: 0,
+      notDue: 0,
+      failures: [],
+      truncated: false,
+    });
 
     const after = await orderRow(pool, order.number);
     expect(after.status).toBe("expired");
@@ -145,7 +153,14 @@ describe("expireDueOrders (real Postgres, injected time)", () => {
       four.push(await maker.place([{ quantity: 1 }]));
     }
     const result = await expireDueOrders(deps, await dueAt(four), { batchSize: 2 });
-    expect(result).toEqual({ scanned: 4, expired: 4, notDue: 0, failures: [], truncated: false });
+    expect(result).toEqual({
+      scanned: 4,
+      expired: 4,
+      deferred: 0,
+      notDue: 0,
+      failures: [],
+      truncated: false,
+    });
     for (const order of four) {
       expect((await orderRow(pool, order.number)).status).toBe("expired");
       expect(await level(order.lines[0]?.variantId ?? "")).toEqual({ on_hand: 50, reserved: 0 });
