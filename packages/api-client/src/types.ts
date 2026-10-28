@@ -491,6 +491,8 @@ export interface StoreConfig {
   locales: string[];
   /** False when no email provider is configured (`EMAIL_PROVIDER=none`): hide "forgot password" and verification prompts. */
   emailDelivery: boolean;
+  /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): orders are paid by hand, show no pay button. */
+  onlinePayment: boolean;
 }
 
 export interface PriceRange {

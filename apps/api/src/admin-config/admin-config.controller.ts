@@ -7,6 +7,7 @@ import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import { ApiZodResponse } from "../common/openapi.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import { EmailProviderRegistry } from "../email/registry/index.js";
+import { PaymentProviderRegistry } from "../payments/registry/index.js";
 import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
 import { adminConfigResponseSchema, type AdminConfigResponse } from "./admin-config.schemas.js";
 
@@ -21,13 +22,14 @@ export class AdminConfigController {
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(MEDIA_CONFIG) private readonly media: MediaConfig,
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderRegistry,
+    @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderRegistry,
   ) {}
 
   @Get()
   @AuthenticatedAdminRoute()
   @ApiOperation({
     summary:
-      "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail is configured, for the admin UI",
+      "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail and online payment are configured, for the admin UI",
   })
   @ApiZodResponse(200, adminConfigResponseSchema, "The shop settings.")
   get(): AdminConfigResponse {
@@ -40,6 +42,7 @@ export class AdminConfigController {
       pricesIncludeTax: this.pricing.pricesIncludeTax,
       lowStockThreshold: this.pricing.lowStockThreshold,
       emailDelivery: this.email.deliveryEnabled(),
+      onlinePayment: this.payments.onlineEnabled(),
       media: {
         uploadsEnabled: this.media.driver !== "none",
         maxBytes: this.media.maxBytes,

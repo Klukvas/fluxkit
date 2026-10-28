@@ -25,6 +25,10 @@ export const adminConfigResponseSchema = z.object({
     description:
       "False when `EMAIL_PROVIDER=none`: no mail is sent, so the admin Email area shows the setup steps and no actions.",
   }),
+  onlinePayment: z.boolean().meta({
+    description:
+      "False when `PAYMENT_PROVIDERS_ENABLED` is empty: no online payment, orders are paid by hand. True when at least one payment provider is enabled.",
+  }),
   media: z
     .object({
       uploadsEnabled: z.boolean().meta({
