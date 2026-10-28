@@ -58,6 +58,9 @@ describe("cart, customers and orders schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "payment_refund",
+      "payment_event",
+      "payment",
       "email_message",
       "customer_auth_token",
       "shipment_status_change",
@@ -104,6 +107,7 @@ describe("cart, customers and orders schema (real Postgres)", () => {
       await pool.query(`drop table if exists "${name}"`);
     }
     for (const name of [
+      "payment_event_append_only",
       "shipment_status_change_append_only",
       "order_shipping_immutable",
       "order_status_change_append_only",

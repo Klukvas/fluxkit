@@ -9,3 +9,4 @@ export * from "./domain-events.js";
 export * from "./media.js";
 export * from "./shipping.js";
 export * from "./email.js";
+export * from "./payments.js";
