@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
 import {
   decideRefund,
+  PROVIDER_REFUND_STATUSES,
   refundStatusAfterCall,
   type Money,
   type PaymentProviderResult,
@@ -158,13 +159,20 @@ export class PaymentRefundsService {
               ),
             this.config.providerTimeoutMs,
           );
-    const result: PaymentProviderResult<{ status: ProviderRefundStatus }> = call?.result ?? {
+    const answered: PaymentProviderResult<{ status: ProviderRefundStatus }> = call?.result ?? {
       ok: false,
       reason: "not_sent",
       providerCodes: ["provider_not_loaded"],
     };
-    if (call !== undefined && !call.result.ok) {
-      this.logger.warn(`Refund ${refund.id}: refund ${describePaymentCall(call)}`);
+    // An answer outside the port is a malformed answer: it may have reached the provider, so `unknown` (decision 13).
+    const result: PaymentProviderResult<{ status: ProviderRefundStatus }> =
+      answered.ok && !PROVIDER_REFUND_STATUSES.includes(answered.value.status)
+        ? { ok: false, reason: "unavailable", providerCodes: ["malformed_answer"] }
+        : answered;
+    if (call !== undefined && !result.ok) {
+      this.logger.warn(
+        `Refund ${refund.id}: refund ${answered.ok ? "malformed answer" : describePaymentCall(call)}`,
+      );
     }
     return this.inTransaction(limits, (tx) =>
       this.recordAnswer(tx, refund.id, attempt, result, now),

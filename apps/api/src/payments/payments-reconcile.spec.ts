@@ -280,6 +280,24 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
       expect(world.provider().refundCalls).toHaveLength(1);
     });
 
+    it("a malformed refund answer (a status outside the port) is unknown at once and never resent", async () => {
+      const { paymentId, refundId } = await latePayment();
+      const provider = world.provider();
+      const original = provider.refund.bind(provider);
+      provider.refund = async (input, signal) => {
+        await original(input, signal);
+        return { ok: true, value: { status: "teleported" as never } };
+      };
+      try {
+        expect(await world.refunds.sendRefund(refundId, at(0))).toEqual({ kind: "unknown" });
+        expect((await world.refundsOf(paymentId))[0]?.status).toBe("unknown");
+        await world.job11(at(10));
+        expect(provider.refundCalls).toHaveLength(1);
+      } finally {
+        provider.refund = original;
+      }
+    });
+
     it("a send that died mid-call (a claim without an answer) becomes unknown once stale and is never sent again", async () => {
       const { paymentId, refundId } = await latePayment();
       await world.pool.query(
