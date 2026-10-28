@@ -76,8 +76,27 @@ describe("bindFact", () => {
     });
     expect(bindFact(fact({ finalAmount: uah(125_001) }), attempt).ok).toBe(false);
     expect(bindFact(fact({ finalAmount: null }), attempt).ok).toBe(true);
-    // A failed or expired fact may carry any final amount (nothing was taken).
+    // A failed or expired fact may carry any final amount up to the amount (nothing was taken).
     expect(bindFact(fact({ status: "failed", finalAmount: uah(0) }), attempt).ok).toBe(true);
+  });
+
+  it("refuses a final amount above the amount whatever the status (the payment row can never store it)", () => {
+    for (const status of [
+      "created",
+      "processing",
+      "failed",
+      "expired",
+      "reversed",
+      null,
+    ] as const) {
+      expect(
+        bindFact(fact({ status, finalAmount: uah(125_001) }), attempt),
+        String(status),
+      ).toEqual({ ok: false, reason: "final_amount_mismatch", attentionCode: "amount_mismatch" });
+    }
+    expect(bindFact(fact({ status: "processing", finalAmount: uah(125_000) }), attempt).ok).toBe(
+      true,
+    );
   });
 
   it("accepts a succeeded fact whose final amount is lowered by its succeeded refunds (ADR 0032 open question 6)", () => {

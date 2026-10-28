@@ -331,6 +331,26 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     });
   });
 
+  it("a signed fact whose final amount exceeds the amount is journaled unapplied with attention and answered 200 (no retry loop)", async () => {
+    const placed = await world.place([{ quantity: 1, price: 2_000 }]);
+    const { paymentId, invoiceId } = await world.created(placed);
+    const { amount } = await world.payment(paymentId);
+    world.provider().setStatus(invoiceId, "processing");
+    world.provider().override(invoiceId, { finalAmount: { amount: amount + 1, currency: "UAH" } });
+    await world.notify(invoiceId);
+    expect(await world.payment(paymentId)).toMatchObject({
+      status: "awaiting_customer",
+      final_amount: null,
+      needs_attention: true,
+      attention_code: "amount_mismatch",
+    });
+    expect((await world.eventsOf(paymentId)).at(-1)).toMatchObject({
+      source: "webhook",
+      applied: false,
+    });
+    expect((await world.orderStatus(placed.id)).status).toBe("awaiting_payment");
+  });
+
   it("reversed after success (a refund made outside the shop) keeps the payment and raises external_reversal", async () => {
     const { placed, paymentId, invoiceId } = await paidAttempt();
     await world.notify(invoiceId);
