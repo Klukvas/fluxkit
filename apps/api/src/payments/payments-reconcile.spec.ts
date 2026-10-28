@@ -103,6 +103,8 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
     const first = await processing();
     const second = await processing();
     world.provider().failNext({ operation: "getPayment", reason: "unavailable" });
+    // Both paid: whichever is read first (equal due times, random ids) fails, the other is applied.
+    world.provider().setStatus(first.invoiceId, "succeeded");
     world.provider().setStatus(second.invoiceId, "succeeded");
     const result = await world.job11(at(2));
     expect(result).toMatchObject({ scanned: 2, polled: 1, pollFailures: 1, failures: [] });
@@ -402,6 +404,47 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
       }
       const result = await world.job11(at(1), { batchSize: 2, maxBatches: 5 });
       expect(result).toMatchObject({ scanned: 3, polled: 3, truncated: false });
+    });
+
+    it("an attempt whose write keeps failing is reported, backed off like a failed read and not read again every run", async () => {
+      const broken = await processing();
+      const healthy = await processing();
+      world.provider().setStatus(healthy.invoiceId, "succeeded");
+      // A damaged row: every journal write of its status reads fails in the database.
+      await world.pool.query(`
+        create or replace function reject_test_poll() returns trigger language plpgsql as $$
+        begin raise exception 'test: damaged payment row'; end $$`);
+      await world.pool.query(
+        `create trigger reject_test_poll before insert on payment_event for each row
+           when (new.source = 'poll' and new.payment_id = '${broken.paymentId}') execute function reject_test_poll()`,
+      );
+      try {
+        const first = await world.job11(at(1));
+        expect(first).toMatchObject({ scanned: 2, polled: 1 });
+        expect(first.failures.map((failure) => failure.paymentId)).toEqual([broken.paymentId]);
+        const row = await world.payment(broken.paymentId);
+        expect(row).toMatchObject({ status: "processing", check_attempts: 1 });
+        expect(row.next_check_at?.getTime()).toBe(at(2).getTime());
+        const reads = world.provider().calls.getPayment;
+        expect((await world.job11(at(1))).scanned).toBe(0);
+        expect(world.provider().calls.getPayment).toBe(reads);
+      } finally {
+        await world.pool.query("drop trigger reject_test_poll on payment_event");
+        await world.pool.query("drop function reject_test_poll()");
+      }
+      expect((await world.payment(healthy.paymentId)).status).toBe("succeeded");
+    });
+
+    it("an attempt of a provider that is no longer enabled waits by the backoff instead of being scanned every run", async () => {
+      const { paymentId } = await processing();
+      await world.pool.query("update payment set provider_code = 'gone' where id = $1", [
+        paymentId,
+      ]);
+      expect((await world.job11(at(1))).scanned).toBe(1);
+      const row = await world.payment(paymentId);
+      expect(row.check_attempts).toBe(1);
+      expect(row.next_check_at?.getTime()).toBe(at(2).getTime());
+      expect((await world.job11(at(1))).scanned).toBe(0);
     });
 
     it("logs ids and codes only: no signature, body, card number, token or personal data", async () => {

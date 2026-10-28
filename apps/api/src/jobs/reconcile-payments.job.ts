@@ -33,7 +33,10 @@ export interface ReconcilePaymentsResult {
 }
 
 export interface ReconcilePaymentsDeps {
-  reconcile: Pick<PaymentReconcileService, "enabled" | "listDue" | "reconcileOne">;
+  reconcile: Pick<
+    PaymentReconcileService,
+    "enabled" | "listDue" | "reconcileOne" | "backOffAfterFailure"
+  >;
 }
 
 export interface ReconcilePaymentsOptions {
@@ -57,7 +60,8 @@ const COUNTERS: Readonly<Record<ReconcileAction, keyof ReconcilePaymentsResult>>
 /**
  * Job 11 `reconcile-payments` (ADR 0032 decision 13). Pages of due attempts (`next_check_at <= now`), oldest due first,
  * continued by a `(next_check_at, id)` cursor, so an attempt that fails is tried once per run and never holds the head
- * of the queue (its schedule moves on by the backoff when its read fails). Per attempt the work of
+ * of the queue (its schedule moves on by the backoff when its read fails, when its work throws and when its provider is
+ * no longer enabled). Per attempt the work of
  * `PaymentReconcileService.reconcileOne`: status reads applied as `poll` facts, closing crashed or unknown creates,
  * invalidating invoices we closed, sending and settling refunds. Provider calls run outside transactions with the API's
  * time limit; a provider that answers `rate_limited` gets no further call in this run. One failing attempt never stops
@@ -105,7 +109,13 @@ export async function reconcilePayments(
           (result[key] as number) += 1;
         }
       } catch (error) {
-        result.failures.push({ paymentId: attempt.id, error: summarizeError(error) });
+        let summary = summarizeError(error);
+        try {
+          await deps.reconcile.backOffAfterFailure(attempt.id, now, jobLimits);
+        } catch (backOffError) {
+          summary = `${summary}; not backed off: ${summarizeError(backOffError)}`;
+        }
+        result.failures.push({ paymentId: attempt.id, error: summary });
       }
     }
     const last = due.at(-1);

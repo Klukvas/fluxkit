@@ -114,11 +114,16 @@ export class PaymentReconcileService {
       return { actions: [await this.closeCreateUnknown(row.id, now, limits)] };
     }
     if (provider === undefined) {
-      // A provider that is no longer enabled: its attempts wait (the order expiry still runs to its cap).
+      // A provider that is no longer enabled: its attempts wait by the backoff like a failed read (the order expiry
+      // still runs to its cap), so they never fill the pages of every run; the schedule's end raises attention.
       this.logger.warn(
         `Payment ${row.id}: provider ${row.providerCode} is not enabled; not reconciled`,
       );
-      return { actions: [] };
+      await this.inTransaction(limits, async (tx) => {
+        const locked = await this.lockWithOrder(tx, row.id);
+        await this.countFailedRead(tx, locked, now);
+      });
+      return { actions: ["rescheduled"] };
     }
     if (paused.has(provider.code)) {
       return { actions: ["rate_limited"] };
@@ -130,6 +135,20 @@ export class PaymentReconcileService {
       return this.refundWork(row, provider, now, paused, limits);
     }
     return { actions: [await this.invalidate(row, provider, now, paused, limits)] };
+  }
+
+  /**
+   * After `reconcileOne` threw (a database failure, a damaged row): the attempt is backed off like a failed read when its
+   * schedule did not move, so a row that keeps failing is not read from the provider in every run and never fills the
+   * pages of the job; the schedule's end raises `reconcile_gave_up`. Throws when this write fails too.
+   */
+  async backOffAfterFailure(paymentId: string, now: Date, limits: JobLimits): Promise<void> {
+    await this.inTransaction(limits, async (tx) => {
+      const locked = await this.lockWithOrder(tx, paymentId);
+      if (locked.nextCheckAt !== null && locked.nextCheckAt.getTime() <= now.getTime()) {
+        await this.countFailedRead(tx, locked, now);
+      }
+    });
   }
 
   private async closeCrashedCreate(
