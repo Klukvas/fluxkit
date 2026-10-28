@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -9,9 +9,10 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, _fake-email, nova-post and resend, reinstall, then lint, typecheck,
-#                     boundaries and tests must pass, and an API told to load fake or nova_post (shipping), or started with
-#                     EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, must refuse to start, loudly (destructive: CI only)
+#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post and resend, reinstall, then lint,
+#                     typecheck, boundaries and tests must pass, and an API told to load fake or nova_post (shipping), or
+#                     started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with PAYMENT_PROVIDERS_ENABLED=fake, must
+#                     refuse to start, loudly (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
 #                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
@@ -27,9 +28,15 @@
 #                     key, and send nothing to Resend at startup: the API runs with a preloaded fetch wrapper that logs and
 #                     refuses any request to a *.resend.com host, and the log must show the wrapper active and no such
 #                     request (run it on a database without queued mail: job 9 would otherwise try to send it)
+# The payment providers (ADR 0032 decision 3) have the observable "Payment providers loaded: <codes|none>" and the public flag
+# `onlinePayment` of GET /store/config (true when any provider is enabled):
+#   providers-payment-none start the API without PAYMENT_PROVIDERS_ENABLED, expect "none", onlinePayment false and no
+#                     mention of fake
+#   providers-payment-fake start the API with PAYMENT_PROVIDERS_ENABLED=fake, expect "fake" and onlinePayment true
+#                     (providers-payment-monobank arrives with the Monobank plugin, payments plan step 7)
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -40,9 +47,12 @@ run_api() {
   local providers="${2:-}"
   # EMAIL_FROM and STOREFRONT_PUBLIC_URL are only read with a provider; a mode that needs them sets them for the call.
   local email="${3:-none}"
+  # PAYMENT_PROVIDERS_ENABLED is set for every call (empty means none), so a value in the caller's shell never leaks in.
+  local payments="${4:-}"
   pnpm build
   # MATRIX_NODE_IMPORT: an optional module preloaded into the API process only (not into the build).
-  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" EMAIL_PROVIDER="$email" PORT="$port" \
+  FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" EMAIL_PROVIDER="$email" \
+    PAYMENT_PROVIDERS_ENABLED="$payments" PORT="$port" \
     node ${MATRIX_NODE_IMPORT:+--import "$MATRIX_NODE_IMPORT"} apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
   api_pid=$!
   trap 'kill "$api_pid" 2>/dev/null || true' EXIT
@@ -91,7 +101,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/nova-post packages/providers/resend
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -117,6 +127,16 @@ case "$mode" in
       fi
       grep -F "Email provider \"$code\" is enabled in EMAIL_PROVIDER" /tmp/fluxkit-matrix-api.log \
         || { echo "expected a loud startup error naming the missing email provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    done
+    # And for the payment providers: an enabled one that is gone stops the startup (monobank joins when its plugin exists).
+    for code in fake; do
+      if PAYMENT_PROVIDERS_ENABLED="$code" PORT="$port" \
+        timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+        echo "the API started although the enabled payment provider $code is deleted" >&2
+        exit 1
+      fi
+      grep -F "Payment provider \"$code\" is enabled in PAYMENT_PROVIDERS_ENABLED" /tmp/fluxkit-matrix-api.log \
+        || { echo "expected a loud startup error naming the missing payment provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
     ;;
   providers-nova-post)
@@ -223,6 +243,24 @@ GUARD
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Resend at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
+    ;;
+  providers-payment-none)
+    run_api "" "" "none" ""
+    grep -F "Payment providers loaded: none" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the payment registry to report no provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -qi "fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fake payment provider must leave no trace when PAYMENT_PROVIDERS_ENABLED is empty" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"onlinePayment":false' || { echo "expected onlinePayment false with no payment provider" >&2; exit 1; }
+    ;;
+  providers-payment-fake)
+    run_api "" "" "none" "fake"
+    grep -F "Payment providers loaded: fake" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the payment registry to report the fake provider" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"onlinePayment":true' || { echo "expected onlinePayment true with the payment provider loaded" >&2; exit 1; }
     ;;
   *)
     echo "unknown mode: $mode" >&2
