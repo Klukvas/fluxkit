@@ -105,7 +105,7 @@ describe("payments: the webhook route and verified facts (real Postgres)", () =>
     const { placed, paymentId, invoiceId } = await paidAttempt();
     await world.notify(invoiceId);
     const body = world.provider().webhookBody(invoiceId);
-    const spaced = signedTestWebhook(JSON.stringify(JSON.parse(body), null, 2));
+    const spaced = signedTestWebhook(JSON.stringify(JSON.parse(body)));
     expect((await world.webhook(spaced)).status).toBe(200);
     expect(await world.eventTypes(placed.id)).toEqual(["order.placed", "order.paid"]);
     expect((await world.payment(paymentId)).status).toBe("succeeded");

@@ -359,7 +359,8 @@ export class TestPaymentProvider implements PaymentProviderPort {
 
   /** The body bytes of a webhook about the invoice's current state (exactly what the provider would send). */
   webhookBody(providerPaymentId: string): string {
-    return JSON.stringify(bodyOf(this.factOf(providerPaymentId)));
+    // Indented like a provider may send it, so a parser that re-serializes the body changes the bytes.
+    return JSON.stringify(bodyOf(this.factOf(providerPaymentId)), null, 1);
   }
 
   /** A correctly signed webhook about the invoice's current state. */
