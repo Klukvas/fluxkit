@@ -318,6 +318,51 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "email",
+    "getEmailStatus",
+    "page.email.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailStatusPage,
+    ),
+  ),
+  route(
+    "emailMessages",
+    "listEmailMessages",
+    "page.emailMessages.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailMessagesPage,
+    ),
+  ),
+  route(
+    "emailMessageDetail",
+    "getEmailMessage",
+    "page.emailMessageDetail.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailMessageDetailPage,
+    ),
+  ),
+  route(
+    "emailTemplates",
+    "listEmailTemplates",
+    "page.emailTemplates.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailTemplatesPage,
+    ),
+  ),
+  route(
+    "emailTemplatePreview",
+    "previewEmailTemplate",
+    "page.emailTemplatePreview.title",
+    areaPage(
+      () => import("./areas/email"),
+      (module) => module.EmailTemplatePreviewPage,
+    ),
+  ),
+  route(
     "users",
     "listUsers",
     "page.users.title",

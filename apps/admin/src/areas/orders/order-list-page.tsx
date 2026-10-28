@@ -7,7 +7,7 @@ import { SEARCH_DEBOUNCE_MS, createDebounce } from "../../lib/debounce";
 import { useResource } from "../../lib/use-resource";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback } from "../../views/status-views";
-import { browserTimeZone } from "./date-range";
+import { browserTimeZone } from "../../lib/date-range";
 import {
   ORDER_STATUS_FILTERS,
   checkOrderSearch,

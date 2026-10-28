@@ -1,6 +1,6 @@
 import type { AdminListOrdersOptions, OrderStatus } from "@fluxkit/api-client";
 import { readEnum, readPaging, readText, writeQuery } from "../../router/query";
-import { isCalendarDay, placedRange, type DayRangeFailure } from "./date-range";
+import { isCalendarDay, placedRange, type DayRangeFailure } from "../../lib/date-range";
 
 /**
  * The order list's state in the URL (filters and paging, so a list can be shared and reloaded; the Stock tab's reservation
