@@ -3,7 +3,7 @@ import { minorUnitsToDecimalString } from "./money";
 /**
  * The price filter of the search page talks to the shopper in major units ("12.50") and to the API in minor units
  * (`price=1250..5000`). Both directions work on decimal TEXT and integers: no amount is ever a floating point number
- * (`0.29 * 100` is `28.999...`).
+ * (0.29 times one hundred is 28.999... in binary floating point).
  */
 
 /**

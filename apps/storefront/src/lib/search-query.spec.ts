@@ -78,7 +78,7 @@ describe("parseSearchParams", () => {
     ["page", ""],
     ["sort", "cheapest"],
     ["price", "abc"],
-    ["price", "..",],
+    ["price", ".."],
     ["price", "5000..1000"],
     ["price", "1.5..2"],
     ["price", "-1..5"],
@@ -107,9 +107,9 @@ describe("parseSearchParams", () => {
       max: 5050,
     });
     expect(parsed({ priceMin: "", priceMax: "" }).price).toBeNull();
-    expect(
-      parsed({ "rmin.attr.length": "1.5", "rmax.attr.length": "20" }).facets,
-    ).toEqual(["attr.length:1.5..20"]);
+    expect(parsed({ "rmin.attr.length": "1.5", "rmax.attr.length": "20" }).facets).toEqual([
+      "attr.length:1.5..20",
+    ]);
     expect(parsed({ "rmin.attr.length": "-2" }).facets).toEqual(["attr.length:-2.."]);
   });
 
@@ -150,7 +150,13 @@ describe("searchPath", () => {
     const samples: SearchQuery[] = [
       empty,
       { ...empty, q: "відвертка" },
-      { q: "a b", facets: ["brand:acme", "attr.length:1.5..3"], price: { min: 0, max: 99 }, sort: "price_desc", page: 417 },
+      {
+        q: "a b",
+        facets: ["brand:acme", "attr.length:1.5..3"],
+        price: { min: 0, max: 99 },
+        sort: "price_desc",
+        page: 417,
+      },
       { ...empty, price: { min: null, max: 7 } },
     ];
     for (const sample of samples) {
@@ -171,9 +177,13 @@ describe("isCanonicalSearch", () => {
     expect(isCanonicalSearch({ q: "x", utm_source: "mail" }, { ...empty, q: "x" })).toBe(true);
     expect(isCanonicalSearch({ q: "x", page: "1" }, { ...empty, q: "x" })).toBe(false);
     expect(isCanonicalSearch({ q: "x", sort: "" }, { ...empty, q: "x" })).toBe(false);
-    expect(isCanonicalSearch({ priceMin: "10" }, { ...empty, price: { min: 1000, max: null } })).toBe(false);
+    expect(
+      isCanonicalSearch({ priceMin: "10" }, { ...empty, price: { min: 1000, max: null } }),
+    ).toBe(false);
     expect(isCanonicalSearch({ q: " x " }, { ...empty, q: "x" })).toBe(false);
-    expect(isCanonicalSearch({ f: ["b:1", "a:2"] }, { ...empty, facets: ["b:1", "a:2"] })).toBe(true);
+    expect(isCanonicalSearch({ f: ["b:1", "a:2"] }, { ...empty, facets: ["b:1", "a:2"] })).toBe(
+      true,
+    );
   });
 });
 
@@ -216,7 +226,10 @@ describe("changing the selection", () => {
     expect(priced).toMatchObject({ price: { min: 100, max: 200 }, page: 1 });
     expect(setPrice(priced, null).price).toBeNull();
     expect(setPrice(priced, { min: null, max: null }).price).toBeNull();
-    expect(setSort({ ...empty, page: 3 }, "price_desc")).toMatchObject({ sort: "price_desc", page: 1 });
+    expect(setSort({ ...empty, page: 3 }, "price_desc")).toMatchObject({
+      sort: "price_desc",
+      page: 1,
+    });
     expect(setSort({ ...empty, sort: "price_desc" }, null).sort).toBeNull();
   });
 
@@ -228,7 +241,13 @@ describe("changing the selection", () => {
       sort: "newest",
       page: 5,
     };
-    expect(clearFilters(query)).toEqual({ q: "x", facets: [], price: null, sort: "newest", page: 1 });
+    expect(clearFilters(query)).toEqual({
+      q: "x",
+      facets: [],
+      price: null,
+      sort: "newest",
+      page: 1,
+    });
   });
 
   it("moves to a page without touching anything else", () => {
@@ -268,7 +287,15 @@ describe("parseSearchForm (the facet form's fields, in the browser)", () => {
   it("reports a bad price box by name, so the form can say which one", () => {
     expect(parseSearchForm([["priceMin", "abc"]], 2)).toEqual({ ok: false, reason: "price_min" });
     expect(parseSearchForm([["priceMax", "x"]], 2)).toEqual({ ok: false, reason: "price_max" });
-    expect(parseSearchForm([["priceMin", "9"], ["priceMax", "1"]], 2)).toEqual({
+    expect(
+      parseSearchForm(
+        [
+          ["priceMin", "9"],
+          ["priceMax", "1"],
+        ],
+        2,
+      ),
+    ).toEqual({
       ok: false,
       reason: "price_order",
     });

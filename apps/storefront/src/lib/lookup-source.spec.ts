@@ -199,7 +199,9 @@ describe("lookup source: answers", () => {
     const second = calls[1];
     expect(second?.signal.aborted).toBe(false);
     // The aborted request rejects: that is not a failure and not a bug, the newer query owns the state.
-    first?.fail(new NetworkError("stop", { cause: new DOMException("stop", "AbortError"), aborted: true }));
+    first?.fail(
+      new NetworkError("stop", { cause: new DOMException("stop", "AbortError"), aborted: true }),
+    );
     await settle();
     expect(source.getState()).toMatchObject({ status: "loading", query: "kyiv oblast" });
     second?.answer(page("Kyiv oblast"));

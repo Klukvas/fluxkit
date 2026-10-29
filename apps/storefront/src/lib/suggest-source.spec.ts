@@ -118,8 +118,16 @@ describe("suggestKey (the keys of the search box)", () => {
   });
 
   it("lets Enter submit the search when nothing is highlighted, even with the list open", () => {
-    expect(suggestKey(open, "Enter", 3)).toEqual({ state: closed, select: null, preventDefault: false });
-    expect(suggestKey(closed, "Enter", 0)).toEqual({ state: closed, select: null, preventDefault: false });
+    expect(suggestKey(open, "Enter", 3)).toEqual({
+      state: closed,
+      select: null,
+      preventDefault: false,
+    });
+    expect(suggestKey(closed, "Enter", 0)).toEqual({
+      state: closed,
+      select: null,
+      preventDefault: false,
+    });
   });
 });
 

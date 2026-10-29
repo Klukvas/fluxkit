@@ -20,11 +20,18 @@ import { decimalToMinorUnits } from "./search-money";
 export const SEARCH_PAGE_SIZE = 24;
 /** The API refuses a first hit at 10 000 or later (`beyond_max_offset`): the last reachable page. */
 export const MAX_SEARCH_PAGE = Math.floor(9_999 / SEARCH_PAGE_SIZE) + 1;
+/** The engine pages through at most this many hits (`pagination.maxTotalHits`): the API's `total` stops here. */
+export const SEARCH_RESULT_CAP = 10_000;
 /** The API's cap on values of `f` (docs/api/search.md). */
 export const MAX_FACET_VALUES = 50;
 const MAX_Q_CODE_POINTS = 200;
 
-export const SEARCH_SORTS: readonly SearchSort[] = ["relevance", "newest", "price_asc", "price_desc"];
+export const SEARCH_SORTS: readonly SearchSort[] = [
+  "relevance",
+  "newest",
+  "price_asc",
+  "price_desc",
+];
 
 export interface SearchPrice {
   /** Minor units; `null` is an open end. */
@@ -43,18 +50,37 @@ export interface SearchQuery {
   page: number;
 }
 
-export type SearchParseResult =
-  | { ok: true; query: SearchQuery }
-  | { ok: false; reason: string };
+export type SearchParseResult = { ok: true; query: SearchQuery } | { ok: false; reason: string };
 
 export type RawSearchParams = Readonly<Record<string, string | string[] | undefined>>;
 
-const FACET_ENTRY = /^([A-Za-z0-9][A-Za-z0-9._-]{0,79}):([^\s\u0000-\u001f\u007f]{1,200})$/;
 const FACET_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const PRICE = /^(\d{0,15})\.\.(\d{0,15})$/;
 const PAGE = /^[1-9]\d{0,5}$/;
 const RANGE_NUMBER = /^-?\d{1,15}(?:\.\d{1,10})?$/;
-const CONTROL = /[\u0000-\u001f\u007f-\u009f]/;
+
+/** A control character (C0, DEL, C1): the API refuses them in `q`, and they have no place in a facet value. */
+function hasControlCharacter(text: string): boolean {
+  for (const character of text) {
+    const code = character.codePointAt(0) ?? 0;
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) return true;
+  }
+  return false;
+}
+
+/** `<facetKey>:<value>`: a key of the API's shape, a value of 1 to 200 characters without a space or a control character. */
+function isFacetEntry(entry: string): boolean {
+  const colon = entry.indexOf(":");
+  if (colon < 1) return false;
+  const value = entry.slice(colon + 1);
+  return (
+    FACET_KEY.test(entry.slice(0, colon)) &&
+    value.length >= 1 &&
+    value.length <= 200 &&
+    !/\s/.test(value) &&
+    !hasControlCharacter(value)
+  );
+}
 
 function all(value: string | string[] | undefined): string[] {
   return value === undefined ? [] : Array.isArray(value) ? value : [value];
@@ -89,11 +115,11 @@ function parseRangeBox(text: string | undefined): string | null | undefined {
 export function parseSearchParams(raw: RawSearchParams, exponent: number): SearchParseResult {
   const q = (first(raw["q"]) ?? "").trim();
   if ([...q].length > MAX_Q_CODE_POINTS) return { ok: false, reason: "q_too_long" };
-  if (CONTROL.test(q)) return { ok: false, reason: "q_control_characters" };
+  if (hasControlCharacter(q)) return { ok: false, reason: "q_control_characters" };
 
   const facets: string[] = [];
   for (const entry of all(raw["f"])) {
-    if (!FACET_ENTRY.test(entry)) return { ok: false, reason: "facet" };
+    if (!isFacetEntry(entry)) return { ok: false, reason: "facet" };
     if (!facets.includes(entry)) facets.push(entry);
   }
   if (facets.length > MAX_FACET_VALUES) return { ok: false, reason: "too_many_facets" };
@@ -102,7 +128,8 @@ export function parseSearchParams(raw: RawSearchParams, exponent: number): Searc
   const rawPrice = first(raw["price"]);
   if (rawPrice !== undefined) {
     const match = PRICE.exec(rawPrice);
-    if (match === null || (match[1] === "" && match[2] === "")) return { ok: false, reason: "price" };
+    if (match === null || (match[1] === "" && match[2] === ""))
+      return { ok: false, reason: "price" };
     price = {
       min: match[1] === "" ? null : Number(match[1]),
       max: match[2] === "" ? null : Number(match[2]),
@@ -155,7 +182,8 @@ export function parseSearchParams(raw: RawSearchParams, exponent: number): Searc
   let page = 1;
   const rawPage = first(raw["page"]);
   if (rawPage !== undefined) {
-    if (!PAGE.test(rawPage) || Number(rawPage) > MAX_SEARCH_PAGE) return { ok: false, reason: "page" };
+    if (!PAGE.test(rawPage) || Number(rawPage) > MAX_SEARCH_PAGE)
+      return { ok: false, reason: "page" };
     page = Number(rawPage);
   }
 
@@ -209,7 +237,9 @@ export function isCanonicalSearch(raw: RawSearchParams, query: SearchQuery): boo
   const written = [...new URLSearchParams(searchPath(query).split("?")[1] ?? "").entries()]
     .map(([name, value]) => `${name}=${value}`)
     .sort();
-  return incoming.length === written.length && incoming.every((entry, index) => entry === written[index]);
+  return (
+    incoming.length === written.length && incoming.every((entry, index) => entry === written[index])
+  );
 }
 
 export function isFacetSelected(query: SearchQuery, key: string, code: string): boolean {
@@ -226,7 +256,9 @@ export function toggleFacet(query: SearchQuery, key: string, code: string): Sear
 
 /** The min and max texts of the selected range of a number attribute, or `null` when none is selected. */
 export function rangeOf(query: SearchQuery, key: string): { min: string; max: string } | null {
-  const entry = query.facets.find((candidate) => candidate.startsWith(`${key}:`) && candidate.includes(".."));
+  const entry = query.facets.find(
+    (candidate) => candidate.startsWith(`${key}:`) && candidate.includes(".."),
+  );
   if (entry === undefined) return null;
   const [min = "", max = ""] = entry.slice(key.length + 1).split("..");
   return { min, max };
@@ -239,7 +271,8 @@ export function setRange(
   max: number | string | null,
 ): SearchQuery {
   const facets = query.facets.filter((entry) => !entry.startsWith(`${key}:`));
-  if (min !== null || max !== null) facets.push(`${key}:${min === null ? "" : String(min)}..${max === null ? "" : String(max)}`);
+  if (min !== null || max !== null)
+    facets.push(`${key}:${min === null ? "" : String(min)}..${max === null ? "" : String(max)}`);
   return { ...query, facets, page: 1 };
 }
 
@@ -259,7 +292,9 @@ export function clearFilters(query: SearchQuery): SearchQuery {
 
 export function setPage(query: SearchQuery, page: number): SearchQuery {
   if (!Number.isInteger(page) || page < 1 || page > MAX_SEARCH_PAGE) {
-    throw new RangeError(`A search page must be a whole number from 1 to ${String(MAX_SEARCH_PAGE)}.`);
+    throw new RangeError(
+      `A search page must be a whole number from 1 to ${String(MAX_SEARCH_PAGE)}.`,
+    );
   }
   return { ...query, page };
 }

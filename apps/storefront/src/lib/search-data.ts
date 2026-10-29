@@ -53,7 +53,7 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
     async search(locale, query) {
       await dependencies.beforeRequest?.();
       const forwarded = (await dependencies.forwardedFor?.()) ?? null;
-      const inner: FetchLike = dependencies.fetch ?? ((url, init) => globalThis.fetch(url, init));
+      const inner: FetchLike = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
       const client = createStoreClient({
         baseUrl: dependencies.baseUrl(),
         fetch: (url, init) =>
@@ -61,7 +61,13 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
             url,
             forwarded === null
               ? init
-              : { ...init, headers: { ...(init.headers as Record<string, string>), "X-Forwarded-For": forwarded } },
+              : {
+                  ...init,
+                  headers: {
+                    ...(init.headers as Record<string, string>),
+                    "X-Forwarded-For": forwarded,
+                  },
+                },
           ),
       });
 
@@ -84,7 +90,9 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
           // The cause is named by type, not by message: undici puts addresses and URLs in messages.
           const cause = thrown.cause;
           const name = cause instanceof Error ? cause.name : typeof cause;
-          console.error(`GET /store/search could not be read (${name}); the page says search is unavailable.`);
+          console.error(
+            `GET /store/search could not be read (${name}); the page says search is unavailable.`,
+          );
           return { kind: "unavailable", retryAfterSeconds: null };
         }
         throw thrown;

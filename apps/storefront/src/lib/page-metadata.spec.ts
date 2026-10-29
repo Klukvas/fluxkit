@@ -1,7 +1,13 @@
 import { createTranslator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import uk from "../messages/uk.json";
-import { homeMetadata, listingMetadata, privateMetadata, productMetadata } from "./page-metadata";
+import {
+  homeMetadata,
+  listingMetadata,
+  privateMetadata,
+  productMetadata,
+  searchMetadata,
+} from "./page-metadata";
 import { product } from "./test-fixtures";
 
 const t = createTranslator(uk, "uk");
@@ -150,5 +156,51 @@ describe("privateMetadata (cart, checkout, account, orders)", () => {
     expect(String(meta.title)).toContain(uk["cart.title"]);
     expect(meta.alternates).toBeUndefined();
     expect(meta.openGraph).toBeUndefined();
+  });
+});
+
+describe("searchMetadata", () => {
+  const query = {
+    q: "викрутка",
+    facets: ["brand:acme"],
+    price: null,
+    sort: null,
+    page: 2,
+  } as const;
+
+  it("is noindex, follow on every state of the results page (a search result is not a page to rank)", () => {
+    expect(searchMetadata({ origin, locale: "uk", t, query }).robots).toEqual({
+      index: false,
+      follow: true,
+    });
+    expect(
+      searchMetadata({
+        origin,
+        locale: "uk",
+        t,
+        query: { q: "", facets: [], price: null, sort: null, page: 1 },
+      }).robots,
+    ).toEqual({ index: false, follow: true });
+  });
+
+  it("points the canonical at the words alone: filters, sort and page are dropped, and the locale and words are encoded", () => {
+    const meta = searchMetadata({ origin, locale: "uk", t, query });
+    expect(meta.alternates).toEqual({
+      canonical:
+        "https://shop.example/uk/search?q=%D0%B2%D0%B8%D0%BA%D1%80%D1%83%D1%82%D0%BA%D0%B0",
+    });
+    expect(
+      searchMetadata({ origin, locale: "en", t, query: { ...query, q: "" } }).alternates?.canonical,
+    ).toBe("https://shop.example/en/search");
+  });
+
+  it("puts the words in the title as plain text, and nothing of the address in the description", () => {
+    const meta = searchMetadata({ origin, locale: "uk", t, query: { ...query, q: "<b>x</b>" } });
+    expect(String(meta.title)).toContain("<b>x</b>");
+    expect(String(meta.title)).toContain(t("search.title"));
+    expect(meta.description).toBe(t("search.metaDescription"));
+    expect(searchMetadata({ origin, locale: "uk", t, query: { ...query, q: "" } }).title).toBe(
+      t("seo.pageTitle", { title: t("search.title"), site: t("site.name") }),
+    );
   });
 });

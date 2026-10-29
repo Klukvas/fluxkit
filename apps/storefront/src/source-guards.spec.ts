@@ -36,10 +36,27 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       })),
     );
     expect(forms.length).toBeGreaterThanOrEqual(6);
+    // Allow-list: the two SEARCH forms, which are GET on purpose (search plan section 9): the words are the search itself,
+    // the result must be an address that can be shared and bookmarked, and both work before the script has loaded. They
+    // carry no personal data: the header box holds the typed words (`q`), the filter form holds facet values and prices.
+    const searchForms = [
+      join("components", "search-box.tsx"),
+      join("components", "search-island.tsx"),
+    ];
     for (const form of forms) {
+      if (searchForms.includes(form.path)) {
+        expect(form.tag, `${form.path}: a search form is GET`).toMatch(/\bmethod="get"/);
+        continue;
+      }
       expect(form.tag, `${form.path}: a form without method="post"`).toMatch(/\bmethod="post"/);
       expect(form.tag, `${form.path}: a form must not name an action`).not.toMatch(/\baction=/);
     }
+    expect(
+      forms
+        .filter((form) => searchForms.includes(form.path))
+        .map((form) => form.path)
+        .sort(),
+    ).toEqual([...searchForms].sort());
   });
 
   it("mounts RouteFocus in the shell, so the focus follows a client-side navigation (review L9)", () => {
@@ -123,8 +140,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       // `result.href` is the checkout outcome's link, built only by `guestOrderHref`, `accountOrderHref` or the cart path
       // (`lib/checkout-attempt.ts`, tested there).
       // `paymentReturnHref` accepts an attempt id (a UUID) and nothing else (`lib/payment-return.ts`, tested there).
+      // `suggestionHref` is `localizedHref` of a product path with the slug encoded (`lib/suggest-source.ts`, tested there).
       expect(call.argument, `${call.path}: router.replace(${call.argument})`).toMatch(
-        /^(safeNextPath\(|localizedHref\(|loginHref\(|paymentReturnHref\(|signInHref$|result\.href$)/,
+        /^(safeNextPath\(|localizedHref\(|loginHref\(|paymentReturnHref\(|suggestionHref\(|signInHref$|result\.href$)/,
       );
     }
     for (const file of sources) {
@@ -489,6 +507,76 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     const route = sources.find((file) => file.path.includes(join("payment", "return", "page.tsx")));
     expect(route).toBeDefined();
     expect(code(route?.text ?? "")).not.toMatch(/searchParams|headers\(|cookies\(/);
+  });
+
+  // Search plan step 10a: the header box, the results page and the filter form.
+  const searchFiles = sources.filter(
+    (file) =>
+      /(^|\/)(search-[\w.-]+|suggest-source|forwarded-address)\.tsx?$/.test(file.path) ||
+      file.path === join("app", "[locale]", "(catalog)", "search", "page.tsx"),
+  );
+
+  it("finds the search sources it guards", () => {
+    expect(searchFiles.map((file) => file.path).sort()).toEqual(
+      [
+        join("app", "[locale]", "(catalog)", "search", "page.tsx"),
+        join("components", "search-box.tsx"),
+        join("components", "search-filters.tsx"),
+        join("components", "search-island.tsx"),
+        join("components", "search-results.tsx"),
+        join("lib", "forwarded-address.ts"),
+        join("lib", "search-data.server.ts"),
+        join("lib", "search-data.ts"),
+        join("lib", "search-facets.ts"),
+        join("lib", "search-ids.ts"),
+        join("lib", "search-money.ts"),
+        join("lib", "search-query.ts"),
+        join("lib", "suggest-source.ts"),
+      ].sort(),
+    );
+  });
+
+  it("reaches the search API through the typed client only: no fetch call, no other transport, no absolute URL", () => {
+    for (const file of searchFiles) {
+      expect(code(file.text), file.path).not.toMatch(
+        /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
+      );
+    }
+    // The browser asks for suggestions through the page's one store client; the server read builds its own client.
+    const callers = (name: string) =>
+      sources
+        .filter((file) => new RegExp(`\\.${name}\\(`).test(code(file.text)))
+        .map((file) => file.path);
+    expect(callers("suggestProducts")).toEqual([join("lib", "suggest-source.ts")]);
+    expect(callers("searchProducts")).toEqual([join("lib", "search-data.ts")]);
+  });
+
+  it("renders the shopper's words as text only, and keeps browser storage and the document title out of the search code", () => {
+    for (const file of searchFiles) {
+      const text = code(file.text);
+      expect(text, file.path).not.toMatch(
+        /dangerouslySetInnerHTML|\.innerHTML|insertAdjacentHTML|document\.write/,
+      );
+      expect(text, file.path).not.toMatch(
+        /\b(localStorage|sessionStorage|indexedDB)\b|document\.cookie|document\.title/,
+      );
+    }
+  });
+
+  it("never logs the words, a facet or an address from the search code", () => {
+    for (const file of searchFiles) {
+      for (const call of code(file.text).matchAll(/console\.\w+\([^;]*\)/gs)) {
+        expect(call[0], `${file.path} logs ${call[0]}`).not.toMatch(
+          /\bquery\b|\bq\b|\bfacets?\b|\bhref\b|\burl\b/i,
+        );
+      }
+    }
+  });
+
+  it("keeps zod and the domain core out of the search code (they must not reach the browser bundle)", () => {
+    for (const file of searchFiles) {
+      expect(file.text, file.path).not.toMatch(/from ["'](?:zod|@fluxkit\/core)["']/);
+    }
   });
 
   it("never has a card data field anywhere: the shop never renders a card form (PCI redirect only)", () => {
