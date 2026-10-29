@@ -87,6 +87,20 @@ export function deriveFacetSpecs(input: {
   return [...FIXED_SPECS, ...options, ...sortedAttributes];
 }
 
+/**
+ * The facets a search may use NOW: the derived specs whose field the LIVE index can filter (its `filterableAttributes`).
+ * A definition change reaches the live settings only with job 13; until then the engine refuses a whole multi-search
+ * that names a field it cannot filter (review F1), so such a facet is not offered (an `f` naming it is
+ * `unknown_facet_key`). A field the live index still has but the definitions no longer derive is not offered either.
+ */
+export function liveFacetSpecs(
+  specs: readonly FacetSpec[],
+  filterableFields: Iterable<string>,
+): FacetSpec[] {
+  const live = new Set(filterableFields);
+  return specs.filter((spec) => live.has(spec.field));
+}
+
 export type PageRequestError = "invalid_page" | "invalid_page_size" | "beyond_max_offset";
 
 /** A page request the engine can serve: the first hit of the page must lie inside the 10 000 hits it pages through. */

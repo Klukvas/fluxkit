@@ -190,6 +190,25 @@ export class SearchEngine {
     return stats.numberOfDocuments;
   }
 
+  /**
+   * The `filterableAttributes` the index has APPLIED (`settings.get`); `engine_index_missing` when it does not exist. The
+   * store asks only for facets in this list (review F1). Only plain field names count: the API never writes the
+   * object form, so an object entry (set by someone else) offers nothing.
+   */
+  async filterableAttributes(uid: string, timeoutMs?: number): Promise<string[]> {
+    const answer = await this.request<unknown>(
+      "GET",
+      `/indexes/${encodeURIComponent(uid)}/settings/filterable-attributes`,
+      undefined,
+      "settings",
+      timeoutMs,
+    );
+    if (!Array.isArray(answer)) {
+      throw new SearchEngineError("engine_bad_response", { operation: "settings" });
+    }
+    return answer.filter((entry): entry is string => typeof entry === "string");
+  }
+
   createIndex(uid: string): Promise<TaskUid> {
     return this.enqueue("POST", "/indexes", { uid, primaryKey: "id" }, "create index");
   }

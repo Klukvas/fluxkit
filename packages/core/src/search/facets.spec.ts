@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SEARCH_LIMITS,
   deriveFacetSpecs,
+  liveFacetSpecs,
   planSearchQueries,
   validatePageRequest,
 } from "./index.js";
@@ -111,6 +112,23 @@ describe("deriveFacetSpecs", () => {
 function plan(selection: SearchSelection, page = 1, pageSize = 24) {
   return planSearchQueries({ selection, specs, page, pageSize });
 }
+
+describe("liveFacetSpecs", () => {
+  it("keeps only the facets whose field the live index can filter, in their order (review F1)", () => {
+    // The definitions gained `opt.size` and `attr.weight`; job 13 has not applied them to the live index yet.
+    const live = specs
+      .map((spec) => spec.field)
+      .filter((field) => field !== "opt_size" && field !== "attr_weight");
+    expect(liveFacetSpecs(specs, live).map((spec) => spec.key)).toEqual(
+      specs.map((spec) => spec.key).filter((key) => key !== "opt.size" && key !== "attr.weight"),
+    );
+  });
+
+  it("never offers a field the live index has but the definitions no longer derive", () => {
+    expect(liveFacetSpecs(specs, [...specs.map((spec) => spec.field), "attr_gone"])).toEqual(specs);
+    expect(liveFacetSpecs(specs, [])).toEqual([]);
+  });
+});
 
 describe("planSearchQueries", () => {
   it("without a selection: hits, variant facets and the price range", () => {

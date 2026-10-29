@@ -12,6 +12,7 @@ import { requireTestDatabaseUrl } from "../../test/env.js";
 import { http } from "../../test/http.js";
 import { insertAdminUserRow, ownerAuthenticator } from "../../test/inventory-fixtures.js";
 import { ensureMigrated } from "../../test/migrate.js";
+import { indexSettings, updateIndexSettingsAsMaster } from "../../test/search-engine.js";
 import { SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { StockWorld } from "../../test/stock-world.js";
 import { SearchIndexer } from "../indexer/index.js";
@@ -61,7 +62,6 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
   let brandB: string;
   let adminId: string;
   const extraAttributeIds: string[] = [];
-  const extraOptionIds: string[] = [];
 
   async function get<T = SearchBody>(path: string, base = app.baseUrl) {
     return http<T>(base, "GET", path);
@@ -199,7 +199,6 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
   afterAll(async () => {
     await fx.cleanup(pool);
     await pool.query("delete from attribute where id = any($1::uuid[])", [extraAttributeIds]);
-    await pool.query("delete from option where id = any($1::uuid[])", [extraOptionIds]);
     await pool.query("delete from brand where slug = any($1)", [[brandA, brandB]]);
     await search.dispose(pool);
     await app.app.close();
@@ -404,6 +403,132 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     ]);
     expect(marked.rows).toEqual([{ reason: "stale_hit" }]);
     await syncIndex();
+  });
+
+  it("keeps answering while a definition change waits for job 13, and offers the new facets once applied (review F1)", async () => {
+    const logged = vi.spyOn(Logger.prototype, "warn");
+    const errors = vi.spyOn(Logger.prototype, "error");
+    // With the app running: a new option of the type, a flipped `isFilterable`, a new filterable attribute.
+    const option = await call(
+      "PUT",
+      `/admin/product-types/${fx.teeTypeId}/options/${fx.foreign.id}`,
+      {},
+    );
+    expect(option.status, JSON.stringify(option.body)).toBeLessThan(300);
+    const material = await pool.query<{ id: string }>("select id from attribute where code = $1", [
+      fx.materialAttributeCode,
+    ]);
+    const flipped = await call("PATCH", `/admin/attributes/${material.rows[0]?.id}`, {
+      isFilterable: true,
+    });
+    expect(flipped.status, JSON.stringify(flipped.body)).toBe(200);
+    const flag = await call<{ id: string }>("POST", "/admin/attributes", {
+      code: `flag_${fx.runId}`,
+      name: { uk: "Прапорець" },
+      inputType: "boolean",
+      isFilterable: true,
+    });
+    expect(flag.status, JSON.stringify(flag.body)).toBe(201);
+    extraAttributeIds.push(flag.body.id);
+    expect(
+      (
+        await call("PUT", `/admin/product-types/${fx.teeTypeId}/attributes/${flag.body.id}`, {
+          level: "product",
+        })
+      ).status,
+    ).toBeLessThan(300);
+
+    // A new app has cold caches: what the running app sees once its 30 s definitions cache expired.
+    const waiting = await startApp({ search: search.env });
+    try {
+      for (const path of [
+        "/store/search",
+        "/store/search?q=shirt&locale=en",
+        `/store/search?f=brand:${brandA}`,
+        `/store/search?f=opt.${fx.size.code}:m`,
+      ]) {
+        const result = await get(path, waiting.baseUrl);
+        expect(result.status, `${path}: ${JSON.stringify(result.body)}`).toBe(200);
+      }
+      // Not filterable in the live index yet: not a facet yet (400), never an engine error.
+      for (const param of [
+        `opt.${fx.foreign.code}:f1`,
+        `attr.${fx.materialAttributeCode}:linen`,
+        `attr.flag_${fx.runId}:true`,
+      ]) {
+        const refused = await get<{ errors?: { code: string }[] }>(
+          `/store/search?f=${encodeURIComponent(param)}`,
+          waiting.baseUrl,
+        );
+        expect(refused.status, `${param}: ${JSON.stringify(refused.body)}`).toBe(400);
+        expect(refused.body.errors?.[0]?.code).toBe("unknown_facet_key");
+      }
+    } finally {
+      await waiting.app.close();
+    }
+
+    await syncIndex(); // job 13 applies the settings (and re-syncs the products the change marked)
+    const applied = await startApp({ search: search.env });
+    try {
+      const linen = await get(
+        `/store/search?f=${encodeURIComponent(`attr.${fx.materialAttributeCode}:linen`)}`,
+        applied.baseUrl,
+      );
+      expect(linen.status, JSON.stringify(linen.body)).toBe(200);
+      expect(linen.body.items.map((item) => item.id)).toEqual([shirt.id]);
+      expect(linen.body.facets.map((facet) => facet.key)).toContain(
+        `attr.${fx.materialAttributeCode}`,
+      );
+      const foreign = await get(`/store/search?f=opt.${fx.foreign.code}:f1`, applied.baseUrl);
+      expect(foreign.status, JSON.stringify(foreign.body)).toBe(200);
+      expect(foreign.body.items).toEqual([]);
+    } finally {
+      await applied.app.close();
+    }
+    const lines = [...logged.mock.calls, ...errors.mock.calls].map((args) => String(args[0]));
+    expect(lines.filter((line) => line.includes("engine_rejected"))).toEqual([]);
+    logged.mockRestore();
+    errors.mockRestore();
+  });
+
+  it("answers an engine 400 with 500, logs it as an error, counts it in the admin status and re-reads the live settings (review F1)", async () => {
+    const drifting = await startApp({
+      search: search.env,
+      adminAuthenticator: ownerAuthenticator(adminId),
+    });
+    const errors = vi.spyOn(Logger.prototype, "error");
+    const uid = search.liveUid("uk");
+    const before = (await indexSettings(uid))["filterableAttributes"] as string[];
+    try {
+      expect((await get("/store/search", drifting.baseUrl)).status).toBe(200); // caches the live settings
+      // Drift behind the API's back: the live index loses a field the cached view still lists.
+      await updateIndexSettingsAsMaster(uid, {
+        filterableAttributes: before.filter((field) => field !== `opt_${fx.size.code}`),
+      });
+      const rejected = await get<{ code: string }>("/store/search", drifting.baseUrl);
+      expect(rejected.status, JSON.stringify(rejected.body)).toBe(500);
+      expect(rejected.body.code).toBe("internal_error");
+      const logged = errors.mock.calls.map((args) => String(args[0])).join("\n");
+      expect(logged).toContain("engine_rejected");
+      expect(logged).toContain("invalid_search_facets");
+      const status = await http<{
+        engine: { rejectedSearches: { count: number; lastCode: string | null; lastAt: string } };
+      }>(drifting.baseUrl, "GET", "/admin/search/status");
+      expect(status.status).toBe(200);
+      expect(status.body.engine.rejectedSearches).toMatchObject({
+        count: 1,
+        lastCode: "invalid_search_facets",
+      });
+      expect(Date.parse(status.body.engine.rejectedSearches.lastAt)).not.toBeNaN();
+      // The rejection dropped the cached view: the next request reads the live settings and answers without the field.
+      const recovered = await get("/store/search", drifting.baseUrl);
+      expect(recovered.status, JSON.stringify(recovered.body)).toBe(200);
+      expect(recovered.body.facets.map((facet) => facet.key)).not.toContain(`opt.${fx.size.code}`);
+    } finally {
+      errors.mockRestore();
+      await updateIndexSettingsAsMaster(uid, { filterableAttributes: before });
+      await drifting.app.close();
+    }
   });
 
   it("answers 503 search_unavailable within the timeout when the engine is down, and logs no query text", async () => {

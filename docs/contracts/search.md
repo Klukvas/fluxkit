@@ -25,4 +25,5 @@ Routes, shapes and errors: `docs/api/search.md` and `docs/api/openapi.json`. Con
 - The tables `search_sync_queue`, `search_index_state`, `search_synonym_group` and the job numbers and budgets (13 `sync-search-index`, 14 `rebuild-search-index`).
 - The rate-limit numbers of the windows `search` and `searchSuggest`, the cache time of `GET /store/search` (`public, max-age=30`), the 2 s engine timeout, the `Retry-After` value, the 30 s label cache.
 - The exact `facets` order beyond `brand`, `category`, `inStock`, then options and attributes by code; how many disjunctive counts are exact (at most 3 selected product facets per request); the `detail` texts.
-- Engine error codes in `GET /admin/search/status` (`engine.code`, `lastErrorCode`, `errorCodes`): informational, may gain values.
+- Engine error codes in `GET /admin/search/status` (`engine.code`, `engine.rejectedSearches.lastCode`, `lastErrorCode`, `errorCodes`): informational, may gain values. `engine.rejectedSearches` counts per API process.
+- When a new option or filterable attribute becomes a facet key: after job 13 applied the index settings and the API's 30 s cache of the live index's filterable fields expired; until then the key is `unknown_facet_key`.

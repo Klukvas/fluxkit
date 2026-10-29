@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import {
   deriveFacetSpecs,
   engineSort,
+  liveFacetSpecs,
   parseSearchQuery,
   parseSearchSort,
   parseSelectionParams,
@@ -31,6 +32,7 @@ import { brand } from "../../database/schema/index.js";
 import { SearchEngineError, type SearchEngine } from "../engine/index.js";
 import { readSearchDefinitions, type SearchDefinitions } from "../indexer/index.js";
 import type { SearchConfig } from "../search-config.js";
+import type { SearchRejections } from "../search-rejections.js";
 import type {
   StoreSearchFacet,
   StoreSearchQuery,
@@ -39,7 +41,10 @@ import type {
   StoreSuggestResponse,
 } from "./store-search.schemas.js";
 
-/** How long the definitions behind facets and labels are kept per process: a label change shows within this time. */
+/**
+ * How long the definitions behind facets and labels, and the live index's filterable fields, are kept per process: a
+ * label change shows within this time, and a facet job 13 applied is offered within this time.
+ */
 export const DEFINITIONS_TTL_MS = 30_000;
 
 interface EngineSearchResult {
@@ -72,12 +77,16 @@ export class StoreSearchService {
 
   private cached: { at: number; definitions: SearchDefinitions; specs: FacetSpec[] } | undefined;
 
+  /** The `filterableAttributes` each live index has applied, by index uid (review F1). */
+  private readonly liveFields = new Map<string, { at: number; fields: readonly string[] }>();
+
   constructor(
     private readonly database: Database,
     private readonly engine: SearchEngine,
     private readonly config: Extract<SearchConfig, { enabled: true }>,
     private readonly store: StoreService,
     private readonly port: SearchPort,
+    private readonly rejections: SearchRejections,
   ) {}
 
   async search(query: StoreSearchQuery): Promise<StoreSearchResponse> {
@@ -100,7 +109,10 @@ export class StoreSearchService {
         { path: page.reason === "invalid_page_size" ? "limit" : "page", code: page.reason },
       ]);
     }
-    const { definitions, specs } = await this.definitions();
+    const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
+    const { definitions, specs: derived } = await this.definitions();
+    // Only facets the live index can already filter: a definition change waits for job 13 without taking search down.
+    const specs = liveFacetSpecs(derived, await this.liveFilterable(uid, text));
     const f = query.f === undefined ? [] : Array.isArray(query.f) ? query.f : [query.f];
     const selected = parseSelectionParams(
       { f, ...(query.price === undefined ? {} : { price: query.price }) },
@@ -120,7 +132,6 @@ export class StoreSearchService {
         pageSize: page.pageSize,
       }),
     );
-    const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const textQueries = planTextQueries(text, locale.locale, "results");
 
     let results = await this.run(uid, textQueries, plan.queries, sort, "all", text);
@@ -174,6 +185,7 @@ export class StoreSearchService {
     }
     const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const answer = await this.call<{ results?: EngineSearchResult[] }>(
+      uid,
       {
         queries: [
           {
@@ -246,24 +258,69 @@ export class StoreSearchService {
             attributesToRetrieve: ["productId"],
           })),
         };
-        return { planned: entry, result: await this.call<EngineSearchResult>(body, text) };
+        return { planned: entry, result: await this.call<EngineSearchResult>(uid, body, text) };
       }),
     );
   }
 
-  private async call<T>(body: object, text: NormalizedSearchQuery): Promise<T> {
+  /** The fields the live index can filter, read once per `DEFINITIONS_TTL_MS` (one cheap `settings.get`). */
+  private async liveFilterable(
+    uid: string,
+    text: NormalizedSearchQuery,
+  ): Promise<readonly string[]> {
+    const now = Date.now();
+    const known = this.liveFields.get(uid);
+    if (known !== undefined && now - known.at <= DEFINITIONS_TTL_MS) {
+      return known.fields;
+    }
+    const fields = await this.guard(
+      uid,
+      () => this.engine.filterableAttributes(uid, this.config.tuning.searchTimeoutMs),
+      text,
+    );
+    this.liveFields.set(uid, { at: now, fields });
+    return fields;
+  }
+
+  private call<T>(uid: string, body: object, text: NormalizedSearchQuery): Promise<T> {
+    return this.guard(
+      uid,
+      () => this.engine.multiSearch<T>(body, this.config.tuning.searchTimeoutMs),
+      text,
+    );
+  }
+
+  /**
+   * Engine failures: unreachable, slow, unauthorized or no index is `503 search_unavailable` (the storefront falls back).
+   * An HTTP 400 (`engine_rejected`) is not an outage but a bug or a drift between the API and the live settings: it is
+   * logged as an error, counted for the admin status and answered `500`; the cached live fields are dropped so the next
+   * request reads them again (review F1).
+   */
+  private async guard<T>(
+    uid: string,
+    run: () => Promise<T>,
+    text: NormalizedSearchQuery,
+  ): Promise<T> {
     const started = Date.now();
     try {
-      return await this.engine.multiSearch<T>(body, this.config.tuning.searchTimeoutMs);
+      return await run();
     } catch (error) {
-      if (error instanceof SearchEngineError) {
-        // Never the query text: its length and the code only.
-        this.logger.warn(
-          `Search failed: ${error.code}${error.engineCode === undefined ? "" : ` [${error.engineCode}]`} after ${String(Date.now() - started)} ms (query of ${String(text.words.length)} words)`,
-        );
-        throw searchUnavailable();
+      if (!(error instanceof SearchEngineError)) {
+        throw error;
       }
-      throw error;
+      // Never the query text: its length and the code only.
+      const what = `${error.code}${error.engineCode === undefined ? "" : ` [${error.engineCode}]`} after ${String(Date.now() - started)} ms (query of ${String(text.words.length)} words)`;
+      if (error.code === "engine_rejected") {
+        this.logger.error(`Search rejected by the engine: ${what}`);
+        this.rejections.record(error.engineCode, new Date());
+        this.liveFields.delete(uid);
+        throw new ProblemException({
+          code: "internal_error",
+          detail: "An unexpected error occurred. Please try again later.",
+        });
+      }
+      this.logger.warn(`Search failed: ${what}`);
+      throw searchUnavailable();
     }
   }
 

@@ -12,6 +12,19 @@ export const adminSearchStatusSchema = z.object({
     code: z.string().nullable().meta({
       description: "The error code when it did not (`engine_unreachable`, `engine_timeout`, ...).",
     }),
+    rejectedSearches: z
+      .object({
+        count: z.number().int().min(0),
+        lastCode: z.string().nullable().meta({
+          description:
+            "The engine's error code of the last refusal (`invalid_search_facets`, ...).",
+        }),
+        lastAt: z.string().nullable(),
+      })
+      .meta({
+        description:
+          "Store searches the engine refused with HTTP 400 since this API process started (a bug or a drift between the API and the live index settings; the store answered 500). Per process.",
+      }),
   }),
   locales: z.array(
     z.object({

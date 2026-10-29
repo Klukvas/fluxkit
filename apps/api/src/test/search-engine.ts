@@ -96,6 +96,12 @@ export async function indexSettings(uid: string): Promise<Record<string, unknown
   return master("GET", `/indexes/${uid}/settings`);
 }
 
+/** Changes settings of an index behind the API's back (master key) and waits: a spec that simulates drift. */
+export async function updateIndexSettingsAsMaster(uid: string, settings: object): Promise<void> {
+  const task = await master<{ taskUid: number }>("PATCH", `/indexes/${uid}/settings`, settings);
+  await waitForMasterTask(task.taskUid);
+}
+
 /** Tasks the engine still keeps for one index (master key). */
 export async function countTasksOf(uid: string): Promise<number> {
   const page = await master<{ total: number }>(

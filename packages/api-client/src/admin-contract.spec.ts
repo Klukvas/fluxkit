@@ -809,7 +809,15 @@ const brandList: Shape<AdminBrandList> = paginated(brand);
 const nullableTimestamp = { nullable: "string" } as const;
 const searchStatus: Shape<Admin.AdminSearchStatus> = {
   object: {
-    engine: { object: { reachable: "boolean", code: { nullable: "string" } } },
+    engine: {
+      object: {
+        reachable: "boolean",
+        code: { nullable: "string" },
+        rejectedSearches: {
+          object: { count: "integer", lastCode: { nullable: "string" }, lastAt: nullableTimestamp },
+        },
+      },
+    },
     locales: {
       array: {
         object: {

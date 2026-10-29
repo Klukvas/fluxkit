@@ -16,6 +16,7 @@ import { SearchEngineError, type SearchEngine } from "../engine/index.js";
 import { readSearchDefinitions, SearchIndexStateRepository } from "../indexer/index.js";
 import { SearchQueueRepository } from "../queue/search-queue.repository.js";
 import type { SearchConfig } from "../search-config.js";
+import type { SearchRejections } from "../search-rejections.js";
 import type {
   AdminSearchRebuild,
   AdminSearchStatus,
@@ -55,6 +56,7 @@ export class AdminSearchService {
     private readonly config: Extract<SearchConfig, { enabled: true }>,
     private readonly locale: LocaleConfig,
     private readonly pricing: PricingConfig,
+    private readonly rejections: SearchRejections,
   ) {}
 
   async status(now: Date): Promise<AdminSearchStatus> {
@@ -116,7 +118,7 @@ export class AdminSearchService {
     }
     const summary = await this.queue.summary(this.database, now);
     return {
-      engine: { reachable, code },
+      engine: { reachable, code, rejectedSearches: this.rejections.snapshot() },
       locales,
       queue: {
         depth: summary.depth,

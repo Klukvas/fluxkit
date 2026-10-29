@@ -22,6 +22,7 @@ import { AdminSearchService } from "./admin/admin-search.service.js";
 import { StoreSearchController } from "./store/store-search.controller.js";
 import { StoreSearchService } from "./store/store-search.service.js";
 import { SEARCH_CONFIG, searchStartupLine, type SearchConfig } from "./search-config.js";
+import { SearchRejections } from "./search-rejections.js";
 
 /** The engine client, or null with `SEARCH_ENABLED=false` (no client is created and nothing connects). */
 export const SEARCH_ENGINE = Symbol("SEARCH_ENGINE");
@@ -93,17 +94,27 @@ export class SearchModule {
       controllers: [StoreSearchController, AdminSearchController],
       providers: [
         ...providers,
+        // One per app: the store counts engine refusals, the admin status shows them.
+        { provide: SearchRejections, useValue: new SearchRejections() },
         {
           provide: StoreSearchService,
-          inject: [DRIZZLE, StoreService, SEARCH_PORT],
-          useFactory: (database: Database, store: StoreService, port: SearchPort) =>
-            new StoreSearchService(database, engine, config, store, port),
+          inject: [DRIZZLE, StoreService, SEARCH_PORT, SearchRejections],
+          useFactory: (
+            database: Database,
+            store: StoreService,
+            port: SearchPort,
+            rejections: SearchRejections,
+          ) => new StoreSearchService(database, engine, config, store, port, rejections),
         },
         {
           provide: AdminSearchService,
-          inject: [DRIZZLE, LOCALE_CONFIG, PRICING_CONFIG],
-          useFactory: (database: Database, locale: LocaleConfig, pricing: PricingConfig) =>
-            new AdminSearchService(database, engine, config, locale, pricing),
+          inject: [DRIZZLE, LOCALE_CONFIG, PRICING_CONFIG, SearchRejections],
+          useFactory: (
+            database: Database,
+            locale: LocaleConfig,
+            pricing: PricingConfig,
+            rejections: SearchRejections,
+          ) => new AdminSearchService(database, engine, config, locale, pricing, rejections),
         },
       ],
       exports: [SEARCH_CONFIG, SEARCH_ENGINE, SEARCH_PORT, SearchIndexer],

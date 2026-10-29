@@ -1562,9 +1562,31 @@
                           "nullable": true,
                           "description": "The error code when it did not (`engine_unreachable`, `engine_timeout`, ...).",
                           "type": "string"
+                        },
+                        "rejectedSearches": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "lastCode": {
+                              "nullable": true,
+                              "description": "The engine's error code of the last refusal (`invalid_search_facets`, ...).",
+                              "type": "string"
+                            },
+                            "lastAt": {
+                              "nullable": true,
+                              "type": "string"
+                            }
+                          },
+                          "required": ["count", "lastCode", "lastAt"],
+                          "additionalProperties": false,
+                          "description": "Store searches the engine refused with HTTP 400 since this API process started (a bug or a drift between the API and the live index settings; the store answered 500). Per process."
                         }
                       },
-                      "required": ["reachable", "code"],
+                      "required": ["reachable", "code", "rejectedSearches"],
                       "additionalProperties": false
                     },
                     "locales": {

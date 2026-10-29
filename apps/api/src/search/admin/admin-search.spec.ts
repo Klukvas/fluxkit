@@ -10,7 +10,11 @@ import { SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { SearchIndexer } from "../indexer/index.js";
 
 interface Status {
-  engine: { reachable: boolean; code: string | null };
+  engine: {
+    reachable: boolean;
+    code: string | null;
+    rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
+  };
   locales: {
     locale: string;
     liveIndex: string | null;
@@ -29,6 +33,9 @@ interface Group {
 }
 
 /** The admin search routes (ADR 0034 decisions 8 and 10) with the real database and engine. */
+
+/** The store has not been refused by the engine (store-search.spec.ts provokes a refusal). */
+const NO_REJECTIONS = { count: 0, lastCode: null, lastAt: null };
 describe("admin search routes (real Postgres, real Meilisearch)", () => {
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
   let search: SearchWorld;
@@ -63,7 +70,11 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
     const result = await http<Status>(owner.baseUrl, "GET", "/admin/search/status");
     expect(result.status, JSON.stringify(result.body)).toBe(200);
     expect(result.headers.get("cache-control")).toBe("no-store");
-    expect(result.body.engine).toEqual({ reachable: true, code: null });
+    expect(result.body.engine).toEqual({
+      reachable: true,
+      code: null,
+      rejectedSearches: NO_REJECTIONS,
+    });
     expect(result.body.locales.map((entry) => [entry.locale, entry.liveIndex])).toEqual([
       ["uk", null],
       ["en", null],
@@ -100,7 +111,11 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
     try {
       const unreachable = await http<Status>(down.baseUrl, "GET", "/admin/search/status");
       expect(unreachable.status).toBe(200);
-      expect(unreachable.body.engine).toEqual({ reachable: false, code: "engine_unreachable" });
+      expect(unreachable.body.engine).toEqual({
+        reachable: false,
+        code: "engine_unreachable",
+        rejectedSearches: NO_REJECTIONS,
+      });
     } finally {
       await down.app.close();
     }

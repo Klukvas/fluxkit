@@ -1325,7 +1325,12 @@ export interface RejectPrivacyRequestBody {
 
 /** `GET /admin/search/status` (only with search on). */
 export interface AdminSearchStatus {
-  engine: { reachable: boolean; code: string | null };
+  engine: {
+    reachable: boolean;
+    code: string | null;
+    /** Store searches the engine refused (HTTP 400) since this API process started; per process. */
+    rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
+  };
   locales: {
     locale: string;
     liveIndex: string | null;
