@@ -211,9 +211,24 @@ describe("no third-party origin and no cookie of its own (ADR 0033 decision 11)"
 
   it("never touches a cookie in the browser or on the server", () => {
     const offenders = files.filter((file) =>
-      /document\.cookie|\bcookies\(\)|Set-Cookie|next\/headers/i.test(readFileSync(file, "utf8")),
+      /document\.cookie|\bcookies\(\)|Set-Cookie/i.test(readFileSync(file, "utf8")),
     );
     expect(offenders).toEqual([]);
+  });
+
+  it("reads request headers in one place only: the results page's read of X-Forwarded-For, and nothing else (search plan step 10a)", () => {
+    const readers = files.filter((file) => /next\/headers/.test(readFileSync(file, "utf8")));
+    expect(readers.map((file) => file.slice(file.lastIndexOf("/src/") + 5))).toEqual([
+      "lib/search-data.server.ts",
+    ]);
+    const text = readFileSync(readers[0] as string, "utf8").replace(
+      /\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+      "",
+    );
+    // The single header read, handed to the address check; the cookie header and the cookie API stay out of reach.
+    expect(text.match(/\bheaders\(\)/g)).toHaveLength(1);
+    expect(text).toMatch(/\(await headers\(\)\)\.get\("x-forwarded-for"\)/);
+    expect(text).not.toMatch(/cookie/i);
   });
 
   it("loads no third-party script, font or analytics", () => {
