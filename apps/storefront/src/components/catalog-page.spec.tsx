@@ -298,6 +298,22 @@ describe("the catalog route with search on", () => {
     });
   }
 
+  for (const address of [{ f: "brand:demo-brand" }, { brand: "demo-brand" }]) {
+    it(`keeps the brand line and its 'Clear the filter' link in the SQL fallback of ${JSON.stringify(address)} (review F3)`, async () => {
+      reads.outcome = { kind: "unavailable", retryAfterSeconds: null };
+      const html = await catalog(address);
+      expect(html).toContain(en["catalog.fallback.title"]);
+      expect(reads.sqlListings).toEqual([["en", { limit: 24, offset: 0, brand: "demo-brand" }]]);
+      // The brand's name comes from a listed product that carries it (`§brand` in the fixtures).
+      expect(html).toContain(
+        `<span>${en["catalog.filter.brand"].replace("{brand}", "§brand")}</span>`,
+      );
+      expect(html).toMatch(
+        new RegExp(`<a[^>]*href="/en/catalog"[^>]*>${en["catalog.filter.clear"]}</a>`),
+      );
+    });
+  }
+
   it("says the list is unfiltered even when the address had no filters", async () => {
     reads.outcome = { kind: "unavailable", retryAfterSeconds: null };
     const html = await catalog({});

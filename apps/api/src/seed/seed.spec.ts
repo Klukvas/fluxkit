@@ -691,6 +691,31 @@ describe("catalog seed (real app, real Postgres)", () => {
       await pool.query("delete from search_synonym_group where 'admin-term' = any(terms)");
     });
 
+    it("creates a demo group although a group of the OTHER locale holds one of its terms (review F3)", async () => {
+      const english = synonymGroups.find((group) => group.locale === "en");
+      if (english === undefined) throw new Error("an en demo group needed");
+      await pool.query("delete from search_synonym_group where terms && $1::text[]", [
+        demoSynonymTerms,
+      ]);
+      // An admin's uk group shares a term with the en demo group: only a group of the same locale makes it existing.
+      await pool.query(
+        "insert into search_synonym_group (locale, terms) values ('uk', array[$1, 'admin-uk-term'])",
+        [english.terms[0]],
+      );
+      try {
+        const run = await runSeedCommand([], { ...env, ...SEARCH_ON });
+        expect(run.synonymGroups.created).toBe(synonymGroups.length);
+        expect(run.synonymGroups.existing).toBe(0);
+        const rows = await pool.query<{ terms: string[] }>(
+          "select terms from search_synonym_group where locale = 'en' and terms = $1::text[]",
+          [[...english.terms]],
+        );
+        expect(rows.rows).toHaveLength(1);
+      } finally {
+        await pool.query("delete from search_synonym_group where 'admin-uk-term' = any(terms)");
+      }
+    });
+
     it("skips and reports the groups of a locale the shop does not serve", async () => {
       await pool.query("delete from search_synonym_group where terms && $1::text[]", [
         demoSynonymTerms,
