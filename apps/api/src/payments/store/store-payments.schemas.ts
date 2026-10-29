@@ -40,7 +40,7 @@ export const customerCreatePaymentBodySchema = z
 export const guestPaymentStatusBodySchema = z.strictObject({
   number: z.string().max(64),
   accessToken: z.string().max(256),
-  paymentId: uuidSchema,
+  paymentId: z.guid().meta({ format: "uuid", description: "The attempt to show (from the return URL)." }),
 });
 
 export const storeCreatedPaymentSchema = z.object({
