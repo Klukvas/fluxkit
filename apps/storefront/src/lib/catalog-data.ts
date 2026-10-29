@@ -63,6 +63,15 @@ export async function loadOnlinePayment(data: StoreData): Promise<boolean> {
   return unwrap("GET /store/config", await data.getConfig()).onlinePayment;
 }
 
+/**
+ * Whether the shop has search (`search` of `GET /store/config`, false with `SEARCH_ENABLED=false`). With false there is no
+ * search box, no results page (it is a 404) and the search routes answer 404 anyway. The same cached read as the rest of the
+ * config, so a change shows within the cache's minute.
+ */
+export async function loadSearchEnabled(data: StoreData): Promise<boolean> {
+  return unwrap("GET /store/config", await data.getConfig()).search;
+}
+
 export interface HomeData {
   newProducts?: ProductSummary[];
   categories?: CategoryNode[];
