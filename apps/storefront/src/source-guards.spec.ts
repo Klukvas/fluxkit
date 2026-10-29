@@ -392,7 +392,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
 
   // Payments plan step 9: the pay redirect, the return page and the payment section of the order pages.
   const paymentFiles = sources.filter((file) =>
-    /(^|\/)(payment-[a-z-]+|order-payment)\.tsx?$/.test(file.path),
+    /(^|\/)(payment-\w[\w-]*|order-payment)\.tsx?$/.test(file.path),
   );
 
   it("finds the payment sources it guards", () => {
