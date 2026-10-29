@@ -2,7 +2,7 @@
 
 import { Button, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
+import { useCallback, useMemo, useState, type ReactNode, type Ref } from "react";
 import { createAccountEmailFlows } from "../lib/account-email-flows";
 import type { Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
@@ -18,7 +18,7 @@ import { ResendVerification } from "./account-verify-notice";
 import { useI18n } from "./i18n-provider";
 import { useAccount, useStoreClient } from "./session-provider";
 import { linkButton } from "./styles";
-import { useFragmentToken } from "./use-fragment-token";
+import { useFragmentTokenRead } from "./use-fragment-token";
 
 export function VerifyEmailDoneView({
   t,
@@ -119,43 +119,42 @@ type Phase =
 
 /**
  * `/{locale}/account/verify-email#t=<token>`. The token is read from the fragment in the browser only and removed from the
- * address bar at once (`useFragmentToken`). Nothing is sent on load: the page explains the link and the confirm call is
- * made only when the person presses the button (or "try again" after an error), with the token in the POST body. The
- * states: ready, confirming, verified, invalid or expired, not available, and a retryable error.
+ * address bar at once (`useFragmentTokenRead`). Nothing is sent on load: the page explains the link and the confirm call
+ * is made only when the person presses the button (or "try again" after an error), with the token in the POST body. A
+ * second link opened in the same tab starts over at "ready" (the phase belongs to one read). The states: ready,
+ * confirming, verified, invalid or expired, not available, and a retryable error.
  */
 export function VerifyEmailPage({ emailDelivery }: { emailDelivery: boolean }) {
   const { locale, t } = useI18n();
   const client = useStoreClient();
   const { state: accountState, store: account } = useAccount();
   const flows = useMemo(() => createAccountEmailFlows(client), [client]);
-  const token = useFragmentToken();
-  const [phase, setPhase] = useState<Phase>({ status: "ready" });
+  const { token, reads } = useFragmentTokenRead();
+  const [state, setState] = useState<{ reads: number; phase: Phase }>({
+    reads: 0,
+    phase: { status: "ready" },
+  });
+  // An outcome of an earlier link (another read) never shows for the current one.
+  const phase: Phase = state.reads === reads ? state.phase : { status: "ready" };
   const headingRef = useHeadingFocus(phase.status !== "confirming");
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
 
   const confirm = useCallback(() => {
     if (typeof token !== "string") return;
-    setPhase({ status: "confirming" });
+    const settle = (next: Phase) =>
+      setState((current) => (current.reads > reads ? current : { reads, phase: next }));
+    settle({ status: "confirming" });
     void flows.confirmEmail(token).then((outcome) => {
-      if (!mounted.current) return;
       if (outcome.status === "verified") {
         // The customer's `emailVerified` changed: the account page must not keep the notice.
         void account.refresh();
-        setPhase({ status: "verified" });
+        settle({ status: "verified" });
       } else if (outcome.status === "failed") {
-        setPhase({ status: "error", failure: outcome.failure });
+        settle({ status: "error", failure: outcome.failure });
       } else {
-        setPhase({ status: outcome.status });
+        settle({ status: outcome.status });
       }
     });
-  }, [token, flows, account]);
+  }, [token, reads, flows, account]);
 
   const signInHref = localizedHref(locale, "/account/login");
   if (!emailDelivery || phase.status === "unavailable") {
