@@ -372,6 +372,42 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "privacy",
+    "listPrivacyRequests",
+    "page.privacy.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyRequestsPage,
+    ),
+  ),
+  route(
+    "privacyLookup",
+    "privacyLookup",
+    "page.privacyLookup.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyLookupPage,
+    ),
+  ),
+  route(
+    "privacyRequestDetail",
+    "getPrivacyRequest",
+    "page.privacyRequestDetail.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyRequestDetailPage,
+    ),
+  ),
+  route(
+    "auditLog",
+    "listAuditEvents",
+    "page.auditLog.title",
+    areaPage(
+      () => import("./areas/audit"),
+      (module) => module.AuditLogPage,
+    ),
+  ),
+  route(
     "users",
     "listUsers",
     "page.users.title",

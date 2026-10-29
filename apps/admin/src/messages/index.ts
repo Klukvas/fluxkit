@@ -56,6 +56,8 @@ export const LAZY_FILES = [
   "shipping",
   "email",
   "payments",
+  "privacy",
+  "audit",
 ] as const;
 export type LazyFile = (typeof LAZY_FILES)[number];
 
@@ -97,6 +99,14 @@ export const LAZY_FILE_LOADERS: Record<LazyFile, Record<Locale, FileLoader>> = {
   payments: {
     uk: () => import("./uk/payments.json").then((module) => module.default),
     en: () => import("./en/payments.json").then((module) => module.default),
+  },
+  privacy: {
+    uk: () => import("./uk/privacy.json").then((module) => module.default),
+    en: () => import("./en/privacy.json").then((module) => module.default),
+  },
+  audit: {
+    uk: () => import("./uk/audit.json").then((module) => module.default),
+    en: () => import("./en/audit.json").then((module) => module.default),
   },
 };
 

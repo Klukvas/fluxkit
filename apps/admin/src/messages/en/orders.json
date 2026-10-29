@@ -297,5 +297,9 @@
   "shipment.refusal.invalid_transition": "The waybill's status does not allow this any more (someone may have changed it). Nothing was sent to the carrier. The order was read again.",
   "shipment.refusal.label_not_available": "There is no label for this waybill (it has no number at the carrier, or it was cancelled).",
   "shipment.refusal.carrier_rejected": "The carrier refused the request. Nothing was changed.",
-  "shipment.refusal.carrier_invalid_credentials": "The carrier does not accept the server's credentials. Nothing was changed. Ask your developers to check the carrier's API key (an environment variable of the server)."
+  "shipment.refusal.carrier_invalid_credentials": "The carrier does not accept the server's credentials. Nothing was changed. Ask your developers to check the carrier's API key (an environment variable of the server).",
+  "order.detail.erasedValue": "Erased",
+  "order.detail.contactErased": "The contact data of this order (names, email, phone and the addresses except the country) was erased on {date}, at the request of the person or when the retention period ended. The order, its lines, totals, payments and shipments are kept.",
+  "order.list.contactErased": "Contact data erased",
+  "shipment.refusal.contact_erased": "The contact data of this order was erased, so a waybill can no longer be created or refreshed for it. Nothing was sent to the carrier."
 }

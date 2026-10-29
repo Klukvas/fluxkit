@@ -1,5 +1,6 @@
 import type { AdminOrder, Address } from "@fluxkit/api-client";
 import {
+  Alert,
   Button,
   DataTable,
   DescriptionList,
@@ -157,6 +158,11 @@ export function OrderDetailView({
   payments,
 }: OrderDetailViewProps) {
   const lines: LineRow[] = orderLineRows(order, { ...money, orderLocale: order.locale });
+  // An erased contact (privacy plan, ADR 0033) has no names, email or phone: say so instead of showing empty cells.
+  const erased = order.contactErasedAt !== null;
+  const erasedValue = (
+    <span className="text-muted-foreground">{t("order.detail.erasedValue")}</span>
+  );
   const customerHref = order.customerId === null ? null : customerDetailHref(order.customerId);
 
   const summary: DescriptionListItem[] = [
@@ -215,7 +221,9 @@ export function OrderDetailView({
       term: t("order.detail.customer"),
       description: (
         <span className="flex flex-col gap-1">
-          {customerHref === null ? (
+          {erased || order.contact.email === null ? (
+            erasedValue
+          ) : customerHref === null ? (
             <span className="break-all">{order.contact.email}</span>
           ) : (
             <Link to={customerHref} className={linkClass}>
@@ -243,9 +251,10 @@ export function OrderDetailView({
     {
       id: "name",
       term: t("order.detail.name"),
-      description: (
+      description: erased ? (
+        erasedValue
+      ) : (
         <span className="break-words">
-          {/* An erased contact (ADR 0033) has no names; TODO(fluxkit): privacy plan step 9 labels it. */}
           {t("order.detail.fullName", {
             first: order.contact.firstName ?? "",
             last: order.contact.lastName ?? "",
@@ -256,9 +265,13 @@ export function OrderDetailView({
     {
       id: "email",
       term: t("order.detail.email"),
-      description: <span className="break-all">{order.contact.email}</span>,
+      description: erased ? erasedValue : <span className="break-all">{order.contact.email}</span>,
     },
-    { id: "phone", term: t("order.detail.phone"), description: order.contact.phone },
+    {
+      id: "phone",
+      term: t("order.detail.phone"),
+      description: erased ? erasedValue : order.contact.phone,
+    },
   ];
 
   const lineColumns: DataTableColumn<LineRow>[] = [
@@ -423,6 +436,13 @@ export function OrderDetailView({
         <DescriptionList items={summary} />
       </Section>
       <Section id="order-contact" title={t("order.detail.contact")}>
+        {order.contactErasedAt === null ? null : (
+          <Alert variant="info">
+            {t("order.detail.contactErased", {
+              date: formatDateTime(order.contactErasedAt, uiLocale),
+            })}
+          </Alert>
+        )}
         <DescriptionList items={contact} />
       </Section>
       <div className="grid gap-8 md:grid-cols-2">
