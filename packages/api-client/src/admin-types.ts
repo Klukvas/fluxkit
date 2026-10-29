@@ -438,7 +438,8 @@ export interface AdminPaymentHistoryEntry {
 
 /**
  * A payment attempt as the admin sees it (ADR 0032). No page URL; card data is the system and the last four digits only.
- * `refundableAmount` is what a new refund may take (the amount less every refund that is not `failed`).
+ * `refundableAmount` is what a new refund may take (the amount less every refund that is not `failed` and less money the
+ * provider returned outside the shop).
  */
 export interface AdminPayment {
   id: string;
