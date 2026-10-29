@@ -1069,6 +1069,258 @@
         "x-fluxkit-permission": "users.manage"
       }
     },
+    "/admin/audit-events": {
+      "get": {
+        "description": "What admins did to customer accounts, admin users and privacy requests. Codes and ids only, never personal data.",
+        "operationId": "AdminAuditController_list",
+        "parameters": [
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive; ISO 8601 with `Z` or an offset.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive; ISO 8601 with `Z` or an offset.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "targetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "targetKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["customer", "order", "admin_user", "privacy_request"]
+            }
+          },
+          {
+            "name": "adminUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer.deactivated",
+                "customer.activated",
+                "customer.unlocked",
+                "admin_user.created",
+                "admin_user.role_changed",
+                "admin_user.deactivated",
+                "admin_user.password_reset",
+                "privacy.lookup",
+                "privacy.exported",
+                "privacy.erased",
+                "privacy.request_changed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of audit events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "adminUserId": {
+                            "nullable": true,
+                            "description": "The acting admin; null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "customer.deactivated",
+                              "customer.activated",
+                              "customer.unlocked",
+                              "admin_user.created",
+                              "admin_user.role_changed",
+                              "admin_user.deactivated",
+                              "admin_user.password_reset",
+                              "privacy.lookup",
+                              "privacy.exported",
+                              "privacy.erased",
+                              "privacy.request_changed"
+                            ]
+                          },
+                          "targetKind": {
+                            "type": "string",
+                            "enum": ["customer", "order", "admin_user", "privacy_request"]
+                          },
+                          "targetId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "detail": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            },
+                            "description": "Codes, counts and flags only; never personal data."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "createdAt",
+                          "adminUserId",
+                          "action",
+                          "targetKind",
+                          "targetId",
+                          "detail"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List admin audit events, newest first",
+        "tags": ["admin-audit-events"],
+        "x-fluxkit-permission": "users.manage"
+      }
+    },
     "/health": {
       "get": {
         "operationId": "HealthController_check",

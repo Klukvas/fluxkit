@@ -739,6 +739,31 @@ const emailMessageDetail: Shape<AdminEmailMessageDetail> = {
   object: { ...emailMessage.object, variables: json },
 };
 const emailMessageList: Shape<AdminEmailMessageList> = paginated(emailMessage);
+const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
+  object: {
+    id: "string",
+    createdAt: "string",
+    adminUserId: { nullable: "string" },
+    action: {
+      enum: [
+        "customer.deactivated",
+        "customer.activated",
+        "customer.unlocked",
+        "admin_user.created",
+        "admin_user.role_changed",
+        "admin_user.deactivated",
+        "admin_user.password_reset",
+        "privacy.lookup",
+        "privacy.exported",
+        "privacy.erased",
+        "privacy.request_changed",
+      ],
+    },
+    targetKind: { enum: ["customer", "order", "admin_user", "privacy_request"] },
+    targetId: "string",
+    detail: { record: { oneOf: ["string", "number", "boolean", { array: "string" }] } },
+  },
+});
 const emailMessageId: Shape<AdminEmailMessageId> = { object: { messageId: "string" } };
 const emailTemplateList: Shape<AdminEmailTemplateList> = {
   object: {
@@ -1332,6 +1357,7 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getEmailStatus: emailStatusResult,
   sendTestEmail: emailMessageId,
   listEmailMessages: emailMessageList,
+  listAuditEvents: auditEventList,
   getEmailMessage: emailMessageDetail,
   resendEmailMessage: emailMessageId,
   cancelEmailMessage: emailMessage,
@@ -1449,6 +1475,7 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getEmailStatus: null,
   sendTestEmail: body.sendTestEmail,
   listEmailMessages: null,
+  listAuditEvents: null,
   getEmailMessage: null,
   resendEmailMessage: null,
   cancelEmailMessage: null,

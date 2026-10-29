@@ -833,6 +833,38 @@ export interface AdminEmailMessageDetail extends AdminEmailMessage {
 
 export type AdminEmailMessageList = Paginated<AdminEmailMessage>;
 
+// ---- admin audit log (ADR 0033 decision 9; `users.manage`)
+
+export type AdminAuditAction =
+  | "customer.deactivated"
+  | "customer.activated"
+  | "customer.unlocked"
+  | "admin_user.created"
+  | "admin_user.role_changed"
+  | "admin_user.deactivated"
+  | "admin_user.password_reset"
+  | "privacy.lookup"
+  | "privacy.exported"
+  | "privacy.erased"
+  | "privacy.request_changed";
+
+export type AdminAuditTargetKind = "customer" | "order" | "admin_user" | "privacy_request";
+
+/** What an admin did; codes and ids only, never personal data. */
+export interface AdminAuditEvent {
+  id: string;
+  createdAt: string;
+  /** Null once that admin user was deleted. */
+  adminUserId: string | null;
+  action: AdminAuditAction;
+  targetKind: AdminAuditTargetKind;
+  targetId: string;
+  /** Codes, counts, flags and lists of codes only. */
+  detail: Record<string, string | number | boolean | string[]>;
+}
+
+export type AdminAuditEventList = Paginated<AdminAuditEvent>;
+
 /** There is no recipient: the test goes to the signed-in admin's own address. */
 export interface SendAdminTestEmailBody {
   /** One of `LOCALES`. Default: `DEFAULT_LOCALE`. */

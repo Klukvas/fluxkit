@@ -326,6 +326,9 @@ export const ADMIN_OPERATIONS = {
     [200],
     "shipping.manage",
   ),
+  listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
+    query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
+  }),
   getEmailStatus: operation("GET", "/admin/email/status", [200], "email.manage"),
   sendTestEmail: operation("POST", "/admin/email/test", [202], "email.manage", { body: "json" }),
   listEmailMessages: operation("GET", "/admin/email/messages", [200], "email.manage", {
