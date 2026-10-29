@@ -1,7 +1,13 @@
 import type { FacetSpec } from "./facets.js";
 import type { AttributeSelection, NumberRange, SearchSelection } from "./filter.js";
 import { SEARCH_LIMITS } from "./limits.js";
-import { MAX_FILTER_NUMBER, isSlugValue, isUuidValue, isValueCode } from "./patterns.js";
+import {
+  DECIMAL_PATTERN,
+  MAX_FILTER_NUMBER,
+  isSlugValue,
+  isUuidValue,
+  isValueCode,
+} from "./patterns.js";
 
 export type SelectionErrorReason =
   | "malformed"
@@ -37,15 +43,22 @@ function parseRange(text: string, pattern: RegExp, integersOnly: boolean): Numbe
     return null;
   }
   const [, low, high] = match;
-  const min = low === undefined ? undefined : Number(low);
-  const max = high === undefined ? undefined : Number(high);
+  // `-0` becomes 0: the engine filter is written from the number, which must print as a plain decimal.
+  const toNumber = (text: string | undefined): number | undefined =>
+    text === undefined ? undefined : Number(text) + 0;
+  const min = toNumber(low);
+  const max = toNumber(high);
   if (min === undefined && max === undefined) {
     return null;
   }
   for (const end of [min, max]) {
     if (
       end !== undefined &&
-      (Math.abs(end) > MAX_FILTER_NUMBER || (integersOnly && !Number.isSafeInteger(end)))
+      (Math.abs(end) > MAX_FILTER_NUMBER ||
+        (integersOnly && !Number.isSafeInteger(end)) ||
+        // The same test `buildSearchFilter` applies: a number JavaScript prints with an exponent (`1e-7`) is refused
+        // here, so a selection this function accepts always builds a filter (review F2: it was a 500).
+        !DECIMAL_PATTERN.test(String(end)))
     ) {
       return null;
     }

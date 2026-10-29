@@ -133,6 +133,10 @@ export const storeConfigSchema = z.object({
     description:
       "False when `PAYMENT_PROVIDERS_ENABLED` is empty (no online payment; orders are paid by hand): show no pay button. True when at least one payment provider is enabled. Says nothing about which provider.",
   }),
+  search: z.boolean().meta({
+    description:
+      "False when `SEARCH_ENABLED=false`: the search routes answer 404, so show no search box and no facets and use `GET /store/products`. True when catalog search is configured (it may still answer `503 search_unavailable` while the engine is down or the first index is built).",
+  }),
 });
 
 export type StoreConfig = z.output<typeof storeConfigSchema>;

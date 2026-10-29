@@ -34,6 +34,12 @@ export {
 } from "./email.js";
 export { parseEnabledFeatures } from "./features.js";
 export {
+  DEFAULT_MEILI_INDEX_PREFIX,
+  isPrivateMeiliHost,
+  MEILI_INDEX_PREFIX_PATTERN,
+  type SearchEnv,
+} from "./search.js";
+export {
   MIN_ORDER_PAYMENT_TTL_MINUTES_WITH_PAYMENT_PROVIDER,
   PAYMENT_PROVIDER_CODE,
   parsePaymentProvidersVariable,

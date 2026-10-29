@@ -2,6 +2,7 @@ export * from "./document.js";
 export * from "./facets.js";
 export * from "./fields.js";
 export * from "./filter.js";
+export * from "./indexing.js";
 export * from "./limits.js";
 export * from "./query.js";
 export * from "./selection.js";

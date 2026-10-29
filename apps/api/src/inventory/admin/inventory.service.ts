@@ -8,6 +8,7 @@ import {
 import { toPage, type Page } from "../../common/pagination.js";
 import { notFound, ruleViolation, validationFailed } from "../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import {
   ProductsRepository,
@@ -58,6 +59,7 @@ export class InventoryService {
     private readonly products: ProductsRepository,
     private readonly inventory: InventoryRepository,
     @Inject(DRIZZLE) private readonly database: Database,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async listLocations(): Promise<LocationListResponse> {
@@ -181,6 +183,8 @@ export class InventoryService {
         reference: emptyToNull(body.reference),
         actorId,
       });
+      // Availability (`inStock`) of the variant's documents may have changed.
+      await this.search.productsChanged(tx, [productId], "stock_changed");
       const level: LevelWithLocation = {
         locationId: location.id,
         locationCode: location.code,

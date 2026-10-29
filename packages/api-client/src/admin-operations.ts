@@ -549,6 +549,18 @@ export const ADMIN_OPERATIONS = {
     [204],
     "catalog.write",
   ),
+  getSearchStatus: operation("GET", "/admin/search/status", [200], "catalog.read"),
+  requestSearchRebuild: operation("POST", "/admin/search/rebuild", [202], "catalog.write"),
+  listSynonymGroups: operation("GET", "/admin/search/synonyms", [200], "catalog.read", {
+    query: ["limit", "offset", "locale"],
+  }),
+  createSynonymGroup: operation("POST", "/admin/search/synonyms", [201], "catalog.write", {
+    body: "json",
+  }),
+  updateSynonymGroup: operation("PATCH", "/admin/search/synonyms/{id}", [200], "catalog.write", {
+    body: "json",
+  }),
+  deleteSynonymGroup: operation("DELETE", "/admin/search/synonyms/{id}", [204], "catalog.write"),
 } as const satisfies Record<string, AdminOperationSpec>;
 
 export type AdminOperationName = keyof typeof ADMIN_OPERATIONS;

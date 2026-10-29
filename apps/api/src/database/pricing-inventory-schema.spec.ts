@@ -38,6 +38,9 @@ describe("pricing and inventory schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "search_synonym_group",
+      "search_sync_queue",
+      "search_index_state",
       "admin_audit_event",
       "privacy_request",
       "payment_refund",
@@ -88,6 +91,7 @@ describe("pricing and inventory schema (real Postgres)", () => {
     ]) {
       await pool.query(`drop table if exists "${name}"`);
     }
+    await pool.query('drop sequence if exists "search_sync_seq"');
     await pool.query('drop function if exists "admin_audit_event_append_only"()');
     await pool.query('drop function if exists "payment_event_append_only"()');
     await pool.query('drop function if exists "shipment_status_change_append_only"()');

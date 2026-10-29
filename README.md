@@ -91,6 +91,24 @@ pnpm db:migrate     # = pnpm build && pnpm --filter @fluxkit/api db:migrate (nod
 - Safe for production and for several instances starting together: a Postgres advisory lock (key `7426002`) lets one instance migrate while the others wait and then find nothing to do. If the database holds a migration newer than every entry of the journal (the code is older than the database), the command refuses with exit code 1 and changes nothing.
 - Not for the `_test` database that `pnpm test` uses: the tests migrate it themselves.
 
+## Catalog search
+
+Search (ADR 0034) is off unless `SEARCH_ENABLED=true`; `.env.example` turns it on for development. The API never uses the Meilisearch master key: create one key scoped to the index prefix once per environment (with the master key, from a machine that can reach the engine) and put only that key into `MEILI_API_KEY`:
+
+```bash
+curl -sS -X POST "$MEILI_URL/keys" \
+  -H "Authorization: Bearer $MEILI_MASTER_KEY" -H "Content-Type: application/json" \
+  -d '{"description":"fluxkit API","indexes":["fluxkit_*"],"expiresAt":null,
+       "actions":["search","documents.add","documents.delete","indexes.create","indexes.delete","indexes.swap",
+                  "settings.update","settings.get","tasks.get","tasks.delete","stats.get"]}'
+# the "key" field of the answer is MEILI_API_KEY; use your MEILI_INDEX_PREFIX instead of fluxkit_ when you set one
+```
+
+- The engine stays on a private network (Compose binds `127.0.0.1`); never route it through the edge proxy. In production `MEILI_URL` must be `https` or a private address, `MEILI_ENV=production` and a master key of at least 16 bytes.
+- The API makes no engine call at startup and logs `Search: enabled (<prefix>)`; `search` in `GET /store/config` tells the storefront.
+- A leaked `MEILI_API_KEY` can rewrite this shop's indexes, not other indexes or keys.
+- The scheduler builds the indexes (jobs 13 and 14, `docs/api/jobs.md`): the first tick after search is switched on builds every locale; until then `GET /store/search` answers `503 search_unavailable`. After `pnpm seed` (or any bulk import) run `pnpm search:reindex` to build at once.
+
 ## Scheduler and jobs
 
 The API runs its background work itself: every `SCHEDULER_INTERVAL_SECONDS` (default 60) it expires unpaid orders (and gives their stock back), sweeps stale stock reservations, delivers domain events to plugins, and deletes expired carts, customer sessions and old delivered events. With several API instances only one works per tick (a Postgres advisory lock, key `7426003`); a crashed instance releases it by itself. Nothing is needed beyond the database.
@@ -417,6 +435,7 @@ Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) relea
 
 ```bash
 pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock
+pnpm search:reindex     # with SEARCH_ENABLED=true: rebuilds every locale's search index and syncs the queue (docs/api/jobs.md); exit 0 done, 1 failed, 2 lock held
 ```
 
 ## Storefront walkthrough

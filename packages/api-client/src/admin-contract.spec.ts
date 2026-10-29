@@ -193,6 +193,7 @@ const config: Shape<AdminConfig> = {
     lowStockThreshold: "integer",
     emailDelivery: "boolean",
     onlinePayment: "boolean",
+    search: "boolean",
     media: {
       object: {
         uploadsEnabled: "boolean",
@@ -805,6 +806,64 @@ const brand: Shape<AdminBrand> = {
   },
 };
 const brandList: Shape<AdminBrandList> = paginated(brand);
+const nullableTimestamp = { nullable: "string" } as const;
+const searchStatus: Shape<Admin.AdminSearchStatus> = {
+  object: {
+    engine: {
+      object: {
+        reachable: "boolean",
+        code: { nullable: "string" },
+        rejectedSearches: {
+          object: { count: "integer", lastCode: { nullable: "string" }, lastAt: nullableTimestamp },
+        },
+      },
+    },
+    locales: {
+      array: {
+        object: {
+          locale: "string",
+          liveIndex: { nullable: "string" },
+          documents: { nullable: "integer" },
+          builtAt: nullableTimestamp,
+          settingsFresh: "boolean",
+          documentsFresh: "boolean",
+          rebuildRequestedAt: nullableTimestamp,
+          build: {
+            nullable: { object: { index: "string", startedAt: "string", documents: "integer" } },
+          },
+          failedAttempts: "integer",
+          lastErrorCode: { nullable: "string" },
+          lastErrorAt: nullableTimestamp,
+          nextAttemptAt: nullableTimestamp,
+        },
+      },
+    },
+    queue: {
+      object: {
+        depth: "integer",
+        due: "integer",
+        leased: "integer",
+        dead: "integer",
+        oldestEnqueuedAt: nullableTimestamp,
+        oldestDueAt: nullableTimestamp,
+        errorCodes: { array: { object: { code: "string", count: "integer" } } },
+      },
+    },
+  },
+};
+const searchRebuild: Shape<Admin.AdminSearchRebuild> = {
+  object: { requestedAt: "string", locales: { array: "string" } },
+};
+const synonymGroup: Shape<Admin.AdminSynonymGroup> = {
+  object: {
+    id: "string",
+    locale: "string",
+    terms: { array: "string" },
+    createdAt: "string",
+    updatedAt: "string",
+  },
+};
+const synonymGroupList: Shape<Admin.AdminSynonymGroupList> = paginated(synonymGroup);
 const category: Shape<AdminCategory> = {
   object: {
     id: "string",
@@ -1232,6 +1291,12 @@ const body = {
       slug: { optional: "string" },
     },
   } satisfies Shape<Admin.UpdateAdminBrandBody>,
+  createSynonymGroup: {
+    object: { locale: "string", terms: { array: "string" } },
+  } satisfies Shape<Admin.CreateSynonymGroupBody>,
+  updateSynonymGroup: {
+    object: { terms: { array: "string" } },
+  } satisfies Shape<Admin.UpdateSynonymGroupBody>,
   createCategory: {
     object: {
       name: localized,
@@ -1484,6 +1549,12 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getBrand: brand,
   updateBrand: brand,
   deleteBrand: "none",
+  getSearchStatus: searchStatus,
+  requestSearchRebuild: searchRebuild,
+  listSynonymGroups: synonymGroupList,
+  createSynonymGroup: synonymGroup,
+  updateSynonymGroup: synonymGroup,
+  deleteSynonymGroup: "none",
   createCategory: category,
   listCategories: categoryList,
   getCategory: category,
@@ -1610,6 +1681,12 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getBrand: null,
   updateBrand: body.updateBrand,
   deleteBrand: null,
+  getSearchStatus: null,
+  requestSearchRebuild: null,
+  listSynonymGroups: null,
+  createSynonymGroup: body.createSynonymGroup,
+  updateSynonymGroup: body.updateSynonymGroup,
+  deleteSynonymGroup: null,
   createCategory: body.createCategory,
   listCategories: null,
   getCategory: null,

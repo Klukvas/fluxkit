@@ -56,7 +56,7 @@ export interface TextQuery {
 }
 
 /**
- * The text queries of one search (ADR 0034 decision 3), to be sent as one federated multi-search.
+ * The text queries of one search (ADR 0034 decision 3); several are merged by a federation (ADR 0036).
  *
  * Results page: the original words, the Snowball stems on `stems` and, for Ukrainian, the five-letter prefixes on
  * `stems5`. Every query ends with a space, so the last word is not prefix-matched (spike S1, E8). A stem query that would

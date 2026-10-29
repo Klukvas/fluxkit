@@ -29,6 +29,9 @@ import type {
   ProductList,
   PickupPointKind,
   RegisterBody,
+  SearchResult,
+  SearchSort,
+  SearchSuggestions,
   SetCartItemQuantityBody,
   ShippingCityPage,
   ShippingOptions,
@@ -53,6 +56,17 @@ export interface ListProductsOptions extends LocaleOptions {
   brand?: string;
   category?: string;
   offset?: number;
+  limit?: number;
+}
+
+export interface SearchProductsOptions extends LocaleOptions {
+  q?: string;
+  /** `<facetKey>:<value>` selections, sent as repeated `f` parameters. */
+  f?: readonly string[];
+  /** `<min>..<max>` in minor units; either end may be left out. */
+  price?: string;
+  sort?: SearchSort;
+  page?: number;
   limit?: number;
 }
 
@@ -171,6 +185,13 @@ export interface StoreClient {
   getConfig(options?: CallOptions): Result<StoreConfig>;
   listProducts(options?: ListProductsOptions): Result<ProductList>;
   getProduct(slug: string, options?: LocaleOptions): Result<ProductDetail>;
+  /**
+   * Catalog search (`404` with `getConfig().search` false; `503 search_unavailable` with `Retry-After` while the engine is
+   * down or the first index is built: fall back to `listProducts`).
+   */
+  searchProducts(options?: SearchProductsOptions): Result<SearchResult>;
+  /** Up to 6 suggestions for typed text of 2 characters or more; never cached. */
+  suggestProducts(q: string, options?: LocaleOptions): Result<SearchSuggestions>;
   /** The shipping methods for the current cart (cookie or session), priced by the server; `no-store`. */
   getShippingOptions(options?: ShippingOptionsOptions): Result<ShippingOptions>;
   /** City search of a provider (`query`: 2 to 50 characters). */
@@ -265,6 +286,9 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     getConfig: (opts) => call("getConfig", { options: opts }),
     listProducts: (opts) => call("listProducts", { options: opts }),
     getProduct: (slug, opts) => call("getProduct", { pathParams: { slug }, options: opts }),
+    searchProducts: (opts) => call("searchProducts", { options: opts }),
+    suggestProducts: (q, opts) =>
+      call("suggestProducts", { options: { ...opts, q } as CallOptions }),
     getShippingOptions: (opts) => call("getShippingOptions", { options: opts }),
     listShippingCities: (providerCode, query, opts) =>
       call("listShippingCities", {

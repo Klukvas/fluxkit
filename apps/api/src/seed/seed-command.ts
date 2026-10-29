@@ -116,6 +116,8 @@ export async function runSeedCommand(
       locale: { defaultLocale: config.defaultLocale, locales: config.locales },
       pricing: toPricingConfig(config),
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
+      // With SEARCH_ENABLED=true the seeded products are queued for the index like any admin write (`pnpm search:reindex`).
+      search: config.search,
     }),
     { logger: ["error", "warn"] },
   );

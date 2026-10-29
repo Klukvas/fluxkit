@@ -17,7 +17,8 @@
     "seed": "node --env-file=../../.env dist/seed/seed.js",
     "admin:create": "node --env-file=../../.env dist/auth/create-admin.js",
     "admin:unlock": "node --env-file=../../.env dist/auth/unlock-admin.js",
-    "jobs:run-once": "node --env-file=../../.env dist/jobs/run-once.js"
+    "jobs:run-once": "node --env-file=../../.env dist/jobs/run-once.js",
+    "search:reindex": "node --env-file=../../.env dist/search/reindex.js"
   },
   "devDependencies": {
     "@nestjs/testing": "12.2.0",

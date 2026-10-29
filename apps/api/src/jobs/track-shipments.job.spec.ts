@@ -374,6 +374,8 @@ describe("track-shipments (job 8; real Postgres, injected time, the in-repo test
       "purge-email-messages",
       "reconcile-payments",
       "anonymise-orders",
+      "sync-search-index",
+      "rebuild-search-index",
     ]);
     expect(reports.find((report) => report.name === "track-shipments")).toMatchObject({
       name: "track-shipments",

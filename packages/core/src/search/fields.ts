@@ -41,8 +41,12 @@ export const SUGGEST_FIELDS: readonly string[] = [
   SEARCH_FIELDS.sku,
 ];
 
-/** Filterable fields that every index has; option and attribute fields are added from the definitions. */
+/**
+ * Filterable fields that every index has; option and attribute fields are added from the definitions. `id` is filterable
+ * so the sync can delete the documents a product lost (`productId IN [...] AND NOT id IN [...]`); it is never a facet.
+ */
 export const FIXED_FILTERABLE_FIELDS: readonly string[] = [
+  SEARCH_FIELDS.id,
   SEARCH_FIELDS.productId,
   SEARCH_FIELDS.brand,
   SEARCH_FIELDS.categories,

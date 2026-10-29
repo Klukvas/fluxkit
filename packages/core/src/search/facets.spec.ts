@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   SEARCH_LIMITS,
   deriveFacetSpecs,
+  liveFacetSpecs,
   planSearchQueries,
   validatePageRequest,
 } from "./index.js";
@@ -112,10 +113,28 @@ function plan(selection: SearchSelection, page = 1, pageSize = 24) {
   return planSearchQueries({ selection, specs, page, pageSize });
 }
 
+describe("liveFacetSpecs", () => {
+  it("keeps only the facets whose field the live index can filter, in their order (review F1)", () => {
+    // The definitions gained `opt.size` and `attr.weight`; job 13 has not applied them to the live index yet.
+    const live = specs
+      .map((spec) => spec.field)
+      .filter((field) => field !== "opt_size" && field !== "attr_weight");
+    expect(liveFacetSpecs(specs, live).map((spec) => spec.key)).toEqual(
+      specs.map((spec) => spec.key).filter((key) => key !== "opt.size" && key !== "attr.weight"),
+    );
+  });
+
+  it("never offers a field the live index has but the definitions no longer derive", () => {
+    expect(liveFacetSpecs(specs, [...specs.map((spec) => spec.field), "attr_gone"])).toEqual(specs);
+    expect(liveFacetSpecs(specs, [])).toEqual([]);
+  });
+});
+
 describe("planSearchQueries", () => {
-  it("without a selection: hits, variant facets and the price range", () => {
+  it("without a selection: hits, and variant facets that also carry the price range (no price selected)", () => {
     const result = plan({});
     expect(result.countsFromMainQuery).toEqual([]);
+    expect(result.priceRangeFrom).toBe("variant_facets");
     expect(result.queries).toEqual([
       {
         purpose: "hits",
@@ -136,16 +155,22 @@ describe("planSearchQueries", () => {
         distinct: false,
         pagination: { kind: "limit", limit: 0 },
         filter: null,
-        facets: ["inStock", "opt_color", "opt_size", "attr_weight"],
-      },
-      {
-        purpose: "price_range",
-        distinct: false,
-        pagination: { kind: "limit", limit: 0 },
-        filter: null,
-        facets: ["price"],
+        facets: ["inStock", "opt_color", "opt_size", "attr_weight", "price"],
       },
     ]);
+  });
+
+  it("asks for the price range in its own query only when a price is selected (its filter differs)", () => {
+    for (const selection of [{}, { brands: ["nordic"] }, { options: { size: ["m"] } }]) {
+      const result = plan(selection);
+      expect(result.priceRangeFrom).toBe("variant_facets");
+      expect(result.queries.map((query) => query.purpose)).not.toContain("price_range");
+    }
+    const priced = plan({ brands: ["nordic"], price: { min: 10 } });
+    expect(priced.priceRangeFrom).toBe("price_range");
+    expect(
+      priced.queries.find((query) => query.purpose === "variant_facets")?.facets,
+    ).not.toContain("price");
   });
 
   it("passes the page and page size to the hits query", () => {
@@ -249,6 +274,9 @@ describe("validatePageRequest", () => {
     expect(validatePageRequest(1, 24)).toEqual({ ok: true, page: 1, pageSize: 24 });
     expect(validatePageRequest(209, 48)).toEqual({ ok: true, page: 209, pageSize: 48 });
     expect(validatePageRequest(417, 24)).toEqual({ ok: true, page: 417, pageSize: 24 });
+    // The last page that starts inside: hit 9 960; the next one starts exactly at hit 10 000 (review F5, M16).
+    expect(validatePageRequest(250, 40)).toEqual({ ok: true, page: 250, pageSize: 40 });
+    expect(validatePageRequest(251, 40)).toEqual({ ok: false, reason: "beyond_max_offset" });
   });
 
   it("refuses pages beyond the limit, bad numbers and page sizes above the maximum", () => {

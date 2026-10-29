@@ -17,16 +17,24 @@ export function login(
   return http(baseUrl, "POST", "/admin/auth/login", { body: { email, password } });
 }
 
-/** Logs in and returns the cookie; fails loudly when the login did not succeed (test setup bug). */
+/**
+ * Logs in and returns the cookie; fails loudly when the login did not succeed (test setup bug). The error carries the
+ * response body and, when given, `diagnostics()` (e.g. the API's "Admin login refused: <reason>" lines a spec captured),
+ * so a failure in CI says WHY the API refused.
+ */
 export async function loginCookie(
   baseUrl: string,
   email: string,
   password: string,
+  diagnostics?: () => string,
 ): Promise<string> {
   const result = await login(baseUrl, email, password);
   const cookie = sessionCookieOf(result);
   if (result.status !== 200 || cookie === undefined) {
-    throw new Error(`Test setup bug: login answered ${result.status}`);
+    throw new Error(
+      `Test setup bug: login answered ${result.status} with ${JSON.stringify(result.body ?? null)}` +
+        (diagnostics === undefined ? "" : `\n${diagnostics()}`),
+    );
   }
   return cookie;
 }
