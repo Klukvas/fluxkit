@@ -14,6 +14,8 @@ import {
 const UNIQUE_VIOLATION = "23505";
 const FOREIGN_KEY_VIOLATION = "23503";
 const CHECK_VIOLATION = "23514";
+/** `lock_not_available`: raised when a statement waited longer than `lock_timeout` for a lock. */
+const LOCK_NOT_AVAILABLE = "55P03";
 
 export interface PostgresErrorInfo {
   code: string;
@@ -153,4 +155,9 @@ export function isUniqueViolation(error: unknown, constraint?: string): boolean 
     info.code === UNIQUE_VIOLATION &&
     (constraint === undefined || info.constraint === constraint)
   );
+}
+
+/** True when a statement gave up waiting for a lock (`lock_timeout`, or `NOWAIT`): SQLSTATE 55P03. */
+export function isLockNotAvailable(error: unknown): boolean {
+  return findPostgresError(error)?.code === LOCK_NOT_AVAILABLE;
 }
