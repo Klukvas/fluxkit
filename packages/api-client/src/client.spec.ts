@@ -69,6 +69,7 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
   getAccount: (c) => c.getAccount(),
   updateAccount: (c) => c.updateAccount({ firstName: "N" }),
   changePassword: (c) => c.changePassword({ currentPassword: "a", newPassword: "b" }),
+  getDataExport: (c) => c.getDataExport(),
   requestPasswordReset: (c) => c.requestPasswordReset({ email: "a@b.c", locale: "uk" }),
   confirmPasswordReset: (c) => c.confirmPasswordReset({ token: "t", newPassword: "b" }),
   confirmEmailVerification: (c) => c.confirmEmailVerification({ token: "t" }),

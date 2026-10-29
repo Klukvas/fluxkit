@@ -326,6 +326,23 @@ export const ADMIN_OPERATIONS = {
     [200],
     "shipping.manage",
   ),
+  privacyLookup: operation("POST", "/admin/privacy/lookup", [200], "privacy.manage", {
+    body: "json",
+  }),
+  listPrivacyRequests: operation("GET", "/admin/privacy/requests", [200], "privacy.manage", {
+    query: ["limit", "offset", "status"],
+  }),
+  createPrivacyRequest: operation("POST", "/admin/privacy/requests", [201], "privacy.manage", {
+    body: "json",
+  }),
+  getPrivacyRequest: operation("GET", "/admin/privacy/requests/{id}", [200], "privacy.manage"),
+  exportPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/export",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
   listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
     query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
   }),

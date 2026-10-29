@@ -62,6 +62,7 @@ describe("customer route walk (default for the store is public; customer routes 
     expect(marked.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
       [
         "DELETE /store/probe-customer-class/two",
+        "GET /store/account/data-export",
         "GET /store/account/me",
         "GET /store/account/orders",
         "GET /store/account/orders/:number",

@@ -39,6 +39,8 @@ import { PaymentRegistryModule, type LoadedPaymentProvider } from "./payments/re
 import { DEFAULT_PAYMENTS_CONFIG, type PaymentsConfig } from "./payments/payments-config.js";
 import { PaymentsModule } from "./payments/payments.module.js";
 import { AdminAuditModule } from "./privacy/audit/admin-audit.module.js";
+import type { PrivacyConfig } from "./privacy/privacy-config.js";
+import { PrivacyModule } from "./privacy/privacy.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
@@ -74,6 +76,8 @@ export interface AppModuleOptions {
   cart?: CartConfig;
   /** Defaults to the defaults of `docs/contracts/config.md` (30 minutes to pay, 90 days of guest access). */
   orders?: OrdersConfig;
+  /** `ORDER_TOKEN_SECRET` for the HMAC of a privacy request's email; defaults to none (requests cannot be recorded). */
+  privacy?: PrivacyConfig;
   /** Defaults to OFF (a caller without an environment must not start a timer); the API process passes `SCHEDULER_ENABLED`. */
   scheduler?: SchedulerConfig;
   /** Defaults to uploads switched off (a caller without an environment needs no media directory); the API passes `MEDIA_*`. */
@@ -148,6 +152,7 @@ export class AppModule {
         ),
         EmailHandlersModule,
         EmailAdminModule,
+        PrivacyModule.register(options.privacy ?? { tokenSecret: null }),
         ...options.features.map((feature) => feature.module),
       ],
     };

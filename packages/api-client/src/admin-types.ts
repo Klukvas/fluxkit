@@ -51,7 +51,8 @@ export type AdminPermission =
   | "customers.write"
   | "shipping.manage"
   | "email.manage"
-  | "payments.refund";
+  | "payments.refund"
+  | "privacy.manage";
 
 export interface AdminLoginBody {
   email: string;
@@ -1231,4 +1232,65 @@ export interface GenerateVariantsResult {
   created: number;
   skipped: number;
   variants: AdminVariant[];
+}
+
+// ---- privacy (ADR 0033 decisions 9 and 10; every operation needs `privacy.manage`, owner only)
+
+export type PrivacyRequestKind = "export" | "erasure";
+export type PrivacyRequestStatus = "received" | "in_progress" | "completed" | "rejected";
+
+export interface AdminPrivacyRequest {
+  id: string;
+  kind: PrivacyRequestKind;
+  subjectKind: "customer" | "email";
+  subjectCustomerId: string | null;
+  channel: "self_service" | "admin";
+  status: PrivacyRequestStatus;
+  receivedAt: string;
+  dueAt: string;
+  completedAt: string | null;
+  overdue: boolean;
+  /** Counts, codes and erased order numbers; never contact data. */
+  result: Record<string, string | number | boolean | string[]> | null;
+  note: string | null;
+  handledBy: string | null;
+}
+
+export type AdminPrivacyRequestList = Paginated<AdminPrivacyRequest>;
+
+export interface AdminPrivacyLookupBody {
+  email: string;
+}
+
+export interface AdminPrivacyLookup {
+  customer: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isActive: boolean;
+    createdAt: string;
+    orderCount: number;
+  } | null;
+  guestOrders: {
+    id: string;
+    number: string;
+    status: OrderStatus;
+    placedAt: string;
+    contactErased: boolean;
+  }[];
+  mailCount: number;
+  openRequests: AdminPrivacyRequest[];
+}
+
+export interface CreatePrivacyRequestBody {
+  kind: PrivacyRequestKind;
+  subject: { customerId: string } | { email: string };
+  /** How the identity was checked; no personal data. */
+  note?: string;
+}
+
+/** An email subject sends its email again (only an HMAC is stored); a customer subject sends `{}`. */
+export interface ExportPrivacyRequestBody {
+  email?: string;
 }
