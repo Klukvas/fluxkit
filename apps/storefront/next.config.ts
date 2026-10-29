@@ -31,18 +31,33 @@ export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal te
 
 /**
  * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
- * production build REFUSES while a `legal.*` message of any language still carries the placeholder marker, naming each file
- * and key. Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
- * when asked to check and the messages cannot be read, the build stops.
+ * production build REFUSES while ANY legal placeholder remains: a `legal.*` message of any language that still carries the
+ * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves), or
+ * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank. Each offender is
+ * named. Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
+ * when asked to check and the messages or the identity file cannot be read, the build stops.
  */
+export const LEGAL_IDENTITY_FIELDS = [
+  "shopLegalName",
+  "shopLegalAddress",
+  "privacyContact",
+  "lastUpdated",
+] as const;
+
 export function assertNoLegalPlaceholders(options: {
   enabled: boolean;
   messagesDir: string;
+  identityFile: string;
 }): void {
   if (!options.enabled) return;
   if (!existsSync(options.messagesDir)) {
     throw new Error(
       `STOREFRONT_REQUIRE_LEGAL_TEXT is set but the messages directory was not found (${options.messagesDir}).`,
+    );
+  }
+  if (!existsSync(options.identityFile)) {
+    throw new Error(
+      `STOREFRONT_REQUIRE_LEGAL_TEXT is set but the legal identity file was not found (${options.identityFile}).`,
     );
   }
   const found: string[] = [];
@@ -60,10 +75,27 @@ export function assertNoLegalPlaceholders(options: {
       }
     }
   }
+  const identity = JSON.parse(readFileSync(options.identityFile, "utf8")) as Record<
+    string,
+    unknown
+  >;
+  const unset = LEGAL_IDENTITY_FIELDS.filter((field) => {
+    const value = identity[field];
+    return typeof value !== "string" || value.trim() === "";
+  });
+  const problems: string[] = [];
   if (found.length > 0) {
+    problems.push(`these messages still carry the placeholder marker:\n${found.join("\n")}`);
+  }
+  if (unset.length > 0) {
+    problems.push(
+      `these legal identity values in ${options.identityFile} are still unset or empty:\n${unset.join("\n")}`,
+    );
+  }
+  if (problems.length > 0) {
     throw new Error(
-      "A production build with STOREFRONT_REQUIRE_LEGAL_TEXT=true needs the shop's own legal texts, but these messages " +
-        `still carry the placeholder marker:\n${found.join("\n")}`,
+      "A production build with STOREFRONT_REQUIRE_LEGAL_TEXT=true needs the shop's own legal texts and identity, but " +
+        problems.join("\n"),
     );
   }
 }
@@ -82,6 +114,7 @@ export default function config(phase: string): NextConfig {
     assertNoLegalPlaceholders({
       enabled: process.env.STOREFRONT_REQUIRE_LEGAL_TEXT === "true",
       messagesDir: resolve(process.cwd(), "src/messages"),
+      identityFile: resolve(process.cwd(), "src/config/legal-identity.json"),
     });
   }
   // Read once, here, by `next build` (the CSP headers are stored in the build output, so changing the CSP list needs a

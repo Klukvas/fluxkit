@@ -1,6 +1,11 @@
 import { Alert, Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { cookieTable, legalIdentity, type LegalPageSlug } from "../config/legal";
+import {
+  LEGAL_PLACEHOLDER_MARKER,
+  cookieTable,
+  legalIdentity,
+  type LegalPageSlug,
+} from "../config/legal";
 import { formatDate } from "../lib/date";
 import { localizedHref } from "../lib/locale-path";
 import { slotValues, splitMessage } from "../lib/rich-message";
@@ -119,14 +124,17 @@ export function LegalPage({
   locale: Locale;
   t: Translator;
 }) {
+  const intro = t(`legal.${slug}.intro`);
   return (
     <Container className="flex flex-col gap-6 py-8">
       <h1 className="text-3xl font-bold text-foreground">{t(`legal.${slug}.title`)}</h1>
-      <Alert variant="warning" title={t("legal.placeholder.title")}>
-        <p>{t("legal.placeholder.body")}</p>
-        <p className="mt-2 font-mono text-sm">{t("legal.placeholder.marker")}</p>
-      </Alert>
-      <p className="max-w-prose text-foreground">{t(`legal.${slug}.intro`)}</p>
+      {/* The box follows the text, not a message of its own: it goes away only when the shop replaced the text. */}
+      {intro.includes(LEGAL_PLACEHOLDER_MARKER) ? (
+        <Alert variant="warning" title={t("legal.placeholder.title")}>
+          <p>{t("legal.placeholder.body")}</p>
+        </Alert>
+      ) : null}
+      <p className="max-w-prose text-foreground">{intro}</p>
       <p className="text-muted-foreground">
         {legalIdentity.lastUpdated === null
           ? t("legal.updated.unset")

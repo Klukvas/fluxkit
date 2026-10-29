@@ -21,6 +21,19 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(sources.length).toBeGreaterThan(30);
   });
 
+  it("sets no cookie from the storefront: no source file writes document.cookie or uses the Cookie Store API (privacy UI review F3)", () => {
+    // The cookie statement (docs/privacy/README.md section 5) says the storefront sets none; the API sets the three cookies.
+    // A named-file guard would miss a new file, so this scans every non-spec source under src.
+    const writesCookie = /document\s*\.\s*cookie|\bcookieStore\b|["']set-cookie["']/i;
+    const withoutComments = (text: string) =>
+      text.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, "$1");
+    expect(writesCookie.test("document.cookie = 'a=b'")).toBe(true);
+    expect(writesCookie.test("await cookieStore.set('a', 'b')")).toBe(true);
+    for (const file of sources) {
+      expect(writesCookie.test(withoutComments(file.text)), file.path).toBe(false);
+    }
+  });
+
   it('gives every <form> method="post", so a submit before hydration never puts a password or personal data into a URL', () => {
     // Until React hydrates, the browser submits natively; a form without a method uses GET and the values land in the address
     // bar, the history, access logs and the Referer of later requests. Allow-list: none (every form holds personal data or a quantity).

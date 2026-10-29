@@ -400,6 +400,69 @@ describe("the reject dialog", () => {
   });
 });
 
+describe("the count sentences of the notices (privacy UI review F4)", () => {
+  async function notice(locale: "uk" | "en", value: RequestNotice): Promise<string> {
+    const t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
+    return renderInRouter(<RequestNoticeView t={t} notice={value} />);
+  }
+
+  it("uses the singular and plural forms in English", async () => {
+    const one = await notice("en", {
+      kind: "exported",
+      file: "personal-data-2026-10-29.json",
+      orders: 1,
+      mail: 1,
+      sessions: 1,
+    });
+    expect(one).toContain("1 order, 1 mail, 1 session");
+    const many = await notice("en", {
+      kind: "exported",
+      file: "personal-data-2026-10-29.json",
+      orders: 0,
+      mail: 2,
+      sessions: 5,
+    });
+    expect(many).toContain("0 orders, 2 mails, 5 sessions");
+    const erasedOne = await notice("en", {
+      kind: "erased",
+      orders: 1,
+      mail: 1,
+      accountDeleted: null,
+    });
+    expect(erasedOne).toContain("The contact data of 1 order was erased.");
+    expect(erasedOne).toContain("1 stored mail was deleted.");
+    const erasedMany = await notice("en", {
+      kind: "erased",
+      orders: 3,
+      mail: 0,
+      accountDeleted: null,
+    });
+    expect(erasedMany).toContain("The contact data of 3 orders was erased.");
+    expect(erasedMany).toContain("0 stored mails were deleted.");
+    expect(one + many + erasedOne + erasedMany).not.toMatch(/\b1 (orders|mails|sessions)\b/);
+  });
+
+  it("uses one, few and many forms in Ukrainian", async () => {
+    const exported = (orders: number, mail: number, sessions: number) =>
+      notice("uk", { kind: "exported", file: "f.json", orders, mail, sessions });
+    expect(await exported(1, 1, 1)).toContain("1 замовлення, 1 лист, 1 сеанс");
+    expect(await exported(2, 3, 4)).toContain("2 замовлення, 3 листи, 4 сеанси");
+    expect(await exported(5, 11, 25)).toContain("5 замовлень, 11 листів, 25 сеансів");
+    expect(await exported(21, 22, 0)).toContain("21 замовлення, 22 листи, 0 сеансів");
+    const erased = (orders: number, mail: number) =>
+      notice("uk", { kind: "erased", orders, mail, accountDeleted: null });
+    const one = await erased(1, 1);
+    expect(one).toContain("в 1 замовленні");
+    expect(one).toContain("Видалено 1 збережений лист.");
+    const few = await erased(2, 3);
+    expect(few).toContain("в 2 замовленнях");
+    expect(few).toContain("Видалено 3 збережені листи.");
+    const many = await erased(5, 12);
+    expect(many).toContain("в 5 замовленнях");
+    expect(many).toContain("Видалено 12 збережених листів.");
+  });
+});
+
 describe("with the real messages", () => {
   it("renders the screens, the dialogs and every notice in uk and en without a raw key", async () => {
     for (const locale of ["uk", "en"] as const) {

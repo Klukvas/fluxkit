@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { createTranslator } from "@fluxkit/ui";
+import { createTranslator, type Translator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -49,13 +49,19 @@ describe("legal pages configuration", () => {
     });
   });
 
-  it("has a title, an intro and the marker for the placeholder in both languages", () => {
+  it("keeps the identity in the JSON file the release check also reads", () => {
+    expect(legalIdentity).toEqual(
+      JSON.parse(readFileSync(join(srcRoot, "config", "legal-identity.json"), "utf8")),
+    );
+  });
+
+  it("has a title and an intro carrying the marker for every page in both languages", () => {
     for (const messages of [en, uk] as Record<string, string>[]) {
       for (const page of legalPages) {
         expect(messages[page.labelKey], page.labelKey).toBeTruthy();
-        expect(messages[`legal.${page.slug}.intro`], page.slug).toBeTruthy();
+        expect(messages[`legal.${page.slug}.intro`], page.slug).toContain(LEGAL_PLACEHOLDER_MARKER);
       }
-      expect(messages["legal.placeholder.marker"]).toContain(LEGAL_PLACEHOLDER_MARKER);
+      expect(messages["legal.placeholder.marker"]).toBeUndefined();
     }
   });
 });
@@ -95,7 +101,23 @@ describe("the cookie statement", () => {
 });
 
 describe("a legal page", () => {
-  it("renders every page without hardcoded text, with one h1 and the template marker message", () => {
+  it("shows the placeholder box only while the page's own text carries the marker", () => {
+    const withMarker = Object.assign(
+      (key: string) => (key.endsWith(".intro") ? `${LEGAL_PLACEHOLDER_MARKER} ${key}` : `§${key}`),
+      { plural: t.plural },
+    ) as Translator;
+    for (const page of legalPages) {
+      const placeholder = renderToStaticMarkup(
+        <LegalPage slug={page.slug} locale="en" t={withMarker} />,
+      );
+      expect(placeholder, page.slug).toContain("§legal.placeholder.title");
+      expect(placeholder).toContain("§legal.placeholder.body");
+      const written = renderToStaticMarkup(<LegalPage slug={page.slug} locale="en" t={t} />);
+      expect(written, page.slug).not.toContain("§legal.placeholder");
+    }
+  });
+
+  it("renders every page without hardcoded text and with one h1", () => {
     for (const page of legalPages) {
       const html = renderToStaticMarkup(<LegalPage slug={page.slug} locale="en" t={t} />);
       // The cookie names are technical identifiers, not words.
@@ -103,8 +125,6 @@ describe("a legal page", () => {
       expect(leftoverText(withoutNames), page.slug).toBe("");
       expect(textAttributes(html).filter((text) => !text.startsWith("§"))).toEqual([]);
       expect(html.match(/<h1/g), page.slug).toHaveLength(1);
-      expect(html).toContain("§legal.placeholder.marker");
-      expect(html).toContain("§legal.placeholder.title");
     }
   });
 
