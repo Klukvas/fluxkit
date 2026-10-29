@@ -1,6 +1,8 @@
 import type pg from "pg";
 import { Pool } from "pg";
+import { sql, type SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { PgDialect } from "drizzle-orm/pg-core";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ProblemBody } from "../../../common/problem.filter.js";
 import { PG_POOL } from "../../../database/database.module.js";
@@ -16,7 +18,7 @@ import { requireTestDatabaseUrl } from "../../../test/env.js";
 import { ensureMigrated } from "../../../test/migrate.js";
 import type { Page } from "../../../common/pagination.js";
 import { product } from "../../../database/schema/index.js";
-import { productSearchCondition, type ProductSearch } from "./products.repository.js";
+import { productIdsWithSku, productSearchCondition } from "./products.repository.js";
 import type { ProductDetailResponse, ProductResponse } from "./products.schemas.js";
 
 describe("GET /admin/products?q= (real app, real Postgres)", () => {
@@ -260,36 +262,47 @@ describe("GET /admin/products?q= (real app, real Postgres)", () => {
   });
 
   describe("the query plan (SKU by index, no text search)", () => {
-    /** The statement the repository really runs, planned with sequential scans off: a missing index shows as a failure. */
-    async function plan(search: ProductSearch): Promise<string> {
-      const { sql: text, params } = drizzle(pool)
-        .select({ id: product.id })
-        .from(product)
-        .where(productSearchCondition(search))
-        .toSQL();
+    /** Plans a statement with sequential scans off, so a missing index shows as a failure instead of a cheap scan. */
+    async function plan(statement: SQL): Promise<string> {
       const client = await pool.connect();
       try {
         await client.query("begin");
         await client.query("set local enable_seqscan = off");
-        const result = await client.query(`explain ${text}`, params);
-        return result.rows.map((row: { "QUERY PLAN": string }) => row["QUERY PLAN"]).join("\n");
+        const result = await drizzle(client).execute<{ "QUERY PLAN": string }>(
+          sql`explain ${statement}`,
+        );
+        return result.rows.map((row) => row["QUERY PLAN"]).join("\n");
       } finally {
         await client.query("rollback");
         client.release();
       }
     }
 
-    it("reads the SKU arm from variant_sku_key", async () => {
-      // The slug arm is a prefix scan of `product` today (no `text_pattern_ops` index, which would be a migration);
-      // see `productSearchCondition`. Only the SKU arm is asserted to be index-served.
-      const text = await plan({ slugPrefix: slug("alpha"), sku: sku("alpha-one") });
-      // Only the variant arm is asserted, on purpose. How the outer `product` side is read and joined (nested loop,
-      // merge or hash join; `product_pkey` or a bitmap scan of another index) is the planner's pick from table
-      // statistics, which move with the rows other specs leave in the shared test database and with autovacuum:
-      // asserting it made this test fail intermittently while the SKU lookup was index-served in every plan.
-      expect(text).toMatch(/Scan (using|on) variant_sku_key/);
+    /** Statement text with numbered placeholders made comparable (`$2` in one statement is `$1` in another). */
+    const shape = (text: string) => text.replace(/\$\d+/g, "$?").replace(/\s+/g, " ");
+
+    it("serves the SKU arm from variant_sku_key", async () => {
+      // The arm alone, not the whole search statement: in the whole statement the planner (PostgreSQL 17+, which can
+      // implement UNION with a Merge Append of presorted inputs) may read `variant` in `product_id` order through
+      // `variant_product_id_position_idx` with `sku` as a filter, when the statistics say `variant` is empty (0 rows:
+      // autovacuum analyzed the shared test database after other specs deleted their rows). That is the
+      // planner's right choice for an empty table and made this test fail intermittently in CI; from a handful of
+      // analyzed rows on it picks `variant_sku_key`. The arm alone has no order to gain from another index, so its
+      // plan depends only on which indexes exist, not on statistics.
+      const text = await plan(productIdsWithSku(sku("alpha-one")));
+      expect(text).toMatch(
+        /Index Scan using variant_sku_key on variant|Bitmap Index Scan on variant_sku_key/,
+      );
       expect(text).toMatch(/Index Cond: \(sku = /);
       expect(text).not.toMatch(/Seq Scan on variant/);
+    });
+
+    it("builds the search from exactly that SKU arm", () => {
+      const dialect = new PgDialect();
+      const arm = dialect.sqlToQuery(productIdsWithSku("A-1"));
+      const search = dialect.sqlToQuery(productSearchCondition({ slugPrefix: "a", sku: "A-1" }));
+      expect(shape(search.sql)).toContain(shape(arm.sql));
+      expect(search.params).toContain("A-1");
     });
 
     it("uses no text search (no ILIKE, no similarity, no full-text operator)", async () => {

@@ -96,8 +96,9 @@ export function escapeLikePattern(text: string): string {
 
 /**
  * Products whose slug starts with the text, or that have a variant with exactly this SKU; a product that matches both
- * ways is one row. The SKU arm is an index lookup (`variant_sku_key`). The slug arm is NOT index-served today: a
- * `LIKE 'prefix%'` can use a btree only on a `C` collation database or an index with `text_pattern_ops`, and
+ * ways is one row. The SKU arm (`productIdsWithSku`) is servable by `variant_sku_key`; only when the statistics say
+ * `variant` is empty may the planner read it in `product_id` order through another index instead (PostgreSQL 17+
+ * Merge Append for UNION). The slug arm is NOT index-served today: a `LIKE 'prefix%'` can use a btree only on a `C` collation database or an index with `text_pattern_ops`, and
  * `product_slug_key` is neither (checked with EXPLAIN on a `C.UTF-8` database), so Postgres scans the product table for
  * it. That is bounded by the catalog size; serving it from an index needs a migration (an index
  * `ON product (slug text_pattern_ops)`), which is a red zone and was not part of this change (plan step 2).
@@ -107,8 +108,16 @@ export function productSearchCondition(search: ProductSearch): SQL {
   return sql`${product.id} in (
     select ${product.id} from ${product} where ${product.slug} like ${pattern} escape '\\'
     union
-    select ${variant.productId} from ${variant} where ${variant.sku} = ${search.sku}
+    ${productIdsWithSku(search.sku)}
   )`;
+}
+
+/**
+ * The SKU arm of `productSearchCondition`: the product of the variant with exactly this SKU. Its own function so the
+ * plan test can EXPLAIN exactly this sub-statement (see `products-search.spec.ts`).
+ */
+export function productIdsWithSku(sku: string): SQL {
+  return sql`select ${variant.productId} from ${variant} where ${variant.sku} = ${sku}`;
 }
 
 /** Queries only (Drizzle query builder, parameterized). Every method runs on the executor it is given. */
