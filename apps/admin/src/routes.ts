@@ -237,6 +237,24 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "search",
+    "getSearchStatus",
+    "page.search.title",
+    areaPage(
+      () => import("./areas/search"),
+      (module) => module.SearchStatusPage,
+    ),
+  ),
+  route(
+    "searchSynonyms",
+    "listSynonymGroups",
+    "page.searchSynonyms.title",
+    areaPage(
+      () => import("./areas/search"),
+      (module) => module.SearchSynonymsPage,
+    ),
+  ),
+  route(
     "orders",
     "listOrders",
     "page.orders.title",

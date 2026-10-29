@@ -82,6 +82,10 @@ export class AdminApi {
     return json<T>(await this.context.patch(path, { headers: CSRF, data }), status);
   }
 
+  async delete(path: string, status: number | number[] = 204): Promise<void> {
+    await json(await this.context.delete(path, { headers: CSRF }), status);
+  }
+
   async createUser(email: string, role: Role, password: string): Promise<AdminUser> {
     return this.post<AdminUser>("/admin/users", { email, role, password }, 201);
   }

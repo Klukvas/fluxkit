@@ -18,7 +18,7 @@ export const NAVIGATION: readonly NavigationGroupConfig[] = [
   {
     id: "catalog",
     headingKey: "nav.group.catalog",
-    items: ["products", "attributes", "options", "productTypes", "brands", "categories"],
+    items: ["products", "attributes", "options", "productTypes", "brands", "categories", "search"],
   },
   { id: "sales", headingKey: "nav.group.sales", items: ["orders", "customers", "payments"] },
   {

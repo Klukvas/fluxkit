@@ -24,6 +24,18 @@ export const ADMIN_E2E_MEDIA_DIR = join(
   `fluxkit-admin-e2e-media-${String(ADMIN_E2E_PORT)}`,
 );
 
+/**
+ * Catalog search (search plan step 10b): the API of this suite runs with `SEARCH_ENABLED=true` against the real Meilisearch
+ * of the services. The indexes live under this prefix (per proxy port, so two runs on different ports never meet), the API
+ * uses a key scoped to it (`support/search-engine.ts`) and never the master key. The key is handed over in a file under the
+ * temp directory: Playwright evaluates the config before `prepare-database.ts` creates the key, so it cannot be in `env`.
+ */
+export const ADMIN_E2E_SEARCH_PREFIX = `adme2e${String(ADMIN_E2E_PORT)}_`;
+export const ADMIN_E2E_SEARCH_KEY_FILE = join(
+  tmpdir(),
+  `fluxkit-admin-e2e-search-key-${String(ADMIN_E2E_PORT)}`,
+);
+
 /** The owner made by `prepare-database.ts` with the built `create-admin`. */
 export const OWNER_EMAIL = "e2e-owner@example.com";
 export const OWNER_PASSWORD = "e2e-owner-password-0123456789";
@@ -128,6 +140,12 @@ export function apiEnvironment(env: Env = process.env): Env {
     EMAIL_PROVIDER: "fake",
     EMAIL_FROM: "Fluxkit E2E <shop@example.com>",
     STOREFRONT_PUBLIC_URL: ADMIN_E2E_ORIGIN,
+    // Catalog search on, against the real engine and a prefix of its own. MEILI_API_KEY is NOT set here: it is created at the
+    // start of the run (`prepare-database.ts`) and given to the API by its start command; a key in the developer's shell
+    // must not be used (it is removed below). With the scheduler off, jobs 12 to 14 never run: the index is the one
+    // `prepare-database.ts` builds with `search/reindex.js`, and what the scenarios change waits in the queue.
+    SEARCH_ENABLED: "true",
+    MEILI_INDEX_PREFIX: ADMIN_E2E_SEARCH_PREFIX,
     // No background timers: nothing in the suite depends on expiry, and a sweep must not race a test.
     SCHEDULER_ENABLED: "false",
     DEFAULT_LOCALE: "uk",
@@ -147,5 +165,6 @@ export function apiEnvironment(env: Env = process.env): Env {
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];
+  delete result["MEILI_API_KEY"];
   return result;
 }
