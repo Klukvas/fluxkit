@@ -82,11 +82,44 @@ describe("SearchEngine (real Meilisearch)", () => {
     expect(error.message).not.toMatch(/no id|doesn't have|primary key/i);
   });
 
-  it("gives up waiting for a task after the deadline with engine_task_timeout", async () => {
-    await expectEngineError(
-      () => engine.waitForTask(Number.MAX_SAFE_INTEGER - 1, 1),
-      "engine_task_timeout",
+  it("gives up waiting for a task that never finishes after the deadline with engine_task_timeout", async () => {
+    // A stub engine that always reports the task as enqueued: the outcome no longer depends on how fast a real engine
+    // answers relative to a 1 ms clock tick (a lookup of a missing task id raced the deadline check before).
+    const pending: Server = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ uid: 1, status: "enqueued" }));
+    });
+    await new Promise<void>((resolve) => pending.listen(0, "127.0.0.1", resolve));
+    try {
+      const port = (pending.address() as AddressInfo).port;
+      const waiting = new SearchEngine({
+        url: `http://127.0.0.1:${port}`,
+        apiKey: key.key,
+        requestTimeoutMs: 2_000,
+      });
+      const started = Date.now();
+      await expectEngineError(() => waiting.waitForTask(1, 100), "engine_task_timeout");
+      expect(Date.now() - started).toBeLessThan(2_000);
+    } finally {
+      pending.closeAllConnections();
+      await new Promise<void>((resolve) => pending.close(() => resolve()));
+    }
+  });
+
+  it("keeps waiting for a task id the engine does not know (yet) until the deadline", async () => {
+    // 4294967295 is the largest id Meilisearch accepts (u32); it answers 404 task_not_found, which means "not yet".
+    await expectEngineError(() => engine.waitForTask(4_294_967_295, 300), "engine_task_timeout");
+  });
+
+  it("maps a task id the engine refuses as invalid to engine_rejected, not to a timeout", async () => {
+    // Beyond u32 Meilisearch answers 400 invalid_task_uids: a real failure, never retried. A 1 ms deadline is
+    // deliberately not used here: whether the lookup or the deadline check comes first would be a race.
+    const error = await expectEngineError(
+      () => engine.waitForTask(Number.MAX_SAFE_INTEGER - 1, 10_000),
+      "engine_rejected",
     );
+    expect(error.status).toBe(400);
+    expect(error.engineCode).toBe("invalid_task_uids");
   });
 
   it("is refused outside its prefix (the key scope) with engine_unauthorized", async () => {
