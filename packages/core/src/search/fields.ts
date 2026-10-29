@@ -62,7 +62,12 @@ export const DISPLAYED_FIELDS: readonly string[] = [
   SEARCH_FIELDS.title,
 ];
 
-export const SORTABLE_FIELDS: readonly string[] = [SEARCH_FIELDS.price, SEARCH_FIELDS.publishedAt];
+/** `productId` breaks ties of `newest` like the SQL listing's `published_at desc, id desc` (review F2 of the search finish). */
+export const SORTABLE_FIELDS: readonly string[] = [
+  SEARCH_FIELDS.price,
+  SEARCH_FIELDS.publishedAt,
+  SEARCH_FIELDS.productId,
+];
 
 export type OptionFieldName = `opt_${string}`;
 export type AttributeFieldName = `attr_${string}`;

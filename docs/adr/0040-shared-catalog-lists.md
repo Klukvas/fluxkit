@@ -1,6 +1,6 @@
-# 0040. Catalog pages through search: the shared lists and their misses
+# 0040. Catalog pages through search: the shared lists, their misses and the newest order
 
-Status: accepted 2026-10-29 (review of the search finish, `docs/plans/2026-10-29-search-finish-review.md`, finding F1). Supersedes in part ADR 0039 decision 5 (the unfiltered list in the Next data cache, without a forwarded address) and its consequence "beyond [the window] shoppers see the fallback notice" for the unfiltered lists. No API, rate-limit, schema, configuration or dependency change: the API's `search` window (60 a minute per client address, ADR 0036) stays as it is.
+Status: accepted 2026-10-29 (review of the search finish, `docs/plans/2026-10-29-search-finish-review.md`, findings F1 and F2). Supersedes in part ADR 0039 decision 5 (the unfiltered list in the Next data cache, without a forwarded address) and its consequence "beyond [the window] shoppers see the fallback notice" for the unfiltered lists. No API route, rate-limit, schema, configuration or dependency change (decision 5 changes the search document version and index settings): the API's `search` window (60 a minute per client address, ADR 0036) stays as it is.
 
 ## Context
 
@@ -14,6 +14,8 @@ Status: accepted 2026-10-29 (review of the search finish, `docs/plans/2026-10-29
 3. **A miss is read for the shopper whose view missed.** The read forwards that shopper's address like every other search read (with `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`), so a client that walks many list addresses uses up its own window, not the server's; its own views fall back, other shoppers' do not. A hit reads no request header.
 4. **Stale while error.** When the re-read of an older list answers `429` or `503` (or the API cannot be reached), the last good list is served for 5 more minutes; only a cold miss, or a list older than 6 minutes, falls back to the SQL listing with the notice. Failures are never kept; a `404` (search off) or a `400` drops the list; an engine refusal (`500`) still throws (ADR 0036 decision 6).
 
+5. **"Newest first" is one order (review F2).** The SQL listing orders by `published_at desc, id desc`; the search document kept `publishedAt` in seconds, so products published within one second (7 of the 8 seeded ones) came in the engine's own order and the list reshuffled between search and its fallback. The document now holds `publishedAt` in milliseconds (the precision the API writes it with) and `newest` sorts by `publishedAt:desc, productId:desc` (`productId` is sortable): `SEARCH_DOCUMENT_VERSION` 2, so every index is rebuilt (job 14 or `pnpm search:reindex`; job 13 pauses until the swap). Until then the store reads the live index's `sortableAttributes` (cached 30 s with its filterable ones) and leaves the tie-break out for an index that cannot sort by `productId`, so search keeps answering during the upgrade.
+
 ## Consequences
 
 - With the forwarding on (the production example), a client can no longer make the catalog claim that filters are unavailable for other shoppers: its misses count against its own window, and a list another shopper already saw stays served while it is younger than 6 minutes even when the API refuses.
@@ -21,3 +23,4 @@ Status: accepted 2026-10-29 (review of the search finish, `docs/plans/2026-10-29
 - A list may be up to 6 minutes old while the API refuses (prices and stock of a list; the product page, the cart and the checkout read fresh data and the server recalculates every total). The cache lives per process: several storefront processes each hold their own (at most 500 lists each; a list of 24 summaries with its facets is a few tens of KB).
 - A page number past the last page of an unfiltered list costs a shared page 1 read instead of a read of that page; a valid page beyond 1 costs two shared reads, normally both hits.
 - Not changed: filtered reads (`f`, `price`) stay `no-store` and private to the shopper's window; the API's windows; the fallback for a cold miss.
+- After an upgrade every index is rebuilt once (document version 2); until the swap `newest` has no tie-break (the old order). A `published_at` written outside the API with sub-millisecond digits can still order two products of the same millisecond differently in the two paths.

@@ -59,6 +59,7 @@ describe("SearchEngine (real Meilisearch)", () => {
     );
     expect(await engine.documentCount(uid)).toBe(2);
     expect(await engine.filterableAttributes(uid)).toEqual(["productId"]);
+    expect(await engine.sortableAttributes(uid)).toEqual([]);
     await engine.waitForTask(await engine.deleteDocumentsByFilter(uid, 'productId = "p1"'), 10_000);
     expect(await engine.documentCount(uid)).toBe(1);
     const result = await engine.multiSearch({ queries: [{ indexUid: uid, q: "футболка" }] });
@@ -66,6 +67,7 @@ describe("SearchEngine (real Meilisearch)", () => {
     await engine.waitForTask(await engine.deleteIndex(uid), 10_000);
     await expectEngineError(() => engine.documentCount(uid), "engine_index_missing");
     await expectEngineError(() => engine.filterableAttributes(uid), "engine_index_missing");
+    await expectEngineError(() => engine.sortableAttributes(uid), "engine_index_missing");
   });
 
   it("maps a failed task to engine_task_failed with the engine's code, never its message", async () => {

@@ -13,6 +13,7 @@ import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
+import { removeSeedRows as removeSeedRowsOf } from "../test/seed-rows.js";
 import { testShippingProviders } from "../test/test-shipping-provider.js";
 import type { ProductDetailResponse } from "../catalog/admin/products/products.schemas.js";
 import type { InventoryResponse, MovementResponse } from "../inventory/admin/inventory.schemas.js";
@@ -162,39 +163,8 @@ describe("catalog seed (real app, real Postgres)", () => {
     return result.rows[0]?.count ?? -1;
   }
 
-  /** Removes only what the seed creates, found by its stable codes and slugs, children before parents. */
-  async function removeSeedRows(): Promise<void> {
-    const productSlugs = products.map((product) => product.slug);
-    const where = "product_id in (select id from product where slug = any($1))";
-    await pool.query(`delete from media where ${where}`, [productSlugs]);
-    await pool.query(`delete from variant where ${where}`, [productSlugs]);
-    await pool.query("delete from product where slug = any($1)", [productSlugs]);
-    const levels: (readonly SeedCategory[])[] = [
-      categories.flatMap((root) => root.children ?? []),
-      categories,
-    ];
-    for (const level of levels) {
-      await pool.query("delete from category where slug = any($1)", [
-        level.map((node) => node.slug),
-      ]);
-    }
-    await pool.query("delete from brand where slug = any($1)", [brands.map((b) => b.slug)]);
-    await pool.query("delete from product_type where code = any($1)", [
-      productTypes.map((type) => type.code),
-    ]);
-    await pool.query("delete from attribute where code = any($1)", [
-      attributes.map((attribute) => attribute.code),
-    ]);
-    await pool.query('delete from "option" where code = any($1)', [
-      options.map((option) => option.code),
-    ]);
-    await pool.query("delete from shipping_method where code = any($1)", [
-      shippingMethods.map((method) => method.code),
-    ]);
-    await pool.query("delete from search_synonym_group where terms && $1::text[]", [
-      demoSynonymTerms,
-    ]);
-  }
+  /** Removes only what the seed creates (`test/seed-rows.ts`). */
+  const removeSeedRows = (): Promise<void> => removeSeedRowsOf(pool);
 
   async function demoSynonymRows(): Promise<{ locale: string; terms: string[] }[]> {
     const result = await pool.query<{ locale: string; terms: string[] }>(
