@@ -2,6 +2,7 @@ import type { SearchFacet, SearchFacetValue, SearchSort } from "@fluxkit/api-cli
 import type { Translator } from "@fluxkit/ui";
 import { minorUnitsToInput } from "./search-money";
 import {
+  facetEntry,
   rangeOf,
   setPrice,
   setRange,
@@ -58,6 +59,11 @@ export function priceBoxHints(
 }
 
 export interface SelectedFilter {
+  /**
+   * Unique among the chips (the React key): `<facetKey>:<code>` for a value, `<facetKey>` for a range, `price`. The label is
+   * not: two facets may share a title and a value label (review F6).
+   */
+  key: string;
   label: string;
   /** The query without this one filter: the address of the "remove" link. */
   remove: SearchQuery;
@@ -84,6 +90,7 @@ export function selectedFilters(input: {
       const range = rangeOf(query, facet.key);
       if (range !== null) {
         chips.push({
+          key: facet.key,
           label: `${title}: ${endsText(t, range.min === "" ? null : range.min, range.max === "" ? null : range.max)}`,
           remove: setRange(query, facet.key, null, null),
         });
@@ -93,6 +100,7 @@ export function selectedFilters(input: {
     for (const value of facet.values) {
       if (!value.selected) continue;
       chips.push({
+        key: facetEntry(facet.key, value.code),
         label: `${title}: ${facetValueLabel(t, facet, value)}`,
         remove: toggleFacet(query, facet.key, value.code),
       });
@@ -101,6 +109,7 @@ export function selectedFilters(input: {
   if (query.price !== null) {
     const price: SearchPrice = query.price;
     chips.push({
+      key: "price",
       label: `${t("search.facet.price", { currency: input.currency })}: ${endsText(
         t,
         price.min === null ? null : minorUnitsToInput(price.min, input.exponent),

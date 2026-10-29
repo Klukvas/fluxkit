@@ -204,7 +204,7 @@ function ResultsBody({
               {chips.length === 0 ? null : (
                 <ul aria-label={t("search.filters.selected")} className="flex flex-wrap gap-2">
                   {chips.map((chip) => (
-                    <li key={chip.label}>
+                    <li key={chip.key}>
                       <a
                         href={pageHref(locale, chip.remove)}
                         aria-label={t("search.filters.remove", { label: chip.label })}

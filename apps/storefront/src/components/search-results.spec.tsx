@@ -1,5 +1,6 @@
 import type { SearchFacet, SearchResult } from "@fluxkit/api-client";
 import { createTranslator } from "@fluxkit/ui";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { formatMoney } from "../lib/money";
@@ -195,6 +196,14 @@ describe("results page markup", () => {
   it("keeps the results in a region that is not busy until a change is pending", () => {
     expect(html).toContain('aria-busy="false"');
     expect(html).not.toContain("§searchForm.updating");
+  });
+});
+
+describe("selected-filter chips (review F6)", () => {
+  it("are keyed by the chip's facet key and value, never by the label two facets can share", () => {
+    const source = readFileSync(new URL("./search-results.tsx", import.meta.url), "utf8");
+    expect(source).toMatch(/<li key=\{chip\.key\}>/);
+    expect(source).not.toMatch(/key=\{chip\.label\}/);
   });
 });
 
