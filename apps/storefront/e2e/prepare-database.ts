@@ -11,12 +11,14 @@ import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
   E2E_MAIL_FILE,
+  E2E_SEARCH_ENABLED,
   E2E_MEDIA_DIR,
   apiEnvironment,
   databaseNameOf,
   type Env,
   requireE2eDatabaseUrl,
 } from "./support/env.ts";
+import { createSuiteKey } from "./support/meili.ts";
 
 const apiRoot = resolve(import.meta.dirname, "../../api");
 const databaseUrl = requireE2eDatabaseUrl();
@@ -57,6 +59,14 @@ console.log(`e2e: upload directory ${E2E_MEDIA_DIR}`);
 // A fresh mailbox: the fake email provider appends to this file, and a mail of an earlier run must never be found.
 rmSync(E2E_MAIL_FILE, { force: true });
 
+// Search on: nothing of an earlier run in the engine, and a key scoped to this suite's index prefix (created with the master
+// key, which only this setup and the teardown hold). `apiEnvironment()` below picks the key up from its file, so the seed
+// (its catalog writes mark the products for the index), the reindex and the API all run with search enabled.
+if (E2E_SEARCH_ENABLED) {
+  await createSuiteKey(process.env);
+  console.log("e2e: engine key created");
+}
+
 const env = apiEnvironment();
 const run = (script: string, args: string[] = [], extra: Env = {}) =>
   execFileSync(process.execPath, [resolve(apiRoot, "dist", script), ...args], {
@@ -67,4 +77,7 @@ const run = (script: string, args: string[] = [], extra: Env = {}) =>
 run("database/migrate.js");
 run("seed/seed.js");
 run("auth/create-admin.js", ["--email", ADMIN_EMAIL], { ADMIN_PASSWORD });
+// `pnpm search:reindex`: builds the index of every locale from the seeded catalog and swaps it in, so the first page load
+// finds products (the scheduler is off in this suite, nothing else would build it).
+if (E2E_SEARCH_ENABLED) run("search/reindex.js");
 console.log("e2e: database ready");

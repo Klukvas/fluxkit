@@ -9,6 +9,8 @@ import * as media from "./media/index.js";
 import * as orders from "./orders/index.js";
 import * as payments from "./payments/index.js";
 import * as pricing from "./pricing/index.js";
+import * as search from "./search/index.js";
+import * as privacy from "./privacy/index.js";
 import * as shipping from "./shipping/index.js";
 
 describe("public entry point", () => {
@@ -265,6 +267,38 @@ describe("public entry point", () => {
     expect("toBase64Url" in core).toBe(false);
   });
 
+  it("exports the search rules and keeps the stemmer machinery and shape checks internal", () => {
+    for (const name of [
+      "parseSearchQuery",
+      "normalizeSearchWords",
+      "planTextQueries",
+      "buildSearchFilter",
+      "parseSelectionParams",
+      "deriveFacetSpecs",
+      "planSearchQueries",
+      "validatePageRequest",
+      "buildSearchDocuments",
+      "deriveIndexSettings",
+      "parseSearchSort",
+      "engineSort",
+      "stemToken",
+      "prefixToken",
+      "SEARCH_DOCUMENT_VERSION",
+      "SEARCH_LIMITS",
+    ]) {
+      expect(name in core, name).toBe(true);
+    }
+    for (const name of [
+      "stemUkrainian",
+      "stemEnglish",
+      "runStem",
+      "hasControlCharacter",
+      "UUID_PATTERN",
+    ]) {
+      expect(name in core, name).toBe(false);
+    }
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of [
       "orders.read",
@@ -279,6 +313,23 @@ describe("public entry point", () => {
     }
   });
 
+  it("exports the privacy rules (ADR 0033)", () => {
+    for (const name of [
+      "decideErasure",
+      "planOrderAnonymisation",
+      "buildPersonalDataExport",
+      "findForbiddenExportKeys",
+      "retentionCutoff",
+      "isOrderRetentionDue",
+      "requestDueAt",
+      "decideRequestTransition",
+      "buildAdminAuditEvent",
+    ]) {
+      expect(typeof (core as Record<string, unknown>)[name], name).toBe("function");
+    }
+    expect(core.PERSONAL_DATA_EXPORT_FORMAT).toBe("fluxkit.personal-data-export/v1");
+  });
+
   it("loses no export: a name that two modules both export would be dropped by `export *`", () => {
     const parts = [
       auth,
@@ -290,6 +341,8 @@ describe("public entry point", () => {
       orders,
       payments,
       pricing,
+      search,
+      privacy,
       shipping,
     ];
     const total = parts.reduce((sum, part) => sum + Object.keys(part).length, 0);

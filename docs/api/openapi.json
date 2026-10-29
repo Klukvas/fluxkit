@@ -245,7 +245,8 @@
                           "customers.write",
                           "shipping.manage",
                           "email.manage",
-                          "payments.refund"
+                          "payments.refund",
+                          "privacy.manage"
                         ]
                       }
                     }
@@ -1069,6 +1070,1547 @@
         "x-fluxkit-permission": "users.manage"
       }
     },
+    "/store/search": {
+      "get": {
+        "operationId": "StoreSearchController_list",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 48,
+              "default": 24
+            }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["relevance", "newest", "price_asc", "price_desc"]
+            }
+          },
+          {
+            "name": "price",
+            "required": false,
+            "in": "query",
+            "description": "`<min>..<max>` in minor units.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "f",
+            "required": false,
+            "in": "query",
+            "description": "Repeated `<facetKey>:<value>` (`brand:<slug>`, `category:<uuid>`, `inStock:true`, `opt.<code>:<value>`, `attr.<code>:<value|true|false|min..max>`).",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of products with facets.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "slug": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "brand": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "slug": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["slug", "name"],
+                            "additionalProperties": false
+                          },
+                          "image": {
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "alt"],
+                            "additionalProperties": false
+                          },
+                          "publishedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "price": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "to": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 1000000000000,
+                                "description": "Minor units of the shop currency (for example kopiykas)."
+                              },
+                              "currency": {
+                                "type": "string",
+                                "description": "Always the shop currency."
+                              }
+                            },
+                            "required": ["from", "to", "currency"],
+                            "additionalProperties": false
+                          },
+                          "availability": {
+                            "type": "string",
+                            "enum": ["in_stock", "low_stock", "out_of_stock"]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "slug",
+                          "title",
+                          "brand",
+                          "image",
+                          "publishedAt",
+                          "price",
+                          "availability"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Products the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed."
+                    },
+                    "page": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "pageCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "sort": {
+                      "type": "string",
+                      "enum": ["relevance", "newest", "price_asc", "price_desc"]
+                    },
+                    "relaxed": {
+                      "type": "boolean",
+                      "description": "True when the complete words matched nothing and a second pass answered: the last word matched as a prefix (an unfinished word) and, with two or more words, only some of the words: show it as partial matches."
+                    },
+                    "query": {
+                      "type": "object",
+                      "properties": {
+                        "normalized": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["normalized"],
+                      "additionalProperties": false
+                    },
+                    "facets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string",
+                            "description": "`brand`, `category`, `inStock`, `opt.<code>` or `attr.<code>`."
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["slug", "uuid", "code", "boolean", "range"]
+                          },
+                          "level": {
+                            "type": "string",
+                            "enum": ["product", "variant"]
+                          },
+                          "label": {
+                            "nullable": true,
+                            "description": "Option or attribute name in the locale; null for brand, category and inStock.",
+                            "type": "string"
+                          },
+                          "counted": {
+                            "type": "boolean",
+                            "description": "Whether `count` is given (product-level facets)."
+                          },
+                          "values": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "code": {
+                                  "type": "string",
+                                  "description": "The value as it goes into `f` (`<key>:<code>`)."
+                                },
+                                "label": {
+                                  "nullable": true,
+                                  "description": "Text in the request's locale; null for `true`/`false` values (the storefront words them).",
+                                  "type": "string"
+                                },
+                                "count": {
+                                  "nullable": true,
+                                  "description": "Products with this value among the results (other values of the same facet ignored); null for variant-level facets, which list values without counts (ADR 0034 decision 4).",
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "selected": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "required": ["code", "label", "count", "selected"],
+                              "additionalProperties": false
+                            }
+                          },
+                          "range": {
+                            "nullable": true,
+                            "description": "Smallest and largest value of a number attribute among the results; null otherwise.",
+                            "type": "object",
+                            "properties": {
+                              "min": {
+                                "type": "number"
+                              },
+                              "max": {
+                                "type": "number"
+                              }
+                            },
+                            "required": ["min", "max"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["key", "kind", "level", "label", "counted", "values", "range"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "price": {
+                      "nullable": true,
+                      "description": "Lowest and highest variant price of the results ignoring the price filter; null without results.",
+                      "type": "object",
+                      "properties": {
+                        "min": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "max": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["min", "max"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "total",
+                    "page",
+                    "pageCount",
+                    "limit",
+                    "sort",
+                    "relaxed",
+                    "query",
+                    "facets",
+                    "price"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Search products: text query, facets (brand, category, in stock, options, filterable attributes), price range, sort and pages",
+        "tags": ["store"]
+      }
+    },
+    "/store/search/suggest": {
+      "get": {
+        "operationId": "StoreSearchController_suggest",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggestions, best first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 6,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["slug", "title"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "At most 6 product suggestions (slug and title) for text typed so far (2 characters or more)",
+        "tags": ["store"]
+      }
+    },
+    "/admin/search/status": {
+      "get": {
+        "operationId": "AdminSearchController_status",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "engine": {
+                      "type": "object",
+                      "properties": {
+                        "reachable": {
+                          "type": "boolean",
+                          "description": "One `GET /health` of the engine with a 2 s limit answered `available`."
+                        },
+                        "code": {
+                          "nullable": true,
+                          "description": "The error code when it did not (`engine_unreachable`, `engine_timeout`, ...).",
+                          "type": "string"
+                        },
+                        "rejectedSearches": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "lastCode": {
+                              "nullable": true,
+                              "description": "The engine's error code of the last refusal (`invalid_search_facets`, ...).",
+                              "type": "string"
+                            },
+                            "lastAt": {
+                              "nullable": true,
+                              "type": "string"
+                            }
+                          },
+                          "required": ["count", "lastCode", "lastAt"],
+                          "additionalProperties": false,
+                          "description": "Store searches the engine refused with HTTP 400 since this API process started (a bug or a drift between the API and the live index settings; the store answered 500). Per process."
+                        }
+                      },
+                      "required": ["reachable", "code", "rejectedSearches"],
+                      "additionalProperties": false
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "locale": {
+                            "type": "string"
+                          },
+                          "liveIndex": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "documents": {
+                            "nullable": true,
+                            "description": "Documents of the live index when it was swapped in.",
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "builtAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "settingsFresh": {
+                            "type": "boolean",
+                            "description": "The live index has the settings the current definitions and synonyms derive; false until job 13 applies a change."
+                          },
+                          "documentsFresh": {
+                            "type": "boolean",
+                            "description": "The live index was built for the current document version and shop currency; false means a rebuild is due."
+                          },
+                          "rebuildRequestedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "build": {
+                            "nullable": true,
+                            "description": "The running rebuild, if any (it is resumed every tick until the swap).",
+                            "type": "object",
+                            "properties": {
+                              "index": {
+                                "type": "string"
+                              },
+                              "startedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "documents": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["index", "startedAt", "documents"],
+                            "additionalProperties": false
+                          },
+                          "failedAttempts": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "lastErrorCode": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "lastErrorAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "nextAttemptAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "locale",
+                          "liveIndex",
+                          "documents",
+                          "builtAt",
+                          "settingsFresh",
+                          "documentsFresh",
+                          "rebuildRequestedAt",
+                          "build",
+                          "failedAttempts",
+                          "lastErrorCode",
+                          "lastErrorAt",
+                          "nextAttemptAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "queue": {
+                      "type": "object",
+                      "properties": {
+                        "depth": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Products waiting to be synced."
+                        },
+                        "due": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "leased": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Held by a sync that is running (or crashed: the lease ends after 2 minutes)."
+                        },
+                        "dead": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Products that failed 10 times or more; they keep retrying hourly."
+                        },
+                        "oldestEnqueuedAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "oldestDueAt": {
+                          "nullable": true,
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "errorCodes": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string"
+                              },
+                              "count": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["code", "count"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "depth",
+                        "due",
+                        "leased",
+                        "dead",
+                        "oldestEnqueuedAt",
+                        "oldestDueAt",
+                        "errorCodes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["engine", "locales", "queue"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Index state per locale (live index, documents, freshness, rebuild, failures), queue depth and engine reachability",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.read"
+      }
+    },
+    "/admin/search/rebuild": {
+      "post": {
+        "operationId": "AdminSearchController_rebuild",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The request is recorded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "requestedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "locales": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": ["requestedAt", "locales"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Request a rebuild of every locale's index (job 14 builds it and swaps it in; idempotent while one runs)",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/admin/search/synonyms": {
+      "get": {
+        "operationId": "AdminSearchController_list",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Only the groups of this configured locale."
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of synonym groups.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "locale": {
+                            "type": "string"
+                          },
+                          "terms": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": ["id", "locale", "terms", "createdAt", "updatedAt"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List synonym groups, by locale then creation time",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.read"
+      },
+      "post": {
+        "operationId": "AdminSearchController_create",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "locale": {
+                    "type": "string",
+                    "maxLength": 35
+                  },
+                  "terms": {
+                    "minItems": 1,
+                    "maxItems": 21,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "description": "2 to 20 distinct terms of at most 50 characters and 3 words; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
+                  }
+                },
+                "required": ["locale", "terms"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created group. `Location` points to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "terms": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["id", "locale", "terms", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a synonym group of one locale (applied to the index by job 13, no rebuild)",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/admin/search/synonyms/{id}": {
+      "patch": {
+        "operationId": "AdminSearchController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Synonym group id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "terms": {
+                    "minItems": 1,
+                    "maxItems": 21,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "description": "2 to 20 distinct terms of at most 50 characters and 3 words; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
+                  }
+                },
+                "required": ["terms"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "locale": {
+                      "type": "string"
+                    },
+                    "terms": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["id", "locale", "terms", "createdAt", "updatedAt"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Replace the terms of a synonym group",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.write"
+      },
+      "delete": {
+        "operationId": "AdminSearchController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Synonym group id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a synonym group",
+        "tags": ["admin-search"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/admin/audit-events": {
+      "get": {
+        "description": "What admins did to customer accounts, admin users and privacy requests. Codes and ids only, never personal data.",
+        "operationId": "AdminAuditController_list",
+        "parameters": [
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Exclusive; ISO 8601 with `Z` or an offset.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive; ISO 8601 with `Z` or an offset.",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "targetId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "targetKind",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["customer", "order", "admin_user", "privacy_request"]
+            }
+          },
+          {
+            "name": "adminUserId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "customer.deactivated",
+                "customer.activated",
+                "customer.unlocked",
+                "admin_user.created",
+                "admin_user.role_changed",
+                "admin_user.deactivated",
+                "admin_user.password_reset",
+                "privacy.lookup",
+                "privacy.exported",
+                "privacy.erased",
+                "privacy.request_changed"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of audit events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "adminUserId": {
+                            "nullable": true,
+                            "description": "The acting admin; null once that admin user was deleted.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "action": {
+                            "type": "string",
+                            "enum": [
+                              "customer.deactivated",
+                              "customer.activated",
+                              "customer.unlocked",
+                              "admin_user.created",
+                              "admin_user.role_changed",
+                              "admin_user.deactivated",
+                              "admin_user.password_reset",
+                              "privacy.lookup",
+                              "privacy.exported",
+                              "privacy.erased",
+                              "privacy.request_changed"
+                            ]
+                          },
+                          "targetKind": {
+                            "type": "string",
+                            "enum": ["customer", "order", "admin_user", "privacy_request"]
+                          },
+                          "targetId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "detail": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            },
+                            "description": "Codes, counts and flags only; never personal data."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "createdAt",
+                          "adminUserId",
+                          "action",
+                          "targetKind",
+                          "targetId",
+                          "detail"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List admin audit events, newest first",
+        "tags": ["admin-audit-events"],
+        "x-fluxkit-permission": "users.manage"
+      }
+    },
     "/health": {
       "get": {
         "operationId": "HealthController_check",
@@ -1372,6 +2914,10 @@
                       "type": "boolean",
                       "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty: no online payment, orders are paid by hand. True when at least one payment provider is enabled."
                     },
+                    "search": {
+                      "type": "boolean",
+                      "description": "False when `SEARCH_ENABLED=false`: the admin search routes answer 404, so the admin Search area shows the setup steps."
+                    },
                     "media": {
                       "type": "object",
                       "properties": {
@@ -1408,6 +2954,7 @@
                     "lowStockThreshold",
                     "emailDelivery",
                     "onlinePayment",
+                    "search",
                     "media"
                   ],
                   "additionalProperties": false
@@ -1446,7 +2993,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail and online payment are configured, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail, online payment and catalog search are configured, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -2559,6 +4106,268 @@
           }
         },
         "summary": "Send the signed-in customer a new verification link",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/data-export": {
+      "get": {
+        "description": "JSON document `fluxkit.personal-data-export/v1` as an attachment: the account, its orders (and, once the address is verified, the guest orders placed with it; ADR 0035), mails, sessions, the cart and the providers the shop uses. At most 5 per customer per 24 hours (`429`); `409 rule_violation` `export_too_large` above 10 000 orders.",
+        "operationId": "AccountDataController_dataExport",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The document (`Content-Disposition: attachment`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": ["fluxkit.personal-data-export/v1"]
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["customer", "email"]
+                        }
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": false
+                    },
+                    "account": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "mail": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "cart": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "processors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["email", "payment", "shipping"]
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "name"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "format",
+                    "generatedAt",
+                    "subject",
+                    "account",
+                    "orders",
+                    "mail",
+                    "sessions",
+                    "cart",
+                    "processors"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The personal-data export `fluxkit.personal-data-export/v1` (docs/contracts/personal-data-export.md), sent as a download."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Download my personal data",
+        "tags": ["store"]
+      }
+    },
+    "/store/account/delete": {
+      "post": {
+        "description": "Needs the current password and `confirm: true`. Deletes the account, its sessions, cart and tokens and the mails to it; the orders stay as accounting records with their contact data anonymised (ADR 0033); guest orders and mails of the address only when it is verified (ADR 0035). Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while an order, payment, refund, shipment or mail is in progress; nothing changes then. A wrong password is `400` on `password` (`incorrect`) and counts as a failed sign-in. At most 5 per customer per hour.",
+        "operationId": "AccountDataController_deleteAccount",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [true],
+                    "description": "Must be true: the deletion is immediate and cannot be undone."
+                  }
+                },
+                "required": ["password", "confirm"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The account is gone and the session cookie is cleared."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete my account now",
         "tags": ["store"]
       }
     },
@@ -6488,20 +8297,25 @@
                           "type": "object",
                           "properties": {
                             "email": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "phone": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "firstName": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "lastName": {
+                              "nullable": true,
                               "type": "string"
                             }
                           },
                           "required": ["email", "phone", "firstName", "lastName"],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                         },
                         "shippingAddress": {
                           "nullable": true,
@@ -7105,20 +8919,25 @@
                           "type": "object",
                           "properties": {
                             "email": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "phone": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "firstName": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "lastName": {
+                              "nullable": true,
                               "type": "string"
                             }
                           },
                           "required": ["email", "phone", "firstName", "lastName"],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                         },
                         "shippingAddress": {
                           "nullable": true,
@@ -7831,20 +9650,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -8539,20 +10363,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -9395,20 +11224,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -10080,20 +11914,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -10652,6 +12491,8 @@
                             "format": "uuid"
                           },
                           "email": {
+                            "nullable": true,
+                            "description": "Null once the contact data of the order was erased (ADR 0033).",
                             "type": "string"
                           },
                           "itemCount": {
@@ -10798,20 +12639,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -11621,7 +13473,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -12021,6 +13873,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -12186,20 +14039,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -13009,7 +14873,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -13409,6 +15273,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -13600,20 +15465,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -14423,7 +16299,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -14823,6 +16699,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -14980,20 +16857,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -15803,7 +17691,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -16203,6 +18091,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -20203,7 +22092,7 @@
     },
     "/store/orders/payments": {
       "post": {
-        "description": "Starts an online payment attempt for an order that awaits payment (ADR 0032). The amount is the order total read by the server; the body takes no amount or currency (a strict body: any such member is a 400). The return and notification URLs are built from `STOREFRONT_PUBLIC_URL`, never from the request. 201 `{paymentId, status, redirectUrl, expiresAt}`: navigate to `redirectUrl` (the provider's page). A previous attempt that still waits for the shopper is replaced (its page stops working). 409 `rule_violation` with rule `order_not_payable`, `payment_in_progress` (a payment is processing, or the previous create's answer was lost), `payment_window_too_short` or `payment_not_available` (no online payment, or the order currency is not supported). 503 `payment_provider_unavailable` with `Retry-After` and `payment: {paymentId, status, canRetry}`: when `canRetry` is false the provider's answer was lost; do not start another attempt, poll the status instead (the attempt is settled by a webhook or the reconcile job). Limited per address (`paymentCreate`); `no-store`.",
+        "description": "Starts an online payment attempt for an order that awaits payment (ADR 0032). The amount is the order total read by the server; the body takes no amount or currency (a strict body: any such member is a 400). The return and notification URLs are built from `STOREFRONT_PUBLIC_URL`, never from the request. 201 `{paymentId, status, redirectUrl, expiresAt}`: navigate to `redirectUrl` (the provider's page). A previous attempt that still waits for the shopper is replaced (its page stops working). 409 `rule_violation` with rule `order_not_payable`, `payment_in_progress` (a payment is processing, or the previous create's answer was lost), `payment_window_too_short` or `payment_not_available` (no online payment, the order currency is not supported, or the order total is 0: nothing to pay online). 503 `payment_provider_unavailable` with `Retry-After` and `payment: {paymentId, status, canRetry}`: when `canRetry` is false the provider's answer was lost; do not start another attempt, poll the status instead (the attempt is settled by a webhook or the reconcile job). Limited per address (`paymentCreate`); `no-store`.",
         "operationId": "StorePaymentsController_create",
         "parameters": [
           {
@@ -20553,7 +22442,7 @@
     },
     "/store/account/orders/{number}/payments": {
       "post": {
-        "description": "Starts an online payment attempt for an order that awaits payment (ADR 0032). The amount is the order total read by the server; the body takes no amount or currency (a strict body: any such member is a 400). The return and notification URLs are built from `STOREFRONT_PUBLIC_URL`, never from the request. 201 `{paymentId, status, redirectUrl, expiresAt}`: navigate to `redirectUrl` (the provider's page). A previous attempt that still waits for the shopper is replaced (its page stops working). 409 `rule_violation` with rule `order_not_payable`, `payment_in_progress` (a payment is processing, or the previous create's answer was lost), `payment_window_too_short` or `payment_not_available` (no online payment, or the order currency is not supported). 503 `payment_provider_unavailable` with `Retry-After` and `payment: {paymentId, status, canRetry}`: when `canRetry` is false the provider's answer was lost; do not start another attempt, poll the status instead (the attempt is settled by a webhook or the reconcile job). Limited per address (`paymentCreate`); `no-store`.",
+        "description": "Starts an online payment attempt for an order that awaits payment (ADR 0032). The amount is the order total read by the server; the body takes no amount or currency (a strict body: any such member is a 400). The return and notification URLs are built from `STOREFRONT_PUBLIC_URL`, never from the request. 201 `{paymentId, status, redirectUrl, expiresAt}`: navigate to `redirectUrl` (the provider's page). A previous attempt that still waits for the shopper is replaced (its page stops working). 409 `rule_violation` with rule `order_not_payable`, `payment_in_progress` (a payment is processing, or the previous create's answer was lost), `payment_window_too_short` or `payment_not_available` (no online payment, the order currency is not supported, or the order total is 0: nothing to pay online). 503 `payment_provider_unavailable` with `Retry-After` and `payment: {paymentId, status, canRetry}`: when `canRetry` is false the provider's answer was lost; do not start another attempt, poll the status instead (the attempt is settled by a webhook or the reconcile job). Limited per address (`paymentCreate`); `no-store`.",
         "operationId": "AccountPaymentsController_create",
         "parameters": [
           {
@@ -21011,7 +22900,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -21368,7 +23257,7 @@
     },
     "/admin/orders/{id}/payments/{paymentId}/refunds": {
       "post": {
-        "description": "Only a `succeeded` attempt; `amount` (minor units, the payment currency) at most `refundableAmount` (the amount less every refund that is not `failed`; checked under the payment row lock, so two admins can never refund more than was paid); a partial amount only when the provider takes partial refunds. The refund is stored `requested`, then sent once to the provider with no transaction open (our refund id is the provider's idempotency reference). 202 `{refund, payment}` with the refund as the provider left it (`succeeded`, `processing`, `failed`, `requested` when the provider throttled us and the reconcile job sends it, `unknown` when the answer was lost: never resent, settled from the provider's refund list). A refund never changes the order status. The same `Idempotency-Key` with the same body answers the same refund (200) without a second call; with another body 409 `idempotency_key_reused`. 409 `rule_violation` with rule `refund_not_allowed`, `refund_exceeds_remaining` or `partial_refund_not_supported`. Limited per admin user (`paymentRefund`).",
+        "description": "Only a `succeeded` attempt; `amount` (minor units, the payment currency) at most `refundableAmount` (the amount less every refund that is not `failed` and less money the provider returned outside the shop, from its final amount; checked under the payment row lock, so two admins can never refund more than was paid and the same money is never refunded twice); a partial amount only when the provider takes partial refunds. The refund is stored `requested`, then sent once to the provider with no transaction open (our refund id is the provider's idempotency reference). 202 `{refund, payment}` with the refund as the provider left it (`succeeded`, `processing`, `failed`, `requested` when the provider throttled us and the reconcile job sends it, `unknown` when the answer was lost: never resent, settled from the provider's refund list). A refund never changes the order status. The same `Idempotency-Key` with the same body answers the same refund (200) without a second call; with another body 409 `idempotency_key_reused`. 409 `rule_violation` with rule `refund_not_allowed`, `refund_exceeds_remaining` or `partial_refund_not_supported`. Limited per admin user (`paymentRefund`).",
         "operationId": "AdminOrderPaymentsController_refund",
         "parameters": [
           {
@@ -21619,7 +23508,7 @@
                           },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                         },
                         "providerStatus": {
                           "nullable": true,
@@ -22090,7 +23979,7 @@
                           },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                         },
                         "providerStatus": {
                           "nullable": true,
@@ -22598,7 +24487,7 @@
                       },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                     },
                     "providerStatus": {
                       "nullable": true,
@@ -23119,7 +25008,7 @@
                                 },
                                 "required": ["amount", "currency"],
                                 "additionalProperties": false,
-                                "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                                "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                               },
                               "providerStatus": {
                                 "nullable": true,
@@ -23601,7 +25490,7 @@
                       },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                     },
                     "providerStatus": {
                       "nullable": true,
@@ -25354,6 +27243,1752 @@
         "x-fluxkit-permission": "email.manage"
       }
     },
+    "/admin/privacy/lookup": {
+      "post": {
+        "description": "The account with this email, its guest orders, the number of mails and the open privacy requests. Audited (`privacy.lookup`). The email is in the body, never in the URL.",
+        "operationId": "PrivacyAdminController_lookup",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  }
+                },
+                "required": ["email"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "customer": {
+                      "nullable": true,
+                      "description": "The account with this email, or null.",
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "email": {
+                          "type": "string"
+                        },
+                        "firstName": {
+                          "type": "string"
+                        },
+                        "lastName": {
+                          "type": "string"
+                        },
+                        "isActive": {
+                          "type": "boolean"
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "ISO 8601, UTC."
+                        },
+                        "orderCount": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "email",
+                        "firstName",
+                        "lastName",
+                        "isActive",
+                        "createdAt",
+                        "orderCount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "guestOrders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "number": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "awaiting_payment",
+                              "paid",
+                              "fulfilled",
+                              "cancelled",
+                              "expired"
+                            ]
+                          },
+                          "placedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "contactErased": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["id", "number", "status", "placedAt", "contactErased"],
+                        "additionalProperties": false
+                      },
+                      "description": "Orders with this email that belong to no account, oldest first."
+                    },
+                    "mailCount": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "openRequests": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["export", "erasure"]
+                          },
+                          "subjectKind": {
+                            "type": "string",
+                            "enum": ["customer", "email"]
+                          },
+                          "subjectCustomerId": {
+                            "nullable": true,
+                            "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "channel": {
+                            "type": "string",
+                            "enum": ["self_service", "admin"]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["received", "in_progress", "completed", "rejected"]
+                          },
+                          "receivedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "completedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "overdue": {
+                            "type": "boolean",
+                            "description": "Open and past its due time."
+                          },
+                          "result": {
+                            "nullable": true,
+                            "description": "Counts, codes and erased order numbers; never contact data.",
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "note": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "handledBy": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "subjectKind",
+                          "subjectCustomerId",
+                          "channel",
+                          "status",
+                          "receivedAt",
+                          "dueAt",
+                          "completedAt",
+                          "overdue",
+                          "result",
+                          "note",
+                          "handledBy"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["customer", "guestOrders", "mailCount", "openRequests"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Find what the shop holds for an email",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests": {
+      "get": {
+        "operationId": "PrivacyAdminController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["received", "in_progress", "completed", "rejected"]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of privacy requests.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["export", "erasure"]
+                          },
+                          "subjectKind": {
+                            "type": "string",
+                            "enum": ["customer", "email"]
+                          },
+                          "subjectCustomerId": {
+                            "nullable": true,
+                            "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "channel": {
+                            "type": "string",
+                            "enum": ["self_service", "admin"]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["received", "in_progress", "completed", "rejected"]
+                          },
+                          "receivedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "dueAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "completedAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "overdue": {
+                            "type": "boolean",
+                            "description": "Open and past its due time."
+                          },
+                          "result": {
+                            "nullable": true,
+                            "description": "Counts, codes and erased order numbers; never contact data.",
+                            "type": "object",
+                            "additionalProperties": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              ]
+                            }
+                          },
+                          "note": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "handledBy": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "uuid"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "subjectKind",
+                          "subjectCustomerId",
+                          "channel",
+                          "status",
+                          "receivedAt",
+                          "dueAt",
+                          "completedAt",
+                          "overdue",
+                          "result",
+                          "note",
+                          "handledBy"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "offset": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": ["items", "total", "limit", "offset"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List privacy requests: open ones by due date first, then closed ones",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      },
+      "post": {
+        "description": "Due 30 days after it is received. The email of an email subject is stored only as an HMAC. Audited (`privacy.request_changed`).",
+        "operationId": "PrivacyAdminController_create",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": ["export", "erasure"]
+                  },
+                  "subject": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "customerId": {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                          }
+                        },
+                        "required": ["customerId"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "email": {
+                            "type": "string",
+                            "maxLength": 254
+                          }
+                        },
+                        "required": ["email"],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "note": {
+                    "description": "How the identity was checked; 1 to 500 characters, trimmed. No personal data (no copies of documents).",
+                    "type": "string"
+                  }
+                },
+                "required": ["kind", "subject"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new request. `Location` points to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Record a privacy request (export or erasure) of an account or an email",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}": {
+      "get": {
+        "operationId": "PrivacyAdminController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get one privacy request",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/export": {
+      "post": {
+        "description": "JSON document `fluxkit.personal-data-export/v1` as an attachment. An email subject needs its email again in the body (only an HMAC is stored). Completes an export request; moves an erasure request to `in_progress`. Audited (`privacy.exported`).",
+        "operationId": "PrivacyAdminController_exportRequest",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The document (`Content-Disposition: attachment`).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "format": {
+                      "type": "string",
+                      "enum": ["fluxkit.personal-data-export/v1"]
+                    },
+                    "generatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "subject": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": ["customer", "email"]
+                        }
+                      },
+                      "required": ["kind"],
+                      "additionalProperties": false
+                    },
+                    "account": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "orders": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "mail": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "sessions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      }
+                    },
+                    "cart": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {}
+                    },
+                    "processors": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": ["email", "payment", "shipping"]
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["kind", "name"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "format",
+                    "generatedAt",
+                    "subject",
+                    "account",
+                    "orders",
+                    "mail",
+                    "sessions",
+                    "cart",
+                    "processors"
+                  ],
+                  "additionalProperties": false,
+                  "description": "The personal-data export `fluxkit.personal-data-export/v1` (docs/contracts/personal-data-export.md), sent as a download."
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Download the personal data of the request's subject",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/erase-preview": {
+      "post": {
+        "description": "Counts and blockers; nothing changes. An email subject needs its email again in the body.",
+        "operationId": "PrivacyAdminController_erasePreview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Counts and blockers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountFound": {
+                      "type": "boolean"
+                    },
+                    "orders": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "ordersToAnonymise": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mail": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "orderNumber": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "open_order",
+                              "payment_in_progress",
+                              "refund_in_progress",
+                              "active_shipment",
+                              "mail_sending"
+                            ]
+                          }
+                        },
+                        "required": ["orderNumber", "reason"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "open_order",
+                          "payment_in_progress",
+                          "refund_in_progress",
+                          "active_shipment",
+                          "mail_sending"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "accountFound",
+                    "orders",
+                    "ordersToAnonymise",
+                    "mail",
+                    "blockers",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What an erasure of the request's subject would do now",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/erase": {
+      "post": {
+        "description": "Deletes the account (if any) and the mails, anonymises the contact fields of every order; orders, payments, refunds and shipments stay. `confirm: true` is required. Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while anything is in progress. Idempotent: a completed erasure request answers its stored result. Audited (`privacy.erased`).",
+        "operationId": "PrivacyAdminController_erase",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [true],
+                    "description": "Must be true: the erasure cannot be undone."
+                  }
+                },
+                "required": ["confirm"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The completed request with its result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Erase the request's subject (irreversible)",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/reject": {
+      "post": {
+        "description": "Audited (`privacy.request_changed`). A closed request is `409 request_closed`.",
+        "operationId": "PrivacyAdminController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reasonCode": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "description": "A code, for example `identity_not_confirmed` or `duplicate`."
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": ["reasonCode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rejected request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reject an open request with a reason code",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
     "/store/categories": {
       "get": {
         "operationId": "StoreCategoriesController_list",
@@ -25584,6 +29219,10 @@
                     "onlinePayment": {
                       "type": "boolean",
                       "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty (no online payment; orders are paid by hand): show no pay button. True when at least one payment provider is enabled. Says nothing about which provider."
+                    },
+                    "search": {
+                      "type": "boolean",
+                      "description": "False when `SEARCH_ENABLED=false`: the search routes answer 404, so show no search box and no facets and use `GET /store/products`. True when catalog search is configured (it may still answer `503 search_unavailable` while the engine is down or the first index is built)."
                     }
                   },
                   "required": [
@@ -25593,7 +29232,8 @@
                     "defaultLocale",
                     "locales",
                     "emailDelivery",
-                    "onlinePayment"
+                    "onlinePayment",
+                    "search"
                   ],
                   "additionalProperties": false
                 }
@@ -39731,7 +43371,8 @@
               "shipping_not_applicable",
               "shipping_changed",
               "shipping_provider_unavailable",
-              "payment_provider_unavailable"
+              "payment_provider_unavailable",
+              "search_unavailable"
             ]
           },
           "detail": {

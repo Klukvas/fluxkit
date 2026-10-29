@@ -1,10 +1,12 @@
 import { Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
+import { Suspense } from "react";
 import { HEADER_CATEGORY_LIMIT, headerLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
 import { AccountLink } from "./account-link";
 import { CartBadge } from "./cart-badge";
 import { LocaleSwitcher } from "./locale-switcher";
+import { SearchBox } from "./search-box";
 import { navLink } from "./styles";
 
 export interface NavigationCategory {
@@ -14,17 +16,20 @@ export interface NavigationCategory {
 
 /**
  * Server-rendered header. `categories` is `null` when the API could not be read (the page still renders, without the
- * category links; the failure is logged where it happened). The cart badge, the account link and the locale switcher are
- * client islands. Needs an `I18nProvider` above it.
+ * category links; the failure is logged where it happened). The cart badge, the account link, the locale switcher and the
+ * search box are client islands. `searchEnabled` is `search` of `GET /store/config`: with false there is NO search box (and
+ * no results page). Needs an `I18nProvider` above it.
  */
 export function SiteHeader({
   locale,
   t,
   categories,
+  searchEnabled,
 }: {
   locale: Locale;
   t: Translator;
   categories: readonly NavigationCategory[] | null;
+  searchEnabled: boolean;
 }) {
   return (
     <header className="border-b border-border bg-background">
@@ -56,6 +61,14 @@ export function SiteHeader({
             ))}
           </ul>
         </nav>
+        {searchEnabled ? (
+          <div className="w-full min-w-48 flex-1 sm:max-w-sm">
+            {/* `useSearchParams` in the box needs a boundary; the page is rendered per request, so it is never the fallback. */}
+            <Suspense fallback={null}>
+              <SearchBox locale={locale} />
+            </Suspense>
+          </div>
+        ) : null}
         <div className="ms-auto flex flex-wrap items-center gap-x-4">
           <LocaleSwitcher />
           <CartBadge />

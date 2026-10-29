@@ -19,7 +19,7 @@ Storefront v1 (`docs/plans/2026-10-18-storefront.md`): steps 1 to 10 merged (PRs
 Admin UI v1 (`docs/plans/2026-10-19-admin-ui.md`, ADR 0027): steps 1 to 13 merged (PRs #81 to #101), except the media upload (step 2b, own plan `docs/plans/2026-10-23-media-upload.md` and ADR 0028): its plan (#102), steps 1 to 8 (#103 to #109) and the step 9 review fixes (#112) are merged.
 Shipping (`docs/plans/2026-10-24-shipping.md`, ADR 0029): steps 1 to 6, 8, 10 and 11 merged (#117 to #126); step 12 (docs sweep) and the fixes of the step 13 review (`docs/plans/2026-10-24-shipping-review.md`) are on `fix/shipping-review`; steps 7a and 7b (Nova Poshta) wait for the owner's API key and sender data.
 
-**Not built yet**: payment providers (an admin marks an order paid by hand), a carrier plugin verified end to end against the real carrier (the Nova Post plugin `packages/providers/nova-post`, shipping plan step 7b, is built and tested against a local stub only: its label request is refused by Nova Post's production for now, and its estimate and most status codes are unverified; shipping works end to end with the test-only `fake` provider), email delivery (no password reset or email verification), search (no search index; the storefront has no search and no sort), and a production deployment (no API or storefront image; the admin is static files that the edge proxy serves, see Deployment notes). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
+**Not built yet**: payment providers (an admin marks an order paid by hand), a carrier plugin verified end to end against the real carrier (the Nova Post plugin `packages/providers/nova-post`, shipping plan step 7b, is built and tested against a local stub only: its label request is refused by Nova Post's production for now, and its estimate and most status codes are unverified; shipping works end to end with the test-only `fake` provider), email delivery (no password reset or email verification), and search (no search index; the storefront has no search and no sort). A production deployment exists as an example, smoke-tested in Docker but never run on a real host: images, a Compose file and the edge proxy (`docs/deployment.md`). The storefront takes NO payment: v1 is not for live sales until the payment plan (an unpaid order expires after `ORDER_PAYMENT_TTL_MINUTES`, 30 by default, unless an admin marks it paid). What exists and works:
 
 - API: `GET /health`, Swagger UI at `/docs`, OpenAPI export, feature loader (sample feature `example`), Drizzle migrations (`0000_health_check`, `0001_catalog`, `0002_admin_auth`, `0003_pricing_inventory`, `0004_cart_customers_orders`, `0005_media_upload`, `0006_shipping`, `0007_email`, `0008_payments`), BullMQ and Meilisearch spikes.
 - Catalog: admin write API under `/admin` (attributes, options, product types, brands, categories, products, variants; protected by sign-in and roles) and public read API under `/store` (categories, product list and detail; locales `uk` and `en`), ProductType presets and demo data (`pnpm seed`). Endpoints and errors: `docs/api/catalog.md`.
@@ -32,7 +32,8 @@ Shipping (`docs/plans/2026-10-24-shipping.md`, ADR 0029): steps 1 to 6, 8, 10 an
 - Storefront (`/uk`, `/en`; plan `docs/plans/2026-10-18-storefront.md`, steps 1 to 10 merged): home, catalog and category pages (brand filter, paging), product page with variants, cart, guest and customer checkout with a delivery step when the shop offers methods, the guest order page (private link) and the customer's order history, sign-in, registration and profile. Rendering and the same-origin rule: ADR 0026 and `apps/storefront/README.md`; the walkthrough is below. Playwright tests of the purchase flow (`pnpm test:e2e`, 28 tests in 14 files; `apps/storefront/e2e/README.md`).
 - Admin: the SPA under `/admin-ui/` (plan `docs/plans/2026-10-19-admin-ui.md`, steps 1 to 13 merged; images are http(s) addresses or uploaded files, see "Image upload" in `apps/admin/README.md`): sign-in, re-sign-in dialog, navigation by role, own account, uk/en; the catalog dictionaries (attributes, options, product types, brands, category tree); products (list, create, the editor with general fields, generated attributes, categories, media, options, variants, prices, stock and the lifecycle); orders (list, detail, mark paid, mark fulfilled, cancel, the delivery and shipment panel); shipping settings (delivery methods, carrier profiles, connection test; `shipping.manage`); customers (deactivate, activate, unlock); admin users (owner only). Details in `apps/admin/README.md`. Playwright tests of the admin flows (`pnpm test:e2e` runs them after the storefront's, 31 tests in 12 files; `apps/admin/e2e/README.md`).
 - Image upload (ADR 0028): `POST /admin/media/uploads` (raw bytes, checked by content, re-encoded without metadata, stored under a random key) and `GET /media/{key}` with the local disk driver in `MEDIA_DIR` (`docs/api/media.md`), the cleanup job for abandoned uploads (`docs/api/jobs.md`), `createAdminClient().uploadMedia`, and the admin controls (the product Media tab and the brand logo, `apps/admin/README.md`). Entering an image URL still works. Operations (volume, backup, memory, proxy routing, the Next image optimizer): "Uploaded images" under Deployment notes below. `MEDIA_STORAGE_DRIVER=none` switches uploads off.
-- CI on GitHub Actions: lint, types, boundaries, tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test, and the Playwright `e2e` job (the storefront suite, then the admin suite).
+- Production deployment (`docs/deployment.md`, plan `docs/plans/2026-10-29-production-deploy.md`): one `Dockerfile` with the targets `api` (also the scheduler, the migrator and the admin commands), `storefront` (`next start`) and `edge` (nginx with the built admin SPA), the Compose example `infra/docker-compose.prod.yml` (Postgres, a migrate step before the API, the API, the storefront, the edge; non-root, read-only roots, secrets from `infra/production.env`), the tested edge configuration `infra/proxy/nginx/` and a Caddy alternative `infra/proxy/caddy/Caddyfile`, and `scripts/deploy-smoke.sh` (CI job `deploy-smoke`).
+- CI on GitHub Actions: lint, types, boundaries, `.env.example` completeness (`pnpm check:env`), tests on real Postgres 17 / Redis 8 / Meilisearch, feature on/off/deleted matrix, license and audit policy, docs-with-code check, Compose smoke test, the production images smoke test (`deploy-smoke`), and the Playwright `e2e` job (the storefront suite, then the admin suite).
 
 Open decisions and next steps are listed at the end.
 
@@ -90,6 +91,24 @@ pnpm db:migrate     # = pnpm build && pnpm --filter @fluxkit/api db:migrate (nod
 - Safe for production and for several instances starting together: a Postgres advisory lock (key `7426002`) lets one instance migrate while the others wait and then find nothing to do. If the database holds a migration newer than every entry of the journal (the code is older than the database), the command refuses with exit code 1 and changes nothing.
 - Not for the `_test` database that `pnpm test` uses: the tests migrate it themselves.
 
+## Catalog search
+
+Search (ADR 0034) is off unless `SEARCH_ENABLED=true`; `.env.example` turns it on for development. The API never uses the Meilisearch master key: create one key scoped to the index prefix once per environment (with the master key, from a machine that can reach the engine) and put only that key into `MEILI_API_KEY`:
+
+```bash
+curl -sS -X POST "$MEILI_URL/keys" \
+  -H "Authorization: Bearer $MEILI_MASTER_KEY" -H "Content-Type: application/json" \
+  -d '{"description":"fluxkit API","indexes":["fluxkit_*"],"expiresAt":null,
+       "actions":["search","documents.add","documents.delete","indexes.create","indexes.delete","indexes.swap",
+                  "settings.update","settings.get","tasks.get","tasks.delete","stats.get"]}'
+# the "key" field of the answer is MEILI_API_KEY; use your MEILI_INDEX_PREFIX instead of fluxkit_ when you set one
+```
+
+- The engine stays on a private network (Compose binds `127.0.0.1`); never route it through the edge proxy. In production `MEILI_URL` must be `https` or a private address, `MEILI_ENV=production` and a master key of at least 16 bytes.
+- The API makes no engine call at startup and logs `Search: enabled (<prefix>)`; `search` in `GET /store/config` tells the storefront.
+- A leaked `MEILI_API_KEY` can rewrite this shop's indexes, not other indexes or keys.
+- The scheduler builds the indexes (jobs 13 and 14, `docs/api/jobs.md`): the first tick after search is switched on builds every locale; until then `GET /store/search` answers `503 search_unavailable`. After `pnpm seed` (or any bulk import) run `pnpm search:reindex` to build at once.
+
 ## Scheduler and jobs
 
 The API runs its background work itself: every `SCHEDULER_INTERVAL_SECONDS` (default 60) it expires unpaid orders (and gives their stock back), sweeps stale stock reservations, delivers domain events to plugins, and deletes expired carts, customer sessions and old delivered events. With several API instances only one works per tick (a Postgres advisory lock, key `7426003`); a crashed instance releases it by itself. Nothing is needed beyond the database.
@@ -105,11 +124,14 @@ pnpm jobs:run-once     # = pnpm build && pnpm --filter @fluxkit/api jobs:run-onc
 
 ## Deployment notes: reverse proxy and rate limits
 
+**The runbook is `docs/deployment.md`.** Its edge proxy (`infra/proxy/nginx/`, used by `infra/docker-compose.prod.yml`) is run by `scripts/deploy-smoke.sh` against the real API, storefront and admin SPA, and `infra/proxy/caddy/Caddyfile` is validated and checked against a stub upstream. Prefer those files to the snippets below, which stay as an explanation of the rules and are still not run as written. They also route the payment webhook `POST /webhooks/payments/{provider}` (ADR 0032) to the API, which the snippets below now do too: without that route a provider's notification reaches the storefront and is lost.
+
 The store rate limits (checkout, registration, login, order lookup, guest cancel, cart writes) and the admin login limit count requests per client address (`request.ip`). The API trusts no proxy by default (`TRUST_PROXY=0`), so the address is the one that connects to it. Behind a reverse proxy or a CDN that address is the proxy's, and every shopper then shares ONE window: the whole shop would get, for example, 10 checkouts per 10 minutes. The catalog reads (`GET /store/products`, categories, config) are not rate limited, so the Next.js server's own catalog reads (through `API_INTERNAL_URL`) do not count against any window.
 
 - Set `TRUST_PROXY` to the **exact number of proxies** between the internet and the API (`1` for one edge proxy such as Caddy or nginx, `2` for a CDN plus nginx, and so on; 0 to 10). Each of them must set `X-Forwarded-For` to the address it saw, or append that address to the value it received (the examples below set it, which is the stricter choice). The Next.js server is not one of these hops for `/store/*`: in a deployment the edge proxy routes `/store/*` straight to the API, and the Next.js rewrite of development forwards the browser's own header unchanged (ADR 0026).
 - **Too high is a security hole:** the extra hops are read from the part of `X-Forwarded-For` the client controls, so a client can invent its address and dodge every limit. **Too low** keeps the shop-wide window. Check it after a deployment: from two different networks, a request to a limited route must be counted separately.
 - Keep the API reachable only through the proxy when `TRUST_PROXY` is above 0; otherwise anyone who can reach it directly can send the header themselves.
+- The same holds for the storefront when `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (ADR 0038): the search results page then passes the page request's `X-Forwarded-For` on to the API, so the storefront port must be reachable only through the edge, and the edge must set or replace that header on page requests exactly as on `/store/*`. Leave the setting off (the default) for a storefront that can be reached directly; every results page then counts as the Next server's one address.
 - IPv6 clients are counted per /64 prefix after this step too. The counters are in memory per API process (ADR 0009, ADR 0016).
 
 ### Example edge proxy: the API, the admin SPA and the storefront
@@ -154,7 +176,7 @@ Caddy 2 (`Caddyfile`):
 shop.example.com {
 	# /media/* is the read route of uploaded images. The API sets their Cache-Control itself (a year, immutable on a file; no-store on
 	# a 404): add no header or cache rule of your own for it. The bare prefixes are listed too (the API accepts /admin and /store).
-	@api path /store /store/* /admin /admin/* /media /media/*
+	@api path /store /store/* /admin /admin/* /media /media/* /webhooks/payments /webhooks/payments/*
 	handle @api {
 		# Caddy sets X-Forwarded-For to the address it saw. Since Caddy 2.5 a value sent by an untrusted client is replaced,
 		# not extended. Do NOT configure `trusted_proxies` for this site and do NOT delete the header with `header_up`:
@@ -205,6 +227,15 @@ server {
     # sets the Cache-Control of /media/* itself (a year, immutable on a file; no-store on a 404): add no add_header, expires or
     # proxy_cache rule here. (An add_header in this location would also stop the server-level HSTS line from being inherited.)
     location ~ ^/(store|media)(/|$) {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # The API: payment provider notifications (ADR 0032). 64k is the API's own body limit; the body is forwarded unchanged.
+    location ~ ^/webhooks/payments(/|$) {
+        client_max_body_size 64k;
         proxy_pass http://127.0.0.1:3000;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $remote_addr;
@@ -275,7 +306,7 @@ The `/admin-ui` blocks neither set nor change `X-Forwarded-For`; the API block i
 - The API locations (nginx) and the API matcher (Caddy) accept the bare prefixes (`/admin`, `/store`, `/media`) as well as the paths below them, like the e2e proxies; without that a bare `/admin` or `/store` would reach the storefront (the API accepts both). Check both with your version: a Caddy `path` matcher with no wildcard is meant to match exactly that path (reasoned from its documentation, not tried).
 - `/media/*`: the API answers a file with `Cache-Control: public, max-age=31536000, immutable` and a 404 of a key with `no-store`, and the proxy must pass both unchanged. The nginx locations and the Caddy `handle` above add nothing of their own. If you put a cache in front (nginx `proxy_cache`, a CDN), let it follow these headers and do not override them with a fixed `expires` or `Cache-Control`: a 404 marked immutable would be kept for a year (the same lesson as for the missing hashed assets above). The locations carry no `add_header`, so a server-level HSTS line is inherited.
 - Body size: nginx `client_max_body_size 12m` on the `/admin` location is what lets an upload through; keep it above `MEDIA_MAX_BYTES` and raise it with that variable. Request buffering (step 9 review L-6, reasoned from nginx's documented defaults, NOT tested against a real nginx): with nginx's default `proxy_request_buffering on`, nginx reads the whole body (up to `client_max_body_size`, spooled to disk above its buffer) before the API sees the request, so an anonymous, viewer, oversized or "uploads disabled" request still costs the full upload, and a chunked upload is forwarded with a `Content-Length` (it succeeds behind nginx while the API alone answers `411`). The example therefore sets `proxy_request_buffering off;` with `proxy_http_version 1.1;` on the `/admin` location, so the API's early refusals reach the client before the body is sent; the e2e proxy streams too. With buffering off, nginx still refuses a body above `client_max_body_size` itself, and chunked uploads then reach the API as chunked bodies (answered `411`). Caddy has no request body limit unless you set one (`request_body { max_size 12MB }`).
-- A missing hashed asset must not be cached as a 404 for a year (it would keep a tab that was open across a deployment broken). nginx: the immutable `Cache-Control` line has no `always`, so nginx does not add it to the 404. Caddy: `header` sets its value before `file_server` answers, so the 404 for a missing file probably carries the immutable header too (reasoned, not tried); check it with your version and, if it does, send `Cache-Control: no-store` for that 404 (for example in a `handle_errors` block).
+- A missing hashed asset must not be cached as a 404 for a year (it would keep a tab that was open across a deployment broken). nginx: the immutable `Cache-Control` line has no `always`, so nginx does not add it to the 404 (smoke-tested with `infra/proxy/nginx/`). Caddy: the snippet above sets the header before `file_server` answers, so its 404 carries the immutable header too; `infra/proxy/caddy/Caddyfile` sets it only when the file exists (`@assetExists file`), checked with Caddy 2.10.2.
 - HSTS: nginx does not inherit server-level `add_header` lines into a location that has its own `add_header`, so a `Strict-Transport-Security` header set on the `server` must be repeated in both `/admin-ui` locations (the commented lines). Caddy has no such inheritance rule: a site-level `header Strict-Transport-Security ...` outside the `handle` blocks also applies to the `/admin-ui` answers (from the Caddy documentation, not tried here).
 
 `MAX_OPEN_ORDERS` (default 3) separately caps the unpaid orders per guest email and per customer (ADR 0024); it does not depend on addresses.
@@ -405,6 +436,7 @@ Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) relea
 
 ```bash
 pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock
+pnpm search:reindex     # with SEARCH_ENABLED=true: rebuilds every locale's search index and syncs the queue (docs/api/jobs.md); exit 0 done, 1 failed, 2 lock held
 ```
 
 ## Storefront walkthrough
@@ -490,5 +522,5 @@ Generate the third-party notices to ship with a delivery with `pnpm notices` (al
 1. Ukrainian search morphology and variant-level facet counts (`docs/adr/0005-search-notes.md`).
 2. Shipping: the Nova Post plugin (plan step 7b, `packages/providers/nova-post`) is built; open for the owner: a live run with a real order (label, prices, status codes), a Ukrainian sandbox key, and whether production shipments are billed. Open owner decision from the step 13 review: a paid order with an active waybill can still be cancelled (`docs/HANDOFF.md`).
 3. Next plans, each with its own plan file and owner approval: payment providers and the first Ukrainian providers (LiqPay, WayForPay, Monobank, Nova Poshta; orders are marked paid by hand until then), email delivery (password reset, email verification, order mails), search indexing (blocked by item 1), the pricing pipeline (discounts, shipping cost, tax; TDD for all money logic), and a privacy plan before the EU launch. Known follow-ups without a plan yet: rate limiting for the catalog routes of `/store/*` (needs a dependency), the auth follow-ups in the auth plan outcome, and the cart, customers and orders follow-ups in `docs/HANDOFF.md`.
-4. Production: API and storefront images (the admin is static files, no image in v1); the edge proxy in front of the API, the admin SPA and the storefront (the examples in Deployment notes are not tested here); gate Swagger UI; branch protection on `main` with the CI checks required; pin GitHub Actions by commit SHA. The browser tests exist for the storefront and the admin (`pnpm test:e2e`, CI job `e2e`); `@axe-core/playwright` is not approved.
+4. Production: the images, the Compose example and the edge proxy exist (`docs/deployment.md`) but have never run on a real host; gate Swagger UI (the example edge does not route `/docs`); branch protection on `main` with the CI checks required; pin GitHub Actions by commit SHA. The browser tests exist for the storefront and the admin (`pnpm test:e2e`, CI job `e2e`); `@axe-core/playwright` is not approved.
 5. `AGENTS.md` (the owner's file) does not yet list `pnpm test:e2e` (which now runs the storefront and the admin suites), `pnpm jobs:run-once`, the CI job `e2e` (both suites) or the scheduler variables; the owner adds them (`docs/HANDOFF.md`).

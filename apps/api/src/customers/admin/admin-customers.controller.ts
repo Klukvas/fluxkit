@@ -1,6 +1,8 @@
 import { Body, Get, HttpCode, Inject, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiNoContentResponse, ApiOperation, ApiParam, ApiQuery } from "@nestjs/swagger";
+import type { AdminPrincipal } from "../../auth/admin-authenticator.js";
 import { AdminController } from "../../auth/admin-controller.decorator.js";
+import { CurrentAdmin } from "../../auth/current-admin.js";
 import {
   ApiPaginationQuery,
   ApiProblemResponses,
@@ -71,8 +73,9 @@ export class AdminCustomersController {
   update(
     @Param("id", uuidParam("id")) id: string,
     @Body(new ZodValidationPipe(updateCustomerSchema)) body: UpdateCustomerBody,
+    @CurrentAdmin() admin: AdminPrincipal,
   ): Promise<CustomerDetail> {
-    return this.customers.update(id, body);
+    return this.customers.update(id, body, admin.userId);
   }
 
   @Post(":id/unlock")
@@ -81,7 +84,10 @@ export class AdminCustomersController {
   @ApiParam(ID_PARAM)
   @ApiNoContentResponse({ description: "The failure counter and the lock are cleared." })
   @ApiProblemResponses(400, 404)
-  async unlock(@Param("id", uuidParam("id")) id: string): Promise<void> {
-    await this.customers.unlock(id);
+  async unlock(
+    @Param("id", uuidParam("id")) id: string,
+    @CurrentAdmin() admin: AdminPrincipal,
+  ): Promise<void> {
+    await this.customers.unlock(id, admin.userId);
   }
 }

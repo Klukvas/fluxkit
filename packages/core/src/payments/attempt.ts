@@ -58,6 +58,9 @@ export type NewAttemptDecision =
  * A new attempt for an order (decision 6), checked in the ADR's order:
  * - `order_not_payable`: the order is not `awaiting_payment`, or an attempt already `succeeded` (money was taken for this
  *   order; another payment would be a duplicate; an admin settles it);
+ * - `payment_not_available` when the order total is not positive (review F2 of 2026-10-29: a free order has nothing to
+ *   pay online and an attempt of 0 cannot exist, `payment_amount_check`; whether a free order is settled automatically
+ *   is an open owner decision, today an admin marks it paid);
  * - `payment_in_progress`: an attempt is `processing`, `create_unknown` (never retried, M5; ADR 0032 open question 1 kept
  *   as planned: blocked until job 11 closes it) or `creating` (a concurrent create);
  * - `payment_window_too_short`: `invoiceValidity` refuses;
@@ -66,17 +69,25 @@ export type NewAttemptDecision =
  */
 export function decideNewPaymentAttempt(input: {
   readonly orderStatus: OrderStatus;
+  /** The order total in minor units (the attempt's amount). */
+  readonly orderTotal: number;
   readonly attempts: readonly AttemptSummary[];
   readonly providerAvailable: boolean;
   readonly now: Date;
   readonly orderExpiresAt: Date;
 }): NewAttemptDecision {
   assertStatuses(input.attempts);
+  if (!Number.isSafeInteger(input.orderTotal)) {
+    throw new RangeError("orderTotal must be a whole number of minor units");
+  }
   if (
     input.orderStatus !== "awaiting_payment" ||
     input.attempts.some((attempt) => attempt.status === "succeeded")
   ) {
     return Object.freeze({ ok: false as const, rule: "order_not_payable" as const });
+  }
+  if (input.orderTotal <= 0) {
+    return Object.freeze({ ok: false as const, rule: "payment_not_available" as const });
   }
   if (blocking(input.attempts)) {
     return Object.freeze({ ok: false as const, rule: "payment_in_progress" as const });

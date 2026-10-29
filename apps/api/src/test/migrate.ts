@@ -52,8 +52,11 @@ export async function ensureMigrated(): Promise<void> {
         `drop table if exists "public".${client.escapeIdentifier(row.tablename)} cascade`,
       );
     }
-    // Dropping a table does not drop the trigger functions of migrations 0003, 0004, 0006 and 0008; leaving one would make the migration fail.
+    // Dropping a table does not drop the sequence of 0010 (its column default only uses it).
+    await client.query('drop sequence if exists "public"."search_sync_seq"');
+    // Dropping a table does not drop the trigger functions of migrations 0003, 0004, 0006, 0008 and 0009; leaving one would make the migration fail.
     for (const name of [
+      "admin_audit_event_append_only",
       "payment_event_append_only",
       "stock_movement_append_only",
       "order_item_immutable",

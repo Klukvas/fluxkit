@@ -237,6 +237,24 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "search",
+    "getSearchStatus",
+    "page.search.title",
+    areaPage(
+      () => import("./areas/search"),
+      (module) => module.SearchStatusPage,
+    ),
+  ),
+  route(
+    "searchSynonyms",
+    "listSynonymGroups",
+    "page.searchSynonyms.title",
+    areaPage(
+      () => import("./areas/search"),
+      (module) => module.SearchSynonymsPage,
+    ),
+  ),
+  route(
     "orders",
     "listOrders",
     "page.orders.title",
@@ -270,6 +288,15 @@ export const ROUTES: readonly AppRoute[] = [
     areaPage(
       () => import("./areas/customers"),
       (module) => module.CustomerDetailPage,
+    ),
+  ),
+  route(
+    "payments",
+    "listPayments",
+    "page.payments.title",
+    areaPage(
+      () => import("./areas/payments"),
+      (module) => module.PaymentsPage,
     ),
   ),
   route(
@@ -360,6 +387,42 @@ export const ROUTES: readonly AppRoute[] = [
     areaPage(
       () => import("./areas/email"),
       (module) => module.EmailTemplatePreviewPage,
+    ),
+  ),
+  route(
+    "privacy",
+    "listPrivacyRequests",
+    "page.privacy.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyRequestsPage,
+    ),
+  ),
+  route(
+    "privacyLookup",
+    "privacyLookup",
+    "page.privacyLookup.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyLookupPage,
+    ),
+  ),
+  route(
+    "privacyRequestDetail",
+    "getPrivacyRequest",
+    "page.privacyRequestDetail.title",
+    areaPage(
+      () => import("./areas/privacy"),
+      (module) => module.PrivacyRequestDetailPage,
+    ),
+  ),
+  route(
+    "auditLog",
+    "listAuditEvents",
+    "page.auditLog.title",
+    areaPage(
+      () => import("./areas/audit"),
+      (module) => module.AuditLogPage,
     ),
   ),
   route(

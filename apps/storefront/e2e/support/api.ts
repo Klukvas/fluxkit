@@ -101,6 +101,55 @@ export class StoreApi {
     await json(await this.context.post("/store/account/logout", { headers: CSRF }), [200, 204]);
   }
 
+  /** Cancels an unpaid order of the signed-in customer (the order stays as a closed record). */
+  async cancelCustomerOrder(number: string): Promise<void> {
+    await json(
+      await this.context.post(`/store/account/orders/${encodeURIComponent(number)}/cancel`, {
+        headers: CSRF,
+      }),
+      200,
+    );
+  }
+
+  /** The status of `GET /store/account/data-export` (200 a document, 429 above 5 a day), and its `Retry-After`. */
+  async dataExportStatus(): Promise<{ status: number; retryAfter: string | null }> {
+    const response = await this.context.get("/store/account/data-export");
+    return { status: response.status(), retryAfter: response.headers()["retry-after"] ?? null };
+  }
+
+  /** Starts the online payment of a guest order (the pay button's call). A replay of `idempotencyKey` answers the same attempt. */
+  async startGuestPayment(order: PlacedOrder, idempotencyKey: string): Promise<StartedPayment> {
+    return json(
+      await this.context.post("/store/orders/payments", {
+        headers: { ...CSRF, "Idempotency-Key": idempotencyKey },
+        data: { number: order.number, accessToken: order.accessToken },
+      }),
+      [200, 201],
+    );
+  }
+
+  /** What the return page reads: the shopper's view of one attempt of a guest order. */
+  async guestPaymentStatus(order: PlacedOrder, paymentId: string): Promise<ShopperPaymentStatus> {
+    return json(
+      await this.context.post("/store/orders/payments/status", {
+        headers: CSRF,
+        data: { number: order.number, accessToken: order.accessToken, paymentId },
+      }),
+      200,
+    );
+  }
+
+  /** Cancels an unpaid guest order. */
+  async cancelGuestOrder(order: PlacedOrder): Promise<void> {
+    await json(
+      await this.context.post("/store/orders/cancel", {
+        headers: CSRF,
+        data: { number: order.number, accessToken: order.accessToken },
+      }),
+      200,
+    );
+  }
+
   /** Places an order for what the cart holds. `email` makes it a guest order (the answer then has the access token). */
   async checkout(options: {
     email?: string;
@@ -129,6 +178,56 @@ export class StoreApi {
       total: result.order.total,
     };
   }
+}
+
+export interface StartedPayment {
+  paymentId: string;
+  status: string;
+  redirectUrl: string;
+  expiresAt: string;
+}
+
+export interface ShopperPaymentStatus {
+  paymentId: string;
+  status: string;
+  failureCategory: string | null;
+  orderStatus: string;
+  canRetry: boolean;
+}
+
+/** The admin view of one payment attempt, the members the payment scenarios read (`docs/api/payments.md`). */
+export interface AdminPaymentView {
+  id: string;
+  status: string;
+  amount: Money;
+  finalAmount: Money | null;
+  orderOutcome: string | null;
+  needsAttention: boolean;
+  attentionCode: string | null;
+  refunds: { id: string; status: string; amount: Money; reason: string }[];
+  refundedAmount: Money;
+  refundableAmount: Money;
+  history: { source: string; applied: boolean; toStatus: string | null }[];
+}
+
+/** The members of the admin order the privacy scenarios read (`docs/api/orders.md`). */
+export interface AdminOrderView {
+  id: string;
+  number: string;
+  status: string;
+  customerId: string | null;
+  contact: {
+    email: string | null;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  contactErasedAt: string | null;
+  shippingAddress: unknown;
+  billingAddress: unknown;
+  items: { sku: string; quantity: number; lineTotal: Money }[];
+  total: Money;
+  subtotal: Money;
 }
 
 /** The owner created by `prepare-database.ts`, signed in. Used only to change the catalog behind the shopper's back. */
@@ -253,6 +352,23 @@ export class AdminApi {
     return found;
   }
 
+  /** The order's status and its payment attempts, oldest first, as the admin sees them. */
+  async paymentsOf(orderId: string): Promise<AdminPaymentView[]> {
+    const answer = await json<{ items: AdminPaymentView[] }>(
+      await this.context.get(`/admin/orders/${orderId}/payments`),
+      200,
+    );
+    return answer.items;
+  }
+
+  async orderStatus(orderId: string): Promise<string> {
+    const order = await json<{ status: string }>(
+      await this.context.get(`/admin/orders/${orderId}`),
+      200,
+    );
+    return order.status;
+  }
+
   /** Records a payment of the full total received outside the system. */
   async markPaid(order: { id: string; total: Money }): Promise<void> {
     await json(
@@ -283,6 +399,17 @@ export class AdminApi {
       throw new Error(`The waybill was not created: ${JSON.stringify(result.shipment)}`);
     }
     return result.shipment.trackingNumber;
+  }
+
+  /** The admin view of one order by its number (contact fields, `contactErasedAt`, totals), read through the list's `?q`. */
+  async orderByNumber(number: string): Promise<AdminOrderView> {
+    const page = await json<{ items: { id: string; number: string }[] }>(
+      await this.context.get(`/admin/orders?q=${encodeURIComponent(number)}&limit=100`),
+      200,
+    );
+    const found = page.items.find((order) => order.number === number);
+    if (found === undefined) throw new Error(`The admin API lists no order numbered ${number}.`);
+    return json(await this.context.get(`/admin/orders/${found.id}`), 200);
   }
 
   /** The numbers of the orders whose contact email matches `email` (`?q`, docs/api/orders.md). */

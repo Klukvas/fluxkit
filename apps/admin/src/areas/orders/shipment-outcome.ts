@@ -29,6 +29,9 @@ export const SHIPMENT_REFUSAL_RULES = [
   "label_not_available",
   "carrier_rejected",
   "carrier_invalid_credentials",
+  // The contact data was erased (privacy plan, ADR 0033): unreachable through the privacy service, which refuses an order with
+  // an active shipment, but a route a script calls must still be explained.
+  "contact_erased",
 ] as const;
 
 /** Whole seconds of a `Retry-After` header, or `null` when it is missing or not a plausible wait. */

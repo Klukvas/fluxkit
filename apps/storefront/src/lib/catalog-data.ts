@@ -53,6 +53,25 @@ export async function loadEmailDelivery(data: StoreData): Promise<boolean> {
   return unwrap("GET /store/config", await data.getConfig()).emailDelivery;
 }
 
+/**
+ * Whether the shop takes payments online (`onlinePayment` of `GET /store/config`, false without a payment provider). Decides
+ * the wording of the checkout and whether the order pages may show a pay button. The same cached read as the rest of the
+ * config; the order's own `payment.canPay` decides per order, and the payment routes answer `409 payment_not_available`
+ * meanwhile if the setting changed.
+ */
+export async function loadOnlinePayment(data: StoreData): Promise<boolean> {
+  return unwrap("GET /store/config", await data.getConfig()).onlinePayment;
+}
+
+/**
+ * Whether the shop has search (`search` of `GET /store/config`, false with `SEARCH_ENABLED=false`). With false there is no
+ * search box, no results page (it is a 404) and the search routes answer 404 anyway. The same cached read as the rest of the
+ * config, so a change shows within the cache's minute.
+ */
+export async function loadSearchEnabled(data: StoreData): Promise<boolean> {
+  return unwrap("GET /store/config", await data.getConfig()).search;
+}
+
 export interface HomeData {
   newProducts?: ProductSummary[];
   categories?: CategoryNode[];

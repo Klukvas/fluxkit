@@ -15,6 +15,8 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { guestOrderHref, isOrderNumber, tokenFromFragment } from "../lib/order-links";
+import { paymentSection } from "../lib/payment-model";
+import { guestPaySource, type PaySource } from "../lib/payment-store";
 import type { ShopMoney } from "../lib/order-model";
 import {
   createOrderStore,
@@ -25,6 +27,7 @@ import {
 } from "../lib/order-store";
 import { useI18n } from "./i18n-provider";
 import { OrderDetailsView } from "./order-details";
+import { OrderPayment } from "./order-payment";
 import { useCancelFocus } from "./use-cancel-focus";
 import { useStoreClient } from "./session-provider";
 import { linkButton } from "./styles";
@@ -154,11 +157,22 @@ function Page({ children }: { children: ReactNode }) {
  * and what a reload needs, and a fragment never leaves the browser. The route sends `Referrer-Policy: no-referrer` and
  * loads nothing from another origin.
  */
-export function GuestOrderPage({ number, shop }: { number: string; shop: ShopMoney }) {
+export function GuestOrderPage({
+  number,
+  shop,
+  onlinePayment = false,
+}: {
+  number: string;
+  shop: ShopMoney;
+  /** `onlinePayment` of `GET /store/config`: the shop takes payments online (the order's own `payment` says if this one can). */
+  onlinePayment?: boolean;
+}) {
   const { locale, t } = useI18n();
   const client = useStoreClient();
   const [store, setStore] = useState<OrderStore | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  // Holds the access token for the payment requests (their POST body), like the order store's source; never rendered.
+  const [paySource, setPaySource] = useState<PaySource | null>(null);
   const [missing, setMissing] = useState(false);
   const [copy, setCopy] = useState<CopyState>("idle");
   const state = useOrderState(store);
@@ -173,6 +187,7 @@ export function GuestOrderPage({ number, shop }: { number: string; shop: ShopMon
     }
     const created = createOrderStore({ source: guestOrderSource(client, number, token, locale) });
     setStore(created);
+    setPaySource(guestPaySource(client, number, token, locale));
     setLink(`${window.location.origin}${guestOrderHref(locale, number, token)}`);
     void created.load();
   }, [client, number, locale]);
@@ -196,6 +211,7 @@ export function GuestOrderPage({ number, shop }: { number: string; shop: ShopMon
       </Page>
     );
   }
+  const payment = paymentSection(state.load.order, onlinePayment);
   return (
     <Page>
       {link === null ? null : (
@@ -217,6 +233,16 @@ export function GuestOrderPage({ number, shop }: { number: string; shop: ShopMon
         onAskCancel={() => store.askCancel()}
         onKeepOrder={() => store.keepOrder()}
         onConfirmCancel={() => void store.cancel()}
+        payment={
+          payment === null || paySource === null ? null : (
+            <OrderPayment
+              model={payment}
+              orderExpiresAt={state.load.order.expiresAt}
+              source={paySource}
+              onOrderChanged={() => void store.load()}
+            />
+          )
+        }
       />
     </Page>
   );

@@ -394,12 +394,16 @@ describe("payments: admin routes (real Postgres)", () => {
 
     it("refunds at once that together exceed what was paid: exactly one refund is accepted and sent", async () => {
       const made = await attempt(world.app, { pay: true });
-      const answers = await Promise.all([
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner" }),
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner too" }),
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner again" }),
+      // A warm pool, so the ten requests really run at once (review F3: on a cold pool they queued and never raced).
+      await world.warmPool(world.orders.owner);
+      const answers = await Promise.all(
+        Array.from({ length: 10 }, (_, index) =>
+          refund(world.orders.owner, made, { amount: uah(1_200), note: `owner ${String(index)}` }),
+        ),
+      );
+      expect(answers.map((answer) => answer.status).sort()).toEqual([
+        202, 409, 409, 409, 409, 409, 409, 409, 409, 409,
       ]);
-      expect(answers.map((answer) => answer.status).sort()).toEqual([202, 409, 409]);
       for (const refused of answers.filter((answer) => answer.status === 409)) {
         expect(refused.body).toMatchObject({ rule: "refund_exceeds_remaining" });
       }
@@ -461,6 +465,123 @@ describe("payments: admin routes (real Postgres)", () => {
       expect(failed.body.payment).toMatchObject({ needsAttention: true });
       // A failed refund frees its amount again.
       expect(failed.body.payment.refundableAmount).toEqual(uah(2_000));
+    });
+  });
+
+  describe("refunds made outside the shop (review F1)", () => {
+    const viewOf = async (orderId: string) =>
+      (
+        await http<AdminPaymentList>(
+          world.orders.owner.baseUrl,
+          "GET",
+          `/admin/orders/${orderId}/payments`,
+        )
+      ).body.items[0];
+
+    it("a partial refund in the provider's cabinet raises external_reversal and lowers what can still be refunded; the same money is never refunded twice", async () => {
+      const made = await attempt(world.app, { pay: true });
+      world.provider().addExternalRefund(made.invoiceId, uah(800));
+      const notified = await world.webhook(world.provider().webhookFor(made.invoiceId));
+      expect(notified.status, notified.text).toBe(200);
+      expect(await world.payment(made.paymentId)).toMatchObject({
+        status: "succeeded",
+        final_amount: 1_200,
+        refunded_amount: 0,
+        needs_attention: true,
+        attention_code: "external_reversal",
+      });
+      expect(await viewOf(made.orderId)).toMatchObject({
+        finalAmount: uah(1_200),
+        refundedAmount: uah(0),
+        refundableAmount: uah(1_200),
+        needsAttention: true,
+        attentionCode: "external_reversal",
+      });
+      // The review's second refund of the same 800 still fits (800 <= 1 200); refunding 1 200 + 1 does not.
+      const tooMuch = await refund(world.orders.owner, made, { amount: uah(1_201), note: "x" });
+      expect(tooMuch.status).toBe(409);
+      expect(tooMuch.body).toMatchObject({ rule: "refund_exceeds_remaining" });
+      const full = await refund(world.orders.owner, made, { amount: uah(2_000), note: "x" });
+      expect(full.body).toMatchObject({ rule: "refund_exceeds_remaining" });
+      expect(world.provider().refundCalls).toHaveLength(0);
+      const rest = await refund(world.orders.owner, made, { amount: uah(1_200), note: "rest" });
+      expect(rest.status, JSON.stringify(rest.body)).toBe(202);
+      expect(rest.body.refund).toMatchObject({ status: "succeeded" });
+      expect(rest.body.payment).toMatchObject({
+        refundedAmount: uah(1_200),
+        refundableAmount: uah(0),
+      });
+      expect(
+        (await refund(world.orders.owner, made, { amount: uah(1), note: "x" })).body,
+      ).toMatchObject({ rule: "refund_exceeds_remaining" });
+      expect(world.provider().refundCalls).toHaveLength(1);
+    });
+
+    it("an external refund after a shop refund: the cap is what the provider holds, never what our records alone say", async () => {
+      const made = await attempt(world.app, { pay: true });
+      const ours = await refund(world.orders.owner, made, { amount: uah(500), note: "ours" });
+      expect(ours.status).toBe(202);
+      world.provider().addExternalRefund(made.invoiceId, uah(1_000));
+      expect((await world.webhook(world.provider().webhookFor(made.invoiceId))).status).toBe(200);
+      expect(await world.payment(made.paymentId)).toMatchObject({
+        final_amount: 500,
+        refunded_amount: 500,
+        needs_attention: true,
+        attention_code: "external_reversal",
+      });
+      expect(await viewOf(made.orderId)).toMatchObject({ refundableAmount: uah(500) });
+      expect(
+        (await refund(world.orders.owner, made, { amount: uah(501), note: "x" })).body,
+      ).toMatchObject({ rule: "refund_exceeds_remaining" });
+      expect(world.provider().refundCalls).toHaveLength(1);
+    });
+
+    it("job 11's status read raises it too, and a cleared item stays cleared on the next fact about the same refund", async () => {
+      const made = await attempt(world.app, { pay: true });
+      world.provider().addExternalRefund(made.invoiceId, uah(300));
+      const resynced = await http<AdminPayment>(
+        world.orders.owner.baseUrl,
+        "POST",
+        `/admin/orders/${made.orderId}/payments/${made.paymentId}/resync`,
+      );
+      expect(resynced.status).toBe(200);
+      expect(resynced.body).toMatchObject({
+        attentionCode: "external_reversal",
+        needsAttention: true,
+        refundableAmount: uah(1_700),
+      });
+      const cleared = await http<AdminPayment>(
+        world.orders.owner.baseUrl,
+        "POST",
+        `/admin/payments/${made.paymentId}/attention/clear`,
+      );
+      expect(cleared.status, JSON.stringify(cleared.body)).toBe(200);
+      // A later fact (the same external refund, a new provider change time) changes nothing for the admin.
+      world.provider().setStatus(made.invoiceId, "succeeded");
+      expect((await world.webhook(world.provider().webhookFor(made.invoiceId))).status).toBe(200);
+      expect(await world.payment(made.paymentId)).toMatchObject({ needs_attention: false });
+    });
+
+    it("refunds made through the shop raise nothing and keep the full amount refundable until then (unchanged behaviour)", async () => {
+      const made = await attempt(world.app, { pay: true });
+      expect(await viewOf(made.orderId)).toMatchObject({
+        finalAmount: uah(2_000),
+        refundableAmount: uah(2_000),
+        needsAttention: false,
+      });
+      expect((await refund(world.orders.owner, made, { amount: uah(700), note: "a" })).status).toBe(
+        202,
+      );
+      // The provider's next fact lists our refund by its id and lowers the final amount: not external.
+      world.provider().setStatus(made.invoiceId, "succeeded");
+      expect((await world.webhook(world.provider().webhookFor(made.invoiceId))).status).toBe(200);
+      expect(await world.payment(made.paymentId)).toMatchObject({
+        final_amount: 1_300,
+        refunded_amount: 700,
+        needs_attention: false,
+        attention_code: null,
+      });
+      expect(await viewOf(made.orderId)).toMatchObject({ refundableAmount: uah(1_300) });
     });
   });
 

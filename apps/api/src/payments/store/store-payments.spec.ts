@@ -413,6 +413,32 @@ describe("payments: store routes (real Postgres)", () => {
         latest: { status: "paid", redirectUrl: null },
       });
     });
+
+    it("a free order (total 0) is never offered online payment; its create is 409 payment_not_available, never a check violation (review F2)", async () => {
+      const placed = await world.place([{ quantity: 1, price: 0 }]);
+      expect(placed.total).toBe(0);
+      const lookup = await http<StoreOrder>(base, "POST", "/store/orders/lookup", {
+        body: { number: placed.number, accessToken: placed.accessToken },
+      });
+      expect(lookup.body.status).toBe("awaiting_payment");
+      expect(lookup.body.payment).toMatchObject({ canPay: false, latest: null });
+      const answer = await guestCreate({ number: placed.number, accessToken: placed.accessToken });
+      expect(answer.status, JSON.stringify(answer.body)).toBe(409);
+      expect(answer.body).toMatchObject({ code: "rule_violation", rule: "payment_not_available" });
+      expect(world.provider().calls.createPayment).toBe(0);
+      expect(await world.paymentsOf(placed.id)).toEqual([]);
+      // The customer route answers the same.
+      const shopper = await customer();
+      const order = await world.orders.place([{ quantity: 1, price: 0 }], {}, shopper);
+      const mine = await shopper.request<Problem>(
+        "POST",
+        `/store/account/orders/${order.number}/payments`,
+        { headers: { "idempotency-key": randomUUID() } },
+      );
+      expect(mine.status, JSON.stringify(mine.body)).toBe(409);
+      expect(mine.body).toMatchObject({ code: "rule_violation", rule: "payment_not_available" });
+      expect(world.provider().calls.createPayment).toBe(0);
+    });
   });
 
   it("logs never carry the guest's access token", async () => {

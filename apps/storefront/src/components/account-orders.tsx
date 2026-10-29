@@ -16,12 +16,14 @@ import {
 } from "@fluxkit/ui";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState, useSyncExternalStore } from "react";
+import { Suspense, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { formatDate } from "../lib/date";
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { accountOrderHref, accountOrdersHref, isOrderNumber } from "../lib/order-links";
 import { orderMoney, orderStatusKey, parseOrdersPage, type ShopMoney } from "../lib/order-model";
+import { paymentSection } from "../lib/payment-model";
+import { accountPaySource } from "../lib/payment-store";
 import {
   accountOrderSource,
   createOrderListStore,
@@ -35,6 +37,7 @@ import { AccountGate } from "./account-gate";
 import { OrderStatusView } from "./guest-order-page";
 import { useI18n } from "./i18n-provider";
 import { OrderDetailsView } from "./order-details";
+import { OrderPayment } from "./order-payment";
 import { useCancelFocus } from "./use-cancel-focus";
 import { useAccount, useStoreClient } from "./session-provider";
 import { focusRing, linkButton } from "./styles";
@@ -213,7 +216,15 @@ export function AccountOrders({ shop }: { shop: ShopMoney }) {
   );
 }
 
-function OrderDetail({ number, shop }: { number: string; shop: ShopMoney }) {
+function OrderDetail({
+  number,
+  shop,
+  onlinePayment,
+}: {
+  number: string;
+  shop: ShopMoney;
+  onlinePayment: boolean;
+}) {
   const { locale, t } = useI18n();
   const client = useStoreClient();
   const { store: account } = useAccount();
@@ -226,6 +237,12 @@ function OrderDetail({ number, shop }: { number: string; shop: ShopMoney }) {
   useCancelFocus(state.cancel);
 
   const malformed = !isOrderNumber(number);
+  const paySource = useMemo(
+    () => (malformed ? null : accountPaySource(client, number, locale)),
+    [client, number, locale, malformed],
+  );
+  const payment =
+    state.load.status === "ready" ? paymentSection(state.load.order, onlinePayment) : null;
 
   useEffect(() => {
     // A number that cannot exist is the same not-found state, without a request.
@@ -245,6 +262,17 @@ function OrderDetail({ number, shop }: { number: string; shop: ShopMoney }) {
       ) : state.load.status === "ready" && store !== null ? (
         <OrderDetailsView
           order={state.load.order}
+          payment={
+            payment === null || paySource === null ? null : (
+              <OrderPayment
+                model={payment}
+                orderExpiresAt={state.load.order.expiresAt}
+                source={paySource}
+                onOrderChanged={() => void store.load()}
+                onSignedOut={() => account.sessionEnded()}
+              />
+            )
+          }
           t={t}
           locale={locale}
           shop={shop}
@@ -269,10 +297,18 @@ function OrderDetail({ number, shop }: { number: string; shop: ShopMoney }) {
 }
 
 /** `/{locale}/account/orders/{number}`: one own order, cancel while it awaits payment; another's is the same not-found. */
-export function AccountOrder({ number, shop }: { number: string; shop: ShopMoney }) {
+export function AccountOrder({
+  number,
+  shop,
+  onlinePayment = false,
+}: {
+  number: string;
+  shop: ShopMoney;
+  onlinePayment?: boolean;
+}) {
   return (
     <AccountGate titleKey="order.title">
-      {() => <OrderDetail number={number} shop={shop} />}
+      {() => <OrderDetail number={number} shop={shop} onlinePayment={onlinePayment} />}
     </AccountGate>
   );
 }

@@ -34,6 +34,7 @@ import {
   type LoadedEmailProvider,
 } from "./email/registry/index.js";
 import { DEFAULT_PAYMENTS_CONFIG } from "./payments/payments-config.js";
+import type { SearchTuning } from "./search/search-config.js";
 import {
   PAYMENT_WEBHOOK_PATH,
   paymentWebhookRawBody,
@@ -71,6 +72,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "cartTtlDays"
       | "orderPaymentTtlMinutes"
       | "orderGuestAccessDays"
+      | "orderContactRetentionDays"
       | "orderTokenSecret"
       | "maxOpenOrders"
       | "trustProxy"
@@ -84,6 +86,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "mediaPublicBaseUrl"
       | "mediaMaxBytes"
       | "mediaMaxPixels"
+      | "search"
     >
   >;
 
@@ -122,6 +125,8 @@ export interface CreateAppOptions {
   logLevels?: LogLevel[];
   /** Tests only: other processing slots, waits and budgets of the media upload (ADR 0028 decision 3). */
   mediaTuning?: Partial<MediaTuning>;
+  /** Tests only: shorter engine timeouts of catalog search. */
+  searchTuning?: Partial<SearchTuning>;
 }
 
 /**
@@ -201,6 +206,10 @@ export async function createApp(
         maxHours: env.customerSessionMaxHours ?? DEFAULT_CUSTOMER_AUTH_CONFIG.maxHours,
       },
       cart: { ttlDays: env.cartTtlDays ?? DEFAULT_CART_CONFIG.ttlDays },
+      privacy: {
+        tokenSecret: env.orderTokenSecret ?? null,
+        orderContactRetentionDays: env.orderContactRetentionDays ?? null,
+      },
       orders: {
         paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
         guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
@@ -213,6 +222,8 @@ export async function createApp(
         intervalSeconds: env.schedulerIntervalSeconds ?? DISABLED_SCHEDULER_CONFIG.intervalSeconds,
       },
       media: mediaConfigOf(env, options.mediaTuning),
+      search: env.search,
+      searchTuning: options.searchTuning,
       rateLimits: options.rateLimits,
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       adminAuthenticator: options.adminAuthenticator,
@@ -231,6 +242,17 @@ export async function createApp(
   app.enableShutdownHooks();
   return app;
 }
+
+/**
+ * The search setting of the OpenAPI document (export and freshness spec): search ON, so the public search routes are
+ * documented. Nothing connects to the engine at startup, so the address and the key are never used.
+ */
+export const OPENAPI_SEARCH_ENV = Object.freeze({
+  enabled: true,
+  meiliUrl: "http://127.0.0.1:1",
+  meiliApiKey: "openapi-export-unused-key",
+  indexPrefix: "fluxkit_",
+} as const);
 
 export function buildOpenApiDocument(app: NestExpressApplication): OpenAPIObject {
   const config = new DocumentBuilder().setTitle("Fluxkit API").setVersion("0.0.0").build();

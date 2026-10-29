@@ -200,6 +200,16 @@ describe("buildRequest URL", () => {
     expect(url).toBe("/store/products?brand=a%26b%3Dc%20d&limit=20&offset=0&k%23=%C3%A9%2B%2F");
   });
 
+  it("repeats the name for every value of a list, in order, and skips an empty list", () => {
+    const { url } = build({
+      path: "/store/search",
+      query: { q: "сукня", f: ["brand:acme", "opt.size:m&x"], none: [] },
+    });
+    expect(url).toBe(
+      "/store/search?q=%D1%81%D1%83%D0%BA%D0%BD%D1%8F&f=brand%3Aacme&f=opt.size%3Am%26x",
+    );
+  });
+
   it("adds no question mark for an empty query", () => {
     expect(build({ query: {} }).url).toBe("/store/cart");
     expect(build({ query: { locale: undefined } }).url).toBe("/store/cart");

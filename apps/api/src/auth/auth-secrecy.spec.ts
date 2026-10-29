@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import { adminUser } from "../database/schema/index.js";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DRIZZLE, type Database } from "../database/database.module.js";
@@ -62,12 +63,39 @@ describe("the password hash never leaves the server", () => {
       seen.push({ name, result });
       return result;
     };
+    // The API's own reason codes for refused logins (the output is captured, so a failure must print them itself).
+    const loginRefusals = (): string =>
+      `Captured login log lines:\n${output
+        .join("")
+        .split("\n")
+        .filter((line) => line.includes("Admin login"))
+        .join("\n")}`;
+    // Later steps depend on these: a wrong status here must fail HERE, with the body, not as a puzzling 401 later.
+    const expectStep = async (
+      result: HttpResult<Record<string, unknown>>,
+      status: number,
+      name: string,
+    ): Promise<void> => {
+      if (result.status === status) {
+        return;
+      }
+      const activeOwners = await db
+        .select({ id: adminUser.id })
+        .from(adminUser)
+        .where(and(eq(adminUser.role, "owner"), eq(adminUser.isActive, true)));
+      throw new Error(
+        `Step "${name}" answered ${String(result.status)} (expected ${String(status)}) with ` +
+          `${JSON.stringify(result.body ?? null)}; active owners in the database: ${String(activeOwners.length)}` +
+          ` (a spec that leaves an owner row behind breaks the last-owner step)\n${loginRefusals()}`,
+      );
+    };
 
     clock.advanceMinutes(11);
     const loginOk = await run("login ok", "POST", "/admin/auth/login", undefined, {
       email: owner.email,
       password: PASSWORD,
     });
+    await expectStep(loginOk, 200, "login ok");
     const cookie = (loginOk.headers.getSetCookie()[0] ?? "").split(";")[0] ?? "";
     await run("login wrong", "POST", "/admin/auth/login", undefined, {
       email: owner.email,
@@ -99,15 +127,25 @@ describe("the password hash never leaves the server", () => {
       password: "x",
     });
     await run("users patch", "PATCH", `/admin/users/${viewer.id}`, cookie, { role: "manager" });
-    await run("users patch last owner", "PATCH", `/admin/users/${owner.id}`, cookie, {
-      role: "viewer",
-    });
+    // Refused only while the owner is the ONLY active owner of the database: if it were demoted, the reset below
+    // would be forbidden and the viewer's login would fail far from the cause.
+    await expectStep(
+      await run("users patch last owner", "PATCH", `/admin/users/${owner.id}`, cookie, {
+        role: "viewer",
+      }),
+      409,
+      "users patch last owner",
+    );
     await run("users patch bad field", "PATCH", `/admin/users/${viewer.id}`, cookie, {
       passwordHash: "x",
     });
-    await run("users reset", "POST", `/admin/users/${viewer.id}/reset-password`, cookie, {
-      newPassword: NEW_PASSWORD,
-    });
+    await expectStep(
+      await run("users reset", "POST", `/admin/users/${viewer.id}/reset-password`, cookie, {
+        newPassword: NEW_PASSWORD,
+      }),
+      204,
+      "users reset",
+    );
     await run("users reset invalid", "POST", `/admin/users/${viewer.id}/reset-password`, cookie, {
       newPassword: "short",
     });
@@ -115,13 +153,17 @@ describe("the password hash never leaves the server", () => {
       currentPassword: "not my password",
       newPassword: NEW_PASSWORD,
     });
-    await run("change ok", "POST", "/admin/auth/change-password", cookie, {
-      currentPassword: PASSWORD,
-      newPassword: NEW_PASSWORD,
-    });
+    await expectStep(
+      await run("change ok", "POST", "/admin/auth/change-password", cookie, {
+        currentPassword: PASSWORD,
+        newPassword: NEW_PASSWORD,
+      }),
+      204,
+      "change ok",
+    );
     const viewerCookie = await (async () => {
       clock.advanceMinutes(11);
-      return loginCookie(running.baseUrl, viewer.email, NEW_PASSWORD);
+      return loginCookie(running.baseUrl, viewer.email, NEW_PASSWORD, loginRefusals);
     })();
     await run("viewer forbidden", "GET", "/admin/users", viewerCookie);
     await run("logout", "POST", "/admin/auth/logout", cookie);
