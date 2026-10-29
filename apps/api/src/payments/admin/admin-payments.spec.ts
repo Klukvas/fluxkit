@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { permissionsOf } from "@fluxkit/core";
+import { PERMISSIONS, permissionsOf, type AdminPermission } from "@fluxkit/core";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { AdminPrincipal } from "../../auth/admin-authenticator.js";
+import { testPrincipal } from "../../test/allow-all-admin-authenticator.js";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { deepKeys } from "../../test/cart-helpers.js";
 import { http, type HttpResult } from "../../test/http.js";
@@ -755,6 +757,43 @@ describe("payments: admin rate limits (real Postgres)", () => {
       }
       expect(statuses, action).toEqual([404, 404, 429]);
       expect(Number(last?.headers.get("retry-after"))).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("payments: the refund and attention routes need payments.refund itself (real Postgres)", () => {
+  let running: RunningApp;
+  let permissions: AdminPermission[] = [];
+
+  beforeAll(async () => {
+    const principal = (): AdminPrincipal => ({ ...testPrincipal("viewer"), permissions });
+    running = await startApp({ adminAuthenticator: { authenticate: principal } });
+  });
+
+  afterAll(async () => {
+    await running.app.close();
+  });
+
+  it("every other permission (orders.write included) is 403; payments.refund alone gets past the guard", async () => {
+    const calls = () => [
+      http(
+        running.baseUrl,
+        "POST",
+        `/admin/orders/${randomUUID()}/payments/${randomUUID()}/refunds`,
+        {
+          body: { amount: { amount: 1, currency: "UAH" }, note: "x" },
+          headers: { "idempotency-key": randomUUID() },
+        },
+      ),
+      http(running.baseUrl, "POST", `/admin/payments/${randomUUID()}/attention/clear`),
+    ];
+    permissions = PERMISSIONS.filter((permission) => permission !== "payments.refund");
+    for (const answer of await Promise.all(calls())) {
+      expect(answer.status).toBe(403);
+    }
+    permissions = ["payments.refund"];
+    for (const answer of await Promise.all(calls())) {
+      expect(answer.status).toBe(404);
     }
   });
 });
