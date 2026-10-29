@@ -19,6 +19,18 @@ export function canManageSearch(permissions: readonly string[] | null): boolean 
   return SEARCH_WRITE_OPERATIONS.every((operation) => canRun(permissions, operation));
 }
 
+/**
+ * Starts a search write only for an admin who may change search; `null` (nothing sent) otherwise. Defence in depth: the
+ * write controls are not rendered without the permission and the API refuses anyway, but a stale handler must not send.
+ */
+export function whenCanManage<T>(
+  canManage: boolean,
+  write: () => Promise<T> | null,
+): Promise<T> | null {
+  if (!canManage) return null;
+  return write();
+}
+
 export function useCanManageSearch(): boolean {
   const session = useSession();
   return canManageSearch(session.state.me?.permissions ?? null);

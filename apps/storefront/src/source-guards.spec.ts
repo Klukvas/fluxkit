@@ -79,7 +79,10 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   });
 
   it("does no floating point money math (amounts are integers and strings)", () => {
-    const floatMoney = /\/\s*100\b|\*\s*100\b|toFixed\(|parseFloat\(|Math\.round\([^)]*amount/;
+    // `Math.round(` and `* 10 **` too (review F5): the price boxes' conversion once survived as
+    // `Math.round(Number(text) * 10 ** exponent)`, which neither of the narrower forms matched.
+    const floatMoney =
+      /\/\s*100\b|\*\s*100\b|toFixed\(|parseFloat\(|Math\.round\(|\*\s*10\s*\*\*|\*\*\s*exponent/;
     for (const file of sources) {
       expect(floatMoney.test(file.text), `${file.path} looks like float money math`).toBe(false);
     }

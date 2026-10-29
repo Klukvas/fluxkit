@@ -92,6 +92,11 @@ describe("parseSearchParams", () => {
     ["f", "brand:"],
     ["f", "bra nd:x"],
     ["f", "brand:x\ny"],
+    // Whitespace that is not a control character (review F5): a space, a leading space, a no-break and an em space.
+    ["f", "brand:a b"],
+    ["f", "brand: a"],
+    ["f", "brand:a\u00a0b"],
+    ["f", "brand:a\u2003b"],
     ["q", "a".repeat(201)],
     ["q", "bad\u0000text"],
     ["q", "bad\u001btext"],

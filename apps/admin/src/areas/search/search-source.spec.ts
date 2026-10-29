@@ -77,7 +77,8 @@ describe("search area source guards", () => {
       page.indexOf("adminClient.createSynonymGroup("),
     );
     expect(page).toMatch(/if \(!canManage/);
-    expect(source("status-page.tsx")).toMatch(/if \(!canManage\) return;/);
+    // The rebuild goes through whenCanManage, whose behaviour search-permissions.spec.ts pins (review F5).
+    expect(source("status-page.tsx")).toMatch(/whenCanManage\(canManage,/);
   });
 
   it("treats a 404 of the search routes as 'search is switched off' on both screens", () => {
