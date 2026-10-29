@@ -185,6 +185,7 @@ export class PaymentCreateService {
             const attempts = await this.payments.lockAttemptsOfOrder(tx, order.id);
             const decision = decideNewPaymentAttempt({
               orderStatus: order.status as OrderStatus,
+              orderTotal: order.totalAmount,
               attempts: attempts.map((attempt) => ({
                 id: attempt.id,
                 status: paymentStatusOf(attempt.status),

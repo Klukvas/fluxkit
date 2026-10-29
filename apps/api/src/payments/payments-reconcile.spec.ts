@@ -368,16 +368,14 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
           idempotencyKey: key,
           now: world.clock.now(),
         });
-      const results = await Promise.all([ask(1_200), ask(1_200), ask(1_200)]);
-      expect(results.map((result) => result.kind).sort()).toEqual([
-        "refused",
-        "refused",
-        "requested",
-      ]);
-      expect(results.filter((result) => result.kind === "refused")).toEqual([
-        { kind: "refused", reason: "refund_exceeds_remaining" },
-        { kind: "refused", reason: "refund_exceeds_remaining" },
-      ]);
+      // A warm pool, so the ten transactions really run at once (review F3: on a cold pool they queued and never raced).
+      await world.warmPool();
+      const results = await Promise.all(Array.from({ length: 10 }, () => ask(1_200)));
+      expect(results.filter((result) => result.kind === "requested")).toHaveLength(1);
+      expect(results.filter((result) => result.kind === "refused")).toEqual(
+        Array.from({ length: 9 }, () => ({ kind: "refused", reason: "refund_exceeds_remaining" })),
+      );
+      expect(await world.refundsOf(paymentId)).toHaveLength(1);
       const key = randomUUID();
       const exact = await ask(800, key);
       expect(exact.kind).toBe("requested");

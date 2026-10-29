@@ -47,6 +47,13 @@ test("the whole purchase works with the keyboard alone (Tab, Enter, Space and ty
     await expect(field(label), `Tab reaches "${label}" in reading order`).toBeFocused();
     if (text !== null) await page.keyboard.type(text);
   }
+  // The information sentence above the button has two links (Terms, Privacy notice): two more stops, in reading order.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Terms", exact: true }).first()).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(
+    page.getByRole("link", { name: "Privacy notice", exact: true }).first(),
+  ).toBeFocused();
   await page.keyboard.press("Tab");
   const submit = page.getByRole("button", { name: "Place the order" });
   await expect(submit).toBeFocused();

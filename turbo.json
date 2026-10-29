@@ -8,7 +8,7 @@
     "@fluxkit/storefront#build": {
       "dependsOn": ["^build"],
       "outputs": [".next/**", "!.next/cache/**"],
-      "env": ["STOREFRONT_IMAGE_HOSTS"]
+      "env": ["STOREFRONT_IMAGE_HOSTS", "STOREFRONT_REQUIRE_LEGAL_TEXT"]
     },
     "typecheck": {
       "dependsOn": ["^build"]

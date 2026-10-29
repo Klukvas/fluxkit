@@ -1,6 +1,6 @@
 // Generates third-party/THIRD_PARTY_NOTICES.md for runtime dependencies. Ship it with every client delivery.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
 const out = execFileSync("pnpm", ["licenses", "list", "--prod", "--json"], {
   encoding: "utf8",
@@ -34,6 +34,19 @@ const lines = [
   "| Package | Version | License | Homepage |",
   "|---|---|---|---|",
   ...rows.map((row) => `| ${row.name} | ${row.versions} | ${row.license} | ${row.homepage} |`),
+  "",
+  "## Vendored code",
+  "",
+  "Source files of other projects that are part of the repository (not npm packages), with the notice their licence requires.",
+  "",
+  "### Snowball stemmers (BSD-3-Clause)",
+  "",
+  "`packages/core/src/search/stemmers/snowball/`: the Ukrainian and English algorithms of Snowball 3.2.0 (https://snowballstem.org) and the TypeScript generated from them.",
+  "",
+  ...readFileSync("packages/core/src/search/stemmers/snowball/COPYING", "utf8")
+    .trimEnd()
+    .split("\n")
+    .map((line) => (line === "" ? "" : `    ${line}`)),
   "",
 ];
 mkdirSync("third-party", { recursive: true });

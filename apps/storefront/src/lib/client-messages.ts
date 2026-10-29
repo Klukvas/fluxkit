@@ -20,6 +20,11 @@ export const CLIENT_MESSAGE_PREFIXES = [
   "account.",
   "checkout.",
   "order.",
+  "payment.",
+  "notice.",
+  // The header search box and the filter form of the results page (the page's own words stay server-side under "search.").
+  "searchBox.",
+  "searchForm.",
 ] as const;
 
 export function pickClientMessages(messages: Messages): Messages {

@@ -97,6 +97,8 @@ jobs:
             providers-payment-fake,
             providers-payment-none,
             providers-payment-monobank,
+            search-on,
+            search-off,
           ]
     services:
       postgres:

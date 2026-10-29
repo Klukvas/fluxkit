@@ -1,10 +1,18 @@
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /** Ports and credentials of the e2e stack. Throwaway values for a database that is wiped at every run. */
 export const E2E_API_PORT = Number(process.env["E2E_API_PORT"] ?? 3100);
 export const E2E_STOREFRONT_PORT = Number(process.env["E2E_STOREFRONT_PORT"] ?? 3101);
+/**
+ * A second `next start` of the same build with `STOREFRONT_FORWARD_CLIENT_ADDRESS` unset (ADR 0038), reached directly by
+ * `search.e2e.ts` only, to show that it passes no client address on. Started only when the suite runs with search on.
+ */
+export const E2E_STOREFRONT_UNFORWARDED_PORT = Number(
+  process.env["E2E_STOREFRONT_UNFORWARDED_PORT"] ?? 3103,
+);
 /** The only origin a browser sees: the proxy (`proxy.ts`). */
 export const E2E_PORT = Number(process.env["E2E_PORT"] ?? 3102);
 export const E2E_ORIGIN = `http://127.0.0.1:${E2E_PORT}`;
@@ -114,8 +122,10 @@ export function apiEnvironment(env: Env = process.env): Env {
     // activated the shop behaves as before shipping existed, so the other scenarios do not notice it; the shipping scenarios
     // create their own methods and deactivate them afterwards (tests/shipping-*.e2e.ts).
     SHIPPING_PROVIDERS_ENABLED: "fake",
-    // No online payment in these suites (payments plan step 4: an empty list loads no provider); a value in the developer's shell must not change the run.
-    PAYMENT_PROVIDERS_ENABLED: "",
+    // The test-only `fake` payment provider (payments plan step 9): `onlinePayment` is true, so the storefront shows the pay step.
+    // The provider is driven only inside the API process, so the suite can start payments (create, redirect URL, status reads)
+    // but never settle one; `tests/payment.e2e.ts` says what it covers. A value in the developer's shell must not change the run.
+    PAYMENT_PROVIDERS_ENABLED: "fake",
     // No background timers: nothing in the suite depends on expiry, and a sweep must not race a test.
     SCHEDULER_ENABLED: "false",
     DEFAULT_LOCALE: "uk",
@@ -140,8 +150,48 @@ export function apiEnvironment(env: Env = process.env): Env {
     EMAIL_FROM: "Fluxkit E2E <shop@example.com>",
     STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
     FAKE_EMAIL_CAPTURE_FILE: E2E_MAIL_FILE,
+    // Catalog search (search plan step 10a): on by default against the real engine, off with `E2E_SEARCH=off` (the suites
+    // that need search skip themselves, `tests/search-off.e2e.ts` runs instead). The index prefix is this suite's own, so
+    // the engine can be shared with other runs; the scoped key is created per run by `prepare-database.ts` (below).
+    SEARCH_ENABLED: E2E_SEARCH_ENABLED ? "true" : "false",
+    MEILI_INDEX_PREFIX: E2E_MEILI_PREFIX,
   };
   // The seed refuses NODE_ENV=production and the API must not run in a mode a developer's shell chose.
   delete result["NODE_ENV"];
+  // A key from the shell is never the suite's key: the suite's own scoped key exists only after `prepare-database.ts`
+  // created it (the file below), so a processes started before that has none and one started after has exactly this one.
+  delete result["MEILI_API_KEY"];
+  const key = E2E_SEARCH_ENABLED ? readMeiliKey() : undefined;
+  if (key !== undefined) result["MEILI_API_KEY"] = key.key;
   return result;
+}
+
+/** `E2E_SEARCH=off` runs the suite against an API with `SEARCH_ENABLED=false` (the default is on). */
+export const E2E_SEARCH_ENABLED = process.env["E2E_SEARCH"] !== "off";
+
+/** Prefix of the suite's indexes (`^[a-z][a-z0-9_]{0,31}_$`), fixed per proxy port like the other temp names. */
+export const E2E_MEILI_PREFIX = `e2e${String(E2E_PORT)}_`;
+
+/** Description of the suite's scoped engine keys: `prepare-database.ts` deletes leftovers of an earlier run by it. */
+export const E2E_MEILI_KEY_DESCRIPTION = `fluxkit storefront e2e ${String(E2E_PORT)}`;
+
+/**
+ * Where `prepare-database.ts` writes the scoped engine key it creates with the master key (`{key, uid}`, mode 0600), under
+ * the system temp directory and fixed per proxy port; `global-teardown.ts` deletes the key and the file. The API process
+ * gets the key from this file through its start command (the config is evaluated before the key exists).
+ */
+export const E2E_MEILI_KEY_FILE = join(
+  tmpdir(),
+  `fluxkit-storefront-e2e-meili-key-${String(E2E_PORT)}.json`,
+);
+
+export interface MeiliKey {
+  key: string;
+  uid: string;
+}
+
+/** The suite's scoped key, or `undefined` before `prepare-database.ts` created it. */
+export function readMeiliKey(): MeiliKey | undefined {
+  if (!existsSync(E2E_MEILI_KEY_FILE)) return undefined;
+  return JSON.parse(readFileSync(E2E_MEILI_KEY_FILE, "utf8")) as MeiliKey;
 }

@@ -4,7 +4,7 @@
  */
 
 /** Paths after the locale of the pages that belong to one shopper. */
-export const PRIVATE_PATHS = ["/cart", "/checkout", "/account", "/order"] as const;
+export const PRIVATE_PATHS = ["/cart", "/checkout", "/account", "/order", "/payment"] as const;
 
 export interface RobotsFile {
   rules: { userAgent: string; allow: string; disallow: string[] }[];

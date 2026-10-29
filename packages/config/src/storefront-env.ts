@@ -74,6 +74,15 @@ const storefrontEnvSchema = z
       originUrl("STOREFRONT_PUBLIC_URL").optional(),
     ),
     STOREFRONT_IMAGE_HOSTS: z.preprocess(blankToUndefined, imageHosts.optional()),
+    // Exactly `true` or `false` (blank is unset): a typo in a trust switch must fail loudly, not pick a side (ADR 0038).
+    STOREFRONT_FORWARD_CLIENT_ADDRESS: z.preprocess(
+      blankToUndefined,
+      z
+        .enum(["true", "false"], {
+          error: "must be exactly true or false (or unset, which means false)",
+        })
+        .optional(),
+    ),
     NODE_ENV: z.string().optional(),
   })
   .superRefine((env, context) => {
@@ -95,6 +104,12 @@ export interface StorefrontEnv {
   storefrontPublicUrl: string;
   /** Lower-case host names allowed for image optimisation and `img-src`; empty means none. */
   imageHosts: string[];
+  /**
+   * Whether the Next server passes the page request's (checked) `X-Forwarded-For` on to the API, for the per-address search
+   * window (ADR 0038). Off unless `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`: only safe when the storefront is reachable
+   * through the edge proxy alone, which sets or replaces that header.
+   */
+  forwardClientAddress: boolean;
 }
 
 /**
@@ -115,5 +130,6 @@ export function loadStorefrontEnv(source: Record<string, string | undefined>): S
     apiInternalUrl: env.API_INTERNAL_URL,
     storefrontPublicUrl: env.STOREFRONT_PUBLIC_URL ?? DEFAULT_STOREFRONT_PUBLIC_URL,
     imageHosts: env.STOREFRONT_IMAGE_HOSTS ?? [],
+    forwardClientAddress: env.STOREFRONT_FORWARD_CLIENT_ADDRESS === "true",
   };
 }

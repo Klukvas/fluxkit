@@ -20,6 +20,7 @@ import {
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page } from "../../../common/pagination.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../../common/pricing-config.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
 import {
   conflict,
@@ -29,7 +30,7 @@ import {
   validationFailed,
   type FieldError,
 } from "../../../common/problem.js";
-import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { withTransaction, type DbExecutor, type Transaction } from "../../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { MediaAttachService } from "../../../media/media-attach.service.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
@@ -88,6 +89,7 @@ export class ProductsService {
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(MediaAttachService) private readonly mediaAttachments: MediaAttachService,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   /** Creates a draft and its single default variant in one transaction. */
@@ -168,6 +170,7 @@ export class ProductsService {
         };
         if (Object.keys(changes).length > 0) {
           await this.products.update(tx, id, changes);
+          await this.search.productsChanged(tx, [id], "product_changed");
         }
         return this.loadDetail(tx, id);
       });
@@ -190,6 +193,8 @@ export class ProductsService {
         );
       }
       await this.products.delete(tx, id);
+      // A tombstone: the queue row outlives the product, so the sync removes any documents it still has.
+      await this.search.productsChanged(tx, [id], "product_changed");
     });
   }
 
@@ -218,6 +223,7 @@ export class ProductsService {
             }
           : {}),
       });
+      await this.search.productsChanged(tx, [id], "product_changed");
       return this.loadDetail(tx, id);
     });
   }
@@ -267,6 +273,7 @@ export class ProductsService {
           );
         }
         await this.products.replaceCategoryAssignments(tx, id, normalized.assignments);
+        await this.search.productsChanged(tx, [id], "product_changed");
         return this.loadDetail(tx, id);
       });
     } catch (error) {
@@ -339,7 +346,7 @@ export class ProductsService {
   }
 
   private async createIn(
-    tx: DbExecutor,
+    tx: Transaction,
     body: CreateProductBody,
     log: ProposalLog,
   ): Promise<ProductDetailResponse> {
@@ -372,6 +379,7 @@ export class ProductsService {
       attributes: {},
       position: 0,
     });
+    await this.search.productsChanged(tx, [created.id], "product_changed");
     return this.loadDetail(tx, created.id);
   }
 

@@ -39,6 +39,7 @@ pnpm seed                # = pnpm build && pnpm --filter @fluxkit/api seed (node
 ```
 
 The runner reads the same environment as the API (`DATABASE_URL`, `DEFAULT_LOCALE`, `LOCALES`; the root `.env` through Node's `--env-file`) and invents no defaults for missing variables.
+With `SEARCH_ENABLED=true` the seeded products are also marked for the search index like any admin write; run `pnpm search:reindex` afterwards to build the index at once (otherwise the scheduler builds it at its next ticks).
 It prints how many entities were created and how many already existed. Any error is printed in full (including the field errors of the admin API) and the exit code is 1.
 
 ## Rules of the runner

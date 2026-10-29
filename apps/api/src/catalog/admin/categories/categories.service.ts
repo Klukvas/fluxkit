@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { sql, type SQL } from "drizzle-orm";
 import {
   generateUniqueSlug,
   slugLookupPrefix,
@@ -19,6 +20,7 @@ import {
   type FieldError,
 } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
 import { retryLostRaces, type ProposalLog } from "../../shared/retry.js";
@@ -37,12 +39,24 @@ const CATEGORY_SLUG_CONSTRAINT = "category_slug_key";
 // slug). Every lost round means another request won, so the bound only has to stop a pathological loop.
 const MAX_SLUG_ATTEMPTS = 5;
 
+/** The products assigned to a category or to any of its descendants (the depth is at most 5, ADR 0006). */
+function productsOfSubtree(categoryId: string): SQL {
+  return sql`
+    with recursive subtree (id) as (
+      select id from category where id = ${categoryId}
+      union all
+      select child.id from category child join subtree on child.parent_id = subtree.id
+    )
+    select assignment.product_id from product_category assignment join subtree on subtree.id = assignment.category_id`;
+}
+
 @Injectable()
 export class CategoriesService {
   constructor(
     private readonly categories: CategoriesRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async create(body: CreateCategoryBody): Promise<CategoryResponse> {
@@ -100,11 +114,17 @@ export class CategoriesService {
       return this.get(id);
     }
     try {
-      const row = await this.categories.update(this.database, id, changes);
-      if (row === undefined) {
-        throw notFound("Category");
-      }
-      return toCategoryResponse(row);
+      return await withTransaction(this.database, async (tx) => {
+        const row = await this.categories.update(tx, id, changes);
+        if (row === undefined) {
+          throw notFound("Category");
+        }
+        // The name and the active flag reach the documents of the products of the subtree (the slug and description do not).
+        if (body.name !== undefined || body.isActive !== undefined) {
+          await this.search.productsChangedWhere(tx, productsOfSubtree(id), "category_changed");
+        }
+        return toCategoryResponse(row);
+      });
     } catch (error) {
       throw translatePostgresError(error, { detail: "Another category already uses this slug." });
     }
@@ -151,6 +171,8 @@ export class CategoriesService {
         throw notFound("Category");
       }
       await this.renumberSiblings(tx, siblings, index);
+      // A move changes the ancestors stored in the documents of the subtree's products.
+      await this.search.productsChangedWhere(tx, productsOfSubtree(id), "category_changed");
       return toCategoryResponse(moved);
     });
   }

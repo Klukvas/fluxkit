@@ -81,6 +81,19 @@ module.exports = {
       },
       to: { path: "^packages/(?!features/|providers/)([^/]+)/src/(?!index\\.ts$)", pathNot: "^$1" },
     },
+    {
+      name: "api-must-not-import-search",
+      comment:
+        "Catalog search is reached through its extension point only (ADR 0034 decision 1): the catalog, price, stock, order " +
+        "and config code injects SEARCH_PORT from apps/api/src/common/search-port.ts and never imports apps/api/src/search/. " +
+        "Only the composition root (app.module.ts, app.factory.ts), the scheduler's job runner and test helpers mount it.",
+      severity: "error",
+      from: {
+        path: "^apps/api/src/",
+        pathNot: "^apps/api/src/(search/|app\\.module\\.ts$|app\\.factory\\.ts$|jobs/|test/)",
+      },
+      to: { path: "^apps/api/src/search/" },
+    },
     { name: "no-circular", severity: "error", from: {}, to: { circular: true } },
   ],
   options: {

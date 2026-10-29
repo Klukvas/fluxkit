@@ -11,6 +11,7 @@ import { createRequire } from "node:module";
 import { resolve } from "node:path";
 import {
   ADMIN_E2E_MEDIA_DIR,
+  ADMIN_E2E_SEARCH_PREFIX,
   OWNER_EMAIL,
   OWNER_PASSWORD,
   apiEnvironment,
@@ -18,6 +19,7 @@ import {
   type Env,
   requireE2eDatabaseUrl,
 } from "./support/env.ts";
+import { createSearchKey } from "./support/search-engine.ts";
 
 const apiRoot = resolve(import.meta.dirname, "../../api");
 const databaseUrl = requireE2eDatabaseUrl();
@@ -55,7 +57,11 @@ rmSync(ADMIN_E2E_MEDIA_DIR, { recursive: true, force: true });
 mkdirSync(ADMIN_E2E_MEDIA_DIR, { recursive: true, mode: 0o750 });
 console.log(`admin e2e: upload directory ${ADMIN_E2E_MEDIA_DIR}`);
 
-const env = apiEnvironment();
+// A key scoped to this suite's index prefix (never the master key); the API's start command reads it from a file.
+const searchKey = await createSearchKey(process.env);
+console.log(`admin e2e: search key created for the prefix ${ADMIN_E2E_SEARCH_PREFIX}`);
+
+const env = { ...apiEnvironment(), MEILI_API_KEY: searchKey };
 const run = (script: string, args: string[] = [], extra: Env = {}) =>
   execFileSync(process.execPath, [resolve(apiRoot, "dist", script), ...args], {
     env: { ...env, ...extra } as NodeJS.ProcessEnv,
@@ -63,5 +69,8 @@ const run = (script: string, args: string[] = [], extra: Env = {}) =>
   });
 run("database/migrate.js");
 run("seed/seed.js");
+// The seed's catalog writes marked every product in the queue; this builds the indexes of every language, swaps them in and
+// drains the queue, so the Search screens start from a live index (the scheduler is off: nothing else would build it).
+run("search/reindex.js");
 run("auth/create-admin.js", ["--email", OWNER_EMAIL], { ADMIN_PASSWORD: OWNER_PASSWORD });
 console.log("admin e2e: database ready");

@@ -45,6 +45,8 @@ export const OPERATIONS = {
   getAccount: operation("GET", "/store/account/me", [200]),
   updateAccount: operation("PATCH", "/store/account/me", [200], { hasBody: true }),
   changePassword: operation("POST", "/store/account/change-password", [204], { hasBody: true }),
+  getDataExport: operation("GET", "/store/account/data-export", [200]),
+  deleteAccount: operation("POST", "/store/account/delete", [204], { hasBody: true }),
   requestPasswordReset: operation("POST", "/store/account/password-reset", [202], {
     hasBody: true,
   }),
@@ -101,6 +103,10 @@ export const OPERATIONS = {
     query: ["brand", "category", "offset", "limit", "locale"],
   }),
   getProduct: operation("GET", "/store/products/{slug}", [200], { query: LOCALE }),
+  searchProducts: operation("GET", "/store/search", [200], {
+    query: ["q", "locale", "f", "price", "sort", "page", "limit"],
+  }),
+  suggestProducts: operation("GET", "/store/search/suggest", [200], { query: ["q", "locale"] }),
   getShippingOptions: operation("GET", "/store/shipping/options", [200], {
     query: ["country", "locale", "cityRef", "pickupPointRef"],
   }),

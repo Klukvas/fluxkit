@@ -18,6 +18,8 @@ import { PaymentProviderRegistry } from "../registry/index.js";
 export interface PaymentOrderFacts {
   readonly id: string;
   readonly status: string;
+  /** The order total in minor units: a total of 0 has nothing to pay online (review F2). */
+  readonly totalAmount: number;
   readonly currency: string;
   readonly expiresAt: Date;
 }
@@ -97,6 +99,7 @@ export class StorePaymentViews {
   canPay(order: PaymentOrderFacts, attempts: readonly PaymentRow[]): boolean {
     return decideNewPaymentAttempt({
       orderStatus: order.status as OrderStatus,
+      orderTotal: order.totalAmount,
       attempts: attempts.map((attempt) => ({
         id: attempt.id,
         status: paymentStatusOf(attempt.status),

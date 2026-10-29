@@ -2,7 +2,8 @@
 // edge proxy of the storefront host serves the admin SPA under `/admin-ui/`:
 //   - `/admin-ui` and `/admin-ui/*`: the BUILT SPA (`apps/admin/dist`), with the `index.html` fallback for SPA paths (deep
 //     links, reloads) and the security and cache headers of `security-headers.ts` on every response;
-//   - `/admin/*`, `/store/*` and `/media/*` (the uploaded images; the API serves GET and HEAD): the API. Like the production edge proxy it
+//   - `/admin/*`, `/store/*`, `/media/*` (the uploaded images; the API serves GET and HEAD) and `/webhooks/payments/*` (the
+//     payment provider's signed notifications, bytes unchanged): the API. Like the production edge proxy it
 //     SETS `X-Forwarded-For` itself (the API runs with TRUST_PROXY=1, so exactly this one hop is trusted). The answer of the
 //     API goes back unchanged: the proxy adds no cookie and no header of its own, the media headers are the API's;
 //   - anything else: 404 (the storefront is not part of this suite; its own suite tests it).
@@ -26,7 +27,8 @@ import { extname, resolve, sep } from "node:path";
 import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../security-headers.ts";
 
 const CLIENT_HEADER = "x-e2e-client";
-const API_ROUTE = /^\/(store|admin|media)(\/|\?|$)/;
+// `/webhooks/payments`: the payment provider's notifications, forwarded byte for byte like the production edge proxy (ADR 0032).
+const API_ROUTE = /^\/(store|admin|media|webhooks\/payments)(\/|\?|$)/;
 const SPA_ROUTE = /^\/admin-ui(\/|\?|$)/;
 const SPA_PREFIX = "/admin-ui";
 const distRoot = resolve(import.meta.dirname, "../dist");
@@ -198,6 +200,6 @@ const server = createServer((incoming, outgoing) => {
 
 server.listen(listenPort, "127.0.0.1", () => {
   console.log(
-    `admin e2e proxy on 127.0.0.1:${String(listenPort)} -> /admin-ui: ${distRoot}, /admin,/store,/media: ${String(apiPort)}`,
+    `admin e2e proxy on 127.0.0.1:${String(listenPort)} -> /admin-ui: ${distRoot}, /admin,/store,/media,/webhooks/payments: ${String(apiPort)}`,
   );
 });

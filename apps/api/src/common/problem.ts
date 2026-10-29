@@ -29,6 +29,8 @@ export const PROBLEM_CODES = [
   "shipping_provider_unavailable",
   // Online payments (ADR 0032 decision 18, docs/api/payments.md).
   "payment_provider_unavailable",
+  // Catalog search (ADR 0034 decision 10, docs/api/search.md).
+  "search_unavailable",
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -57,6 +59,7 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   shipping_changed: 409,
   shipping_provider_unavailable: 503,
   payment_provider_unavailable: 503,
+  search_unavailable: 503,
 };
 
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
@@ -83,6 +86,7 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   shipping_changed: "The shipping changed",
   shipping_provider_unavailable: "Shipping provider unavailable",
   payment_provider_unavailable: "Payment provider unavailable",
+  search_unavailable: "Search unavailable",
 };
 
 /** One problem with a request field. `path` is dotted (`name.uk`, `attributes.size`); empty for the whole body. */

@@ -2,6 +2,7 @@ import { Inject, Injectable } from "@nestjs/common";
 import { exponentOf, type StoreLocale } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
+import { SEARCH_PORT, type SearchPort } from "../../common/search-port.js";
 import { EmailProviderRegistry, type EmailProviderSource } from "../../email/registry/index.js";
 import {
   PaymentProviderRegistry,
@@ -96,6 +97,7 @@ export class StoreService {
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
     @Inject(EmailProviderRegistry) private readonly email: EmailProviderSource,
     @Inject(PaymentProviderRegistry) private readonly payments: PaymentProviderSource,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   /** What the storefront needs to format money and pick a language; nothing else (no thresholds, no internals). */
@@ -108,6 +110,7 @@ export class StoreService {
       locales: [...this.config.locales],
       emailDelivery: this.email.deliveryEnabled(),
       onlinePayment: this.payments.onlineEnabled(),
+      search: this.search.enabled,
     };
   }
 
@@ -156,6 +159,14 @@ export class StoreService {
       { categoryIds, brandSlug: query.brand, shopCurrency: this.pricing.shopCurrency },
       query,
     );
+    return toPage(await this.toListItems(rows, locale), total, query);
+  }
+
+  /** The list items of product rows: three batched reads for the whole page, whatever its size. */
+  private async toListItems(
+    rows: readonly ProductListRow[],
+    locale: StoreLocale,
+  ): Promise<StoreProductListItem[]> {
     const productIds = rows.map((row) => row.id);
     // Three batched reads for the whole page, whatever its size.
     const [media, variants, levels] = await Promise.all([
@@ -190,7 +201,32 @@ export class StoreService {
         },
       ];
     });
-    return toPage(items, total, query);
+    return items;
+  }
+
+  /**
+   * List items of the given products in the given order, for the search routes (ADR 0034 decision 10: items are hydrated
+   * from Postgres). The same rules as `listProducts`: only active products with a sellable variant; `missing` holds the
+   * ids that are not for sale any more (or never were).
+   */
+  async listItemsByIds(
+    productIds: readonly string[],
+    requestedLocale: string,
+  ): Promise<{ items: StoreProductListItem[]; missing: string[] }> {
+    const locale = this.resolveLocale(requestedLocale);
+    if (productIds.length === 0) {
+      return { items: [], missing: [] };
+    }
+    const rows = await this.store.listProductsByIds(productIds, this.pricing.shopCurrency);
+    const items = await this.toListItems(rows, locale);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return {
+      items: productIds.flatMap((id) => {
+        const item = byId.get(id);
+        return item === undefined ? [] : [item];
+      }),
+      missing: productIds.filter((id) => !byId.has(id)),
+    };
   }
 
   async getProduct(slug: string, requestedLocale: string | undefined): Promise<StoreProductDetail> {

@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import { AdminApi, StoreApi } from "./api.ts";
 import { E2E_ORIGIN, clientMarker } from "./env.ts";
+import { FakeProvider } from "./fake-provider.ts";
 
 export { expect };
 
@@ -25,6 +26,8 @@ interface Fixtures {
   otherShopper: StoreApi;
   /** The owner, signed in with its own client address. */
   admin: AdminApi;
+  /** The payment provider as a caller of the webhook route (own client address; `support/fake-provider.ts`). */
+  provider: FakeProvider;
 }
 
 /**
@@ -59,6 +62,14 @@ export const test = base.extend<Fixtures>({
       clientMarker(testInfo.testId, testInfo.retry, "admin"),
     );
     await use(await AdminApi.signIn(context));
+    await context.dispose();
+  },
+  provider: async ({ playwright }, use, testInfo) => {
+    const context = await newApiContext(
+      playwright,
+      clientMarker(testInfo.testId, testInfo.retry, "provider"),
+    );
+    await use(new FakeProvider(context));
     await context.dispose();
   },
 });

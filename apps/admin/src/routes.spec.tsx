@@ -49,6 +49,7 @@ describe("route table", () => {
       "users.manage",
       "shipping.manage",
       "email.manage",
+      "privacy.manage",
     ]);
     for (const route of ROUTES) {
       expect(allowed.has(route.permission), `${route.id}: ${route.permission}`).toBe(true);
@@ -81,10 +82,13 @@ describe("route table", () => {
       categories: "catalog.read",
       categoryNew: "catalog.write",
       categoryDetail: "catalog.read",
+      search: "catalog.read",
+      searchSynonyms: "catalog.read",
       orders: "orders.read",
       orderDetail: "orders.read",
       customers: "customers.read",
       customerDetail: "customers.read",
+      payments: "orders.read",
       shipping: "shipping.manage",
       shippingMethodNew: "shipping.manage",
       shippingMethodDetail: "shipping.manage",
@@ -95,6 +99,10 @@ describe("route table", () => {
       emailMessageDetail: "email.manage",
       emailTemplates: "email.manage",
       emailTemplatePreview: "email.manage",
+      privacy: "privacy.manage",
+      privacyLookup: "privacy.manage",
+      privacyRequestDetail: "privacy.manage",
+      auditLog: "users.manage",
       users: "users.manage",
       userNew: "users.manage",
       userDetail: "users.manage",
@@ -144,8 +152,10 @@ describe("lazy pages and their message files", () => {
     expect(declared.attributes).toEqual(["catalog-dictionaries"]);
     expect(declared.categoryDetail).toEqual(["catalog-dictionaries"]);
     expect(declared.account).toEqual([]);
-    expect(declared.orders).toEqual(["orders"]);
-    expect(declared.orderDetail).toEqual(["orders"]);
+    // The order detail carries the payment panel (payments plan step 10), so both order screens load its messages too.
+    expect(declared.orders).toEqual(["orders", "payments"]);
+    expect(declared.orderDetail).toEqual(["orders", "payments"]);
+    expect(declared.payments).toEqual(["orders", "payments"]);
     expect(declared.customers).toEqual(["customers"]);
     expect(declared.customerDetail).toEqual(["customers"]);
     expect(declared.users).toEqual(["users"]);
@@ -169,6 +179,12 @@ describe("lazy pages and their message files", () => {
     ]) {
       expect(declared[id], id).toEqual(["email"]);
     }
+    for (const id of ["privacy", "privacyLookup", "privacyRequestDetail"]) {
+      expect(declared[id], id).toEqual(["privacy", "orders"]);
+    }
+    expect(declared.auditLog).toEqual(["audit"]);
+    expect(declared.search).toEqual(["search"]);
+    expect(declared.searchSynonyms).toEqual(["search"]);
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });

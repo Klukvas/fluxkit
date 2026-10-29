@@ -12,10 +12,13 @@
   "page.productTypes.title": "Product types",
   "page.brands.title": "Brands",
   "page.categories.title": "Categories",
+  "page.search.title": "Search",
+  "page.searchSynonyms.title": "Search synonyms",
   "page.orders.title": "Orders",
   "page.orderDetail.title": "Order",
   "page.customers.title": "Customers",
   "page.customerDetail.title": "Customer",
+  "page.payments.title": "Payments to review",
   "page.email.title": "Email",
   "page.emailMessages.title": "Messages",
   "page.emailMessageDetail.title": "Message",
@@ -40,5 +43,9 @@
   "page.shippingMethodNew.title": "New delivery method",
   "page.shippingMethodDetail.title": "Delivery method",
   "page.shippingProviders.title": "Carriers",
-  "page.shippingProviderDetail.title": "Carrier"
+  "page.shippingProviderDetail.title": "Carrier",
+  "page.privacy.title": "Personal data",
+  "page.privacyLookup.title": "Look up by email",
+  "page.privacyRequestDetail.title": "Privacy request",
+  "page.auditLog.title": "Audit log"
 }

@@ -1,7 +1,7 @@
 import { createTranslator } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { AccountOrder } from "../../../../../../components/account-orders";
-import { getShopMoney } from "../../../../../../lib/catalog-pages.server";
+import { getOnlinePayment, getShopMoney } from "../../../../../../lib/catalog-pages.server";
 import { privateMetadata } from "../../../../../../lib/page-metadata";
 import { routeLocale } from "../../../../../../lib/route-locale";
 import { messagesByLocale } from "../../../../../../messages";
@@ -19,5 +19,11 @@ export async function generateMetadata({ params }: AccountOrderRouteProps): Prom
 export default async function AccountOrderRoute({ params }: AccountOrderRouteProps) {
   await routeLocale(params);
   const { number } = await params;
-  return <AccountOrder number={number} shop={await getShopMoney()} />;
+  return (
+    <AccountOrder
+      number={number}
+      shop={await getShopMoney()}
+      onlinePayment={await getOnlinePayment()}
+    />
+  );
 }

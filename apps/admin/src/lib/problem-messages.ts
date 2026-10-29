@@ -35,6 +35,7 @@ export const KNOWN_PROBLEM_CODES = [
   "shipping_changed",
   "shipping_provider_unavailable",
   "payment_provider_unavailable",
+  "search_unavailable",
 ] as const;
 
 /**

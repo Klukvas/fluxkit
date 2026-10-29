@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
+import type pg from "pg";
 import { expect } from "vitest";
 import type { PaymentWebhookInput } from "@fluxkit/core";
 import { DEFAULT_JOB_LIMITS } from "../common/job-limits.js";
+import { PG_POOL } from "../database/database.module.js";
 import { reconcilePayments, type ReconcilePaymentsResult } from "../jobs/reconcile-payments.job.js";
 import type { JobBudget } from "../jobs/job-budget.js";
 import { OrdersService } from "../orders/orders.service.js";
@@ -105,6 +107,41 @@ export class PaymentWorld {
     return running.app
       .get(PaymentProviderRegistry)
       .get(TEST_PAYMENT_PROVIDER_CODE) as TestPaymentProvider;
+  }
+
+  /**
+   * Opens `connections` clients of the API's own database pool at once and hands them back idle (review F3). The pool
+   * closes clients idle for 10 s; on a cold pool the requests of a `Promise.all` queue for the first new connection, so
+   * the first transaction commits before the others start and nothing really races. Ten is the `pg` default pool size.
+   * Call it right before the `Promise.all` that must race.
+   */
+  async warmPool(running: RunningApp = this.app, connections = 10): Promise<void> {
+    const pool = running.app.get<pg.Pool>(PG_POOL);
+    const clients = await Promise.all(Array.from({ length: connections }, () => pool.connect()));
+    for (const client of clients) {
+      client.release();
+    }
+  }
+
+  /**
+   * Waits until at least `count` backends of THIS database wait for a lock (a race set up by holding a row from the
+   * test's own connection; other spec files use other databases).
+   */
+  async waitForLockWaiters(count: number, timeoutMs = 5_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const waiting = await this.pool.query<{ count: string }>(
+        `select count(*) as count from pg_stat_activity
+          where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()`,
+      );
+      if (Number(waiting.rows[0]?.count) >= count) {
+        return;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`fewer than ${String(count)} transactions ever waited for a lock`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
   }
 
   resetProvider(): void {

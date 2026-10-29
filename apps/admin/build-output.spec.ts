@@ -27,6 +27,8 @@ const dist = join(import.meta.dirname, "dist");
  * before and 414 174 raw, 123 878 gzip after.
  * Email plan step 11 (the five Email routes, their titles and the email client methods; the area itself is a lazy chunk of
  * 31 404 bytes raw, 8 074 gzip): 415 472 raw, 123 830 gzip before and 417 312 raw, 124 169 gzip after.
+ * Search plan step 10b (the two Search routes and their titles; the area is a lazy chunk of 27 817 bytes raw, 7 763 gzip):
+ * 425 447 raw, 127 561 gzip before and 426 210 raw, 127 733 gzip after.
  */
 const INITIAL_JS_BUDGET = { raw: 440_000, gzip: 135_000 };
 
@@ -40,6 +42,10 @@ const AREA_MODULES = [
   "src/areas/users/index.tsx",
   "src/areas/shipping/index.tsx",
   "src/areas/email/index.tsx",
+  "src/areas/payments/index.tsx",
+  "src/areas/privacy/index.tsx",
+  "src/areas/audit/index.tsx",
+  "src/areas/search/index.tsx",
 ];
 
 interface ManifestChunk {

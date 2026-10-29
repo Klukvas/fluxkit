@@ -31,6 +31,7 @@ const config: AdminConfig = {
   lowStockThreshold: 5,
   emailDelivery: false,
   onlinePayment: false,
+  search: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,
@@ -59,6 +60,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
     customerId: null,
     isGuest: true,
     contact: { email: "a@example.com", phone: "+380501234567", firstName: "A", lastName: "B" },
+    contactErasedAt: null,
     shippingAddress: null,
     billingAddress: null,
     shipping: null,

@@ -326,6 +326,47 @@ export const ADMIN_OPERATIONS = {
     [200],
     "shipping.manage",
   ),
+  privacyLookup: operation("POST", "/admin/privacy/lookup", [200], "privacy.manage", {
+    body: "json",
+  }),
+  listPrivacyRequests: operation("GET", "/admin/privacy/requests", [200], "privacy.manage", {
+    query: ["limit", "offset", "status"],
+  }),
+  createPrivacyRequest: operation("POST", "/admin/privacy/requests", [201], "privacy.manage", {
+    body: "json",
+  }),
+  getPrivacyRequest: operation("GET", "/admin/privacy/requests/{id}", [200], "privacy.manage"),
+  exportPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/export",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  previewPrivacyErasure: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase-preview",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  erasePrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  rejectPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/reject",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
+    query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
+  }),
   getEmailStatus: operation("GET", "/admin/email/status", [200], "email.manage"),
   sendTestEmail: operation("POST", "/admin/email/test", [202], "email.manage", { body: "json" }),
   listEmailMessages: operation("GET", "/admin/email/messages", [200], "email.manage", {
@@ -508,6 +549,18 @@ export const ADMIN_OPERATIONS = {
     [204],
     "catalog.write",
   ),
+  getSearchStatus: operation("GET", "/admin/search/status", [200], "catalog.read"),
+  requestSearchRebuild: operation("POST", "/admin/search/rebuild", [202], "catalog.write"),
+  listSynonymGroups: operation("GET", "/admin/search/synonyms", [200], "catalog.read", {
+    query: ["limit", "offset", "locale"],
+  }),
+  createSynonymGroup: operation("POST", "/admin/search/synonyms", [201], "catalog.write", {
+    body: "json",
+  }),
+  updateSynonymGroup: operation("PATCH", "/admin/search/synonyms/{id}", [200], "catalog.write", {
+    body: "json",
+  }),
+  deleteSynonymGroup: operation("DELETE", "/admin/search/synonyms/{id}", [204], "catalog.write"),
 } as const satisfies Record<string, AdminOperationSpec>;
 
 export type AdminOperationName = keyof typeof ADMIN_OPERATIONS;

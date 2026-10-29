@@ -165,6 +165,7 @@ describe("ProblemDetailsFilter", () => {
         "not_found",
         "payment_provider_unavailable",
         "rule_violation",
+        "search_unavailable",
         "service_unavailable",
         "shipping_changed",
         "shipping_method_required",
