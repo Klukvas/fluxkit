@@ -48,7 +48,16 @@ function usePending(): PendingValue {
   return value;
 }
 
-export function SearchPending({ locale, children }: { locale: Locale; children: ReactNode }) {
+export function SearchPending({
+  locale,
+  basePath = "/search",
+  children,
+}: {
+  locale: Locale;
+  /** Locale-less path the filter form navigates on (`/search`, or `/catalog` and `/c/<slug>` with search on). */
+  basePath?: string;
+  children: ReactNode;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const wasPending = useRef(false);
@@ -67,7 +76,7 @@ export function SearchPending({ locale, children }: { locale: Locale; children: 
     pending,
     navigate(query) {
       startTransition(() => {
-        router.push(localizedHref(locale, searchPath(query)));
+        router.push(localizedHref(locale, searchPath(query, basePath)));
       });
     },
   };

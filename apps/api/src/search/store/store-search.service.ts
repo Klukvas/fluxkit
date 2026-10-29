@@ -19,7 +19,6 @@ import {
   type NormalizedSearchQuery,
   type PlannedQuery,
   type SearchSelection,
-  type SearchSort,
   type TextQuery,
 } from "@fluxkit/core";
 import { inArray } from "drizzle-orm";
@@ -57,6 +56,11 @@ interface EngineSearchResult {
 
 type Strategy = "all" | "last";
 
+interface LiveFields {
+  readonly filterable: readonly string[];
+  readonly sortable: readonly string[];
+}
+
 /** The engine could not answer in time (or has no live index yet): the store answers 503, the storefront falls back. */
 export function searchUnavailable(): ProblemException {
   return new ProblemException({
@@ -77,8 +81,8 @@ export class StoreSearchService {
 
   private cached: { at: number; definitions: SearchDefinitions; specs: FacetSpec[] } | undefined;
 
-  /** The `filterableAttributes` each live index has applied, by index uid (review F1). */
-  private readonly liveFields = new Map<string, { at: number; fields: readonly string[] }>();
+  /** The `filterableAttributes` and `sortableAttributes` each live index has applied, by index uid (review F1). */
+  private readonly liveFields = new Map<string, { at: number } & LiveFields>();
 
   constructor(
     private readonly database: Database,
@@ -112,7 +116,8 @@ export class StoreSearchService {
     const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const { definitions, specs: derived } = await this.definitions();
     // Only facets the live index can already filter: a definition change waits for job 13 without taking search down.
-    const specs = liveFacetSpecs(derived, await this.liveFilterable(uid, text));
+    const live = await this.liveFieldsOf(uid, text);
+    const specs = liveFacetSpecs(derived, live.filterable);
     const f = query.f === undefined ? [] : Array.isArray(query.f) ? query.f : [query.f];
     const selected = parseSelectionParams(
       { f, ...(query.price === undefined ? {} : { price: query.price }) },
@@ -134,7 +139,8 @@ export class StoreSearchService {
     );
     const textQueries = planTextQueries(text, locale.locale, "results");
 
-    let results = await this.run(uid, textQueries, plan.queries, sort, "all", text);
+    const rules = engineSort(sort, live.sortable);
+    let results = await this.run(uid, textQueries, plan.queries, rules, "all", text);
     let relaxed = false;
     const hits = results.find((entry) => entry.planned.purpose === "hits")?.result;
     if ((hits?.totalHits ?? 0) === 0 && text.words.length >= 1) {
@@ -142,7 +148,7 @@ export class StoreSearchService {
       // may also drop words from the end. Complete words that found something never reach this pass.
       const relaxedQueries = planTextQueries(text, locale.locale, "relaxed");
       const strategy: Strategy = text.words.length >= 2 ? "last" : "all";
-      results = await this.run(uid, relaxedQueries, plan.queries, sort, strategy, text);
+      results = await this.run(uid, relaxedQueries, plan.queries, rules, strategy, text);
       relaxed = true;
     }
     const main = results.find((entry) => entry.planned.purpose === "hits")?.result ?? {};
@@ -236,11 +242,10 @@ export class StoreSearchService {
     uid: string,
     textQueries: readonly TextQuery[],
     planned: readonly PlannedQuery[],
-    sort: SearchSort,
+    rules: string[] | undefined,
     strategy: Strategy,
     text: NormalizedSearchQuery,
   ): Promise<{ planned: PlannedQuery; result: EngineSearchResult }[]> {
-    const rules = engineSort(sort);
     const [single, ...others] = textQueries;
     if (others.length === 0) {
       const textQuery: TextQuery = single ?? { role: "original", q: "" };
@@ -306,23 +311,28 @@ export class StoreSearchService {
     );
   }
 
-  /** The fields the live index can filter, read once per `DEFINITIONS_TTL_MS` (one cheap `settings.get`). */
-  private async liveFilterable(
-    uid: string,
-    text: NormalizedSearchQuery,
-  ): Promise<readonly string[]> {
+  /**
+   * The fields the live index can filter and sort by, read once per `DEFINITIONS_TTL_MS` (two cheap `settings.get`, in
+   * parallel).
+   */
+  private async liveFieldsOf(uid: string, text: NormalizedSearchQuery): Promise<LiveFields> {
     const now = Date.now();
     const known = this.liveFields.get(uid);
     if (known !== undefined && now - known.at <= DEFINITIONS_TTL_MS) {
-      return known.fields;
+      return known;
     }
-    const fields = await this.guard(
+    const timeout = this.config.tuning.searchTimeoutMs;
+    const [filterable, sortable] = await this.guard(
       uid,
-      () => this.engine.filterableAttributes(uid, this.config.tuning.searchTimeoutMs),
+      () =>
+        Promise.all([
+          this.engine.filterableAttributes(uid, timeout),
+          this.engine.sortableAttributes(uid, timeout),
+        ]),
       text,
     );
-    this.liveFields.set(uid, { at: now, fields });
-    return fields;
+    this.liveFields.set(uid, { at: now, filterable, sortable });
+    return { filterable, sortable };
   }
 
   private call<T>(uid: string, body: object, text: NormalizedSearchQuery): Promise<T> {

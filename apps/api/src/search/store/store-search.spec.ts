@@ -631,6 +631,49 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     }
   });
 
+  it("keeps answering newest from an index built before document version 2 (no product id to sort by) until the rebuild swaps it (review F2)", async () => {
+    const uid = search.liveUid("uk");
+    const before = (await indexSettings(uid))["sortableAttributes"] as string[];
+    expect(before).toContain("productId");
+    const searches = vi.spyOn(SearchEngine.prototype, "multiSearch");
+    // A fresh process: nothing of the live settings is cached yet.
+    const upgraded = await startApp({ search: search.env });
+    try {
+      await updateIndexSettingsAsMaster(uid, {
+        sortableAttributes: before.filter((field) => field !== "productId"),
+      });
+      const answer = await get("/store/search?sort=newest", upgraded.baseUrl);
+      expect(answer.status, JSON.stringify(answer.body)).toBe(200);
+      expect(answer.body.items.length).toBeGreaterThan(0);
+      const sorts = searches.mock.calls.flatMap(([body]) =>
+        ((body as { queries?: { sort?: string[] }[] }).queries ?? []).flatMap((query) =>
+          query.sort === undefined ? [] : [query.sort],
+        ),
+      );
+      expect(sorts).toContainEqual(["publishedAt:desc"]);
+      expect(sorts).not.toContainEqual(["publishedAt:desc", "productId:desc"]);
+    } finally {
+      searches.mockRestore();
+      await updateIndexSettingsAsMaster(uid, { sortableAttributes: before });
+      await upgraded.app.close();
+    }
+    // With the field back, a fresh process sorts with the tie-break.
+    const current = vi.spyOn(SearchEngine.prototype, "multiSearch");
+    const fresh = await startApp({ search: search.env });
+    try {
+      expect((await get("/store/search?sort=newest", fresh.baseUrl)).status).toBe(200);
+      const sorts = current.mock.calls.flatMap(([body]) =>
+        ((body as { queries?: { sort?: string[] }[] }).queries ?? []).flatMap((query) =>
+          query.sort === undefined ? [] : [query.sort],
+        ),
+      );
+      expect(sorts).toContainEqual(["publishedAt:desc", "productId:desc"]);
+    } finally {
+      current.mockRestore();
+      await fresh.app.close();
+    }
+  });
+
   it("refuses hostile option and attribute values and a page whose first hit is exactly 10 000 (review F5)", async () => {
     for (const param of [
       `opt.${fx.size.code}:m" OR inStock = true`,

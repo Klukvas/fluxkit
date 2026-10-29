@@ -35,6 +35,11 @@ export interface ListingMetadataInput {
   /** Locale-less path of the list: `/catalog` or `/c/<slug>`. */
   basePath: string;
   query: CatalogQuery;
+  /**
+   * With search on: the address selects facets, a price or a sort (`isFilteredCatalog`). Such a view is `noindex, follow`
+   * like a brand filter, and its canonical is the plain list (plan section 9).
+   */
+  filtered?: boolean;
   title: string;
   description: string | undefined;
 }
@@ -55,7 +60,8 @@ export function listingMetadata(input: ListingMetadataInput): Metadata {
     input.locale,
     catalogPath(input.basePath, { page: query.page }),
   );
-  const robots = listingRobots(query);
+  const robots =
+    input.filtered === true ? ({ index: false, follow: true } as const) : listingRobots(query);
   return {
     title,
     ...(input.description === undefined ? {} : { description: input.description }),

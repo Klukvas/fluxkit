@@ -153,7 +153,7 @@ describe("buildSearchDocuments", () => {
       categories: ["c-leaf", "c-mid", "c-root"],
       price: 199000,
       inStock: true,
-      publishedAt: Math.floor(Date.parse("2026-10-29T10:00:00.000Z") / 1000),
+      publishedAt: Date.parse("2026-10-29T10:00:00.000Z"),
       opt_size: "m",
       opt_color: "red",
       attr_material: "cotton",
@@ -362,6 +362,7 @@ describe("buildSearchDocuments", () => {
   });
 
   it("exports the document version that triggers a rebuild when it changes", () => {
-    expect(SEARCH_DOCUMENT_VERSION).toBe(1);
+    // 2: `publishedAt` in milliseconds (search finish review F2).
+    expect(SEARCH_DOCUMENT_VERSION).toBe(2);
   });
 });
