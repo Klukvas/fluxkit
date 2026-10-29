@@ -11,6 +11,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { AdminApi, StoreApi, type Role } from "./api.ts";
+import { FakeProvider } from "./fake-provider.ts";
 import {
   ADMIN_E2E_ORIGIN,
   MANAGER_EMAIL,
@@ -267,6 +268,8 @@ interface Fixtures {
   owner: AdminApi;
   /** A shopper on the store API, own cookies and address: orders and customers for the admin to work on. */
   shopper: StoreApi;
+  /** The payment provider as a caller of the webhook route (own client address; `support/fake-provider.ts`). */
+  provider: FakeProvider;
   /** A new API context with its own client address; disposed after the test. */
   apiContext: (role: string) => Promise<APIRequestContext>;
 }
@@ -341,6 +344,9 @@ export const test = base.extend<Fixtures>({
   },
   shopper: async ({ apiContext }, use) => {
     await use(new StoreApi(await apiContext("shopper")));
+  },
+  provider: async ({ apiContext }, use) => {
+    await use(new FakeProvider(await apiContext("provider")));
   },
 });
 

@@ -152,6 +152,13 @@ export interface FakePaymentRequest {
 export interface FakePaymentProviderOptions {
   /** Another time source for `modifiedAt` (default: the logical clock, one second per state change). */
   readonly clock?: () => Date;
+  /**
+   * A verified webhook also moves the fake's own invoice to the state the webhook announces (default off). It exists for a
+   * second process: when the API runs in another process than the test, a signed webhook is the only message that reaches
+   * the fake, and a refund later needs the invoice to be paid. Only a webhook that is signed, about an invoice the fake
+   * holds, with the invoice's own reference and amount and a time not older than the invoice's, is adopted.
+   */
+  readonly adoptVerifiedWebhooks?: boolean;
 }
 
 interface MutableInvoice {
@@ -677,9 +684,13 @@ export class FakePaymentProvider implements PaymentProviderPort {
         return paymentProviderFailure("invalid_signature", { providerCodes: ["bad_signature"] });
       }
       const fact = parseWebhookBody(input.rawBody);
-      return fact === undefined
-        ? paymentProviderFailure("rejected", { providerCodes: ["malformed_body"] })
-        : paymentProviderOk(fact);
+      if (fact === undefined) {
+        return paymentProviderFailure("rejected", { providerCodes: ["malformed_body"] });
+      }
+      if (this.options.adoptVerifiedWebhooks === true) {
+        this.adopt(fact);
+      }
+      return paymentProviderOk(fact);
     });
   }
 
@@ -693,6 +704,36 @@ export class FakePaymentProvider implements PaymentProviderPort {
     }
     this.tick += 1;
     return new Date(CLOCK_START_MS + this.tick * 1000);
+  }
+
+  /** See `adoptVerifiedWebhooks`: the service's own state follows what a verified webhook says it did. */
+  private adopt(fact: ProviderPaymentFact): void {
+    const invoice = this.invoiceById.get(fact.providerPaymentId);
+    if (
+      invoice === undefined ||
+      fact.status === null ||
+      invoice.reference !== fact.reference ||
+      !sameMoney(invoice.amount, fact.amount) ||
+      fact.modifiedAt.getTime() < invoice.modifiedAt.getTime()
+    ) {
+      return;
+    }
+    invoice.status = fact.status;
+    invoice.finalAmount = fact.finalAmount === null ? null : { ...fact.finalAmount };
+    invoice.failureCode = fact.failureCode;
+    invoice.card = fact.card === null ? null : { ...fact.card };
+    invoice.refunds = fact.refunds.map((refund) => ({
+      refundId: refund.refundId,
+      amount: { ...refund.amount },
+      status: refund.status,
+      modifiedAt: new Date(refund.modifiedAt),
+    }));
+    invoice.modifiedAt = new Date(fact.modifiedAt);
+    // Later changes of the fake itself (a refund) must stay newer than what was adopted (M10: the greater time is current).
+    const seconds = Math.ceil((fact.modifiedAt.getTime() - CLOCK_START_MS) / 1000);
+    if (this.options.clock === undefined && seconds > this.tick) {
+      this.tick = seconds;
+    }
   }
 
   private touch(invoice: MutableInvoice): void {

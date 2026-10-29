@@ -11,7 +11,9 @@
 import { createServer, request, type IncomingHttpHeaders, type IncomingMessage } from "node:http";
 
 const CLIENT_HEADER = "x-e2e-client";
-const API_ROUTE = /^\/(store|admin|media)(\/|\?|$)/;
+// `/webhooks/payments`: the payment provider's server-to-server notifications (ADR 0032), forwarded byte for byte like the
+// production edge proxy does (the API checks the signature over the exact body).
+const API_ROUTE = /^\/(store|admin|media|webhooks\/payments)(\/|\?|$)/;
 
 function requiredPort(name: string): number {
   const value = process.env[name];

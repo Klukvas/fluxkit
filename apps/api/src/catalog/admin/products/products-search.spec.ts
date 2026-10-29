@@ -283,8 +283,13 @@ describe("GET /admin/products?q= (real app, real Postgres)", () => {
       // The slug arm is a prefix scan of `product` today (no `text_pattern_ops` index, which would be a migration);
       // see `productSearchCondition`. Only the SKU arm is asserted to be index-served.
       const text = await plan({ slugPrefix: slug("alpha"), sku: sku("alpha-one") });
-      expect(text).toContain("variant_sku_key");
-      expect(text).toContain("product_pkey");
+      // Only the variant arm is asserted, on purpose. How the outer `product` side is read and joined (nested loop,
+      // merge or hash join; `product_pkey` or a bitmap scan of another index) is the planner's pick from table
+      // statistics, which move with the rows other specs leave in the shared test database and with autovacuum:
+      // asserting it made this test fail intermittently while the SKU lookup was index-served in every plan.
+      expect(text).toMatch(/Scan (using|on) variant_sku_key/);
+      expect(text).toMatch(/Index Cond: \(sku = /);
+      expect(text).not.toMatch(/Seq Scan on variant/);
     });
 
     it("uses no text search (no ILIKE, no similarity, no full-text operator)", async () => {
