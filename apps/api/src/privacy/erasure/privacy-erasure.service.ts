@@ -114,6 +114,31 @@ export class PrivacyErasureService {
       .where(this.ordersCondition(subject))
       .orderBy(asc(salesOrder.id));
     const orders = lock ? await orderQuery.for("update") : await orderQuery;
+    const { facts } = await this.orderFacts(tx, orders);
+    const mailQuery = tx
+      .select({
+        id: emailMessage.id,
+        status: emailMessage.status,
+        leaseUntil: emailMessage.leaseUntil,
+      })
+      .from(emailMessage)
+      .where(this.mailCondition(subject))
+      .orderBy(asc(emailMessage.id));
+    const mail = lock ? await mailQuery.for("update") : await mailQuery;
+    const sendingMail = mail.some(
+      (row) => row.status === "sending" && row.leaseUntil !== null && row.leaseUntil > now,
+    );
+    return { orders, facts, mailIds: mail.map((row) => row.id), sendingMail };
+  }
+
+  /**
+   * The erasure facts of orders (their payment, refund and shipment statuses) and the newest refund time of each, read in
+   * a fixed number of statements. The caller holds the order locks when it acts on the answer.
+   */
+  async orderFacts(
+    tx: Transaction,
+    orders: readonly (typeof salesOrder.$inferSelect)[],
+  ): Promise<{ facts: ErasureOrderFacts[]; lastRefundAt: Map<string, Date> }> {
     const ids = orders.map((row) => row.id);
     const [payments, shipments] =
       ids.length === 0
@@ -132,7 +157,11 @@ export class PrivacyErasureService {
       payments.length === 0
         ? []
         : await tx
-            .select({ paymentId: paymentRefund.paymentId, status: paymentRefund.status })
+            .select({
+              paymentId: paymentRefund.paymentId,
+              status: paymentRefund.status,
+              createdAt: paymentRefund.createdAt,
+            })
             .from(paymentRefund)
             .where(
               inArray(
@@ -156,20 +185,50 @@ export class PrivacyErasureService {
         .filter((row) => row.orderId === order.id)
         .map((row) => row.status as ShipmentStatus),
     }));
-    const mailQuery = tx
-      .select({
-        id: emailMessage.id,
-        status: emailMessage.status,
-        leaseUntil: emailMessage.leaseUntil,
-      })
-      .from(emailMessage)
-      .where(this.mailCondition(subject))
-      .orderBy(asc(emailMessage.id));
-    const mail = lock ? await mailQuery.for("update") : await mailQuery;
-    const sendingMail = mail.some(
-      (row) => row.status === "sending" && row.leaseUntil !== null && row.leaseUntil > now,
+    const lastRefundAt = new Map<string, Date>();
+    for (const refund of refunds) {
+      const orderId = orderOfPayment.get(refund.paymentId);
+      if (orderId === undefined) continue;
+      const known = lastRefundAt.get(orderId);
+      if (known === undefined || refund.createdAt > known)
+        lastRefundAt.set(orderId, refund.createdAt);
+    }
+    return { facts, lastRefundAt };
+  }
+
+  /**
+   * Anonymises the contact fields of one order with core `planOrderAnonymisation` (a random new fingerprint). The caller
+   * holds the order's row lock and has decided that nothing blocks it.
+   */
+  async anonymiseOrder(
+    tx: Transaction,
+    order: typeof salesOrder.$inferSelect,
+    now: Date,
+  ): Promise<void> {
+    const values = planOrderAnonymisation(
+      {
+        shippingAddress: order.shippingAddress,
+        billingAddress: order.billingAddress,
+        requestFingerprint: order.requestFingerprint,
+      },
+      { erasedAt: now, newFingerprint: randomFingerprint() },
     );
-    return { orders, facts, mailIds: mail.map((row) => row.id), sendingMail };
+    await tx
+      .update(salesOrder)
+      .set({
+        email: values.email,
+        phone: values.phone,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        shippingAddress: values.shippingAddress,
+        billingAddress: values.billingAddress,
+        cancellationReason: values.cancellationReason,
+        accessTokenHash: values.accessTokenHash,
+        accessExpiresAt: values.accessExpiresAt,
+        requestFingerprint: values.requestFingerprint,
+        contactErasedAt: values.contactErasedAt,
+      })
+      .where(eq(salesOrder.id, order.id));
   }
 
   private blockersOf(gathered: Gathered): { orderNumber: string | null; reason: ErasureReason }[] {
@@ -223,30 +282,7 @@ export class PrivacyErasureService {
     const anonymised: string[] = [];
     for (const order of gathered.orders) {
       if (order.contactErasedAt !== null) continue;
-      const values = planOrderAnonymisation(
-        {
-          shippingAddress: order.shippingAddress,
-          billingAddress: order.billingAddress,
-          requestFingerprint: order.requestFingerprint,
-        },
-        { erasedAt: now, newFingerprint: randomFingerprint() },
-      );
-      await tx
-        .update(salesOrder)
-        .set({
-          email: values.email,
-          phone: values.phone,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          shippingAddress: values.shippingAddress,
-          billingAddress: values.billingAddress,
-          cancellationReason: values.cancellationReason,
-          accessTokenHash: values.accessTokenHash,
-          accessExpiresAt: values.accessExpiresAt,
-          requestFingerprint: values.requestFingerprint,
-          contactErasedAt: values.contactErasedAt,
-        })
-        .where(eq(salesOrder.id, order.id));
+      await this.anonymiseOrder(tx, order, now);
       anonymised.push(order.number);
     }
     if (gathered.mailIds.length > 0) {

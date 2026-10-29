@@ -62,6 +62,8 @@ export const DEFAULT_ORDER_PAYMENT_TTL_MINUTES = 30;
 const MIN_ORDER_PAYMENT_TTL_MINUTES = 5;
 const MAX_ORDER_PAYMENT_TTL_MINUTES = 1440;
 export const DEFAULT_ORDER_GUEST_ACCESS_DAYS = 90;
+/** The longest retention period of order contact data (core `retentionCutoff` refuses more). */
+const MAX_ORDER_CONTACT_RETENTION_DAYS = 36_500;
 const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
 
 /**
@@ -278,6 +280,9 @@ const envSchema = z
     ORDER_GUEST_ACCESS_DAYS: positiveInteger(MAX_ORDER_GUEST_ACCESS_DAYS).default(
       DEFAULT_ORDER_GUEST_ACCESS_DAYS,
     ),
+    // No default (ADR 0033 decision 8): unset keeps order contact data without a period and job 12 off; the owner sets it
+    // with an accountant. TODO(fluxkit): legal review of the period per market.
+    ORDER_CONTACT_RETENTION_DAYS: positiveInteger(MAX_ORDER_CONTACT_RETENTION_DAYS).optional(),
     // No default and no trimming: a secret that is silently weak or silently altered is worse than a refusal to start.
     ORDER_TOKEN_SECRET: z
       .string()
@@ -514,6 +519,11 @@ export interface AppEnv {
   /** A guest can open their order with its access token for this many days (1 to 3650). */
   orderGuestAccessDays: number;
   /**
+   * Days after an order closed (or its newest refund) before job 12 anonymises its contact data (1 to 36 500); with it, job
+   * 12 also purges old privacy requests and audit events. Unset: job 12 is off (ADR 0033 decision 8).
+   */
+  orderContactRetentionDays?: number;
+  /**
    * Secret of the derived guest access tokens (ADR 0023); at least 32 characters. Required when `NODE_ENV` is
    * production; the API refuses to start without it in every environment. Never log it.
    */
@@ -599,6 +609,9 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     cartTtlDays: env.CART_TTL_DAYS,
     orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
     orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
+    ...(env.ORDER_CONTACT_RETENTION_DAYS === undefined
+      ? {}
+      : { orderContactRetentionDays: env.ORDER_CONTACT_RETENTION_DAYS }),
     orderTokenSecret: env.ORDER_TOKEN_SECRET,
     maxOpenOrders: env.MAX_OPEN_ORDERS,
     trustProxy: env.TRUST_PROXY,

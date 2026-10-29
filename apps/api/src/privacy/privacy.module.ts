@@ -5,6 +5,7 @@ import { PrivacyErasureService } from "./erasure/privacy-erasure.service.js";
 import { PersonalDataExportService } from "./export/personal-data-export.service.js";
 import { PersonalDataReader } from "./export/personal-data.reader.js";
 import { PRIVACY_CONFIG, type PrivacyConfig } from "./privacy-config.js";
+import { PrivacyRetentionService } from "./retention/privacy-retention.service.js";
 
 /**
  * Privacy (ADR 0033): the personal-data reader and export, privacy requests and the admin Privacy routes. Core, no
@@ -24,8 +25,10 @@ export class PrivacyModule {
         PersonalDataExportService,
         PrivacyAdminService,
         PrivacyErasureService,
+        PrivacyRetentionService,
       ],
       exports: [
+        PrivacyRetentionService,
         PRIVACY_CONFIG,
         PersonalDataReader,
         PersonalDataExportService,

@@ -71,6 +71,7 @@ export type CreateAppEnv = Pick<AppEnv, "databaseUrl" | "enabledFeatures" | "fea
       | "cartTtlDays"
       | "orderPaymentTtlMinutes"
       | "orderGuestAccessDays"
+      | "orderContactRetentionDays"
       | "orderTokenSecret"
       | "maxOpenOrders"
       | "trustProxy"
@@ -201,7 +202,10 @@ export async function createApp(
         maxHours: env.customerSessionMaxHours ?? DEFAULT_CUSTOMER_AUTH_CONFIG.maxHours,
       },
       cart: { ttlDays: env.cartTtlDays ?? DEFAULT_CART_CONFIG.ttlDays },
-      privacy: { tokenSecret: env.orderTokenSecret ?? null },
+      privacy: {
+        tokenSecret: env.orderTokenSecret ?? null,
+        orderContactRetentionDays: env.orderContactRetentionDays ?? null,
+      },
       orders: {
         paymentTtlMinutes: env.orderPaymentTtlMinutes ?? DEFAULT_ORDERS_CONFIG.paymentTtlMinutes,
         guestAccessDays: env.orderGuestAccessDays ?? DEFAULT_ORDERS_CONFIG.guestAccessDays,
