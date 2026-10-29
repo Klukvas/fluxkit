@@ -569,6 +569,8 @@ export interface StoreConfig {
   emailDelivery: boolean;
   /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): orders are paid by hand, show no pay button. */
   onlinePayment: boolean;
+  /** False with `SEARCH_ENABLED=false`: the search routes answer 404; show no search box or facets, use the product list. */
+  search: boolean;
 }
 
 export interface PriceRange {

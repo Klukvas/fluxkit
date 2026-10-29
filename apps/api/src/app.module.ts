@@ -51,6 +51,9 @@ import {
   type ShipmentCallTimeouts,
 } from "./shipping/registry/index.js";
 import { ShipmentsModule } from "./shipping/shipments/shipments.module.js";
+import type { SearchEnv } from "@fluxkit/config";
+import { searchConfigOf, type SearchTuning } from "./search/search-config.js";
+import { SearchModule } from "./search/search.module.js";
 
 export interface AppModuleOptions {
   databaseUrl: string;
@@ -82,6 +85,10 @@ export interface AppModuleOptions {
   scheduler?: SchedulerConfig;
   /** Defaults to uploads switched off (a caller without an environment needs no media directory); the API passes `MEDIA_*`. */
   media?: MediaConfig;
+  /** Catalog search (`SEARCH_ENABLED`, `MEILI_*` as `loadEnv` reads them); defaults to off (no client, no routes, no queue writes). */
+  search?: SearchEnv;
+  /** Tests only: shorter engine timeouts of catalog search. */
+  searchTuning?: Partial<SearchTuning>;
   /** Tests only: shorter limits for the shipment provider calls (default `DEFAULT_SHIPMENT_CALL_TIMEOUTS`). */
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Tests only: other numbers for the named rate limits (a concurrency spec places many orders from one address). */
@@ -121,6 +128,7 @@ export class AppModule {
           cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
         }),
         RateLimitModule.register(options.rateLimits),
+        SearchModule.register(searchConfigOf(options.search, options.searchTuning)),
         AdminAuditModule,
         CustomerAuthModule.register({
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,

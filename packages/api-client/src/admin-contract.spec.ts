@@ -193,6 +193,7 @@ const config: Shape<AdminConfig> = {
     lowStockThreshold: "integer",
     emailDelivery: "boolean",
     onlinePayment: "boolean",
+    search: "boolean",
     media: {
       object: {
         uploadsEnabled: "boolean",

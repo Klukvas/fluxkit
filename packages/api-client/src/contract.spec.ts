@@ -419,6 +419,7 @@ const storeConfig: Shape<StoreConfig> = {
     locales: { array: "string" },
     emailDelivery: "boolean",
     onlinePayment: "boolean",
+    search: "boolean",
   },
 };
 

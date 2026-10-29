@@ -124,6 +124,8 @@ export interface AdminConfig {
   emailDelivery: boolean;
   /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): no online payment, orders are paid by hand. */
   onlinePayment: boolean;
+  /** False with `SEARCH_ENABLED=false`: the admin search routes answer 404, the Search area shows setup steps. */
+  search: boolean;
   media: AdminMediaConfig;
 }
 

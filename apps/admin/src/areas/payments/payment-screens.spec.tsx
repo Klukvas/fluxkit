@@ -37,6 +37,7 @@ const config: AdminConfig = {
   lowStockThreshold: 5,
   emailDelivery: false,
   onlinePayment: true,
+  search: false,
   media: { uploadsEnabled: true, maxBytes: 1, contentTypes: [] },
 };
 const money = { locale: "en", config };

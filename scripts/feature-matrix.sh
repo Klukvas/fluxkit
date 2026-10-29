@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -39,9 +39,15 @@
 #                     true, never print the token, and send nothing to Monobank at startup (the webhook key is fetched on
 #                     the first webhook): the API runs with a preloaded fetch wrapper that logs and refuses any request to
 #                     a *.monobank.ua host, and the log must show the wrapper active and no such request
+# Catalog search (ADR 0034) has the observable "Search: <disabled|enabled (<prefix>)>" and the public flag `search` of
+# GET /store/config:
+#   search-off   start the API with SEARCH_ENABLED=false, expect "Search: disabled", search false and 404 on every search
+#                route (store and admin)
+#   search-on    start the API with SEARCH_ENABLED=true, an engine that is NOT reachable and an invented key: it must start
+#                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -56,8 +62,9 @@ run_api() {
   local payments="${4:-}"
   pnpm build
   # MATRIX_NODE_IMPORT: an optional module preloaded into the API process only (not into the build).
+  # SEARCH_ENABLED is set for every call too (MATRIX_SEARCH_ENABLED, default false); the search modes set the MEILI_* values.
   FEATURES_ENABLED="$features" SHIPPING_PROVIDERS_ENABLED="$providers" EMAIL_PROVIDER="$email" \
-    PAYMENT_PROVIDERS_ENABLED="$payments" PORT="$port" \
+    PAYMENT_PROVIDERS_ENABLED="$payments" SEARCH_ENABLED="${MATRIX_SEARCH_ENABLED:-false}" PORT="$port" \
     node ${MATRIX_NODE_IMPORT:+--import "$MATRIX_NODE_IMPORT"} apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1 &
   api_pid=$!
   trap 'kill "$api_pid" 2>/dev/null || true' EXIT
@@ -310,6 +317,32 @@ GUARD
     ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
       || { echo "the API sent a request to Monobank at startup" >&2; exit 1; }
     rm -rf "$guard_dir"
+    ;;
+  search-off)
+    MATRIX_SEARCH_ENABLED=false run_api "" "" "none" ""
+    grep -F "Search: disabled" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the search module to report disabled" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"search":false' || { echo "expected search false with SEARCH_ENABLED=false" >&2; exit 1; }
+    for path in "/store/search?q=shirt" "/store/search/suggest?q=sh" "/admin/search/status" "/admin/search/synonyms"; do
+      code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}${path}")"
+      echo "$path -> HTTP $code"
+      [ "$code" = "404" ] || { echo "expected 404 on $path with search off" >&2; exit 1; }
+    done
+    ;;
+  search-on)
+    # An engine address nothing listens on and an invented key: the API must start without calling the engine.
+    invented_key="matrix-invented-search-key-$(date +%s)"
+    MEILI_URL=http://127.0.0.1:9 MEILI_API_KEY="$invented_key" MEILI_INDEX_PREFIX=matrix_ \
+      MATRIX_SEARCH_ENABLED=true run_api "" "" "none" ""
+    grep -F "Search: enabled (matrix_)" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the search module to report enabled" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"search":true' || { echo "expected search true with SEARCH_ENABLED=true" >&2; exit 1; }
+    ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the search key" >&2; exit 1; }
     ;;
   *)
     echo "unknown mode: $mode" >&2

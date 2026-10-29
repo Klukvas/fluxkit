@@ -1625,6 +1625,10 @@
                       "type": "boolean",
                       "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty: no online payment, orders are paid by hand. True when at least one payment provider is enabled."
                     },
+                    "search": {
+                      "type": "boolean",
+                      "description": "False when `SEARCH_ENABLED=false`: the admin search routes answer 404, so the admin Search area shows the setup steps."
+                    },
                     "media": {
                       "type": "object",
                       "properties": {
@@ -1661,6 +1665,7 @@
                     "lowStockThreshold",
                     "emailDelivery",
                     "onlinePayment",
+                    "search",
                     "media"
                   ],
                   "additionalProperties": false
@@ -1699,7 +1704,7 @@
             }
           }
         },
-        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail and online payment are configured, for the admin UI",
+        "summary": "Locales, shop currency, supported currencies, stock threshold, upload limits and whether mail, online payment and catalog search are configured, for the admin UI",
         "tags": ["admin-config"],
         "x-fluxkit-permission": "authenticated"
       }
@@ -27925,6 +27930,10 @@
                     "onlinePayment": {
                       "type": "boolean",
                       "description": "False when `PAYMENT_PROVIDERS_ENABLED` is empty (no online payment; orders are paid by hand): show no pay button. True when at least one payment provider is enabled. Says nothing about which provider."
+                    },
+                    "search": {
+                      "type": "boolean",
+                      "description": "False when `SEARCH_ENABLED=false`: the search routes answer 404, so show no search box and no facets and use `GET /store/products`. True when catalog search is configured (it may still answer `503 search_unavailable` while the engine is down or the first index is built)."
                     }
                   },
                   "required": [
@@ -27934,7 +27943,8 @@
                     "defaultLocale",
                     "locales",
                     "emailDelivery",
-                    "onlinePayment"
+                    "onlinePayment",
+                    "search"
                   ],
                   "additionalProperties": false
                 }

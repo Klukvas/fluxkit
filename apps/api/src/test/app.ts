@@ -1,4 +1,5 @@
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import type { SearchEnv } from "@fluxkit/config";
 import type { AdminRole } from "@fluxkit/core";
 import { createApp } from "../app.factory.js";
 import type { AdminAuthenticator } from "../auth/admin-authenticator.js";
@@ -9,6 +10,7 @@ import type { LoadedEmailProvider } from "../email/registry/index.js";
 import type { LoadedPaymentProvider } from "../payments/registry/index.js";
 import type { LoadedShippingProvider, ShipmentCallTimeouts } from "../shipping/registry/index.js";
 import type { MediaTuning } from "../media/media-config.js";
+import type { SearchTuning } from "../search/search-config.js";
 import type { RateLimitOverrides } from "../rate-limit/rate-limiter.js";
 import { AllowAllAdminAuthenticator } from "./allow-all-admin-authenticator.js";
 import { requireEnv } from "./env.js";
@@ -113,6 +115,10 @@ export interface StartAppOptions {
   mediaMaxPixels?: number;
   /** Other processing slots, waits and budgets of the media upload. */
   mediaTuning?: Partial<MediaTuning>;
+  /** `SEARCH_ENABLED` and `MEILI_*`; defaults to search off (see `search-world.ts` for a scoped key on a fresh prefix). */
+  search?: SearchEnv;
+  /** Shorter engine timeouts of catalog search. */
+  searchTuning?: Partial<SearchTuning>;
 }
 
 export async function startApp(options: StartAppOptions = {}): Promise<RunningApp> {
@@ -153,6 +159,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       mediaPublicBaseUrl: options.mediaPublicBaseUrl,
       mediaMaxBytes: options.mediaMaxBytes,
       mediaMaxPixels: options.mediaMaxPixels,
+      search: options.search,
     },
     {
       adminAuthenticator: authenticator === "production-default" ? undefined : authenticator,
@@ -167,6 +174,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       shipmentCallTimeouts: options.shipmentCallTimeouts,
       paymentCallTimeoutMs: options.paymentCallTimeoutMs,
       mediaTuning: options.mediaTuning,
+      searchTuning: options.searchTuning,
     },
   );
   await app.listen(0, "127.0.0.1");

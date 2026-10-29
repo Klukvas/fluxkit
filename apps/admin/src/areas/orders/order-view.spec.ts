@@ -31,6 +31,7 @@ const config: AdminConfig = {
   lowStockThreshold: 5,
   emailDelivery: false,
   onlinePayment: false,
+  search: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,
