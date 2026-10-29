@@ -227,12 +227,20 @@ export class SearchEngine {
     );
   }
 
-  /** One atomic swap of every pair (spike S1, E9). */
-  swapIndexes(pairs: readonly (readonly [string, string])[]): Promise<TaskUid> {
+  /**
+   * One atomic swap of every pair (spike S1, E9). `rename: true` gives the FIRST (existing) index the second uid, which
+   * must not exist yet (a first build); without it a missing uid fails the task.
+   */
+  swapIndexes(
+    pairs: readonly { readonly indexes: readonly [string, string]; readonly rename?: boolean }[],
+  ): Promise<TaskUid> {
     return this.enqueue(
       "POST",
       "/swap-indexes",
-      pairs.map((pair) => ({ indexes: [...pair] })),
+      pairs.map((pair) => ({
+        indexes: [...pair.indexes],
+        ...(pair.rename === true ? { rename: true } : {}),
+      })),
       "swap indexes",
     );
   }

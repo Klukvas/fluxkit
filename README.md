@@ -106,6 +106,7 @@ curl -sS -X POST "$MEILI_URL/keys" \
 - The engine stays on a private network (Compose binds `127.0.0.1`); never route it through the edge proxy. In production `MEILI_URL` must be `https` or a private address, `MEILI_ENV=production` and a master key of at least 16 bytes.
 - The API makes no engine call at startup and logs `Search: enabled (<prefix>)`; `search` in `GET /store/config` tells the storefront.
 - A leaked `MEILI_API_KEY` can rewrite this shop's indexes, not other indexes or keys.
+- The scheduler builds the indexes (jobs 13 and 14, `docs/api/jobs.md`): the first tick after search is switched on builds every locale; until then `GET /store/search` answers `503 search_unavailable`. After `pnpm seed` (or any bulk import) run `pnpm search:reindex` to build at once.
 
 ## Scheduler and jobs
 
@@ -422,6 +423,7 @@ Unpaid orders expire by themselves: the scheduler (see Scheduler and jobs) relea
 
 ```bash
 pnpm jobs:run-once      # prints one line per job (expire-orders, sweep-reservations, dispatch-events, ...); exit 0 ran, 2 a running scheduler holds the lock
+pnpm search:reindex     # with SEARCH_ENABLED=true: rebuilds every locale's search index and syncs the queue (docs/api/jobs.md); exit 0 done, 1 failed, 2 lock held
 ```
 
 ## Storefront walkthrough

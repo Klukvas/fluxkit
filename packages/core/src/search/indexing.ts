@@ -34,7 +34,6 @@ export const SEARCH_SYNC_REASONS = [
   "price_changed",
   "stock_changed",
   "reservation_changed",
-  "media_changed",
   "brand_changed",
   "category_changed",
   "option_changed",

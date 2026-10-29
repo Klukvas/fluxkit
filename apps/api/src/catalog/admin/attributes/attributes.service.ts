@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { sql, type SQL } from "drizzle-orm";
 import {
   CATALOG_LIMITS,
   TEXT_LIMITS,
@@ -22,6 +23,7 @@ import {
   type FieldError,
 } from "../../../common/problem.js";
 import { withTransaction } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { attributeHasValues, attributeOptionCodeInUse } from "../../shared/attribute-usage.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
@@ -46,12 +48,21 @@ import {
 
 const SELECTABLE_TYPES: readonly AttributeInputType[] = ["select", "multiselect"];
 
+/** The products of every product type the attribute is assigned to. */
+function productsWithAttribute(attributeId: string): SQL {
+  return sql`
+    select product.id from product
+    join product_type_attribute assignment on assignment.product_type_id = product.product_type_id
+    where assignment.attribute_id = ${attributeId}`;
+}
+
 @Injectable()
 export class AttributesService {
   constructor(
     private readonly attributes: AttributesRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async create(body: CreateAttributeBody): Promise<AttributeResponse> {
@@ -178,6 +189,11 @@ export class AttributesService {
         Object.keys(changes).length === 0
           ? current
           : ((await this.attributes.update(tx, id, changes)) ?? current);
+      if (Object.keys(changes).length > 0) {
+        // Flags and the unit decide what the documents of every product of a type with this attribute carry; the
+        // filterable list of the index follows through the settings hash.
+        await this.search.productsChangedWhere(tx, productsWithAttribute(id), "attribute_changed");
+      }
       return toAttributeResponse(row);
     });
   }
@@ -281,11 +297,21 @@ export class AttributesService {
     if (Object.keys(changes).length === 0) {
       return toAttributeOptionResponse(current);
     }
-    const row = await this.attributes.updateOption(this.database, optionId, changes);
-    if (row === undefined) {
-      throw notFound("Attribute option");
-    }
-    return toAttributeOptionResponse(row);
+    return withTransaction(this.database, async (tx) => {
+      const row = await this.attributes.updateOption(tx, optionId, changes);
+      if (row === undefined) {
+        throw notFound("Attribute option");
+      }
+      // A select label is searchable text of the products that hold the code.
+      if (body.label !== undefined) {
+        await this.search.productsChangedWhere(
+          tx,
+          productsWithAttribute(attributeId),
+          "attribute_changed",
+        );
+      }
+      return toAttributeOptionResponse(row);
+    });
   }
 
   async deleteOption(attributeId: string, optionId: string): Promise<void> {

@@ -8,6 +8,7 @@ import {
   type FieldError,
 } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { ProductsRepository, type ProductRow } from "../products/products.repository.js";
 import { toPriceResponse } from "./prices.mapper.js";
@@ -61,6 +62,7 @@ export class PricesService {
     private readonly prices: PricesRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async list(productId: string, variantId: string): Promise<PriceListResponse> {
@@ -97,6 +99,8 @@ export class PricesService {
       if (row === undefined) {
         throw new Error("An upserted price was not returned.");
       }
+      // Only the shop currency reaches a document; marking on every currency keeps the rule simple.
+      await this.search.productsChanged(tx, [productId], "price_changed");
       return { price: toPriceResponse(row), created: existing === undefined };
     });
   }
@@ -124,6 +128,7 @@ export class PricesService {
         );
       }
       await this.prices.delete(tx, variantId, currency);
+      await this.search.productsChanged(tx, [productId], "price_changed");
     });
   }
 
@@ -184,6 +189,7 @@ export class PricesService {
         tx,
         accepted.map(({ item, price }) => toNewPrice(item.variantId, price)),
       );
+      await this.search.productsChanged(tx, [productId], "price_changed");
       return { items: rows.map(toPriceResponse) };
     });
   }

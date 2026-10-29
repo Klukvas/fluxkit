@@ -45,6 +45,8 @@ describe("deriveIndexSettings", () => {
         "description",
       ],
       filterableAttributes: [
+        // id: the sync deletes the documents a product lost with `productId IN [...] AND NOT id IN [...]`.
+        "id",
         "productId",
         "brand",
         "categories",

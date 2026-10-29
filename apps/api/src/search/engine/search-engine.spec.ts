@@ -92,7 +92,7 @@ describe("SearchEngine (real Meilisearch)", () => {
     );
     expect(error.status).toBe(403);
     await expectEngineError(
-      () => engine.swapIndexes([[`${prefix}x`, "someone_elses_index"]]),
+      () => engine.swapIndexes([{ indexes: [`${prefix}x`, "someone_elses_index"] }]),
       "engine_unauthorized",
     );
   });
@@ -137,6 +137,22 @@ describe("SearchEngine (real Meilisearch)", () => {
       silent.closeAllConnections();
       await new Promise<void>((resolve) => silent.close(() => resolve()));
     }
+  });
+
+  it("KNOWN LIMITATION: a key scoped to indexes can not read the swap task; a later task of the index ends after it", async () => {
+    const left = `${prefix}swap_a`;
+    const right = `${prefix}swap_b`;
+    await engine.waitForTask(await engine.createIndex(left), 10_000);
+    await engine.waitForTask(await engine.createIndex(right), 10_000);
+    await engine.waitForTask(
+      await engine.addDocuments(right, [{ id: "x", productId: "p" }]),
+      10_000,
+    );
+    const swap = await engine.swapIndexes([{ indexes: [left, right] }]);
+    await expectEngineError(() => engine.waitForTask(swap, 300), "engine_task_timeout");
+    await engine.waitForTask(await engine.updateSettings(left, {}), 10_000);
+    expect(await engine.documentCount(left)).toBe(1);
+    expect(await engine.documentCount(right)).toBe(0);
   });
 
   it("prunes the finished tasks of its own indexes (tasks.delete in the key)", async () => {

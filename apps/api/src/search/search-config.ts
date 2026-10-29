@@ -1,4 +1,5 @@
 import type { SearchEnv } from "@fluxkit/config";
+import { SEARCH_INDEXING } from "@fluxkit/core";
 
 /** How long the API waits for the engine (ADR 0034 decision 11). Tests shorten them. */
 export interface SearchTuning {
@@ -10,6 +11,8 @@ export interface SearchTuning {
   readonly healthTimeoutMs: number;
   /** One indexing task (documents, settings, swap). */
   readonly taskTimeoutMs: number;
+  /** A fan-out writer above this many products requests a rebuild instead (core `SEARCH_INDEXING`). */
+  readonly fanOutRebuildThreshold: number;
 }
 
 export const DEFAULT_SEARCH_TUNING: SearchTuning = Object.freeze({
@@ -17,6 +20,7 @@ export const DEFAULT_SEARCH_TUNING: SearchTuning = Object.freeze({
   searchTimeoutMs: 2_000,
   healthTimeoutMs: 2_000,
   taskTimeoutMs: 20_000,
+  fanOutRebuildThreshold: SEARCH_INDEXING.fanOutRebuildThreshold,
 });
 
 export const SEARCH_CONFIG = Symbol("SEARCH_CONFIG");
