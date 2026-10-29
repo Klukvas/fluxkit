@@ -11,6 +11,7 @@ import * as orders from "../areas/orders";
 import * as payments from "../areas/payments";
 import * as privacy from "../areas/privacy";
 import * as products from "../areas/products";
+import * as search from "../areas/search";
 import * as shipping from "../areas/shipping";
 import * as users from "../areas/users";
 import {
@@ -184,6 +185,7 @@ describe("the lazy file loader", () => {
       payments: { uk: unused, en: unused },
       privacy: { uk: unused, en: unused },
       audit: { uk: unused, en: unused },
+      search: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
@@ -226,6 +228,7 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   payments: payments.MESSAGE_FILES,
   privacy: privacy.MESSAGE_FILES,
   products: products.MESSAGE_FILES,
+  search: search.MESSAGE_FILES,
   shipping: shipping.MESSAGE_FILES,
   users: users.MESSAGE_FILES,
 };

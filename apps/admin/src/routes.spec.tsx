@@ -82,6 +82,8 @@ describe("route table", () => {
       categories: "catalog.read",
       categoryNew: "catalog.write",
       categoryDetail: "catalog.read",
+      search: "catalog.read",
+      searchSynonyms: "catalog.read",
       orders: "orders.read",
       orderDetail: "orders.read",
       customers: "customers.read",
@@ -181,6 +183,8 @@ describe("lazy pages and their message files", () => {
       expect(declared[id], id).toEqual(["privacy", "orders"]);
     }
     expect(declared.auditLog).toEqual(["audit"]);
+    expect(declared.search).toEqual(["search"]);
+    expect(declared.searchSynonyms).toEqual(["search"]);
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });
