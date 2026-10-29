@@ -11,6 +11,7 @@ export const PERMISSIONS = Object.freeze([
   "shipping.manage",
   "email.manage",
   "payments.refund",
+  "privacy.manage",
 ] as const);
 
 export type AdminRole = (typeof ROLES)[number];
@@ -21,6 +22,7 @@ export type AdminPermission = (typeof PERMISSIONS)[number];
 // Shipping settings (methods, rates, provider profiles) are shop configuration: owner and manager, not the viewer (ADR 0029 decision 13).
 // Mail delivery (status, test send, outbox with recipient addresses, resend, cancel, preview): owner and manager; addresses are personal data (ADR 0031 decision 15).
 // Refunds move money, so they need their own permission beyond the order permissions: owner and manager (ADR 0032 decision 11, owner answer 3).
+// Privacy requests, export and erasure of a data subject: owner only, erasure is irreversible (ADR 0033 decision 9, plan question 8).
 export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermission[]>> =
   Object.freeze({
     owner: Object.freeze([...PERMISSIONS]),

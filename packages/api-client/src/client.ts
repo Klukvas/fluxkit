@@ -23,6 +23,7 @@ import type {
   PaymentState,
   PasswordResetConfirmBody,
   PasswordResetRequestBody,
+  PersonalDataExport,
   ProductDetail,
   ProductList,
   PickupPointKind,
@@ -102,6 +103,8 @@ export interface StoreClient {
   getAccount(options?: CallOptions): Result<AccountResult>;
   updateAccount(body: UpdateAccountBody, options?: CallOptions): Result<AccountResult>;
   changePassword(body: ChangePasswordBody, options?: CallOptions): Result<undefined>;
+  /** The signed-in customer's personal data (`fluxkit.personal-data-export/v1`); `429` above 5 a day. */
+  getDataExport(options?: CallOptions): Result<PersonalDataExport>;
   /**
    * Asks for a reset link by mail. Always `202 {}` for any address (no account enumeration); `404` without a mail
    * provider (`getConfig().emailDelivery` is false then).
@@ -206,6 +209,7 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     getAccount: (opts) => call("getAccount", { options: opts }),
     updateAccount: (body, opts) => call("updateAccount", { body, options: opts }),
     changePassword: (body, opts) => call("changePassword", { body, options: opts }),
+    getDataExport: (opts) => call("getDataExport", { options: opts }),
     requestPasswordReset: (body, opts) => call("requestPasswordReset", { body, options: opts }),
     confirmPasswordReset: (body, opts) => call("confirmPasswordReset", { body, options: opts }),
     confirmEmailVerification: (body, opts) =>

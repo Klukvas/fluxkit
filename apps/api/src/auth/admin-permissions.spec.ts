@@ -58,6 +58,15 @@ const USERS_ROUTES = [
 /** The admin audit log (ADR 0033 decision 9): read only, owner only, declared once on the controller. */
 const AUDIT_ROUTES = ["GET /admin/audit-events"];
 
+/** The Privacy area (ADR 0033 decisions 9 and 10): owner only, declared once on the controller. */
+const PRIVACY_ROUTES = [
+  "POST /admin/privacy/lookup",
+  "GET /admin/privacy/requests",
+  "POST /admin/privacy/requests",
+  "GET /admin/privacy/requests/:id",
+  "POST /admin/privacy/requests/:id/export",
+];
+
 /** Customer management: declared once on the controller with its own default pair (`customers.read`, `customers.write`). */
 const CUSTOMERS_ROUTES = [
   "GET /admin/customers",
@@ -126,6 +135,7 @@ function expectedPermission(method: string, pattern: string): AdminPermission {
   if (`${method} ${pattern}` === RESERVATIONS_ROUTE) return "orders.read";
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
   if (AUDIT_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
+  if (PRIVACY_ROUTES.includes(`${method} ${pattern}`)) return "privacy.manage";
   if (PAYMENTS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" ? "orders.read" : "payments.refund";
   }
@@ -405,6 +415,7 @@ describe("admin route permissions", () => {
         "orders.read",
         "orders.write",
         "payments.refund",
+        "privacy.manage",
         "shipping.manage",
         "users.manage",
       ]);
@@ -412,6 +423,7 @@ describe("admin route permissions", () => {
         expect(permissionsOf("owner")).toContain(permission);
       }
       expect(permissionsOf("manager")).not.toContain("users.manage");
+      expect(permissionsOf("manager")).not.toContain("privacy.manage");
       expect(permissionsOf("viewer")).not.toContain("users.manage");
       // Shipping settings are shop configuration: owner and manager, not the viewer.
       expect(permissionsOf("manager")).toContain("shipping.manage");

@@ -663,3 +663,23 @@ export interface ProductDetail {
   availability: Availability;
   media: ProductMedia[];
 }
+
+// ---- personal data export (ADR 0033 decision 7; docs/contracts/personal-data-export.md)
+
+export type ExportJsonValue =
+  string | number | boolean | null | ExportJsonValue[] | { [key: string]: ExportJsonValue };
+
+export type ExportJsonObject = Record<string, ExportJsonValue>;
+
+/** `fluxkit.personal-data-export/v1`: keys and rules in `docs/contracts/personal-data-export.md`. */
+export interface PersonalDataExport {
+  format: "fluxkit.personal-data-export/v1";
+  generatedAt: string;
+  subject: { kind: "customer" | "email" };
+  account: ExportJsonObject | null;
+  orders: ExportJsonObject[];
+  mail: ExportJsonObject[];
+  sessions: ExportJsonObject[];
+  cart: ExportJsonObject | null;
+  processors: { kind: "email" | "payment" | "shipping"; name: string }[];
+}

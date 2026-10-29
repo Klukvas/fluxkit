@@ -2,6 +2,7 @@ import { Module, RequestMethod, type MiddlewareConsumer, type NestModule } from 
 import type { NextFunction, Request, Response } from "express";
 import { markStoreAccountResponseUncacheable } from "../common/store-path.js";
 import { EmailAuthModule } from "../email/auth/index.js";
+import { AccountDataController } from "./account/account-data.controller.js";
 import { AccountEmailController } from "./account/account-email.controller.js";
 import { AccountEmailService } from "./account/account-email.service.js";
 import { AccountController } from "./account/account.controller.js";
@@ -25,7 +26,12 @@ function storeAccountNoStore(request: Request, response: Response, next: NextFun
  */
 @Module({
   imports: [EmailAuthModule],
-  controllers: [AccountController, AccountEmailController, AdminCustomersController],
+  controllers: [
+    AccountController,
+    AccountEmailController,
+    AccountDataController,
+    AdminCustomersController,
+  ],
   providers: [
     CustomerRepository,
     CustomerAccountService,

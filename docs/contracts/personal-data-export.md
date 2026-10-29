@@ -1,6 +1,6 @@
 # Contract: personal data export
 
-Status: draft. The document builder is implemented in `packages/core/src/privacy/export.ts` (ADR 0033 decision 7, privacy plan step 3); no route serves it yet (plan steps 6 and 7). Since version: unreleased.
+Status: draft. The document builder is implemented in `packages/core/src/privacy/export.ts` (ADR 0033 decision 7, privacy plan step 3); `GET /store/account/data-export` and `POST /admin/privacy/requests/{id}/export` serve it (plan step 6, `docs/api/privacy.md`). Since version: unreleased.
 
 ## Format `fluxkit.personal-data-export/v1`
 

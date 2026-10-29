@@ -44,6 +44,7 @@ import type {
   ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
+  PersonalDataExport,
 } from "./types.js";
 import {
   compareShape,
@@ -614,6 +615,24 @@ const updateAccountBody: Shape<UpdateAccountBody> = {
     phone: { optional: { nullable: "string" } },
   },
 };
+const exportRecord = { record: "any" } as const;
+const personalDataExport: Shape<PersonalDataExport> = {
+  object: {
+    format: { enum: ["fluxkit.personal-data-export/v1"] },
+    generatedAt: "string",
+    subject: { object: { kind: { enum: ["customer", "email"] } } },
+    account: { nullable: exportRecord },
+    orders: { array: exportRecord },
+    mail: { array: exportRecord },
+    sessions: { array: exportRecord },
+    cart: { nullable: exportRecord },
+    processors: {
+      array: {
+        object: { kind: { enum: ["email", "payment", "shipping"] }, name: "string" },
+      },
+    },
+  },
+};
 const changePasswordBody: Shape<ChangePasswordBody> = {
   object: { currentPassword: "string", newPassword: "string" },
 };
@@ -677,6 +696,7 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getAccount: accountResult,
   updateAccount: accountResult,
   changePassword: "none",
+  getDataExport: personalDataExport,
   requestPasswordReset: passwordResetAccepted,
   confirmPasswordReset: "none",
   confirmEmailVerification: "none",
@@ -714,6 +734,7 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getAccount: null,
   updateAccount: updateAccountBody,
   changePassword: changePasswordBody,
+  getDataExport: null,
   requestPasswordReset: passwordResetRequestBody,
   confirmPasswordReset: passwordResetConfirmBody,
   confirmEmailVerification: verifyEmailBody,
