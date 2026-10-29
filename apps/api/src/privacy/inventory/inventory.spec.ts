@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ORDER_ANONYMISATION_PLAN, ORDER_COLUMNS_KEPT_ON_ANONYMISATION } from "@fluxkit/core";
 import { checkInventory, coreInventory, listSchemaTables } from "./index.js";
 import type { ColumnEntry, Inventory, SchemaTable } from "./types.js";
 
@@ -82,6 +83,40 @@ describe("the core inventory against the Drizzle schema", () => {
           expect(entry.erasure, `${table}.${column}`).not.toBe("keep");
         }
       }
+    }
+  });
+});
+
+describe("the inventory against the core anonymisation plan (ADR 0033 decision 6)", () => {
+  // `contact_erased_at` is added by the privacy migration (plan step 4); until then it is in the plan only.
+  const NOT_YET_IN_SCHEMA = ["contact_erased_at"];
+  const planned = ORDER_ANONYMISATION_PLAN.map((step) => step.column).filter(
+    (column) => !NOT_YET_IN_SCHEMA.includes(column),
+  );
+
+  it("changes exactly the sales_order columns the inventory anonymises or clears", () => {
+    const inventoried = Object.entries(coreInventory["sales_order"] ?? {})
+      .filter(([, entry]) => entry.erasure === "anonymise" || entry.erasure === "clear")
+      .map(([column]) => column);
+    expect([...planned].sort()).toEqual(inventoried.sort());
+  });
+
+  it("assigns every sales_order column to the plan or to the kept list, and no column to both", () => {
+    const columns = schemaTables.find((table) => table.name === "sales_order")?.columns ?? [];
+    expect(columns.length).toBeGreaterThan(20);
+    for (const column of columns) {
+      const inPlan = planned.includes(column);
+      const kept = ORDER_COLUMNS_KEPT_ON_ANONYMISATION.includes(column);
+      expect(inPlan !== kept, `${column}: plan ${String(inPlan)}, kept ${String(kept)}`).toBe(true);
+    }
+    for (const column of ORDER_COLUMNS_KEPT_ON_ANONYMISATION) {
+      expect(columns, column).toContain(column);
+    }
+  });
+
+  it("keeps in the plan nothing the inventory calls personal data", () => {
+    for (const column of ORDER_COLUMNS_KEPT_ON_ANONYMISATION) {
+      expect(coreInventory["sales_order"]?.[column]?.class, column).not.toBe("personal");
     }
   });
 });

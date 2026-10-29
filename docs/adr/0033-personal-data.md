@@ -108,6 +108,6 @@ Re-authentication for deletion; export only for the signed-in customer (a guest 
 1. **Which order fields accounting law requires and for how long** (tasks O5): the plan keeps number, lines, totals, dates, shipping and payment records and anonymises the rest; an accountant confirms.
 2. **Retention of `privacy_request` (3 years) and `admin_audit_event` (1 year):** proposals for the lawyer.
 3. **Mail rows `sending` under a live lease at erasure time:** wait for the lease or refuse with `erasure_blocked mail_sending`; decided in step 7.
-4. **Whether any shopper-supplied text reaches `order_status_change.reason` or `sales_order.cancellation_reason`:** step 3 checks the writers (result in the plan's step 3 row).
+4. **Whether any shopper-supplied text reaches `order_status_change.reason` or `sales_order.cancellation_reason`:** answered in step 3: no. Only `OrdersService.cancelAsAdmin` writes a reason (admin text, 1 to 500 characters); guest, customer and system status changes pass none. The rule "admins do not type personal data here" stays a UI hint.
 5. **A wrong password on account deletion** and the lockout counter: decided in step 7.
 6. **Processor roles and data locations** (Resend, Nova Post, Monobank, the host): tasks O2, O7.

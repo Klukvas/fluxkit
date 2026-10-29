@@ -94,9 +94,15 @@ export const customerTables: Inventory = {
 
   cart_item: {
     ...none("D5", "id", "cart_id", "created_at", "updated_at"),
+    variant_id: classified(
+      "pseudonymous",
+      "D5",
+      "excluded",
+      "cascade",
+      "Internal id; the export shows the SKU and title of the line.",
+    ),
     ...many(
       classified("pseudonymous", "D5", "included", "cascade"),
-      "variant_id",
       "quantity",
       "seen_unit_amount",
       "seen_currency",
