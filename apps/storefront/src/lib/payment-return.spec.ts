@@ -24,7 +24,12 @@ function memoryStorage(): AttemptStorage & { entries: Map<string, string> } {
   };
 }
 
-const guest: PaymentReturn = { kind: "guest", number: "7K3M-9QX2", accessToken: TOKEN, paymentId: ID };
+const guest: PaymentReturn = {
+  kind: "guest",
+  number: "7K3M-9QX2",
+  accessToken: TOKEN,
+  paymentId: ID,
+};
 const account: PaymentReturn = { kind: "account", number: "7K3M-9QX2", paymentId: ID };
 
 describe("the hand-off to the return page", () => {
@@ -72,7 +77,10 @@ describe("the hand-off to the return page", () => {
     ["not JSON", "{oops"],
     ["an array", "[]"],
     ["an unknown kind", JSON.stringify({ kind: "admin", number: "7K3M-9QX2", paymentId: ID })],
-    ["a guest entry without a token", JSON.stringify({ kind: "guest", number: "7K3M-9QX2", paymentId: ID })],
+    [
+      "a guest entry without a token",
+      JSON.stringify({ kind: "guest", number: "7K3M-9QX2", paymentId: ID }),
+    ],
     ["a malformed token", JSON.stringify({ ...guest, accessToken: "short" })],
     ["a malformed order number", JSON.stringify({ ...guest, number: "../etc" })],
     ["a malformed payment id", JSON.stringify({ ...guest, paymentId: "not-a-uuid" })],

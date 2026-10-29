@@ -30,7 +30,8 @@ export function paymentStatusKey(status: ShopperPaymentStatus): string {
 
 /** The explanation of a `failed` or `expired` attempt; a missing or unknown category is the technical-problem text. */
 export function paymentFailureKey(category: ShopperPaymentFailureCategory | null): string {
-  return category !== null && ["declined", "expired", "technical", "not_accepted"].includes(category)
+  return category !== null &&
+    ["declined", "expired", "technical", "not_accepted"].includes(category)
     ? `payment.failure.${category}`
     : "payment.failure.technical";
 }

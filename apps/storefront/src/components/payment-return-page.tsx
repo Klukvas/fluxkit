@@ -82,10 +82,15 @@ const TONE_BORDER = {
  * `aria-live="polite"`, so a screen reader announces each new state), a reserved height so the page does not jump, and the
  * next actions of the state. Pure: state in, markup out.
  */
-export function PaymentReturnView({ t, locale, state, entry, onCheckAgain }: PaymentReturnViewProps) {
+export function PaymentReturnView({
+  t,
+  locale,
+  state,
+  entry,
+  onCheckAgain,
+}: PaymentReturnViewProps) {
   const view = returnPresentation(state);
-  const payment =
-    state !== "noEntry" && "payment" in state ? state.payment : null;
+  const payment = state !== "noEntry" && "payment" in state ? state.payment : null;
   const failure = state !== "noEntry" && state.phase === "error" ? state.failure : null;
   return (
     <Container className="flex flex-col gap-6 py-8">
@@ -116,9 +121,11 @@ export function PaymentReturnView({ t, locale, state, entry, onCheckAgain }: Pay
           {entry === null ? null : (
             <p className="mt-2 text-sm text-muted-foreground">
               {t("payment.return.order", { number: entry.number })}
-              {payment === null
-                ? ""
-                : ` · ${t("payment.return.orderStatus", { status: t(orderStatusKey(payment.orderStatus)) })}`}
+            </p>
+          )}
+          {payment === null ? null : (
+            <p className="text-sm text-muted-foreground">
+              {t("payment.return.orderStatus", { status: t(orderStatusKey(payment.orderStatus)) })}
             </p>
           )}
         </div>

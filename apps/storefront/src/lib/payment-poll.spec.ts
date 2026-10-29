@@ -99,7 +99,10 @@ describe("createPaymentWatch", () => {
     watch.start();
     await vi.advanceTimersByTimeAsync(10 * 60_000);
     expect(read).toHaveBeenCalledTimes(1 + PAYMENT_POLL_MAX_FOLLOW_UPS);
-    expect(watch.getState()).toMatchObject({ phase: "timedOut", payment: { status: "processing" } });
+    expect(watch.getState()).toMatchObject({
+      phase: "timedOut",
+      payment: { status: "processing" },
+    });
     expect(vi.getTimerCount()).toBe(0);
   });
 

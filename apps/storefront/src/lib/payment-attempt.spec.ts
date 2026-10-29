@@ -36,8 +36,12 @@ describe("the payment attempt key", () => {
 
   it("keeps the key across a reload of the tab (the stored attempt is read again)", async () => {
     const storage = memoryStorage();
-    const first = await createPaymentAttemptManager({ storage, crypto: fakeCrypto() }).keyFor(order);
-    const again = await createPaymentAttemptManager({ storage, crypto: fakeCrypto() }).keyFor(order);
+    const first = await createPaymentAttemptManager({ storage, crypto: fakeCrypto() }).keyFor(
+      order,
+    );
+    const again = await createPaymentAttemptManager({ storage, crypto: fakeCrypto() }).keyFor(
+      order,
+    );
     expect(again).toBe(first);
   });
 
@@ -66,7 +70,11 @@ describe("the payment attempt key", () => {
     const manager = createPaymentAttemptManager({ storage, crypto: fakeCrypto() });
     await manager.keyFor(order);
     const stored = storage.entries.get(PAYMENT_ATTEMPT_STORAGE_KEY) ?? "";
-    expect(Object.keys(JSON.parse(stored) as object).sort()).toEqual(["key", "requestHash", "salt"]);
+    expect(Object.keys(JSON.parse(stored) as object).sort()).toEqual([
+      "key",
+      "requestHash",
+      "salt",
+    ]);
     expect(stored).not.toContain("7K3M");
     expect(stored).not.toContain('"uk"');
   });

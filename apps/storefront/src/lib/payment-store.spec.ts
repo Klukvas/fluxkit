@@ -45,7 +45,13 @@ function memoryStorage(): AttemptStorage & { entries: Map<string, string> } {
 const created = (overrides: Partial<CreatedPayment> = {}): StoreResult<CreatedPayment> => ({
   ok: true,
   status: 201,
-  data: { paymentId: ID, status: "waiting", redirectUrl: PAGE, expiresAt: "2026-10-29T12:00:00.000Z", ...overrides },
+  data: {
+    paymentId: ID,
+    status: "waiting",
+    redirectUrl: PAGE,
+    expiresAt: "2026-10-29T12:00:00.000Z",
+    ...overrides,
+  },
 });
 
 function problem(
@@ -75,7 +81,12 @@ interface Harness {
 
 function harness(
   answers: (StoreResult<CreatedPayment> | Error)[],
-  options: { returnStorage?: AttemptStorage | null; attempts?: () => ReturnType<typeof createPaymentAttemptManager>; navigates?: boolean; now?: () => number } = {},
+  options: {
+    returnStorage?: AttemptStorage | null;
+    attempts?: () => ReturnType<typeof createPaymentAttemptManager>;
+    navigates?: boolean;
+    now?: () => number;
+  } = {},
 ): Harness {
   const storage = memoryStorage();
   const keys: string[] = [];
@@ -87,11 +98,16 @@ function harness(
   const source: PaySource = {
     identity: { orderNumber: "7K3M-9QX2", provider: null, locale: "uk" },
     create,
-    returnEntry: (paymentId) => ({ kind: "guest", number: "7K3M-9QX2", accessToken: TOKEN, paymentId }),
+    returnEntry: (paymentId) => ({
+      kind: "guest",
+      number: "7K3M-9QX2",
+      accessToken: TOKEN,
+      paymentId,
+    }),
   };
   const shared = createPaymentAttemptManager({ storage, crypto: crypto() });
   const attempts = options.attempts ?? (() => shared);
-  const navigate = vi.fn((_url: string) => options.navigates ?? true);
+  const navigate = vi.fn<(url: string) => boolean>(() => options.navigates ?? true);
   const onOrderChanged = vi.fn();
   const onSignedOut = vi.fn();
   const returnStorage = options.returnStorage === undefined ? storage : options.returnStorage;
@@ -149,7 +165,13 @@ describe("createPayStore.pay", () => {
 
   it("sends the SAME key again after a lost answer, and a NEW key after a definitive one", async () => {
     const lost = new NetworkError("down", { cause: new TypeError("fetch failed"), aborted: false });
-    const h = harness([lost, problem(500, "internal_error"), problem(409, "rule_violation", { rule: "payment_not_available" }), created(), created()]);
+    const h = harness([
+      lost,
+      problem(500, "internal_error"),
+      problem(409, "rule_violation", { rule: "payment_not_available" }),
+      created(),
+      created(),
+    ]);
     await h.store.pay();
     expect(h.store.getState().outcome).toMatchObject({ kind: "retry" });
     await h.store.pay();
@@ -164,7 +186,15 @@ describe("createPayStore.pay", () => {
   it("503 with canRetry false keeps the key and starts the countdown; canRetry true forgets the key", async () => {
     let now = 1_000_000;
     const wait = harness(
-      [problem(503, "payment_provider_unavailable", { payment: { paymentId: ID, status: "processing", canRetry: false } }, "45"), created()],
+      [
+        problem(
+          503,
+          "payment_provider_unavailable",
+          { payment: { paymentId: ID, status: "processing", canRetry: false } },
+          "45",
+        ),
+        created(),
+      ],
       { now: () => now },
     );
     await wait.store.pay();
@@ -179,7 +209,15 @@ describe("createPayStore.pay", () => {
     expect(wait.keys[1]).toBe(wait.keys[0]);
 
     const retry = harness(
-      [problem(503, "payment_provider_unavailable", { payment: { paymentId: ID, status: "failed", canRetry: true } }, "30"), created()],
+      [
+        problem(
+          503,
+          "payment_provider_unavailable",
+          { payment: { paymentId: ID, status: "failed", canRetry: true } },
+          "30",
+        ),
+        created(),
+      ],
       { now: () => now },
     );
     await retry.store.pay();
@@ -263,19 +301,33 @@ describe("createPayStore.continuePayment and rememberReturn", () => {
 describe("the sources talk through the typed client with the token in the body", () => {
   it("guest: createOrderPayment with number, token and locale in the body and the key as an option", async () => {
     const createOrderPayment = vi.fn(() => Promise.resolve(created()));
-    const source = guestPaySource({ createOrderPayment } as unknown as Pick<StoreClient, "createOrderPayment">, "7K3M-9QX2", TOKEN, "en");
+    const source = guestPaySource(
+      { createOrderPayment } as unknown as Pick<StoreClient, "createOrderPayment">,
+      "7K3M-9QX2",
+      TOKEN,
+      "en",
+    );
     await source.create("key-1");
     expect(createOrderPayment).toHaveBeenCalledWith(
       { number: "7K3M-9QX2", accessToken: TOKEN, locale: "en" },
       expect.objectContaining({ idempotencyKey: "key-1" }),
     );
     expect(source.identity).toEqual({ orderNumber: "7K3M-9QX2", provider: null, locale: "en" });
-    expect(source.returnEntry(ID)).toEqual({ kind: "guest", number: "7K3M-9QX2", accessToken: TOKEN, paymentId: ID });
+    expect(source.returnEntry(ID)).toEqual({
+      kind: "guest",
+      number: "7K3M-9QX2",
+      accessToken: TOKEN,
+      paymentId: ID,
+    });
   });
 
   it("account: createAccountOrderPayment by number, no token anywhere", async () => {
     const createAccountOrderPayment = vi.fn(() => Promise.resolve(created()));
-    const source = accountPaySource({ createAccountOrderPayment } as unknown as Pick<StoreClient, "createAccountOrderPayment">, "7K3M-9QX2", "uk");
+    const source = accountPaySource(
+      { createAccountOrderPayment } as unknown as Pick<StoreClient, "createAccountOrderPayment">,
+      "7K3M-9QX2",
+      "uk",
+    );
     await source.create("key-2");
     expect(createAccountOrderPayment).toHaveBeenCalledWith(
       "7K3M-9QX2",
@@ -286,11 +338,30 @@ describe("the sources talk through the typed client with the token in the body",
   });
 
   it("status reads: guest by body, account by path", async () => {
-    const state: PaymentState = { paymentId: ID, status: "waiting", failureCategory: null, expiresAt: "x", orderStatus: "awaiting_payment", canRetry: false };
-    const getOrderPaymentStatus = vi.fn(() => Promise.resolve({ ok: true, status: 200, data: state } as StoreResult<PaymentState>));
-    const getAccountOrderPayment = vi.fn(() => Promise.resolve({ ok: true, status: 200, data: state } as StoreResult<PaymentState>));
-    const client = { getOrderPaymentStatus, getAccountOrderPayment } as unknown as Pick<StoreClient, "getOrderPaymentStatus" | "getAccountOrderPayment">;
-    await statusReadFor(client, { kind: "guest", number: "7K3M-9QX2", accessToken: TOKEN, paymentId: ID })();
+    const state: PaymentState = {
+      paymentId: ID,
+      status: "waiting",
+      failureCategory: null,
+      expiresAt: "x",
+      orderStatus: "awaiting_payment",
+      canRetry: false,
+    };
+    const getOrderPaymentStatus = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, data: state } as StoreResult<PaymentState>),
+    );
+    const getAccountOrderPayment = vi.fn(() =>
+      Promise.resolve({ ok: true, status: 200, data: state } as StoreResult<PaymentState>),
+    );
+    const client = { getOrderPaymentStatus, getAccountOrderPayment } as unknown as Pick<
+      StoreClient,
+      "getOrderPaymentStatus" | "getAccountOrderPayment"
+    >;
+    await statusReadFor(client, {
+      kind: "guest",
+      number: "7K3M-9QX2",
+      accessToken: TOKEN,
+      paymentId: ID,
+    })();
     expect(getOrderPaymentStatus).toHaveBeenCalledWith(
       { number: "7K3M-9QX2", accessToken: TOKEN, paymentId: ID },
       expect.anything(),
@@ -301,7 +372,10 @@ describe("the sources talk through the typed client with the token in the body",
 });
 
 describe("payFocusTarget", () => {
-  const phase = (name: "idle" | "pending" | "redirecting" | "failed") => ({ ...initialPayState, phase: name });
+  const phase = (name: "idle" | "pending" | "redirecting" | "failed") => ({
+    ...initialPayState,
+    phase: name,
+  });
 
   it("puts the focus on the message when a start fails, and back on the action when the message is dismissed", () => {
     expect(payFocusTarget(phase("pending"), phase("failed"))).toBe("message");

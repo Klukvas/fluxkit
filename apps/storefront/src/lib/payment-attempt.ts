@@ -1,8 +1,4 @@
-import {
-  canonicalJson,
-  type AttemptCrypto,
-  type AttemptStorage,
-} from "./checkout-attempt";
+import { canonicalJson, type AttemptCrypto, type AttemptStorage } from "./checkout-attempt";
 
 /**
  * The idempotency key of "Pay now" (ADR 0032 decision 6; same model as `checkout-attempt.ts`). One attempt `{key, salt,

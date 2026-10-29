@@ -444,7 +444,11 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
               {t("checkout.payment.title")}
             </h2>
             <p className="text-foreground">
-              {t(props.onlinePayment === true ? "checkout.payment.noteOnline" : "checkout.payment.note")}
+              {t(
+                props.onlinePayment === true
+                  ? "checkout.payment.noteOnline"
+                  : "checkout.payment.note",
+              )}
             </p>
           </section>
 

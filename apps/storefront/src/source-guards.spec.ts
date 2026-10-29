@@ -440,7 +440,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     );
     expect(assigners.map((file) => file.path)).toEqual([join("lib", "payment-redirect.ts")]);
     const redirect = sources.find((file) => file.path === join("lib", "payment-redirect.ts"));
-    expect(code(redirect?.text ?? "")).toMatch(/const url = providerRedirectUrl\(raw\);\s*if \(url === null\) return false;\s*win\.location\.assign\(url\);/);
+    expect(code(redirect?.text ?? "")).toMatch(
+      /const url = providerRedirectUrl\(raw\);\s*if \(url === null\) return false;\s*win\.location\.assign\(url\);/,
+    );
     // A provider page is reached by navigating, never by a form post (the CSP has form-action 'self').
     for (const file of paymentFiles) expect(code(file.text), file.path).not.toMatch(/<form\b/);
   });
@@ -453,7 +455,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     // The island passes the url the store hands it (the store got it from the API's answer or the order view).
     const island = sources.find((file) => file.path === join("components", "order-payment.tsx"));
     expect(code(island?.text ?? "")).toMatch(/navigate: \(url\) => goToProvider\(window, url\)/);
-    expect(code(island?.text ?? "")).not.toMatch(/location\.(search|hash)|URLSearchParams|useSearchParams/);
+    expect(code(island?.text ?? "")).not.toMatch(
+      /location\.(search|hash)|URLSearchParams|useSearchParams/,
+    );
   });
 
   it("reads the query only in the return page, only through paymentIdFromSearch (an attempt id, nothing else)", () => {
@@ -462,7 +466,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     );
     const names = readers.map((file) => file.path);
     expect(names).toContain(join("components", "payment-return-page.tsx"));
-    const page = sources.find((file) => file.path === join("components", "payment-return-page.tsx"));
+    const page = sources.find(
+      (file) => file.path === join("components", "payment-return-page.tsx"),
+    );
     expect(code(page?.text ?? "")).toMatch(/paymentIdFromSearch\(window\.location\.search\)/);
     // No payment module other than the id parser touches the query.
     for (const file of paymentFiles) {
@@ -495,7 +501,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
 
   it("keeps zod and the domain core out of the payment code (they must not reach the browser bundle)", () => {
     for (const file of paymentFiles) {
-      expect(file.text, file.path).not.toMatch(/from ["'](?:zod|@fluxkit\/core|@fluxkit\/config)["']/);
+      expect(file.text, file.path).not.toMatch(
+        /from ["'](?:zod|@fluxkit\/core|@fluxkit\/config)["']/,
+      );
     }
   });
 

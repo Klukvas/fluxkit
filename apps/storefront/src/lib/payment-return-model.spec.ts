@@ -1,14 +1,15 @@
-import type { PaymentState, ShopperPaymentFailureCategory, ShopperPaymentStatus } from "@fluxkit/api-client";
+import type {
+  PaymentState,
+  ShopperPaymentFailureCategory,
+  ShopperPaymentStatus,
+} from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
 import { returnPresentation } from "./payment-return-model";
 import type { PaymentWatchState } from "./payment-poll";
 
 const ID = "6f1c1d8e-5f0a-4f6e-9a0b-0c2f4b7d1a11";
 
-function payment(
-  status: ShopperPaymentStatus,
-  over: Partial<PaymentState> = {},
-): PaymentState {
+function payment(status: ShopperPaymentStatus, over: Partial<PaymentState> = {}): PaymentState {
   return {
     paymentId: ID,
     status,
@@ -66,7 +67,10 @@ describe("returnPresentation: one description per state of the return page", () 
   ] as [ShopperPaymentFailureCategory, boolean, string[]][])(
     "failed (%s, canRetry %s) says why and offers %j",
     (failureCategory, canRetry, actions) => {
-      const view = present({ phase: "final", payment: payment("failed", { failureCategory, canRetry }) });
+      const view = present({
+        phase: "final",
+        payment: payment("failed", { failureCategory, canRetry }),
+      });
       expect(view).toMatchObject({
         titleKey: "payment.return.failed.title",
         bodyKey: `payment.failure.${failureCategory}`,
@@ -79,7 +83,10 @@ describe("returnPresentation: one description per state of the return page", () 
 
   it("expired explains the link and offers a new payment when the API allows one", () => {
     expect(
-      present({ phase: "final", payment: payment("expired", { failureCategory: "expired", canRetry: true }) }),
+      present({
+        phase: "final",
+        payment: payment("expired", { failureCategory: "expired", canRetry: true }),
+      }),
     ).toMatchObject({
       titleKey: "payment.return.expired.title",
       bodyKey: "payment.failure.expired",
@@ -105,10 +112,20 @@ describe("returnPresentation: one description per state of the return page", () 
     expect(
       present({
         phase: "error",
-        failure: { messageKey: "errors.network", status: null, code: null, retryAfterSeconds: null, fieldErrors: [] },
+        failure: {
+          messageKey: "errors.network",
+          status: null,
+          code: null,
+          retryAfterSeconds: null,
+          fieldErrors: [],
+        },
         last: null,
       }),
-    ).toMatchObject({ titleKey: "payment.return.error.title", tone: "danger", actions: ["checkAgain", "backToOrder"] });
+    ).toMatchObject({
+      titleKey: "payment.return.error.title",
+      tone: "danger",
+      actions: ["checkAgain", "backToOrder"],
+    });
     expect(present({ phase: "notFound" })).toMatchObject({
       titleKey: "payment.return.notFound.title",
       bodyKey: "payment.return.notFound.body",

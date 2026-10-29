@@ -22,7 +22,10 @@ import {
 const ID = "6f1c1d8e-5f0a-4f6e-9a0b-0c2f4b7d1a11";
 const PAGE = "https://pay.fake.invalid/pay/fake-pay-000001";
 
-const created = (overrides: Partial<CreatedPayment> = {}, status = 201): StoreResult<CreatedPayment> => ({
+const created = (
+  overrides: Partial<CreatedPayment> = {},
+  status = 201,
+): StoreResult<CreatedPayment> => ({
   ok: true,
   status,
   data: {
@@ -160,7 +163,10 @@ describe("createPaymentOutcome: the outcome table of 'Pay now'", () => {
   });
 
   it("keeps the key after a network failure or a timeout", () => {
-    const thrown = new NetworkError("down", { cause: new TypeError("fetch failed"), aborted: false });
+    const thrown = new NetworkError("down", {
+      cause: new TypeError("fetch failed"),
+      aborted: false,
+    });
     expect(createPaymentOutcome({ thrown })).toMatchObject({ kind: "retry", attempt: "keep" });
   });
 
@@ -216,12 +222,25 @@ describe("paymentSection: what the order page offers", () => {
   });
 
   it("is hidden when online payment is off, or when the order cannot be paid online and has no attempt", () => {
-    expect(paymentSection(order("awaiting_payment", { canPay: true, providers: ["fake"], latest: null }), false)).toBeNull();
-    expect(paymentSection(order("awaiting_payment", { canPay: false, providers: [], latest: null }), true)).toBeNull();
+    expect(
+      paymentSection(
+        order("awaiting_payment", { canPay: true, providers: ["fake"], latest: null }),
+        false,
+      ),
+    ).toBeNull();
+    expect(
+      paymentSection(
+        order("awaiting_payment", { canPay: false, providers: [], latest: null }),
+        true,
+      ),
+    ).toBeNull();
   });
 
   it("offers Pay now when the API says canPay", () => {
-    const model = paymentSection(order("awaiting_payment", { canPay: true, providers: ["fake"], latest: null }), true);
+    const model = paymentSection(
+      order("awaiting_payment", { canPay: true, providers: ["fake"], latest: null }),
+      true,
+    );
     expect(model).toMatchObject({ action: "pay", status: null, continueUrl: null });
   });
 
@@ -251,7 +270,11 @@ describe("paymentSection: what the order page offers", () => {
 
   it("offers nothing while the attempt is processing (canPay is false) but lets the shopper check the status", () => {
     const model = paymentSection(
-      order("awaiting_payment", { canPay: false, providers: ["fake"], latest: latest("processing") }),
+      order("awaiting_payment", {
+        canPay: false,
+        providers: ["fake"],
+        latest: latest("processing"),
+      }),
       true,
     );
     expect(model).toMatchObject({ action: "checkStatus", status: "processing" });
@@ -300,10 +323,16 @@ describe("message keys exist in every locale", () => {
   it("has a translated status and failure text for every shopper status and category", () => {
     for (const locale of locales) {
       for (const status of statuses) {
-        expect(messagesByLocale[locale][paymentStatusKey(status)], `${locale} ${status}`).toBeTruthy();
+        expect(
+          messagesByLocale[locale][paymentStatusKey(status)],
+          `${locale} ${status}`,
+        ).toBeTruthy();
       }
       for (const category of categories) {
-        expect(messagesByLocale[locale][paymentFailureKey(category)], `${locale} ${category}`).toBeTruthy();
+        expect(
+          messagesByLocale[locale][paymentFailureKey(category)],
+          `${locale} ${category}`,
+        ).toBeTruthy();
       }
       expect(messagesByLocale[locale][paymentFailureKey(null)]).toBeTruthy();
     }
@@ -311,6 +340,8 @@ describe("message keys exist in every locale", () => {
 
   it("falls back to neutral keys for a value the storefront does not know yet", () => {
     expect(paymentStatusKey("brand_new" as ShopperPaymentStatus)).toBe("payment.status.unknown");
-    expect(paymentFailureKey("brand_new" as ShopperPaymentFailureCategory)).toBe("payment.failure.technical");
+    expect(paymentFailureKey("brand_new" as ShopperPaymentFailureCategory)).toBe(
+      "payment.failure.technical",
+    );
   });
 });

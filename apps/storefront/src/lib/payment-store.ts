@@ -1,9 +1,4 @@
-import type {
-  CreatedPayment,
-  PaymentState,
-  StoreClient,
-  StoreResult,
-} from "@fluxkit/api-client";
+import type { CreatedPayment, PaymentState, StoreClient, StoreResult } from "@fluxkit/api-client";
 import { InsecureContextError, type AttemptStorage } from "./checkout-attempt";
 import type { PaymentAttemptManager, PaymentRequestIdentity } from "./payment-attempt";
 import { createPaymentOutcome, type PayOutcome } from "./payment-model";
@@ -72,7 +67,11 @@ export function statusReadFor(
   entry: PaymentReturn,
 ): () => Promise<StoreResult<PaymentState>> {
   if (entry.kind === "guest") {
-    const body = { number: entry.number, accessToken: entry.accessToken, paymentId: entry.paymentId };
+    const body = {
+      number: entry.number,
+      accessToken: entry.accessToken,
+      paymentId: entry.paymentId,
+    };
     return () => client.getOrderPaymentStatus(body, { fetchOptions: NO_STORE });
   }
   return () =>
@@ -150,7 +149,12 @@ export function createPayStore(options: {
     if (options.navigate(url)) {
       set({ ...state, phase: "redirecting", outcome, waitUntil: null, returnSaved });
     } else {
-      set({ ...state, phase: "failed", outcome: { kind: "noPage", attempt: "clear" }, returnSaved });
+      set({
+        ...state,
+        phase: "failed",
+        outcome: { kind: "noPage", attempt: "clear" },
+        returnSaved,
+      });
     }
   }
 

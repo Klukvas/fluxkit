@@ -62,7 +62,9 @@ describe("route structure", () => {
     const personal = pages(localeRoot).filter(
       (page) =>
         /^\(site\)\/(cart|checkout|account|order|payment)\//.test(relative(localeRoot, page)) ||
-        /^\(site\)\/(cart|checkout|account|order|payment)$/.test(dirname(relative(localeRoot, page))),
+        /^\(site\)\/(cart|checkout|account|order|payment)$/.test(
+          dirname(relative(localeRoot, page)),
+        ),
     );
     expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
       "(site)/account/forgot-password/page.tsx",

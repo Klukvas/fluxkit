@@ -100,7 +100,11 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
   const outcome = pay.outcome;
   const failedText =
     model.status === "failed" || model.status === "expired"
-      ? t(paymentFailureKey(model.failureCategory ?? (model.status === "expired" ? "expired" : null)))
+      ? t(
+          paymentFailureKey(
+            model.failureCategory ?? (model.status === "expired" ? "expired" : null),
+          ),
+        )
       : null;
   // A refused start has its own message; the old failure explanation of the previous attempt would repeat it.
   const showOutcome = outcome !== null && outcome.kind !== "redirect" && pay.phase !== "pending";
@@ -174,7 +178,12 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
 
       {/* Announced from the start of the page, changed later (a region that appears with its text is often not read). The
           per-second countdown above is NOT in a live region; only the end of the wait is announced. */}
-      <p role="status" aria-live="polite" aria-atomic="true" className="min-h-6 text-muted-foreground">
+      <p
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="min-h-6 text-muted-foreground"
+      >
         {pay.phase === "pending" ? t("payment.opening") : ""}
         {pay.phase === "redirecting" ? t("payment.redirecting") : ""}
         {pay.waitUntil !== null && !waiting && pay.phase === "failed" ? t("payment.wait.done") : ""}
