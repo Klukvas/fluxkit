@@ -168,6 +168,12 @@ export function decideIndexAction(input: {
 
 export const SYNONYM_LIMITS = Object.freeze({ minTerms: 2, maxTerms: 20, maxTermLength: 50 });
 
+/**
+ * Words of one synonym term: Meilisearch applies multi-word synonyms of at most three words and silently ignores longer
+ * ones (review F4, ADR 0036). Not a database check (`SYNONYM_LIMITS` mirrors those): an engine limit, enforced here.
+ */
+export const SYNONYM_MAX_TERM_WORDS = 3;
+
 export type SynonymTermsError =
   "not_a_list" | "invalid_term" | "too_few_terms" | "too_many_terms" | "duplicate_terms";
 
@@ -177,7 +183,7 @@ export type SynonymTermsResult =
 
 /**
  * The terms of a synonym group (ADR 0034 decision 8), normalized exactly like query words so a term matches what a
- * shopper types: 2 to 20 distinct terms of 1 to 50 characters, no control characters.
+ * shopper types: 2 to 20 distinct terms of 1 to 50 characters and 1 to 3 words, no control characters.
  */
 export function parseSynonymTerms(raw: unknown): SynonymTermsResult {
   if (!Array.isArray(raw)) {
@@ -192,7 +198,11 @@ export function parseSynonymTerms(raw: unknown): SynonymTermsResult {
       return { ok: false, reason: "invalid_term" };
     }
     const term = normalizeSearchWords(entry).join(" ");
-    if (term === "" || [...term].length > SYNONYM_LIMITS.maxTermLength) {
+    if (
+      term === "" ||
+      [...term].length > SYNONYM_LIMITS.maxTermLength ||
+      term.split(" ").length > SYNONYM_MAX_TERM_WORDS
+    ) {
       return { ok: false, reason: "invalid_term" };
     }
     if (terms.includes(term)) {

@@ -6,6 +6,7 @@ import {
   SEARCH_INDEX_UID_PATTERN,
   SEARCH_SYNC_REASONS,
   SYNONYM_LIMITS,
+  SYNONYM_MAX_TERM_WORDS,
   decideIndexAction,
   deriveIndexSettings,
   isOwnedIndexUid,
@@ -119,6 +120,20 @@ describe("parseSynonymTerms", () => {
     });
     expect(parseSynonymTerms(["a", "b".repeat(50)]).ok).toBe(true);
     expect(parseSynonymTerms(["a", "a"])).toEqual({ ok: false, reason: "duplicate_terms" });
+  });
+
+  it("refuses a term of more than three words: the engine ignores longer multi-word synonyms (review F4)", () => {
+    expect(SYNONYM_MAX_TERM_WORDS).toBe(3);
+    expect(parseSynonymTerms(["shirt", "long sleeve top"])).toEqual({
+      ok: true,
+      terms: ["shirt", "long sleeve top"],
+    });
+    for (const long of ["long sleeve cotton top", "  a  b   c d ", "футболка з довгим рукавом"]) {
+      expect(parseSynonymTerms(["shirt", long]), long).toEqual({
+        ok: false,
+        reason: "invalid_term",
+      });
+    }
   });
 
   it("refuses terms that are not text, are empty after normalization or carry control characters", () => {

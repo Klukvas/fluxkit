@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { SYNONYM_LIMITS } from "@fluxkit/core";
+import { SYNONYM_LIMITS, SYNONYM_MAX_TERM_WORDS } from "@fluxkit/core";
 import { paginationQuerySchema } from "../../common/pagination.js";
 
 const timestamp = z.string().meta({ format: "date-time" });
@@ -87,7 +87,7 @@ const termsSchema = z
   .min(1)
   .max(SYNONYM_LIMITS.maxTerms + 1)
   .meta({
-    description: `${String(SYNONYM_LIMITS.minTerms)} to ${String(SYNONYM_LIMITS.maxTerms)} distinct terms of at most ${String(SYNONYM_LIMITS.maxTermLength)} characters; normalized like a search query (lower case, one apostrophe form, words joined by one space).`,
+    description: `${String(SYNONYM_LIMITS.minTerms)} to ${String(SYNONYM_LIMITS.maxTerms)} distinct terms of at most ${String(SYNONYM_LIMITS.maxTermLength)} characters and ${String(SYNONYM_MAX_TERM_WORDS)} words; normalized like a search query (lower case, one apostrophe form, words joined by one space).`,
   });
 
 export const createSynonymGroupSchema = z.strictObject({

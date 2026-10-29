@@ -2044,7 +2044,7 @@
                       "type": "string",
                       "maxLength": 200
                     },
-                    "description": "2 to 20 distinct terms of at most 50 characters; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
+                    "description": "2 to 20 distinct terms of at most 50 characters and 3 words; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
                   }
                 },
                 "required": ["locale", "terms"],
@@ -2175,7 +2175,7 @@
                       "type": "string",
                       "maxLength": 200
                     },
-                    "description": "2 to 20 distinct terms of at most 50 characters; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
+                    "description": "2 to 20 distinct terms of at most 50 characters and 3 words; normalized like a search query (lower case, one apostrophe form, words joined by one space)."
                   }
                 },
                 "required": ["terms"],

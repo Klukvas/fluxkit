@@ -202,6 +202,34 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
     }
   });
 
+  it("refuses a synonym term of more than three words as invalid_term, on create and update (review F4)", async () => {
+    const created = await http<{ id: string }>(owner.baseUrl, "POST", "/admin/search/synonyms", {
+      body: { locale: "en", terms: ["shirt", "long sleeve top"] },
+    });
+    expect(created.status, JSON.stringify(created.body)).toBe(201);
+    const refusals = [
+      await http<{ errors?: { path: string; code: string }[] }>(
+        owner.baseUrl,
+        "POST",
+        "/admin/search/synonyms",
+        { body: { locale: "en", terms: ["shirt", "long sleeve cotton top"] } },
+      ),
+      await http<{ errors?: { path: string; code: string }[] }>(
+        owner.baseUrl,
+        "PATCH",
+        `/admin/search/synonyms/${created.body.id}`,
+        { body: { terms: ["shirt", "long sleeve cotton top"] } },
+      ),
+    ];
+    for (const refused of refusals) {
+      expect(refused.status, JSON.stringify(refused.body)).toBe(400);
+      expect(refused.body.errors?.[0]).toMatchObject({ path: "terms", code: "invalid_term" });
+    }
+    expect(
+      (await http(owner.baseUrl, "DELETE", `/admin/search/synonyms/${created.body.id}`)).status,
+    ).toBe(204);
+  });
+
   it("lets catalog.read see the status and the synonyms but not change anything", async () => {
     expect((await http(viewer.baseUrl, "GET", "/admin/search/status")).status).toBe(200);
     expect((await http(viewer.baseUrl, "GET", "/admin/search/synonyms")).status).toBe(200);
