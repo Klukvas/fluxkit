@@ -529,5 +529,6 @@
   "payment.return.backToOrder": "Back to the order",
   "payment.return.tryAgain": "Try to pay again",
   "payment.return.checkAgain": "Check again",
-  "payment.return.contact": "If you have questions about a payment, contact the shop."
+  "payment.return.contact": "If you have questions about a payment, contact the shop.",
+  "payment.return.signedOut.title": "Sign in to see the payment"
 }

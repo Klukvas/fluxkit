@@ -4,6 +4,7 @@ import {
   PAYMENT_RETURN_STORAGE_KEY,
   clearPaymentReturn,
   paymentIdFromSearch,
+  paymentReturnHref,
   readPaymentReturn,
   returnOrderHref,
   savePaymentReturn,
@@ -120,5 +121,16 @@ describe("returnOrderHref", () => {
   it("links a guest back to the order with the token in the fragment, an account entry to the account order", () => {
     expect(returnOrderHref("uk", guest)).toBe(`/uk/order/7K3M-9QX2#t=${TOKEN}`);
     expect(returnOrderHref("en", account)).toBe("/en/account/orders/7K3M-9QX2");
+  });
+});
+
+describe("paymentReturnHref", () => {
+  it("builds the return path with the attempt id only", () => {
+    expect(paymentReturnHref("uk", ID)).toBe(`/uk/payment/return?payment=${ID}`);
+  });
+
+  it("refuses anything that is not an attempt id", () => {
+    expect(() => paymentReturnHref("uk", "../x")).toThrow(RangeError);
+    expect(() => paymentReturnHref("uk", `${ID}&token=${TOKEN}`)).toThrow(RangeError);
   });
 });

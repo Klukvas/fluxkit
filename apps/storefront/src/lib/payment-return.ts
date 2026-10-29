@@ -101,3 +101,9 @@ export function returnOrderHref(locale: Locale, entry: PaymentReturn): string {
     ? guestOrderHref(locale, entry.number, entry.accessToken)
     : accountOrderHref(locale, entry.number);
 }
+
+/** `/{locale}/payment/return?payment=<id>`: the page the provider sends the shopper back to (ADR 0032), and the status link. */
+export function paymentReturnHref(locale: Locale, paymentId: string): string {
+  if (!isPaymentId(paymentId)) throw new RangeError("Not a payment id.");
+  return `/${locale}/payment/return?payment=${paymentId}`;
+}

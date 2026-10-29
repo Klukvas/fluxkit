@@ -122,8 +122,9 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     for (const call of calls) {
       // `result.href` is the checkout outcome's link, built only by `guestOrderHref`, `accountOrderHref` or the cart path
       // (`lib/checkout-attempt.ts`, tested there).
+      // `paymentReturnHref` accepts an attempt id (a UUID) and nothing else (`lib/payment-return.ts`, tested there).
       expect(call.argument, `${call.path}: router.replace(${call.argument})`).toMatch(
-        /^(safeNextPath\(|localizedHref\(|loginHref\(|signInHref$|result\.href$)/,
+        /^(safeNextPath\(|localizedHref\(|loginHref\(|paymentReturnHref\(|signInHref$|result\.href$)/,
       );
     }
     for (const file of sources) {
@@ -145,12 +146,21 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   // Step 7: the checkout attempt and the guest order token (plan, "Guest order token", "Checkout idempotency").
   const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
 
-  it("uses browser storage only for the checkout attempt (sessionStorage, a key and a hash), never localStorage or cookies", () => {
+  it("uses browser storage only for the checkout attempt, the payment attempt and the payment hand-off (sessionStorage), never localStorage or cookies", () => {
     const storage = sources.filter((file) => /\bsessionStorage\b/.test(code(file.text)));
-    expect(storage.map((file) => file.path)).toEqual([join("components", "checkout-page.tsx")]);
-    expect(code(storage[0]?.text ?? "")).toMatch(
-      /sessionAttemptStorage\(\(\) => window\.sessionStorage\)/,
+    // Each of these three islands makes its storage once, through the probing helper, in the browser.
+    expect(storage.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "checkout-page.tsx"),
+        join("components", "order-payment.tsx"),
+        join("components", "payment-return-page.tsx"),
+      ].sort(),
     );
+    for (const file of storage) {
+      expect(code(file.text), file.path).toMatch(
+        /sessionAttemptStorage\(\(\) => window\.sessionStorage\)/,
+      );
+    }
     for (const file of sources) {
       expect(code(file.text), file.path).not.toMatch(
         /\b(localStorage|indexedDB)\b|document\.cookie/,
@@ -377,6 +387,121 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       const route = sources.find((file) => file.path.includes(join("account", name, "page.tsx")));
       expect(route, name).toBeDefined();
       expect(code(route?.text ?? ""), name).not.toMatch(/token|password\b.*params|email.*params/i);
+    }
+  });
+
+  // Payments plan step 9: the pay redirect, the return page and the payment section of the order pages.
+  const paymentFiles = sources.filter((file) =>
+    /(^|\/)(payment-[a-z-]+|order-payment)\.tsx?$/.test(file.path),
+  );
+
+  it("finds the payment sources it guards", () => {
+    expect(paymentFiles.map((file) => file.path).sort()).toEqual(
+      [
+        join("components", "order-payment.tsx"),
+        join("components", "payment-return-page.tsx"),
+        join("components", "payment-section.tsx"),
+        join("lib", "payment-attempt.ts"),
+        join("lib", "payment-model.ts"),
+        join("lib", "payment-poll.ts"),
+        join("lib", "payment-redirect.ts"),
+        join("lib", "payment-return-model.ts"),
+        join("lib", "payment-return.ts"),
+        join("lib", "payment-store.ts"),
+      ].sort(),
+    );
+  });
+
+  it("reaches the payment routes through the typed client only: no fetch, no absolute URL, no other transport", () => {
+    for (const file of paymentFiles) {
+      expect(code(file.text), file.path).not.toMatch(
+        /\bfetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|https?:\/\//,
+      );
+    }
+  });
+
+  it("calls the four payment routes from lib/payment-store.ts only (the guest token travels in their bodies there)", () => {
+    for (const name of [
+      "createOrderPayment",
+      "getOrderPaymentStatus",
+      "createAccountOrderPayment",
+      "getAccountOrderPayment",
+    ]) {
+      const callers = sources
+        .filter((file) => new RegExp(`\\.${name}\\(`).test(code(file.text)))
+        .map((file) => file.path);
+      expect(callers, name).toEqual([join("lib", "payment-store.ts")]);
+    }
+  });
+
+  it("assigns the browser location in ONE place, lib/payment-redirect.ts, which checks the URL first", () => {
+    const assigners = sources.filter((file) =>
+      /\blocation\s*(=(?!=)|\.(href\s*=(?!=)|assign\(|replace\())/.test(code(file.text)),
+    );
+    expect(assigners.map((file) => file.path)).toEqual([join("lib", "payment-redirect.ts")]);
+    const redirect = sources.find((file) => file.path === join("lib", "payment-redirect.ts"));
+    expect(code(redirect?.text ?? "")).toMatch(/const url = providerRedirectUrl\(raw\);\s*if \(url === null\) return false;\s*win\.location\.assign\(url\);/);
+    // A provider page is reached by navigating, never by a form post (the CSP has form-action 'self').
+    for (const file of paymentFiles) expect(code(file.text), file.path).not.toMatch(/<form\b/);
+  });
+
+  it("feeds goToProvider from the API's answer only: never from a query string, a fragment or storage", () => {
+    const callers = sources.filter((file) => /\bgoToProvider\(/.test(code(file.text)));
+    expect(callers.map((file) => file.path).sort()).toEqual(
+      [join("components", "order-payment.tsx"), join("lib", "payment-redirect.ts")].sort(),
+    );
+    // The island passes the url the store hands it (the store got it from the API's answer or the order view).
+    const island = sources.find((file) => file.path === join("components", "order-payment.tsx"));
+    expect(code(island?.text ?? "")).toMatch(/navigate: \(url\) => goToProvider\(window, url\)/);
+    expect(code(island?.text ?? "")).not.toMatch(/location\.(search|hash)|URLSearchParams|useSearchParams/);
+  });
+
+  it("reads the query only in the return page, only through paymentIdFromSearch (an attempt id, nothing else)", () => {
+    const readers = sources.filter((file) =>
+      /location\.search|useSearchParams|URLSearchParams|searchParams/.test(code(file.text)),
+    );
+    const names = readers.map((file) => file.path);
+    expect(names).toContain(join("components", "payment-return-page.tsx"));
+    const page = sources.find((file) => file.path === join("components", "payment-return-page.tsx"));
+    expect(code(page?.text ?? "")).toMatch(/paymentIdFromSearch\(window\.location\.search\)/);
+    // No payment module other than the id parser touches the query.
+    for (const file of paymentFiles) {
+      if (file.path === join("lib", "payment-return.ts")) continue;
+      if (file.path === join("components", "payment-return-page.tsx")) continue;
+      expect(code(file.text), file.path).not.toMatch(
+        /location\.search|useSearchParams|URLSearchParams|searchParams/,
+      );
+    }
+    // The server shell of the return route reads nothing of the request.
+    const route = sources.find((file) => file.path.includes(join("payment", "return", "page.tsx")));
+    expect(route).toBeDefined();
+    expect(code(route?.text ?? "")).not.toMatch(/searchParams|headers\(|cookies\(/);
+  });
+
+  it("never has a card data field anywhere: the shop never renders a card form (PCI redirect only)", () => {
+    const card =
+      /cc-(?:number|exp|csc|name)|card-?number|card_number|cardholder|\bcvv\b|\bcvc\b|\bcsc\b|\bpan\b|expir(?:y|ation)Date|security-?code/i;
+    for (const file of sources) {
+      expect(code(file.text), `${file.path} names a card data field`).not.toMatch(card);
+    }
+  });
+
+  it("hardcodes no payment provider, host or page: the provider URL is the API's answer", () => {
+    const provider = /monobank|liqpay|wayforpay|fondy|stripe|paypal|portmone|pay\.fake/i;
+    for (const file of sources) {
+      expect(code(file.text), `${file.path} names a payment provider`).not.toMatch(provider);
+    }
+  });
+
+  it("keeps zod and the domain core out of the payment code (they must not reach the browser bundle)", () => {
+    for (const file of paymentFiles) {
+      expect(file.text, file.path).not.toMatch(/from ["'](?:zod|@fluxkit\/core|@fluxkit\/config)["']/);
+    }
+  });
+
+  it("never logs a payment id, token, link or answer from the payment code", () => {
+    for (const file of paymentFiles) {
+      expect(code(file.text), file.path).not.toMatch(/\bconsole\./);
     }
   });
 });

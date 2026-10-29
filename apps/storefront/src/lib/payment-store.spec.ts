@@ -14,6 +14,8 @@ import {
   accountPaySource,
   createPayStore,
   guestPaySource,
+  initialPayState,
+  payFocusTarget,
   statusReadFor,
   type PaySource,
 } from "./payment-store";
@@ -295,5 +297,21 @@ describe("the sources talk through the typed client with the token in the body",
     );
     await statusReadFor(client, { kind: "account", number: "7K3M-9QX2", paymentId: ID })();
     expect(getAccountOrderPayment).toHaveBeenCalledWith("7K3M-9QX2", ID, expect.anything());
+  });
+});
+
+describe("payFocusTarget", () => {
+  const phase = (name: "idle" | "pending" | "redirecting" | "failed") => ({ ...initialPayState, phase: name });
+
+  it("puts the focus on the message when a start fails, and back on the action when the message is dismissed", () => {
+    expect(payFocusTarget(phase("pending"), phase("failed"))).toBe("message");
+    expect(payFocusTarget(phase("failed"), phase("idle"))).toBe("action");
+  });
+
+  it("leaves the focus alone for every other change (the redirect, the first click, an unchanged state)", () => {
+    expect(payFocusTarget(phase("idle"), phase("pending"))).toBeNull();
+    expect(payFocusTarget(phase("pending"), phase("redirecting"))).toBeNull();
+    expect(payFocusTarget(phase("pending"), phase("idle"))).toBeNull();
+    expect(payFocusTarget(phase("failed"), phase("failed"))).toBeNull();
   });
 });

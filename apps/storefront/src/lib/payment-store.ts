@@ -244,3 +244,17 @@ export function createPayStore(options: {
     },
   };
 }
+
+/**
+ * Where the keyboard focus goes after the state changed: a refused or lost start puts the message (which is also announced)
+ * in front of the shopper, because the button they pressed is disabled and nothing else says what happened. Pure, so every
+ * transition has a test; `components/order-payment.tsx` applies the answer.
+ */
+export type PayFocusTarget = "message" | "action";
+
+export function payFocusTarget(before: PayState, after: PayState): PayFocusTarget | null {
+  if (before.phase === "pending" && after.phase === "failed") return "message";
+  // The message was dismissed: back to the control that asks again.
+  if (before.phase === "failed" && after.phase === "idle") return "action";
+  return null;
+}

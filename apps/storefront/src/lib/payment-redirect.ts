@@ -1,12 +1,12 @@
 /**
  * Where the browser may be sent to pay (ADR 0032 decision 6, "Storefront": the CSP has `form-action 'self'`, so the shopper
- * reaches the provider by a navigation, `window.location.assign`, never a form POST).
+ * reaches the provider by a navigation (the location's `assign`), never a form POST).
  *
  * The address comes from the API's answer only (`redirectUrl` of the create route, or of the order's latest attempt), never
  * from a query string, a fragment or storage, and is checked here before the browser leaves: an absolute `https` URL with a
  * host and no credentials, short, without whitespace or control characters. Anything else (http, `javascript:`, `data:`, a
  * relative or protocol-relative address, a backslash trick) is refused and the page shows its "technical problem" message.
- * This is the ONE module of the storefront that may assign `window.location` (a source guard checks it).
+ * This is the ONE module of the storefront that may assign the browser location (a source guard checks it).
  */
 
 const MAX_URL_LENGTH = 2048;

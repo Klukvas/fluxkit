@@ -543,5 +543,6 @@
   "payment.return.backToOrder": "Повернутися до замовлення",
   "payment.return.tryAgain": "Спробувати оплатити ще раз",
   "payment.return.checkAgain": "Перевірити ще раз",
-  "payment.return.contact": "Якщо є запитання щодо оплати, зверніться до магазину."
+  "payment.return.contact": "Якщо є запитання щодо оплати, зверніться до магазину.",
+  "payment.return.signedOut.title": "Увійдіть, щоб побачити оплату"
 }

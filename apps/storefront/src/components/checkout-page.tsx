@@ -196,6 +196,8 @@ export interface CheckoutPageViewProps {
   t: Translator;
   locale: Locale;
   exponent: number;
+  /** The shop takes payments online: the payment note says so instead of "no payment is taken". */
+  onlinePayment?: boolean;
   config: CheckoutConfig;
   cartState: CartState;
   checkout: CheckoutState;
@@ -441,7 +443,9 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             <h2 id="checkout-payment-heading" className="text-xl font-semibold text-foreground">
               {t("checkout.payment.title")}
             </h2>
-            <p className="text-foreground">{t("checkout.payment.note")}</p>
+            <p className="text-foreground">
+              {t(props.onlinePayment === true ? "checkout.payment.noteOnline" : "checkout.payment.note")}
+            </p>
           </section>
 
           <div className="flex flex-col gap-2">
@@ -592,7 +596,13 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
  * form values live in component state only (never a URL, browser storage or a log); the attempt in `sessionStorage` is a
  * key and a hash.
  */
-export function CheckoutPage({ exponent }: { exponent: number }) {
+export function CheckoutPage({
+  exponent,
+  onlinePayment = false,
+}: {
+  exponent: number;
+  onlinePayment?: boolean;
+}) {
   const { locale, t } = useI18n();
   const client = useStoreClient();
   const { state: cartState, store: cartStore } = useCart();
@@ -694,6 +704,7 @@ export function CheckoutPage({ exponent }: { exponent: number }) {
       t={t}
       locale={locale}
       exponent={exponent}
+      onlinePayment={onlinePayment}
       config={checkoutConfig}
       cartState={cartState}
       checkout={checkoutState}

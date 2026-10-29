@@ -1,4 +1,5 @@
 import type { Address, Order } from "@fluxkit/api-client";
+import type { ReactNode } from "react";
 import {
   Alert,
   Badge,
@@ -70,6 +71,11 @@ export interface OrderDetailsViewProps {
   onAskCancel: () => void;
   onKeepOrder: () => void;
   onConfirmCancel: () => void;
+  /**
+   * The online payment section (`PaymentSectionView`), given by the page when the shop takes payments online and this order
+   * has something to show. It replaces the neutral "the shop will contact you" wording, which would be wrong beside a pay button.
+   */
+  payment?: ReactNode;
 }
 
 export function OrderDetailsView({
@@ -81,6 +87,7 @@ export function OrderDetailsView({
   onAskCancel,
   onKeepOrder,
   onConfirmCancel,
+  payment = null,
 }: OrderDetailsViewProps) {
   const money = (value: Order["total"]) => orderMoney(value, shop, locale);
   const status = t(orderStatusKey(order.status));
@@ -134,7 +141,9 @@ export function OrderDetailsView({
         </div>
       </dl>
 
-      {order.status === "awaiting_payment" ? (
+      {payment !== null ? (
+        payment
+      ) : order.status === "awaiting_payment" ? (
         <Alert variant="info" title={t("order.payment.title")}>
           <p>{t("order.payment.awaiting", { time: formatDateTime(order.expiresAt, locale) })}</p>
         </Alert>
