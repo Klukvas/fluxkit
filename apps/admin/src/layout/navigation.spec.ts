@@ -17,6 +17,7 @@ describe("navigation configuration", () => {
       "productTypes",
       "brands",
       "categories",
+      "search",
       "orders",
       "customers",
       "payments",
@@ -34,7 +35,7 @@ describe("navigation configuration", () => {
     }
   });
 
-  it("shows the viewer the catalog only", () => {
+  it("shows the viewer the catalog only (the Search status is read with catalog.read)", () => {
     expect(ids([...ROLE_PERMISSIONS.viewer])).toEqual([
       "products",
       "attributes",
@@ -42,6 +43,7 @@ describe("navigation configuration", () => {
       "productTypes",
       "brands",
       "categories",
+      "search",
     ]);
   });
 

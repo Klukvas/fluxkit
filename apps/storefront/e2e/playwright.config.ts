@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 import {
   E2E_API_PORT,
+  E2E_MEILI_KEY_FILE,
+  E2E_SEARCH_ENABLED,
   E2E_ORIGIN,
   E2E_PORT,
   E2E_STOREFRONT_PORT,
@@ -58,8 +60,12 @@ export default defineConfig({
     {
       name: "api",
       // Wipe, migrate, seed and create the owner, then become the API (exec: the server itself receives the shutdown signal).
-      command:
-        "node --experimental-strip-types e2e/prepare-database.ts && exec node ../api/dist/main.js",
+      command: `node --experimental-strip-types e2e/prepare-database.ts && ${
+        // The scoped engine key is created by the line above and read here, so it never appears in a process list or a log.
+        E2E_SEARCH_ENABLED
+          ? `MEILI_API_KEY="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8')).key" ${JSON.stringify(E2E_MEILI_KEY_FILE)})" `
+          : ""
+      }exec node ../api/dist/main.js`,
       cwd: storefrontRoot,
       env: { ...apiEnvironment() } as Record<string, string>,
       url: `${apiOrigin}/health`,

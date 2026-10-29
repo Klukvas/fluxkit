@@ -14,6 +14,7 @@ const mustAnswerRealNotFound = [
   "(catalog)/catalog/page.tsx",
   "(catalog)/c/[slug]/page.tsx",
   "(catalog)/p/[slug]/page.tsx",
+  "(catalog)/search/page.tsx",
   "[...rest]/page.tsx",
 ];
 

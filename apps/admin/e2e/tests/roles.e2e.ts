@@ -19,6 +19,8 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Categories" })).toBeVisible();
+  // The Search status and synonym groups are read with catalog.read (the viewer's pages: `search.e2e.ts`).
+  await expect(nav.getByRole("link", { name: "Search", exact: true })).toBeVisible();
   for (const hidden of [
     "Orders",
     "Customers",

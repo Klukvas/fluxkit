@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SiteShell } from "../../components/site-shell";
+import { headerSearchEnabled } from "../../lib/search-data.server";
 import { navigationCategories } from "../../lib/store-data.server";
 import { messagesByLocale } from "../../messages";
 import "../globals.css";
@@ -39,6 +40,7 @@ export default async function LocaleLayout({
   const messages = messagesByLocale[locale];
   const t = createTranslator(messages, locale);
   const categories = await navigationCategories(locale);
+  const searchEnabled = await headerSearchEnabled();
 
   return (
     <html lang={locale} data-theme="light">
@@ -48,6 +50,7 @@ export default async function LocaleLayout({
           messages={messages}
           t={t}
           categories={categories}
+          searchEnabled={searchEnabled}
           year={new Date().getFullYear()}
         >
           {children}
