@@ -147,6 +147,7 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
     world = await ShipmentWorld.start({
       rateLimits: {
         checkout: { maxAttempts: 100_000, windowMinutes: 10 },
+        registration: { maxAttempts: 100_000, windowMinutes: 60 },
         accountDelete: { maxAttempts: 100_000, windowMinutes: 60 },
         dataExport: { maxAttempts: 100_000, windowMinutes: 60 },
       },
@@ -353,6 +354,51 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
             .sort(),
         );
       }
+    });
+  });
+
+  describe("F3: only orders in the subject's scope block an erasure", () => {
+    it("a stranger's unpaid guest order with my UNVERIFIED address does not block my deletion and stays untouched", async () => {
+      const email = nextEmail("unpaid-stranger");
+      const { shopper, id } = await register(email);
+      // Anyone can place a guest order with my address and leave it awaiting payment.
+      const strangers = await pickupOrder(email);
+      expect((await orderRow(strangers.id)).status).toBe("awaiting_payment");
+      const before = await orderRow(strangers.id);
+
+      const deleted = await deleteAccount(shopper);
+      expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
+      expect(JSON.stringify(deleted.body ?? "")).not.toContain(strangers.number);
+      expect(await orderRow(strangers.id)).toEqual(before);
+      const left = await world.pool.query("select 1 from customer where id = $1", [id]);
+      expect(left.rowCount).toBe(0);
+    });
+
+    it("another account's open order that carries my verified address does not block my deletion", async () => {
+      const email = nextEmail("open-other-account");
+      const other = await register(nextEmail("other-account"));
+      const open = await pickupOrder(email, other.shopper);
+      const before = await orderRow(open.id);
+      const holder = await register(email);
+      await verify(holder.id);
+
+      const deleted = await deleteAccount(holder.shopper);
+      expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
+      expect(await orderRow(open.id)).toEqual(before);
+    });
+
+    it("an open guest order with my VERIFIED address is in my scope and blocks (documented: it expires with the payment window)", async () => {
+      const email = nextEmail("unpaid-verified");
+      const { shopper, id } = await register(email);
+      await verify(id);
+      const open = await pickupOrder(email);
+
+      const refused = await deleteAccount(shopper);
+      expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+      expect(refused.body).toMatchObject({
+        rule: "erasure_blocked",
+        blockers: [{ orderNumber: open.number, reason: "open_order" }],
+      });
     });
   });
 });
