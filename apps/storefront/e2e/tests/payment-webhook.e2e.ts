@@ -257,6 +257,23 @@ test("a signed success for another amount is flagged for attention and never mar
   await page.goto(`/en/order/${started.order.number}#t=${started.order.accessToken}`);
   await expect(page.getByText("Payment received")).toHaveCount(0);
 
+  // An invoice of ANOTHER amount than the shop sent, even one whose final amount equals the order total, does not bind
+  // (this case differs from the one above: the final-amount rule alone would let it through).
+  const otherInvoice = await provider.postSigned(
+    paidBody(started, {
+      amount: started.order.total.amount + 100,
+      finalAmount: started.order.total.amount,
+      minutes: 12,
+    }),
+  );
+  expect(otherInvoice.status()).toBe(200);
+  expect(await admin.orderStatus(started.orderId)).toBe("awaiting_payment");
+  expect((await admin.paymentsOf(started.orderId))[0]).toMatchObject({
+    status: "awaiting_customer",
+    needsAttention: true,
+    attentionCode: "amount_mismatch",
+  });
+
   // The right amount but a FINAL amount of less than was charged is the same kind of lie.
   const short = await provider.postSigned(
     paidBody(started, { finalAmount: wrongAmount, minutes: 11 }),
