@@ -1,8 +1,12 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { loadStorefrontEnv } from "@fluxkit/config";
 import type { NextConfig } from "next";
-import { PHASE_DEVELOPMENT_SERVER, PHASE_PRODUCTION_SERVER } from "next/constants.js";
+import {
+  PHASE_DEVELOPMENT_SERVER,
+  PHASE_PRODUCTION_BUILD,
+  PHASE_PRODUCTION_SERVER,
+} from "next/constants.js";
 
 // Keep in sync with defaultLocale in @fluxkit/ui (this file runs in plain Node and cannot import the bundler-built package).
 const DEFAULT_LOCALE = "uk";
@@ -20,6 +24,51 @@ export function loadRootEnvFile(phase: string, file = resolve(process.cwd(), "..
 }
 
 /**
+ * The marker every placeholder legal text carries (`src/config/legal.ts` `LEGAL_PLACEHOLDER_MARKER`; a spec keeps the two
+ * equal: this file runs in plain Node and cannot import the app's source).
+ */
+export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal text";
+
+/**
+ * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
+ * production build REFUSES while a `legal.*` message of any language still carries the placeholder marker, naming each file
+ * and key. Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
+ * when asked to check and the messages cannot be read, the build stops.
+ */
+export function assertNoLegalPlaceholders(options: {
+  enabled: boolean;
+  messagesDir: string;
+}): void {
+  if (!options.enabled) return;
+  if (!existsSync(options.messagesDir)) {
+    throw new Error(
+      `STOREFRONT_REQUIRE_LEGAL_TEXT is set but the messages directory was not found (${options.messagesDir}).`,
+    );
+  }
+  const found: string[] = [];
+  const files = readdirSync(options.messagesDir)
+    .filter((name) => name.endsWith(".json"))
+    .sort();
+  for (const file of files) {
+    const messages = JSON.parse(readFileSync(resolve(options.messagesDir, file), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    for (const [key, value] of Object.entries(messages)) {
+      if (key.startsWith("legal.") && typeof value === "string" && value.includes(LEGAL_MARKER)) {
+        found.push(`${file}: ${key}`);
+      }
+    }
+  }
+  if (found.length > 0) {
+    throw new Error(
+      "A production build with STOREFRONT_REQUIRE_LEGAL_TEXT=true needs the shop's own legal texts, but these messages " +
+        `still carry the placeholder marker:\n${found.join("\n")}`,
+    );
+  }
+}
+
+/**
  * `phase` is the Next.js phase, not NODE_ENV: it is `phase-development-server` only for `next dev`.
  *
  * The `/store/*` rewrite exists for local development only (ADR 0026). In every deployed environment an edge reverse
@@ -29,6 +78,12 @@ export function loadRootEnvFile(phase: string, file = resolve(process.cwd(), "..
  */
 export default function config(phase: string): NextConfig {
   loadRootEnvFile(phase);
+  if (phase === PHASE_PRODUCTION_BUILD) {
+    assertNoLegalPlaceholders({
+      enabled: process.env.STOREFRONT_REQUIRE_LEGAL_TEXT === "true",
+      messagesDir: resolve(process.cwd(), "src/messages"),
+    });
+  }
   // Read once, here, by `next build` (the CSP headers are stored in the build output, so changing the CSP list needs a
   // rebuild) and again by `next start` (the image optimizer's allow-list). No API_INTERNAL_URL exists at build time; a
   // placeholder satisfies the shared parser, only `imageHosts` is read. A malformed list stops the build or the server

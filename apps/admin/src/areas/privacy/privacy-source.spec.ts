@@ -109,7 +109,7 @@ describe("privacy area source guards", () => {
   it("downloads the export as a JSON file built from the typed client's document", () => {
     const page = source("request-detail-page.tsx");
     expect(page).toMatch(
-      /downloadBlob\(exportBlob\(outcome\.data\), exportFileName\(outcome\.data\)/,
+      /downloadBlob\(\s*exportBlob\(outcome\.data\),\s*exportFileName\(outcome\.data\)/,
     );
     const view = source("privacy-view.ts");
     expect(view).toMatch(/export const EXPORT_CONTENT_TYPE = "application\/json";/);

@@ -49,6 +49,9 @@ export const KNOWN_RULES = [
   "payment_in_progress",
   "payment_window_too_short",
   "payment_not_available",
+  // the privacy routes (docs/api/privacy.md)
+  "erasure_blocked",
+  "export_too_large",
 ] as const;
 
 /** Codes of `errors[]` entries the storefront's forms and cart can receive (docs/api/{cart,customers,orders}.md). */
