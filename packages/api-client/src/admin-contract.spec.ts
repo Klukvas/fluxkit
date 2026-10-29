@@ -373,6 +373,112 @@ const shipmentCreateResult: Shape<AdminShipmentCreateResult> = {
   },
 };
 
+const paymentStatus = {
+  enum: [
+    "creating",
+    "awaiting_customer",
+    "processing",
+    "succeeded",
+    "failed",
+    "expired",
+    "invalidated",
+    "create_unknown",
+  ],
+} as const;
+
+const paymentRefund: Shape<Admin.AdminPaymentRefund> = {
+  object: {
+    id: "string",
+    amount: money,
+    status: { enum: ["requested", "processing", "succeeded", "failed", "unknown"] },
+    reason: { enum: ["admin", "late_payment", "duplicate_payment", "amount_mismatch"] },
+    note: { nullable: "string" },
+    actorAdminId: { nullable: "string" },
+    failureCode: { nullable: "string" },
+    createdAt: "string",
+    updatedAt: "string",
+  },
+};
+
+const payment: Shape<Admin.AdminPayment> = {
+  object: {
+    id: "string",
+    providerCode: "string",
+    providerPaymentId: { nullable: "string" },
+    status: paymentStatus,
+    amount: money,
+    finalAmount: { nullable: money },
+    refundedAmount: money,
+    refundableAmount: money,
+    providerStatus: { nullable: "string" },
+    providerModifiedAt: { nullable: "string" },
+    failureCode: { nullable: "string" },
+    orderOutcome: {
+      nullable: {
+        enum: [
+          "applied",
+          "already_paid",
+          "order_not_payable",
+          "amount_mismatch",
+          "reference_conflict",
+        ],
+      },
+    },
+    needsAttention: "boolean",
+    attentionCode: {
+      nullable: {
+        enum: [
+          "late_payment",
+          "duplicate_payment",
+          "amount_mismatch",
+          "fact_not_bound",
+          "unknown_provider_status",
+          "unexpected_provider_status",
+          "external_reversal",
+          "refund_failed",
+          "refund_mismatch",
+          "reconcile_gave_up",
+        ],
+      },
+    },
+    card: { nullable: { object: { system: "string", last4: "string" } } },
+    createdBy: { enum: ["customer", "guest", "admin"] },
+    expiresAt: "string",
+    createdAt: "string",
+    updatedAt: "string",
+    nextCheckAt: { nullable: "string" },
+    refunds: { array: paymentRefund },
+    history: {
+      array: {
+        object: {
+          source: { enum: ["webhook", "poll", "create", "admin", "system"] },
+          fromStatus: { nullable: paymentStatus },
+          toStatus: { nullable: paymentStatus },
+          providerStatus: { nullable: "string" },
+          providerModifiedAt: { nullable: "string" },
+          applied: "boolean",
+          failureCode: { nullable: "string" },
+          actorAdminId: { nullable: "string" },
+          action: { nullable: { enum: ["attention_cleared"] } },
+          at: "string",
+        },
+      },
+    },
+  },
+};
+
+const paymentList: Shape<Admin.AdminPaymentList> = { object: { items: { array: payment } } };
+const paymentPage: Shape<Admin.AdminPaymentPage> = {
+  object: {
+    items: { array: { object: { orderId: "string", orderNumber: "string", payment } } },
+    limit: "integer",
+    nextCursor: { nullable: "string" },
+  },
+};
+const refundResult: Shape<Admin.AdminRefundResult> = {
+  object: { refund: paymentRefund, payment },
+};
+
 const order: Shape<AdminOrder> = {
   object: {
     id: "string",
@@ -450,6 +556,7 @@ const order: Shape<AdminOrder> = {
       },
     },
     shipments: { array: shipment },
+    payments: { array: payment },
     history: {
       array: {
         object: {
@@ -895,6 +1002,9 @@ const body = {
   markOrderPaid: {
     object: { reference: "string", amount: moneyInput },
   } satisfies Shape<Admin.MarkAdminOrderPaidBody>,
+  refundPayment: {
+    object: { amount: moneyInput, note: "string" },
+  } satisfies Shape<Admin.RefundAdminPaymentBody>,
   createAttribute: {
     object: {
       code: "string",
@@ -1192,6 +1302,11 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   cancelShipment: shipment,
   refreshShipment: shipment,
   getShipmentLabel: "pdf",
+  listOrderPayments: paymentList,
+  refundPayment: refundResult,
+  resyncPayment: payment,
+  listPayments: paymentPage,
+  clearPaymentAttention: payment,
   createAttribute: attribute,
   listAttributes: attributeList,
   getAttribute: attributeWithOptions,
@@ -1304,6 +1419,11 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   cancelShipment: null,
   refreshShipment: null,
   getShipmentLabel: null,
+  listOrderPayments: null,
+  refundPayment: body.refundPayment,
+  resyncPayment: null,
+  listPayments: null,
+  clearPaymentAttention: null,
   createAttribute: body.createAttribute,
   listAttributes: null,
   getAttribute: null,
@@ -1503,7 +1623,12 @@ describe("ADMIN_OPERATIONS against docs/api/openapi.json", () => {
       .filter((p) => p.in === "header")
       .map((p) => p.name)
       .sort();
-    expect(headerNames).toEqual(spec.method === "GET" ? [] : [CSRF_HEADER]);
+    expect(headerNames).toEqual(
+      [
+        ...(spec.method === "GET" ? [] : [CSRF_HEADER]),
+        ...(spec.requiresIdempotencyKey ? ["Idempotency-Key"] : []),
+      ].sort(),
+    );
     for (const header of parameters.filter((p) => p.in === "header"))
       expect(header.required).toBe(true);
 

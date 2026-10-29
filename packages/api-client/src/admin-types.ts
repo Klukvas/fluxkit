@@ -343,6 +343,8 @@ export interface AdminOrder {
   shipping: AdminOrderShipping | null;
   /** The carrier waybills of the order, oldest first (at most one active). */
   shipments: AdminShipment[];
+  /** The online payment attempts of the order, oldest first (ADR 0032); empty when none was made. */
+  payments: AdminPayment[];
   history: AdminOrderHistoryEntry[];
   placedAt: string;
   expiresAt: string;
@@ -367,6 +369,125 @@ export interface AdminOrderShipping {
   destination: OrderPickupPoint | null;
   providerService: string | null;
   title: Record<string, string>;
+}
+
+// ------------------------------------------------------------------ payments
+
+export type PaymentAttemptStatus =
+  | "creating"
+  | "awaiting_customer"
+  | "processing"
+  | "succeeded"
+  | "failed"
+  | "expired"
+  | "invalidated"
+  | "create_unknown";
+
+export type PaymentRefundStatus = "requested" | "processing" | "succeeded" | "failed" | "unknown";
+
+export type PaymentRefundReason =
+  "admin" | "late_payment" | "duplicate_payment" | "amount_mismatch";
+
+export type PaymentOrderOutcome =
+  "applied" | "already_paid" | "order_not_payable" | "amount_mismatch" | "reference_conflict";
+
+export type PaymentAttentionCode =
+  | "late_payment"
+  | "duplicate_payment"
+  | "amount_mismatch"
+  | "fact_not_bound"
+  | "unknown_provider_status"
+  | "unexpected_provider_status"
+  | "external_reversal"
+  | "refund_failed"
+  | "refund_mismatch"
+  | "reconcile_gave_up";
+
+export type PaymentEventSource = "webhook" | "poll" | "create" | "admin" | "system";
+
+export interface AdminPaymentRefund {
+  /** Also the idempotency reference sent to the provider. */
+  id: string;
+  amount: Money;
+  /** `requested`: not sent yet (job 11 sends it). `unknown`: the answer was lost; never sent again. */
+  status: PaymentRefundStatus;
+  reason: PaymentRefundReason;
+  /** Null for an automatic refund. */
+  note: string | null;
+  actorAdminId: string | null;
+  /** The provider's code of a failed refund, never text. */
+  failureCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminPaymentHistoryEntry {
+  source: PaymentEventSource;
+  fromStatus: PaymentAttemptStatus | null;
+  toStatus: PaymentAttemptStatus | null;
+  /** The provider's raw status word of a fact. */
+  providerStatus: string | null;
+  providerModifiedAt: string | null;
+  applied: boolean;
+  failureCode: string | null;
+  actorAdminId: string | null;
+  /** An admin action without a status change. */
+  action: "attention_cleared" | null;
+  at: string;
+}
+
+/**
+ * A payment attempt as the admin sees it (ADR 0032). No page URL; card data is the system and the last four digits only.
+ * `refundableAmount` is what a new refund may take (the amount less every refund that is not `failed`).
+ */
+export interface AdminPayment {
+  id: string;
+  providerCode: string;
+  providerPaymentId: string | null;
+  status: PaymentAttemptStatus;
+  amount: Money;
+  finalAmount: Money | null;
+  refundedAmount: Money;
+  refundableAmount: Money;
+  providerStatus: string | null;
+  providerModifiedAt: string | null;
+  failureCode: string | null;
+  orderOutcome: PaymentOrderOutcome | null;
+  needsAttention: boolean;
+  /** Kept after an admin cleared the item. */
+  attentionCode: PaymentAttentionCode | null;
+  card: { system: string; last4: string } | null;
+  createdBy: "customer" | "guest" | "admin";
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+  nextCheckAt: string | null;
+  refunds: AdminPaymentRefund[];
+  history: AdminPaymentHistoryEntry[];
+}
+
+export interface AdminPaymentList {
+  items: AdminPayment[];
+}
+
+export interface AdminPaymentPage {
+  items: { orderId: string; orderNumber: string; payment: AdminPayment }[];
+  limit: number;
+  /** Pass as `cursor` for the next page; null on the last page. */
+  nextCursor: string | null;
+}
+
+/** A full or partial refund; never more than `refundableAmount` (the API decides under a lock). */
+export interface RefundAdminPaymentBody {
+  amount: Money;
+  /** Why the money is returned; trimmed, 1 to 500 characters. */
+  note: string;
+}
+
+/** `refund.status` as the provider left it: `succeeded`, `processing`, `failed`, `requested` or `unknown`. */
+export interface AdminRefundResult {
+  refund: AdminPaymentRefund;
+  payment: AdminPayment;
 }
 
 // ----------------------------------------------------------------- shipments

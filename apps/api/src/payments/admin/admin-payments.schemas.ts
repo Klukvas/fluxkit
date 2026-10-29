@@ -38,12 +38,6 @@ export const adminRefundResultSchema = z.object({
   payment: adminPaymentSchema.meta({ description: "The payment attempt afterwards." }),
 });
 
-/** `POST /admin/payments/{paymentId}/attention/clear` takes no body (or an empty object). */
-export const clearAttentionBodySchema = z
-  .strictObject({})
-  .optional()
-  .transform(() => ({}));
-
 const refundAmountSchema = z
   .strictObject({
     amount: z.number().meta({ description: "Integer minor units of the payment currency." }),

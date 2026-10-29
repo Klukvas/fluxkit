@@ -15,7 +15,6 @@ import {
   adminPaymentListSchema,
   adminPaymentPageSchema,
   adminRefundResultSchema,
-  clearAttentionBodySchema,
   listAdminPaymentsQuerySchema,
   refundPaymentSchema,
   type AdminPayment,
@@ -148,15 +147,13 @@ export class AdminPaymentsController {
   @ApiOperation({
     summary: "Close the attention item of a payment",
     description:
-      "After an admin settled the case (for example refunded by hand): `needsAttention` becomes false, `attentionCode` stays as a record, and the journal names the admin (`action: attention_cleared`). No body. An attempt without an open item is answered unchanged.",
+      "After an admin settled the case (for example refunded by hand): `needsAttention` becomes false, `attentionCode` stays as a record, and the journal names the admin (`action: attention_cleared`). No body (the journal has no note column; ADR 0032 named a note). An attempt without an open item is answered unchanged.",
   })
   @ApiParam(PAYMENT_PARAM)
-  @ApiZodBody(clearAttentionBodySchema)
   @ApiZodResponse(200, adminPaymentSchema, "The attempt afterwards.")
   @ApiProblemResponses(400, 404)
   clear(
     @Param("paymentId", uuidParam("paymentId")) paymentId: string,
-    @Body(new ZodValidationPipe(clearAttentionBodySchema)) _body: unknown,
     @CurrentAdmin() admin: AdminPrincipal,
   ): Promise<AdminPayment> {
     return this.payments.clearAttention(paymentId, admin.userId);

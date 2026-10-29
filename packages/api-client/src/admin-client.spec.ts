@@ -58,6 +58,7 @@ const operations = Object.entries(ADMIN_OPERATIONS) as [
 ][];
 
 const UPLOAD_BYTES = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+const REFUND_KEY = "8b4c5c2e-1d2f-4c0e-9a55-3f7f2f1d9a10";
 
 type LooseClient = Record<string, (...args: unknown[]) => Promise<unknown>>;
 
@@ -68,6 +69,7 @@ function callOperation(client: AdminClient, name: AdminOperationName, body: unkn
   const args: unknown[] = Array.from({ length: placeholders }, (_unused, index) => `p${index + 1}`);
   if (spec.bodyKind === "binary") args.push(UPLOAD_BYTES);
   else if (spec.hasBody) args.push(body);
+  if (spec.requiresIdempotencyKey) args.push({ idempotencyKey: REFUND_KEY });
   const fn = (client as unknown as LooseClient)[name];
   if (fn === undefined) throw new Error(`The client has no function ${name}`);
   return fn(...args);
@@ -199,6 +201,17 @@ describe.each(operations)("%s", (name, spec) => {
     },
   );
 
+  it(
+    spec.requiresIdempotencyKey ? "sends the caller's Idempotency-Key" : "sends no Idempotency-Key",
+    async () => {
+      const { fetch, calls } = fakeFetch(() => okFor(name));
+      await callOperation(createAdminClient({ baseUrl: BASE, fetch }), name);
+      expect(calls[0]?.init.headers.get("Idempotency-Key") ?? null).toBe(
+        spec.requiresIdempotencyKey ? REFUND_KEY : null,
+      );
+    },
+  );
+
   it("does not retry or replay after a network failure", async () => {
     const { fetch, calls } = fakeFetch(() => {
       throw new TypeError("fetch failed");
@@ -219,6 +232,37 @@ describe.each(operations)("%s", (name, spec) => {
     )) as AdminResult<unknown>;
     expect(result).toMatchObject({ ok: false, status: 503, retryAfter: "3" });
     expect(calls).toHaveLength(1);
+  });
+});
+
+describe("payments", () => {
+  it("refundPayment refuses a missing or unsafe idempotencyKey before sending anything", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({}, 202));
+    const client = createAdminClient({ baseUrl: BASE, fetch });
+    for (const idempotencyKey of [undefined, "", "a b", "x".repeat(300)]) {
+      await expect(
+        client.refundPayment(
+          "o1",
+          "p1",
+          { amount: { amount: 100, currency: "UAH" }, note: "n" },
+          { idempotencyKey: idempotencyKey as string },
+        ),
+      ).rejects.toBeInstanceOf(InvalidRequestError);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("listPayments sends needsAttention as true or false and the cursor unchanged", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({ items: [], limit: 20, nextCursor: null }));
+    const client = createAdminClient({ baseUrl: BASE, fetch });
+    await client.listPayments({ needsAttention: true, limit: 5, cursor: "abc_-" });
+    await client.listPayments({ needsAttention: false });
+    await client.listPayments();
+    expect(calls.map((call) => call.url)).toEqual([
+      `${BASE}/admin/payments?needsAttention=true&limit=5&cursor=abc_-`,
+      `${BASE}/admin/payments?needsAttention=false`,
+      `${BASE}/admin/payments`,
+    ]);
   });
 });
 
@@ -582,7 +626,7 @@ describe("construction and options", () => {
     expect(calls[0]?.init.signal).toBe(controller.signal);
   });
 
-  it("the admin client does not send an idempotency header", async () => {
+  it("the admin client sends no idempotency header on an ordinary write", async () => {
     const { fetch, calls } = fakeFetch(() => jsonOk({}, 201));
     await createAdminClient({ baseUrl: BASE, fetch }).createBrand({ name: { uk: "A" } });
     expect(calls[0]?.init.headers.get("Idempotency-Key")).toBeNull();

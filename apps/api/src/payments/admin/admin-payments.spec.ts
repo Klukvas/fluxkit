@@ -585,7 +585,6 @@ describe("payments: admin routes (real Postgres)", () => {
         world.orders.owner.baseUrl,
         "POST",
         `/admin/payments/${second.paymentId}/attention/clear`,
-        { body: {} },
       );
       expect(again.status).toBe(200);
       expect(
@@ -599,7 +598,7 @@ describe("payments: admin routes (real Postgres)", () => {
       expect(open.body.items.map((item) => item.payment.id)).not.toContain(second.paymentId);
     });
 
-    it("refuses a misspelt filter, a damaged cursor, a body on the clear and an unknown payment", async () => {
+    it("refuses a misspelt filter, a damaged cursor and an unknown payment", async () => {
       const get = (query: string) =>
         http<Problem>(world.orders.owner.baseUrl, "GET", `/admin/payments${query}`);
       expect((await get("?needsattention=true")).status).toBe(400);
@@ -608,19 +607,6 @@ describe("payments: admin routes (real Postgres)", () => {
       const damaged = await get("?cursor=not-a-cursor");
       expect(damaged.status).toBe(400);
       expect(damaged.body).toMatchObject({ errors: [{ path: "cursor", code: "invalid_cursor" }] });
-      const made = await attempt(world.app);
-      expect(
-        (
-          await http(
-            world.orders.owner.baseUrl,
-            "POST",
-            `/admin/payments/${made.paymentId}/attention/clear`,
-            {
-              body: { note: "x" },
-            },
-          )
-        ).status,
-      ).toBe(400);
       expect(
         (
           await http(
