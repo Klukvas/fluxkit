@@ -304,7 +304,7 @@ export const adminPaymentSchema = z.object({
   refundedAmount: moneySchema.meta({ description: "The sum of the succeeded refunds." }),
   refundableAmount: moneySchema.meta({
     description:
-      "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0.",
+      "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0.",
   }),
   providerStatus: z.string().nullable(),
   providerModifiedAt: timestampSchema.nullable(),

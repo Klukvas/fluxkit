@@ -217,7 +217,10 @@ export interface AdminOrderPaymentView {
   readonly finalAmount: AdminOrderMoney | null;
   /** The sum of the succeeded refunds. */
   readonly refundedAmount: AdminOrderMoney;
-  /** What a new refund may still take: for a succeeded attempt the amount less every refund that is not `failed`, else 0. */
+  /**
+   * What a new refund may still take: for a succeeded attempt the amount less every refund that is not `failed` and less
+   * money the provider returned outside the shop (core `refundableAmount`), else 0.
+   */
   readonly refundableAmount: AdminOrderMoney;
   readonly providerStatus: string | null;
   readonly providerModifiedAt: string | null;

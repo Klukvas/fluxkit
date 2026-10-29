@@ -76,7 +76,7 @@
   "payment.attention.help.fact_not_bound": "A notice about this payment did not match what the shop sent. Nothing was changed. Use Check status; if it keeps coming back, contact support.",
   "payment.attention.help.unknown_provider_status": "The provider reported a status this version does not understand. Nothing was changed. Use Check status and look at the payment in the provider's cabinet.",
   "payment.attention.help.unexpected_provider_status": "The provider reported a status that does not fit this payment's state. Use Check status and compare with the provider's cabinet.",
-  "payment.attention.help.external_reversal": "The provider reports the payment as reversed although the shop did not refund it (for example a refund made in the provider's cabinet). Compare with the provider's records.",
+  "payment.attention.help.external_reversal": "The provider reports money returned to the customer (all or part of the payment) that the shop did not refund, for example a refund made in the provider's cabinet. The amount that can still be refunded already excludes it. Compare with the provider's records.",
   "payment.attention.help.refund_failed": "The provider refused a refund. The amount is available to refund again. Check the failure code in the refunds table, fix the cause, then try again or return the money another way.",
   "payment.attention.help.refund_mismatch": "The provider's record of a refund differs from the shop's. Use Check status and compare with the provider's cabinet before refunding again.",
   "payment.attention.help.reconcile_gave_up": "The shop checked this payment for a long time and stopped. Use Check status once; if the status is still unclear, look at the payment in the provider's cabinet.",
