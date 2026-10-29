@@ -36,8 +36,20 @@ describe("parseSearchSort", () => {
 describe("engineSort", () => {
   it("maps the public names to engine sort rules", () => {
     expect(engineSort("relevance")).toBeUndefined();
-    expect(engineSort("newest")).toEqual(["publishedAt:desc"]);
+    expect(engineSort("newest")).toEqual(["publishedAt:desc", "productId:desc"]);
     expect(engineSort("price_asc")).toEqual(["price:asc"]);
     expect(engineSort("price_desc")).toEqual(["price:desc"]);
+  });
+
+  it("breaks a tie of newest by the product id, like the SQL listing's `published_at desc, id desc` (review F2)", () => {
+    expect(engineSort("newest", ["price", "publishedAt", "productId"])).toEqual([
+      "publishedAt:desc",
+      "productId:desc",
+    ]);
+  });
+
+  it("leaves the tie-break out while the live index cannot sort by the product id (an index of document version 1)", () => {
+    expect(engineSort("newest", ["price", "publishedAt"])).toEqual(["publishedAt:desc"]);
+    expect(engineSort("price_asc", ["price", "publishedAt"])).toEqual(["price:asc"]);
   });
 });

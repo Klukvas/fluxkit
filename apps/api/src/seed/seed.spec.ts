@@ -13,6 +13,7 @@ import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
+import { removeSeedRows as removeSeedRowsOf } from "../test/seed-rows.js";
 import { testShippingProviders } from "../test/test-shipping-provider.js";
 import type { ProductDetailResponse } from "../catalog/admin/products/products.schemas.js";
 import type { InventoryResponse, MovementResponse } from "../inventory/admin/inventory.schemas.js";
@@ -30,8 +31,30 @@ import {
   runSeedCommand,
 } from "./seed-command.js";
 
-const { attributes, options, productTypes, brands, categories, products, shippingMethods } =
-  catalogSeed;
+const {
+  attributes,
+  options,
+  productTypes,
+  brands,
+  categories,
+  products,
+  shippingMethods,
+  synonymGroups,
+} = catalogSeed;
+
+/** Every term of the demo synonym groups: a group holding one of them is a demo group (the runner's own test). */
+const demoSynonymTerms = synonymGroups.flatMap((group) => [...group.terms]);
+
+/**
+ * Search switched on for the seed only: the search module mounts and the catalog writes mark the queue, but nothing calls
+ * the engine (no call at startup, and the seed asks the engine nothing), so an invented address and key are enough.
+ */
+const SEARCH_ON = {
+  SEARCH_ENABLED: "true",
+  MEILI_URL: "http://127.0.0.1:9",
+  MEILI_API_KEY: "seed-spec-invented-key-0123456789",
+  MEILI_INDEX_PREFIX: "seedspec_",
+};
 
 /** The demo methods without a provider: the spec's runs load no provider unless they mount the test carrier. */
 const methodsWithoutProvider = shippingMethods.filter((method) => method.providerCode === null);
@@ -140,35 +163,15 @@ describe("catalog seed (real app, real Postgres)", () => {
     return result.rows[0]?.count ?? -1;
   }
 
-  /** Removes only what the seed creates, found by its stable codes and slugs, children before parents. */
-  async function removeSeedRows(): Promise<void> {
-    const productSlugs = products.map((product) => product.slug);
-    const where = "product_id in (select id from product where slug = any($1))";
-    await pool.query(`delete from media where ${where}`, [productSlugs]);
-    await pool.query(`delete from variant where ${where}`, [productSlugs]);
-    await pool.query("delete from product where slug = any($1)", [productSlugs]);
-    const levels: (readonly SeedCategory[])[] = [
-      categories.flatMap((root) => root.children ?? []),
-      categories,
-    ];
-    for (const level of levels) {
-      await pool.query("delete from category where slug = any($1)", [
-        level.map((node) => node.slug),
-      ]);
-    }
-    await pool.query("delete from brand where slug = any($1)", [brands.map((b) => b.slug)]);
-    await pool.query("delete from product_type where code = any($1)", [
-      productTypes.map((type) => type.code),
-    ]);
-    await pool.query("delete from attribute where code = any($1)", [
-      attributes.map((attribute) => attribute.code),
-    ]);
-    await pool.query('delete from "option" where code = any($1)', [
-      options.map((option) => option.code),
-    ]);
-    await pool.query("delete from shipping_method where code = any($1)", [
-      shippingMethods.map((method) => method.code),
-    ]);
+  /** Removes only what the seed creates (`test/seed-rows.ts`). */
+  const removeSeedRows = (): Promise<void> => removeSeedRowsOf(pool);
+
+  async function demoSynonymRows(): Promise<{ locale: string; terms: string[] }[]> {
+    const result = await pool.query<{ locale: string; terms: string[] }>(
+      "select locale, terms from search_synonym_group where terms && $1::text[] order by locale, created_at, id",
+      [demoSynonymTerms],
+    );
+    return result.rows;
   }
 
   beforeAll(async () => {
@@ -203,6 +206,19 @@ describe("catalog seed (real app, real Postgres)", () => {
     // 3 + 8 + 4 clothing variants, one default variant for each of the 5 products without options.
     expect(firstRun.variantsCreated).toBe(9 + 8 + 4 + 5);
     expect(formatSummary(firstRun)).toContain("products      created   8");
+  });
+
+  it("writes no synonym group with search off (no DB side effect of search) and says why", async () => {
+    expect(firstRun.synonymGroups).toEqual({
+      searchEnabled: false,
+      created: 0,
+      existing: 0,
+      skippedLocales: [],
+    });
+    expect(formatSummary(firstRun)).toContain(
+      "synonym groups not written: search is off (SEARCH_ENABLED)",
+    );
+    expect(await demoSynonymRows()).toEqual([]);
   });
 
   it("writes one price per variant in the shop currency, and a level and a journal row per stocked variant", async () => {
@@ -616,6 +632,109 @@ describe("catalog seed (real app, real Postgres)", () => {
         [brands[0]?.slug],
       );
       expect(row.rows[0]?.name).toEqual({ uk: "Змінено", en: "Edited" });
+    });
+  });
+
+  describe("demo synonym groups with search on (search plan step 11)", () => {
+    it("creates every demo group once, through the admin API's rules, and a second run adds nothing", async () => {
+      await pool.query("delete from search_synonym_group where terms && $1::text[]", [
+        demoSynonymTerms,
+      ]);
+      const first = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      expect(first.synonymGroups).toEqual({
+        searchEnabled: true,
+        created: synonymGroups.length,
+        existing: 0,
+        skippedLocales: [],
+      });
+      expect(formatSummary(first)).toContain(
+        `synonym groups created ${String(synonymGroups.length).padStart(3)}, existing   0`,
+      );
+      expect(await demoSynonymRows()).toEqual(
+        [...synonymGroups]
+          .map((group) => ({ locale: group.locale, terms: [...group.terms] }))
+          .sort((a, b) => a.locale.localeCompare(b.locale)),
+      );
+
+      const before = await tableCounts();
+      const second = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      expect(second.synonymGroups).toEqual({
+        searchEnabled: true,
+        created: 0,
+        existing: synonymGroups.length,
+        skippedLocales: [],
+      });
+      expect(await tableCounts()).toEqual(before);
+    });
+
+    it("leaves a group an admin edited alone (found by any of its terms) and re-creates one that was deleted", async () => {
+      const [edited, deleted] = synonymGroups;
+      if (edited === undefined || deleted === undefined) throw new Error("two demo groups needed");
+      await runSeedCommand([], { ...env, ...SEARCH_ON });
+      // The admin keeps one demo term and adds a term of their own.
+      await pool.query(
+        "update search_synonym_group set terms = array[$2, 'admin-term'] where locale = $1 and terms && $3::text[]",
+        [edited.locale, edited.terms[0], [...edited.terms]],
+      );
+      await pool.query(
+        "delete from search_synonym_group where locale = $1 and terms && $2::text[]",
+        [deleted.locale, [...deleted.terms]],
+      );
+      const again = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      expect(again.synonymGroups.created).toBe(1);
+      expect(again.synonymGroups.existing).toBe(synonymGroups.length - 1);
+      const rows = await pool.query<{ terms: string[] }>(
+        "select terms from search_synonym_group where locale = $1 and terms && $2::text[]",
+        [edited.locale, [...edited.terms]],
+      );
+      expect(rows.rows).toEqual([{ terms: [edited.terms[0], "admin-term"] }]);
+      await pool.query("delete from search_synonym_group where 'admin-term' = any(terms)");
+    });
+
+    it("creates a demo group although a group of the OTHER locale holds one of its terms (review F3)", async () => {
+      const english = synonymGroups.find((group) => group.locale === "en");
+      if (english === undefined) throw new Error("an en demo group needed");
+      await pool.query("delete from search_synonym_group where terms && $1::text[]", [
+        demoSynonymTerms,
+      ]);
+      // An admin's uk group shares a term with the en demo group: only a group of the same locale makes it existing.
+      await pool.query(
+        "insert into search_synonym_group (locale, terms) values ('uk', array[$1, 'admin-uk-term'])",
+        [english.terms[0]],
+      );
+      try {
+        const run = await runSeedCommand([], { ...env, ...SEARCH_ON });
+        expect(run.synonymGroups.created).toBe(synonymGroups.length);
+        expect(run.synonymGroups.existing).toBe(0);
+        const rows = await pool.query<{ terms: string[] }>(
+          "select terms from search_synonym_group where locale = 'en' and terms = $1::text[]",
+          [[...english.terms]],
+        );
+        expect(rows.rows).toHaveLength(1);
+      } finally {
+        await pool.query("delete from search_synonym_group where 'admin-uk-term' = any(terms)");
+      }
+    });
+
+    it("skips and reports the groups of a locale the shop does not serve", async () => {
+      await pool.query("delete from search_synonym_group where terms && $1::text[]", [
+        demoSynonymTerms,
+      ]);
+      const ukOnly = await runSeedCommand([], {
+        ...env,
+        ...SEARCH_ON,
+        LOCALES: "uk",
+        DEFAULT_LOCALE: "uk",
+      });
+      const uk = synonymGroups.filter((group) => group.locale === "uk").length;
+      expect(ukOnly.synonymGroups).toEqual({
+        searchEnabled: true,
+        created: uk,
+        existing: 0,
+        skippedLocales: ["en"],
+      });
+      expect(formatSummary(ukOnly)).toContain("skipped (locale not in LOCALES): en");
+      expect(new Set((await demoSynonymRows()).map((row) => row.locale))).toEqual(new Set(["uk"]));
     });
   });
 

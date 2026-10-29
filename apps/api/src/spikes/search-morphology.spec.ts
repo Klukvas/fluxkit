@@ -6,6 +6,7 @@ import {
   stemToken,
 } from "@fluxkit/core";
 import type { SearchDocument, SearchProductFacts, TextQuery } from "@fluxkit/core";
+import { demoSynonymGroups } from "@fluxkit/seeds";
 import { afterAll, describe, expect, it } from "vitest";
 import { requireEnv } from "../test/env.js";
 import { buildCorpus } from "./search-corpus.js";
@@ -58,6 +59,7 @@ async function indexDocuments(
   name: string,
   locale: string,
   documents: readonly SearchDocument[],
+  synonymGroups: readonly (readonly string[])[] = [],
 ): Promise<string> {
   const uid = `${prefix}${name}`;
   createdIndexes.push(uid);
@@ -67,7 +69,7 @@ async function indexDocuments(
     currency: "UAH",
     options: [],
     attributes: [],
-    synonymGroups: [],
+    synonymGroups,
   });
   await waitFor(await engine("PATCH", `/indexes/${uid}/settings`, settings));
   await waitFor(await engine("POST", `/indexes/${uid}/documents`, documents));
@@ -553,5 +555,60 @@ describe("English plural and singular forms", () => {
     expect(withStems.singular).toBeGreaterThan(0.93);
     const irregular = new Set(["scarf", "scarves", "knife", "knives", "mouse", "mice"]);
     expect(withStems.missed.filter((form) => !irregular.has(form))).toEqual([]);
+  });
+});
+
+describe("the demo synonym groups of the seeds (ADR 0034 decisions 6 and 8, search plan step 11)", () => {
+  const all = ["original", "stems", "prefixes"] as const;
+  const groupsOf = (locale: string) =>
+    demoSynonymGroups.filter((group) => group.locale === locale).map((group) => group.terms);
+  const ukProducts: [string, string][] = [
+    ["u1", "Демо підставка для ноги"],
+    ["u2", "Демо викрутка хрестова"],
+    ["u3", "Демо лляна сорочка"],
+  ];
+  const enProducts: [string, string][] = [
+    ["e1", "Demo Wool Scarf"],
+    ["e2", "Demo Kitchen Knife"],
+    ["e3", "Demo Wireless Mouse"],
+    ["e4", "Demo Linen Shirt for Men"],
+  ];
+  const documentsOf = (products: [string, string][], locale: "uk" | "en") =>
+    products.flatMap(([id, title]) =>
+      buildSearchDocuments(
+        facts(id, title, null, [{ id: `${id}-v1`, sku: `SKU-${id}`, price: 1000 }], locale),
+        { locale, defaultLocale: locale, attributes: [], options: [] },
+      ),
+    );
+  const uids = { uk: "", ukPlain: "", en: "", enPlain: "" };
+
+  it("indexes the same products with and without the demo groups", async () => {
+    uids.uk = await indexDocuments("syn_uk", "uk", documentsOf(ukProducts, "uk"), groupsOf("uk"));
+    uids.ukPlain = await indexDocuments("syn_uk_plain", "uk", documentsOf(ukProducts, "uk"));
+    uids.en = await indexDocuments("syn_en", "en", documentsOf(enProducts, "en"), groupsOf("en"));
+    uids.enPlain = await indexDocuments("syn_en_plain", "en", documentsOf(enProducts, "en"));
+  });
+
+  it("finds нозі (the stemmer's documented miss), відвертка and the Russian рубашка only through the groups", async () => {
+    for (const [query, expected] of [
+      ["нозі", ["u1"]],
+      ["відвертка", ["u2"]],
+      ["рубашка", ["u3"]],
+    ] as const) {
+      expect(await search(uids.uk, "uk", query, all), query).toEqual(expected);
+      expect(await search(uids.ukPlain, "uk", query, all), `${query} without synonyms`).toEqual([]);
+    }
+  });
+
+  it("finds the irregular English forms the stemmer misses only through the groups", async () => {
+    for (const [query, expected] of [
+      ["scarves", ["e1"]],
+      ["knives", ["e2"]],
+      ["mice", ["e3"]],
+      ["man", ["e4"]],
+    ] as const) {
+      expect(await search(uids.en, "en", query, all), query).toEqual(expected);
+      expect(await search(uids.enPlain, "en", query, all), `${query} without synonyms`).toEqual([]);
+    }
   });
 });
