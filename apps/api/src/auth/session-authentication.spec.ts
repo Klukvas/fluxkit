@@ -108,6 +108,7 @@ describe("admin sessions end to end (real SessionAdminAuthenticator, real Postgr
         "customers.write",
         "shipping.manage",
         "email.manage",
+        "payments.refund",
       ],
     });
     expect(result.body.sessionId).toMatch(/^[0-9a-f-]{36}$/);

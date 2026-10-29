@@ -26,6 +26,7 @@ export const USER_ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPer
     "customers.write",
     "shipping.manage",
     "email.manage",
+    "payments.refund",
   ],
   manager: [
     "catalog.read",
@@ -37,6 +38,7 @@ export const USER_ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPer
     "customers.write",
     "shipping.manage",
     "email.manage",
+    "payments.refund",
   ],
   viewer: ["catalog.read"],
 };

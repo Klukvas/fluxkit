@@ -50,7 +50,8 @@ export type AdminPermission =
   | "customers.read"
   | "customers.write"
   | "shipping.manage"
-  | "email.manage";
+  | "email.manage"
+  | "payments.refund";
 
 export interface AdminLoginBody {
   email: string;
