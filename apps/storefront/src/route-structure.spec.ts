@@ -61,8 +61,10 @@ describe("route structure", () => {
       });
     const personal = pages(localeRoot).filter(
       (page) =>
-        /^\(site\)\/(cart|checkout|account|order)\//.test(relative(localeRoot, page)) ||
-        /^\(site\)\/(cart|checkout|account|order)$/.test(dirname(relative(localeRoot, page))),
+        /^\(site\)\/(cart|checkout|account|order|payment)\//.test(relative(localeRoot, page)) ||
+        /^\(site\)\/(cart|checkout|account|order|payment)$/.test(
+          dirname(relative(localeRoot, page)),
+        ),
     );
     expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
       "(site)/account/forgot-password/page.tsx",
@@ -77,6 +79,7 @@ describe("route structure", () => {
       "(site)/cart/page.tsx",
       "(site)/checkout/page.tsx",
       "(site)/order/[number]/page.tsx",
+      "(site)/payment/return/page.tsx",
     ]);
     for (const page of personal) {
       const source = readFileSync(page, "utf8");
