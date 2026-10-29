@@ -1,0 +1,26 @@
+# Build context of the root Dockerfile (docs/deployment.md). Everything the images need is source plus the lockfile;
+# installed modules, build output, local secrets, uploads and agent worktrees never enter the context.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/coverage
+**/*.tsbuildinfo
+**/test-results
+**/playwright-report
+**/blob-report
+.git
+.github
+.claude
+.env
+.env.*
+!.env.example
+infra/production.env
+infra/certs
+infra/.smoke
+var
+third-party
+*.log
+**/*-findings*.json
+Dockerfile
+.dockerignore

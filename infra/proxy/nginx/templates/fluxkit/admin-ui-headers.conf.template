@@ -1,0 +1,10 @@
+# The /admin-ui response headers: copies of apps/admin/security-headers.ts (ADR 0027 decision 3), kept in sync by
+# apps/admin/edge-proxy-headers.spec.ts. A location with its own add_header inherits NONE from the server, so HSTS is
+# repeated here. FLUXKIT_ADMIN_IMG_SRC is " https://<host>" per STOREFRONT_IMAGE_HOSTS entry (16-fluxkit-env.envsh).
+add_header Strict-Transport-Security "max-age=31536000" always;
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:${FLUXKIT_ADMIN_IMG_SRC}; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;

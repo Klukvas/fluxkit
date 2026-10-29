@@ -26,3 +26,8 @@ nova-post-findings*.json
 resend-findings*.json
 # Monobank spike findings (scripts/spikes/README.md); may describe the token owner's merchant
 monobank-findings*.json
+
+# Production deployment (docs/deployment.md): the real env file and certificates, and the smoke test work directory
+infra/production.env
+infra/certs/
+infra/.smoke/
