@@ -152,7 +152,9 @@ export class AppModule {
         ),
         EmailHandlersModule,
         EmailAdminModule,
-        PrivacyModule.register(options.privacy ?? { tokenSecret: null }),
+        PrivacyModule.register(
+          options.privacy ?? { tokenSecret: null, orderContactRetentionDays: null },
+        ),
         ...options.features.map((feature) => feature.module),
       ],
     };

@@ -1,6 +1,6 @@
 # API: privacy (personal data export, requests)
 
-Personal data of customers and guest buyers: the self-service export and account deletion of a signed-in customer and the admin Privacy area (lookup by email, privacy requests, export, erasure preview, erasure and rejection of a request). Privacy plan steps 6 and 7, ADR 0033 decisions 1, 6, 7, 9, 10 and 13. Source of truth for routes and schemas: `docs/api/openapi.json`; the export document is the contract `docs/contracts/personal-data-export.md`. No feature flag: privacy is core. The retention job (plan step 8) is not built yet. TODO(fluxkit): legal review of the export content and the request periods before an EU launch (plan tasks O1 to O8).
+Personal data of customers and guest buyers: the self-service export and account deletion of a signed-in customer and the admin Privacy area (lookup by email, privacy requests, export, erasure preview, erasure and rejection of a request). Privacy plan steps 6 and 7, ADR 0033 decisions 1, 6, 7, 9, 10 and 13. Source of truth for routes and schemas: `docs/api/openapi.json`; the export document is the contract `docs/contracts/personal-data-export.md`. No feature flag: privacy is core. The retention job is job 12 (`docs/api/jobs.md`), off until `ORDER_CONTACT_RETENTION_DAYS` is set. TODO(fluxkit): legal review of the export content and the request periods before an EU launch (plan tasks O1 to O8).
 
 ## Rules
 

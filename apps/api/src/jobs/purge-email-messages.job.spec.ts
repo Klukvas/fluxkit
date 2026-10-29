@@ -152,15 +152,16 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     expect(left.rows.map((entry) => entry.id)).not.toContain(old);
   });
 
-  it("is job 10 of the tick (job 11, the payment reconcile, runs after it)", async () => {
+  it("is job 10 of the tick (jobs 11 and 12, the payment reconcile and the privacy retention, run after it)", async () => {
     const id = await row("sent", 31 * DAY);
     const reports = await world.get(JobsRunner).runAll(now());
-    expect(reports.map((report) => report.name).slice(-3)).toEqual([
+    expect(reports.map((report) => report.name).slice(-4)).toEqual([
       "send-emails",
       "purge-email-messages",
       "reconcile-payments",
+      "anonymise-orders",
     ]);
-    expect(reports.at(-2)).toMatchObject({ ok: true, result: { deleted: 1 } });
+    expect(reports.at(-3)).toMatchObject({ ok: true, result: { deleted: 1 } });
     expect(await exists(id)).toBe(false);
   });
 });

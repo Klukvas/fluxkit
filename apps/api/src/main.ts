@@ -4,6 +4,7 @@ import { SwaggerModule } from "@nestjs/swagger";
 import { buildOpenApiDocument, createApp } from "./app.factory.js";
 import { emailProviderStartupWarning, storefrontUrlStartupWarning } from "./email/auth/index.js";
 import { prepareDefaultMediaDirectory } from "./media/media-directory.js";
+import { retentionStartupWarning } from "./privacy/privacy-config.js";
 
 async function bootstrap(): Promise<void> {
   const env = loadEnv(process.env);
@@ -27,6 +28,13 @@ async function bootstrap(): Promise<void> {
     if (warning !== undefined) {
       new Logger("EmailDelivery").warn(warning);
     }
+  }
+  const retentionWarning = retentionStartupWarning(
+    env.orderContactRetentionDays,
+    process.env["NODE_ENV"],
+  );
+  if (retentionWarning !== undefined) {
+    new Logger("Privacy").warn(retentionWarning);
   }
   SwaggerModule.setup("docs", app, buildOpenApiDocument(app));
   await app.listen(env.port);

@@ -7,6 +7,18 @@ export const PRIVACY_CONFIG = Symbol("PRIVACY_CONFIG");
 export interface PrivacyConfig {
   /** `ORDER_TOKEN_SECRET`: keys the HMAC of a subject's email (its own label, ADR 0033 decision 9). */
   readonly tokenSecret: string | null;
+  /** `ORDER_CONTACT_RETENTION_DAYS` (ADR 0033 decision 8); null keeps job 12 off. */
+  readonly orderContactRetentionDays: number | null;
+}
+
+/** The startup warning of a production API without a retention period (ADR 0033 decision 8), or undefined. */
+export function retentionStartupWarning(
+  orderContactRetentionDays: number | undefined,
+  nodeEnv: string | undefined,
+): string | undefined {
+  return nodeEnv === "production" && orderContactRetentionDays === undefined
+    ? "Order contact data is kept without a retention period: ORDER_CONTACT_RETENTION_DAYS is not set, so job 12 (anonymise-orders) is off."
+    : undefined;
 }
 
 /** The label of the third use of `ORDER_TOKEN_SECRET` (after the guest order token and the auth tokens). */

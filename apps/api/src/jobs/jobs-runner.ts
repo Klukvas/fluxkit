@@ -25,6 +25,9 @@ import { sendEmails } from "./send-emails.job.js";
 import { purgeEmailMessages } from "./purge-email-messages.job.js";
 import { PaymentReconcileService } from "../payments/payment-reconcile.service.js";
 import { reconcilePayments } from "./reconcile-payments.job.js";
+import { PRIVACY_CONFIG, type PrivacyConfig } from "../privacy/privacy-config.js";
+import { PrivacyRetentionService } from "../privacy/retention/privacy-retention.service.js";
+import { anonymiseOrders } from "./anonymise-orders.job.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
 export const JOB_NAMES = [
@@ -39,6 +42,7 @@ export const JOB_NAMES = [
   "send-emails",
   "purge-email-messages",
   "reconcile-payments",
+  "anonymise-orders",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -69,6 +73,8 @@ export class JobsRunner {
     @Inject(EmailSender) private readonly emailSender: EmailSender,
     @Inject(EmailOutboxRepository) private readonly emailOutbox: EmailOutboxRepository,
     @Inject(PaymentReconcileService) private readonly paymentReconcile: PaymentReconcileService,
+    @Inject(PrivacyRetentionService) private readonly privacyRetention: PrivacyRetentionService,
+    @Inject(PRIVACY_CONFIG) private readonly privacyConfig: PrivacyConfig,
     @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
   ) {
     this.leases = pgEventLeaseSource(databaseUrl);
@@ -83,7 +89,9 @@ export class JobsRunner {
    * too, after the dispatcher so a mail a handler enqueued goes out in the same tick; latency-critical auth mail does not
    * wait for it, the request makes an immediate attempt), the mail purge of job 10 and, last, the payment reconcile of job 11
    * (provider calls too: after everything else, so a slow payment provider delays no mail; a fact it applies may write
-   * `order.paid`, delivered by the next tick, and a deferral of job 1 made its attempts due for this run). Every job gets its
+   * `order.paid`, delivered by the next tick, and a deferral of job 1 made its attempts due for this run), and after it job 12
+   * (`anonymise-orders`, ADR 0033: off without `ORDER_CONTACT_RETENTION_DAYS`; destructive, so it runs last and never
+   * delays anything time-critical). Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -154,6 +162,16 @@ export class JobsRunner {
     );
     await run("reconcile-payments", (budget) =>
       reconcilePayments({ reconcile: this.paymentReconcile }, now, { budget }),
+    );
+    await run("anonymise-orders", (budget) =>
+      anonymiseOrders(
+        {
+          retention: this.privacyRetention,
+          retentionDays: this.privacyConfig.orderContactRetentionDays,
+        },
+        now,
+        { budget },
+      ),
     );
     return reports;
   }
