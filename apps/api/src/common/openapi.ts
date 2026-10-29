@@ -10,7 +10,12 @@ import {
   type ApiResponseOptions,
   type OpenAPIObject,
 } from "@nestjs/swagger";
-import { PROVIDER_FAILURE_REASONS, type ProviderFailureReason } from "@fluxkit/core";
+import {
+  PROVIDER_FAILURE_REASONS,
+  SHOPPER_PAYMENT_STATUSES,
+  type ProviderFailureReason,
+  type ShopperPaymentStatus,
+} from "@fluxkit/core";
 import { z } from "zod";
 import { cartSchema, type CartResponse } from "../cart/cart.schemas.js";
 import {
@@ -123,6 +128,14 @@ export class ProblemDetailsDoc {
     enum: [...PROVIDER_FAILURE_REASONS],
   })
   reason?: ProviderFailureReason;
+  // Placeholder: `documentStoreContract` replaces it with `paymentProblemSchema` (as `cart` above).
+  @ApiPropertyOptional({
+    description:
+      "Only on `payment_provider_unavailable` of the store create routes: the attempt (`paymentId`, its shopper `status`) and whether a new attempt is accepted (`canRetry`). With `canRetry` false the provider's answer was lost: wait (`Retry-After`) and read the status instead of starting another attempt.",
+    type: "object",
+    properties: {},
+  })
+  payment?: { paymentId: string; status: ShopperPaymentStatus; canRetry: boolean };
   @ApiPropertyOptional({
     description:
       "Only on a carrier failure of a shipment route: the raw carrier codes (never message text); may be empty.",
@@ -318,10 +331,30 @@ function documentShippingProblem(document: OpenAPIObject): void {
   };
 }
 
+/** The `payment` of `payment_provider_unavailable` (store create routes, ADR 0032): what the shopper may do next. */
+export const paymentProblemSchema = z.object({
+  paymentId: z.string().meta({ format: "uuid" }),
+  status: z.enum(SHOPPER_PAYMENT_STATUSES),
+  canRetry: z.boolean(),
+});
+
+function documentPaymentProblem(document: OpenAPIObject): void {
+  const problem = document.components?.schemas?.["ProblemDetailsDoc"];
+  if (problem === undefined || "$ref" in problem || problem.properties?.["payment"] === undefined) {
+    throw new Error("ProblemDetailsDoc.payment is missing from the OpenAPI document");
+  }
+  const placeholder = problem.properties["payment"];
+  problem.properties["payment"] = {
+    ...zodToOpenApiSchema(paymentProblemSchema, "output"),
+    ...("description" in placeholder ? { description: placeholder.description } : {}),
+  };
+}
+
 /** Finishes the generated document with what decorators cannot say: the store contract (`docs/contracts/api.md`). */
 export function documentStoreContract(document: OpenAPIObject): OpenAPIObject {
   documentStoreCsrf(document);
   documentCartProblem(document);
   documentShippingProblem(document);
+  documentPaymentProblem(document);
   return document;
 }

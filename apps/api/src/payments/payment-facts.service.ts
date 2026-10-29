@@ -53,6 +53,12 @@ export interface ApplyFactInput {
    * is still unpaid after its end is closed (`awaiting_customer` -> `invalidated`, `create_unknown` -> `failed`).
    */
   readonly polledPaymentId?: string;
+  /**
+   * An on-demand status read of exactly this attempt (the store status routes, the admin resync): the fact is applied
+   * to this attempt (never looked up by the fact's ids), like a webhook it leaves job 11's schedule alone unless the
+   * status changes. Not together with `polledPaymentId`.
+   */
+  readonly readPaymentId?: string;
   /** Statement and lock timeouts of the transaction (job 11 passes the job limits). */
   readonly limits?: JobLimits;
 }
@@ -131,10 +137,14 @@ export class PaymentFactsService {
     if (!isProviderPaymentFact(input.fact)) {
       throw new RangeError("applyProviderFact needs a well-formed provider fact");
     }
+    if (input.polledPaymentId !== undefined && input.readPaymentId !== undefined) {
+      throw new RangeError("A fact is either job 11's read or an on-demand read, not both");
+    }
+    const readId = input.polledPaymentId ?? input.readPaymentId;
     const attempt =
-      input.polledPaymentId === undefined
+      readId === undefined
         ? await this.findAttempt(input.providerCode, input.fact)
-        : await this.payments.findById(this.database, input.polledPaymentId);
+        : await this.payments.findById(this.database, readId);
     if (attempt === undefined) {
       return { kind: "unknown_attempt" };
     }

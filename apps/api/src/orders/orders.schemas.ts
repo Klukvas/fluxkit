@@ -3,6 +3,15 @@ import {
   MAX_AMOUNT,
   MAX_LINE_QUANTITY,
   ORDER_STATUSES,
+  PAYMENT_ATTENTION_CODES,
+  PAYMENT_CREATED_BY,
+  PAYMENT_EVENT_SOURCES,
+  PAYMENT_ORDER_OUTCOMES,
+  PAYMENT_STATUSES,
+  REFUND_REASONS,
+  REFUND_STATUSES,
+  SHOPPER_PAYMENT_FAILURE_CATEGORIES,
+  SHOPPER_PAYMENT_STATUSES,
   PICKUP_POINT_KINDS,
   SHIPMENT_ACTORS,
   SHIPMENT_PAYERS,
@@ -244,6 +253,128 @@ export const adminShipmentSchema = z.object({
   ),
 });
 
+export const adminPaymentRefundSchema = z.object({
+  id: uuidSchema.meta({ description: "Also the idempotency reference sent to the provider." }),
+  amount: moneySchema,
+  status: z.enum(REFUND_STATUSES).meta({
+    description:
+      "`requested`: not sent yet (or throttled; the reconcile job sends it). `unknown`: the provider's answer was lost; settled from the provider's refund list, never sent again.",
+  }),
+  reason: z.enum(REFUND_REASONS),
+  note: z
+    .string()
+    .nullable()
+    .meta({ description: "The admin's note; null for an automatic refund." }),
+  actorAdminId: uuidSchema.nullable(),
+  failureCode: z
+    .string()
+    .nullable()
+    .meta({ description: "The provider's code of a failed refund, never text." }),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+});
+
+export const adminPaymentHistorySchema = z.object({
+  source: z.enum(PAYMENT_EVENT_SOURCES),
+  fromStatus: z.enum(PAYMENT_STATUSES).nullable(),
+  toStatus: z.enum(PAYMENT_STATUSES).nullable(),
+  providerStatus: z.string().nullable().meta({ description: "The provider's raw status word." }),
+  providerModifiedAt: timestampSchema.nullable(),
+  applied: z.boolean().meta({
+    description:
+      "False for a fact that was older than the current state, did not bind or changed nothing.",
+  }),
+  failureCode: z.string().nullable(),
+  actorAdminId: uuidSchema.nullable(),
+  action: z.enum(["attention_cleared"]).nullable().meta({
+    description: "An admin action without a status change: `attention_cleared`; null otherwise.",
+  }),
+  at: timestampSchema,
+});
+
+export const adminPaymentSchema = z.object({
+  id: uuidSchema,
+  providerCode: z.string(),
+  providerPaymentId: z.string().nullable().meta({
+    description: "The provider's invoice id; null until the provider answered the create.",
+  }),
+  status: z.enum(PAYMENT_STATUSES),
+  amount: moneySchema,
+  finalAmount: moneySchema.nullable(),
+  refundedAmount: moneySchema.meta({ description: "The sum of the succeeded refunds." }),
+  refundableAmount: moneySchema.meta({
+    description:
+      "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0.",
+  }),
+  providerStatus: z.string().nullable(),
+  providerModifiedAt: timestampSchema.nullable(),
+  failureCode: z
+    .string()
+    .nullable()
+    .meta({ description: "A provider or outcome code, never text." }),
+  orderOutcome: z.enum(PAYMENT_ORDER_OUTCOMES).nullable(),
+  needsAttention: z.boolean(),
+  attentionCode: z
+    .enum(PAYMENT_ATTENTION_CODES)
+    .nullable()
+    .meta({ description: "Kept after an admin cleared the item." }),
+  card: z
+    .object({ system: z.string(), last4: z.string() })
+    .nullable()
+    .meta({ description: "The card system and the last four digits only." }),
+  createdBy: z.enum(PAYMENT_CREATED_BY),
+  expiresAt: timestampSchema.meta({ description: "The end of the provider's invoice." }),
+  createdAt: timestampSchema,
+  updatedAt: timestampSchema,
+  nextCheckAt: timestampSchema.nullable().meta({
+    description: "When the reconcile job reads the provider next; null when it does not.",
+  }),
+  refunds: z.array(adminPaymentRefundSchema),
+  history: z.array(adminPaymentHistorySchema).meta({
+    description:
+      "Status changes, provider facts and admin actions, oldest first (internal bookkeeping rows are left out).",
+  }),
+});
+
+/** The shopper's view of one payment attempt (ADR 0032 decision 6): a small status set, never provider data. */
+export const shopperPaymentStatusSchema = z.enum(SHOPPER_PAYMENT_STATUSES).meta({
+  description:
+    "`waiting`: the provider's page is open; `processing`: the provider (or our create call) is still working, the order updates by itself; `paid`; `failed` (see `failureCategory`); `expired`: the invoice ended or a newer attempt replaced it.",
+});
+
+export const shopperPaymentFailureCategorySchema = z
+  .enum(SHOPPER_PAYMENT_FAILURE_CATEGORIES)
+  .nullable()
+  .meta({
+    description:
+      "Only for `failed` and `expired`: `declined` (the provider reported a failed payment), `expired`, `technical` (no invoice could be made), `not_accepted` (the money was taken but the order could not take it: it is refunded or the shop settles it).",
+  });
+
+/** The `payment` member of the store order views (ADR 0032 decision 18). */
+export const storeOrderPaymentSchema = z.object({
+  canPay: z.boolean().meta({
+    description:
+      "Whether `POST .../payments` would start a new attempt now (the order awaits payment, an online provider takes its currency, no payment is in progress, enough time is left).",
+  }),
+  providers: z.array(z.string()).meta({
+    description:
+      "The enabled online payment providers that take the order currency; empty when online payment is off.",
+  }),
+  latest: z
+    .object({
+      paymentId: uuidSchema,
+      status: shopperPaymentStatusSchema,
+      failureCategory: shopperPaymentFailureCategorySchema,
+      expiresAt: timestampSchema.meta({ description: "The end of the provider's invoice." }),
+      redirectUrl: z.string().nullable().meta({
+        description:
+          "The provider's payment page while the status is `waiting` (continue the payment there); null otherwise.",
+      }),
+    })
+    .nullable()
+    .meta({ description: "The newest payment attempt of the order; null when none was made." }),
+});
+
 export const storeOrderItemSchema = z.object({
   sku: z.string(),
   productTitle: z.string(),
@@ -298,6 +429,7 @@ export const storeOrderSchema = z.object({
       "The carrier waybills of the order that have a number, oldest first; empty until the shop created one.",
   }),
   history: z.array(z.object({ status: statusSchema, at: timestampSchema })),
+  payment: storeOrderPaymentSchema,
 });
 
 export const storeOrderSummarySchema = z.object({
@@ -325,6 +457,9 @@ export const checkoutResponseSchema = z.object({
 });
 
 export type StoreOrder = z.output<typeof storeOrderSchema>;
+export type StoreOrderPayment = z.output<typeof storeOrderPaymentSchema>;
+export type AdminPayment = z.output<typeof adminPaymentSchema>;
+export type AdminPaymentRefund = z.output<typeof adminPaymentRefundSchema>;
 export type StoreOrderSummary = z.output<typeof storeOrderSummarySchema>;
 export type StoreOrderPage = z.output<typeof storeOrderPageSchema>;
 export type CheckoutResponse = z.output<typeof checkoutResponseSchema>;

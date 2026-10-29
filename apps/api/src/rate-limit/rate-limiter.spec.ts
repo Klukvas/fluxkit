@@ -24,11 +24,15 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       emailTest: { maxAttempts: 5, windowMinutes: 60 },
       emailResend: { maxAttempts: 30, windowMinutes: 60 },
       paymentWebhook: { maxAttempts: 300, windowMinutes: 1 },
+      paymentCreate: { maxAttempts: 10, windowMinutes: 10 },
+      paymentStatus: { maxAttempts: 60, windowMinutes: 10 },
+      paymentRefund: { maxAttempts: 20, windowMinutes: 10 },
+      paymentResync: { maxAttempts: 30, windowMinutes: 10 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
   });
 
-  it("counts every limit per client address, except mediaUpload, shippingCheck, emailTest and emailResend (per admin user, ADR 0028, ADR 0029, ADR 0031) and the per-email and per-customer limits of ADR 0031 (counted by their service)", () => {
+  it("counts every limit per client address, except mediaUpload, shippingCheck, emailTest, emailResend, paymentRefund and paymentResync (per admin user, ADR 0028, ADR 0029, ADR 0031, ADR 0032) and the per-email and per-customer limits of ADR 0031 (counted by their service)", () => {
     expect(RATE_LIMIT_SUBJECTS).toEqual({
       login: "clientAddress",
       registration: "clientAddress",
@@ -47,6 +51,10 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       emailTest: "adminUser",
       emailResend: "adminUser",
       paymentWebhook: "clientAddress",
+      paymentCreate: "clientAddress",
+      paymentStatus: "clientAddress",
+      paymentRefund: "adminUser",
+      paymentResync: "adminUser",
     });
     expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });

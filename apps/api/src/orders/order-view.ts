@@ -11,6 +11,10 @@ import { z } from "zod";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import type { DbExecutor } from "../common/transaction.js";
 import { StoreService } from "../catalog/store/store.service.js";
+import {
+  StorePaymentViews,
+  type StoreOrderPaymentView,
+} from "../payments/store/store-payment-views.js";
 import { toStoreShipments } from "../shipping/shipments/shipment-view.js";
 import {
   OrdersRepository,
@@ -111,6 +115,7 @@ export function toStoreOrder(
   adjustments: readonly OrderAdjustmentRow[],
   shipping: OrderShippingRow | undefined,
   shipments: readonly ShipmentRow[],
+  payment: StoreOrderPaymentView,
   locale: StoreLocale,
 ): StoreOrder {
   return {
@@ -149,6 +154,11 @@ export function toStoreOrder(
       status: row.toStatus as StoreOrder["status"],
       at: row.createdAt.toISOString(),
     })),
+    payment: {
+      canPay: payment.canPay,
+      providers: [...payment.providers],
+      latest: payment.latest === null ? null : { ...payment.latest },
+    },
   };
 }
 
@@ -163,13 +173,14 @@ export function toStoreOrderSummary(order: OrderRow, itemCount: number): StoreOr
   };
 }
 
-/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments, shipping, shipments) and builds it. */
+/** Loads what the store view needs in a fixed number of statements (items, journal, adjustments, shipping, shipments, payment attempts) and builds it. */
 @Injectable()
 export class OrderViewService {
   constructor(
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
     @Inject(StoreService) private readonly store: StoreService,
     @Inject(LOCALE_CONFIG) private readonly config: LocaleConfig,
+    @Inject(StorePaymentViews) private readonly payments: StorePaymentViews,
   ) {}
 
   /**
@@ -192,7 +203,8 @@ export class OrderViewService {
     const adjustments = await this.orders.listAdjustments(db, [order.id]);
     const [shipping] = await this.orders.listShipping(db, [order.id]);
     const shipments = await this.orders.listShipments(db, [order.id]);
-    return toStoreOrder(order, items, history, adjustments, shipping, shipments, locale);
+    const payment = await this.payments.orderPayment(db, order);
+    return toStoreOrder(order, items, history, adjustments, shipping, shipments, payment, locale);
   }
 
   async summaries(db: DbExecutor, rows: readonly OrderRow[]): Promise<StoreOrderSummary[]> {

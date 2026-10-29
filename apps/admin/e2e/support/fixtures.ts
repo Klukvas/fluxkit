@@ -214,7 +214,7 @@ export class Guard {
   private recordCsp(text: string): void {
     const image =
       /^img-src blocked (\S+)$/.exec(text) ??
-      /^Refused to load the image '([^']+)' because it violates the following Content Security Policy directive: "img-src 'self' data:"/.exec(
+      /^(?:Refused to load|Loading) the image '([^']+)' (?:because it )?violates the following Content Security Policy directive: "img-src 'self' data:"/.exec(
         text,
       );
     if (image?.[1] !== undefined) {

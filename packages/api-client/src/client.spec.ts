@@ -86,6 +86,20 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
   listAccountOrders: (c) => c.listAccountOrders(),
   getAccountOrder: (c) => c.getAccountOrder("FK-1"),
   cancelAccountOrder: (c) => c.cancelAccountOrder("FK-1"),
+  createOrderPayment: (c) =>
+    c.createOrderPayment(
+      { number: "FK-1", accessToken: "tok" },
+      { idempotencyKey: "4f1c1f6e-7a52-4a8a-8c7e-0d4f3a1b2c3d" },
+    ),
+  getOrderPaymentStatus: (c) =>
+    c.getOrderPaymentStatus({ number: "FK-1", accessToken: "tok", paymentId: VARIANT_ID }),
+  createAccountOrderPayment: (c) =>
+    c.createAccountOrderPayment(
+      "FK-1",
+      {},
+      { idempotencyKey: "5f1c1f6e-7a52-4a8a-8c7e-0d4f3a1b2c3d" },
+    ),
+  getAccountOrderPayment: (c) => c.getAccountOrderPayment("FK-1", VARIANT_ID),
   listCategories: (c) => c.listCategories(),
   getConfig: (c) => c.getConfig(),
   listProducts: (c) => c.listProducts(),
@@ -136,7 +150,7 @@ describe("every store operation", () => {
       expect(init.headers.get("X-Fluxkit-CSRF")).toBe(isWrite ? "1" : null);
       expect(init.headers.get("Content-Type")).toBe(operation.hasBody ? "application/json" : null);
       expect(init.body === undefined).toBe(!operation.hasBody);
-      expect(init.headers.has("Idempotency-Key")).toBe(name === "checkout");
+      expect(init.headers.has("Idempotency-Key")).toBe(operation.requiresIdempotencyKey);
     },
   );
 
@@ -218,6 +232,71 @@ describe("URLs", () => {
       InvalidRequestError,
     );
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("payment creates", () => {
+  const KEY = "0b4c5c2e-1d2f-4c0e-9a55-3f7f2f1d9a10";
+
+  it("send the Idempotency-Key and only the documented body (never an amount)", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({}, 201));
+    const client = createStoreClient({ baseUrl: "", fetch });
+    await client.createOrderPayment(
+      { number: "FK-1", accessToken: "tok", locale: "en" },
+      { idempotencyKey: KEY },
+    );
+    await client.createAccountOrderPayment("FK 1/2", {}, { idempotencyKey: KEY });
+    const [guest, account] = calls as Recorded[];
+    expect(guest?.url).toBe("/store/orders/payments");
+    expect(guest?.init.headers.get("Idempotency-Key")).toBe(KEY);
+    expect(JSON.parse(String(guest?.init.body))).toEqual({
+      number: "FK-1",
+      accessToken: "tok",
+      locale: "en",
+    });
+    expect(account?.url).toBe("/store/account/orders/FK%201%2F2/payments");
+    expect(account?.init.headers.get("Idempotency-Key")).toBe(KEY);
+  });
+
+  it("refuse a missing or unsafe key before sending anything", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({}, 201));
+    const client = createStoreClient({ baseUrl: "", fetch });
+    for (const idempotencyKey of [undefined, "", "a b", "x".repeat(300)]) {
+      await expect(
+        client.createOrderPayment(
+          { number: "FK-1", accessToken: "tok" },
+          { idempotencyKey: idempotencyKey as string },
+        ),
+      ).rejects.toBeInstanceOf(InvalidRequestError);
+      await expect(
+        client.createAccountOrderPayment("FK-1", {}, { idempotencyKey: idempotencyKey as string }),
+      ).rejects.toBeInstanceOf(InvalidRequestError);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("return the typed payment member and Retry-After of payment_provider_unavailable", async () => {
+    const { fetch } = fakeFetch(() =>
+      problemResponse(
+        503,
+        {
+          code: "payment_provider_unavailable",
+          payment: { paymentId: VARIANT_ID, status: "processing", canRetry: false },
+        },
+        { "Retry-After": "120" },
+      ),
+    );
+    const result = await createStoreClient({ baseUrl: "", fetch }).createOrderPayment(
+      { number: "FK-1", accessToken: "tok" },
+      { idempotencyKey: KEY },
+    );
+    if (result.ok) throw new Error("unreachable");
+    expect(result.retryAfter).toBe("120");
+    expect(result.problem.payment).toEqual({
+      paymentId: VARIANT_ID,
+      status: "processing",
+      canRetry: false,
+    });
   });
 });
 

@@ -19,6 +19,9 @@ import type {
   VerifyEmailBody,
   CheckoutBody,
   CheckoutResult,
+  CreateAccountOrderPaymentBody,
+  CreatedPayment,
+  CreateOrderPaymentBody,
   Customer,
   LoginBody,
   Money,
@@ -26,6 +29,9 @@ import type {
   OrderShipment,
   OrderAccessBody,
   OrderList,
+  OrderPayment,
+  OrderPaymentStatusBody,
+  PaymentState,
   ProblemDetails,
   ProductDetail,
   ProductList,
@@ -279,6 +285,51 @@ const orderShipment: Shape<OrderShipment> = {
   },
 };
 
+const shopperPaymentStatus = {
+  enum: ["waiting", "processing", "paid", "failed", "expired"],
+} as const;
+const shopperFailureCategory = {
+  nullable: { enum: ["declined", "expired", "technical", "not_accepted"] },
+} as const;
+
+const orderPayment: Shape<OrderPayment> = {
+  object: {
+    canPay: "boolean",
+    providers: { array: "string" },
+    latest: {
+      nullable: {
+        object: {
+          paymentId: "string",
+          status: shopperPaymentStatus,
+          failureCategory: shopperFailureCategory,
+          expiresAt: "string",
+          redirectUrl: { nullable: "string" },
+        },
+      },
+    },
+  },
+};
+
+const createdPayment: Shape<CreatedPayment> = {
+  object: {
+    paymentId: "string",
+    status: shopperPaymentStatus,
+    redirectUrl: { nullable: "string" },
+    expiresAt: "string",
+  },
+};
+
+const paymentState: Shape<PaymentState> = {
+  object: {
+    paymentId: "string",
+    status: shopperPaymentStatus,
+    failureCategory: shopperFailureCategory,
+    expiresAt: "string",
+    orderStatus,
+    canRetry: "boolean",
+  },
+};
+
 const order: Shape<Order> = {
   object: {
     number: "string",
@@ -325,6 +376,7 @@ const order: Shape<Order> = {
     shipping: orderShipping,
     shipments: { array: orderShipment },
     history: { array: { object: { status: orderStatus, at: "string" } } },
+    payment: orderPayment,
   },
 };
 
@@ -517,6 +569,7 @@ const problemDetails: Shape<ProblemDetails> = {
         "shipping_not_applicable",
         "shipping_changed",
         "shipping_provider_unavailable",
+        "payment_provider_unavailable",
       ],
     },
     detail: "string",
@@ -530,6 +583,11 @@ const problemDetails: Shape<ProblemDetails> = {
       optional: { enum: ["unavailable", "rejected", "invalid_credentials", "not_supported"] },
     },
     providerCodes: { optional: { array: "string" } },
+    payment: {
+      optional: {
+        object: { paymentId: "string", status: shopperPaymentStatus, canRetry: "boolean" },
+      },
+    },
   },
 };
 
@@ -586,6 +644,20 @@ const checkoutBody: Shape<CheckoutBody> = {
 const orderAccessBody: Shape<OrderAccessBody> = {
   object: { number: "string", accessToken: "string" },
 };
+const createOrderPaymentBody: Shape<CreateOrderPaymentBody> = {
+  object: {
+    number: "string",
+    accessToken: "string",
+    provider: { optional: "string" },
+    locale: { optional: "string" },
+  },
+};
+const createAccountOrderPaymentBody: Shape<CreateAccountOrderPaymentBody> = {
+  object: { provider: { optional: "string" }, locale: { optional: "string" } },
+};
+const orderPaymentStatusBody: Shape<OrderPaymentStatusBody> = {
+  object: { number: "string", accessToken: "string", paymentId: "string" },
+};
 
 /** Success body per operation, typed by what the client function really returns. */
 type DataOf<N extends OperationName> = Extract<
@@ -616,6 +688,10 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   listAccountOrders: orderList,
   getAccountOrder: order,
   cancelAccountOrder: order,
+  createOrderPayment: createdPayment,
+  getOrderPaymentStatus: paymentState,
+  createAccountOrderPayment: createdPayment,
+  getAccountOrderPayment: paymentState,
   listCategories: categoryList,
   getConfig: storeConfig,
   listProducts: productList,
@@ -649,6 +725,10 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   listAccountOrders: null,
   getAccountOrder: null,
   cancelAccountOrder: null,
+  createOrderPayment: createOrderPaymentBody,
+  getOrderPaymentStatus: orderPaymentStatusBody,
+  createAccountOrderPayment: createAccountOrderPaymentBody,
+  getAccountOrderPayment: null,
   listCategories: null,
   getConfig: null,
   listProducts: null,

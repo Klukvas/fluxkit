@@ -136,6 +136,7 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
           "number",
           "paidAt",
           "paymentReference",
+          "payments",
           "placedAt",
           "shipments",
           "shipping",

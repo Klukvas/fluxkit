@@ -1,6 +1,7 @@
 export {
   createStoreClient,
   type CheckoutOptions,
+  type CreatePaymentOptions,
   type ListOrdersOptions,
   type ListProductsOptions,
   type LocaleOptions,
@@ -18,10 +19,12 @@ export {
   type AdminListCustomersOptions,
   type AdminListEmailMessagesOptions,
   type AdminListOrdersOptions,
+  type AdminListPaymentsOptions,
   type AdminListProductsOptions,
   type AdminListReservationsOptions,
   type AdminPageOptions,
   type AdminPreviewEmailTemplateOptions,
+  type AdminRefundOptions,
   type AdminResult,
 } from "./admin-client.js";
 export type { CallOptions, FetchLike } from "./transport.js";

@@ -27,6 +27,7 @@
   "errors.code.shipping_not_applicable": "Замовлення не містить товарів для доставки.",
   "errors.code.shipping_changed": "Вартість або доступність доставки змінилася.",
   "errors.code.shipping_provider_unavailable": "Служба доставки зараз недоступна. Спробуйте пізніше.",
+  "errors.code.payment_provider_unavailable": "Платіжний сервіс зараз недоступний. Спробуйте пізніше.",
   "errors.reason.required": "Це поле обов'язкове.",
   "errors.reason.unknown_field": "Запит містить поле, яке сервер не приймає.",
   "errors.reason.invalid_type": "Значення має неправильний тип.",

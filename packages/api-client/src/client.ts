@@ -11,11 +11,16 @@ import type {
   ChangePasswordBody,
   CheckoutBody,
   CheckoutResult,
+  CreateAccountOrderPaymentBody,
+  CreatedPayment,
+  CreateOrderPaymentBody,
   LoginBody,
   Order,
   OrderAccessBody,
   OrderList,
+  OrderPaymentStatusBody,
   PasswordResetAccepted,
+  PaymentState,
   PasswordResetConfirmBody,
   PasswordResetRequestBody,
   ProductDetail,
@@ -82,6 +87,11 @@ export interface CheckoutOptions extends CallOptions {
   idempotencyKey: string;
 }
 
+export interface CreatePaymentOptions extends CallOptions {
+  /** One key per payment attempt the shopper starts; reuse it only to repeat the same request. */
+  idempotencyKey: string;
+}
+
 type Result<T> = Promise<StoreResult<T>>;
 
 /** One function per operation under `/store` in `docs/api/openapi.json`. Results are values; broken answers throw. */
@@ -125,6 +135,29 @@ export interface StoreClient {
   listAccountOrders(options?: ListOrdersOptions): Result<OrderList>;
   getAccountOrder(number: string, options?: LocaleOptions): Result<Order>;
   cancelAccountOrder(number: string, options?: LocaleOptions): Result<Order>;
+  /**
+   * Starts the online payment of a guest order (201; 200 for a replay of the key). The server takes the amount from the
+   * order. On `503 payment_provider_unavailable` read `problem.payment.canRetry`: false means wait, never start another.
+   * Refuses (throws) a missing or empty `idempotencyKey` before anything is sent.
+   */
+  createOrderPayment(
+    body: CreateOrderPaymentBody,
+    options: CreatePaymentOptions,
+  ): Result<CreatedPayment>;
+  /** The state of a guest order's attempt for the return page (the token travels in the POST body only). */
+  getOrderPaymentStatus(body: OrderPaymentStatusBody, options?: CallOptions): Result<PaymentState>;
+  /** As `createOrderPayment` for a signed-in customer's own order. */
+  createAccountOrderPayment(
+    number: string,
+    body: CreateAccountOrderPaymentBody,
+    options: CreatePaymentOptions,
+  ): Result<CreatedPayment>;
+  /** As `getOrderPaymentStatus` for a signed-in customer's own order. */
+  getAccountOrderPayment(
+    number: string,
+    paymentId: string,
+    options?: CallOptions,
+  ): Result<PaymentState>;
   listCategories(options?: LocaleOptions): Result<CategoryList>;
   getConfig(options?: CallOptions): Result<StoreConfig>;
   listProducts(options?: ListProductsOptions): Result<ProductList>;
@@ -155,6 +188,17 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     return send<T>(OPERATIONS[name], parts);
   }
 
+  /** The `Idempotency-Key` of a write that needs one, checked before anything is sent. */
+  function idempotencyKeyOf(options: unknown, route: string): string {
+    const key: unknown = (options as { idempotencyKey?: unknown } | undefined)?.idempotencyKey;
+    if (typeof key !== "string" || !IDEMPOTENCY_KEY.test(key)) {
+      throw new InvalidRequestError(
+        `${route} needs an idempotencyKey (1 to 255 visible ASCII characters).`,
+      );
+    }
+    return key;
+  }
+
   return {
     register: (body, opts) => call("register", { body, options: opts }),
     login: (body, opts) => call("login", { body, options: opts }),
@@ -176,12 +220,7 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
       call("removeCartItem", { pathParams: { variantId }, options: opts }),
     acknowledgeCart: (opts) => call("acknowledgeCart", { options: opts }),
     checkout: async (body, opts) => {
-      const key: unknown = (opts as Partial<CheckoutOptions> | undefined)?.idempotencyKey;
-      if (typeof key !== "string" || !IDEMPOTENCY_KEY.test(key)) {
-        throw new InvalidRequestError(
-          "POST /store/checkout needs an idempotencyKey (1 to 255 visible ASCII characters).",
-        );
-      }
+      const key = idempotencyKeyOf(opts, "POST /store/checkout");
       return call("checkout", { body, headers: { "Idempotency-Key": key }, options: opts });
     },
     lookupOrder: (body, opts) => call("lookupOrder", { body, options: opts }),
@@ -191,6 +230,26 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
       call("getAccountOrder", { pathParams: { number }, options: opts }),
     cancelAccountOrder: (number, opts) =>
       call("cancelAccountOrder", { pathParams: { number }, options: opts }),
+    createOrderPayment: async (body, opts) => {
+      const key = idempotencyKeyOf(opts, "POST /store/orders/payments");
+      return call("createOrderPayment", {
+        body,
+        headers: { "Idempotency-Key": key },
+        options: opts,
+      });
+    },
+    getOrderPaymentStatus: (body, opts) => call("getOrderPaymentStatus", { body, options: opts }),
+    createAccountOrderPayment: async (number, body, opts) => {
+      const key = idempotencyKeyOf(opts, "POST /store/account/orders/{number}/payments");
+      return call("createAccountOrderPayment", {
+        pathParams: { number },
+        body,
+        headers: { "Idempotency-Key": key },
+        options: opts,
+      });
+    },
+    getAccountOrderPayment: (number, paymentId, opts) =>
+      call("getAccountOrderPayment", { pathParams: { number, paymentId }, options: opts }),
     listCategories: (opts) => call("listCategories", { options: opts }),
     getConfig: (opts) => call("getConfig", { options: opts }),
     listProducts: (opts) => call("listProducts", { options: opts }),

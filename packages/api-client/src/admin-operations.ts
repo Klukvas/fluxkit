@@ -32,6 +32,8 @@ export interface AdminOperationSpec {
   query: readonly string[];
   /** `pdf`: the success body is the raw file (`application/pdf`), handed out as a `Blob`; `json` otherwise. */
   responseKind: AdminResponseKind;
+  /** Whether the operation requires the `Idempotency-Key` header (a payment refund). */
+  requiresIdempotencyKey: boolean;
 }
 
 interface OperationRow<
@@ -67,7 +69,12 @@ function operation<
   path: Path,
   successStatuses: Statuses,
   permission: Permission,
-  options: { body: Kind; query?: Query; response?: AdminResponseKind },
+  options: {
+    body: Kind;
+    query?: Query;
+    response?: AdminResponseKind;
+    requiresIdempotencyKey?: boolean;
+  },
 ): OperationRow<Method, Path, Statuses, Permission, Kind, Query>;
 function operation<
   const Method extends HttpMethod,
@@ -87,7 +94,12 @@ function operation(
   path: string,
   successStatuses: readonly number[],
   permission: AdminOperationPermission,
-  options: { body?: AdminBodyKind; query?: readonly string[]; response?: AdminResponseKind } = {},
+  options: {
+    body?: AdminBodyKind;
+    query?: readonly string[];
+    response?: AdminResponseKind;
+    requiresIdempotencyKey?: boolean;
+  } = {},
 ): AdminOperationSpec {
   const bodyKind = options.body ?? "none";
   return {
@@ -99,6 +111,7 @@ function operation(
     bodyKind,
     query: options.query ?? [],
     responseKind: options.response ?? "json",
+    requiresIdempotencyKey: options.requiresIdempotencyKey ?? false,
   };
 }
 
@@ -207,6 +220,33 @@ export const ADMIN_OPERATIONS = {
     { response: "pdf" },
   ),
   markOrderFulfilled: operation("POST", "/admin/orders/{id}/mark-fulfilled", [200], "orders.write"),
+  listOrderPayments: operation("GET", "/admin/orders/{id}/payments", [200], "orders.read"),
+  /**
+   * Moves money: never retried by the client. A replay with the same `Idempotency-Key` and body answers the same refund
+   * (200) without a second provider call; `refund.status` `unknown` is settled by the API, never sent again.
+   */
+  refundPayment: operation(
+    "POST",
+    "/admin/orders/{id}/payments/{paymentId}/refunds",
+    [202, 200],
+    "payments.refund",
+    { body: "json", requiresIdempotencyKey: true },
+  ),
+  resyncPayment: operation(
+    "POST",
+    "/admin/orders/{id}/payments/{paymentId}/resync",
+    [200],
+    "orders.write",
+  ),
+  listPayments: operation("GET", "/admin/payments", [200], "orders.read", {
+    query: ["needsAttention", "limit", "cursor"],
+  }),
+  clearPaymentAttention: operation(
+    "POST",
+    "/admin/payments/{paymentId}/attention/clear",
+    [200],
+    "payments.refund",
+  ),
   createAttribute: operation("POST", "/admin/attributes", [201], "catalog.write", {
     body: "json",
   }),

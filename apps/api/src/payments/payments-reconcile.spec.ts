@@ -360,6 +360,7 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
       await world.notify(invoiceId);
       const ask = (amount: number, key = randomUUID()) =>
         world.refunds.requestAdminRefund({
+          orderId: placed.id,
           paymentId,
           adminId: world.orders.ownerId,
           amount: { amount, currency: "UAH" },
@@ -393,6 +394,7 @@ describe("payments: job 11 reconcile-payments and refunds (real Postgres)", () =
       const { paymentId } = await world.created(placed);
       expect(
         await world.refunds.requestAdminRefund({
+          orderId: placed.id,
           paymentId,
           adminId: null,
           amount: { amount: 1, currency: "UAH" },
