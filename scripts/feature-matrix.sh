@@ -48,7 +48,8 @@
 #                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key.
 #                Then, against the real engine (MEILI_URL, MEILI_MASTER_KEY): create a key scoped to a fresh prefix,
 #                migrate and seed (the catalog writes mark products in the queue), `search:reindex` (builds, swaps,
-#                drains the queue), start the API and find a seeded product with GET /store/search and its suggest.
+#                drains the queue), start the API and find a seeded product with GET /store/search (also by a partial
+#                last word, ADR 0037) and its suggest.
 #                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
@@ -422,6 +423,13 @@ GUARD
     echo "store/search?q=screwdriver -> $results"
     echo "$results" | grep -q '"title":"Demo Screwdriver"' \
       || { echo "expected the seeded screwdriver in the search results" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # A word the shopper did not finish, sent from the results page (Enter): the prefix pass finds it (ADR 0037).
+    partial="$(curl -fsS "http://127.0.0.1:${port}/store/search?q=screw&locale=en")"
+    echo "store/search?q=screw -> $partial"
+    echo "$partial" | grep -q '"title":"Demo Screwdriver"' \
+      || { echo "expected the seeded screwdriver for the partial word 'screw'" >&2; exit 1; }
+    echo "$partial" | grep -q '"relaxed":true' \
+      || { echo "expected the partial word to be answered by the relaxed pass" >&2; exit 1; }
     suggestions="$(curl -fsS "http://127.0.0.1:${port}/store/search/suggest?q=screw&locale=en")"
     echo "store/search/suggest?q=screw -> $suggestions"
     echo "$suggestions" | grep -q '"title":"Demo Screwdriver"' \

@@ -61,12 +61,15 @@ export interface TextQuery {
  * Results page: the original words, the Snowball stems on `stems` and, for Ukrainian, the five-letter prefixes on
  * `stems5`. Every query ends with a space, so the last word is not prefix-matched (spike S1, E8). A stem query that would
  * read exactly like the original words is left out.
+ * Relaxed (the second pass of a results page that found nothing, ADR 0037): the same queries, but the original words end
+ * without the space, so a last word the shopper did not finish ("screw") is prefix-matched. Stems and prefixes keep the
+ * space (the stem of a cut word is no stem), and the set of queries is the strict pass's, so a pass costs the same.
  * Suggest: the words as typed on the text fields only; a half-typed word must not be stemmed.
  */
 export function planTextQueries(
   query: NormalizedSearchQuery,
   locale: string,
-  mode: "results" | "suggest",
+  mode: "results" | "relaxed" | "suggest",
 ): TextQuery[] {
   if (query.words.length === 0) {
     return [];
@@ -75,7 +78,9 @@ export function planTextQueries(
     return [{ role: "original", q: query.text, attributesToSearchOn: SUGGEST_FIELDS }];
   }
   const original = `${query.text} `;
-  const queries: TextQuery[] = [{ role: "original", q: original }];
+  const queries: TextQuery[] = [
+    { role: "original", q: mode === "relaxed" ? query.text : original },
+  ];
   const language = stemLanguageOf(locale);
   if (language === null) {
     return queries;
