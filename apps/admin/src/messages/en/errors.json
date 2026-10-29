@@ -27,6 +27,7 @@
   "errors.code.shipping_not_applicable": "The order has nothing to deliver.",
   "errors.code.shipping_changed": "The delivery price or availability changed.",
   "errors.code.shipping_provider_unavailable": "The delivery service is not available right now. Try again later.",
+  "errors.code.payment_provider_unavailable": "The payment service is not available right now. Try again later.",
   "errors.reason.required": "This field is required.",
   "errors.reason.unknown_field": "The request contains a field the server does not accept.",
   "errors.reason.invalid_type": "This value has the wrong type.",

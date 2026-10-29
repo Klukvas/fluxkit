@@ -112,6 +112,7 @@
   "errors.shipping_not_applicable": "Nothing in your cart needs delivery.",
   "errors.shipping_changed": "The delivery price or availability changed. Check it and confirm again.",
   "errors.shipping_provider_unavailable": "The delivery service is not available right now. Try again later or choose another method.",
+  "errors.payment_provider_unavailable": "The payment service is not available right now. Please try again later.",
   "errors.rule.variant_not_sellable": "This product variant cannot be ordered right now.",
   "errors.rule.quantity_limit": "This quantity is above the limit for one item.",
   "errors.rule.too_many_lines": "The cart has too many different items.",
