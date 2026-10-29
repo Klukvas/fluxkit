@@ -283,6 +283,15 @@ describe("transport failures, statuses and size caps", () => {
 
   it("answers unavailable for a timeout of the caller's signal and of the request's own ceiling", async () => {
     const { provider, http } = providerOn(stub);
+    // A slow authorization must not decide the outcome: an abort while the caller still waits for the JWT is
+    // "aborted" (see below); this test is about an abort of the request itself, so the JWT is cached first.
+    stub.override("authorization", () => ({
+      status: 200,
+      json: { jwt: stubJwt(1, EXP_SECONDS) },
+      delayMs: 100,
+    }));
+    stub.issued.push(stubJwt(1, EXP_SECONDS));
+    await provider.searchCities({ query: "Тест", locale: "uk", limit: 1 }, live());
     stub.override("tracking", () => ({ status: 200, hang: true }));
     const controller = new AbortController();
     setTimeout(() => {
