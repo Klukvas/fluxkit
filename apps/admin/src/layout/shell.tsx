@@ -11,6 +11,7 @@ import { useSession } from "../session/session-context";
 import { NotAllowedView } from "../views/status-views";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
+import { mayOpenRoute } from "./route-gate";
 import { UserMenu } from "./user-menu";
 
 /** What each route object carries for the shell (`router/route-objects.tsx`). */
@@ -107,7 +108,7 @@ export function Shell() {
     .pop();
   useDocumentTitle(handle?.titleKey ?? "notFound.title");
 
-  const allowed = handle === undefined || session.can(handle.permission);
+  const allowed = mayOpenRoute(handle, (permission) => session.can(permission));
   const groups: SideNavGroup[] = visibleNavigation(session.state.me?.permissions ?? null).map(
     (group) => ({
       id: group.id,

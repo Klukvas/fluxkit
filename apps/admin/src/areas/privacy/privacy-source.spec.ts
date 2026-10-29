@@ -62,14 +62,25 @@ describe("privacy area source guards", () => {
     expect(page.match(/<EraseDialog/g)).toHaveLength(1);
     expect(page).toMatch(/onSubmit=\{\(\) => void confirmErase\(\)\}/);
     expect(page.match(/adminClient\.erasePrivacyRequest\(/g)).toHaveLength(1);
+    // The call goes through `attemptErase` (erase-flow.ts, its direction is unit tested in erase-flow.spec.ts), which checks the
+    // typed word first; the page may not call the API for an erasure any other way.
     const confirm = page.slice(page.indexOf("async function confirmErase("));
-    const checkAt = confirm.indexOf("confirmationMatches(typed, t(");
+    const attemptAt = confirm.indexOf("attemptErase({");
     const callAt = confirm.indexOf("adminClient.erasePrivacyRequest(");
-    expect(checkAt).toBeGreaterThan(-1);
-    expect(callAt).toBeGreaterThan(checkAt);
-    // A failed check returns before anything is sent.
-    expect(confirm.slice(checkAt, callAt)).toMatch(/return;/);
+    expect(attemptAt).toBeGreaterThan(-1);
+    expect(callAt).toBeGreaterThan(attemptAt);
+    expect(page.match(/attemptErase\(/g)).toHaveLength(1);
+    expect(confirm).toMatch(/expectedWord: t\("personal\.erase\.word"\)/);
+    expect(confirm).toMatch(
+      /attempt\.kind === "word_mismatch"\) \{\s*setTypedError\([^)]*\);\s*return;/,
+    );
     expect(confirm).toMatch(/confirm: true/);
+    const flow = source("erase-flow.ts");
+    const checkAt = flow.indexOf("!confirmationMatches(input.typed, input.expectedWord)");
+    const sendAt = flow.indexOf("input.send(");
+    expect(checkAt).toBeGreaterThan(-1);
+    expect(sendAt).toBeGreaterThan(checkAt);
+    expect(flow.slice(checkAt, sendAt)).toMatch(/return \{ kind: "word_mismatch" \}/);
   });
 
   it("offers the erase button only after a clean preview of the same address", () => {
