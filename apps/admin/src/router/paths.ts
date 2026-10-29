@@ -27,6 +27,8 @@ export const PATHS = {
   categories: "/catalog/categories",
   categoryNew: "/catalog/categories/new",
   categoryDetail: "/catalog/categories/:id",
+  search: "/catalog/search",
+  searchSynonyms: "/catalog/search/synonyms",
   orders: "/orders",
   orderDetail: "/orders/:id",
   customers: "/customers",
