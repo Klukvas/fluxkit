@@ -73,6 +73,7 @@ describe("customer route walk (default for the store is public; customer routes 
         "GET /store/probe-customer/me",
         "PATCH /store/account/me",
         "POST /store/account/change-password",
+        "POST /store/account/delete",
         "POST /store/account/logout",
         "POST /store/account/verify-email/resend",
         "POST /store/probe-customer/sign-out",

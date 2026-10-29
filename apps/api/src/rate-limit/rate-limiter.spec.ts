@@ -30,6 +30,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       paymentResync: { maxAttempts: 30, windowMinutes: 10 },
       dataExport: { maxAttempts: 5, windowMinutes: 1440 },
       privacyExport: { maxAttempts: 30, windowMinutes: 60 },
+      accountDelete: { maxAttempts: 5, windowMinutes: 60 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
   });
@@ -59,6 +60,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       paymentResync: "adminUser",
       dataExport: "account",
       privacyExport: "adminUser",
+      accountDelete: "account",
     });
     expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });

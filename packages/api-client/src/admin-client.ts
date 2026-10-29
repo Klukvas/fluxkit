@@ -23,7 +23,10 @@ import type {
   AdminEmailMessageList,
   AdminAuditAction,
   AdminAuditEventList,
+  AdminErasurePreview,
   AdminPrivacyLookup,
+  ErasePrivacyRequestBody,
+  RejectPrivacyRequestBody,
   AdminPrivacyLookupBody,
   AdminPrivacyRequest,
   AdminPrivacyRequestList,
@@ -408,6 +411,24 @@ export interface AdminClient {
     options?: CallOptions,
   ): Result<PersonalDataExport>;
 
+  /** Counts and blockers; nothing changes. */
+  previewPrivacyErasure(
+    id: string,
+    body: ExportPrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminErasurePreview>;
+  /** Irreversible. `409 rule_violation` `erasure_blocked` (with `reasons`), `request_closed`, `not_an_erasure_request`. */
+  erasePrivacyRequest(
+    id: string,
+    body: ErasePrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminPrivacyRequest>;
+  rejectPrivacyRequest(
+    id: string,
+    body: RejectPrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminPrivacyRequest>;
+
   // audit log (ADR 0033 decision 9; `users.manage`, owner only)
   listAuditEvents(options?: AdminListAuditEventsOptions): Result<AdminAuditEventList>;
 
@@ -726,6 +747,12 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("getPrivacyRequest", { pathParams: { id }, options: opts }),
     exportPrivacyRequest: (id, body, opts) =>
       call("exportPrivacyRequest", { pathParams: { id }, body, options: opts }),
+    previewPrivacyErasure: (id, body, opts) =>
+      call("previewPrivacyErasure", { pathParams: { id }, body, options: opts }),
+    erasePrivacyRequest: (id, body, opts) =>
+      call("erasePrivacyRequest", { pathParams: { id }, body, options: opts }),
+    rejectPrivacyRequest: (id, body, opts) =>
+      call("rejectPrivacyRequest", { pathParams: { id }, body, options: opts }),
     listAuditEvents: (opts) => call("listAuditEvents", { options: opts }),
 
     getEmailStatus: (opts) => call("getEmailStatus", { options: opts }),

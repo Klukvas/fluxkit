@@ -1,6 +1,7 @@
 import { Module, type DynamicModule } from "@nestjs/common";
 import { PrivacyAdminController } from "./admin/privacy-admin.controller.js";
 import { PrivacyAdminService } from "./admin/privacy-admin.service.js";
+import { PrivacyErasureService } from "./erasure/privacy-erasure.service.js";
 import { PersonalDataExportService } from "./export/personal-data-export.service.js";
 import { PersonalDataReader } from "./export/personal-data.reader.js";
 import { PRIVACY_CONFIG, type PrivacyConfig } from "./privacy-config.js";
@@ -22,8 +23,15 @@ export class PrivacyModule {
         PersonalDataReader,
         PersonalDataExportService,
         PrivacyAdminService,
+        PrivacyErasureService,
       ],
-      exports: [PRIVACY_CONFIG, PersonalDataReader, PersonalDataExportService, PrivacyAdminService],
+      exports: [
+        PRIVACY_CONFIG,
+        PersonalDataReader,
+        PersonalDataExportService,
+        PrivacyAdminService,
+        PrivacyErasureService,
+      ],
     };
   }
 }

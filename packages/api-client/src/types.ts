@@ -683,3 +683,9 @@ export interface PersonalDataExport {
   cart: ExportJsonObject | null;
   processors: { kind: "email" | "payment" | "shipping"; name: string }[];
 }
+
+/** `POST /store/account/delete`: the current password and an explicit confirmation. */
+export interface DeleteAccountBody {
+  password: string;
+  confirm: true;
+}

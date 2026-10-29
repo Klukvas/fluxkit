@@ -18,13 +18,21 @@ import { RateLimit } from "../../rate-limit/rate-limit.decorator.js";
 import { personalDataExportSchema, setExportHeaders } from "../export/export-response.js";
 import {
   createRequestBodySchema,
+  eraseBodySchema,
+  erasePreviewBodySchema,
+  erasePreviewSchema,
   exportBodySchema,
+  rejectBodySchema,
   listRequestsQuerySchema,
   lookupBodySchema,
   lookupResultSchema,
   privacyRequestSchema,
   type CreateRequestBody,
+  type EraseBody,
+  type ErasePreviewBody,
+  type ErasePreviewView,
   type ExportBody,
+  type RejectBody,
   type ListRequestsQuery,
   type LookupBody,
   type LookupResult,
@@ -129,5 +137,60 @@ export class PrivacyAdminController {
     const document = await this.privacy.exportRequest(id, body, admin.userId);
     setExportHeaders(response, document);
     return document;
+  }
+
+  @Post("requests/:id/erase-preview")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "What an erasure of the request's subject would do now",
+    description:
+      "Counts and blockers; nothing changes. An email subject needs its email again in the body.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(erasePreviewBodySchema)
+  @ApiZodResponse(200, erasePreviewSchema, "Counts and blockers.")
+  @ApiProblemResponses(400, 404, 409)
+  erasePreview(
+    @Param("id", uuidParam("id")) id: string,
+    @Body(new ZodValidationPipe(erasePreviewBodySchema)) body: ErasePreviewBody,
+  ): Promise<ErasePreviewView> {
+    return this.privacy.erasePreview(id, body);
+  }
+
+  @Post("requests/:id/erase")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Erase the request's subject (irreversible)",
+    description:
+      "Deletes the account (if any) and the mails, anonymises the contact fields of every order; orders, payments, refunds and shipments stay. `confirm: true` is required. Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while anything is in progress. Idempotent: a completed erasure request answers its stored result. Audited (`privacy.erased`).",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(eraseBodySchema)
+  @ApiZodResponse(200, privacyRequestSchema, "The completed request with its result.")
+  @ApiProblemResponses(400, 404, 409)
+  erase(
+    @Param("id", uuidParam("id")) id: string,
+    @Body(new ZodValidationPipe(eraseBodySchema)) body: EraseBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+  ): Promise<PrivacyRequestView> {
+    return this.privacy.erase(id, body, admin.userId);
+  }
+
+  @Post("requests/:id/reject")
+  @HttpCode(200)
+  @ApiOperation({
+    summary: "Reject an open request with a reason code",
+    description: "Audited (`privacy.request_changed`). A closed request is `409 request_closed`.",
+  })
+  @ApiParam(ID_PARAM)
+  @ApiZodBody(rejectBodySchema)
+  @ApiZodResponse(200, privacyRequestSchema, "The rejected request.")
+  @ApiProblemResponses(400, 404, 409)
+  reject(
+    @Param("id", uuidParam("id")) id: string,
+    @Body(new ZodValidationPipe(rejectBodySchema)) body: RejectBody,
+    @CurrentAdmin() admin: AdminPrincipal,
+  ): Promise<PrivacyRequestView> {
+    return this.privacy.reject(id, body, admin.userId);
   }
 }

@@ -65,6 +65,9 @@ const PRIVACY_ROUTES = [
   "POST /admin/privacy/requests",
   "GET /admin/privacy/requests/:id",
   "POST /admin/privacy/requests/:id/export",
+  "POST /admin/privacy/requests/:id/erase-preview",
+  "POST /admin/privacy/requests/:id/erase",
+  "POST /admin/privacy/requests/:id/reject",
 ];
 
 /** Customer management: declared once on the controller with its own default pair (`customers.read`, `customers.write`). */
