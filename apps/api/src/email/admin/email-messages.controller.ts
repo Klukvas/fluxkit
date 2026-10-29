@@ -125,14 +125,15 @@ export class EmailMessagesController {
 
   @Post("messages/:id/resend")
   @HttpCode(202)
+  @RateLimit("emailResend")
   @ApiOperation({
     summary: "Send a message again as a new message",
     description:
-      "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it.",
+      "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it. 30 per hour per admin user (429 with `Retry-After`).",
   })
   @ApiParam(ID_PARAM)
   @ApiZodResponse(202, emailMessageIdResponseSchema, "The new message.")
-  @ApiProblemResponses(400, 404, 409)
+  @ApiProblemResponses(400, 404, 409, 429)
   resend(
     @Param("id", uuidParam("id")) id: string,
     @CurrentAdmin() admin: AdminPrincipal,

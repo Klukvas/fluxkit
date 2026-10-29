@@ -649,6 +649,30 @@ describe("admin email API (real Postgres, test provider)", () => {
       ).toEqual([second.email.toLowerCase()]);
     });
 
+    it("limits resends to 30 per hour per admin user (email review F2), and another admin keeps their own window", async () => {
+      const original = await world().enqueued({
+        templateKey: "order.cancelled",
+        recipientKind: "guest",
+        variables: { orderNumber: "AAAA-0009" },
+      });
+      await settle(original, "sent");
+      const path = `/admin/email/messages/${original}/resend`;
+      for (let resent = 0; resent < 30; resent += 1) {
+        expect((await ctx.call("POST", path)).status, `resend ${String(resent)}`).toBe(202);
+      }
+      const before = await world().count();
+      const limited = await ctx.call<ProblemBody>("POST", path);
+      expect(limited.status).toBe(429);
+      expect(limited.body).toMatchObject({ code: "too_many_requests" });
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(await world().count()).toBe(before);
+      await ctx.signInAs("manager");
+      expect((await ctx.call("POST", path)).status).toBe(202);
+      ctx.switchTo(owner);
+      world().clock.advanceMinutes(61);
+      expect((await ctx.call("POST", path)).status).toBe(202);
+    });
+
     it("answers 404 for an unknown id", async () => {
       expect((await ctx.call("POST", `/admin/email/messages/${randomUUID()}/resend`)).status).toBe(
         404,

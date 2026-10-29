@@ -19136,7 +19136,7 @@
     },
     "/admin/email/messages/{id}/resend": {
       "post": {
-        "description": "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it.",
+        "description": "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it. 30 per hour per admin user (429 with `Retry-After`).",
         "operationId": "EmailMessagesController_resend",
         "parameters": [
           {
@@ -19222,6 +19222,16 @@
           },
           "409": {
             "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {
