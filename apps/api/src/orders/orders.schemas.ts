@@ -286,24 +286,18 @@ export const adminPaymentHistorySchema = z.object({
   }),
   failureCode: z.string().nullable(),
   actorAdminId: uuidSchema.nullable(),
-  action: z
-    .enum(["attention_cleared"])
-    .nullable()
-    .meta({
-      description: "An admin action without a status change: `attention_cleared`; null otherwise.",
-    }),
+  action: z.enum(["attention_cleared"]).nullable().meta({
+    description: "An admin action without a status change: `attention_cleared`; null otherwise.",
+  }),
   at: timestampSchema,
 });
 
 export const adminPaymentSchema = z.object({
   id: uuidSchema,
   providerCode: z.string(),
-  providerPaymentId: z
-    .string()
-    .nullable()
-    .meta({
-      description: "The provider's invoice id; null until the provider answered the create.",
-    }),
+  providerPaymentId: z.string().nullable().meta({
+    description: "The provider's invoice id; null until the provider answered the create.",
+  }),
   status: z.enum(PAYMENT_STATUSES),
   amount: moneySchema,
   finalAmount: moneySchema.nullable(),
