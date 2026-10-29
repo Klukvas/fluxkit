@@ -109,7 +109,7 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
   expect(document.orders.map((entry) => entry.number)).toEqual([open.number]);
   expect(JSON.stringify(document)).not.toMatch(/accessTokenHash|requestFingerprint|passwordHash/i);
   expect(await blobTypes(page)).toEqual(["application/json"]);
-  await expect(main.getByText(/was downloaded: 1 orders, 0 mails, 0 sessions\./)).toBeVisible();
+  await expect(main.getByText(/was downloaded: 1 order, 0 mails, 0 sessions\./)).toBeVisible();
   await expect(main.getByText("Completed", { exact: true }).first()).toBeVisible();
 
   // --- An erasure request for the open guest: the preview names the blocker, erasing is not offered.
@@ -171,7 +171,7 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
   await dialog.getByRole("button", { name: "Erase for good" }).click();
   await expect(main.getByText("The erasure is done and cannot be undone.")).toBeVisible();
   await expect(
-    main.getByText("The contact data of 1 orders was erased and 0 stored mails were deleted."),
+    main.getByText("The contact data of 1 order was erased. 0 stored mails were deleted."),
   ).toBeVisible();
   await expect(main.getByText("There was no account to delete.")).toBeVisible();
   await expect(main.getByText("Completed", { exact: true }).first()).toBeVisible();
