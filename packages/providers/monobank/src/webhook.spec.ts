@@ -153,7 +153,7 @@ describe("verifyWebhook", () => {
       codes: ["signature_mismatch"],
     });
     const before = stub.requests.length;
-    for (const headers of [
+    const malformed: Record<string, string>[] = [
       {},
       { "x-sign": "" },
       { "x-sign": "   " },
@@ -163,7 +163,8 @@ describe("verifyWebhook", () => {
       { "x-sign": "A".repeat(400) },
       { "X-Sign": webhook.headers["x-sign"] as string }, // names arrive lower-case; any other spelling is not read
       { "x-signature": webhook.headers["x-sign"] as string },
-    ]) {
+    ];
+    for (const headers of malformed) {
       expect(
         outcome(await provider.verifyWebhook({ headers, rawBody: webhook.rawBody }, live())),
         JSON.stringify(headers).slice(0, 60),

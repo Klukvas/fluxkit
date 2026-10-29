@@ -186,7 +186,7 @@ describe("request shapes", () => {
     const base = {
       providerPaymentId: "p2_stub000001",
       refundId: REFUND_ID,
-      amount: { amount: 1_000, currency: "UAH" as const },
+      amount: { amount: 1_000, currency: "UAH" } as { amount: number; currency: "UAH" | "USD" },
       full: false,
     };
     const cases: [string, Partial<typeof base> & Record<string, unknown>][] = [

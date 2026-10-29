@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { MONOBANK_PATHS } from "./config.js";
-import { MONOBANK_MAX_ANSWER_BYTES, MonobankHttp, type MonobankPath } from "./http.js";
+import { MONOBANK_PATHS, type MonobankPath } from "./config.js";
+import { MONOBANK_MAX_ANSWER_BYTES, MonobankHttp } from "./http.js";
 import { aborted, live } from "./test-support/fixtures.js";
 import { STUB_TOKEN, startStubMonobank, type StubMonobank } from "./test-support/stub-monobank.js";
 
