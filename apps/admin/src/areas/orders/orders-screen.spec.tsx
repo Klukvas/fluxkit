@@ -82,6 +82,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
     billingAddress: null,
     shipping: null,
     shipments: [],
+    payments: [],
     items: [
       {
         position: 0,

@@ -10,6 +10,7 @@ export const PERMISSIONS = Object.freeze([
   "customers.write",
   "shipping.manage",
   "email.manage",
+  "payments.refund",
 ] as const);
 
 export type AdminRole = (typeof ROLES)[number];
@@ -19,6 +20,7 @@ export type AdminPermission = (typeof PERMISSIONS)[number];
 // Orders and customers hold personal data, so the viewer gets neither (ADR 0017); the manager gets all four.
 // Shipping settings (methods, rates, provider profiles) are shop configuration: owner and manager, not the viewer (ADR 0029 decision 13).
 // Mail delivery (status, test send, outbox with recipient addresses, resend, cancel, preview): owner and manager; addresses are personal data (ADR 0031 decision 15).
+// Refunds move money, so they need their own permission beyond the order permissions: owner and manager (ADR 0032 decision 11, owner answer 3).
 export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermission[]>> =
   Object.freeze({
     owner: Object.freeze([...PERMISSIONS]),
@@ -32,6 +34,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermissi
       "customers.write",
       "shipping.manage",
       "email.manage",
+      "payments.refund",
     ] as const),
     viewer: Object.freeze(["catalog.read"] as const),
   });

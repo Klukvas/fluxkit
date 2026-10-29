@@ -179,6 +179,7 @@ describe("checkout: POST /store/checkout (real app, real Postgres)", () => {
         shipping: null,
         shipments: [],
         history: [{ status: "awaiting_payment", at: expect.any(String) }],
+        payment: { canPay: false, providers: [], latest: null },
       });
 
       const row = await orderRow(pool, order?.number ?? "");

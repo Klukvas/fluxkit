@@ -77,6 +77,19 @@ const ORDERS_ROUTES = [
   "POST /admin/orders/:id/shipments/:shipmentId/cancel",
   "POST /admin/orders/:id/shipments/:shipmentId/refresh",
   "GET /admin/orders/:id/shipments/:shipmentId/label",
+  // Payments of an order (ADR 0032 decision 18): the same pair; the refund is `payments.refund` (PAYMENTS_ROUTES).
+  "GET /admin/orders/:id/payments",
+  "POST /admin/orders/:id/payments/:paymentId/resync",
+];
+
+/**
+ * Online payments (ADR 0032 decisions 11 and 18): the attention list reads with `orders.read` (its controller's default
+ * pair is `orders.read` / `payments.refund`); a refund (declared on the route) and the attention clear need `payments.refund`.
+ */
+const PAYMENTS_ROUTES = [
+  "GET /admin/payments",
+  "POST /admin/payments/:paymentId/attention/clear",
+  "POST /admin/orders/:id/payments/:paymentId/refunds",
 ];
 
 /** Shipping settings: declared once on the controllers with their own default pair (`shipping.manage` for reads and writes). */
@@ -109,6 +122,9 @@ const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventor
 function expectedPermission(method: string, pattern: string): AdminPermission {
   if (`${method} ${pattern}` === RESERVATIONS_ROUTE) return "orders.read";
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
+  if (PAYMENTS_ROUTES.includes(`${method} ${pattern}`)) {
+    return method === "GET" ? "orders.read" : "payments.refund";
+  }
   if (ORDERS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" || method === "HEAD" ? "orders.read" : "orders.write";
   }
@@ -253,8 +269,9 @@ describe("admin route permissions", () => {
     });
 
     it("gives the orders routes the order pair by the controller default: read for GET, write for the rest", () => {
-      const orders = declaredAdminRoutes(manager.app).filter(({ pattern }) =>
-        pattern.startsWith("/admin/orders"),
+      const orders = declaredAdminRoutes(manager.app).filter(
+        ({ method, pattern }) =>
+          pattern.startsWith("/admin/orders") && !PAYMENTS_ROUTES.includes(`${method} ${pattern}`),
       );
       expect(orders.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
         [...ORDERS_ROUTES].sort(),
@@ -264,6 +281,22 @@ describe("admin route permissions", () => {
           kind: "permission",
           permission: method === "GET" ? "orders.read" : "orders.write",
           source: "default",
+        });
+      }
+    });
+
+    it("gives the payment routes orders.read to list and payments.refund to refund or clear attention", () => {
+      const payments = declaredAdminRoutes(manager.app).filter(({ method, pattern }) =>
+        PAYMENTS_ROUTES.includes(`${method} ${pattern}`),
+      );
+      expect(payments.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual(
+        [...PAYMENTS_ROUTES].sort(),
+      );
+      for (const { method, pattern, access } of payments) {
+        expect(access, `${method} ${pattern}`).toEqual({
+          kind: "permission",
+          permission: method === "GET" ? "orders.read" : "payments.refund",
+          source: pattern.endsWith("/refunds") ? "route" : "default",
         });
       }
     });
@@ -308,6 +341,7 @@ describe("admin route permissions", () => {
           !CUSTOMERS_ROUTES.includes(`${method} ${pattern}`) &&
           !SHIPPING_ROUTES.includes(`${method} ${pattern}`) &&
           !EMAIL_ROUTES.includes(`${method} ${pattern}`) &&
+          !PAYMENTS_ROUTES.includes(`${method} ${pattern}`) &&
           !ORDERS_ROUTES.includes(`${method} ${pattern}`),
       );
       expect(others.length).toBeGreaterThan(30);
@@ -366,6 +400,7 @@ describe("admin route permissions", () => {
         "email.manage",
         "orders.read",
         "orders.write",
+        "payments.refund",
         "shipping.manage",
         "users.manage",
       ]);
@@ -380,6 +415,9 @@ describe("admin route permissions", () => {
       // Mail delivery shows recipient addresses: owner and manager, not the viewer.
       expect(permissionsOf("manager")).toContain("email.manage");
       expect(permissionsOf("viewer")).not.toContain("email.manage");
+      // Refunds move money: owner and manager, not the viewer.
+      expect(permissionsOf("manager")).toContain("payments.refund");
+      expect(permissionsOf("viewer")).not.toContain("payments.refund");
       // The customer permissions hold personal data: manager and owner have them, the viewer has neither.
       for (const permission of [
         "customers.read",

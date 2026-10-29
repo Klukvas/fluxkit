@@ -28,7 +28,7 @@ export type AdminRefundResult =
   | { readonly kind: "requested"; readonly replay: boolean; readonly refund: RefundRow }
   | { readonly kind: "refused"; readonly reason: RefundRefusal }
   | { readonly kind: "not_found" }
-  /** The same `Idempotency-Key` was used for another payment or amount. */
+  /** The same `Idempotency-Key` was used for another payment, amount or note. */
   | { readonly kind: "idempotency_key_reused" };
 
 export type SendRefundResult =
@@ -73,6 +73,8 @@ export class PaymentRefundsService {
    * route or job 11).
    */
   async requestAdminRefund(input: {
+    /** The order in the route: a payment of another order is `not_found` (no oracle across orders). */
+    readonly orderId: string;
     readonly paymentId: string;
     readonly adminId: string | null;
     readonly amount: Money;
@@ -84,12 +86,16 @@ export class PaymentRefundsService {
       () =>
         withTransaction(this.database, async (tx) => {
           const row = await this.payments.lockById(tx, input.paymentId);
-          if (row === undefined) {
+          if (row === undefined || row.orderId !== input.orderId) {
             return { kind: "not_found" as const };
           }
           const replayed = await this.payments.findRefundByIdempotencyKey(tx, input.idempotencyKey);
           if (replayed !== undefined) {
-            return replayed.paymentId === row.id && replayed.amount === input.amount.amount
+            // The same key with another payment, amount, currency or note is another request.
+            return replayed.paymentId === row.id &&
+              replayed.amount === input.amount.amount &&
+              replayed.currency === input.amount.currency &&
+              replayed.note === input.note
               ? { kind: "requested" as const, replay: true, refund: replayed }
               : { kind: "idempotency_key_reused" as const };
           }

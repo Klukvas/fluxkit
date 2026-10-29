@@ -8,6 +8,11 @@ import type {
   AdminAttributeOption,
   AdminAttributeWithOptions,
   AdminBrand,
+  AdminPayment,
+  AdminPaymentList,
+  AdminPaymentPage,
+  AdminRefundResult,
+  RefundAdminPaymentBody,
   AdminShipment,
   AdminShipmentCreateResult,
   AdminShipmentList,
@@ -169,6 +174,19 @@ export interface AdminListEmailMessagesOptions extends AdminPageOptions {
   createdTo?: string;
 }
 
+export interface AdminListPaymentsOptions extends CallOptions {
+  /** `true`: the open attention items; `false`: the others; missing: all. */
+  needsAttention?: boolean;
+  limit?: number;
+  /** `nextCursor` of the previous page, unchanged. */
+  cursor?: string;
+}
+
+export interface AdminRefundOptions extends CallOptions {
+  /** One key per refund the admin confirms; a repeat of the same request with it answers the same refund. */
+  idempotencyKey: string;
+}
+
 export interface AdminPreviewEmailTemplateOptions extends CallOptions {
   /** One of `LOCALES`. Default: `DEFAULT_LOCALE`. */
   locale?: string;
@@ -279,6 +297,27 @@ export interface AdminClient {
    * it is a `GET` with the session cookie and no CSRF header.
    */
   getShipmentLabel(id: string, shipmentId: string, options?: CallOptions): Result<Blob>;
+
+  // payments (ADR 0032 decision 18; `orders.read` to see, `orders.write` to resync, `payments.refund` to refund or
+  // clear an attention item). Writes are never retried.
+  listOrderPayments(id: string, options?: CallOptions): Result<AdminPaymentList>;
+  /**
+   * `202 {refund, payment}` with the refund as the provider left it; `200` for a replay of the same key and body.
+   * `409 rule_violation` `refund_not_allowed`, `refund_exceeds_remaining`, `partial_refund_not_supported`. A refund never
+   * changes the order status. Refuses (throws) a missing or unsafe `idempotencyKey` before anything is sent.
+   */
+  refundPayment(
+    id: string,
+    paymentId: string,
+    body: RefundAdminPaymentBody,
+    options: AdminRefundOptions,
+  ): Result<AdminRefundResult>;
+  /** Reads the provider's status now (`503 payment_provider_unavailable` with `Retry-After` when it cannot). */
+  resyncPayment(id: string, paymentId: string, options?: CallOptions): Result<AdminPayment>;
+  /** The payment attempts of the shop, newest first; `needsAttention: true` is the attention list. */
+  listPayments(options?: AdminListPaymentsOptions): Result<AdminPaymentPage>;
+  /** Closes an attention item (journaled with the admin); the code stays as a record. */
+  clearPaymentAttention(paymentId: string, options?: CallOptions): Result<AdminPayment>;
 
   // attributes
   createAttribute(body: CreateAdminAttributeBody, options?: CallOptions): Result<AdminAttribute>;
@@ -503,6 +542,9 @@ export interface AdminClient {
  * rules hold: `X-Fluxkit-CSRF: 1` on every request that is not GET or HEAD (the sign-in included), a JSON content
  * type exactly when there is a JSON body (the upload sends raw bytes as `application/octet-stream`), `credentials: "same-origin"`, one `fetch` per call and never a retry or a replay.
  */
+/** Header-safe: visible ASCII only, so a key can never inject a header or be silently altered. */
+const IDEMPOTENCY_KEY = /^[\x21-\x7e]{1,255}$/;
+
 export function createAdminClient(options: AdminClientOptions): AdminClient {
   const send = createTransport(options);
 
@@ -575,6 +617,36 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("refreshShipment", { pathParams: { id, shipmentId }, options: opts }),
     getShipmentLabel: (id, shipmentId, opts) =>
       call("getShipmentLabel", { pathParams: { id, shipmentId }, options: opts }),
+
+    listOrderPayments: (id, opts) =>
+      call("listOrderPayments", { pathParams: { id }, options: opts }),
+    refundPayment: async (id, paymentId, body, opts) => {
+      const key: unknown = (opts as Partial<AdminRefundOptions> | undefined)?.idempotencyKey;
+      if (typeof key !== "string" || !IDEMPOTENCY_KEY.test(key)) {
+        throw new InvalidRequestError(
+          "POST /admin/orders/{id}/payments/{paymentId}/refunds needs an idempotencyKey (1 to 255 visible ASCII characters).",
+        );
+      }
+      return call("refundPayment", {
+        pathParams: { id, paymentId },
+        body,
+        headers: { "Idempotency-Key": key },
+        options: opts,
+      });
+    },
+    resyncPayment: (id, paymentId, opts) =>
+      call("resyncPayment", { pathParams: { id, paymentId }, options: opts }),
+    listPayments: (opts) => {
+      const { needsAttention, ...rest } = opts ?? {};
+      return call("listPayments", {
+        options: {
+          ...rest,
+          ...(needsAttention === undefined ? {} : { needsAttention: String(needsAttention) }),
+        } as CallOptions,
+      });
+    },
+    clearPaymentAttention: (paymentId, opts) =>
+      call("clearPaymentAttention", { pathParams: { paymentId }, options: opts }),
 
     createAttribute: (body, opts) => call("createAttribute", { body, options: opts }),
     listAttributes: (opts) => call("listAttributes", { options: opts }),

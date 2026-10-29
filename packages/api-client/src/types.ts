@@ -59,7 +59,9 @@ export type ProblemCode =
   /** Only the shipping price or the method's availability changed: `shipping` carries the fresh option. */
   | "shipping_changed"
   /** The carrier cannot be reached and nothing usable is cached; only that method or lookup fails (`Retry-After`). */
-  | "shipping_provider_unavailable";
+  | "shipping_provider_unavailable"
+  /** The payment provider refused or did not answer (`Retry-After`); the store create routes add `payment`. */
+  | "payment_provider_unavailable";
 
 /** The `application/problem+json` body of every error answer. */
 export interface ProblemDetails {
@@ -80,6 +82,11 @@ export interface ProblemDetails {
   reason?: "unavailable" | "rejected" | "invalid_credentials" | "not_supported";
   /** A carrier failure of an admin shipment route: raw carrier codes, never message text. */
   providerCodes?: string[];
+  /**
+   * `payment_provider_unavailable` of the store create routes: the attempt and whether a new one is accepted. With
+   * `canRetry` false the provider's answer was lost: wait (`Retry-After`) and read the status, never start another.
+   */
+  payment?: { paymentId: string; status: ShopperPaymentStatus; canRetry: boolean };
 }
 
 // -------------------------------------------------------------------- cart
@@ -289,6 +296,74 @@ export interface Order {
   /** The carrier waybills of the order that have a number, oldest first; empty until the shop created one. */
   shipments: OrderShipment[];
   history: OrderHistoryEntry[];
+  /** Online payment of the order (ADR 0032): whether a new attempt is possible and the newest attempt. */
+  payment: OrderPayment;
+}
+
+/**
+ * A payment attempt as the shopper sees it: `waiting` (the provider's page is open), `processing` (the order updates by
+ * itself), `paid`, `failed` (see the category), `expired` (the invoice ended or a newer attempt replaced it). Never a
+ * provider status or text.
+ */
+export type ShopperPaymentStatus = "waiting" | "processing" | "paid" | "failed" | "expired";
+
+/** Only for `failed` and `expired`; `not_accepted`: the money was taken but the order could not take it (refunded). */
+export type ShopperPaymentFailureCategory = "declined" | "expired" | "technical" | "not_accepted";
+
+export interface OrderPayment {
+  /** Whether `createOrderPayment` / `createAccountOrderPayment` would start a new attempt now. */
+  canPay: boolean;
+  /** Enabled providers that take the order currency; empty when online payment is off. */
+  providers: string[];
+  latest: {
+    paymentId: string;
+    status: ShopperPaymentStatus;
+    failureCategory: ShopperPaymentFailureCategory | null;
+    expiresAt: string;
+    /** The provider's page while `waiting` ("continue payment"); null otherwise. */
+    redirectUrl: string | null;
+  } | null;
+}
+
+/** `createOrderPayment` (guest): the order as for the lookup; never an amount (the server uses the order total). */
+export interface CreateOrderPaymentBody {
+  number: string;
+  accessToken: string;
+  /** Optional while one provider is enabled. */
+  provider?: string;
+  /** The locale of the return page; the order's when missing. */
+  locale?: string;
+}
+
+/** `createAccountOrderPayment` (customer): the order comes from the path and the session. */
+export interface CreateAccountOrderPaymentBody {
+  provider?: string;
+  locale?: string;
+}
+
+/** `getOrderPaymentStatus` (guest): which attempt to show, under the lookup's ownership check. */
+export interface OrderPaymentStatusBody {
+  number: string;
+  accessToken: string;
+  paymentId: string;
+}
+
+export interface CreatedPayment {
+  paymentId: string;
+  status: ShopperPaymentStatus;
+  /** Navigate here (`window.location.assign`); null when the attempt is not waiting for the shopper. */
+  redirectUrl: string | null;
+  expiresAt: string;
+}
+
+export interface PaymentState {
+  paymentId: string;
+  status: ShopperPaymentStatus;
+  failureCategory: ShopperPaymentFailureCategory | null;
+  expiresAt: string;
+  orderStatus: OrderStatus;
+  /** Whether a new attempt would be accepted now. */
+  canRetry: boolean;
 }
 
 export interface OrderSummary {

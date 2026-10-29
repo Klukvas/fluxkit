@@ -49,6 +49,8 @@ export type CreatePaymentResult =
   | { readonly kind: "refused"; readonly rule: CreatePaymentRefusal }
   /** `404`: no such order (ownership is checked by the route before this is called). */
   | { readonly kind: "not_found" }
+  /** `409 idempotency_key_reused`: the key already made an attempt of this order with another provider. */
+  | { readonly kind: "idempotency_key_reused" }
   /**
    * `503 payment_provider_unavailable`: the provider refused or did not answer. `failed`: the shopper may try again at
    * once; `create_unknown`: never retried, blocks a new attempt until job 11 closes it (ADR 0032 open question 1, kept).
@@ -178,7 +180,7 @@ export class PaymentCreateService {
               input.idempotencyKey,
             );
             if (replayed !== undefined) {
-              return { kind: "created" as const, replay: true, payment: viewOf(replayed) };
+              return this.replayOf(replayed, input);
             }
             const attempts = await this.payments.lockAttemptsOfOrder(tx, order.id);
             const decision = decideNewPaymentAttempt({
@@ -237,11 +239,29 @@ export class PaymentCreateService {
           input.idempotencyKey,
         );
         if (replayed !== undefined) {
-          return { kind: "created", replay: true, payment: viewOf(replayed) };
+          return this.replayOf(replayed, input);
         }
       }
       throw error;
     }
+  }
+
+  /**
+   * The same `Idempotency-Key` again: the same attempt as it is now (never a second provider call). A key that names
+   * another provider than the attempt it made is a different request.
+   */
+  private replayOf(
+    replayed: PaymentRow,
+    input: CreatePaymentInput,
+  ): Extract<CreatePaymentResult, { kind: "created" | "idempotency_key_reused" }> {
+    if (
+      input.providerCode !== undefined &&
+      input.providerCode !== null &&
+      input.providerCode !== replayed.providerCode
+    ) {
+      return { kind: "idempotency_key_reused" };
+    }
+    return { kind: "created", replay: true, payment: viewOf(replayed) };
   }
 
   /** Closes the order's `awaiting_customer` attempts (a new attempt replaces them; their invoices are invalidated by job 11). */

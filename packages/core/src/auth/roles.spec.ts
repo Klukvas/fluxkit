@@ -23,6 +23,7 @@ describe("role table", () => {
       "customers.write",
       "shipping.manage",
       "email.manage",
+      "payments.refund",
     ]);
   });
 
@@ -38,6 +39,7 @@ describe("role table", () => {
       "customers.write",
       "shipping.manage",
       "email.manage",
+      "payments.refund",
     ]);
     expect([...ROLE_PERMISSIONS.viewer]).toEqual(["catalog.read"]);
   });
@@ -110,6 +112,7 @@ describe("hasPermission", () => {
       "customers.write",
       "shipping.manage",
       "email.manage",
+      "payments.refund",
     ],
     manager: [
       "catalog.read",
@@ -121,6 +124,7 @@ describe("hasPermission", () => {
       "customers.write",
       "shipping.manage",
       "email.manage",
+      "payments.refund",
     ],
     viewer: ["catalog.read"],
   };
@@ -193,6 +197,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "customers.write": true,
       "shipping.manage": true,
       "email.manage": true,
+      "payments.refund": true,
     },
     manager: {
       "catalog.read": true,
@@ -205,6 +210,7 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "customers.write": true,
       "shipping.manage": true,
       "email.manage": true,
+      "payments.refund": true,
     },
     viewer: {
       "catalog.read": true,
@@ -217,12 +223,13 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       "customers.write": false,
       "shipping.manage": false,
       "email.manage": false,
+      "payments.refund": false,
     },
   } as const;
 
   const personalData = ["orders.read", "orders.write", "customers.read", "customers.write"];
 
-  it("lists exactly the ten permissions of the matrix", () => {
+  it("lists exactly the eleven permissions of the matrix", () => {
     expect([...PERMISSIONS].sort()).toEqual(Object.keys(matrix.owner).sort());
   });
 
@@ -248,6 +255,17 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
     expect(hasPermission("viewer", "email.manage")).toBe(false);
   });
 
+  it("gives payments.refund to the owner and the manager, never to the viewer (ADR 0032 decision 11, owner answer 3)", () => {
+    expect(hasPermission("owner", "payments.refund")).toBe(true);
+    expect(hasPermission("manager", "payments.refund")).toBe(true);
+    expect(hasPermission("viewer", "payments.refund")).toBe(false);
+    // Refunds move money: holding the order permissions alone is not enough.
+    expect(isAdminPermission("payments.refund")).toBe(true);
+    for (const value of ["payments", "payment.refund", "payments.write", "Payments.refund"]) {
+      expect(isAdminPermission(value), value).toBe(false);
+    }
+  });
+
   it("keeps personal data away from the viewer: no order and no customer permission", () => {
     expect(permissionsOf("viewer")).toEqual(["catalog.read"]);
     for (const permission of personalData) {
@@ -260,8 +278,8 @@ describe("orders and customers permissions (plan 2026-10-17, open question 6)", 
       expect(hasPermission("manager", permission), permission).toBe(true);
       expect(hasPermission("owner", permission), permission).toBe(true);
     }
-    expect(permissionsOf("owner")).toHaveLength(10);
-    expect(permissionsOf("manager")).toHaveLength(9);
+    expect(permissionsOf("owner")).toHaveLength(11);
+    expect(permissionsOf("manager")).toHaveLength(10);
   });
 
   it("recognizes the new names as permissions and nothing close to them", () => {

@@ -27,6 +27,8 @@ export const PROBLEM_CODES = [
   "shipping_not_applicable",
   "shipping_changed",
   "shipping_provider_unavailable",
+  // Online payments (ADR 0032 decision 18, docs/api/payments.md).
+  "payment_provider_unavailable",
 ] as const;
 
 export type ProblemCode = (typeof PROBLEM_CODES)[number];
@@ -54,6 +56,7 @@ export const PROBLEM_STATUS: Readonly<Record<ProblemCode, number>> = {
   shipping_not_applicable: 400,
   shipping_changed: 409,
   shipping_provider_unavailable: 503,
+  payment_provider_unavailable: 503,
 };
 
 export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
@@ -79,6 +82,7 @@ export const PROBLEM_TITLE: Readonly<Record<ProblemCode, string>> = {
   shipping_not_applicable: "Nothing to ship",
   shipping_changed: "The shipping changed",
   shipping_provider_unavailable: "Shipping provider unavailable",
+  payment_provider_unavailable: "Payment provider unavailable",
 };
 
 /** One problem with a request field. `path` is dotted (`name.uk`, `attributes.size`); empty for the whole body. */
@@ -253,6 +257,23 @@ export function shippingProviderUnavailable(retryAfterSeconds: number): ProblemE
     detail:
       "The delivery service cannot be reached right now. Try again later or choose another method.",
     headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+  });
+}
+
+/**
+ * The payment provider refused, did not answer or could not be read (ADR 0032 decisions 6 and 18). `Retry-After` says
+ * when asking again makes sense; `payment` (a documented member of the store create route) tells the shopper whether a
+ * new attempt is allowed at all: after a lost create answer it is not, until the attempt is closed.
+ */
+export function paymentProviderUnavailable(
+  retryAfterSeconds: number,
+  payment?: Readonly<Record<string, unknown>>,
+): ProblemException {
+  return new ProblemException({
+    code: "payment_provider_unavailable",
+    detail: "The payment service cannot be reached right now. Try again later.",
+    headers: { "Retry-After": String(Math.max(1, Math.ceil(retryAfterSeconds))) },
+    ...(payment === undefined ? {} : { members: { payment } }),
   });
 }
 

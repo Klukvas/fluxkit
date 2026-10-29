@@ -12,6 +12,7 @@ import { timestampSchema, uuidSchema } from "../../common/openapi-formats.js";
 import {
   addressOutput,
   adminOrderShippingSchema,
+  adminPaymentSchema,
   adminShipmentSchema,
   moneySchema,
   signedMoneySchema,
@@ -235,6 +236,10 @@ export const adminOrderSchema = z.object({
   }),
   shipments: z.array(adminShipmentSchema).meta({
     description: "The carrier waybills of the order, oldest first (at most one active).",
+  }),
+  payments: z.array(adminPaymentSchema).meta({
+    description:
+      "The online payment attempts of the order, oldest first, with their refunds and journal (ADR 0032); empty when none was made. No page URL and no card data beyond system and last 4.",
   }),
   history: z.array(
     z.object({

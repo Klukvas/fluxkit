@@ -24,6 +24,7 @@ import {
   invalidTransition,
   notFound,
   ruleViolation,
+  paymentProviderUnavailable,
   serviceUnavailable,
   tooManyOpenOrders,
   tooManyRequests,
@@ -136,6 +137,19 @@ describe("ProblemDetailsFilter", () => {
     expect(result.body).toMatchObject({ code: "service_unavailable", status: 503 });
   });
 
+  it("answers payment_provider_unavailable with 503, a Retry-After header and the documented payment member", () => {
+    const result = run(
+      paymentProviderUnavailable(4.1, { paymentId: "p", status: "processing", canRetry: false }),
+    );
+    expect(result.status).toBe(503);
+    expect(result.headers["Retry-After"]).toBe("5");
+    expect(result.body).toMatchObject({
+      code: "payment_provider_unavailable",
+      status: 503,
+      payment: { paymentId: "p", status: "processing", canRetry: false },
+    });
+  });
+
   it("covers every documented problem code", () => {
     expect([...PROBLEM_CODES].sort()).toEqual(
       [
@@ -149,6 +163,7 @@ describe("ProblemDetailsFilter", () => {
         "internal_error",
         "invalid_transition",
         "not_found",
+        "payment_provider_unavailable",
         "rule_violation",
         "service_unavailable",
         "shipping_changed",

@@ -11,7 +11,7 @@ export interface OperationSpec {
   hasBody: boolean;
   /** Query parameter names the document lists. */
   query: readonly string[];
-  /** Whether the operation requires the `Idempotency-Key` header (checkout). */
+  /** Whether the operation requires the `Idempotency-Key` header (checkout, payment creates). */
   requiresIdempotencyKey: boolean;
 }
 
@@ -77,6 +77,24 @@ export const OPERATIONS = {
   cancelAccountOrder: operation("POST", "/store/account/orders/{number}/cancel", [200], {
     query: LOCALE,
   }),
+  createOrderPayment: operation("POST", "/store/orders/payments", [201, 200], {
+    hasBody: true,
+    requiresIdempotencyKey: true,
+  }),
+  getOrderPaymentStatus: operation("POST", "/store/orders/payments/status", [200], {
+    hasBody: true,
+  }),
+  createAccountOrderPayment: operation(
+    "POST",
+    "/store/account/orders/{number}/payments",
+    [201, 200],
+    { hasBody: true, requiresIdempotencyKey: true },
+  ),
+  getAccountOrderPayment: operation(
+    "GET",
+    "/store/account/orders/{number}/payments/{paymentId}",
+    [200],
+  ),
   listCategories: operation("GET", "/store/categories", [200], { query: LOCALE }),
   getConfig: operation("GET", "/store/config", [200]),
   listProducts: operation("GET", "/store/products", [200], {

@@ -85,10 +85,12 @@ describe("customer and admin principals are separate on the real routes", () => 
       "GET /store/account/me",
       "GET /store/account/orders",
       "GET /store/account/orders/:number",
+      "GET /store/account/orders/:number/payments/:paymentId",
       "PATCH /store/account/me",
       "POST /store/account/change-password",
       "POST /store/account/logout",
       "POST /store/account/orders/:number/cancel",
+      "POST /store/account/orders/:number/payments",
       "POST /store/account/verify-email/resend",
     ]);
     for (const { method, path } of routes) {
