@@ -249,7 +249,10 @@ export class MonobankPaymentProvider implements PaymentProviderPort {
     }
     const verification = await this.keys.verify(body, signature, () => this.fetchKey(signal));
     if (verification.kind === "unavailable") {
-      this.logFailure("verifyWebhook", "key fetch", verification.failure, 0);
+      // A failed fetch was logged by `exchange`; a fetch skipped by the throttle is logged here.
+      if (verification.failure.providerCodes.includes("key_unavailable")) {
+        this.logFailure("verifyWebhook", "key fetch throttled", verification.failure, 0);
+      }
       return verification.failure;
     }
     if (verification.kind === "invalid") {

@@ -102,6 +102,7 @@ One warning per failure: `<operation>: <HTTP status | no answer | not sent> -> <
 | A test token answers `pubkey` and `details` | `pubkey` is used for webhooks | open question 11 |
 | `invoiceId` alphabet | `^[A-Za-z0-9_.-]{1,64}$` (core `PROVIDER_PAYMENT_ID_PATTERN`; the example is `p2_9ZgpZVsl3`) | checked at S1 |
 | Token format | 20 to 256 visible ASCII | UNKNOWN |
+| Answers declare JSON | an answer is parsed only when its `content-type` names JSON (else it is unreadable: `unavailable`) | the spec declares `application/json` for every answer; S1 records the content types |
 
 ## Plan S1 (the owner's live test with a TEST token)
 Nothing here has been run against Monobank. S1 needs the owner, on a machine of their own:
