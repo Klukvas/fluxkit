@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   ADMIN_CACHE_CONTROL,
@@ -78,5 +80,41 @@ describe("admin security headers (ADR 0027 decision 3)", () => {
       html: "no-cache",
       assets: "public, max-age=31536000, immutable",
     });
+  });
+});
+
+describe("the admin app has no cookie of its own and loads nothing from a third party (ADR 0033 decision 11)", () => {
+  function sourceFiles(directory: string): string[] {
+    return readdirSync(directory).flatMap((name) => {
+      const path = `${directory}/${name}`;
+      if (statSync(path).isDirectory()) return sourceFiles(path);
+      return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) ? [path] : [];
+    });
+  }
+  const files = sourceFiles(fileURLToPath(new URL("./src", import.meta.url)));
+
+  it("reads the source it scans (the checks below are not vacuous)", () => {
+    expect(files.length).toBeGreaterThan(50);
+  });
+
+  it("never touches document.cookie", () => {
+    expect(files.filter((file) => /document\.cookie/.test(readFileSync(file, "utf8")))).toEqual([]);
+  });
+
+  it("keeps localStorage inside the language preference code (the language code is all it stores)", () => {
+    const users = files.filter((file) => /localStorage/.test(readFileSync(file, "utf8")));
+    expect(users.map((file) => file.slice(file.indexOf("/src/")))).toEqual([
+      "/src/i18n/i18n-context.tsx",
+      "/src/i18n/locale-preference.ts",
+    ]);
+  });
+
+  it("loads no third-party script, font or analytics", () => {
+    const offenders = files.filter((file) =>
+      /googletagmanager|google-analytics|gtag\(|fbq\(|fonts\.googleapis|<script[^>]+src=["']https?:/i.test(
+        readFileSync(file, "utf8"),
+      ),
+    );
+    expect(offenders).toEqual([]);
   });
 });

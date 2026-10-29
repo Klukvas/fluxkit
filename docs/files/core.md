@@ -199,6 +199,17 @@ Pure rules for the catalog search; no I/O, no engine client (the Meilisearch cli
 - `src/search/stemmers/snowball/` - third-party, BSD-3-Clause (`COPYING`): the Snowball algorithm files `ukrainian.sbl` and `english.sbl`, the stemmers generated from them (`*.generated.ts`, never edit by hand) and a 1-in-100 sample of the reference vocabularies (`*-sample.ts`).
 - `src/search/test-support.ts` - attribute definition fixtures of the specs (excluded from the build).
 - `src/search/*.spec.ts`, `src/search/stemmers/stemmers.spec.ts` - Vitest specs; the stemmer spec reproduces the reference stems of the vocabulary samples exactly.
+## Privacy rules (ADR 0033)
+
+Pure rules for personal data (privacy plan step 3): no I/O; the clock and the randomness are parameters. The API (later steps) gathers the facts under its locks and applies the results.
+
+- `src/privacy/erasure.ts` - `decideErasure(orders)`: blockers (`open_order`, `payment_in_progress`, `refund_in_progress`, `active_shipment`) over the statuses of the order, payment, refund and shipment machines, or the action per order (`anonymise`, `already_anonymised`). One blocked order refuses the whole erasure. Unknown statuses are a `RangeError`.
+- `src/privacy/anonymisation.ts` - `ORDER_ANONYMISATION_PLAN` (the `sales_order` columns that change and how), `ORDER_COLUMNS_KEPT_ON_ANONYMISATION`, `planOrderAnonymisation(order, options)` (values to write: contact NULL, addresses reduced to `{countryCode}`, reason NULL, guest access NULL, a new request fingerprint, the erasure time). The API spec `inventory.spec.ts` checks the plan against the data inventory. It must NOT delete or change amounts, lines, dates, shipments, payments or journals.
+- `src/privacy/export.ts` - `buildPersonalDataExport(facts)` (format `fluxkit.personal-data-export/v1`, `docs/contracts/personal-data-export.md`), `PERSONAL_DATA_EXPORT_FORMAT`, `EXPORT_FORBIDDEN_KEYS`, `findForbiddenExportKeys(value)`. The builder copies a whitelist of keys only.
+- `src/privacy/retention.ts` - `retentionCutoff(now, days)`, `orderFinalDate`, `isOrderRetentionDue`, `PRIVACY_REQUEST_RETENTION_DAYS` (1095), `AUDIT_EVENT_RETENTION_DAYS` (365). Whole 24-hour days in UTC; a closed order is due when its final date is strictly older than the cut-off.
+- `src/privacy/request.ts` - privacy request kinds, subject kinds, channels and statuses, `requestDueAt` (30 days), `extendRequestDueAt` (reason required, at most 90 days in total), `decideRequestTransition` (`request_closed` for a finished request), `isRequestOverdue`.
+- `src/privacy/audit.ts` - `ADMIN_AUDIT_ACTIONS`, `ADMIN_AUDIT_TARGET_KINDS`, `buildAdminAuditEvent` (a closed action list, a uuid target, a detail of codes, counts and flags only, at most 2 KiB; personal data in a detail is a `RangeError`).
+- `src/privacy/index.ts` - re-exports the six files. Specs sit next to each file.
 
 ## Test-only and tests
 
