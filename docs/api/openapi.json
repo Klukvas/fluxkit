@@ -11621,7 +11621,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -13009,7 +13009,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -14423,7 +14423,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -15803,7 +15803,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -21011,7 +21011,7 @@
                             },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                            "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                           },
                           "providerStatus": {
                             "nullable": true,
@@ -21368,7 +21368,7 @@
     },
     "/admin/orders/{id}/payments/{paymentId}/refunds": {
       "post": {
-        "description": "Only a `succeeded` attempt; `amount` (minor units, the payment currency) at most `refundableAmount` (the amount less every refund that is not `failed`; checked under the payment row lock, so two admins can never refund more than was paid); a partial amount only when the provider takes partial refunds. The refund is stored `requested`, then sent once to the provider with no transaction open (our refund id is the provider's idempotency reference). 202 `{refund, payment}` with the refund as the provider left it (`succeeded`, `processing`, `failed`, `requested` when the provider throttled us and the reconcile job sends it, `unknown` when the answer was lost: never resent, settled from the provider's refund list). A refund never changes the order status. The same `Idempotency-Key` with the same body answers the same refund (200) without a second call; with another body 409 `idempotency_key_reused`. 409 `rule_violation` with rule `refund_not_allowed`, `refund_exceeds_remaining` or `partial_refund_not_supported`. Limited per admin user (`paymentRefund`).",
+        "description": "Only a `succeeded` attempt; `amount` (minor units, the payment currency) at most `refundableAmount` (the amount less every refund that is not `failed` and less money the provider returned outside the shop, from its final amount; checked under the payment row lock, so two admins can never refund more than was paid and the same money is never refunded twice); a partial amount only when the provider takes partial refunds. The refund is stored `requested`, then sent once to the provider with no transaction open (our refund id is the provider's idempotency reference). 202 `{refund, payment}` with the refund as the provider left it (`succeeded`, `processing`, `failed`, `requested` when the provider throttled us and the reconcile job sends it, `unknown` when the answer was lost: never resent, settled from the provider's refund list). A refund never changes the order status. The same `Idempotency-Key` with the same body answers the same refund (200) without a second call; with another body 409 `idempotency_key_reused`. 409 `rule_violation` with rule `refund_not_allowed`, `refund_exceeds_remaining` or `partial_refund_not_supported`. Limited per admin user (`paymentRefund`).",
         "operationId": "AdminOrderPaymentsController_refund",
         "parameters": [
           {
@@ -21619,7 +21619,7 @@
                           },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                         },
                         "providerStatus": {
                           "nullable": true,
@@ -22090,7 +22090,7 @@
                           },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                          "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                         },
                         "providerStatus": {
                           "nullable": true,
@@ -22598,7 +22598,7 @@
                       },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                     },
                     "providerStatus": {
                       "nullable": true,
@@ -23119,7 +23119,7 @@
                                 },
                                 "required": ["amount", "currency"],
                                 "additionalProperties": false,
-                                "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                                "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                               },
                               "providerStatus": {
                                 "nullable": true,
@@ -23601,7 +23601,7 @@
                       },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0."
+                      "description": "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0."
                     },
                     "providerStatus": {
                       "nullable": true,

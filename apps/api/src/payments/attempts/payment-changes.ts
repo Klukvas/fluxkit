@@ -13,6 +13,7 @@ import {
   type PaymentStatus,
   type ProviderPaymentFact,
   type RefundReason,
+  type RefundRecord,
   type RefundStatus,
 } from "@fluxkit/core";
 import type { Transaction } from "../../common/transaction.js";
@@ -61,6 +62,22 @@ export function refundStatusOf(value: string): RefundStatus {
     throw new RangeError(`A refund has an unknown status: ${value}`);
   }
   return value as RefundStatus;
+}
+
+/**
+ * A stored refund as core reads it. `inFinalAmount`: a `succeeded` refund an applied provider fact listed (only facts set
+ * `provider_modified_at`), so the stored final amount already shows it (review F1).
+ */
+export function refundRecordOf(refund: RefundRow): RefundRecord {
+  const status = refundStatusOf(refund.status);
+  return {
+    amount: {
+      amount: refund.amount,
+      currency: refund.currency as RefundRecord["amount"]["currency"],
+    },
+    status,
+    inFinalAmount: status === "succeeded" && refund.providerModifiedAt !== null,
+  };
 }
 
 function factColumns(fact: ProviderPaymentFact | undefined) {
@@ -309,6 +326,23 @@ export class PaymentChanges {
       },
     });
     return { ok: true, payment, refund: updated };
+  }
+
+  /**
+   * An applied provider fact lists a refund of a LOCKED attempt that is already `succeeded` (the provider's answer to our
+   * call said so first): its `provider_modified_at` records that the provider's final amount now shows it (review F1,
+   * core `RefundRecord.inFinalAmount`). No status change, no event.
+   */
+  async noteRefundListed(
+    tx: Transaction,
+    refund: RefundRow,
+    providerModifiedAt: Date,
+    now: Date,
+  ): Promise<void> {
+    if (refundStatusOf(refund.status) !== "succeeded") {
+      throw new Error("Only a succeeded refund is noted as listed");
+    }
+    await this.payments.setRefundProviderModifiedAt(tx, refund.id, providerModifiedAt, now);
   }
 
   /** A journal row without any other write (a system note, a claim). `false`: the dedupe key was taken. */

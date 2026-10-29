@@ -4,7 +4,7 @@ import {
   PAYMENT_EVENT_SOURCES,
   PAYMENT_ORDER_OUTCOMES,
   REFUND_REASONS,
-  remainingRefundable,
+  refundableAmount,
   type Money,
   type PaymentAttentionCode,
   type PaymentCreatedBy,
@@ -21,6 +21,7 @@ import type {
 import {
   ATTENTION_CLEARED_KEY,
   paymentStatusOf,
+  refundRecordOf,
   refundStatusOf,
 } from "../attempts/payment-changes.js";
 import type { PaymentEventRow, PaymentRow, RefundRow } from "../attempts/payments.repository.js";
@@ -101,13 +102,11 @@ export function toAdminPayment(
   const amount = moneyOf(row.amount, row.currency);
   const refundable =
     status === "succeeded"
-      ? remainingRefundable(
+      ? refundableAmount({
           amount,
-          refunds.map((refund) => ({
-            amount: moneyOf(refund.amount, refund.currency),
-            status: refundStatusOf(refund.status),
-          })),
-        ).amount
+          finalAmount: row.finalAmount === null ? null : moneyOf(row.finalAmount, row.currency),
+          refunds: refunds.map(refundRecordOf),
+        }).amount
       : 0;
   return {
     id: row.id,

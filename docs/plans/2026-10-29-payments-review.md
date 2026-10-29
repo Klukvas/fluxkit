@@ -106,3 +106,22 @@ Runner: `payrev-mutate.py` in the session scratchpad (replace one exact snippet,
 - The edge proxies passing the webhook body byte for byte (`infra/proxy`), and behaviour with several API instances (in-memory read throttles and the Monobank key cache are per process).
 - Down migration with payment data present (only the empty-database cycle was run; the down script drops all payment history by design).
 - Load: the attention list (`GET /admin/payments`) sorts by `created_at, id` without a matching index; not measured.
+
+## Fixes (branch `fix/payments-review`)
+
+Developer agent (Claude Opus 5.5), started from `origin/review/payments` so this review ships with its fixes. Constraints set by the orchestrator: no migration, no schema or CHECK change, no new attention code, no edit of an old ADR (the decisions are recorded here instead). Money logic test first (AGENTS.md section 13).
+
+### F1 fix: refunds made outside the shop
+
+- Attention: the existing `external_reversal` ("money returned that our own refunds do not explain, a refund made outside the shop"; already in `PAYMENT_ATTENTION_CODES` and `payment_attention_code_check`). No new code, no CHECK change.
+- Core (`packages/core/src/payments/refund.ts`):
+  - `refundableAmount({amount, finalAmount, refunds})` = `remainingRefundable` less the external part `max(0, amount - finalAmount - our succeeded refunds the final amount already shows)`, at least 0. `decideRefund` takes the optional `payment.finalAmount` and uses it, so `refund_exceeds_remaining` also covers money returned outside the shop.
+  - `RefundRecord.inFinalAmount`: a `succeeded` refund of ours that an applied fact listed `succeeded`. Without it a stale stored final amount (the provider has not reported our latest refund yet) would let the same money count twice or not at all.
+  - `externalRefundAmount` (the larger of the final-amount view and the listed refunds without our id or with an id we do not know, never their sum) and `decideExternalRefund` (attention when a fact shows more external money than the previously stored final amount did).
+- API: `PaymentFactsService.applyIn` calls `decideExternalRefund` after settling our refunds on a `succeeded` attempt; `settleRefunds` records `payment_refund.provider_modified_at` on a refund that is already `succeeded` when a fact lists it `succeeded` (an existing column, its meaning unchanged: the provider's change time of the listed refund); `requestAdminRefund`, the automatic refund and the admin view use `refundableAmount` through `refundRecordOf`.
+- Decisions (recorded here instead of editing ADR 0032):
+  - D1. Re-use `external_reversal` for partial external refunds; the admin help text (uk and en) now says "all or part of the payment" and that the refundable amount already excludes it.
+  - D2. Without new storage the shop cannot always tell, from the stored final amount alone, how much of the missing money was its own refund made after an external one. The attention rule errs towards raising: the fact after such a shop refund may raise `external_reversal` once more (never fewer); an external refund the provider still lists as `processing` raises it on every new fact until the final amount drops. Proved by core specs ("errs towards attention").
+  - D3. `refundedAmount` stays the sum of OUR succeeded refunds; the money returned elsewhere shows as `finalAmount` and in `refundableAmount` only.
+  - D4. An external refund the provider lists as `processing` raises attention but caps `refundableAmount` only once the provider lowers its final amount (the refund list is not stored). A provider is expected to refuse a refund above what it holds (the test provider answers `not_cancellable`, stored `failed` with `refund_failed`); not verified against Monobank.
+- Behaviour without an external refund is unchanged (core specs per exponent 0/2/3, API spec "refunds made through the shop raise nothing").
