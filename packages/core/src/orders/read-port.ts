@@ -1,3 +1,11 @@
+import type { PaymentOrderOutcome } from "../payments/outcome.js";
+import type {
+  PaymentAttentionCode,
+  PaymentCreatedBy,
+  PaymentEventSource,
+  RefundReason,
+} from "../payments/reasons.js";
+import type { PaymentStatus, RefundStatus } from "../payments/status.js";
 import type { ShippingMethodKind, ShippingPayer } from "../shipping/limits.js";
 import type { PickupPointKind } from "../shipping/provider-port.js";
 import type { ShipmentActor, ShipmentPayer, ShipmentStatus } from "../shipping/shipment-status.js";
@@ -155,6 +163,80 @@ export interface AdminOrderShipmentView {
   readonly history: readonly AdminOrderShipmentHistoryEntry[];
 }
 
+/** One refund of a payment attempt (`payment_refund`, ADR 0032 decision 11). */
+export interface AdminOrderPaymentRefundView {
+  /** Also the idempotency reference sent to the provider (Monobank `extRef`). */
+  readonly id: string;
+  readonly amount: AdminOrderMoney;
+  readonly status: RefundStatus;
+  readonly reason: RefundReason;
+  /** The admin's note; null for an automatic refund. */
+  readonly note: string | null;
+  /** Null for an automatic refund, and once that admin user was deleted. */
+  readonly actorAdminId: string | null;
+  /** The provider's code of a `failed` refund; never provider text. */
+  readonly failureCode: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * One entry of a payment's journal (`payment_event`): a status change, a provider fact (applied or not) or an admin
+ * action. The internal bookkeeping rows (refund send claims) and the dedupe keys are left out.
+ */
+export interface AdminOrderPaymentHistoryEntry {
+  readonly source: PaymentEventSource;
+  /** Both null when the status did not change. */
+  readonly fromStatus: PaymentStatus | null;
+  readonly toStatus: PaymentStatus | null;
+  /** The provider's raw status word of a fact (`success`), never provider text. */
+  readonly providerStatus: string | null;
+  readonly providerModifiedAt: string | null;
+  /** False for a fact that was older than the current state, did not bind or changed nothing. */
+  readonly applied: boolean;
+  readonly failureCode: string | null;
+  /** The admin of an admin action; null otherwise and once that admin user was deleted. */
+  readonly actorAdminId: string | null;
+  readonly at: string;
+}
+
+/**
+ * A payment attempt of the order (ADR 0032 decisions 5 and 18). Card data is the card system and the last four digits
+ * only; no page URL, no idempotency key, no raw provider answer.
+ */
+export interface AdminOrderPaymentView {
+  readonly id: string;
+  readonly providerCode: string;
+  /** The provider's id of the invoice; null until the provider answered the create. */
+  readonly providerPaymentId: string | null;
+  readonly status: PaymentStatus;
+  readonly amount: AdminOrderMoney;
+  /** The provider's final amount (after its refunds); null until known. */
+  readonly finalAmount: AdminOrderMoney | null;
+  /** The sum of the succeeded refunds. */
+  readonly refundedAmount: AdminOrderMoney;
+  /** What a new refund may still take: for a succeeded attempt the amount less every refund that is not `failed`, else 0. */
+  readonly refundableAmount: AdminOrderMoney;
+  readonly providerStatus: string | null;
+  readonly providerModifiedAt: string | null;
+  readonly failureCode: string | null;
+  /** What `markPaidIn` answered for a success; null otherwise. */
+  readonly orderOutcome: PaymentOrderOutcome | null;
+  readonly needsAttention: boolean;
+  /** Kept after an admin cleared the item. */
+  readonly attentionCode: PaymentAttentionCode | null;
+  readonly card: { readonly system: string; readonly last4: string } | null;
+  readonly createdBy: PaymentCreatedBy;
+  /** The end of the invoice. */
+  readonly expiresAt: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  /** When the reconcile job reads it next; null when it does not. */
+  readonly nextCheckAt: string | null;
+  readonly refunds: readonly AdminOrderPaymentRefundView[];
+  readonly history: readonly AdminOrderPaymentHistoryEntry[];
+}
+
 export interface AdminOrderView {
   readonly id: string;
   readonly number: string;
@@ -185,6 +267,8 @@ export interface AdminOrderView {
   readonly shipping: AdminOrderShippingView | null;
   /** The carrier waybills of the order, oldest first (at most one active); empty when none was created. */
   readonly shipments: readonly AdminOrderShipmentView[];
+  /** The online payment attempts of the order, oldest first (ADR 0032); empty when none was made. */
+  readonly payments: readonly AdminOrderPaymentView[];
   readonly history: readonly AdminOrderHistoryEntry[];
   /** ISO 8601, UTC. */
   readonly placedAt: string;

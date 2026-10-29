@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, eq, gt, isNotNull, like, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, like, lt, lte, or } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../../common/transaction.js";
 import {
   domainEvent,
@@ -50,6 +50,18 @@ export interface DuePayment {
 export interface DueCursor {
   readonly nextCheckAt: Date;
   readonly id: string;
+}
+
+/** Keyset cursor of the admin payment list: `(created_at, id)`, newest first. */
+export interface PaymentListCursor {
+  readonly createdAt: Date;
+  readonly id: string;
+}
+
+/** A row of the admin payment list: the attempt and its order's number. */
+export interface PaymentListRow {
+  readonly payment: PaymentRow;
+  readonly orderNumber: string;
 }
 
 /** What the basket needs of one order line (snapshot, ADR 0011). */
@@ -213,6 +225,65 @@ export class PaymentsRepository {
       .from(paymentEvent)
       .where(eq(paymentEvent.paymentId, paymentId))
       .orderBy(asc(paymentEvent.createdAt), asc(paymentEvent.id));
+  }
+
+  /** The journals of several attempts in one statement, oldest first (the admin views). */
+  async listEventsOfPayments(
+    db: DbExecutor,
+    paymentIds: readonly string[],
+  ): Promise<PaymentEventRow[]> {
+    if (paymentIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(paymentEvent)
+      .where(inArray(paymentEvent.paymentId, [...paymentIds]))
+      .orderBy(asc(paymentEvent.createdAt), asc(paymentEvent.id));
+  }
+
+  /** The refunds of several attempts in one statement, oldest first (the admin views). */
+  async listRefundsOfPayments(db: DbExecutor, paymentIds: readonly string[]): Promise<RefundRow[]> {
+    if (paymentIds.length === 0) {
+      return [];
+    }
+    return db
+      .select()
+      .from(paymentRefund)
+      .where(inArray(paymentRefund.paymentId, [...paymentIds]))
+      .orderBy(asc(paymentRefund.createdAt), asc(paymentRefund.id));
+  }
+
+  /**
+   * The admin payment list, newest first, keyset paged by `(created_at, id)`; `needsAttention` filters the open attention
+   * items. No index serves the attention filter yet (plan step 3 (h)): the payment table is read in creation order.
+   */
+  async listPage(
+    db: DbExecutor,
+    filter: { readonly needsAttention: boolean | undefined },
+    after: PaymentListCursor | undefined,
+    limit: number,
+  ): Promise<PaymentListRow[]> {
+    const rows = await db
+      .select({ payment, orderNumber: salesOrder.number })
+      .from(payment)
+      .innerJoin(salesOrder, eq(salesOrder.id, payment.orderId))
+      .where(
+        and(
+          filter.needsAttention === undefined
+            ? undefined
+            : eq(payment.needsAttention, filter.needsAttention),
+          after === undefined
+            ? undefined
+            : or(
+                lt(payment.createdAt, after.createdAt),
+                and(eq(payment.createdAt, after.createdAt), lt(payment.id, after.id)),
+              ),
+        ),
+      )
+      .orderBy(desc(payment.createdAt), desc(payment.id))
+      .limit(limit);
+    return rows;
   }
 
   async insertRefund(tx: Transaction, values: NewRefundRow): Promise<RefundRow> {

@@ -28,7 +28,7 @@ export type AdminRefundResult =
   | { readonly kind: "requested"; readonly replay: boolean; readonly refund: RefundRow }
   | { readonly kind: "refused"; readonly reason: RefundRefusal }
   | { readonly kind: "not_found" }
-  /** The same `Idempotency-Key` was used for another payment or amount. */
+  /** The same `Idempotency-Key` was used for another payment, amount or note. */
   | { readonly kind: "idempotency_key_reused" };
 
 export type SendRefundResult =
@@ -89,7 +89,11 @@ export class PaymentRefundsService {
           }
           const replayed = await this.payments.findRefundByIdempotencyKey(tx, input.idempotencyKey);
           if (replayed !== undefined) {
-            return replayed.paymentId === row.id && replayed.amount === input.amount.amount
+            // The same key with another payment, amount, currency or note is another request.
+            return replayed.paymentId === row.id &&
+              replayed.amount === input.amount.amount &&
+              replayed.currency === input.amount.currency &&
+              replayed.note === input.note
               ? { kind: "requested" as const, replay: true, refund: replayed }
               : { kind: "idempotency_key_reused" as const };
           }

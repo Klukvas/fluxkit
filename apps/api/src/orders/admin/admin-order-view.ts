@@ -2,6 +2,13 @@ import { Inject, Injectable } from "@nestjs/common";
 import { ORDER_ACTORS, ORDER_STATUSES, type OrderReadPort } from "@fluxkit/core";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import type { DbExecutor } from "../../common/transaction.js";
+import { toAdminPayments } from "../../payments/admin/admin-payment-view.js";
+import {
+  PaymentsRepository,
+  type PaymentEventRow,
+  type PaymentRow,
+  type RefundRow,
+} from "../../payments/attempts/payments.repository.js";
 import { toAdminShipments } from "../../shipping/shipments/shipment-view.js";
 import { optionValuesSchema, parseAddress, parseOrderShipping, textMap } from "../order-view.js";
 import {
@@ -60,6 +67,10 @@ export interface AdminOrderParts {
   /** The order's shipments, oldest first, and their status journals. */
   readonly shipments: readonly ShipmentRow[];
   readonly shipmentChanges: readonly ShipmentStatusChangeRow[];
+  /** The order's payment attempts, oldest first, with the refunds and journal rows of all of them. */
+  readonly payments: readonly PaymentRow[];
+  readonly paymentRefunds: readonly RefundRow[];
+  readonly paymentEvents: readonly PaymentEventRow[];
 }
 
 export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
@@ -126,6 +137,7 @@ export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
             title: textMap.parse(parts.shipping.title),
           },
     shipments: toAdminShipments(parts.shipments, parts.shipmentChanges),
+    payments: toAdminPayments(parts.payments, parts.paymentRefunds, parts.paymentEvents),
     history: parts.history.map((row) => ({
       fromStatus: row.fromStatus === null ? null : status(row.fromStatus),
       toStatus: status(row.toStatus),
@@ -163,7 +175,7 @@ export function toAdminOrderSummary(order: OrderRow, itemCount: number): AdminOr
 
 /**
  * Loads the parts of one order in a fixed number of statements (order, items, journal, adjustments, reservations, shipping,
- * shipments and their journals) and
+ * shipments and their journals, payment attempts with their refunds and journals) and
  * builds the view. Implements `OrderReadPort` (token `ORDER_READ_PORT`): the admin detail route and the plugins share
  * this one method.
  */
@@ -172,6 +184,7 @@ export class AdminOrderViewService implements OrderReadPort {
   constructor(
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
+    @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
   ) {}
 
   /**
@@ -204,6 +217,10 @@ export class AdminOrderViewService implements OrderReadPort {
       db,
       shipments.map((row) => row.id),
     );
+    const payments = await this.payments.listAttemptsOfOrder(db, order.id);
+    const paymentIds = payments.map((row) => row.id);
+    const paymentRefunds = await this.payments.listRefundsOfPayments(db, paymentIds);
+    const paymentEvents = await this.payments.listEventsOfPayments(db, paymentIds);
     return buildAdminOrderView({
       order,
       items,
@@ -213,6 +230,9 @@ export class AdminOrderViewService implements OrderReadPort {
       shipping,
       shipments,
       shipmentChanges,
+      payments,
+      paymentRefunds,
+      paymentEvents,
     });
   }
 

@@ -13,5 +13,6 @@ export * from "./provider-port.js";
 export * from "./reasons.js";
 export * from "./reconcile.js";
 export * from "./refund.js";
+export * from "./shopper.js";
 export * from "./status.js";
 export * from "./validity.js";
