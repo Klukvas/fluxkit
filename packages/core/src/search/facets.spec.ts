@@ -274,6 +274,9 @@ describe("validatePageRequest", () => {
     expect(validatePageRequest(1, 24)).toEqual({ ok: true, page: 1, pageSize: 24 });
     expect(validatePageRequest(209, 48)).toEqual({ ok: true, page: 209, pageSize: 48 });
     expect(validatePageRequest(417, 24)).toEqual({ ok: true, page: 417, pageSize: 24 });
+    // The last page that starts inside: hit 9 960; the next one starts exactly at hit 10 000 (review F5, M16).
+    expect(validatePageRequest(250, 40)).toEqual({ ok: true, page: 250, pageSize: 40 });
+    expect(validatePageRequest(251, 40)).toEqual({ ok: false, reason: "beyond_max_offset" });
   });
 
   it("refuses pages beyond the limit, bad numbers and page sizes above the maximum", () => {

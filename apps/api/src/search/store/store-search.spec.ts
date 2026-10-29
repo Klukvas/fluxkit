@@ -141,8 +141,23 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
       isFilterable: true,
     });
     expect(weight.status, JSON.stringify(weight.body)).toBe(201);
-    extraAttributeIds.push(internal.body.id, hidden.body.id, weight.body.id);
-    for (const id of [hidden.body.id, weight.body.id]) {
+    // A public, filterable select attribute (hostile `attr.<code>:<value>` cases).
+    const fit = await call<{ id: string }>("POST", "/admin/attributes", {
+      code: `fit_${fx.runId}`,
+      name: { uk: "Крій" },
+      inputType: "select",
+      isFilterable: true,
+    });
+    expect(fit.status, JSON.stringify(fit.body)).toBe(201);
+    for (const code of ["slim", "loose"]) {
+      const created = await call("POST", `/admin/attributes/${fit.body.id}/options`, {
+        code,
+        label: { uk: code },
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+    }
+    extraAttributeIds.push(internal.body.id, hidden.body.id, weight.body.id, fit.body.id);
+    for (const id of [hidden.body.id, weight.body.id, fit.body.id]) {
       const assigned = await call("PUT", `/admin/product-types/${fx.teeTypeId}/attributes/${id}`, {
         level: "product",
       });
@@ -159,6 +174,7 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
         [`secret_${fx.runId}`]: SENTINEL,
         [`hidden_${fx.runId}`]: SENTINEL,
         [`weight_${fx.runId}`]: 1.5,
+        [`fit_${fx.runId}`]: "slim",
       },
     });
     expect(patchedShirt.status, JSON.stringify(patchedShirt.body)).toBe(200);
@@ -359,7 +375,7 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     expect((await get(`/store/search?${values}`)).status).toBe(400);
   });
 
-  it("never returns an internal attribute value, its code or its label in any answer", async () => {
+  it("never returns an internal or hidden attribute value, its code or its label in any answer", async () => {
     for (const path of [
       `/store/search?q=${SENTINEL}`,
       `/store/search?q=shirt&locale=en`,
@@ -373,8 +389,13 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
       expect(text).not.toContain(SENTINEL);
       expect(text).not.toContain(`secret_${fx.runId}`);
       expect(text).not.toContain("Собівартість");
+      expect(text).not.toContain(`hidden_${fx.runId}`);
+      expect(text).not.toContain("Прихований");
     }
+    // The shirt carries the sentinel in an internal AND in a hidden but searchable attribute: neither may be indexed
+    // (the hidden one is excluded by `isPublicAttribute` alone, review F5 / mutation M2).
     expect((await get(`/store/search?q=${SENTINEL}`)).body.items).toEqual([]);
+    expect((await get(`/store/search?q=${SENTINEL}&locale=en`)).body.items).toEqual([]);
   });
 
   it("suggests products for typed text from 2 characters on, never cached", async () => {
@@ -580,6 +601,29 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
       await updateIndexSettingsAsMaster(uid, { filterableAttributes: before });
       await drifting.app.close();
     }
+  });
+
+  it("refuses hostile option and attribute values and a page whose first hit is exactly 10 000 (review F5)", async () => {
+    for (const param of [
+      `opt.${fx.size.code}:m" OR inStock = true`,
+      `opt.${fx.size.code}:m) OR (inStock = true`,
+      `opt.${fx.size.code}:M`,
+      `opt.${fx.size.code}:m\u0000`,
+      `attr.fit_${fx.runId}:slim" OR brand = "x`,
+      `attr.fit_${fx.runId}:Slim`,
+    ]) {
+      const refused = await get<{ code: string; errors?: { path: string; code: string }[] }>(
+        `/store/search?f=${encodeURIComponent(param)}`,
+      );
+      expect(refused.status, `${param}: ${JSON.stringify(refused.body)}`).toBe(400);
+      expect(refused.body.errors?.[0], param).toMatchObject({ path: "f", code: "invalid_value" });
+    }
+    const boundary = await get<{ errors?: { path: string; code: string }[] }>(
+      "/store/search?page=251&limit=40",
+    );
+    expect(boundary.status, JSON.stringify(boundary.body)).toBe(400);
+    expect(boundary.body.errors?.[0]).toMatchObject({ path: "page", code: "beyond_max_offset" });
+    expect((await get("/store/search?page=250&limit=40")).status).toBe(200);
   });
 
   it("answers 503 search_unavailable within the timeout when the engine is down, and logs no query text", async () => {
