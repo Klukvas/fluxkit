@@ -46,7 +46,7 @@ function CookieTable({ t }: { t: Translator }) {
         {t("legal.cookies.tableTitle")}
       </h2>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-xl border-collapse text-start text-foreground">
+        <table className="w-full min-w-xl text-start text-foreground">
           <caption className="sr-only">{t("legal.cookies.tableCaption")}</caption>
           <thead>
             <tr className="border-b border-border">
