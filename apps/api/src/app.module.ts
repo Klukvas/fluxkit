@@ -36,6 +36,8 @@ import { DISABLED_SCHEDULER_CONFIG, type SchedulerConfig } from "./jobs/schedule
 import { DEFAULT_ORDERS_CONFIG, type OrdersConfig } from "./orders/orders-config.js";
 import { OrdersModule } from "./orders/orders.module.js";
 import { PaymentRegistryModule, type LoadedPaymentProvider } from "./payments/registry/index.js";
+import { DEFAULT_PAYMENTS_CONFIG, type PaymentsConfig } from "./payments/payments-config.js";
+import { PaymentsModule } from "./payments/payments.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
@@ -54,6 +56,8 @@ export interface AppModuleOptions {
   shippingProviders?: LoadedShippingProvider[];
   /** The enabled payment provider packages (`PAYMENT_PROVIDERS_ENABLED`); defaults to none (no online payment). */
   paymentProviders?: LoadedPaymentProvider[];
+  /** `STOREFRONT_PUBLIC_URL` for the payment URLs and the provider call timeout; defaults to none (no online payment URLs). */
+  payments?: PaymentsConfig;
   /** The loaded email provider package (`EMAIL_PROVIDER`): zero or one; defaults to none (`EMAIL_PROVIDER=none`). */
   emailProviders?: LoadedEmailProvider[];
   /** `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL` and the sender tuning; defaults to none of them (no provider). */
@@ -134,6 +138,7 @@ export class AppModule {
         ShippingAdminModule,
         ShipmentsModule,
         PaymentRegistryModule.register(options.paymentProviders ?? []),
+        PaymentsModule.register(options.payments ?? DEFAULT_PAYMENTS_CONFIG),
         EmailRegistryModule.register(options.emailProviders ?? []),
         EmailOutboxModule.register(
           options.emailDelivery ?? DISABLED_EMAIL_DELIVERY,

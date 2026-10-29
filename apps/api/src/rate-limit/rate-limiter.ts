@@ -31,6 +31,9 @@ export const RATE_LIMITS = Object.freeze({
   verificationResend: { maxAttempts: 3, windowMinutes: 60 },
   // ADR 0031 decision 15: the admin test send goes through the real provider (quota and reputation); per signed-in admin user.
   emailTest: { maxAttempts: 5, windowMinutes: 60 },
+  // ADR 0032 decisions 12 and 14: the payment webhook, per address; generous because the provider's addresses are
+  // unknown (M25) and one address may carry every notification of the shop.
+  paymentWebhook: { maxAttempts: 300, windowMinutes: 1 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -63,6 +66,7 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     passwordResetConfirm: "clientAddress",
     verificationResend: "account",
     emailTest: "adminUser",
+    paymentWebhook: "clientAddress",
   },
 );
 

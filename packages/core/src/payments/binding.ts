@@ -49,8 +49,9 @@ function refused(
  * the amount (exact minor units), refunds that add up to more than the amount, and for a `succeeded` fact the final
  * amount. ADR 0032 open question 6, decided here: a provider may report a partly refunded payment as still succeeded
  * with a lowered final amount, so the final amount must equal either the amount or the amount less the fact's succeeded
- * refunds; anything else is `final_amount_mismatch`. A malformed fact or attempt is a bug (the API checks facts with
- * `isProviderPaymentFact` first): RangeError.
+ * refunds; anything else is `final_amount_mismatch`. Whatever the status, a final amount above the amount is
+ * `final_amount_mismatch` too (no provider finalizes more than it invoiced, and the payment row could not store it). A
+ * malformed fact or attempt is a bug (the API checks facts with `isProviderPaymentFact` first): RangeError.
  */
 export function bindFact(fact: ProviderPaymentFact, attempt: BindableAttempt): BindDecision {
   if (!isProviderPaymentFact(fact)) {
@@ -82,6 +83,9 @@ export function bindFact(fact: ProviderPaymentFact, attempt: BindableAttempt): B
   }
   if (activeRefunds > attempt.amount.amount) {
     return refused("refunds_exceed_amount", "amount_mismatch");
+  }
+  if (fact.finalAmount !== null && fact.finalAmount.amount > attempt.amount.amount) {
+    return refused("final_amount_mismatch", "amount_mismatch");
   }
   if (fact.status === "succeeded" && fact.finalAmount !== null) {
     const final = fact.finalAmount.amount;

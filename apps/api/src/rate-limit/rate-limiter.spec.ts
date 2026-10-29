@@ -22,6 +22,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       passwordResetConfirm: { maxAttempts: 10, windowMinutes: 10 },
       verificationResend: { maxAttempts: 3, windowMinutes: 60 },
       emailTest: { maxAttempts: 5, windowMinutes: 60 },
+      paymentWebhook: { maxAttempts: 300, windowMinutes: 1 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
   });
@@ -43,6 +44,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       passwordResetConfirm: "clientAddress",
       verificationResend: "account",
       emailTest: "adminUser",
+      paymentWebhook: "clientAddress",
     });
     expect(Object.isFrozen(RATE_LIMIT_SUBJECTS)).toBe(true);
   });

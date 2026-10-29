@@ -453,6 +453,19 @@ export class OrdersRepository {
     return row;
   }
 
+  /** Moves the payment deadline of a LOCKED `awaiting_payment` order later (the expiry deferral, ADR 0032 decision 8). */
+  async updateExpiresAt(tx: Transaction, orderId: string, expiresAt: Date): Promise<OrderRow> {
+    const [row] = await tx
+      .update(salesOrder)
+      .set({ expiresAt })
+      .where(eq(salesOrder.id, orderId))
+      .returning();
+    if (row === undefined) {
+      throw new Error("An updated order was not returned.");
+    }
+    return row;
+  }
+
   /**
    * The replay of a checkout renews the guest access window and writes the hash of the DERIVED token (ADR 0023). The hash
    * is the one already stored unless `ORDER_TOKEN_SECRET` changed since the order was placed; the old hash is replaced,

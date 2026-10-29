@@ -144,6 +144,7 @@ export const KNOWN_REASON_CODES = [
   "order_not_found",
   "order_not_payable",
   "payment_reference_conflict",
+  "payment_in_progress",
   "idempotency_key_required",
   "invalid_idempotency_key",
   "shipping_address_required",

@@ -40,8 +40,30 @@ export async function insertSoldLine(
   return { orderId, itemId };
 }
 
+/**
+ * Deletes the payment attempts of orders, their refunds and their outbox rows (test cleanup): a payment RESTRICTs its
+ * order and a refund its payment; the journal goes with the payment by cascade.
+ */
+export async function deletePaymentsOfOrders(
+  pool: pg.Pool,
+  orderIds: readonly string[],
+): Promise<void> {
+  const refunds = await pool.query<{ id: string }>(
+    "delete from payment_refund where payment_id in (select id from payment where order_id = any($1::uuid[])) returning id",
+    [orderIds],
+  );
+  const payments = await pool.query<{ id: string }>(
+    "delete from payment where order_id = any($1::uuid[]) returning id",
+    [orderIds],
+  );
+  await pool.query("delete from domain_event where aggregate_id = any($1::uuid[])", [
+    [...refunds.rows, ...payments.rows].map((row) => row.id),
+  ]);
+}
+
 /** Deletes orders and everything below them (test cleanup; the application never deletes orders). */
 export async function deleteOrders(pool: pg.Pool, orderIds: readonly string[]): Promise<void> {
+  await deletePaymentsOfOrders(pool, orderIds);
   await pool.query("delete from sales_order where id = any($1::uuid[])", [orderIds]);
 }
 
@@ -75,6 +97,7 @@ export class PlacedOrders {
     await this.pool.query("delete from domain_event where aggregate_id = any($1::uuid[])", [
       shipments.rows.map((row) => row.id),
     ]);
+    await deletePaymentsOfOrders(this.pool, ids);
     await this.pool.query("delete from sales_order where id = any($1::uuid[])", [ids]);
     this.numbers.clear();
   }

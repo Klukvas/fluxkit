@@ -23,6 +23,8 @@ import { trackShipments } from "./track-shipments.job.js";
 import { EmailOutboxRepository, EmailSender } from "../email/outbox/index.js";
 import { sendEmails } from "./send-emails.job.js";
 import { purgeEmailMessages } from "./purge-email-messages.job.js";
+import { PaymentReconcileService } from "../payments/payment-reconcile.service.js";
+import { reconcilePayments } from "./reconcile-payments.job.js";
 
 /** The jobs in the order a tick runs them. The order matters (see `JobsRunner.runAll`). */
 export const JOB_NAMES = [
@@ -36,6 +38,7 @@ export const JOB_NAMES = [
   "track-shipments",
   "send-emails",
   "purge-email-messages",
+  "reconcile-payments",
 ] as const;
 
 export type JobName = (typeof JOB_NAMES)[number];
@@ -65,6 +68,7 @@ export class JobsRunner {
     @Inject(ShipmentTrackingService) private readonly shipmentTracking: ShipmentTrackingService,
     @Inject(EmailSender) private readonly emailSender: EmailSender,
     @Inject(EmailOutboxRepository) private readonly emailOutbox: EmailOutboxRepository,
+    @Inject(PaymentReconcileService) private readonly paymentReconcile: PaymentReconcileService,
     @Inject(SCHEDULER_DATABASE_URL) databaseUrl: string,
   ) {
     this.leases = pgEventLeaseSource(databaseUrl);
@@ -77,7 +81,9 @@ export class JobsRunner {
    * files), then the carrier polls of job 8 (outbound network calls: after everything time-critical, so a slow carrier
    * delays nothing else; the events it writes are delivered by the next tick), then the mail of job 9 (outbound calls
    * too, after the dispatcher so a mail a handler enqueued goes out in the same tick; latency-critical auth mail does not
-   * wait for it, the request makes an immediate attempt) and the mail purge of job 10. Every job gets its
+   * wait for it, the request makes an immediate attempt), the mail purge of job 10 and, last, the payment reconcile of job 11
+   * (provider calls too: after everything else, so a slow payment provider delays no mail; a fact it applies may write
+   * `order.paid`, delivered by the next tick, and a deferral of job 1 made its attempts due for this run). Every job gets its
    * own time budget (`budgetMs`, default `DEFAULT_JOB_BUDGET_MS`) and stops starting new work when it is used up, so no
    * job can hold the tick, and with it the lock, for hours; what is left waits for the next tick. One failing job never
    * stops the next and never throws out of here: its error is logged and returned.
@@ -145,6 +151,9 @@ export class JobsRunner {
         DEFAULT_CLEANUP_LIMITS,
         budget,
       ),
+    );
+    await run("reconcile-payments", (budget) =>
+      reconcilePayments({ reconcile: this.paymentReconcile }, now, { budget }),
     );
     return reports;
   }

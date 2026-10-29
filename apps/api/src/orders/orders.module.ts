@@ -11,6 +11,7 @@ import { ORDER_PAYMENTS_PORT, ORDER_READ_PORT } from "@fluxkit/core";
 import { StoreModule } from "../catalog/store/store.module.js";
 import { markStoreOrderResponseUncacheable } from "../common/store-path.js";
 import { InventoryModule } from "../inventory/inventory.module.js";
+import { PaymentAttemptsModule } from "../payments/attempts/payment-attempts.module.js";
 import { ShippingStoreModule } from "../shipping/store/shipping-store.module.js";
 import { AdminOrderViewService } from "./admin/admin-order-view.js";
 import { AdminOrdersController } from "./admin/admin-orders.controller.js";
@@ -49,7 +50,8 @@ export class OrdersModule implements NestModule {
   static register(options: OrdersModuleOptions): DynamicModule {
     return {
       module: OrdersModule,
-      imports: [StoreModule, InventoryModule, ShippingStoreModule],
+      // The payment tables: the cancel, mark-paid and expiry guards of ADR 0032 decisions 8 and 10.
+      imports: [StoreModule, InventoryModule, ShippingStoreModule, PaymentAttemptsModule],
       controllers: [
         CheckoutController,
         StoreOrdersController,

@@ -82,7 +82,7 @@ describe("pnpm jobs:run-once (real Postgres)", () => {
       const lines = result.stdout.trim().split("\n");
       expect(lines.map((line) => line.split(":")[0])).toEqual([...JOB_NAMES]);
       expect(lines[0]).toMatch(
-        /^expire-orders: scanned=\d+ expired=\d+ notDue=\d+ failures=0 truncated=false$/,
+        /^expire-orders: scanned=\d+ expired=\d+ deferred=\d+ notDue=\d+ failures=0 truncated=false$/,
       );
       expect(lines.every((line) => !line.includes("FAILED"))).toBe(true);
     });
