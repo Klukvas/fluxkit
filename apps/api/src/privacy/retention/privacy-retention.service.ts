@@ -47,7 +47,8 @@ export class PrivacyRetentionService {
   }
 
   async anonymiseIfDue(orderId: string, cutoff: Date, now: Date): Promise<RetentionOutcome> {
-    // Job statement and lock limits (docs/api/jobs.md): a row held by a stuck writer fails this order, not the tick.
+    // Job statement and lock limits (docs/api/jobs.md): a row held by a stuck writer fails this order; job 12 records the
+    // failure and goes on with the next order, so it never fails the tick (review F4).
     return withJobTransaction(this.db, async (tx) => {
       const [order] = await tx
         .select()

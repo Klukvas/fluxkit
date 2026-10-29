@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrivacyRetentionService } from "../privacy/retention/privacy-retention.service.js";
 import type { PlacedForAdmin } from "../test/admin-orders-world.js";
 import { ShipmentWorld, TEST_POINT_REF } from "../test/shipment-world.js";
-import { anonymiseOrders } from "./anonymise-orders.job.js";
+import { anonymiseOrders, type AnonymiseOrdersDeps } from "./anonymise-orders.job.js";
 import { JobBudget } from "./job-budget.js";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -84,6 +84,7 @@ describe("anonymise-orders (job 12; real Postgres, injected time)", () => {
       enabled: false,
       anonymised: 0,
       skipped: 0,
+      failures: [],
       requestsDeleted: 0,
       auditEventsDeleted: 0,
       truncated: false,
@@ -220,5 +221,64 @@ describe("anonymise-orders (job 12; real Postgres, injected time)", () => {
     expect(await left("privacy_request", oldOpen)).toBe(1);
     expect(await left("admin_audit_event", oldAudit)).toBe(0);
     expect(await left("admin_audit_event", newAudit)).toBe(1);
+  });
+});
+
+describe("anonymise-orders: one failing order (privacy review F4; unit, injected service)", () => {
+  type Retention = AnonymiseOrdersDeps["retention"];
+
+  function fakeRetention(failing: ReadonlySet<string>, ids: string[]) {
+    const calls: string[] = [];
+    const purges: string[] = [];
+    const retention: Retention = {
+      candidates: (_cutoff, afterId, limit) => {
+        const start = afterId === null ? 0 : ids.indexOf(afterId) + 1;
+        return Promise.resolve(ids.slice(start, start + limit));
+      },
+      anonymiseIfDue: (id) => {
+        calls.push(id);
+        if (failing.has(id)) {
+          // A database error text embeds the statement and its parameters (personal data); it must never be logged.
+          const error = Object.assign(
+            new Error("canceling statement due to lock timeout: email = victim@example.test"),
+            { code: "55P03" },
+          );
+          return Promise.reject(error);
+        }
+        return Promise.resolve("anonymised");
+      },
+      deleteOldRequests: () => {
+        purges.push("requests");
+        return Promise.resolve(0);
+      },
+      deleteOldAuditEvents: () => {
+        purges.push("audit");
+        return Promise.resolve(0);
+      },
+    };
+    return { retention, calls, purges };
+  }
+
+  it("continues with the next orders, counts the failure without personal data and still runs the purges", async () => {
+    const { retention, calls, purges } = fakeRetention(new Set(["b"]), ["a", "b", "c", "d"]);
+    const result = await anonymiseOrders({ retention, retentionDays: 30 }, new Date(), {
+      pageSize: 2,
+    });
+    expect(calls).toEqual(["a", "b", "c", "d"]);
+    expect(result).toMatchObject({ enabled: true, anonymised: 3, skipped: 0, truncated: false });
+    expect(result.failures).toEqual([{ orderId: "b", error: "Error cause=Error code=55P03" }]);
+    expect(JSON.stringify(result)).not.toContain("victim@example.test");
+    expect(purges).toEqual(["requests", "audit"]);
+  });
+
+  it("still fails the tick when the candidates cannot be read at all", async () => {
+    const { retention } = fakeRetention(new Set(), ["a"]);
+    const failing: Retention = {
+      ...retention,
+      candidates: () => Promise.reject(new Error("connection lost")),
+    };
+    await expect(
+      anonymiseOrders({ retention: failing, retentionDays: 30 }, new Date()),
+    ).rejects.toThrow("connection lost");
   });
 });

@@ -3,6 +3,7 @@ import {
   PRIVACY_REQUEST_RETENTION_DAYS,
   retentionCutoff,
 } from "@fluxkit/core";
+import { summarizeError } from "../common/error-summary.js";
 import type { PrivacyRetentionService } from "../privacy/retention/privacy-retention.service.js";
 import { DEFAULT_CLEANUP_LIMITS, drainInBatches, type BatchLimits } from "./batches.js";
 import type { JobBudget } from "./job-budget.js";
@@ -16,6 +17,8 @@ export interface AnonymiseOrdersResult {
   anonymised: number;
   /** Due orders with a blocker (something still in progress): left for a later run. */
   skipped: number;
+  /** Orders whose transaction failed (logged as errors by the runner); retried on the next run. */
+  failures: { orderId: string; error: string }[];
   requestsDeleted: number;
   auditEventsDeleted: number;
   truncated: boolean;
@@ -34,7 +37,9 @@ export interface AnonymiseOrdersDeps {
  * Job 12 `anonymise-orders` (ADR 0033 decision 8). Off (`enabled: false`, nothing read or changed) until the owner sets
  * `ORDER_CONTACT_RETENTION_DAYS`. Then: the contact data of every closed order whose final date (closing time or newest
  * refund) is strictly older than the period is anonymised, one order per short transaction, in pages by id within the
- * time budget; an order with a blocker is skipped and counted; then closed privacy requests older than
+ * time budget; an order with a blocker is skipped and counted; an order whose transaction fails is recorded in
+ * `failures` (id and error class and code only) and the run goes on with the next one; only a failure to read the
+ * candidates fails the run. Then closed privacy requests older than
  * `PRIVACY_REQUEST_RETENTION_DAYS` and audit events older than `AUDIT_EVENT_RETENTION_DAYS` are deleted in batches.
  * TODO(fluxkit): legal review of both purge periods (ADR 0033 open question 2).
  */
@@ -47,6 +52,7 @@ export async function anonymiseOrders(
     enabled: deps.retentionDays !== null,
     anonymised: 0,
     skipped: 0,
+    failures: [],
     requestsDeleted: 0,
     auditEventsDeleted: 0,
     truncated: false,
@@ -68,10 +74,16 @@ export async function anonymiseOrders(
         result.truncated = true;
         break pages;
       }
-      const outcome = await deps.retention.anonymiseIfDue(id, cutoff, now);
-      if (outcome === "anonymised") result.anonymised += 1;
-      if (outcome === "blocked") result.skipped += 1;
       afterId = id;
+      try {
+        const outcome = await deps.retention.anonymiseIfDue(id, cutoff, now);
+        if (outcome === "anonymised") result.anonymised += 1;
+        if (outcome === "blocked") result.skipped += 1;
+      } catch (error) {
+        // One order (a lock timeout, a corrupt row) must not hold back every order after it nor the purges (review F4).
+        // The class and the code only: a database error text embeds the statement and its parameters (personal data).
+        result.failures.push({ orderId: id, error: summarizeError(error) });
+      }
     }
     if (ids.length < pageSize) break;
   }
