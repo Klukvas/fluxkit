@@ -470,6 +470,13 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       (file) => file.path === join("components", "payment-return-page.tsx"),
     );
     expect(code(page?.text ?? "")).toMatch(/paymentIdFromSearch\(window\.location\.search\)/);
+    // That is the ONLY read of the query in the page: a status, an amount or an order number there is never looked at.
+    expect(code(page?.text ?? "").match(/location\.search/g)).toHaveLength(1);
+    expect(code(page?.text ?? "")).not.toMatch(/useSearchParams|URLSearchParams|searchParams/);
+    // The id parser takes the `payment` member and nothing else.
+    const parser = sources.find((file) => file.path === join("lib", "payment-return.ts"));
+    expect(code(parser?.text ?? "").match(/getAll\(/g)).toEqual(["getAll("]);
+    expect(code(parser?.text ?? "")).toMatch(/getAll\("payment"\)/);
     // No payment module other than the id parser touches the query.
     for (const file of paymentFiles) {
       if (file.path === join("lib", "payment-return.ts")) continue;
