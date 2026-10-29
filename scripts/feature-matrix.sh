@@ -43,13 +43,14 @@
 # GET /store/config:
 #   search-off   migrate and seed with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
 #                search false, 404 on every search route (store and admin), and not one row written to the search tables
-#                by the seed's catalog writes or the scheduler's first tick (no DB side effects)
+#                by the seed's catalog writes, its demo synonym groups or the scheduler's first tick (no DB side effects)
 #   search-on    start the API with SEARCH_ENABLED=true, an engine that is NOT reachable and an invented key: it must start
 #                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key.
 #                Then, against the real engine (MEILI_URL, MEILI_MASTER_KEY): create a key scoped to a fresh prefix,
-#                migrate and seed (the catalog writes mark products in the queue), `search:reindex` (builds, swaps,
-#                drains the queue), start the API and find a seeded product with GET /store/search (also by a partial
-#                last word, ADR 0037) and its suggest.
+#                migrate and seed (the catalog writes mark products in the queue, the demo synonym groups are written),
+#                `search:reindex` (builds, swaps, drains the queue, applies the groups), start the API and find a seeded
+#                product with GET /store/search (also by a partial last word, ADR 0037, and by a demo synonym, `spanner`)
+#                and its suggest.
 #                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
@@ -410,6 +411,9 @@ GUARD
     case "$marked" in
       "queue=0 "*) echo "expected the seed's catalog writes to mark products for the index" >&2; exit 1 ;;
     esac
+    case "$marked" in
+      *" synonyms=0") echo "expected the seed to write the demo synonym groups with search on" >&2; exit 1 ;;
+    esac
     node apps/api/dist/search/reindex.js
     drained="$(search_rows)"
     echo "search tables after search:reindex: $drained"
@@ -430,6 +434,11 @@ GUARD
       || { echo "expected the seeded screwdriver for the partial word 'screw'" >&2; exit 1; }
     echo "$partial" | grep -q '"relaxed":true' \
       || { echo "expected the partial word to be answered by the relaxed pass" >&2; exit 1; }
+    # A demo synonym group of the seed (wrench/spanner), applied by search:reindex: a word no product has finds the wrench.
+    synonym="$(curl -fsS "http://127.0.0.1:${port}/store/search?q=spanner&locale=en")"
+    echo "store/search?q=spanner -> $synonym"
+    echo "$synonym" | grep -q '"title":"Demo Adjustable Wrench"' \
+      || { echo "expected the seeded synonym group wrench/spanner to find the wrench" >&2; exit 1; }
     suggestions="$(curl -fsS "http://127.0.0.1:${port}/store/search/suggest?q=screw&locale=en")"
     echo "store/search/suggest?q=screw -> $suggestions"
     echo "$suggestions" | grep -q '"title":"Demo Screwdriver"' \
