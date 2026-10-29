@@ -399,7 +399,7 @@ describe("admin email API (real Postgres, test provider)", () => {
       expect(result.headers.get("cache-control")).toBe("no-store");
     });
 
-    it("redacts the variables of account mails and of any key that names a secret, and cuts long texts", async () => {
+    it("shows only the variables the template declares, none of an account mail, and none of an unregistered template", async () => {
       const tokenRow = randomUUID();
       const reset = await world().enqueued({
         templateKey: "customer.password_reset",
@@ -421,6 +421,33 @@ describe("admin email API (real Postgres, test provider)", () => {
         orderNumber: "AAAA-0003",
         currency: "UAH",
         total: 4200,
+      });
+
+      // Only the keys the template declares (`displayVariables`) are shown; a stored key it does not list is not,
+      // whatever its name (review F3), and neither is any value of a template that is not registered any more.
+      await world().pool.query(
+        `update email_message set variables = variables || '{"code":"123456","href":"https://x.example/m"}' where id = $1`,
+        [paid],
+      );
+      const extra = await ctx.call<MessageBody>("GET", `/admin/email/messages/${paid}`);
+      expect(extra.body.variables).toEqual({
+        orderNumber: "AAAA-0003",
+        currency: "UAH",
+        total: 4200,
+        code: "[redacted]",
+        href: "[redacted]",
+      });
+      await world().pool.query(
+        "update email_message set template_key = 'removed_feature.notice' where id = $1",
+        [paid],
+      );
+      const orphan = await ctx.call<MessageBody>("GET", `/admin/email/messages/${paid}`);
+      expect(orphan.body.variables).toEqual({
+        orderNumber: "[redacted]",
+        currency: "[redacted]",
+        total: "[redacted]",
+        code: "[redacted]",
+        href: "[redacted]",
       });
     });
 

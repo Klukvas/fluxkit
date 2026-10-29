@@ -1,8 +1,8 @@
 import type { JsonObject } from "@fluxkit/api-client";
 
 /**
- * The stored template input of a mail as a flat list of rows for display. The API redacts it (`[redacted]` for account
- * mails and for keys that name a token, secret, password, key or link, texts cut to 200 characters); the screen shows what
+ * The stored template input of a mail as a flat list of rows for display. The API redacts it (`[redacted]` for every key
+ * its template does not declare displayable and for account mails, texts cut to 200 characters); the screen shows what
  * it gets and marks a redacted value as hidden, it never tries to restore one. Every value is text for a text node.
  */
 

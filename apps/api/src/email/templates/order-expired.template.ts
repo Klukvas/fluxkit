@@ -36,6 +36,7 @@ export const orderExpiredTemplate: EmailTemplate<OrderClosedVariables> = Object.
   category: "order",
   variablesSchema: orderClosedVariablesSchema,
   sampleVariables: Object.freeze({ orderNumber: "7K3M-9QX2" }),
+  displayVariables: Object.freeze(["orderNumber"]),
   render,
 });
 

@@ -142,6 +142,12 @@ export interface EmailTemplate<V> {
   readonly variablesSchema: EmailVariablesSchema<V>;
   /** Variables the preview renders; they must pass `variablesSchema`. */
   readonly sampleVariables: V;
+  /**
+   * The top-level variable keys whose stored values an admin may see in the outbox detail (an allowlist). Every other
+   * value is shown as `[redacted]`; omitted or empty, none is shown. Never list a key that holds a token, a one-time code,
+   * a link or anything else a reader could use.
+   */
+  readonly displayVariables?: readonly string[];
   render(variables: V, context: EmailRenderContext): EmailRenderOutput;
 }
 
@@ -173,6 +179,17 @@ export function checkEmailTemplateDefinition(template: EmailTemplate<unknown>): 
     problems.push("variablesSchema has no safeParse");
   } else if (!candidate.variablesSchema?.safeParse(candidate.sampleVariables).success) {
     problems.push("sampleVariables do not pass variablesSchema");
+  }
+  const display: unknown = candidate.displayVariables;
+  if (
+    display !== undefined &&
+    !(
+      Array.isArray(display) &&
+      display.every((key) => typeof key === "string" && key.length > 0) &&
+      new Set(display).size === display.length
+    )
+  ) {
+    problems.push("displayVariables is not a list of distinct, non-empty keys");
   }
   return problems;
 }

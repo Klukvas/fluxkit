@@ -144,7 +144,7 @@ export const emailMessageResponseSchema = z.object({
 export const emailMessageDetailResponseSchema = emailMessageResponseSchema.extend({
   variables: z.record(z.string(), z.unknown()).meta({
     description:
-      "The frozen template input, redacted: every value of a `customer.*` mail and any value under a key that names a token, secret, password, key or link is `[redacted]`.",
+      "The frozen template input, redacted: only the top-level keys the template declares in `displayVariables` keep their value; every other value, every value of a `customer.*` mail and every value of a template that is not registered any more is `[redacted]`.",
   }),
 });
 

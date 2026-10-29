@@ -24,7 +24,7 @@ With `EMAIL_PROVIDER=none` the status, the list, the detail, the cancel, the tem
 - `to` is the recipient address (personal data). `recipientKind` is `customer`, `guest` or `admin` (a test send).
 - `status` is `pending`, `sending`, `sent` (accepted by the provider, not delivered), `failed`, `unknown` (the provider may or may not have sent it; never retried automatically) or `cancelled`. Codes (`lastErrorCode`, `providerCode`) are short codes, never provider text.
 - `canCancel` is true while pending. `canResend` is true for a final mail that is not a `customer.*` account mail; it does not look at the provider or the template, the resend itself does.
-- `variables` (detail only) is the stored template input: every value of a `customer.*` mail and any value under a key that names a token, secret, password, key or link is `[redacted]`; texts are cut to 200 characters.
+- `variables` (detail only) is the stored template input: only the top-level keys the template declares in `displayVariables` (`docs/contracts/email-templates.md`) keep their value; every other value, every value of a `customer.*` mail and every value of a template that is not registered any more is `[redacted]` (an allowlist since email review F3; it was a key-name denylist); texts are cut to 200 characters.
 
 ## Decisions of step 9
 

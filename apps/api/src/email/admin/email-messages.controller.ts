@@ -114,7 +114,7 @@ export class EmailMessagesController {
   @ApiOperation({
     summary: "Get one mail message",
     description:
-      "The journal fields, codes and the deadline, and the frozen template variables redacted (`[redacted]`: every value of a `customer.*` mail, any value under a key that names a token, secret, password or link).",
+      "The journal fields, codes and the deadline, and the frozen template variables redacted (`[redacted]`: only the top-level keys the template declares in `displayVariables` keep their value; every other value, every value of a `customer.*` mail and every value of a template that is not registered any more is hidden).",
   })
   @ApiParam(ID_PARAM)
   @ApiZodResponse(200, emailMessageDetailResponseSchema, "The message.")
