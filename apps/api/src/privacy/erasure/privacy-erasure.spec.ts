@@ -1,6 +1,10 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
+import type pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ProblemBody } from "../../common/problem.filter.js";
+import { PG_POOL } from "../../database/database.module.js";
+import { startApp } from "../../test/app.js";
+import { PrivacyRetentionService } from "../retention/privacy-retention.service.js";
 import type { PlacedForAdmin } from "../../test/admin-orders-world.js";
 import { http, type HttpResult } from "../../test/http.js";
 import { checkoutAs, checkoutBody } from "../../test/order-http.js";
@@ -151,6 +155,61 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
     return id;
   }
 
+  /** Opens the API's pool connections first, so a race really runs at once (payments review F3). */
+  async function warmApiPool(connections = 10): Promise<void> {
+    const pool = owner().app.get<pg.Pool>(PG_POOL);
+    const clients = await Promise.all(Array.from({ length: connections }, () => pool.connect()));
+    for (const client of clients) client.release();
+  }
+
+  /** Waits until `count` backends of this database wait for a lock held by the test's own connection. */
+  async function waitForLockWaiters(count: number, timeoutMs = 5_000): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const waiting = await world.pool.query<{ count: string }>(
+        `select count(*) as count from pg_stat_activity
+          where datname = current_database() and wait_event_type = 'Lock' and pid <> pg_backend_pid()`,
+      );
+      if (Number(waiting.rows[0]?.count) >= count) return;
+      if (Date.now() > deadline) {
+        throw new Error(`fewer than ${String(count)} transactions ever waited for a lock`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  /**
+   * Holds `lockSql` (first parameter: the customer id) in a transaction of the test, starts `action`, waits until it
+   * waits for that lock, runs `meanwhile` in the same transaction and commits: what the action finds under its lock is
+   * then the changed state.
+   */
+  async function whileHolding<T>(
+    lockSql: string,
+    customerId: string,
+    action: () => Promise<T>,
+    meanwhile: (client: pg.PoolClient) => Promise<void>,
+  ): Promise<T> {
+    await warmApiPool();
+    const client = await world.pool.connect();
+    try {
+      await client.query("begin");
+      await client.query(lockSql, [customerId]);
+      const pending = action();
+      try {
+        await waitForLockWaiters(1);
+        await meanwhile(client);
+        await client.query("commit");
+      } catch (error) {
+        await client.query("rollback");
+        await pending.catch(() => undefined);
+        throw error;
+      }
+      return await pending;
+    } finally {
+      client.release();
+    }
+  }
+
   function deleteAccount(
     shopper: Shopper,
     body: unknown = { password: PASSWORD, confirm: true },
@@ -162,6 +221,7 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
     world = await ShipmentWorld.start({
       rateLimits: {
         checkout: { maxAttempts: 100_000, windowMinutes: 10 },
+        registration: { maxAttempts: 100_000, windowMinutes: 60 },
         accountDelete: { maxAttempts: 100_000, windowMinutes: 60 },
       },
     });
@@ -327,6 +387,84 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
       await world.pool.query("select 1"); // warm the pool before the race
       const results = await Promise.all([deleteAccount(shopper), deleteAccount(shopper)]);
       expect(results.map((result) => result.status).sort()).toEqual([204, 401]);
+    });
+
+    it("leaves an order that job 12 already anonymised alone: not anonymised again, not counted (review F6, M1)", async () => {
+      const email = nextEmail("pre-erased");
+      const { shopper, id } = await register(email);
+      const order = await cancelled(await pickupOrder(email, shopper));
+      const retention = owner().app.get(PrivacyRetentionService);
+      const now = new Date();
+      expect(
+        await retention.anonymiseIfDue(order.id, new Date(now.getTime() + 24 * 3_600_000), now),
+      ).toBe("anonymised");
+      const before = await orderRow(order.id);
+      expect(before.customer_id).toBe(id);
+      expect(before.contact_erased_at).toBeInstanceOf(Date);
+
+      const deleted = await deleteAccount(shopper);
+      expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
+      const after = await orderRow(order.id);
+      expect(after.contact_erased_at).toEqual(before.contact_erased_at);
+      expect(after.request_fingerprint).toBe(before.request_fingerprint);
+      const request = await world.pool.query<{ result: Row }>(
+        "select result from privacy_request where subject_customer_id = $1 and kind = 'erasure'",
+        [id],
+      );
+      expect(request.rows[0]?.result).toMatchObject({ ordersAnonymised: 0, orderNumbers: [] });
+    });
+
+    it("re-checks the account under its lock: a password change or a deactivation after the password check refuses the deletion (review F6, M4)", async () => {
+      const other = await register(nextEmail("other-hash"));
+      const otherHash = (
+        await world.pool.query<{ password_hash: string }>(
+          "select password_hash from customer where id = $1",
+          [other.id],
+        )
+      ).rows[0]?.password_hash;
+      const changes: [string, string, unknown[]][] = [
+        ["password changed", "update customer set password_hash = $2 where id = $1", [otherHash]],
+        ["deactivated", "update customer set is_active = false where id = $1", []],
+      ];
+      for (const [label, change, values] of changes) {
+        const { shopper, id } = await register(nextEmail("recheck"));
+        const result = await whileHolding(
+          "select id from customer where id = $1 for update",
+          id,
+          () => deleteAccount(shopper),
+          async (client) => {
+            await client.query(change, [id, ...values]);
+          },
+        );
+        expect(result.status, `${label}: ${JSON.stringify(result.body)}`).toBe(400);
+        expect(result.body.errors).toEqual([
+          expect.objectContaining({ path: "password", code: "incorrect" }),
+        ]);
+        expect(await count("customer where id = $1", [id]), label).toBe(1);
+      }
+    });
+
+    it("is limited per customer (accountDelete) with 429 and Retry-After (review F6, M12)", async () => {
+      const limited = await startApp({
+        rateLimits: { accountDelete: { maxAttempts: 1, windowMinutes: 60 } },
+      });
+      try {
+        const shopper = new Shopper(limited.baseUrl);
+        const registered = await shopper.post<{ customer: { id: string } }>(
+          "/store/account/register",
+          { email: nextEmail("limited"), password: PASSWORD, firstName: "Rate", lastName: "Limit" },
+        );
+        expect(registered.status, JSON.stringify(registered.body)).toBe(201);
+        const wrong = { password: "not-the-password-1", confirm: true };
+        expect((await deleteAccount(shopper, wrong)).status).toBe(400);
+        const refused = await deleteAccount(shopper);
+        expect(refused.status).toBe(429);
+        expect(refused.headers.get("retry-after")).toMatch(/^\d+$/);
+        expect(await count("customer where id = $1", [registered.body.customer.id])).toBe(1);
+        await world.pool.query("delete from customer where id = $1", [registered.body.customer.id]);
+      } finally {
+        await limited.app.close();
+      }
     });
 
     it("serializes with a checkout of the same customer: never a deleted account with a live order of it", async () => {
@@ -497,6 +635,18 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
         note: "No reply from the address.",
       });
       expect(rejected.body.completedAt).not.toBeNull();
+      // The rejection is audited in its transaction (review F6, M6).
+      const audit = await world.pool.query<{ action: string; detail: Row }>(
+        "select action, detail from admin_audit_event where target_id = $1 order by created_at, id",
+        [created.id],
+      );
+      expect(audit.rows).toEqual([
+        { action: "privacy.request_changed", detail: { kind: "erasure", toStatus: "received" } },
+        {
+          action: "privacy.request_changed",
+          detail: { toStatus: "rejected", reason: "identity_not_confirmed" },
+        },
+      ]);
       const erase = await post(`/admin/privacy/requests/${created.id}/erase`, {
         email,
         confirm: true,
@@ -513,15 +663,93 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
       ).toBe(400);
     });
 
-    it("refuses to erase with an export request (kind export)", async () => {
+    it("refuses to erase with an export request (kind export), also once it is completed", async () => {
       const email = nextEmail("kind");
+      const order = await cancelled(await pickupOrder(email));
       const created = await request({ email }, "export");
-      const refused = await post(`/admin/privacy/requests/${created.id}/erase`, {
-        email,
-        confirm: true,
-      });
+      const erase = () =>
+        post(`/admin/privacy/requests/${created.id}/erase`, { email, confirm: true });
+      const refused = await erase();
       expect(refused.status).toBe(409);
       expect(refused.body).toMatchObject({ rule: "not_an_erasure_request" });
+      // A completed EXPORT request is not an erasure answered again (the idempotency guard checks the kind; M9).
+      expect((await post(`/admin/privacy/requests/${created.id}/export`, { email })).status).toBe(
+        200,
+      );
+      expect((await view(created.id)).status).toBe("completed");
+      const again = await erase();
+      expect(again.status, JSON.stringify(again.body)).toBe(409);
+      expect(again.body).toMatchObject({ rule: "not_an_erasure_request" });
+      expect((await orderRow(order.id)).email).toBe(email);
+    });
+
+    it("refuses with refund_in_progress while a refund is not settled (review F6, M7)", async () => {
+      const email = nextEmail("refund");
+      const order = await cancelled(await pickupOrder(email));
+      const paymentId = (
+        await world.pool.query<{ id: string }>(
+          `insert into payment (order_id, provider_code, provider_payment_id, amount, currency, status, expires_at,
+             created_by, refunded_amount)
+           values ($1, 'fake', 'p-' || $2, 1000, 'UAH', 'succeeded', now() + interval '1 day', 'admin', 0)
+           returning id`,
+          [order.id, randomUUID().slice(0, 8)],
+        )
+      ).rows[0]?.id;
+      await world.pool.query(
+        `insert into payment_refund (payment_id, amount, currency, payment_amount, reason, status)
+         values ($1, 1000, 'UAH', 1000, 'admin', 'requested')`,
+        [paymentId],
+      );
+      try {
+        const created = await request({ email });
+        const preview = await post(`/admin/privacy/requests/${created.id}/erase-preview`, {
+          email,
+        });
+        expect(preview.body).toMatchObject({
+          blockers: [{ orderNumber: order.number, reason: "refund_in_progress" }],
+          reasons: ["refund_in_progress"],
+        });
+        const refused = await post(`/admin/privacy/requests/${created.id}/erase`, {
+          email,
+          confirm: true,
+        });
+        expect(refused.status, JSON.stringify(refused.body)).toBe(409);
+        expect(refused.body).toMatchObject({
+          rule: "erasure_blocked",
+          reasons: ["refund_in_progress"],
+        });
+        expect((await orderRow(order.id)).email).toBe(email);
+      } finally {
+        await world.pool.query("delete from payment_refund where payment_id = $1", [paymentId]);
+        await world.pool.query("delete from payment where id = $1", [paymentId]);
+      }
+    });
+
+    it("locks the customer first: an order that becomes the customer's while the row is held is erased too (review F6, M5)", async () => {
+      const email = nextEmail("admin-lock");
+      const { id } = await register(email);
+      // A closed order of someone else that becomes this customer's while a checkout-like writer holds the row.
+      const late = await cancelled(await pickupOrder(nextEmail("late")));
+      const created = await request({ customerId: id });
+      const erased = await whileHolding(
+        "select id from customer where id = $1 for key share",
+        id,
+        () => post(`/admin/privacy/requests/${created.id}/erase`, { confirm: true }),
+        async (client) => {
+          // A customer's order has no guest access (sales_order_customer_or_token_check).
+          await client.query(
+            `update sales_order set customer_id = $1, access_token_hash = null, access_expires_at = null
+             where id = $2`,
+            [id, late.id],
+          );
+        },
+      );
+      expect(erased.status, JSON.stringify(erased.body)).toBe(200);
+      expect(erased.body).toMatchObject({
+        result: { ordersAnonymised: 1, orderNumbers: [late.number], customerDeleted: true },
+      });
+      expect(await orderRow(late.id)).toMatchObject({ email: null, customer_id: null });
+      expect((await orderRow(late.id)).contact_erased_at).toBeInstanceOf(Date);
     });
   });
 

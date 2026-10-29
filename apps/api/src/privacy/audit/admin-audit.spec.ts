@@ -221,6 +221,14 @@ describe("admin audit log (ADR 0033 decision 9, privacy plan step 5)", () => {
           })
         ).status,
       ).toBe(200);
+      // Deactivating an already inactive user changes nothing and records nothing (review F6, M10).
+      expect(
+        (
+          await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, {
+            body: { isActive: false },
+          })
+        ).status,
+      ).toBe(200);
       expect((await eventsOf(target.id)).map((event) => event.action)).toEqual([
         "admin_user.role_changed",
         "admin_user.deactivated",

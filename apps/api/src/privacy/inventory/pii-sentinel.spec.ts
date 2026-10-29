@@ -39,6 +39,9 @@ describe("PII sentinel guard (real Postgres, test providers, the real checkout, 
   const runId = randomBytes(3).toString("hex");
   const guest = sentinelSubject(1, runId);
   const member = sentinelSubject(2, runId);
+  /** Registers, exports its data and deletes its account (the privacy routes). */
+  const deleted = sentinelSubject(3, runId);
+  const privacyOrderIds: string[] = [];
   let world: ShipmentWorld;
   let logText = "";
   const setCookies: string[] = [];
@@ -177,6 +180,68 @@ describe("PII sentinel guard (real Postgres, test providers, the real checkout, 
         expect(probe.status).toBeGreaterThanOrEqual(200);
       }
 
+      // 3b. The privacy routes (review F6): a third subject exports its data and deletes its account; the owner looks
+      // up, exports and tries to erase the guest (blocked by the live shipment), and records and rejects a request.
+      const leaver = new NotingShopper(owner().baseUrl);
+      const joined = await leaver.post("/store/account/register", {
+        email: deleted.email,
+        password: PASSWORD,
+        firstName: deleted.firstName,
+        lastName: deleted.lastName,
+        phone: deleted.phone,
+      });
+      expect(joined.status, JSON.stringify(joined.body)).toBe(201);
+      const leaverOrder = await world.orders.place(
+        [{ quantity: 1 }],
+        { ...contact(deleted), shipping: { methodCode: method.code } },
+        leaver,
+      );
+      expect((await world.orders.cancel(leaverOrder.id, "Shop cancelled")).status).toBe(200);
+      expect((await leaver.get("/store/account/data-export")).status).toBe(200);
+      const gone = await leaver.post("/store/account/delete", {
+        password: PASSWORD,
+        confirm: true,
+      });
+      expect(gone.status, JSON.stringify(gone.body)).toBe(204);
+      privacyOrderIds.push(leaverOrder.id);
+
+      const admin = (path: string, body: unknown) =>
+        http<Record<string, unknown>>(owner().baseUrl, "POST", path, { body });
+      expect((await admin("/admin/privacy/lookup", { email: guest.email })).status).toBe(200);
+      expect((await admin("/admin/privacy/lookup", { email: member.email })).status).toBe(200);
+      const exportRequest = await admin("/admin/privacy/requests", {
+        kind: "export",
+        subject: { email: guest.email },
+        note: "Identity checked by a reply from the address.",
+      });
+      expect(exportRequest.status).toBe(201);
+      const exportId = String(exportRequest.body["id"]);
+      expect(
+        (await admin(`/admin/privacy/requests/${exportId}/export`, { email: guest.email })).status,
+      ).toBe(200);
+      const erasureRequest = await admin("/admin/privacy/requests", {
+        kind: "erasure",
+        subject: { email: guest.email },
+      });
+      const erasureId = String(erasureRequest.body["id"]);
+      expect(
+        (await admin(`/admin/privacy/requests/${erasureId}/erase-preview`, { email: guest.email }))
+          .status,
+      ).toBe(200);
+      const blocked = await admin(`/admin/privacy/requests/${erasureId}/erase`, {
+        email: guest.email,
+        confirm: true,
+      });
+      expect(blocked.status, JSON.stringify(blocked.body)).toBe(409);
+      expect(
+        (
+          await admin(`/admin/privacy/requests/${erasureId}/reject`, {
+            reasonCode: "duplicate",
+          })
+        ).status,
+      ).toBe(200);
+      expect((await http(owner().baseUrl, "GET", "/admin/audit-events")).status).toBe(200);
+
       // 4. Staff change the account, the jobs deliver the events and send the mails.
       const customerId = (
         await world.pool.query<{ id: string }>("select id from customer where email = $1", [
@@ -211,6 +276,7 @@ describe("PII sentinel guard (real Postgres, test providers, the real checkout, 
   const everything = () => [
     ...guest.values,
     ...member.values,
+    ...deleted.values,
     ...tokens.filter((token) => token !== ""),
     PASSWORD,
   ];
@@ -276,8 +342,44 @@ describe("PII sentinel guard (real Postgres, test providers, the real checkout, 
       expect(await rowsContaining(world.pool, table.name, columns, member.values), table.name).toBe(
         0,
       );
+      expect(
+        await rowsContaining(world.pool, table.name, columns, deleted.values),
+        table.name,
+      ).toBe(0);
     }
     expect(guarded.length).toBeGreaterThan(300);
+  });
+
+  it("did exercise the privacy routes, and their audit rows and requests hold no sentinel (review F6)", async () => {
+    const actions = await world.pool.query<{ action: string }>(
+      "select distinct action from admin_audit_event where action like 'privacy.%'",
+    );
+    // Other spec files share the database, so other actions may be there too.
+    expect(actions.rows.map((row) => row.action)).toEqual(
+      expect.arrayContaining(["privacy.exported", "privacy.lookup", "privacy.request_changed"]),
+    );
+    const requests = await world.pool.query<{ channel: string; kind: string; status: string }>(
+      "select channel, kind, status from privacy_request",
+    );
+    expect(requests.rows).toEqual(
+      expect.arrayContaining([
+        { channel: "self_service", kind: "export", status: "completed" },
+        { channel: "self_service", kind: "erasure", status: "completed" },
+        { channel: "admin", kind: "export", status: "completed" },
+        { channel: "admin", kind: "erasure", status: "rejected" },
+      ]),
+    );
+    const erased = await world.pool.query<{ contact_erased_at: Date | null }>(
+      "select contact_erased_at from sales_order where id = any($1::uuid[])",
+      [privacyOrderIds],
+    );
+    expect(erased.rows.map((row) => row.contact_erased_at)).toEqual([expect.any(Date)]);
+    for (const table of ["admin_audit_event", "privacy_request"]) {
+      const text = await world.pool.query<{ text: string }>(
+        `select coalesce(string_agg(to_jsonb(t)::text, E'\\n'), '') as text from ${table} t`,
+      );
+      expect(sentinelsIn(text.rows[0]?.text ?? "", everything()), table).toEqual([]);
+    }
   });
 
   it("freezes no contact data into the mail variables", async () => {
