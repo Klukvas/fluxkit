@@ -45,6 +45,10 @@ export const KNOWN_RULES = [
   "line_total_out_of_range",
   "subtotal_out_of_range",
   "invalid_transition",
+  "order_not_payable",
+  "payment_in_progress",
+  "payment_window_too_short",
+  "payment_not_available",
 ] as const;
 
 /** Codes of `errors[]` entries the storefront's forms and cart can receive (docs/api/{cart,customers,orders}.md). */

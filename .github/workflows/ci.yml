@@ -72,6 +72,7 @@ jobs:
       - name: Schema drift (Drizzle schema vs committed migrations)
         run: pnpm --filter @fluxkit/api db:drift
       - run: pnpm check:boundaries
+      - run: pnpm check:env
       - run: pnpm test
 
   feature-matrix:
@@ -256,3 +257,14 @@ jobs:
           docker compose --env-file .env -f infra/docker-compose.yml exec -T meilisearch sh -c 'which wget curl; wget -S -O- http://127.0.0.1:7700/health' || true
       - if: always()
         run: docker compose --env-file .env -f infra/docker-compose.yml down -v
+
+  deploy-smoke:
+    name: Production images and Compose example (smoke)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+      # Builds the api, storefront and edge targets of the root Dockerfile (nothing is pushed), starts
+      # infra/docker-compose.prod.yml with a throwaway env file and a self-signed certificate, checks routing, headers,
+      # TLS, the webhook route, an upload and the per-client rate limit through the edge, then removes everything.
+      - run: bash scripts/deploy-smoke.sh

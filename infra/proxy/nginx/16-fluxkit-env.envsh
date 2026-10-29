@@ -1,0 +1,54 @@
+#!/bin/sh
+# Sourced by the nginx image's entrypoint before the templates are rendered (docs/deployment.md). It checks the edge
+# variables and derives the ones the templates use; a wrong value stops the container instead of serving a wrong config.
+#   FLUXKIT_DOMAIN              required: the shop host name (server_name, the https redirect target)
+#   FLUXKIT_API_UPSTREAM        optional, default api:3000: where the API listens
+#   FLUXKIT_STOREFRONT_UPSTREAM optional, default storefront:3001: where the storefront listens
+#   STOREFRONT_IMAGE_HOSTS      optional: the storefront's image hosts, added to the admin CSP img-src as https://<host>
+#                               (the same list and the same host-name rule as apps/admin/security-headers.ts)
+
+# The host-name rule of apps/admin/security-headers.ts and the storefront parser: lower-case DNS labels only.
+fluxkit_hostname='^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$'
+fluxkit_upstream='^[A-Za-z0-9.-]+:[0-9]{1,5}$'
+
+fluxkit_fail() {
+  echo "fluxkit edge: $1" >&2
+  exit 1
+}
+
+if ! printf '%s' "${FLUXKIT_DOMAIN:-}" | grep -Eq "$fluxkit_hostname"; then
+  fluxkit_fail "FLUXKIT_DOMAIN must be the shop host name in lower case, for example shop.example.com"
+fi
+
+FLUXKIT_API_UPSTREAM="${FLUXKIT_API_UPSTREAM:-api:3000}"
+FLUXKIT_STOREFRONT_UPSTREAM="${FLUXKIT_STOREFRONT_UPSTREAM:-storefront:3001}"
+for fluxkit_value in "$FLUXKIT_API_UPSTREAM" "$FLUXKIT_STOREFRONT_UPSTREAM"; do
+  printf '%s' "$fluxkit_value" | grep -Eq "$fluxkit_upstream" ||
+    fluxkit_fail "FLUXKIT_API_UPSTREAM and FLUXKIT_STOREFRONT_UPSTREAM must be host:port"
+done
+
+# Parsed like the storefront does (packages/config, storefront-env.ts): split on commas, trimmed, lower case, duplicates
+# dropped, and an empty entry is an error.
+FLUXKIT_ADMIN_IMG_SRC=""
+fluxkit_hosts=$(printf '%s' "${STOREFRONT_IMAGE_HOSTS:-}" | tr 'A-Z' 'a-z' | tr -d ' \t')
+if [ -n "$fluxkit_hosts" ]; then
+  case "$fluxkit_hosts" in
+    ,* | *, | *,,*) fluxkit_fail "STOREFRONT_IMAGE_HOSTS must not contain an empty entry" ;;
+  esac
+  fluxkit_ifs=$IFS
+  IFS=','
+  set -f
+  for fluxkit_host in $fluxkit_hosts; do
+    printf '%s' "$fluxkit_host" | grep -Eq "$fluxkit_hostname" ||
+      fluxkit_fail "STOREFRONT_IMAGE_HOSTS must be bare host names separated by commas (no scheme, port, path or wildcard)"
+    case "$FLUXKIT_ADMIN_IMG_SRC " in
+      *" https://$fluxkit_host "*) ;;
+      *) FLUXKIT_ADMIN_IMG_SRC="$FLUXKIT_ADMIN_IMG_SRC https://$fluxkit_host" ;;
+    esac
+  done
+  set +f
+  IFS=$fluxkit_ifs
+fi
+
+export FLUXKIT_DOMAIN FLUXKIT_API_UPSTREAM FLUXKIT_STOREFRONT_UPSTREAM FLUXKIT_ADMIN_IMG_SRC
+unset fluxkit_hostname fluxkit_upstream fluxkit_value fluxkit_hosts fluxkit_host fluxkit_ifs

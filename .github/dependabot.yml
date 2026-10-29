@@ -17,3 +17,8 @@ updates:
     directory: /infra
     schedule:
       interval: weekly
+  # The base images of the production Dockerfile (node, nginx-unprivileged; pinned by digest).
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly

@@ -147,6 +147,17 @@ describe("headerRules: Referrer-Policy per page (Next's own matcher, last matchi
     }
   });
 
+  it("sends no Referer from the payment return page, in both locales, and nowhere else under /payment", () => {
+    for (const locale of ["uk", "en"]) {
+      const headers = headersFor(`/${locale}/payment/return`);
+      expect(headers.get("Referrer-Policy"), locale).toBe("no-referrer");
+      expect(headers.get("Content-Security-Policy"), locale).toContain("default-src 'self'");
+    }
+    expect(headersFor("/uk/payment/other").get("Referrer-Policy")).toBe(
+      "strict-origin-when-cross-origin",
+    );
+  });
+
   it("keeps the site-wide policy everywhere else, the checkout and the account orders included", () => {
     for (const path of [
       "/uk",

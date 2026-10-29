@@ -119,6 +119,12 @@ export function buildContentSecurityPolicy(options: SecurityHeadersOptions): str
 export const TOKEN_PAGE_SOURCE = "/:locale/order/:path*";
 
 /**
+ * The payment return page (ADR 0032 decision 6): the provider sends the shopper back to `/{locale}/payment/return?payment=<id>`.
+ * The id is an attempt reference, not a secret, but the page belongs to one order, so it sends no `Referer` either.
+ */
+export const PAYMENT_RETURN_PAGE_SOURCE = "/:locale/payment/return";
+
+/**
  * The three pages of the emailed links (email plan step 10): forgot password, reset password and verify email. The last two
  * read a bearer token from their URL fragment; all three send no `Referer`, so nothing about the visit (the address, that
  * a reset was asked for) reaches another site.
@@ -140,6 +146,10 @@ export function headerRules(
       source: ACCOUNT_EMAIL_PAGE_SOURCE,
       headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
     },
+    {
+      source: PAYMENT_RETURN_PAGE_SOURCE,
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    },
   ];
 }
 
@@ -147,7 +157,7 @@ export function securityHeaders(options: SecurityHeadersOptions): HeaderEntry[] 
   return [
     { key: "Content-Security-Policy", value: buildContentSecurityPolicy(options) },
     { key: "X-Content-Type-Options", value: "nosniff" },
-    // The guest order page and the emailed-link pages override this with `no-referrer` (their URL fragments never leave the
+    // The guest order page, the payment return page and the emailed-link pages override this with `no-referrer` (their URL fragments never leave the
     // browser, but be strict).
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
