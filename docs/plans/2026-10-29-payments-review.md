@@ -125,3 +125,10 @@ Developer agent (Claude Opus 5.5), started from `origin/review/payments` so this
   - D3. `refundedAmount` stays the sum of OUR succeeded refunds; the money returned elsewhere shows as `finalAmount` and in `refundableAmount` only.
   - D4. An external refund the provider lists as `processing` raises attention but caps `refundableAmount` only once the provider lowers its final amount (the refund list is not stored). A provider is expected to refuse a refund above what it holds (the test provider answers `not_cancellable`, stored `failed` with `refund_failed`); not verified against Monobank.
 - Behaviour without an external refund is unchanged (core specs per exponent 0/2/3, API spec "refunds made through the shop raise nothing").
+
+### F2 fix: an order total of 0
+
+- Core `decideNewPaymentAttempt` takes `orderTotal` (minor units; not a safe integer: RangeError) and refuses a total of 0 or less with the EXISTING rule `payment_not_available` ("Online payment is not available for this order."), checked right after `order_not_payable`. No new rule value, so the public problem contract (`docs/contracts/api.md`) does not change and the storefront already has a friendly message for it.
+- API: the create flow passes `order.totalAmount` (under the order lock); the store order views pass it too, so `payment.canPay` is false. The create route answers `409 rule_violation payment_not_available` instead of `400 validation_failed check_violation`; no attempt row and no provider call.
+- Decision D5: `payment_not_available` over `order_not_payable` (that one means paid, cancelled or expired, and the storefront says so) and over a new `payment_not_needed` (a public contract change, red zone).
+- Open question for the owner (not decided here): should a free order be settled automatically (marked paid by the system at checkout) instead of waiting for an admin's manual mark paid? Until decided, a free order stays `awaiting_payment` and expires like any unpaid order unless an admin marks it paid.
