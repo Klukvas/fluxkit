@@ -8,7 +8,7 @@
 | [0002](0002-tech-stack.md) | Technology stack | accepted (versions and tooling fixed at scaffolding) |
 | [0003](0003-tooling.md) | Tooling | accepted (versions fixed at scaffolding) |
 | [0004](0004-core-data-model.md) | Core data model | accepted (decisions); entity list is a draft, refined by ADR 0006 for the catalog |
-| [0005](0005-search-notes.md) | Search notes (Meilisearch spike) | findings recorded; two decisions open (Ukrainian morphology, variant-level facet counts) |
+| [0005](0005-search-notes.md) | Search notes (Meilisearch spike) | findings recorded; its two open decisions (Ukrainian morphology, variant-level facet counts) are resolved by [ADR 0033](0033-catalog-search.md) |
 | [0006](0006-catalog-schema.md) | Catalog schema | accepted (2026-10-15); refines the catalog part of ADR 0004 |
 | [0007](0007-store-hides-unsellable-option-values.md) | The store hides option values and images that no active variant can sell | accepted (2026-10-16); adds a rule to ADR 0006 section 10 |
 | [0008](0008-generated-variants-of-live-products.md) | Generated variants of live products | accepted (2026-10-16); extends ADR 0006 sections 4 and 6 |
@@ -36,3 +36,4 @@
 | [0030](0030-nova-post-api.md) | Nova Post API for the first carrier plugin | accepted (2026-10-25, owner decision); supersedes in part ADR 0029 (decision 11 and the Nova Poshta specific parts of decisions 7 and 8) |
 | [0031](0031-transactional-email.md) | Transactional email | accepted (2026-10-26, owner's quiz answers on the email plan); builds on ADR 0016, 0018, 0023, 0025, 0028 and 0029, changes none of them |
 | [0032](0032-online-payments.md) | Online payments | accepted (2026-10-26, owner's quiz answers on the payments plan); builds on ADR 0015, 0017, 0018, 0019, 0025, 0029 and 0031, refines ADR 0004 decision 4, ADR 0017 (one status kept next to a `payment` entity) and one sentence of ADR 0018 (payment routes and `markPaid` in the core payments module) |
+| [0033](0033-catalog-search.md) | Catalog search | accepted (2026-10-29, owner's standing instruction on the search plan); resolves the two open decisions of ADR 0005, refines ADR 0004 decision 4 for search (a coalescing queue table instead of the event outbox), builds on ADR 0002, 0006, 0007, 0011, 0012, 0018, 0021, 0025, 0026, 0027 and 0031; two items marked CONFIRM (the morphology acceptance, the vendored Snowball code) |
