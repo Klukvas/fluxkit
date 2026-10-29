@@ -9,7 +9,7 @@ Browser tests of the purchase flow against the real stack: Postgres, Redis, Meil
    ```bash
    createdb -h 127.0.0.1 -U <user> fluxkit_e2e_test          # or: psql ... -c 'create database fluxkit_e2e_test'
    ```
-3. Install the browser once: `pnpm --filter @fluxkit/storefront exec playwright install chromium` (add `--with-deps` on a fresh Linux machine). If `PLAYWRIGHT_BROWSERS_PATH` already points at a Chromium of the right revision (1194 for the pinned `@playwright/test` 1.56.1) nothing is downloaded.
+3. Install the browser once: `pnpm --filter @fluxkit/storefront exec playwright install chromium` (add `--with-deps` on a fresh Linux machine). If `PLAYWRIGHT_BROWSERS_PATH` already points at a Chromium of the right revision (1248 for the pinned `@playwright/test` 1.64.1, see `browsers.json` of `playwright-core`) nothing is downloaded.
 4. Run, from the repository root:
    ```bash
    ( export E2E_DATABASE_URL=postgres://<user>:<password>@127.0.0.1:5432/fluxkit_e2e_test \
@@ -71,7 +71,7 @@ Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`, `E2
 ## Troubleshooting
 
 - `E2E_DATABASE_URL must be set` / `Refusing to wipe database ...`: see step 2; the name rule is deliberate.
-- `Executable doesn't exist ...`: the browser for this Playwright version is not installed (step 3). Playwright 1.56.1 needs Chromium revision 1194.
+- `Executable doesn't exist ...`: the browser for this Playwright version is not installed (step 3). Playwright 1.64.1 needs Chromium revision 1248.
 - A web server "timed out": run the three commands of the table by hand to see the error. The API needs `pnpm build` (the suite uses `dist/`), Redis and Meilisearch.
 - Product pages answer "Nothing was found" on add to cart: the storefront rendered ids of a previous seed from its on-disk data cache (`.next/cache/fetch-cache`, 60 s). The suite deletes that directory before it starts the storefront; if you start the storefront yourself against a re-seeded database, delete it too.
 - Port in use: another run or server holds 3100 to 3102 (`reuseExistingServer` is off on purpose): stop it or set the `E2E_*` ports.
