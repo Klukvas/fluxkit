@@ -29,6 +29,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FULL = /189\.00/;
 
 /**
+ * The provider time (`providerTime` minutes) of the webhook that settles one fake invoice. The fake adopts a webhook only when
+ * its time is not older than the invoice, and adopting moves the fake's ONE logical clock (shared by every invoice of the API
+ * process) past that time. A fixed time therefore works for the first invoice only: an invoice created after an adoption is
+ * newer than it, its webhook is silently not adopted, the invoice stays `created` and the refund is refused (`not_paid`), as
+ * on a CI retry or a `--repeat-each`. Each invoice gets its own window after the one before it, from its sequence number in
+ * the fake (`fake-pay-000002` -> 2), so a webhook is always newer than the invoice it settles, in any order and on any retry.
+ * A window is 100 minutes (6000 logical seconds): far more than the fake's own changes (one second each) of one scenario.
+ */
+function settleMinutes(providerPaymentId: string): number {
+  const sequence = /^fake-pay-(\d+)$/.exec(providerPaymentId)?.[1];
+  if (sequence === undefined) throw new Error(`Not a fake invoice id: ${providerPaymentId}`);
+  return Number(sequence) * 100;
+}
+
+/**
  * An order paid the way a real one is: the shopper starts the payment, the provider's signed webhook arrives. Answers the
  * ids the admin screens and routes use (`paymentId` is the attempt, `providerPaymentId` the fake's invoice).
  */
@@ -47,7 +62,7 @@ async function payThroughProvider(
       reference: started.paymentId,
       amount: placed.total.amount,
       status: "success",
-      minutes: 10,
+      minutes: settleMinutes(providerPaymentId),
     }),
   );
   expect(delivered.status()).toBe(200);
@@ -242,7 +257,10 @@ test("payments: a payment settled by the provider's signed webhook, check status
   await form.getByRole("textbox", { name: /Reason/ }).fill("Rest of the order");
   await form.getByRole("button", { name: "Review refund" }).click();
   await confirm.getByRole("button", { name: /^Refund .*138\.50/ }).click();
+  // The confirmation step is an `alertdialog`, open until the answer arrives: waiting for "no dialog" alone passed at once
+  // and read the requests before the second one was seen (1 instead of 2 in a local repeat of this scenario).
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
   expect(refunds).toHaveLength(2);
   const second = refunds[1] as Request;
   expect(second.headers()["idempotency-key"]).toMatch(UUID);
@@ -276,6 +294,56 @@ test("payments: a payment settled by the provider's signed webhook, check status
   expect((await owner.payments(orderId))[0]?.refunds).toHaveLength(2);
 });
 
+test("payments: a refused review focuses its field at once, so what is typed next in the reason stays in the reason (late frames)", async ({
+  page,
+  signIn,
+  shopper,
+  owner,
+  provider,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const { placed, orderId } = await payThroughProvider(
+    owner,
+    shopper,
+    provider,
+    `e2e-focus-${u}@example.com`,
+  );
+  // TEST-ONLY emulation of a loaded machine (a CI runner) whose next frame comes late: every animation frame callback of the
+  // page runs 300 ms later. Regression of the CI run of PR #191: the focus of the first issue waited for the next frame and
+  // arrived after the test had moved on to the reason, so the reason was typed into the amount ("50.50Damaged in transit").
+  await page.addInitScript(() => {
+    window.requestAnimationFrame = (callback) =>
+      window.setTimeout(() => callback(performance.now()), 300);
+    window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
+  });
+  await signIn("manager");
+  await page.goto(`${SPA}/orders/${orderId}`);
+  const card = page
+    .getByRole("main")
+    .getByRole("region", { name: "Online payment" })
+    .getByRole("article");
+  const refunds = watch(page, /\/payments\/[^/]+\/refunds$/);
+  await card.getByRole("button", { name: "Refund" }).click();
+  const form = page.getByRole("dialog", { name: `Refund order ${placed.number}` });
+  const amount = form.getByRole("textbox", { name: /Amount to refund \(UAH\)/ });
+  const reason = form.getByRole("textbox", { name: /Reason/ });
+  await expect(amount).toHaveValue("189.00");
+
+  await amount.fill("189.01");
+  await form.getByRole("button", { name: "Review refund" }).click();
+  await expect(form.getByText(/At most .*189\.00 can still be refunded\./)).toBeVisible();
+  // Read once, no waiting: the field of the first issue has the focus as soon as the issue is shown.
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("payment-refund-amount");
+
+  // The admin goes on to the reason at once and types it: every key stays in the reason.
+  await reason.focus();
+  await page.keyboard.type("Damaged in transit", { delay: 40 });
+  await expect(reason).toHaveValue("Damaged in transit");
+  await expect(amount).toHaveValue("189.01");
+  await expect(reason).toBeFocused();
+  expect(refunds).toHaveLength(0);
+});
+
 test("payments: a payment that arrives after the shopper cancelled shows in 'Payments to review' with its queued refund", async ({
   page,
   signIn,
@@ -291,13 +359,14 @@ test("payments: a payment that arrives after the shopper cancelled shows in 'Pay
   );
   const started = await shopper.startGuestPayment(placed);
   await shopper.cancelGuestOrder(placed);
+  const providerPaymentId = providerPaymentIdOf(started.redirectUrl);
   const delivered = await provider.postSigned(
     webhookBody({
-      providerPaymentId: providerPaymentIdOf(started.redirectUrl),
+      providerPaymentId,
       reference: started.paymentId,
       amount: placed.total.amount,
       status: "success",
-      minutes: 10,
+      minutes: settleMinutes(providerPaymentId),
     }),
   );
   expect(delivered.status()).toBe(200);

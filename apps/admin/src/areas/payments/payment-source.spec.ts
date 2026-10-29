@@ -87,6 +87,19 @@ describe("payment section source guards", () => {
     expect(section.match(/onChanged\(\)/g)?.length).toBeGreaterThanOrEqual(4);
   });
 
+  it("focuses the field of the first issue in the commit that shows it, never in a later frame", () => {
+    // A focus deferred to the next animation frame landed after the next field had been focused, so what was typed there
+    // went into the amount (CI run of PR #191: the amount read "50.50Damaged in transit", the reason stayed empty).
+    expect(section).not.toMatch(/requestAnimationFrame|setTimeout|queueMicrotask/);
+    expect(body("focusFirstIssue")).toContain("setIssueFocus(");
+    expect(body("focusFirstIssue")).not.toContain(".focus()");
+    expect(section).toMatch(
+      /useLayoutEffect\(\(\) => \{\s*if \(issueFocus !== null\) document\.getElementById\(issueFocus\.id\)\?\.focus\(\);\s*\}, \[issueFocus\]\);/,
+    );
+    expect(body("review")).toContain("focusFirstIssue(plan.issues)");
+    expect(body("confirmRefund")).toContain("focusFirstIssue(plan.issues)");
+  });
+
   it("gates the actions by the permissions of their operations, not by role names", () => {
     expect(section).toContain("offeredPaymentActions(payment, permissions)");
     expect(section).not.toMatch(/owner|manager|viewer/);
