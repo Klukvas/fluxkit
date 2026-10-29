@@ -100,6 +100,12 @@ export function SearchFilterForm({
   const { navigate } = usePending();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(null);
+  // Before the script runs the browser's own pattern check on the price boxes applies; once it runs, the form's own check
+  // does (it says which box and in the shop's words), so the native one must not stop the submit first.
+  const [scripted, setScripted] = useState(false);
+  useEffect(() => {
+    setScripted(true);
+  }, []);
 
   function onSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
@@ -129,7 +135,13 @@ export function SearchFilterForm({
   return (
     // GET: without a script the browser submits the same fields to the same page, which turns them into the short address
     // (`isCanonicalSearch`). The source guard allows exactly the search forms.
-    <form id={SEARCH_FORM_ID} method="get" onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form
+      id={SEARCH_FORM_ID}
+      method="get"
+      noValidate={scripted}
+      onSubmit={onSubmit}
+      className="flex flex-col gap-4"
+    >
       {error === null ? null : (
         <Alert variant="danger" title={t("searchForm.error.title")}>
           <p>{error}</p>
