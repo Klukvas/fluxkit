@@ -132,3 +132,9 @@ Developer agent (Claude Opus 5.5), started from `origin/review/payments` so this
 - API: the create flow passes `order.totalAmount` (under the order lock); the store order views pass it too, so `payment.canPay` is false. The create route answers `409 rule_violation payment_not_available` instead of `400 validation_failed check_violation`; no attempt row and no provider call.
 - Decision D5: `payment_not_available` over `order_not_payable` (that one means paid, cancelled or expired, and the storefront says so) and over a new `payment_not_needed` (a public contract change, red zone).
 - Open question for the owner (not decided here): should a free order be settled automatically (marked paid by the system at checkout) instead of waiting for an admin's manual mark paid? Until decided, a free order stays `awaiting_payment` and expires like any unpaid order unless an admin marks it paid.
+
+### F3 fix: the refund concurrency specs race
+
+- `PaymentWorld.warmPool(running?, connections = 10)` opens ten clients of the API's own `pg` pool at once and hands them back idle, right before the `Promise.all`; ten is the `pg` default pool size.
+- `admin-payments.spec.ts` ("refunds at once ...") and `payments-reconcile.spec.ts` ("admin refunds keep the cumulative limit under concurrency") now send ten refunds of 1 200 on a 2 000 payment on a warm pool: exactly one accepted, nine `refund_exceeds_remaining`, one refund row. Every race of `payments-races.spec.ts` warms the pool first too.
+- Mutation M2 again (`lockById` -> `findById` in `requestAdminRefund`), whole API `src/payments`: **killed** (2 failed of 196: the reconcile spec got 9 accepted refunds instead of 1, the admin route spec 202 + 409 x3 + 500 x6 instead of 202 + 409 x9). Restored byte for byte; unmutated the same specs pass.

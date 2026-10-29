@@ -11,7 +11,8 @@ const TTL = 30;
  * Races on one order (ADR 0032 decision 7, ADR 0015 lock order `sales_order` -> `payment` -> reservations): every writer
  * takes the order row first, so webhooks, job 11's read, a manual mark paid, a cancel and the expiry job decide one after
  * the other. Exactly one outcome, never a double payment without a refund, never a deadlock (a deadlock that survived
- * its one retry would answer 503 or fail the job). Real Postgres, real HTTP.
+ * its one retry would answer 503 or fail the job). Every race first warms the API's connection pool (`warmPool`, review F3),
+ * so the requests really run at once instead of queuing for one new connection. Real Postgres, real HTTP.
  */
 describe("payments: races on one order (real Postgres)", () => {
   let world: PaymentWorld;
@@ -82,6 +83,7 @@ describe("payments: races on one order (real Postgres)", () => {
     for (let round = 0; round < 3; round += 1) {
       const { placed, paymentId, invoiceId } = await succeededAt();
       const body = world.provider().webhookBody(invoiceId);
+      await world.warmPool();
       const [first, second, job] = await Promise.all([
         world.webhook(world.provider().webhookFor(invoiceId)),
         world.webhook(signedTestWebhook(`${body} `)),
@@ -103,6 +105,7 @@ describe("payments: races on one order (real Postgres)", () => {
       const placed = await world.place([{ quantity: 1, price: 2_000 }]);
       const { paymentId, invoiceId } = await world.created(placed);
       world.provider().setStatus(invoiceId, "succeeded");
+      await world.warmPool();
       const [hook, manual] = await Promise.all([
         world.webhook(world.provider().webhookFor(invoiceId)),
         world.orders.pay(placed, `BANK-${String(round)}`),
@@ -131,6 +134,7 @@ describe("payments: races on one order (real Postgres)", () => {
       const placed = await world.place([{ quantity: 1, price: 2_000 }]);
       const { paymentId, invoiceId } = await world.created(placed);
       world.provider().setStatus(invoiceId, "succeeded");
+      await world.warmPool();
       const [hook, cancel] = await Promise.all([
         world.webhook(world.provider().webhookFor(invoiceId)),
         http(world.app.baseUrl, "POST", "/store/orders/cancel", {
@@ -161,6 +165,7 @@ describe("payments: races on one order (real Postgres)", () => {
         )
       ).rows[0]?.placed_at;
       const cap = new Date((placedAt ?? new Date()).getTime() + (TTL + 30) * MINUTE);
+      await world.warmPool();
       const [hook, expiry] = await Promise.all([
         world.webhook(world.provider().webhookFor(invoiceId)),
         world.orderService.expireOne(placed.id, cap),
@@ -185,6 +190,7 @@ describe("payments: races on one order (real Postgres)", () => {
     const results: string[] = [];
     for (let round = 0; round < 3; round += 1) {
       const { placed, paymentId, invoiceId } = await succeededAt();
+      await world.warmPool();
       const [job, cancel, hook] = await Promise.all([
         world.job11(at(5)),
         world.orders.cancel(placed.id),

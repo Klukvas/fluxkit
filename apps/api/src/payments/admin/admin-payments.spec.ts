@@ -394,12 +394,16 @@ describe("payments: admin routes (real Postgres)", () => {
 
     it("refunds at once that together exceed what was paid: exactly one refund is accepted and sent", async () => {
       const made = await attempt(world.app, { pay: true });
-      const answers = await Promise.all([
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner" }),
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner too" }),
-        refund(world.orders.owner, made, { amount: uah(1_200), note: "owner again" }),
+      // A warm pool, so the ten requests really run at once (review F3: on a cold pool they queued and never raced).
+      await world.warmPool(world.orders.owner);
+      const answers = await Promise.all(
+        Array.from({ length: 10 }, (_, index) =>
+          refund(world.orders.owner, made, { amount: uah(1_200), note: `owner ${String(index)}` }),
+        ),
+      );
+      expect(answers.map((answer) => answer.status).sort()).toEqual([
+        202, 409, 409, 409, 409, 409, 409, 409, 409, 409,
       ]);
-      expect(answers.map((answer) => answer.status).sort()).toEqual([202, 409, 409]);
       for (const refused of answers.filter((answer) => answer.status === 409)) {
         expect(refused.body).toMatchObject({ rule: "refund_exceeds_remaining" });
       }
