@@ -101,13 +101,63 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     ).toBe("search");
   });
 
-  it("caches the unfiltered list for the catalog minute and keeps filtered reads out of the data cache", async () => {
+  it("answers an unfiltered page past the last one from the shared page 1, without reading that page (review F1)", async () => {
+    const { store, search, searches } = fakes({ kind: "results", result });
+    for (const page of [3, 4, 75, 417]) {
+      expect(
+        await loadCatalogSearchPage(store, search, "en", {
+          categorySlug: "tops",
+          query: { ...empty, sort: "price_asc", page },
+        }),
+      ).toEqual({ kind: "not_found" });
+    }
+    // Only page 1 of the same list (same locale, category and sort) was asked for, through the shared cache, so bogus page
+    // numbers add neither engine reads nor cache entries.
+    expect(searches).toHaveLength(4);
+    for (const entry of searches) {
+      expect(entry).toEqual({
+        locale: "en",
+        query: { ...empty, sort: "price_asc", facets: ["category:category-tops"], page: 1 },
+        read: { shared: true },
+      });
+    }
+  });
+
+  it("reads an existing unfiltered page after its page 1", async () => {
+    const { store, search, searches } = fakes({ kind: "results", result });
+    const page = await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 2 } });
+    expect(page.kind).toBe("search");
+    expect(searches.map((entry) => entry.query.page)).toEqual([1, 2]);
+    expect(searches.map((entry) => entry.read)).toEqual([{ shared: true }, { shared: true }]);
+  });
+
+  it("falls back when page 1 cannot be read, without reading the page itself", async () => {
+    const { store, search, searches, listings } = fakes({
+      kind: "rate_limited",
+      retryAfterSeconds: 5,
+    });
+    const page = await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 1 } });
+    expect(page.kind).toBe("fallback");
+    await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 2 } });
+    expect(searches.map((entry) => entry.query.page)).toEqual([1, 1]);
+    expect(listings).toHaveLength(2);
+  });
+
+  it("reads a filtered page directly (the shopper's own window, never shared)", async () => {
+    const { store, search, searches } = fakes({ kind: "results", result });
+    await loadCatalogSearchPage(store, search, "en", {
+      query: { ...empty, facets: ["brand:a"], page: 2 },
+    });
+    expect(searches.map((entry) => [entry.query.page, entry.read])).toEqual([[2, undefined]]);
+  });
+
+  it("shares the unfiltered list between shoppers and keeps filtered reads private", async () => {
     const { store, search, searches } = fakes({ kind: "results", result });
     await loadCatalogSearchPage(store, search, "en", { query: { ...empty, sort: "price_desc" } });
     await loadCatalogSearchPage(store, search, "en", {
       query: { ...empty, facets: ["brand:a"] },
     });
-    expect(searches.map((entry) => entry.read)).toEqual([{ cacheSeconds: 60 }, undefined]);
+    expect(searches.map((entry) => entry.read)).toEqual([{ shared: true }, undefined]);
   });
 
   for (const outcome of [

@@ -6,9 +6,11 @@ import {
   isCacheableCatalogSearch,
 } from "./catalog-search";
 import { categoryTrail } from "./category-trail";
-import type { SearchData } from "./search-data";
+import type { SearchData, SearchOutcome, SearchReadOptions } from "./search-data";
 import type { SearchQuery } from "./search-query";
-import { CATALOG_REVALIDATE_SECONDS, type StoreData } from "./store-data";
+import type { StoreData } from "./store-data";
+
+const SHARED: SearchReadOptions = { shared: true };
 
 /**
  * The catalog and category pages while search is on (plan 2026-10-29-search.md, section 9 and "Failure handling"; owner
@@ -24,7 +26,8 @@ import { CATALOG_REVALIDATE_SECONDS, type StoreData } from "./store-data";
  *   results page does; silently listing everything would show something else than the address says.
  * - No fallback for an engine refusal (500) or anything unexpected: it throws and the route's error page renders (ADR 0036
  *   decision 6: a refusal is a bug to fix, not an outage).
- * - A page past the last one is not found, in both paths.
+ * - A page past the last one is not found, in both paths. An unfiltered list reads its page 1 first (shared, so mostly a
+ *   cache hit) and answers a page past the last one without reading it (review F1).
  */
 
 export type CatalogSearchPage =
@@ -71,11 +74,22 @@ export async function loadCatalogSearchPage(
   }
   const category = trail[trail.length - 1] ?? null;
 
-  const outcome = await search.search(
-    locale,
-    catalogSearchRequest(query, category?.id ?? null),
-    isCacheableCatalogSearch(query) ? { cacheSeconds: CATALOG_REVALIDATE_SECONDS } : undefined,
-  );
+  const request = catalogSearchRequest(query, category?.id ?? null);
+  let outcome: SearchOutcome;
+  if (!isCacheableCatalogSearch(query)) {
+    outcome = await search.search(locale, request);
+  } else {
+    // Page 1 of the same list says how many pages exist: a page past the last one is answered from that shared entry,
+    // never read (review F1: bogus page numbers would each be a read and an entry).
+    const first = await search.search(locale, { ...request, page: 1 }, SHARED);
+    if (first.kind === "results" && query.page > Math.max(first.result.pageCount, 1)) {
+      return { kind: "not_found" };
+    }
+    outcome =
+      query.page === 1 || first.kind !== "results"
+        ? first
+        : await search.search(locale, request, SHARED);
+  }
   switch (outcome.kind) {
     case "results":
       if (query.page > 1 && query.page > outcome.result.pageCount) return { kind: "not_found" };

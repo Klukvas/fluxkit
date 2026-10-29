@@ -216,7 +216,7 @@ describe("the catalog route with search on", () => {
     expect(reads.searched).toEqual([
       {
         query: { q: "", facets: [], price: null, sort: null, page: 1 },
-        read: { cacheSeconds: 60 },
+        read: { shared: true },
       },
     ]);
     expect(reads.listings).toEqual([]);

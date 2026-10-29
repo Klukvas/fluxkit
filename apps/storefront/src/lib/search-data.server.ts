@@ -5,7 +5,8 @@ import { cache } from "react";
 import { loadSearchEnabled } from "./catalog-data";
 import { forwardableAddresses } from "./forwarded-address";
 import { createSearchData } from "./search-data";
-import { StoreUnavailableError } from "./store-data";
+import { createSharedSearchCache, type SharedSearchCache } from "./shared-search-cache";
+import { CATALOG_REVALIDATE_SECONDS, StoreUnavailableError } from "./store-data";
 import { storeData } from "./store-data.server";
 
 /**
@@ -14,7 +15,22 @@ import { storeData } from "./store-data.server";
  * (`STOREFRONT_FORWARD_CLIENT_ADDRESS=true`, ADR 0038): a storefront reachable around the edge would otherwise let a client
  * choose its own rate-limit key. Off, every page read counts as the Next server's one address.
  */
+
+/**
+ * The bounded cache of the unfiltered catalog lists (ADR 0040): the catalog minute fresh, five more minutes served while the
+ * API answers 429 or 503, 500 lists (a list of 24 summaries with its facets is a few tens of KB). One per server process,
+ * kept on `globalThis` so that two route bundles loading this module still share it.
+ */
+const SHARED_CACHE = Symbol.for("fluxkit.storefront.sharedSearchCache");
+const holder = globalThis as typeof globalThis & { [SHARED_CACHE]?: SharedSearchCache };
+const sharedCache = (holder[SHARED_CACHE] ??= createSharedSearchCache({
+  maxEntries: 500,
+  freshMs: CATALOG_REVALIDATE_SECONDS * 1000,
+  staleMs: 5 * 60 * 1000,
+}));
+
 export const searchData = createSearchData({
+  sharedCache,
   baseUrl: () => loadStorefrontEnv(process.env).apiInternalUrl,
   beforeRequest: connection,
   forwardedFor: async () =>

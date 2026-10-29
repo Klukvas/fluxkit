@@ -1,0 +1,23 @@
+# 0040. Catalog pages through search: the shared lists and their misses
+
+Status: accepted 2026-10-29 (review of the search finish, `docs/plans/2026-10-29-search-finish-review.md`, finding F1). Supersedes in part ADR 0039 decision 5 (the unfiltered list in the Next data cache, without a forwarded address) and its consequence "beyond [the window] shoppers see the fallback notice" for the unfiltered lists. No API, rate-limit, schema, configuration or dependency change: the API's `search` window (60 a minute per client address, ADR 0036) stays as it is.
+
+## Context
+
+- ADR 0039 read the unfiltered catalog and category lists through the Next data cache without a forwarded address, because Next puts the request headers into the cache key. So every miss counted against the API window of the Next server's one address, whatever `STOREFRONT_FORWARD_CLIENT_ADDRESS` said.
+- The review showed one client using that window up in seconds with 74 page numbers past the last page (each was a miss: the page read the engine before it answered 404) and then every shopper's fresh plain list showing "Filters are temporarily unavailable" for the rest of the minute, with a healthy engine. The valid addresses alone are enough on the demo catalog (2 locales x 10 lists x 3 sorts = 60), and a real catalog has thousands. A `429` was never cached, and the data cache wrote one file per bogus address (measured on the e2e stack: 6 files before, 154 after 2 x 74 bogus pages).
+
+## Decision
+
+1. **No read for a page that cannot exist.** An unfiltered list reads its page 1 first (shared, so normally a cache hit) and answers a page past the last one with a 404 without reading it (`apps/storefront/src/lib/catalog-search-data.ts`). Bogus page numbers cost no engine read and add no cache entry. The other parts of the key are already bounded before any read: the locale and the category slug are checked (404), `sort` takes the four API values and the default ones are redirected away, `page` stops at the last reachable one.
+2. **The storefront's own cache for the shared lists**, instead of the Next data cache (`apps/storefront/src/lib/shared-search-cache.ts`, one per server process): key = locale and query (never a header); 60 s fresh (the catalog minute); at most 500 lists, the least recently used dropped first; concurrent misses of one list share one read. Nothing of it is written to disk.
+3. **A miss is read for the shopper whose view missed.** The read forwards that shopper's address like every other search read (with `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`), so a client that walks many list addresses uses up its own window, not the server's; its own views fall back, other shoppers' do not. A hit reads no request header.
+4. **Stale while error.** When the re-read of an older list answers `429` or `503` (or the API cannot be reached), the last good list is served for 5 more minutes; only a cold miss, or a list older than 6 minutes, falls back to the SQL listing with the notice. Failures are never kept; a `404` (search off) or a `400` drops the list; an engine refusal (`500`) still throws (ADR 0036 decision 6).
+
+## Consequences
+
+- With the forwarding on (the production example), a client can no longer make the catalog claim that filters are unavailable for other shoppers: its misses count against its own window, and a list another shopper already saw stays served while it is younger than 6 minutes even when the API refuses.
+- With the forwarding off, every miss still counts against the Next server's one address (ADR 0038): a client walking valid list addresses can use it up, and then fresh lists fall back for at most the rest of that minute, while lists read in the last 6 minutes are still served. Bogus page numbers no longer count at all. Operators behind an edge switch the forwarding on.
+- A list may be up to 6 minutes old while the API refuses (prices and stock of a list; the product page, the cart and the checkout read fresh data and the server recalculates every total). The cache lives per process: several storefront processes each hold their own (at most 500 lists each; a list of 24 summaries with its facets is a few tens of KB).
+- A page number past the last page of an unfiltered list costs a shared page 1 read instead of a read of that page; a valid page beyond 1 costs two shared reads, normally both hits.
+- Not changed: filtered reads (`f`, `price`) stay `no-store` and private to the shopper's window; the API's windows; the fallback for a cold miss.

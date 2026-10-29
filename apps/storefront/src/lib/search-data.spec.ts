@@ -1,6 +1,7 @@
 import type { SearchResult } from "@fluxkit/api-client";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createSearchData } from "./search-data";
+import { createSearchData, type SearchDataDependencies } from "./search-data";
+import { createSharedSearchCache } from "./shared-search-cache";
 import { json, problem } from "./test-fetch";
 import type { SearchQuery } from "./search-query";
 
@@ -29,7 +30,7 @@ type Call = { url: string; init: RequestInit };
 
 function setup(
   handler: (call: Call) => Response | Promise<Response>,
-  extra: { forwardedFor?: () => Promise<string | null> } = {},
+  extra: Pick<SearchDataDependencies, "forwardedFor" | "sharedCache"> = {},
 ) {
   const calls: Call[] = [];
   const events: string[] = [];
@@ -99,17 +100,82 @@ describe("search data (the results page's server read of GET /store/search)", ()
     expect(new Headers(calls[0]?.init.headers).get("x-forwarded-for")).toBe("203.0.113.5");
   });
 
-  it("on request, caches a read of the catalog pages for the given seconds and then forwards no address (one cache entry for every shopper)", async () => {
-    const forwardedFor = vi.fn(async () => "203.0.113.5");
-    const { data, calls } = setup(() => json(result), { forwardedFor });
-    await data.search("uk", { ...query, q: "", facets: [], price: null }, { cacheSeconds: 60 });
-    const init = calls[0]?.init as RequestInit & {
-      next?: { revalidate?: number; tags?: string[] };
-    };
-    expect(init.cache).toBeUndefined();
-    expect(init.next).toEqual({ revalidate: 60, tags: ["store", "store:search"] });
-    expect(new Headers(init.headers).has("x-forwarded-for")).toBe(false);
-    expect(forwardedFor).not.toHaveBeenCalled();
+  describe("a shared read (the unfiltered catalog lists, review F1)", () => {
+    const plain: SearchQuery = { q: "", facets: [], price: null, sort: "price_asc", page: 1 };
+
+    function shared(handler: (call: Call) => Response | Promise<Response>) {
+      let clock = 0;
+      const forwardedFor = vi.fn(async () => "203.0.113.5");
+      const built = setup(handler, {
+        forwardedFor,
+        sharedCache: createSharedSearchCache({
+          maxEntries: 10,
+          freshMs: 60_000,
+          staleMs: 300_000,
+          now: () => clock,
+        }),
+      });
+      return {
+        ...built,
+        forwardedFor,
+        advance: (ms: number) => {
+          clock += ms;
+        },
+      };
+    }
+
+    it("stays out of the Next data cache and forwards the address of the shopper whose view missed, so a miss counts against that shopper's window and not the server's", async () => {
+      const { data, calls } = shared(() => json(result));
+      await data.search("uk", plain, { shared: true });
+      const init = calls[0]?.init as RequestInit & { next?: unknown };
+      expect(init.cache).toBe("no-store");
+      expect(init.next).toBeUndefined();
+      expect(new Headers(init.headers).get("x-forwarded-for")).toBe("203.0.113.5");
+    });
+
+    it("answers every shopper from one entry per locale and address for the catalog minute", async () => {
+      const { data, calls, forwardedFor } = shared(() => json(result));
+      await data.search("uk", plain, { shared: true });
+      expect(await data.search("uk", plain, { shared: true })).toEqual({
+        kind: "results",
+        result,
+      });
+      expect(calls).toHaveLength(1);
+      // A hit reads no request header at all.
+      expect(forwardedFor).toHaveBeenCalledTimes(1);
+      await data.search("en", plain, { shared: true });
+      await data.search("uk", { ...plain, page: 2 }, { shared: true });
+      expect(calls).toHaveLength(3);
+    });
+
+    it("serves the last good list when the re-read answers 429 or 503, instead of the fallback", async () => {
+      let status = 200;
+      const { data, advance } = shared(() =>
+        status === 200
+          ? json(result)
+          : problem(status, status === 429 ? "too_many_requests" : "search_unavailable"),
+      );
+      await data.search("uk", plain, { shared: true });
+      advance(61_000);
+      status = 429;
+      expect(await data.search("uk", plain, { shared: true })).toEqual({
+        kind: "results",
+        result,
+      });
+      status = 503;
+      expect(await data.search("uk", plain, { shared: true })).toEqual({
+        kind: "results",
+        result,
+      });
+    });
+
+    it("without a shared cache, a shared read is a plain uncached read", async () => {
+      const { data, calls } = setup(() => json(result));
+      await data.search("uk", plain, { shared: true });
+      await data.search("uk", plain, { shared: true });
+      expect(calls).toHaveLength(2);
+      expect(calls[0]?.init.cache).toBe("no-store");
+    });
   });
 
   it("sends no forwarded address when the request had none", async () => {

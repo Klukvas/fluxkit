@@ -1,5 +1,13 @@
 import type { Page } from "@playwright/test";
-import { E2E_SEARCH_ENABLED } from "../support/env.ts";
+import { existsSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+import {
+  E2E_API_PORT,
+  E2E_ORIGIN,
+  E2E_SEARCH_ENABLED,
+  E2E_STOREFRONT_UNFORWARDED_PORT,
+  clientMarker,
+} from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { waitForHydration } from "../support/flows.ts";
 
@@ -111,4 +119,87 @@ test("falls back to the SQL listing and says so when search cannot answer (the s
     "href",
     "/en/catalog?f=opt.color%3Ablack&sort=price_asc",
   );
+});
+
+// Review F1 of the search finish (ADR 0040): the unfiltered lists are shared between shoppers, and a miss must neither
+// count against the Next server's one window nor let one client add an entry per bogus address.
+const fetchCache = resolve(import.meta.dirname, "../../.next/cache/fetch-cache");
+
+function fetchCacheFiles(): number {
+  return existsSync(fetchCache) ? readdirSync(fetchCache).length : 0;
+}
+
+test("pages past the last one cost no engine read and no cache entry, on either storefront (review F1)", async ({
+  page,
+  playwright,
+}) => {
+  // Warm up: the config and the categories of a catalog view are cached reads of their own (fixed addresses).
+  expect((await page.request.get("/en/catalog?page=76")).status()).toBe(404);
+  const direct = `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}`;
+  const client = await playwright.request.newContext();
+  try {
+    expect((await client.get(`${direct}/uk/catalog?page=76`)).status()).toBe(404);
+    const before = fetchCacheFiles();
+    // The review's scenario: one client asks for 74 addresses that cannot have a page, in a few seconds.
+    for (let number = 2; number <= 75; number += 1) {
+      const response = await page.request.get(`/en/catalog?page=${String(number)}`);
+      expect(response.status(), `page ${String(number)}`).toBe(404);
+    }
+    // The same through the storefront without the forwarding, where every read is the Next server's own address.
+    for (let number = 2; number <= 75; number += 1) {
+      const response = await client.get(`${direct}/uk/catalog?page=${String(number)}`);
+      expect(response.status(), `unforwarded page ${String(number)}`).toBe(404);
+    }
+    // The Next server's address (this runner reaches the API from the same address, without a forwarded one) still has
+    // its window: before the fix, the 148 bogus pages had used it up (429).
+    const server = await client.get(
+      `http://127.0.0.1:${String(E2E_API_PORT)}/store/search?locale=en`,
+    );
+    expect.soft(server.status(), "the Next server's own window").toBe(200);
+    // No entry per bogus address (before the fix: one file per page address).
+    const after = fetchCacheFiles();
+    expect(after, `data cache files: ${String(before)} before, ${String(after)} after`).toBe(
+      before,
+    );
+  } finally {
+    await client.dispose();
+  }
+});
+
+test("a client that used up its own window cannot switch another shopper's plain lists to the fallback (review F1)", async ({
+  page,
+  browser,
+}, testInfo) => {
+  // Addresses no other test reads, different on a retry (a list stays shared for the catalog minute).
+  const [mine, theirs] =
+    testInfo.retry === 0
+      ? [
+          "/en/c/demo-tools-screwdrivers?sort=price_desc",
+          "/en/c/demo-digital-templates?sort=price_desc",
+        ]
+      : ["/en/c/demo-clothing-shirts?sort=price_desc", "/en/c/demo-digital-books?sort=price_desc"];
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    expect((await page.request.get("/store/search?locale=en")).status()).toBe(200);
+  }
+  expect((await page.request.get("/store/search?locale=en")).status()).toBe(429);
+
+  // The miss of a plain list is read for the shopper whose view missed: this client's own window, so its page falls back.
+  expect((await page.goto(mine))?.status()).toBe(200);
+  await expect(page.getByText("Filters are temporarily unavailable")).toBeVisible();
+
+  // Another shopper (own address) is not affected: a fresh plain list, and the very list the first client could not read.
+  const other = await browser.newContext({
+    baseURL: E2E_ORIGIN,
+    extraHTTPHeaders: { "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, "other") },
+  });
+  try {
+    const theirPage = await other.newPage();
+    for (const address of [theirs, mine]) {
+      expect((await theirPage.goto(address))?.status(), address).toBe(200);
+      await expect(theirPage.getByRole("complementary", { name: "Filters" })).toBeVisible();
+      await expect(theirPage.getByText("Filters are temporarily unavailable")).toHaveCount(0);
+    }
+  } finally {
+    await other.close();
+  }
 });
