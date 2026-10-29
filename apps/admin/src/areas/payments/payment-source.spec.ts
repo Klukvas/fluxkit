@@ -43,6 +43,8 @@ describe("payment section source guards", () => {
   it("asks for confirmation before a refund is sent: only the confirm step reaches the client", () => {
     expect(body("review")).not.toContain("adminClient");
     expect(body("review")).not.toContain("send(");
+    expect(body("review")).not.toContain("confirmRefund");
+    expect(body("review")).toContain('step: "confirm"');
     expect(body("openRefund")).not.toContain("adminClient");
     expect(body("onAction")).not.toContain("adminClient");
     expect(body("confirmRefund")).toContain("adminClient.refundPayment(");
