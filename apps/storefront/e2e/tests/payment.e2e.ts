@@ -8,9 +8,10 @@ import { PROVIDER_HOST, captureCreate, stubProviderPages } from "../support/paym
 
 /**
  * Online payment in the storefront (payments plan step 9). The API of this suite runs with the test-only `fake` payment
- * provider (`PAYMENT_PROVIDERS_ENABLED=fake`, `support/env.ts`). That provider is driven only from inside the API process
- * (no HTTP bridge exists, and the production API gets no test-only route), so the suite can START payments for real
- * (create, redirect URL, status reads) but cannot make the provider PAY or FAIL one. What this file covers:
+ * provider (`PAYMENT_PROVIDERS_ENABLED=fake`, `support/env.ts`). The fake's in-process hooks cannot cross the process
+ * boundary and the production API gets no test-only route, so THIS file starts payments for real (create, redirect URL,
+ * status reads) but never settles one; settling a payment by the provider's signed webhook (paid, replay, forged, mismatch,
+ * late) is `payment-webhook.e2e.ts` (plan step 11). What this file covers:
  *
  * - REAL stack: the pay step on the guest and the account order page, the create call with an Idempotency-Key, the redirect
  *   to the provider's https page (the browser is sent there; Playwright answers that host with a stub page, nothing leaves
@@ -19,8 +20,6 @@ import { PROVIDER_HOST, captureCreate, stubProviderPages } from "../support/paym
  * - BROWSER-LEVEL STUBS (`page.route` on the shop's own API paths, named as such): the states the fake cannot produce
  *   (a lost provider answer with a countdown, a refused create, a payment already in progress, an unsafe redirect URL, a
  *   network failure, and a status that moves from processing to paid or failed). They test the page, not the API.
- *
- * The API's own behaviour for paid/failed is covered by the API's integration tests, not here.
  */
 
 interface PlacedGuestOrder {
