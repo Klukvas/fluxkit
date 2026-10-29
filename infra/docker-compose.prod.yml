@@ -53,8 +53,8 @@ services:
       timeout: 3s
       retries: 20
 
-  # Forward-only migrations before every start of the API (advisory lock: safe if two run at once). A failure stops the
-  # rollout here: the api service does not start, the old container is already gone, so take a backup first.
+  # Forward-only migrations before every start of the API (advisory lock: safe if two run at once). When it fails the
+  # new api container is not started (docs/deployment.md, "Updates and migrations"); rollbacks are manual, so back up first.
   migrate:
     <<: *hardening
     image: ${FLUXKIT_IMAGE_PREFIX:-fluxkit}-api:${FLUXKIT_IMAGE_TAG:-latest}
