@@ -4,6 +4,8 @@
  * to the storefront in v1, not a public contract (plan, open question 11).
  */
 
+import { legalPages } from "../config/legal";
+
 export interface NavigationLink {
   labelKey: string;
   href: string;
@@ -24,6 +26,8 @@ export const footerLinks: readonly NavigationLink[] = [
   { labelKey: "footer.catalog", href: "/catalog" },
   { labelKey: "footer.cart", href: "/cart" },
   { labelKey: "footer.account", href: "/account" },
+  // The legal pages (privacy plan step 10) come from their own config: add or remove a page there, the footer follows.
+  ...legalPages.map((page) => ({ labelKey: page.labelKey, href: `/legal/${page.slug}` })),
 ];
 
 /** Targets of the header's cart and account islands. */

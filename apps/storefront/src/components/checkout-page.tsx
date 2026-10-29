@@ -61,6 +61,7 @@ import {
 } from "../lib/checkout-store";
 import { clientFailure, failureText, type Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
+import { LegalNotice, noticeLinks } from "./legal-notice";
 import { formatMoney } from "../lib/money";
 import { loginHref } from "../lib/safe-next";
 import {
@@ -453,6 +454,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           </section>
 
           <div className="flex flex-col gap-2">
+            <LegalNotice t={t} kind="checkout" links={noticeLinks(locale)} />
             <Button
               type="submit"
               className="self-start"

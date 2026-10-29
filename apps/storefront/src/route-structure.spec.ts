@@ -67,6 +67,8 @@ describe("route structure", () => {
         ),
     );
     expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
+      "(site)/account/data/page.tsx",
+      "(site)/account/deleted/page.tsx",
       "(site)/account/forgot-password/page.tsx",
       "(site)/account/login/page.tsx",
       "(site)/account/orders/[number]/page.tsx",

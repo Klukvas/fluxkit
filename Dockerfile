@@ -40,6 +40,10 @@ RUN pnpm install --offline --frozen-lockfile
 # Read by `next build` for the storefront CSP (image hosts): set the SAME value at run time (docs/deployment.md).
 ARG STOREFRONT_IMAGE_HOSTS=""
 ENV STOREFRONT_IMAGE_HOSTS=${STOREFRONT_IMAGE_HOSTS}
+# A client fork's release build: "true" refuses the build while a legal text still carries the template marker
+# (apps/storefront/README.md).
+ARG STOREFRONT_REQUIRE_LEGAL_TEXT=""
+ENV STOREFRONT_REQUIRE_LEGAL_TEXT=${STOREFRONT_REQUIRE_LEGAL_TEXT}
 RUN pnpm build
 
 # --- production dependencies only, for one app, in the monorepo layout ---

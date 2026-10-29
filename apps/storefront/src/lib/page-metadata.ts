@@ -97,6 +97,22 @@ export function productMetadata(input: {
 }
 
 /**
+ * Metadata of a legal page (privacy plan step 10): a title and the page's own canonical, no robots opinion. The text is
+ * the shop's to supply; master ships placeholders (`config/legal.ts`).
+ */
+export function legalMetadata(input: {
+  origin: string;
+  locale: string;
+  t: Translator;
+  titleKey: string;
+  slug: string;
+}): Metadata {
+  const title = pageTitle(input.t, input.t(input.titleKey));
+  const alternates = alternatesFor(input.origin, input.locale, `/legal/${input.slug}`);
+  return { title, alternates };
+}
+
+/**
  * Metadata of a page that belongs to one shopper (cart, checkout, account): a title and `noindex, nofollow`. No canonical
  * and no alternates: the page is not a search result in any language. `robots.txt` keeps crawlers out as well
  * (`lib/robots.ts`); this tag covers a crawler that follows a link anyway. `noReferrer` adds the referrer meta tag.
