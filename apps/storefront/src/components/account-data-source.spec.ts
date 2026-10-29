@@ -17,19 +17,25 @@ const container = read("account-data.tsx");
 const views = read("account-data-views.tsx");
 const deleted = read("account-deleted.tsx");
 const lib = readFileSync(join(folder, "..", "lib", "personal-data.ts"), "utf8");
+const deletion = readFileSync(join(folder, "..", "lib", "delete-account.ts"), "utf8").replace(
+  /\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g,
+  "$1",
+);
 const download = readFileSync(join(folder, "..", "lib", "file-download.ts"), "utf8");
 
 describe("your data page source guards", () => {
   it("sends the deletion once, only after the typed word matched, with the explicit confirmation", () => {
-    expect(container.match(/client\.deleteAccount\(/g)).toHaveLength(1);
-    const run = container.slice(container.indexOf("run: async (values)"));
-    const check = run.indexOf("confirmationMatches(values.confirmWord");
-    const call = run.indexOf("client.deleteAccount(");
+    // The flow is `lib/delete-account.ts` (behaviour in `lib/delete-account.spec.ts`); the page only wires it.
+    expect(container.match(/runAccountDeletion\(/g)).toHaveLength(1);
+    expect(container).not.toMatch(/deleteAccount\(/);
+    expect(deletion.match(/client\.deleteAccount\(/g)).toHaveLength(1);
+    const check = deletion.indexOf("confirmationMatches(values.confirmWord");
+    const call = deletion.indexOf("client.deleteAccount(");
     expect(check).toBeGreaterThan(-1);
     expect(call).toBeGreaterThan(check);
     // A failed check returns a field failure before anything is sent.
-    expect(run.slice(check, call)).toMatch(/return clientFailure\(/);
-    expect(container).toMatch(/deleteBody\(values\.password\)/);
+    expect(deletion.slice(check, call)).toMatch(/return clientFailure\(/);
+    expect(deletion).toMatch(/deleteBody\(values\.password\)/);
     expect(lib).toMatch(/return \{ password, confirm: true \};/);
   });
 
@@ -49,6 +55,7 @@ describe("your data page source guards", () => {
       ["account-data-views.tsx", views],
       ["account-deleted.tsx", deleted],
       ["file-download.ts", download],
+      ["delete-account.ts", deletion],
     ] as const) {
       expect(code, name).not.toMatch(
         /localStorage|sessionStorage|document\.cookie|indexedDB|console\./,
@@ -74,7 +81,9 @@ describe("your data page source guards", () => {
   it("never reads the password or the typed word into a URL, a message or the deletion's confirmation page", () => {
     expect(container).not.toMatch(/router\.(replace|push)\([^)]*(password|confirmWord)/);
     expect(deleted).not.toMatch(/password|searchParams|location/);
+    // The flow tells the page to empty the fields; the page wires those effects to the form.
     expect(container).toMatch(/form\.setValues\(\{ password: "", confirmWord: "" \}\)/);
+    expect(container).toMatch(/clearPassword: \(\) => \{\s*form\.setValue\("password", ""\);/);
   });
 
   it("ends a deletion on the confirmation page and refreshes the session and cart there", () => {

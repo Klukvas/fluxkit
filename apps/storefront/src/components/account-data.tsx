@@ -4,18 +4,11 @@ import { Container } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { clientFailure, failureFromThrown, type FieldFailure } from "../lib/failure";
+import { runAccountDeletion } from "../lib/delete-account";
+import { failureFromThrown } from "../lib/failure";
 import { browserDownloadEnvironment, downloadBlob } from "../lib/file-download";
 import { localizedHref } from "../lib/locale-path";
-import {
-  confirmationMatches,
-  deleteBody,
-  exportBlob,
-  exportFileName,
-  mapDeleteFailure,
-  mapExportFailure,
-  type WaitParts,
-} from "../lib/personal-data";
+import { exportBlob, exportFileName, mapExportFailure, type WaitParts } from "../lib/personal-data";
 import { AccountGate } from "./account-gate";
 import {
   DELETE_FIELDS,
@@ -112,46 +105,30 @@ function DeletePanel() {
         form.submit(event, {
           required: DELETE_FIELDS,
           leaves: true,
-          run: async (values) => {
-            setBlocked(null);
-            setLimited(undefined);
-            // The typed word is the explicit confirmation: nothing is sent without it.
-            if (!confirmationMatches(values.confirmWord, t("account.data.delete.word"))) {
-              const mismatch: FieldFailure = {
-                path: "confirmWord",
-                code: "invalid",
-                messageKey: "account.data.delete.wordMismatch",
-              };
-              return clientFailure("errors.validation_failed", [mismatch]);
-            }
-            let result;
-            try {
-              result = await client.deleteAccount(deleteBody(values.password), NO_STORE);
-            } catch (error) {
-              return failureFromThrown(error);
-            }
-            if (result.ok) {
-              // Both passwords leave the form's memory; the confirmation page reads the (now ended) session.
-              form.setValues({ password: "", confirmWord: "" });
-              router.replace(localizedHref(locale, "/account/deleted"));
-              return null;
-            }
-            const mapped = mapDeleteFailure(result);
-            switch (mapped.kind) {
-              case "signed_out":
-                store.sessionEnded();
-                return clientFailure("account.gate.redirecting");
-              case "blocked":
-                setBlocked(mapped.reasons);
-                return clientFailure("account.data.blocked.title");
-              case "rate_limited":
-                setLimited(mapped.wait);
-                return clientFailure("account.data.delete.limited");
-              case "other":
-                form.setValue("password", "");
-                return mapped.failure;
-            }
-          },
+          // The rules (typed word first, one request, the password cleared after every failed answer) are in `lib/delete-account.ts`.
+          run: (values) =>
+            runAccountDeletion({
+              values,
+              expectedWord: t("account.data.delete.word"),
+              client,
+              callOptions: NO_STORE,
+              effects: {
+                setBlocked,
+                setLimited,
+                clearPassword: () => {
+                  form.setValue("password", "");
+                },
+                clearAll: () => {
+                  form.setValues({ password: "", confirmWord: "" });
+                },
+                sessionEnded: () => {
+                  store.sessionEnded();
+                },
+                leave: () => {
+                  router.replace(localizedHref(locale, "/account/deleted"));
+                },
+              },
+            }),
         })
       }
     />
