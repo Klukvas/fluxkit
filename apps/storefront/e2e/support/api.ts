@@ -101,6 +101,22 @@ export class StoreApi {
     await json(await this.context.post("/store/account/logout", { headers: CSRF }), [200, 204]);
   }
 
+  /** Cancels an unpaid order of the signed-in customer (the order stays as a closed record). */
+  async cancelCustomerOrder(number: string): Promise<void> {
+    await json(
+      await this.context.post(`/store/account/orders/${encodeURIComponent(number)}/cancel`, {
+        headers: CSRF,
+      }),
+      200,
+    );
+  }
+
+  /** The status of `GET /store/account/data-export` (200 a document, 429 above 5 a day), and its `Retry-After`. */
+  async dataExportStatus(): Promise<{ status: number; retryAfter: string | null }> {
+    const response = await this.context.get("/store/account/data-export");
+    return { status: response.status(), retryAfter: response.headers()["retry-after"] ?? null };
+  }
+
   /** Starts the online payment of a guest order (the pay button's call). A replay of `idempotencyKey` answers the same attempt. */
   async startGuestPayment(order: PlacedOrder, idempotencyKey: string): Promise<StartedPayment> {
     return json(
@@ -192,6 +208,26 @@ export interface AdminPaymentView {
   refundedAmount: Money;
   refundableAmount: Money;
   history: { source: string; applied: boolean; toStatus: string | null }[];
+}
+
+/** The members of the admin order the privacy scenarios read (`docs/api/orders.md`). */
+export interface AdminOrderView {
+  id: string;
+  number: string;
+  status: string;
+  customerId: string | null;
+  contact: {
+    email: string | null;
+    phone: string | null;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  contactErasedAt: string | null;
+  shippingAddress: unknown;
+  billingAddress: unknown;
+  items: { sku: string; quantity: number; lineTotal: Money }[];
+  total: Money;
+  subtotal: Money;
 }
 
 /** The owner created by `prepare-database.ts`, signed in. Used only to change the catalog behind the shopper's back. */
@@ -363,6 +399,17 @@ export class AdminApi {
       throw new Error(`The waybill was not created: ${JSON.stringify(result.shipment)}`);
     }
     return result.shipment.trackingNumber;
+  }
+
+  /** The admin view of one order by its number (contact fields, `contactErasedAt`, totals), read through the list's `?q`. */
+  async orderByNumber(number: string): Promise<AdminOrderView> {
+    const page = await json<{ items: { id: string; number: string }[] }>(
+      await this.context.get(`/admin/orders?q=${encodeURIComponent(number)}&limit=100`),
+      200,
+    );
+    const found = page.items.find((order) => order.number === number);
+    if (found === undefined) throw new Error(`The admin API lists no order numbered ${number}.`);
+    return json(await this.context.get(`/admin/orders/${found.id}`), 200);
   }
 
   /** The numbers of the orders whose contact email matches `email` (`?q`, docs/api/orders.md). */
