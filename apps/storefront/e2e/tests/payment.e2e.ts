@@ -4,12 +4,14 @@ import type { StoreApi } from "../support/api.ts";
 import { E2E_ORIGIN } from "../support/env.ts";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
 import { orderNumberOnPage, tabTo, tokenOf, waitForHydration } from "../support/flows.ts";
+import { PROVIDER_HOST, captureCreate, stubProviderPages } from "../support/payment-pages.ts";
 
 /**
  * Online payment in the storefront (payments plan step 9). The API of this suite runs with the test-only `fake` payment
- * provider (`PAYMENT_PROVIDERS_ENABLED=fake`, `support/env.ts`). That provider is driven only from inside the API process
- * (no HTTP bridge exists, and the production API gets no test-only route), so the suite can START payments for real
- * (create, redirect URL, status reads) but cannot make the provider PAY or FAIL one. What this file covers:
+ * provider (`PAYMENT_PROVIDERS_ENABLED=fake`, `support/env.ts`). The fake's in-process hooks cannot cross the process
+ * boundary and the production API gets no test-only route, so THIS file starts payments for real (create, redirect URL,
+ * status reads) but never settles one; settling a payment by the provider's signed webhook (paid, replay, forged, mismatch,
+ * late) is `payment-webhook.e2e.ts` (plan step 11). What this file covers:
  *
  * - REAL stack: the pay step on the guest and the account order page, the create call with an Idempotency-Key, the redirect
  *   to the provider's https page (the browser is sent there; Playwright answers that host with a stub page, nothing leaves
@@ -18,25 +20,7 @@ import { orderNumberOnPage, tabTo, tokenOf, waitForHydration } from "../support/
  * - BROWSER-LEVEL STUBS (`page.route` on the shop's own API paths, named as such): the states the fake cannot produce
  *   (a lost provider answer with a countdown, a refused create, a payment already in progress, an unsafe redirect URL, a
  *   network failure, and a status that moves from processing to paid or failed). They test the page, not the API.
- *
- * The API's own behaviour for paid/failed is covered by the API's integration tests, not here.
  */
-
-const PROVIDER_HOST = "https://pay.fake.invalid";
-
-/** Answers the provider's host with a stub page, so the redirect has somewhere to land and nothing leaves the machine. */
-async function stubProviderPages(page: Page): Promise<string[]> {
-  const visited: string[] = [];
-  await page.route(`${PROVIDER_HOST}/**`, async (route) => {
-    visited.push(route.request().url());
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Stub provider</title><h1>Stub provider page</h1>",
-    });
-  });
-  return visited;
-}
 
 interface PlacedGuestOrder {
   number: string;
@@ -68,33 +52,6 @@ async function openGuestOrder(page: Page, order: PlacedGuestOrder): Promise<void
     page.getByRole("heading", { level: 1, name: `Order ${order.number}` }),
   ).toBeVisible();
   await waitForHydration(page);
-}
-
-interface CreatedAnswer {
-  paymentId: string;
-  status: string;
-  redirectUrl: string;
-}
-
-/**
- * Lets the create call through to the REAL API and keeps its answer. The browser leaves for the provider's page as soon as
- * the answer arrives, and a response body that is read after that navigation is gone, so the test reads it here.
- */
-async function captureCreate(page: Page, pathEnd: string): Promise<() => Promise<CreatedAnswer>> {
-  let answer: ((value: CreatedAnswer) => void) | null = null;
-  const captured = new Promise<CreatedAnswer>((resolve) => {
-    answer = resolve;
-  });
-  await page.route(`**${pathEnd}`, async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.fallback();
-      return;
-    }
-    const response = await route.fetch();
-    answer?.((await response.json()) as CreatedAnswer);
-    await route.fulfill({ response });
-  });
-  return () => captured;
 }
 
 const paymentSection = (page: Page) => page.getByRole("region", { name: "Payment", exact: true });

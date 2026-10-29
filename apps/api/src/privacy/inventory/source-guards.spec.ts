@@ -137,8 +137,10 @@ describe("a feature or provider package declares no database table (ADR 0033 dec
     ...sourceFiles(join(ROOT, "packages/providers"), /\.tsx?$/),
   ];
 
+  // The feature matrix deletes the features or the providers in turn, so only one of the two roots is
+  // guaranteed to hold files; the check needs at least one file to be a real scan.
   it("finds the packages (the check below is not vacuous)", () => {
-    expect(files.length).toBeGreaterThan(10);
+    expect(files.length).toBeGreaterThan(0);
   });
 
   it("does not import the Drizzle table builders, so no table can bypass the inventory", () => {
