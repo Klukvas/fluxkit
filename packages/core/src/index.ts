@@ -7,4 +7,5 @@ export * from "./media/index.js";
 export * from "./orders/index.js";
 export * from "./payments/index.js";
 export * from "./pricing/index.js";
+export * from "./privacy/index.js";
 export * from "./shipping/index.js";
