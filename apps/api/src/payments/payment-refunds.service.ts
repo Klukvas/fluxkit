@@ -12,7 +12,12 @@ import { retryOnDeadlock } from "../common/deadlock-retry.js";
 import { applyJobLimits, type JobLimits } from "../common/job-limits.js";
 import { withTransaction, type Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
-import { PaymentChanges, paymentStatusOf, refundStatusOf } from "./attempts/payment-changes.js";
+import {
+  PaymentChanges,
+  paymentStatusOf,
+  refundRecordOf,
+  refundStatusOf,
+} from "./attempts/payment-changes.js";
 import {
   PaymentsRepository,
   type PaymentRow,
@@ -105,11 +110,10 @@ export class PaymentRefundsService {
             payment: {
               status: paymentStatusOf(row.status),
               amount: moneyOf(row.amount, row.currency),
+              // The provider's view caps the refund: money returned outside the shop is never refunded twice.
+              finalAmount: row.finalAmount === null ? null : moneyOf(row.finalAmount, row.currency),
             },
-            refunds: refunds.map((refund) => ({
-              amount: moneyOf(refund.amount, refund.currency),
-              status: refundStatusOf(refund.status),
-            })),
+            refunds: refunds.map(refundRecordOf),
             amount: input.amount,
             capabilities: {
               partialRefunds: provider?.capabilities.partialRefunds ?? false,

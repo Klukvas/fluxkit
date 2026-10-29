@@ -12,10 +12,13 @@
   "page.productTypes.title": "Типи товарів",
   "page.brands.title": "Бренди",
   "page.categories.title": "Категорії",
+  "page.search.title": "Пошук",
+  "page.searchSynonyms.title": "Синоніми пошуку",
   "page.orders.title": "Замовлення",
   "page.orderDetail.title": "Замовлення",
   "page.customers.title": "Покупці",
   "page.customerDetail.title": "Покупець",
+  "page.payments.title": "Платежі на перевірку",
   "page.email.title": "Електронна пошта",
   "page.emailMessages.title": "Листи",
   "page.emailMessageDetail.title": "Лист",
@@ -40,5 +43,9 @@
   "page.shippingMethodNew.title": "Новий спосіб доставки",
   "page.shippingMethodDetail.title": "Спосіб доставки",
   "page.shippingProviders.title": "Перевізники",
-  "page.shippingProviderDetail.title": "Перевізник"
+  "page.shippingProviderDetail.title": "Перевізник",
+  "page.privacy.title": "Персональні дані",
+  "page.privacyLookup.title": "Пошук за email",
+  "page.privacyRequestDetail.title": "Запит щодо даних",
+  "page.auditLog.title": "Журнал дій"
 }

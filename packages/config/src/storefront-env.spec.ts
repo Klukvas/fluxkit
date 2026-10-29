@@ -167,6 +167,39 @@ describe("loadStorefrontEnv errors", () => {
       apiInternalUrl: "http://127.0.0.1:3000",
       storefrontPublicUrl: "http://localhost:3001",
       imageHosts: [],
+      forwardClientAddress: false,
     });
   });
+});
+
+describe("loadStorefrontEnv STOREFRONT_FORWARD_CLIENT_ADDRESS (ADR 0038)", () => {
+  it("is off when unset or blank: the Next server passes no client header on unless the operator says so", () => {
+    expect(loadStorefrontEnv(base).forwardClientAddress).toBe(false);
+    expect(
+      loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: "" }).forwardClientAddress,
+    ).toBe(false);
+    expect(
+      loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: "  " }).forwardClientAddress,
+    ).toBe(false);
+    expect(
+      loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: "false" })
+        .forwardClientAddress,
+    ).toBe(false);
+  });
+
+  it("is on only for exactly true", () => {
+    expect(
+      loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: "true" })
+        .forwardClientAddress,
+    ).toBe(true);
+  });
+
+  it.each(["TRUE", "True", "1", "yes", "on", "true ", "no"])(
+    "refuses %j loudly instead of guessing (a typo in a trust switch must not pick a side)",
+    (value) => {
+      expect(() =>
+        loadStorefrontEnv({ ...base, STOREFRONT_FORWARD_CLIENT_ADDRESS: value }),
+      ).toThrow(/Invalid storefront environment: STOREFRONT_FORWARD_CLIENT_ADDRESS/);
+    },
+  );
 });

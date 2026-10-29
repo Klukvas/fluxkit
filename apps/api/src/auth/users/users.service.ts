@@ -10,6 +10,7 @@ import {
 } from "../../common/problem.js";
 import { withTransaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
+import { AdminAuditWriter } from "../../privacy/audit/admin-audit.writer.js";
 import { AdminUserRepository } from "../admin-user.repository.js";
 import { CLOCK, type Clock } from "../clock.js";
 import { PasswordHasher } from "../password-hasher.js";
@@ -44,6 +45,7 @@ export class UsersService {
     @Inject(PasswordHasher) private readonly hasher: PasswordHasher,
     @Inject(SessionService) private readonly sessions: SessionService,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(AdminAuditWriter) private readonly audit: AdminAuditWriter,
   ) {}
 
   async list(page: PaginationQuery): Promise<Page<UserResponse>> {
@@ -59,7 +61,7 @@ export class UsersService {
     return toUserResponse(row);
   }
 
-  async create(body: CreateUserBody): Promise<UserResponse> {
+  async create(body: CreateUserBody, actorAdminId: string): Promise<UserResponse> {
     const errors: FieldError[] = [];
     const email = validateEmail(body.email);
     if (!email.ok) {
@@ -73,7 +75,19 @@ export class UsersService {
     }
     const passwordHash = await this.hasher.hash(body.password);
     try {
-      const row = await this.users.insert({ email: email.email, passwordHash, role: body.role });
+      const row = await withTransaction(this.db, async (transaction) => {
+        const inserted = await this.users.insert(
+          { email: email.email, passwordHash, role: body.role },
+          transaction,
+        );
+        await this.audit.record(transaction, actorAdminId, {
+          action: "admin_user.created",
+          targetKind: "admin_user",
+          targetId: inserted.id,
+          detail: { role: inserted.role },
+        });
+        return inserted;
+      });
       return toUserResponse(row);
     } catch (error) {
       // `admin_user_email_key` becomes 409 conflict with field `email`.
@@ -87,7 +101,7 @@ export class UsersService {
    * the last two owners between them. Deactivating ends all sessions of the user in the same transaction; a role
    * change needs no revocation because the role is read from the database on every request.
    */
-  async update(id: string, body: UpdateUserBody): Promise<UserResponse> {
+  async update(id: string, body: UpdateUserBody, actorAdminId: string): Promise<UserResponse> {
     if (body.role === undefined && body.isActive === undefined) {
       return this.get(id);
     }
@@ -122,13 +136,29 @@ export class UsersService {
       if (body.isActive === false) {
         await this.sessions.revokeAllForUser(id, undefined, transaction);
       }
+      // Audit (ADR 0033): one event per real change. Re-activating an admin has no action in the core list.
+      if (body.role !== undefined && body.role !== target.role) {
+        await this.audit.record(transaction, actorAdminId, {
+          action: "admin_user.role_changed",
+          targetKind: "admin_user",
+          targetId: id,
+          detail: { fromRole: target.role, toRole: body.role },
+        });
+      }
+      if (body.isActive === false && target.isActive) {
+        await this.audit.record(transaction, actorAdminId, {
+          action: "admin_user.deactivated",
+          targetKind: "admin_user",
+          targetId: id,
+        });
+      }
       return row;
     });
     return toUserResponse(updated);
   }
 
   /** New password for another (or the own) account: clears the lockout and ends all sessions of that user. */
-  async resetPassword(id: string, body: ResetPasswordBody): Promise<void> {
+  async resetPassword(id: string, body: ResetPasswordBody, actorAdminId: string): Promise<void> {
     const target = await this.users.findById(id);
     if (target === undefined) {
       throw notFound("User");
@@ -153,6 +183,11 @@ export class UsersService {
         throw notFound("User");
       }
       await this.sessions.revokeAllForUser(id, undefined, transaction);
+      await this.audit.record(transaction, actorAdminId, {
+        action: "admin_user.password_reset",
+        targetKind: "admin_user",
+        targetId: id,
+      });
     });
   }
 }

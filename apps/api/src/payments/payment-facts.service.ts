@@ -4,6 +4,7 @@ import {
   bindFact,
   buildPollDedupeKey,
   buildProviderReference,
+  decideExternalRefund,
   decideOrderOutcome,
   decideRefund,
   decideRefundFromFact,
@@ -25,6 +26,7 @@ import {
   DuplicatePaymentFact,
   PaymentChanges,
   paymentStatusOf,
+  refundRecordOf,
   refundStatusOf,
   type JournalEntry,
 } from "./attempts/payment-changes.js";
@@ -97,7 +99,9 @@ function pollDigest(paymentId: string): (text: string) => string {
  * 4. on entering `succeeded`, `OrdersService.markPaidIn` in THIS transaction and core `decideOrderOutcome`: `applied`,
  *    `already_paid`, or attention with a full automatic refund queued `requested` (late or duplicate payment; sent by job
  *    11 after commit, never here) or without one (amount mismatch);
- * 5. our refunds listed in the fact are settled by their refund id (core `decideRefundFromFact`).
+ * 5. our refunds listed in the fact are settled by their refund id (core `decideRefundFromFact`);
+ * 6. on a `succeeded` attempt, money returned outside the shop (core `decideExternalRefund`: a lowered final amount or a
+ *    listed refund our refunds do not explain) raises `external_reversal` (review F1).
  * The attempt's status changes only through `PaymentChanges`; the order's only through `OrdersService`.
  */
 @Injectable()
@@ -215,14 +219,14 @@ export class PaymentFactsService {
       return { kind: "not_bound", paymentId };
     }
     const from = paymentStatusOf(row.status);
+    // The provider's view before this fact (review F1): an external refund is new only when it shows more than this did.
+    const previousFinalAmount =
+      row.finalAmount === null ? null : moneyOf(row.finalAmount, row.currency);
     const decision = normalizeProviderFact(fact, {
       status: from,
       providerModifiedAt: row.providerModifiedAt,
       amount,
-      refunds: refunds.map((refund) => ({
-        amount: moneyOf(refund.amount, refund.currency),
-        status: refundStatusOf(refund.status),
-      })),
+      refunds: refunds.map(refundRecordOf),
     });
     if (decision.kind !== "apply") {
       row = await this.changes.record(tx, row, { now, applied: false, entry });
@@ -301,6 +305,20 @@ export class PaymentFactsService {
     row = await this.settleRefunds(tx, row, fact, now);
 
     const latestRefunds = await this.payments.lockRefundsOfPayment(tx, row.id);
+    if (paymentStatusOf(row.status) === "succeeded") {
+      const external = decideExternalRefund({
+        amount,
+        previousFinalAmount,
+        refunds: latestRefunds.map((refund) => ({ id: refund.id, ...refundRecordOf(refund) })),
+        fact,
+      });
+      if (external.attentionCode !== null) {
+        this.logger.warn(
+          `Payment ${row.id}: the provider reports money returned outside the shop; attention raised`,
+        );
+        row = await this.changes.raiseAttention(tx, row, external.attentionCode, now);
+      }
+    }
     const changedStatus = decision.toStatus !== null;
     if (polled && !changedStatus && orderOutcome === null) {
       await this.afterPoll(tx, row, fact, now, latestRefunds);
@@ -356,11 +374,12 @@ export class PaymentFactsService {
   ): Promise<void> {
     const provider = this.registry.get(row.providerCode);
     const decision = decideRefund({
-      payment: { status: "succeeded", amount: moneyOf(row.amount, row.currency) },
-      refunds: refunds.map((refund) => ({
-        amount: moneyOf(refund.amount, refund.currency),
-        status: refundStatusOf(refund.status),
-      })),
+      payment: {
+        status: "succeeded",
+        amount: moneyOf(row.amount, row.currency),
+        finalAmount: row.finalAmount === null ? null : moneyOf(row.finalAmount, row.currency),
+      },
+      refunds: refunds.map(refundRecordOf),
       amount: moneyOf(row.amount, row.currency),
       capabilities: {
         partialRefunds: provider?.capabilities.partialRefunds ?? false,
@@ -391,6 +410,21 @@ export class PaymentFactsService {
     const refunds = await this.payments.lockRefundsOfPayment(tx, row.id);
     for (const refund of refunds) {
       const status = refundStatusOf(refund.status);
+      if (status === "succeeded" && refund.providerModifiedAt === null) {
+        // Succeeded by the provider's answer to our call; now listed: the final amount shows it (review F1).
+        const entries = fact.refunds.filter((entry) => entry.refundId === refund.id);
+        const [entry] = entries;
+        if (
+          entries.length === 1 &&
+          entry !== undefined &&
+          entry.status === "succeeded" &&
+          entry.amount.amount === refund.amount &&
+          entry.amount.currency === refund.currency
+        ) {
+          await this.changes.noteRefundListed(tx, refund, entry.modifiedAt, now);
+        }
+        continue;
+      }
       if (status === "succeeded" || status === "failed") {
         continue;
       }

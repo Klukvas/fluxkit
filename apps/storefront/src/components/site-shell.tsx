@@ -18,6 +18,7 @@ export function SiteShell({
   messages,
   t,
   categories,
+  searchEnabled,
   year,
   children,
 }: {
@@ -25,6 +26,8 @@ export function SiteShell({
   messages: Messages;
   t: Translator;
   categories: readonly NavigationCategory[] | null;
+  /** `search` of the store config: false means no search box in the header. */
+  searchEnabled: boolean;
   year: number;
   children: ReactNode;
 }) {
@@ -33,7 +36,7 @@ export function SiteShell({
       <SessionProvider locale={locale}>
         <RouteFocus />
         <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
-        <SiteHeader locale={locale} t={t} categories={categories} />
+        <SiteHeader locale={locale} t={t} categories={categories} searchEnabled={searchEnabled} />
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
           <SessionNotices />
           {children}

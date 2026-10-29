@@ -78,6 +78,9 @@ export function AccountOverviewView({
         <Link href={localizedHref(locale, "/account/profile")} className={linkButton}>
           {t("account.overview.edit")}
         </Link>
+        <Link href={localizedHref(locale, "/account/data")} className={linkButton}>
+          {t("account.overview.data")}
+        </Link>
         <Button variant="secondary" onClick={onLogout} disabled={pending} aria-busy={pending}>
           {pending ? t("account.logout.pending") : t("account.logout")}
         </Button>

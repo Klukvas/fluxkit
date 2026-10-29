@@ -9,7 +9,9 @@ import {
 } from "../../common/openapi.js";
 import { pageSchema, type Page, type PaginationQuery } from "../../common/pagination.js";
 import { uuidParam, ZodValidationPipe } from "../../common/zod-validation.pipe.js";
+import type { AdminPrincipal } from "../admin-authenticator.js";
 import { AdminController } from "../admin-controller.decorator.js";
+import { CurrentAdmin } from "../current-admin.js";
 import { RequirePermission } from "../route-access.js";
 import {
   createUserSchema,
@@ -54,8 +56,9 @@ export class UsersController {
   async create(
     @Body(new ZodValidationPipe(createUserSchema)) body: CreateUserBody,
     @Res({ passthrough: true }) response: Response,
+    @CurrentAdmin() admin: AdminPrincipal,
   ): Promise<UserResponse> {
-    const created = await this.users.create(body);
+    const created = await this.users.create(body, admin.userId);
     response.setHeader("Location", `/admin/users/${created.id}`);
     return created;
   }
@@ -82,8 +85,9 @@ export class UsersController {
   update(
     @Param("id", uuidParam("id")) id: string,
     @Body(new ZodValidationPipe(updateUserSchema)) body: UpdateUserBody,
+    @CurrentAdmin() admin: AdminPrincipal,
   ): Promise<UserResponse> {
-    return this.users.update(id, body);
+    return this.users.update(id, body, admin.userId);
   }
 
   @Post(":id/reset-password")
@@ -101,7 +105,8 @@ export class UsersController {
   async resetPassword(
     @Param("id", uuidParam("id")) id: string,
     @Body(new ZodValidationPipe(resetPasswordSchema)) body: ResetPasswordBody,
+    @CurrentAdmin() admin: AdminPrincipal,
   ): Promise<void> {
-    await this.users.resetPassword(id, body);
+    await this.users.resetPassword(id, body, admin.userId);
   }
 }

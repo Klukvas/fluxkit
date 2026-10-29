@@ -3,6 +3,7 @@ import { homeSections } from "../layout/home";
 import {
   loadCatalogListing,
   loadEmailDelivery,
+  loadOnlinePayment,
   loadHomeData,
   loadProductPage,
   loadShopExponent,
@@ -37,3 +38,6 @@ export const getShopMoney = cache(() => loadShopMoney(storeData));
 
 /** Whether the shop has an email provider: the pages of the emailed links and their entry points depend on it. */
 export const getEmailDelivery = cache(() => loadEmailDelivery(storeData));
+
+/** Whether the shop takes payments online: the checkout wording and the pay button of the order pages depend on it. */
+export const getOnlinePayment = cache(() => loadOnlinePayment(storeData));

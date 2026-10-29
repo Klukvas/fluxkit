@@ -253,6 +253,32 @@ describe("loadEnv orders", () => {
   );
 });
 
+describe("loadEnv ORDER_CONTACT_RETENTION_DAYS (ADR 0033 decision 8)", () => {
+  const base = { DATABASE_URL: "postgres://x" };
+
+  it("is unset by default: job 12 is off and no period is baked in", () => {
+    expect(loadEnv(base).orderContactRetentionDays).toBeUndefined();
+  });
+
+  it("accepts whole days from 1 to 36 500 (core MAX_RETENTION_DAYS)", () => {
+    expect(loadEnv({ ...base, ORDER_CONTACT_RETENTION_DAYS: "1" }).orderContactRetentionDays).toBe(
+      1,
+    );
+    expect(
+      loadEnv({ ...base, ORDER_CONTACT_RETENTION_DAYS: "36500" }).orderContactRetentionDays,
+    ).toBe(36500);
+  });
+
+  it.each(["0", "36501", "-1", "1.5", "abc", "", "1e2", "0x10", " 30", "030"])(
+    "rejects ORDER_CONTACT_RETENTION_DAYS=%j",
+    (value) => {
+      expect(() => loadEnv({ ...base, ORDER_CONTACT_RETENTION_DAYS: value })).toThrow(
+        /ORDER_CONTACT_RETENTION_DAYS/,
+      );
+    },
+  );
+});
+
 describe("loadEnv ORDER_TOKEN_SECRET", () => {
   const base = { DATABASE_URL: "postgres://x" };
   const SECRET = "o".repeat(32);

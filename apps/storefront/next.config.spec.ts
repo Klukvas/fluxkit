@@ -7,7 +7,8 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import config, { loadRootEnvFile } from "./next.config.js";
+import config, { LEGAL_MARKER, assertNoLegalPlaceholders, loadRootEnvFile } from "./next.config.js";
+import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
 
 // `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
 // real .env cannot change what these tests see.
@@ -102,9 +103,9 @@ describe("next.config headers", () => {
     return resolved.headers === undefined ? [] : await resolved.headers();
   }
 
-  it("applies the security headers to every path, then no-referrer to the guest order page and the emailed-link pages", async () => {
+  it("applies the security headers to every path, then no-referrer to the guest order page, the emailed-link pages and the payment return page", async () => {
     const rules = await headersFor(PHASE_PRODUCTION_BUILD);
-    expect(rules).toHaveLength(3);
+    expect(rules).toHaveLength(4);
     expect(rules[0]?.source).toBe("/:path*");
     expect(rules[1]).toEqual({
       source: "/:locale/order/:path*",
@@ -112,6 +113,10 @@ describe("next.config headers", () => {
     });
     expect(rules[2]).toEqual({
       source: "/:locale/account/:page(forgot-password|reset-password|verify-email)",
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    });
+    expect(rules[3]).toEqual({
+      source: "/:locale/payment/return",
       headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
     });
     const names = rules[0]?.headers.map((header) => header.key) ?? [];
@@ -173,5 +178,62 @@ describe("next.config images", () => {
     expect(resolved.images?.remotePatterns).toEqual([
       { protocol: "https", hostname: "cdn.example.com" },
     ]);
+  });
+});
+
+describe("next.config legal placeholder guard (privacy plan step 10)", () => {
+  const masterMessages = join(import.meta.dirname, "src", "messages");
+
+  it("uses the marker the legal config names, and master carries it in both languages", () => {
+    expect(LEGAL_MARKER).toBe(LEGAL_PLACEHOLDER_MARKER);
+    expect(() => assertNoLegalPlaceholders({ enabled: true, messagesDir: masterMessages })).toThrow(
+      /legal\.placeholder\.marker/,
+    );
+  });
+
+  it("names the files and keys of every message that still carries the marker, and no other", () => {
+    let message = "";
+    try {
+      assertNoLegalPlaceholders({ enabled: true, messagesDir: masterMessages });
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain("en.json: legal.placeholder.marker");
+    expect(message).toContain("uk.json: legal.placeholder.marker");
+    expect(message).not.toContain("legal.privacy.title");
+  });
+
+  it("does nothing while the check is off (master builds with its placeholders)", () => {
+    expect(() =>
+      assertNoLegalPlaceholders({ enabled: false, messagesDir: masterMessages }),
+    ).not.toThrow();
+    expect(() => config(PHASE_PRODUCTION_BUILD)).not.toThrow();
+  });
+
+  it("passes when no legal message carries the marker, and only legal messages count", () => {
+    const directory = mkdtempSync(join(tmpdir(), "storefront-legal-"));
+    try {
+      writeFileSync(
+        join(directory, "en.json"),
+        JSON.stringify({ "legal.privacy.title": "Privacy", "site.note": `x ${LEGAL_MARKER} y` }),
+      );
+      expect(() =>
+        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory }),
+      ).not.toThrow();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when asked to check and the messages cannot be read", () => {
+    vi.stubEnv("STOREFRONT_REQUIRE_LEGAL_TEXT", "true");
+    expect(() => config(PHASE_PRODUCTION_BUILD)).toThrow(/messages/);
+  });
+
+  it("checks only for a production build, not for the dev server or a running server", () => {
+    vi.stubEnv("STOREFRONT_REQUIRE_LEGAL_TEXT", "true");
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
+    expect(() => config(PHASE_PRODUCTION_SERVER)).not.toThrow();
+    expect(() => config(PHASE_DEVELOPMENT_SERVER)).not.toThrow();
   });
 });

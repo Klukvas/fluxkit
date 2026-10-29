@@ -6,6 +6,7 @@ import { notFound } from "../../common/problem.js";
 import { withTransaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { CustomerAuthTokens } from "../../email/auth/index.js";
+import { AdminAuditWriter } from "../../privacy/audit/admin-audit.writer.js";
 import { CustomerSessionService } from "../auth/customer-session.service.js";
 import { CustomerRepository, type CustomerRow } from "../customer.repository.js";
 import type {
@@ -40,6 +41,7 @@ export class AdminCustomersService {
     @Inject(CustomerSessionService) private readonly sessions: CustomerSessionService,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(CustomerAuthTokens) private readonly authTokens: CustomerAuthTokens,
+    @Inject(AdminAuditWriter) private readonly audit: AdminAuditWriter,
   ) {}
 
   async list(query: ListCustomersQuery): Promise<Page<CustomerSummary>> {
@@ -57,9 +59,13 @@ export class AdminCustomersService {
    * row lock is the one a login takes before it creates a session, so a login either finished first (and its
    * session is deleted here) or waits and then sees the customer inactive: no session can outlive the deactivation.
    * Deactivating also ends the reset and verification links still out (ADR 0031 decision 9), so activating the
-   * customer again does not revive them.
+   * customer again does not revive them. The admin audit event is written in the same transaction (ADR 0033).
    */
-  async update(id: string, body: UpdateCustomerBody): Promise<CustomerDetail> {
+  async update(
+    id: string,
+    body: UpdateCustomerBody,
+    actorAdminId: string,
+  ): Promise<CustomerDetail> {
     await withTransaction(this.db, async (transaction) => {
       const target = await this.customers.findByIdForUpdate(id, transaction);
       if (target === undefined) {
@@ -70,18 +76,28 @@ export class AdminCustomersService {
         await this.sessions.revokeAllForCustomer(id, undefined, transaction);
         await this.authTokens.invalidate(transaction, id, undefined, this.clock.now());
       }
+      await this.audit.record(transaction, actorAdminId, {
+        action: body.isActive ? "customer.activated" : "customer.deactivated",
+        targetKind: "customer",
+        targetId: id,
+      });
     });
     return this.detail(id);
   }
 
   /** Clears the lockout (counter and lock time). Sessions are untouched: a lock never ended them. */
-  async unlock(id: string): Promise<void> {
+  async unlock(id: string, actorAdminId: string): Promise<void> {
     await withTransaction(this.db, async (transaction) => {
       const target = await this.customers.findByIdForUpdate(id, transaction);
       if (target === undefined) {
         throw notFound("Customer");
       }
       await this.customers.update(id, { failedLoginCount: 0, lockedUntil: null }, transaction);
+      await this.audit.record(transaction, actorAdminId, {
+        action: "customer.unlocked",
+        targetKind: "customer",
+        targetId: id,
+      });
     });
   }
 

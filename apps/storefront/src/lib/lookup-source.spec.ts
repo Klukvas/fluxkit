@@ -17,6 +17,7 @@ function page(...names: string[]): StoreResult<LookupPage<string>> {
 }
 
 interface Pending {
+  signal: AbortSignal;
   query: string;
   answer(result: StoreResult<LookupPage<string>>): void;
   fail(error: unknown): void;
@@ -28,9 +29,9 @@ function setup(options: { minChars?: number; searchEmpty?: boolean } = {}) {
   const source: LookupSource<string> = createLookupSource<string>({
     minChars: options.minChars ?? 2,
     ...(options.searchEmpty === undefined ? {} : { searchEmpty: options.searchEmpty }),
-    search: (query) =>
+    search: (query, signal) =>
       new Promise((resolve, reject) => {
-        calls.push({ query, answer: resolve, fail: reject });
+        calls.push({ query, signal, answer: resolve, fail: reject });
       }),
   });
   return { source, calls };
@@ -184,6 +185,63 @@ describe("lookup source: answers", () => {
     expect(source.getState().status).toBe("idle");
     expect(unhandled).toHaveLength(1);
     expect(unhandled[0]).toBeInstanceOf(NetworkError);
+  });
+
+  it("aborts the request in flight when the text changes, so a stale answer is never even read", async () => {
+    const { source, calls } = setup();
+    source.setQuery("kyiv");
+    vi.advanceTimersByTime(300);
+    const first = calls[0];
+    expect(first?.signal.aborted).toBe(false);
+    source.setQuery("kyiv oblast");
+    expect(first?.signal.aborted).toBe(true);
+    vi.advanceTimersByTime(300);
+    const second = calls[1];
+    expect(second?.signal.aborted).toBe(false);
+    // The aborted request rejects: that is not a failure and not a bug, the newer query owns the state.
+    first?.fail(
+      new NetworkError("stop", { cause: new DOMException("stop", "AbortError"), aborted: true }),
+    );
+    await settle();
+    expect(source.getState()).toMatchObject({ status: "loading", query: "kyiv oblast" });
+    second?.answer(page("Kyiv oblast"));
+    await settle();
+    expect(source.getState()).toMatchObject({ status: "ready", items: ["Kyiv oblast"] });
+    // An answered request is not aborted afterwards.
+    expect(second?.signal.aborted).toBe(false);
+  });
+
+  it("aborts the request in flight when the text falls below the minimum, on reset() and on dispose()", () => {
+    const { source, calls } = setup();
+    source.setQuery("kyiv");
+    vi.advanceTimersByTime(300);
+    source.setQuery("k");
+    expect(calls[0]?.signal.aborted).toBe(true);
+    source.setQuery("lviv");
+    vi.advanceTimersByTime(300);
+    source.reset();
+    expect(calls[1]?.signal.aborted).toBe(true);
+    source.setQuery("odesa");
+    vi.advanceTimersByTime(300);
+    source.dispose();
+    expect(calls[2]?.signal.aborted).toBe(true);
+  });
+
+  it("asks again on retry() with a fresh, live signal", () => {
+    const { source, calls } = setup();
+    source.setQuery("kyiv");
+    vi.advanceTimersByTime(300);
+    calls[0]?.answer({
+      ok: false,
+      status: 503,
+      problem: { type: "t", title: "t", status: 503, code: "search_unavailable", detail: "d" },
+      retryAfter: null,
+    });
+    return settle().then(() => {
+      source.retry();
+      expect(calls).toHaveLength(2);
+      expect(calls[1]?.signal.aborted).toBe(false);
+    });
   });
 
   it("reset() and dispose() cancel a pending search", () => {

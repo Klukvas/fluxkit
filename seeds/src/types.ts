@@ -123,6 +123,14 @@ export interface SeedShippingMethod {
   position: number;
 }
 
+/** A demo synonym group of catalog search, created only when search is enabled (`SEARCH_ENABLED=true`). */
+export interface SeedSynonymGroup {
+  /** A locale of `LOCALES`; a group of a locale the shop does not serve is skipped and reported. */
+  locale: string;
+  /** 2 to 20 terms in the stored form of core `parseSynonymTerms`, none repeated in another group of the locale. */
+  terms: readonly string[];
+}
+
 export interface CatalogSeed {
   attributes: readonly SeedAttribute[];
   options: readonly SeedOption[];
@@ -131,4 +139,5 @@ export interface CatalogSeed {
   categories: readonly SeedCategory[];
   products: readonly SeedProduct[];
   shippingMethods: readonly SeedShippingMethod[];
+  synonymGroups: readonly SeedSynonymGroup[];
 }

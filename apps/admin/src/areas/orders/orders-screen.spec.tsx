@@ -51,6 +51,7 @@ const config: AdminConfig = {
   lowStockThreshold: 5,
   emailDelivery: false,
   onlinePayment: false,
+  search: false,
   media: {
     uploadsEnabled: true,
     maxBytes: 10485760,
@@ -73,6 +74,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
       firstName: "<b>Olena</b>",
       lastName: "Shevchenko",
     },
+    contactErasedAt: null,
     shippingAddress: {
       countryCode: "UA",
       city: "Kyiv",
@@ -221,7 +223,7 @@ describe("order list screen", () => {
     const rowData = [
       summary.number,
       formatDateTime(summary.placedAt, "en"),
-      summary.email,
+      summary.email ?? "",
       "UAH 39.98",
     ];
     for (const state of states) {
@@ -288,10 +290,10 @@ describe("order detail screen", () => {
     const html = detail(sentinel, paid, [...ROLE_PERMISSIONS.manager]);
     const data = [
       paid.number,
-      paid.contact.email,
-      paid.contact.phone,
-      paid.contact.lastName,
-      paid.contact.firstName,
+      paid.contact.email ?? "",
+      paid.contact.phone ?? "",
+      paid.contact.lastName ?? "",
+      paid.contact.firstName ?? "",
       "<script>alert(1)</script> Street 1",
       "01001 Kyiv",
       "R-1",
@@ -467,6 +469,45 @@ describe("action dialogs", () => {
     const unpaid = render("release");
     expect(unpaid).not.toContain("§order.cancel.paidBody");
     expect(unpaid).toContain("§order.cancel.unpaidBody");
+  });
+});
+
+describe("an order whose contact data was erased (privacy plan, ADR 0033)", () => {
+  const erasedOrder = order({
+    customerId: null,
+    isGuest: false,
+    contact: { email: null, phone: null, firstName: null, lastName: null },
+    contactErasedAt: "2026-10-28T09:30:00.000Z",
+    shippingAddress: null,
+  });
+
+  it("labels the erased contact instead of showing empty cells, in uk and en", async () => {
+    for (const locale of ["uk", "en"] as const) {
+      const t = createTranslator(await messagesForArea(locale, MESSAGE_FILES), locale);
+      const html = detail(t, erasedOrder, [...ROLE_PERMISSIONS.owner]);
+      expect(html).toContain(
+        t("order.detail.contactErased", { date: "October 28, 2026" }).slice(0, 20),
+      );
+      // The name, the email, the phone and the customer line each say "erased".
+      expect(html.split(t("order.detail.erasedValue")).length - 1).toBe(4);
+      expect(html).not.toContain("shopper@example.com");
+    }
+  });
+
+  it("shows the label in the order list, not an empty customer cell", async () => {
+    const t = createTranslator(await messagesForArea("en", MESSAGE_FILES), "en");
+    const html = results(t, {
+      status: "ready",
+      data: { items: [{ ...summary, email: null }], total: 1, limit: 50, offset: 0 },
+    });
+    expect(html).toContain(t("order.list.contactErased"));
+  });
+
+  it("does not show the label for a live contact", async () => {
+    const t = createTranslator(await messagesForArea("en", MESSAGE_FILES), "en");
+    const html = detail(t, order(), [...ROLE_PERMISSIONS.owner]);
+    expect(html).not.toContain(t("order.detail.erasedValue"));
+    expect(html).toContain("shopper@example.com");
   });
 });
 

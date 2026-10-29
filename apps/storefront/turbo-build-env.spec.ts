@@ -21,4 +21,9 @@ describe("turbo.json, the storefront build", () => {
     const task = turbo.tasks["@fluxkit/storefront#build"];
     expect(task?.env).toContain("STOREFRONT_IMAGE_HOSTS");
   });
+
+  it("hands STOREFRONT_REQUIRE_LEGAL_TEXT to next build, so the release check runs and a cached build is not reused after it changes", () => {
+    const task = turbo.tasks["@fluxkit/storefront#build"];
+    expect(task?.env).toContain("STOREFRONT_REQUIRE_LEGAL_TEXT");
+  });
 });

@@ -17,10 +17,14 @@ describe("navigation configuration", () => {
       "productTypes",
       "brands",
       "categories",
+      "search",
       "orders",
       "customers",
+      "payments",
       "shipping",
       "email",
+      "privacy",
+      "auditLog",
       "users",
     ]);
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {
@@ -31,7 +35,7 @@ describe("navigation configuration", () => {
     }
   });
 
-  it("shows the viewer the catalog only", () => {
+  it("shows the viewer the catalog only (the Search status is read with catalog.read)", () => {
     expect(ids([...ROLE_PERMISSIONS.viewer])).toEqual([
       "products",
       "attributes",
@@ -39,6 +43,7 @@ describe("navigation configuration", () => {
       "productTypes",
       "brands",
       "categories",
+      "search",
     ]);
   });
 
@@ -65,6 +70,15 @@ describe("navigation configuration", () => {
     );
     expect(ids(["email.manage"])).toEqual(["email"]);
     expect(visibleNavigation(["email.manage"]).map((group) => group.id)).toEqual(["settings"]);
+  });
+
+  it("shows the payment attention list to a session that reads orders: owner and manager, never the viewer, never through the refund permission alone", () => {
+    expect(ids([...ROLE_PERMISSIONS.owner])).toContain("payments");
+    expect(ids([...ROLE_PERMISSIONS.manager])).toContain("payments");
+    expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("payments");
+    expect(ids(["payments.refund", "shipping.manage", "email.manage"])).not.toContain("payments");
+    expect(ids(["orders.read"])).toEqual(["orders", "payments"]);
+    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales"]);
   });
 
   it("shows the owner everything, and drops groups that end up empty", () => {

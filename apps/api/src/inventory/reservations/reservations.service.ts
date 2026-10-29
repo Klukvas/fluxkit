@@ -14,6 +14,7 @@ import {
 } from "@fluxkit/core";
 import { productStatusSchema } from "../../catalog/admin/products/products.schemas.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../common/pricing-config.js";
+import { SEARCH_PORT, type SearchPort } from "../../common/search-port.js";
 import { applyJobLimits, type JobLimits } from "../../common/job-limits.js";
 import { withTransaction, type DbExecutor, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
@@ -289,6 +290,7 @@ export class ReservationsService {
     private readonly reservations: ReservationsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   /**
@@ -398,6 +400,12 @@ export class ReservationsService {
 
   /** Lowers `reserved`, status `released`, writes no journal row; in the caller's transaction. */
   async releaseIn(tx: Transaction, reservationId: string): Promise<ReservationResult> {
+    const result = await this.releaseHeld(tx, reservationId);
+    await this.markChanged(tx, [result]);
+    return result;
+  }
+
+  private async releaseHeld(tx: Transaction, reservationId: string): Promise<ReservationResult> {
     const locked = await this.lockPair(tx, reservationId);
     if (locked === undefined) {
       return { ok: false, reason: "reservation_not_found" };
@@ -424,6 +432,16 @@ export class ReservationsService {
     tx: Transaction,
     reservationId: string,
     options: CommitOptions = {},
+  ): Promise<CommitResult> {
+    const result = await this.commitHeld(tx, reservationId, options);
+    await this.markChanged(tx, [result]);
+    return result;
+  }
+
+  private async commitHeld(
+    tx: Transaction,
+    reservationId: string,
+    options: CommitOptions,
   ): Promise<CommitResult> {
     const locked = await this.lockPair(tx, reservationId);
     if (locked === undefined) {
@@ -458,7 +476,12 @@ export class ReservationsService {
     tx: Transaction,
     reservationIds: readonly string[],
   ): Promise<BatchEntry<ReservationResult>[]> {
-    return this.inLevelOrder(tx, reservationIds, (id) => this.releaseIn(tx, id));
+    const entries = await this.inLevelOrder(tx, reservationIds, (id) => this.releaseHeld(tx, id));
+    await this.markChanged(
+      tx,
+      entries.map((entry) => entry.result),
+    );
+    return entries;
   }
 
   /** The sorted batch of `commitIn` (payment, fulfilment); see `releaseManyIn` for the order and the answers. */
@@ -467,7 +490,14 @@ export class ReservationsService {
     reservationIds: readonly string[],
     options: CommitOptions = {},
   ): Promise<BatchEntry<CommitResult>[]> {
-    return this.inLevelOrder(tx, reservationIds, (id) => this.commitIn(tx, id, options));
+    const entries = await this.inLevelOrder(tx, reservationIds, (id) =>
+      this.commitHeld(tx, id, options),
+    );
+    await this.markChanged(
+      tx,
+      entries.map((entry) => entry.result),
+    );
+    return entries;
   }
 
   /** The sorted batch of `extend` (a paid order's backordered lines); see `releaseManyIn`. */
@@ -569,8 +599,23 @@ export class ReservationsService {
         return decision.reason;
       }
       await this.apply(tx, locked.reservation, decision.level, "expired");
+      await this.search.variantsChanged(tx, [locked.reservation.variantId], "reservation_changed");
       return "expired";
     });
+  }
+
+  /**
+   * Marks the products whose availability a successful release or commit changed for the search index, once per call and
+   * after every level lock of it (lock order: product, variant, level, then the search queue).
+   */
+  private async markChanged(
+    tx: Transaction,
+    results: readonly (ReservationResult | CommitResult)[],
+  ): Promise<void> {
+    const variantIds = results.flatMap((result) =>
+      result.ok ? [result.reservation.variantId] : [],
+    );
+    await this.search.variantsChanged(tx, variantIds, "reservation_changed");
   }
 
   /** Runs `work` for each id in (variant id, location id) order: the one place a batch decides its lock order. */
@@ -690,6 +735,7 @@ export class ReservationsService {
     const sorted = [...candidates].sort(
       (a, b) => compareText(a.variant.id, b.variant.id) || compareText(a.locationId, b.locationId),
     );
+    const heldProducts: string[] = [];
     try {
       await tx.transaction(async (savepoint) => {
         const decided: { candidate: Candidate; level: StockLevel }[] = [];
@@ -741,6 +787,7 @@ export class ReservationsService {
             reference: hold.reference,
           });
           outcomes[candidate.index] = { kind: "reserved", reservation: toView(created) };
+          heldProducts.push(candidate.variant.productId);
         }
       });
     } catch (error) {
@@ -748,6 +795,8 @@ export class ReservationsService {
         throw error;
       }
     }
+    // After every level lock of this hold (lock order: product, variant, level, then the search queue).
+    await this.search.productsChanged(tx, heldProducts, "reservation_changed");
     return outcomes;
   }
 

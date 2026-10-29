@@ -50,11 +50,11 @@
 		import to_api
 	}
 
-	# Payment provider notifications (ADR 0032): the API checks the signature over the exact bytes; 64 KiB is its limit.
+	# Payment provider notifications (ADR 0032): the API checks the signature over the exact bytes; 64 KiB is its limit (KiB: Caddy reads KB as 1000 bytes).
 	@webhooks path /webhooks/payments /webhooks/payments/*
 	handle @webhooks {
 		request_body {
-			max_size 64KB
+			max_size 64KiB
 		}
 		import to_api
 	}

@@ -10,7 +10,7 @@ import {
   type RefundRow,
 } from "../../payments/attempts/payments.repository.js";
 import { toAdminShipments } from "../../shipping/shipments/shipment-view.js";
-import { optionValuesSchema, parseAddress, parseOrderShipping, textMap } from "../order-view.js";
+import { optionValuesSchema, viewAddress, parseOrderShipping, textMap } from "../order-view.js";
 import {
   OrdersRepository,
   type OrderAdjustmentRow,
@@ -96,8 +96,9 @@ export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
       firstName: order.firstName,
       lastName: order.lastName,
     },
-    shippingAddress: parseAddress(order.shippingAddress),
-    billingAddress: parseAddress(order.billingAddress),
+    contactErasedAt: instant(order.contactErasedAt),
+    shippingAddress: viewAddress(order, order.shippingAddress),
+    billingAddress: viewAddress(order, order.billingAddress),
     items: parts.items.map((row) => ({
       position: row.position,
       productId: row.productId,

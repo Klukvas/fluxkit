@@ -1,0 +1,59 @@
+import { loadStorefrontEnv } from "@fluxkit/config";
+import { headers } from "next/headers";
+import { connection } from "next/server";
+import { cache } from "react";
+import { loadSearchEnabled } from "./catalog-data";
+import { forwardableAddresses } from "./forwarded-address";
+import { createSearchData, type SharedSearchCache } from "./search-data";
+import { createSharedSearchCache } from "./shared-search-cache";
+import { CATALOG_REVALIDATE_SECONDS, StoreUnavailableError } from "./store-data";
+import { storeData } from "./store-data.server";
+
+/**
+ * The search reads of the running app. Server code only (a test keeps `.server` modules out of client files). `headers()`
+ * is read here and nowhere else, for the forwarded address, and only when the operator switched the forwarding on
+ * (`STOREFRONT_FORWARD_CLIENT_ADDRESS=true`, ADR 0038): a storefront reachable around the edge would otherwise let a client
+ * choose its own rate-limit key. Off, every page read counts as the Next server's one address.
+ */
+
+/**
+ * The bounded cache of the unfiltered catalog lists (ADR 0040): the catalog minute fresh, five more minutes served while the
+ * API answers 429 or 503, 500 lists (a list of 24 summaries with its facets is a few tens of KB). One per server process,
+ * kept on `globalThis` so that two route bundles loading this module still share it.
+ */
+const SHARED_CACHE = Symbol.for("fluxkit.storefront.sharedSearchCache");
+const holder = globalThis as typeof globalThis & { [SHARED_CACHE]?: SharedSearchCache };
+const sharedCache = (holder[SHARED_CACHE] ??= createSharedSearchCache({
+  maxEntries: 500,
+  freshMs: CATALOG_REVALIDATE_SECONDS * 1000,
+  staleMs: 5 * 60 * 1000,
+}));
+
+export const searchData = createSearchData({
+  sharedCache,
+  baseUrl: () => loadStorefrontEnv(process.env).apiInternalUrl,
+  beforeRequest: connection,
+  forwardedFor: async () =>
+    loadStorefrontEnv(process.env).forwardClientAddress
+      ? forwardableAddresses((await headers()).get("x-forwarded-for"))
+      : null,
+});
+
+/**
+ * Whether the shop has search (`search` of the cached `GET /store/config`). Read once per request. The results page uses
+ * this one: a config that cannot be read throws and the route's error page renders.
+ */
+export const getSearchEnabled = cache(() => loadSearchEnabled(storeData));
+
+/**
+ * The same for the header's search box. The header must not take every page down, so an API that cannot be read (already
+ * logged by the store data layer) means no box, exactly like the header's category links; anything else throws.
+ */
+export async function headerSearchEnabled(): Promise<boolean> {
+  try {
+    return await getSearchEnabled();
+  } catch (error) {
+    if (error instanceof StoreUnavailableError) return false;
+    throw error;
+  }
+}

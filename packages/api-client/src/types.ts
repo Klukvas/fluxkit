@@ -61,7 +61,9 @@ export type ProblemCode =
   /** The carrier cannot be reached and nothing usable is cached; only that method or lookup fails (`Retry-After`). */
   | "shipping_provider_unavailable"
   /** The payment provider refused or did not answer (`Retry-After`); the store create routes add `payment`. */
-  | "payment_provider_unavailable";
+  | "payment_provider_unavailable"
+  /** The search engine is down or the first index is still built (`Retry-After`): fall back to the catalog list. */
+  | "search_unavailable";
 
 /** The `application/problem+json` body of every error answer. */
 export interface ProblemDetails {
@@ -262,11 +264,12 @@ export interface OrderAdjustment {
   includedInPrice: boolean;
 }
 
+/** All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set. */
 export interface OrderContact {
-  email: string;
-  phone: string;
-  firstName: string;
-  lastName: string;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export interface OrderHistoryEntry {
@@ -568,6 +571,8 @@ export interface StoreConfig {
   emailDelivery: boolean;
   /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): orders are paid by hand, show no pay button. */
   onlinePayment: boolean;
+  /** False with `SEARCH_ENABLED=false`: the search routes answer 404; show no search box or facets, use the product list. */
+  search: boolean;
 }
 
 export interface PriceRange {
@@ -590,6 +595,51 @@ export interface ProductSummary {
   publishedAt: string;
   price: PriceRange;
   availability: Availability;
+}
+
+/** The public sort names of `GET /store/search` (ADR 0034). */
+export type SearchSort = "relevance" | "newest" | "price_asc" | "price_desc";
+
+export interface SearchFacetValue {
+  /** The value as it goes into `f` (`<key>:<code>`). */
+  code: string;
+  /** Null for `true`/`false` values: the storefront words them. */
+  label: string | null;
+  /** Products with the value; null for variant-level facets (values without counts). */
+  count: number | null;
+  selected: boolean;
+}
+
+export interface SearchFacet {
+  /** `brand`, `category`, `inStock`, `opt.<code>` or `attr.<code>`. */
+  key: string;
+  kind: "slug" | "uuid" | "code" | "boolean" | "range";
+  level: "product" | "variant";
+  /** Option or attribute name; null for brand, category and inStock. */
+  label: string | null;
+  counted: boolean;
+  values: SearchFacetValue[];
+  /** Smallest and largest value of a number attribute; null otherwise. */
+  range: { min: number; max: number } | null;
+}
+
+/** `GET /store/search`. Items are hydrated from the database, so prices and availability are current. */
+export interface SearchResult {
+  items: ProductSummary[];
+  total: number;
+  page: number;
+  pageCount: number;
+  limit: number;
+  sort: SearchSort;
+  /** The complete words matched nothing: the items match the last word as a prefix or only some words (show them as partial matches). */
+  relaxed: boolean;
+  query: { normalized: string };
+  facets: SearchFacet[];
+  price: { min: number; max: number } | null;
+}
+
+export interface SearchSuggestions {
+  items: { slug: string; title: string }[];
 }
 
 export interface ProductList {
@@ -661,4 +711,30 @@ export interface ProductDetail {
   price: PriceRange;
   availability: Availability;
   media: ProductMedia[];
+}
+
+// ---- personal data export (ADR 0033 decision 7; docs/contracts/personal-data-export.md)
+
+export type ExportJsonValue =
+  string | number | boolean | null | ExportJsonValue[] | { [key: string]: ExportJsonValue };
+
+export type ExportJsonObject = Record<string, ExportJsonValue>;
+
+/** `fluxkit.personal-data-export/v1`: keys and rules in `docs/contracts/personal-data-export.md`. */
+export interface PersonalDataExport {
+  format: "fluxkit.personal-data-export/v1";
+  generatedAt: string;
+  subject: { kind: "customer" | "email" };
+  account: ExportJsonObject | null;
+  orders: ExportJsonObject[];
+  mail: ExportJsonObject[];
+  sessions: ExportJsonObject[];
+  cart: ExportJsonObject | null;
+  processors: { kind: "email" | "payment" | "shipping"; name: string }[];
+}
+
+/** `POST /store/account/delete`: the current password and an explicit confirmation. */
+export interface DeleteAccountBody {
+  password: string;
+  confirm: true;
 }

@@ -4,6 +4,7 @@ import {
   ADMIN_E2E_API_PORT,
   ADMIN_E2E_ORIGIN,
   ADMIN_E2E_PORT,
+  ADMIN_E2E_SEARCH_KEY_FILE,
   SPA,
   apiEnvironment,
 } from "./support/env.ts";
@@ -56,9 +57,9 @@ export default defineConfig({
   webServer: [
     {
       name: "api",
-      // Wipe, migrate, seed and create the owner, then become the API (exec: the server itself receives the shutdown signal).
-      command:
-        "node --experimental-strip-types e2e/prepare-database.ts && exec node ../api/dist/main.js",
+      // Wipe, migrate, seed, index and create the owner, then become the API (exec: the server itself receives the shutdown
+      // signal). The scoped search key was created by `prepare-database.ts` and is given to the API through its environment here.
+      command: `node --experimental-strip-types e2e/prepare-database.ts && MEILI_API_KEY="$(cat "${ADMIN_E2E_SEARCH_KEY_FILE}")" exec node ../api/dist/main.js`,
       cwd: adminRoot,
       env: { ...apiEnvironment() } as Record<string, string>,
       url: `${apiOrigin}/health`,

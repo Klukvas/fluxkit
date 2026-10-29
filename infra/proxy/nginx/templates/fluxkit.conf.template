@@ -114,13 +114,13 @@ server {
 
     # Everything else: the storefront. Next sends its own HSTS in production; it is hidden so that every answer carries
     # exactly the one header the edge sets (inherited from the server, since this location has no add_header).
+    # X-Forwarded-For comes from the snippet the API locations use too: the results page passes it on to the API for the
+    # search window (STOREFRONT_FORWARD_CLIENT_ADDRESS, ADR 0038), so both paths must give the API the same chain.
     location / {
         proxy_pass http://fluxkit_storefront;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $remote_addr;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        include /etc/nginx/fluxkit/forwarded-headers.conf;
         proxy_hide_header Strict-Transport-Security;
         proxy_hide_header X-Powered-By;
     }

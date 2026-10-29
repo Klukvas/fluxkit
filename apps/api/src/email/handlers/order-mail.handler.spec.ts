@@ -495,6 +495,41 @@ describe("order and shipment mails (real Postgres, domain events, the in-repo te
       expect(logs.text()).not.toContain(placed.email);
     });
 
+    it("an order whose contact was erased (ADR 0033) is never mailed: no_recipient, no row", async () => {
+      const placed = await placeOrder();
+      const real = owner().app.get<OrderReadPort>(ORDER_READ_PORT);
+      const view = (await real.getOrder(placed.id)) as AdminOrderView;
+      const erased: AdminOrderView = {
+        ...view,
+        contact: { email: null, phone: null, firstName: null, lastName: null },
+        contactErasedAt: new Date().toISOString(),
+      };
+      const handler = new OrderMailHandler(
+        { getOrder: () => Promise.resolve(erased) },
+        owner().app.get(EmailOutbox),
+        database(),
+        owner().app.get(CLOCK),
+        owner().app.get(LOCALE_CONFIG),
+      );
+      const logs = captureLogs();
+      try {
+        for (const type of ["order.placed", "order.paid", "order.cancelled"]) {
+          await handler.handle({
+            id: randomUUID(),
+            type,
+            aggregateId: placed.id,
+            payload: { orderId: placed.id, orderNumber: placed.number, status: "paid" },
+            occurredAt: new Date(),
+            previousFailures: 0,
+          });
+        }
+      } finally {
+        logs.stop();
+      }
+      expect(await mails(placed.id)).toEqual([]);
+      expect(logs.text().match(/no_recipient/g)).toHaveLength(3);
+    });
+
     it("a malformed payload fails loudly (the event is retried), never a silent skip", async () => {
       const handler = owner().app.get(OrderMailHandler);
       await expect(

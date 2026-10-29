@@ -29,6 +29,10 @@ export const adminConfigResponseSchema = z.object({
     description:
       "False when `PAYMENT_PROVIDERS_ENABLED` is empty: no online payment, orders are paid by hand. True when at least one payment provider is enabled.",
   }),
+  search: z.boolean().meta({
+    description:
+      "False when `SEARCH_ENABLED=false`: the admin search routes answer 404, so the admin Search area shows the setup steps.",
+  }),
   media: z
     .object({
       uploadsEnabled: z.boolean().meta({
