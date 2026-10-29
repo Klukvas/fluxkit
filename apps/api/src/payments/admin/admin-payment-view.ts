@@ -5,9 +5,6 @@ import {
   PAYMENT_ORDER_OUTCOMES,
   REFUND_REASONS,
   remainingRefundable,
-  type AdminOrderPaymentHistoryEntry,
-  type AdminOrderPaymentRefundView,
-  type AdminOrderPaymentView,
   type Money,
   type PaymentAttentionCode,
   type PaymentCreatedBy,
@@ -15,12 +12,18 @@ import {
   type PaymentOrderOutcome,
   type RefundReason,
 } from "@fluxkit/core";
-import { paymentStatusOf, refundStatusOf } from "../attempts/payment-changes.js";
+import type { z } from "zod";
 import type {
-  PaymentEventRow,
-  PaymentRow,
-  RefundRow,
-} from "../attempts/payments.repository.js";
+  adminPaymentHistorySchema,
+  adminPaymentRefundSchema,
+  adminPaymentSchema,
+} from "../../orders/orders.schemas.js";
+import {
+  ATTENTION_CLEARED_KEY,
+  paymentStatusOf,
+  refundStatusOf,
+} from "../attempts/payment-changes.js";
+import type { PaymentEventRow, PaymentRow, RefundRow } from "../attempts/payments.repository.js";
 
 /*
  * The ONE admin view of a payment attempt (ADR 0032 decision 18): the `payments` of `GET /admin/orders/{id}` (and of
@@ -28,6 +31,11 @@ import type {
  * field from the rows, never by spreading one: no page URL (`redirect_url`), no idempotency key, no dedupe key, no
  * reconcile counter; card data is the system and the last four digits only (decision 1, question 12).
  */
+
+/** The admin payment view (the schema's output; assignable to core's `AdminPaymentView` of `OrderReadPort`). */
+export type AdminPaymentView = z.output<typeof adminPaymentSchema>;
+export type AdminPaymentRefundView = z.output<typeof adminPaymentRefundSchema>;
+type AdminPaymentHistoryEntry = z.output<typeof adminPaymentHistorySchema>;
 
 /** Stored values outside these lists are damaged data: loud, never passed on. */
 function member<T extends string>(list: readonly T[], value: string, name: string): T {
@@ -46,7 +54,7 @@ function instant(value: Date | null): string | null {
   return value === null ? null : value.toISOString();
 }
 
-export function toAdminRefund(row: RefundRow): AdminOrderPaymentRefundView {
+export function toAdminRefund(row: RefundRow): AdminPaymentRefundView {
   return {
     id: row.id,
     amount: { amount: row.amount, currency: row.currency },
@@ -68,7 +76,7 @@ function isShownEntry(row: PaymentEventRow): boolean {
   return row.toStatus !== null || row.providerStatus !== null || row.source === "admin";
 }
 
-function toHistoryEntry(row: PaymentEventRow): AdminOrderPaymentHistoryEntry {
+function toHistoryEntry(row: PaymentEventRow): AdminPaymentHistoryEntry {
   return {
     source: member<PaymentEventSource>(PAYMENT_EVENT_SOURCES, row.source, "journal source"),
     fromStatus: row.fromStatus === null ? null : paymentStatusOf(row.fromStatus),
@@ -78,6 +86,7 @@ function toHistoryEntry(row: PaymentEventRow): AdminOrderPaymentHistoryEntry {
     applied: row.applied,
     failureCode: row.failureCode,
     actorAdminId: row.actorAdminId,
+    action: row.dedupeKey?.startsWith(ATTENTION_CLEARED_KEY) === true ? "attention_cleared" : null,
     at: row.createdAt.toISOString(),
   };
 }
@@ -87,7 +96,7 @@ export function toAdminPayment(
   row: PaymentRow,
   refunds: readonly RefundRow[],
   events: readonly PaymentEventRow[],
-): AdminOrderPaymentView {
+): AdminPaymentView {
   const status = paymentStatusOf(row.status);
   const amount = moneyOf(row.amount, row.currency);
   const refundable =
@@ -121,7 +130,11 @@ export function toAdminPayment(
     attentionCode:
       row.attentionCode === null
         ? null
-        : member<PaymentAttentionCode>(PAYMENT_ATTENTION_CODES, row.attentionCode, "attention code"),
+        : member<PaymentAttentionCode>(
+            PAYMENT_ATTENTION_CODES,
+            row.attentionCode,
+            "attention code",
+          ),
     card:
       row.cardSystem === null || row.cardLast4 === null
         ? null
@@ -141,7 +154,7 @@ export function toAdminPayments(
   rows: readonly PaymentRow[],
   refunds: readonly RefundRow[],
   events: readonly PaymentEventRow[],
-): AdminOrderPaymentView[] {
+): AdminPaymentView[] {
   return rows.map((row) =>
     toAdminPayment(
       row,

@@ -2,10 +2,7 @@ import { createMoney, CATALOG_LIMITS, PAYMENT_LIMITS, type Money } from "@fluxki
 import { z } from "zod";
 import { uuidSchema } from "../../common/openapi-formats.js";
 import { trimmedText } from "../../orders/admin/admin-orders.schemas.js";
-import {
-  adminPaymentRefundSchema,
-  adminPaymentSchema,
-} from "../../orders/orders.schemas.js";
+import { adminPaymentRefundSchema, adminPaymentSchema } from "../../orders/orders.schemas.js";
 
 // Admin payment API shapes (docs/api/payments.md, ADR 0032 decisions 11 and 18). The payment view itself
 // (`adminPaymentSchema`) lives next to the order views in `orders.schemas.ts`, like the shipment view, because the admin
@@ -26,6 +23,26 @@ export const adminPaymentPageSchema = z.object({
     description: "Pass as `cursor` for the next page; null on the last page. Opaque.",
   }),
 });
+
+export const adminPaymentListSchema = z.object({
+  items: z.array(adminPaymentSchema).meta({
+    description: "The payment attempts of the order, oldest first; empty when none was made.",
+  }),
+});
+
+export const adminRefundResultSchema = z.object({
+  refund: adminPaymentRefundSchema.meta({
+    description:
+      "The refund as the provider left it: `succeeded`, `processing` (the provider settles it later), `failed`, `requested` (throttled; the reconcile job sends it) or `unknown` (the answer was lost: never sent again, settled from the provider's refund list).",
+  }),
+  payment: adminPaymentSchema.meta({ description: "The payment attempt afterwards." }),
+});
+
+/** `POST /admin/payments/{paymentId}/attention/clear` takes no body (or an empty object). */
+export const clearAttentionBodySchema = z
+  .strictObject({})
+  .optional()
+  .transform(() => ({}));
 
 const refundAmountSchema = z
   .strictObject({
@@ -84,5 +101,7 @@ export const listAdminPaymentsQuerySchema = z.strictObject({
 export type AdminPayment = z.output<typeof adminPaymentSchema>;
 export type AdminPaymentRefund = z.output<typeof adminPaymentRefundSchema>;
 export type AdminPaymentPage = z.output<typeof adminPaymentPageSchema>;
+export type AdminPaymentList = z.output<typeof adminPaymentListSchema>;
+export type AdminRefundResult = z.output<typeof adminRefundResultSchema>;
 export type RefundPaymentBody = z.output<typeof refundPaymentSchema>;
 export type ListAdminPaymentsQuery = z.output<typeof listAdminPaymentsQuerySchema>;

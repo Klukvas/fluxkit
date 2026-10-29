@@ -73,6 +73,8 @@ export class PaymentRefundsService {
    * route or job 11).
    */
   async requestAdminRefund(input: {
+    /** The order in the route: a payment of another order is `not_found` (no oracle across orders). */
+    readonly orderId: string;
     readonly paymentId: string;
     readonly adminId: string | null;
     readonly amount: Money;
@@ -84,7 +86,7 @@ export class PaymentRefundsService {
       () =>
         withTransaction(this.database, async (tx) => {
           const row = await this.payments.lockById(tx, input.paymentId);
-          if (row === undefined) {
+          if (row === undefined || row.orderId !== input.orderId) {
             return { kind: "not_found" as const };
           }
           const replayed = await this.payments.findRefundByIdempotencyKey(tx, input.idempotencyKey);

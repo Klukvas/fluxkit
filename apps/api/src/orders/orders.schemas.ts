@@ -261,7 +261,10 @@ export const adminPaymentRefundSchema = z.object({
       "`requested`: not sent yet (or throttled; the reconcile job sends it). `unknown`: the provider's answer was lost; settled from the provider's refund list, never sent again.",
   }),
   reason: z.enum(REFUND_REASONS),
-  note: z.string().nullable().meta({ description: "The admin's note; null for an automatic refund." }),
+  note: z
+    .string()
+    .nullable()
+    .meta({ description: "The admin's note; null for an automatic refund." }),
   actorAdminId: uuidSchema.nullable(),
   failureCode: z
     .string()
@@ -278,10 +281,17 @@ export const adminPaymentHistorySchema = z.object({
   providerStatus: z.string().nullable().meta({ description: "The provider's raw status word." }),
   providerModifiedAt: timestampSchema.nullable(),
   applied: z.boolean().meta({
-    description: "False for a fact that was older than the current state, did not bind or changed nothing.",
+    description:
+      "False for a fact that was older than the current state, did not bind or changed nothing.",
   }),
   failureCode: z.string().nullable(),
   actorAdminId: uuidSchema.nullable(),
+  action: z
+    .enum(["attention_cleared"])
+    .nullable()
+    .meta({
+      description: "An admin action without a status change: `attention_cleared`; null otherwise.",
+    }),
   at: timestampSchema,
 });
 
@@ -291,7 +301,9 @@ export const adminPaymentSchema = z.object({
   providerPaymentId: z
     .string()
     .nullable()
-    .meta({ description: "The provider's invoice id; null until the provider answered the create." }),
+    .meta({
+      description: "The provider's invoice id; null until the provider answered the create.",
+    }),
   status: z.enum(PAYMENT_STATUSES),
   amount: moneySchema,
   finalAmount: moneySchema.nullable(),
@@ -302,7 +314,10 @@ export const adminPaymentSchema = z.object({
   }),
   providerStatus: z.string().nullable(),
   providerModifiedAt: timestampSchema.nullable(),
-  failureCode: z.string().nullable().meta({ description: "A provider or outcome code, never text." }),
+  failureCode: z
+    .string()
+    .nullable()
+    .meta({ description: "A provider or outcome code, never text." }),
   orderOutcome: z.enum(PAYMENT_ORDER_OUTCOMES).nullable(),
   needsAttention: z.boolean(),
   attentionCode: z
@@ -326,7 +341,6 @@ export const adminPaymentSchema = z.object({
       "Status changes, provider facts and admin actions, oldest first (internal bookkeeping rows are left out).",
   }),
 });
-
 
 /** The shopper's view of one payment attempt (ADR 0032 decision 6): a small status set, never provider data. */
 export const shopperPaymentStatusSchema = z.enum(SHOPPER_PAYMENT_STATUSES).meta({

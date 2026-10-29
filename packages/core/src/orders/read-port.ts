@@ -197,6 +197,8 @@ export interface AdminOrderPaymentHistoryEntry {
   readonly failureCode: string | null;
   /** The admin of an admin action; null otherwise and once that admin user was deleted. */
   readonly actorAdminId: string | null;
+  /** An admin action without a status change (`attention_cleared`); null otherwise. */
+  readonly action: "attention_cleared" | null;
   readonly at: string;
 }
 

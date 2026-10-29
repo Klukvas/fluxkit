@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
 import {
   buildPaymentEventPayload,
@@ -23,6 +24,9 @@ import {
   type RefundColumns,
   type RefundRow,
 } from "./payments.repository.js";
+
+/** The dedupe key prefix of an admin's attention clear (`admin:attention-cleared:<code>:<uuid>`). */
+export const ATTENTION_CLEARED_KEY = "admin:attention-cleared:";
 
 /** One journal row's own facts: where it comes from, its dedupe key and, for a provider fact, the normalized fields. */
 export interface JournalEntry {
@@ -194,6 +198,37 @@ export class PaymentChanges {
       attentionCode: code,
       updatedAt: now,
     });
+  }
+
+  /**
+   * An admin closes the open attention item of a LOCKED attempt (ADR 0032 decision 18): `needs_attention` false, the code
+   * kept (what it was about stays visible), and an `admin` journal row naming the admin whose dedupe key carries
+   * `attention-cleared` and the code. `false`: there was no open item (nothing written).
+   */
+  async clearAttention(
+    tx: Transaction,
+    current: PaymentRow,
+    adminId: string,
+    now: Date,
+  ): Promise<{ readonly cleared: boolean; readonly row: PaymentRow }> {
+    if (!current.needsAttention || current.attentionCode === null) {
+      return { cleared: false, row: current };
+    }
+    await this.journal(
+      tx,
+      current.id,
+      {
+        source: "admin",
+        dedupeKey: `${ATTENTION_CLEARED_KEY}${current.attentionCode}:${randomUUID()}`,
+        actorAdminId: adminId,
+      },
+      { applied: true, from: null, to: null },
+    );
+    const row = await this.payments.update(tx, current.id, {
+      needsAttention: false,
+      updatedAt: now,
+    });
+    return { cleared: true, row };
   }
 
   /** Inserts a refund of a LOCKED, succeeded attempt as `requested` (`null -> requested`); no event. */
