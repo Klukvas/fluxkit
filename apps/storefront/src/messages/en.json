@@ -387,6 +387,7 @@
   "order.totals.tax": "Tax",
   "order.totals.total": "Total",
   "order.contact.title": "Contact",
+  "order.contact.erased": "The contact data of this order was removed after the retention period.",
   "order.address.title": "Shipping address",
   "order.history.title": "History",
   "order.history.entry": "{status}: {time}",

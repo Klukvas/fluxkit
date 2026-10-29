@@ -399,6 +399,7 @@
   "order.totals.tax": "Податок",
   "order.totals.total": "Разом",
   "order.contact.title": "Контакти",
+  "order.contact.erased": "Контактні дані цього замовлення видалено після закінчення строку зберігання.",
   "order.address.title": "Адреса доставки",
   "order.history.title": "Історія",
   "order.history.entry": "{status}: {time}",
