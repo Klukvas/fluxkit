@@ -406,7 +406,7 @@ describe("payments: admin routes (real Postgres)", () => {
       expect(await world.payment(made.paymentId)).toMatchObject({ refunded_amount: 1_200 });
     });
 
-    it("a lost answer leaves the refund unknown (202), raises attention and is never sent again, also on a replay", async () => {
+    it("a lost answer leaves the refund unknown (202) and it is never sent again, also on a replay", async () => {
       const made = await attempt(world.app, { pay: true });
       world.provider().failNext({ operation: "refund", reason: "unavailable", afterEffect: true });
       const key = randomUUID();
