@@ -2,7 +2,7 @@ import { Logger } from "@nestjs/common";
 import { loadEnv } from "@fluxkit/config";
 import { SwaggerModule } from "@nestjs/swagger";
 import { buildOpenApiDocument, createApp } from "./app.factory.js";
-import { emailProviderStartupWarning } from "./email/auth/index.js";
+import { emailProviderStartupWarning, storefrontUrlStartupWarning } from "./email/auth/index.js";
 import { prepareDefaultMediaDirectory } from "./media/media-directory.js";
 
 async function bootstrap(): Promise<void> {
@@ -15,9 +15,18 @@ async function bootstrap(): Promise<void> {
   }
   await prepareDefaultMediaDirectory(env, process.env);
   const app = await createApp(env);
-  const emailWarning = emailProviderStartupWarning(env.emailProvider, process.env["NODE_ENV"]);
-  if (emailWarning !== undefined) {
-    new Logger("EmailDelivery").warn(emailWarning);
+  const emailWarnings = [
+    emailProviderStartupWarning(env.emailProvider, process.env["NODE_ENV"]),
+    storefrontUrlStartupWarning(
+      env.emailProvider,
+      process.env["STOREFRONT_PUBLIC_URL"],
+      process.env["NODE_ENV"],
+    ),
+  ];
+  for (const warning of emailWarnings) {
+    if (warning !== undefined) {
+      new Logger("EmailDelivery").warn(warning);
+    }
   }
   SwaggerModule.setup("docs", app, buildOpenApiDocument(app));
   await app.listen(env.port);
