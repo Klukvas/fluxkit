@@ -1,10 +1,13 @@
-import { createTranslator, isLocale } from "@fluxkit/ui";
+import { createTranslator } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CatalogView } from "../../../../../components/catalog-view";
+import { CatalogRouteView } from "../../../../../components/catalog-search-view";
 import { JsonLd } from "../../../../../components/json-ld";
-import { getListing } from "../../../../../lib/catalog-pages.server";
-import { parseCatalogQuery } from "../../../../../lib/catalog-query";
+import {
+  isFilteredCatalog,
+  loadCatalogList,
+  resolveCatalogRoute,
+} from "../../../../../lib/catalog-route.server";
 import { imageHosts } from "../../../../../lib/image-hosts.server";
 import { localizedHref } from "../../../../../lib/locale-path";
 import { listingMetadata } from "../../../../../lib/page-metadata";
@@ -17,26 +20,29 @@ interface CategoryProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-/** An unknown, inactive or hidden category, a malformed page and a page past the last one are all a real 404. */
-async function resolve({ params, searchParams }: CategoryProps) {
-  const { locale, slug } = await params;
-  if (!isLocale(locale)) notFound();
-  const parsed = parseCatalogQuery(await searchParams);
-  if (!parsed.ok) notFound();
-  const listing = await getListing(locale, slug, parsed.query.page, parsed.query.brand);
-  if (listing.kind === "not_found" || listing.category === null) notFound();
-  return { locale, slug, query: parsed.query, listing, category: listing.category };
+/**
+ * An unknown, inactive or hidden category, a malformed address and a page past the last one are all a real 404. Search off:
+ * the SQL listing; search on: `GET /store/search` filtered by this category, with the SQL fallback
+ * (`lib/catalog-route.server.ts`).
+ */
+async function resolve(props: CategoryProps) {
+  const { slug } = await props.params;
+  const basePath = `/c/${encodeURIComponent(slug)}`;
+  const route = await resolveCatalogRoute({ ...props, categorySlug: slug, basePath });
+  if (route.category === null) notFound();
+  return { route, slug, basePath, category: route.category };
 }
 
 export async function generateMetadata(props: CategoryProps): Promise<Metadata> {
-  const { locale, slug, query, category } = await resolve(props);
-  const t = createTranslator(messagesByLocale[locale], locale);
+  const { route, basePath, category } = await resolve(props);
+  const t = createTranslator(messagesByLocale[route.locale], route.locale);
   return listingMetadata({
     origin: await publicOrigin(),
-    locale,
+    locale: route.locale,
     t,
-    basePath: `/c/${encodeURIComponent(slug)}`,
-    query,
+    basePath,
+    query: route.mode === "sql" ? route.query : { page: route.query.page, brand: null },
+    filtered: route.mode === "search" && isFilteredCatalog(route.query),
     title: category.name,
     description:
       trimDescription(category.description) ??
@@ -45,14 +51,16 @@ export async function generateMetadata(props: CategoryProps): Promise<Metadata> 
 }
 
 export default async function CategoryPage(props: CategoryProps) {
-  const { locale, slug, query, listing, category } = await resolve(props);
+  const { route, slug, basePath, category } = await resolve(props);
+  const { locale } = route;
   const t = createTranslator(messagesByLocale[locale], locale);
   const origin = await publicOrigin();
-  const ancestors = listing.trail.slice(0, -1);
+  const list = await loadCatalogList(route, slug);
+  const ancestors = route.trail.slice(0, -1);
   const homeItem = { label: t("breadcrumbs.home"), href: localizedHref(locale, "/") };
   return (
     <>
-      <CatalogView
+      <CatalogRouteView
         locale={locale}
         t={t}
         heading={category.name}
@@ -65,24 +73,16 @@ export default async function CategoryPage(props: CategoryProps) {
           })),
           { label: category.name },
         ]}
-        products={listing.products}
-        page={listing.page}
-        pageCount={listing.pageCount}
-        exponent={listing.exponent}
-        imageHosts={imageHosts()}
-        basePath={`/c/${encodeURIComponent(slug)}`}
+        basePath={basePath}
         subcategories={category.children}
-        brand={
-          query.brand === null
-            ? null
-            : { slug: query.brand, name: listing.brandName ?? query.brand }
-        }
         isCategory
+        imageHosts={imageHosts()}
+        list={list}
       />
       <JsonLd
         data={breadcrumbJsonLd([
           { name: t("breadcrumbs.home"), url: absoluteUrl(origin, localizedHref(locale, "/")) },
-          ...listing.trail.map((node) => ({
+          ...route.trail.map((node) => ({
             name: node.name,
             url: absoluteUrl(origin, localizedHref(locale, `/c/${encodeURIComponent(node.slug)}`)),
           })),

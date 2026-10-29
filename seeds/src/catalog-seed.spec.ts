@@ -3,6 +3,7 @@ import {
   MAX_ON_HAND,
   isValidCode,
   isValidValueCode,
+  parseSynonymTerms,
   validateCountryCodes,
   validateShippingPricing,
   validateSlug,
@@ -297,6 +298,48 @@ describe("catalog seed data", () => {
           method.providerCode === null ? [] : [method.providerCode],
         ),
       ).toEqual(["fake"]);
+    });
+  });
+
+  describe("demo synonym groups (ADR 0034 decision 8, search plan step 11)", () => {
+    const groups = catalogSeed.synonymGroups;
+
+    it("are valid groups by the admin API's own rule, already in its normalized form", () => {
+      expect(groups.length).toBeGreaterThan(0);
+      for (const group of groups) {
+        const parsed = parseSynonymTerms(group.terms);
+        expect(parsed, group.terms.join(", ")).toEqual({ ok: true, terms: [...group.terms] });
+      }
+    });
+
+    it("cover both locales, the нозі exception of the Ukrainian stemmer and irregular English forms", () => {
+      expect(new Set(groups.map((group) => group.locale))).toEqual(new Set(["uk", "en"]));
+      const together = (locale: string, a: string, b: string): boolean =>
+        groups.some(
+          (group) => group.locale === locale && group.terms.includes(a) && group.terms.includes(b),
+        );
+      expect(together("uk", "нога", "нозі")).toBe(true);
+      expect(together("uk", "викрутка", "відвертка")).toBe(true);
+      expect(together("uk", "сорочка", "рубашка")).toBe(true);
+      for (const [singular, plural] of [
+        ["scarf", "scarves"],
+        ["knife", "knives"],
+        ["mouse", "mice"],
+        ["man", "men"],
+        ["woman", "women"],
+        ["foot", "feet"],
+      ]) {
+        expect(together("en", singular ?? "", plural ?? ""), `${singular} ${plural}`).toBe(true);
+      }
+    });
+
+    it("never share a term within a locale (the runner treats a group as existing when any of its terms is)", () => {
+      for (const locale of ["uk", "en"]) {
+        const terms = groups
+          .filter((group) => group.locale === locale)
+          .flatMap((group) => group.terms);
+        expect(unique(terms), locale).toBe(true);
+      }
     });
   });
 

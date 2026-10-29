@@ -40,6 +40,24 @@ export interface SearchPort {
   productsChangedWhere(tx: Transaction, productIds: SQL, reason: SearchSyncReason): Promise<void>;
 }
 
+/**
+ * The demo seed's way to write synonym groups (`apps/api/src/seed/`, search plan step 11) without importing the search
+ * module. Provided ONLY with `SEARCH_ENABLED=true`; with search off the runner reads `SEARCH_PORT.enabled` and writes
+ * nothing to the search tables.
+ */
+export const SEARCH_SYNONYM_SEEDER = Symbol("SEARCH_SYNONYM_SEEDER");
+
+export type SeedSynonymOutcome = "created" | "existing" | "locale_not_served";
+
+export interface SearchSynonymSeeder {
+  /**
+   * Creates the group with the rules of `POST /admin/search/synonyms` (normalized terms, a refusal throws), unless a group
+   * of the locale already holds one of its terms: then the group counts as existing and is left exactly as it is (an
+   * admin may have edited it). A locale outside `LOCALES` creates nothing.
+   */
+  ensureGroup(locale: string, terms: readonly string[]): Promise<SeedSynonymOutcome>;
+}
+
 const nothing = (): Promise<void> => Promise.resolve();
 
 export const DISABLED_SEARCH_PORT: SearchPort = Object.freeze({

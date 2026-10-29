@@ -9,6 +9,7 @@ import {
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
+import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import { describeFormFailure, selectedFilters, sortChoices } from "../lib/search-facets";
@@ -60,17 +61,23 @@ export interface SearchResultsViewProps {
 
 const chipLink = `inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-foreground ${focusRing}`;
 
-function pageHref(locale: Locale, query: SearchQuery): string {
-  return localizedHref(locale, searchPath(query));
+const SEARCH_BASE_PATH = "/search";
+
+function pageHref(locale: Locale, query: SearchQuery, basePath = SEARCH_BASE_PATH): string {
+  return localizedHref(locale, searchPath(query, basePath));
 }
 
-function ProblemState({
+/** The problem states of a read of `GET /store/search`; the catalog pages show only `invalid` (they fall back otherwise). */
+export function ProblemState({
   locale,
   t,
   query,
   outcome,
+  basePath = SEARCH_BASE_PATH,
 }: Pick<SearchResultsViewProps, "locale" | "t" | "query"> & {
   outcome: Exclude<SearchPageOutcome, { kind: "results" }>;
+  /** Locale-less path of the page the links stay on (`/search`, `/catalog`, `/c/<slug>`). */
+  basePath?: string;
 }) {
   const wait =
     outcome.kind === "rate_limited" || outcome.kind === "unavailable"
@@ -85,7 +92,7 @@ function ProblemState({
       >
         <p>{t(range ? "search.invalidRange.description" : "search.invalid.description")}</p>
         <p className="mt-3">
-          <a href={pageHref(locale, clearFilters(query))} className={linkButton}>
+          <a href={pageHref(locale, clearFilters(query), basePath)} className={linkButton}>
             {t("search.empty.clear")}
           </a>
         </p>
@@ -101,7 +108,7 @@ function ProblemState({
       <p>{t(limited ? "errors.too_many_requests" : "errors.search_unavailable")}</p>
       {wait === null ? null : <p>{t.plural("errors.retryAfter", wait)}</p>}
       <p className="mt-3 flex flex-wrap gap-3">
-        <a href={pageHref(locale, query)} className={linkButton}>
+        <a href={pageHref(locale, query, basePath)} className={linkButton}>
           {t("search.unavailable.retry")}
         </a>
         <a href={localizedHref(locale, "/catalog")} className={chipLink}>
@@ -138,7 +145,31 @@ function EmptyResults({
   );
 }
 
-function ResultsBody({
+export interface FacetedResultsProps extends Omit<SearchResultsViewProps, "outcome"> {
+  result: SearchResult;
+  /** Locale-less path the filters, chips and pages link to: `/search`, `/catalog` or `/c/<slug>`. */
+  basePath: string;
+  /** Plural key of the result count heading (`search.count`, `catalog.count`). */
+  countKey: string;
+  listLabel: string;
+  paginationLabel: string;
+  /** What the list shows without items (the page's own empty state). */
+  empty: ReactNode;
+  /** The link of a product card's brand. */
+  brandPathFor: (slug: string) => string;
+  /**
+   * Facets the page itself already decides and must not offer (the category of a category page: its path). Left out of
+   * the panel and of the chips.
+   */
+  hiddenFacetKeys?: readonly string[];
+}
+
+/**
+ * The facet panel, sort, chips, list and pages of a `GET /store/search` answer: the results page and, with search on, the
+ * catalog and category pages (`catalog-search-view.tsx`). Everything links to `basePath`, so the URL state is the same on
+ * every page that lists through the index.
+ */
+export function FacetedResults({
   locale,
   t,
   query,
@@ -147,18 +178,26 @@ function ResultsBody({
   exponent,
   imageHosts,
   formFailure,
-}: Omit<SearchResultsViewProps, "outcome"> & { result: SearchResult }) {
-  const chips = selectedFilters({ query, facets: result.facets, t, currency, exponent });
+  basePath,
+  countKey,
+  listLabel,
+  paginationLabel,
+  empty,
+  brandPathFor,
+  hiddenFacetKeys = [],
+}: FacetedResultsProps) {
+  const facets = result.facets.filter((facet) => !hiddenFacetKeys.includes(facet.key));
+  const chips = selectedFilters({ query, facets, t, currency, exponent });
   const sorts = sortChoices(query);
   const pageCount = Math.min(result.pageCount, MAX_SEARCH_PAGE);
   return (
-    <SearchPending locale={locale}>
+    <SearchPending locale={locale} basePath={basePath}>
       <div className="grid gap-6 lg:grid-cols-4">
         <aside aria-label={t("search.filters.title")} className="lg:col-span-1">
           <FiltersDisclosure title={t("search.filters.title")}>
             {/* Keyed by the address: the checkboxes are uncontrolled and must start over with every new result. */}
             <SearchFilterForm
-              key={searchPath(query)}
+              key={searchPath(query, basePath)}
               exponent={exponent}
               initialError={
                 formFailure === null || formFailure === undefined
@@ -169,7 +208,7 @@ function ResultsBody({
               <SearchFilters
                 t={t}
                 query={query}
-                facets={result.facets}
+                facets={facets}
                 price={result.price}
                 currency={currency}
                 exponent={exponent}
@@ -178,7 +217,7 @@ function ResultsBody({
           </FiltersDisclosure>
         </aside>
 
-        <section aria-label={t("search.list.label")} className="flex flex-col gap-4 lg:col-span-3">
+        <section aria-label={listLabel} className="flex flex-col gap-4 lg:col-span-3">
           <SearchResultsRegion>
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -188,7 +227,7 @@ function ResultsBody({
                     tabIndex={-1}
                     className="text-lg font-semibold text-foreground focus:outline-none"
                   >
-                    {t.plural("search.count", result.total)}
+                    {t.plural(countKey, result.total)}
                   </h2>
                 </LiveRegion>
                 <SortSelect
@@ -206,7 +245,7 @@ function ResultsBody({
                   {chips.map((chip) => (
                     <li key={chip.key}>
                       <a
-                        href={pageHref(locale, chip.remove)}
+                        href={pageHref(locale, chip.remove, basePath)}
                         aria-label={t("search.filters.remove", { label: chip.label })}
                         className={chipLink}
                       >
@@ -217,7 +256,7 @@ function ResultsBody({
                   ))}
                   <li>
                     <a
-                      href={pageHref(locale, clearFilters(query))}
+                      href={pageHref(locale, clearFilters(query), basePath)}
                       className={`${chipLink} underline underline-offset-4`}
                     >
                       {t("search.filters.clear")}
@@ -233,7 +272,7 @@ function ResultsBody({
               ) : null}
 
               {result.items.length === 0 ? (
-                <EmptyResults locale={locale} t={t} query={query} />
+                empty
               ) : (
                 <ProductGrid
                   products={result.items}
@@ -242,16 +281,16 @@ function ResultsBody({
                   exponent={exponent}
                   imageHosts={imageHosts}
                   headingLevel="h3"
-                  brandPathFor={(slug) => catalogPath("/catalog", { brand: slug })}
-                  label={t("search.list.label")}
+                  brandPathFor={brandPathFor}
+                  label={listLabel}
                 />
               )}
 
               <Pagination
-                label={t("search.pagination.label")}
+                label={paginationLabel}
                 currentPage={result.page}
                 pageCount={pageCount}
-                hrefForPage={(target) => pageHref(locale, setPage(query, target))}
+                hrefForPage={(target) => pageHref(locale, setPage(query, target), basePath)}
                 previousLabel={t("catalog.pagination.previous")}
                 nextLabel={t("catalog.pagination.next")}
                 pageLabel={(target) => t("catalog.pagination.page", { page: target })}
@@ -289,7 +328,16 @@ export function SearchResultsView(props: SearchResultsViewProps) {
           : t("search.heading.query", { query: query.q })}
       </h1>
       {outcome.kind === "results" ? (
-        <ResultsBody {...props} result={outcome.result} />
+        <FacetedResults
+          {...props}
+          result={outcome.result}
+          basePath={SEARCH_BASE_PATH}
+          countKey="search.count"
+          listLabel={t("search.list.label")}
+          paginationLabel={t("search.pagination.label")}
+          empty={<EmptyResults locale={locale} t={t} query={query} />}
+          brandPathFor={(slug) => catalogPath("/catalog", { brand: slug })}
+        />
       ) : (
         <>
           {/* Without results there is no filter form to hold the failure: it is said here (review F3). */}

@@ -74,7 +74,20 @@ export function formatSummary(summary: SeedSummary): string {
       : [
           `  skipped (provider not loaded, SHIPPING_PROVIDERS_ENABLED): ${summary.skippedShippingMethods.join(", ")}`,
         ]),
+    ...synonymLines(summary.synonymGroups),
   ].join("\n");
+}
+
+function synonymLines(groups: SeedSummary["synonymGroups"]): string[] {
+  if (!groups.searchEnabled) {
+    return ["  synonym groups not written: search is off (SEARCH_ENABLED)"];
+  }
+  return [
+    `  synonym groups created ${String(groups.created).padStart(3)}, existing ${String(groups.existing).padStart(3)} (applied by pnpm search:reindex or the scheduler)`,
+    ...(groups.skippedLocales.length === 0
+      ? []
+      : [`  synonym groups skipped (locale not in LOCALES): ${groups.skippedLocales.join(", ")}`]),
+  ];
 }
 
 /** A problem exception has a generic message; the field errors say what is wrong. */

@@ -1,3 +1,5 @@
+import { SEARCH_FIELDS, SORTABLE_FIELDS } from "./fields.js";
+
 /** The public sort names of the search routes (ADR 0034 decision 10). Engine syntax is never accepted from clients. */
 export const SEARCH_SORTS = ["relevance", "newest", "price_asc", "price_desc"] as const;
 
@@ -18,13 +20,23 @@ export function parseSearchSort(raw: string | undefined, hasQuery: boolean): Sea
   return sort === "relevance" && !hasQuery ? "newest" : sort;
 }
 
-/** The engine sort rules for a public sort name; `undefined` keeps the engine's relevance ranking. */
-export function engineSort(sort: SearchSort): string[] | undefined {
+/**
+ * The engine sort rules for a public sort name; `undefined` keeps the engine's relevance ranking. `newest` is the SQL
+ * listing's `published_at desc, id desc` (review F2 of the search finish): the product id breaks ties, but only when the
+ * live index can sort by it (`sortable`: its applied `sortableAttributes`), so an index built before document version 2
+ * keeps answering until the rebuild swaps it.
+ */
+export function engineSort(
+  sort: SearchSort,
+  sortable: readonly string[] = SORTABLE_FIELDS,
+): string[] | undefined {
   switch (sort) {
     case "relevance":
       return undefined;
     case "newest":
-      return ["publishedAt:desc"];
+      return sortable.includes(SEARCH_FIELDS.productId)
+        ? ["publishedAt:desc", "productId:desc"]
+        : ["publishedAt:desc"];
     case "price_asc":
       return ["price:asc"];
     case "price_desc":

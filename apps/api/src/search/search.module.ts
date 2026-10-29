@@ -12,7 +12,12 @@ import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { SearchIndexer } from "./indexer/index.js";
-import { DISABLED_SEARCH_PORT, SEARCH_PORT, type SearchPort } from "../common/search-port.js";
+import {
+  DISABLED_SEARCH_PORT,
+  SEARCH_PORT,
+  SEARCH_SYNONYM_SEEDER,
+  type SearchPort,
+} from "../common/search-port.js";
 import { SearchEngine } from "./engine/index.js";
 import { SearchQueue } from "./queue/search-queue.js";
 import { StoreModule } from "../catalog/store/store.module.js";
@@ -116,6 +121,8 @@ export class SearchModule {
             rejections: SearchRejections,
           ) => new AdminSearchService(database, engine, config, locale, pricing, rejections),
         },
+        // The demo seed's synonym groups (search plan step 11): the same service and rules as the admin routes.
+        { provide: SEARCH_SYNONYM_SEEDER, useExisting: AdminSearchService },
       ],
       exports: [SEARCH_CONFIG, SEARCH_ENGINE, SEARCH_PORT, SearchIndexer],
     };

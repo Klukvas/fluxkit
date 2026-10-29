@@ -30,6 +30,7 @@ export const STORE_TAGS = {
   config: "store:config",
   categories: "store:categories",
   products: "store:products",
+  search: "store:search",
 } as const;
 
 /** Most last-good responses kept in memory per server process (oldest dropped first). */

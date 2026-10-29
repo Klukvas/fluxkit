@@ -6,6 +6,7 @@ import type {
   SeedCategory,
   SeedProduct,
   SeedShippingMethod,
+  SeedSynonymGroup,
   SeedVariantCommerce,
 } from "@fluxkit/seeds";
 import type { z } from "zod";
@@ -41,6 +42,12 @@ import { PricesService } from "../catalog/admin/prices/prices.service.js";
 import { putProductPricesSchema } from "../catalog/admin/prices/prices.schemas.js";
 import { adjustmentSchema } from "../inventory/admin/inventory.schemas.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
+import {
+  SEARCH_PORT,
+  SEARCH_SYNONYM_SEEDER,
+  type SearchPort,
+  type SearchSynonymSeeder,
+} from "../common/search-port.js";
 import { ProductOptionsService } from "../catalog/admin/product-options/product-options.service.js";
 import { putProductOptionsSchema } from "../catalog/admin/product-options/product-options.schemas.js";
 import { ProductTypesService } from "../catalog/admin/product-types/product-types.service.js";
@@ -82,6 +89,17 @@ export interface SeedSummary {
   variantsCreated: number;
   /** Demo shipping methods not created because their provider is not loaded (`SHIPPING_PROVIDERS_ENABLED`), by code. */
   skippedShippingMethods: string[];
+  /**
+   * Demo synonym groups of catalog search: written only with `SEARCH_ENABLED=true` (with search off nothing reaches the
+   * search tables). A group counts as existing when one of its terms is already in a group of its locale.
+   */
+  synonymGroups: {
+    searchEnabled: boolean;
+    created: number;
+    existing: number;
+    /** Locales of demo groups the shop does not serve (`LOCALES`), each once. */
+    skippedLocales: string[];
+  };
 }
 
 function emptyCounts(): Record<SeedEntityKind, number> {
@@ -121,6 +139,7 @@ export class CatalogSeeder {
     existing: emptyCounts(),
     variantsCreated: 0,
     skippedShippingMethods: [],
+    synonymGroups: { searchEnabled: false, created: 0, existing: 0, skippedLocales: [] },
   };
   private readonly attributeIds = new Map<string, string>();
   private readonly optionIds = new Map<string, string>();
@@ -145,11 +164,18 @@ export class CatalogSeeder {
     private readonly pricing: PricingConfig,
     private readonly shippingMethods: ShippingMethodsService,
     private readonly shippingProviders: ShippingProviderRegistry,
+    /** `null` with search off: the demo synonym groups are then not written at all. */
+    private readonly synonyms: SearchSynonymSeeder | null,
   ) {}
 
   static fromContext(app: INestApplicationContext): CatalogSeeder {
     // The services are not exported by their modules; `strict: false` finds them anywhere in the container.
     const get = <T>(token: new (...args: never[]) => T): T => app.get(token, { strict: false });
+    // The search module provides the synonym writer only with search on; the port says which (no import of src/search/).
+    const search = app.get<SearchPort>(SEARCH_PORT, { strict: false });
+    const synonyms = search.enabled
+      ? app.get<SearchSynonymSeeder>(SEARCH_SYNONYM_SEEDER, { strict: false })
+      : null;
     return new CatalogSeeder(
       app.get<Database>(DRIZZLE, { strict: false }),
       get(AttributesService),
@@ -165,6 +191,7 @@ export class CatalogSeeder {
       app.get<PricingConfig>(PRICING_CONFIG, { strict: false }),
       get(ShippingMethodsService),
       get(ShippingProviderRegistry),
+      synonyms,
     );
   }
 
@@ -190,7 +217,31 @@ export class CatalogSeeder {
     for (const definition of seed.shippingMethods) {
       await this.ensureShippingMethod(definition);
     }
+    await this.ensureSynonymGroups(seed.synonymGroups);
     return this.summary;
+  }
+
+  /**
+   * The demo synonym groups, through the admin search service (same rules as `POST /admin/search/synonyms`). With search
+   * off there is no writer and nothing is written: the search tables stay untouched (feature matrix `search-off`). With
+   * search on, job 13 applies the groups as an in-place settings update (`pnpm search:reindex` or the next tick).
+   */
+  private async ensureSynonymGroups(groups: readonly SeedSynonymGroup[]): Promise<void> {
+    const summary = this.summary.synonymGroups;
+    if (this.synonyms === null) {
+      return;
+    }
+    summary.searchEnabled = true;
+    for (const group of groups) {
+      const outcome = await this.synonyms.ensureGroup(group.locale, group.terms);
+      if (outcome === "created") {
+        summary.created += 1;
+      } else if (outcome === "existing") {
+        summary.existing += 1;
+      } else if (!summary.skippedLocales.includes(group.locale)) {
+        summary.skippedLocales.push(group.locale);
+      }
+    }
   }
 
   /**

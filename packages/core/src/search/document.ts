@@ -175,7 +175,11 @@ function searchableText(
   }
 }
 
-function epochSeconds(iso: string | null): number {
+/**
+ * Milliseconds, the precision the API writes `published_at` with: seconds tied products published in the same second and
+ * the engine then listed them in its own order, unlike the SQL listing (review F2 of the search finish).
+ */
+function epochMilliseconds(iso: string | null): number {
   if (iso === null) {
     return 0;
   }
@@ -183,7 +187,7 @@ function epochSeconds(iso: string | null): number {
   if (Number.isNaN(milliseconds)) {
     throw new RangeError("A product has a publish timestamp that is not a date");
   }
-  return Math.floor(milliseconds / 1000);
+  return milliseconds;
 }
 
 function cut(text: string, length: number): string {
@@ -216,7 +220,7 @@ export function buildSearchDocuments(
       .map((category) => textOf(category.name, context))
       .filter((name) => name !== ""),
   );
-  const publishedAt = epochSeconds(product.publishedAt);
+  const publishedAt = epochMilliseconds(product.publishedAt);
 
   const documents: SearchDocument[] = [];
   for (const variant of product.variants) {

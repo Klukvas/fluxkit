@@ -209,6 +209,24 @@ export class SearchEngine {
     return answer.filter((entry): entry is string => typeof entry === "string");
   }
 
+  /**
+   * The `sortableAttributes` the index has APPLIED (`settings.get`); `engine_index_missing` when it does not exist. The
+   * store asks for the product id tie-break of `newest` only when it is in this list (review F2 of the search finish).
+   */
+  async sortableAttributes(uid: string, timeoutMs?: number): Promise<string[]> {
+    const answer = await this.request<unknown>(
+      "GET",
+      `/indexes/${encodeURIComponent(uid)}/settings/sortable-attributes`,
+      undefined,
+      "settings",
+      timeoutMs,
+    );
+    if (!Array.isArray(answer)) {
+      throw new SearchEngineError("engine_bad_response", { operation: "settings" });
+    }
+    return answer.filter((entry): entry is string => typeof entry === "string");
+  }
+
   createIndex(uid: string): Promise<TaskUid> {
     return this.enqueue("POST", "/indexes", { uid, primaryKey: "id" }, "create index");
   }

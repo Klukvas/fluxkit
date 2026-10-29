@@ -58,7 +58,7 @@ describe("deriveIndexSettings", () => {
         "attr_waterproof",
         "attr_weight",
       ],
-      sortableAttributes: ["price", "publishedAt"],
+      sortableAttributes: ["price", "publishedAt", "productId"],
       displayedAttributes: ["id", "productId", "productSlug", "title"],
       typoTolerance: {
         enabled: true,

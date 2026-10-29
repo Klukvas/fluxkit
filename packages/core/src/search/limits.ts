@@ -4,7 +4,7 @@ import { CATALOG_LIMITS } from "../catalog/limits.js";
  * Version of the search document shape and of the text rules that build it (ADR 0034 decision 2). Bump it whenever a
  * document would come out different for the same catalog data, so every index is rebuilt.
  */
-export const SEARCH_DOCUMENT_VERSION = 1;
+export const SEARCH_DOCUMENT_VERSION = 2; // 2: `publishedAt` in milliseconds (search finish review F2)
 
 /** Search limits, ADR 0034. Enforced by these rules and by the API at the boundary. */
 export const SEARCH_LIMITS = Object.freeze({
