@@ -210,4 +210,89 @@ describe("payments: races on one order (real Postgres)", () => {
       expect(["paid:409", "cancelled:200"]).toContain(result);
     }
   });
+  describe("a create racing a cancel, the expiry job or a manual mark paid (review F4: the order row lock of the create)", () => {
+    const LIVE = ["creating", "awaiting_customer", "processing", "create_unknown"];
+
+    /**
+     * Sets the race up deterministically: the test holds the `payment` table (ACCESS EXCLUSIVE), so the create (started
+     * first) and then `other` both stop at their first read of payment rows. With the create's order row lock the create
+     * stops holding the order, `other` waits for the order until the create committed its new attempt, and then sees it.
+     * Without that lock (review F4) `other` takes the order row first; when the table is released, `other` reads no live
+     * attempt and closes the order, while the create's insert waits for the order row and then lands a live attempt on
+     * the closed order.
+     */
+    async function raceCreateWith<T>(
+      other: (placed: Awaited<ReturnType<typeof world.place>>) => Promise<T>,
+    ) {
+      const placed = await world.place([{ quantity: 1, price: 2_000 }]);
+      await world.warmPool();
+      const holder = await world.pool.connect();
+      try {
+        await holder.query("begin");
+        await holder.query("lock table payment in access exclusive mode");
+        const create = world.create(placed);
+        await world.waitForLockWaiters(1);
+        const competing = other(placed);
+        await world.waitForLockWaiters(2);
+        await holder.query("rollback");
+        const [created, result] = await Promise.all([create, competing]);
+        return { placed, created, result };
+      } finally {
+        // Destroyed, not returned to the pool: a failed assertion leaves its transaction open.
+        holder.release(true);
+      }
+    }
+
+    async function liveAttempts(orderId: string): Promise<string[]> {
+      return (await world.paymentsOf(orderId))
+        .map((row) => row.status)
+        .filter((status) => LIVE.includes(status));
+    }
+
+    it("a guest cancel: refused payment_in_progress, or the order is cancelled with no live attempt left", async () => {
+      const { placed, created, result } = await raceCreateWith((order) =>
+        http(world.app.baseUrl, "POST", "/store/orders/cancel", {
+          body: { number: order.number, accessToken: order.accessToken },
+        }),
+      );
+      expect(created.kind).toBe("created");
+      const order = await world.orderStatus(placed.id);
+      if (result.status === 200) {
+        expect(order.status).toBe("cancelled");
+        expect(await liveAttempts(placed.id)).toEqual([]);
+      } else {
+        expect(result.status, JSON.stringify(result.body)).toBe(409);
+        expect(result.body).toMatchObject({ rule: "payment_in_progress" });
+        expect(order.status).toBe("awaiting_payment");
+      }
+    });
+
+    it("the expiry job at the deadline: deferred while the new attempt is live, never expired under it", async () => {
+      const { placed, created, result } = await raceCreateWith(async (order) => {
+        const deadline = (await world.orderStatus(order.id)).expires_at;
+        return world.orderService.expireOne(order.id, deadline);
+      });
+      expect(created.kind).toBe("created");
+      const order = await world.orderStatus(placed.id);
+      expect(result).toBe("deferred");
+      expect(order.status).toBe("awaiting_payment");
+      expect(await liveAttempts(placed.id)).toEqual(["awaiting_customer"]);
+    });
+
+    it("an admin's manual mark paid: refused payment_in_progress, or paid with no live attempt left", async () => {
+      const { placed, created, result } = await raceCreateWith((order) =>
+        world.orders.pay(order, "BANK-F4"),
+      );
+      expect(created.kind).toBe("created");
+      const order = await world.orderStatus(placed.id);
+      if (result.status === 200) {
+        expect(order.status).toBe("paid");
+        expect(await liveAttempts(placed.id)).toEqual([]);
+      } else {
+        expect(result.status, JSON.stringify(result.body)).toBe(409);
+        expect(result.body).toMatchObject({ rule: "payment_in_progress" });
+        expect(order.status).toBe("awaiting_payment");
+      }
+    });
+  });
 });
