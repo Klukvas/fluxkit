@@ -253,12 +253,15 @@ export interface AdminOrderView {
   readonly customerId: string | null;
   /** Placed without an account: the shopper holds a guest access token. */
   readonly isGuest: boolean;
+  /** All four are null once the contact was erased (`contactErasedAt` set, ADR 0033 decision 5); never mail or ship then. */
   readonly contact: {
-    readonly email: string;
-    readonly phone: string;
-    readonly firstName: string;
-    readonly lastName: string;
+    readonly email: string | null;
+    readonly phone: string | null;
+    readonly firstName: string | null;
+    readonly lastName: string | null;
   };
+  /** ISO 8601, UTC: when the contact data was anonymised (privacy erasure or retention); null for a live contact. */
+  readonly contactErasedAt: string | null;
   readonly shippingAddress: Address | null;
   readonly billingAddress: Address | null;
   readonly items: readonly AdminOrderItemView[];

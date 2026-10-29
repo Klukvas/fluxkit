@@ -412,12 +412,17 @@ export const storeOrderSchema = z.object({
       includedInPrice: z.boolean(),
     }),
   ),
-  contact: z.object({
-    email: z.string(),
-    phone: z.string(),
-    firstName: z.string(),
-    lastName: z.string(),
-  }),
+  contact: z
+    .object({
+      email: z.string().nullable(),
+      phone: z.string().nullable(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+    })
+    .meta({
+      description:
+        "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set.",
+    }),
   shippingAddress: addressOutput.nullable(),
   billingAddress: addressOutput.nullable(),
   shipping: storeOrderShippingSchema.nullable().meta({

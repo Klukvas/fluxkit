@@ -262,11 +262,12 @@ export interface OrderAdjustment {
   includedInPrice: boolean;
 }
 
+/** All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set. */
 export interface OrderContact {
-  email: string;
-  phone: string;
-  firstName: string;
-  lastName: string;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export interface OrderHistoryEntry {

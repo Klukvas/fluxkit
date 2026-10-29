@@ -58,6 +58,8 @@ describe("cart, customers and orders schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "admin_audit_event",
+      "privacy_request",
       "payment_refund",
       "payment_event",
       "payment",
@@ -107,6 +109,7 @@ describe("cart, customers and orders schema (real Postgres)", () => {
       await pool.query(`drop table if exists "${name}"`);
     }
     for (const name of [
+      "admin_audit_event_append_only",
       "payment_event_append_only",
       "shipment_status_change_append_only",
       "order_shipping_immutable",
@@ -892,10 +895,11 @@ describe("cart, customers and orders schema (real Postgres)", () => {
           "",
         ],
       );
+      // NULL only on an erased order (migration 0009, privacy-schema.spec.ts).
       await expectViolation(
         () => insert("sales_order", guestOrderRow({ phone: null })),
-        NOT_NULL_VIOLATION,
-        undefined,
+        CHECK_VIOLATION,
+        "sales_order_contact_check",
       );
     });
 

@@ -78,6 +78,13 @@ export const orderTables: Inventory = {
       "Unsalted hash of the checkout request: replaced by a hash of random bytes, because it could confirm a guess of the erased contact data.",
     ),
     cancellation_reason: classified("free_text", "D10", "included", "anonymise"),
+    contact_erased_at: classified(
+      "pseudonymous",
+      "D6",
+      "included",
+      "anonymise",
+      "Set by the anonymisation itself (core ORDER_ANONYMISATION_PLAN, set_erased_at): it marks the contact as erased.",
+    ),
     payment_reference: classified(
       "free_text",
       "D10",
