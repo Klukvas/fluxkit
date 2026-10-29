@@ -2,13 +2,20 @@
  * The shop's legal pages and who is responsible for them (privacy plan step 10, ADR 0033 decision 11; AGENTS.md sections 2.2
  * and 15). Internal to the storefront in v1: a client fork edits THIS file and the `legal.*` messages, nowhere else.
  *
- * Master ships placeholders only: the texts are i18n messages that say the shop must supply its own, and the identity below is
- * empty. A page shows a visible placeholder for every identity value that is still `null`. Nothing here is legal advice.
+ * Master ships placeholders only: the texts are i18n messages that say the shop must supply its own, and the identity
+ * (`legal-identity.json`) is empty. A page shows a visible placeholder for every identity value that is still `null`.
+ * Nothing here is legal advice.
  * TODO(fluxkit): legal review of the texts, the retention periods and the processor list before an EU launch (privacy plan
  * tasks O1 to O8).
  */
 
-/** The marker every placeholder text carries; `lib/legal-marker.ts` finds it, a release check refuses it. */
+import legalIdentityFile from "./legal-identity.json";
+
+/**
+ * The marker every placeholder legal text (the `legal.<page>.intro` message of every page, in every language) starts with.
+ * A page shows the "Template placeholder" box only while its own text carries it, and the release check refuses the build
+ * while any `legal.*` message carries it.
+ */
 export const LEGAL_PLACEHOLDER_MARKER = "TODO(fluxkit): replace with the shop's own legal text";
 
 export type LegalPageSlug = "privacy" | "terms" | "cookies";
@@ -60,9 +67,8 @@ export interface LegalIdentity {
   lastUpdated: string | null;
 }
 
-export const legalIdentity: LegalIdentity = {
-  shopLegalName: null,
-  shopLegalAddress: null,
-  privacyContact: null,
-  lastUpdated: null,
-};
+/**
+ * The values live in `legal-identity.json` (a fork edits THAT file) because the release check in `next.config.ts` runs in
+ * plain Node and reads the same file; with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` the build refuses a `null` or blank value.
+ */
+export const legalIdentity: LegalIdentity = legalIdentityFile;
