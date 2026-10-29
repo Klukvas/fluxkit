@@ -99,6 +99,19 @@ describe("search data (the results page's server read of GET /store/search)", ()
     expect(new Headers(calls[0]?.init.headers).get("x-forwarded-for")).toBe("203.0.113.5");
   });
 
+  it("on request, caches a read of the catalog pages for the given seconds and then forwards no address (one cache entry for every shopper)", async () => {
+    const forwardedFor = vi.fn(async () => "203.0.113.5");
+    const { data, calls } = setup(() => json(result), { forwardedFor });
+    await data.search("uk", { ...query, q: "", facets: [], price: null }, { cacheSeconds: 60 });
+    const init = calls[0]?.init as RequestInit & {
+      next?: { revalidate?: number; tags?: string[] };
+    };
+    expect(init.cache).toBeUndefined();
+    expect(init.next).toEqual({ revalidate: 60, tags: ["store", "store:search"] });
+    expect(new Headers(init.headers).has("x-forwarded-for")).toBe(false);
+    expect(forwardedFor).not.toHaveBeenCalled();
+  });
+
   it("sends no forwarded address when the request had none", async () => {
     const { data, calls } = setup(() => json(result), { forwardedFor: async () => null });
     await data.search("uk", query);

@@ -9,6 +9,7 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import { ProductGrid } from "./product-grid";
@@ -34,9 +35,16 @@ export interface CatalogViewProps {
   brand: { slug: string; name: string } | null;
   /** A category page, for the "category empty" state. */
   isCategory: boolean;
+  /**
+   * Shown above the list: with search on, the notice that this is the SQL fallback (search could not answer), so the
+   * shopper is never shown fewer filters than the address asks for without being told.
+   */
+  notice?: ReactNode;
+  /** The link of a later page; by default the SQL listing's address (`?brand=&page=`). */
+  hrefForPage?: (page: number) => string;
 }
 
-function EmptyList({
+export function EmptyList({
   t,
   locale,
   basePath,
@@ -80,6 +88,49 @@ function EmptyList({
   );
 }
 
+/** The `h1` and the description of a catalog or category page (shared with `catalog-search-view.tsx`). */
+export function CatalogHeader({
+  heading,
+  description,
+}: Pick<CatalogViewProps, "heading" | "description">) {
+  return (
+    <header className="flex flex-col gap-2">
+      <h1 className="text-3xl font-bold text-foreground">{heading}</h1>
+      {description === null ? null : (
+        <p className="whitespace-pre-line text-muted-foreground">{description}</p>
+      )}
+    </header>
+  );
+}
+
+/** The child categories of a category page as links (shared with `catalog-search-view.tsx`). */
+export function Subcategories({
+  locale,
+  t,
+  subcategories,
+}: Pick<CatalogViewProps, "locale" | "t" | "subcategories">) {
+  if (subcategories.length === 0) return null;
+  return (
+    <section aria-labelledby="catalog-subcategories-title" className="flex flex-col gap-2">
+      <h2 id="catalog-subcategories-title" className="text-lg font-semibold text-foreground">
+        {t("catalog.subcategories")}
+      </h2>
+      <ul className="flex flex-wrap gap-2">
+        {subcategories.map((child) => (
+          <li key={child.id}>
+            <Link
+              href={localizedHref(locale, `/c/${encodeURIComponent(child.slug)}`)}
+              className={`inline-flex min-h-11 items-center rounded-md border border-border px-3 text-foreground ${focusRing}`}
+            >
+              {child.name}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 /**
  * The catalog and category pages share this view (pages only compose). Headings: `h1` the page, `h2` the subcategories and
  * the product titles. The brand filter exists only as links (owner answer 11): a product's brand link leads here with
@@ -100,37 +151,16 @@ export function CatalogView({
   subcategories,
   brand,
   isCategory,
+  notice = null,
+  hrefForPage,
 }: CatalogViewProps) {
   const brandSlug = brand?.slug ?? null;
   return (
     <Container className="flex flex-col gap-6 py-8">
       <Breadcrumbs label={t("breadcrumbs.label")} items={breadcrumbs} />
-      <header className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-foreground">{heading}</h1>
-        {description === null ? null : (
-          <p className="whitespace-pre-line text-muted-foreground">{description}</p>
-        )}
-      </header>
-
-      {subcategories.length === 0 ? null : (
-        <section aria-labelledby="catalog-subcategories-title" className="flex flex-col gap-2">
-          <h2 id="catalog-subcategories-title" className="text-lg font-semibold text-foreground">
-            {t("catalog.subcategories")}
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {subcategories.map((child) => (
-              <li key={child.id}>
-                <Link
-                  href={localizedHref(locale, `/c/${encodeURIComponent(child.slug)}`)}
-                  className={`inline-flex min-h-11 items-center rounded-md border border-border px-3 text-foreground ${focusRing}`}
-                >
-                  {child.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <CatalogHeader heading={heading} description={description} />
+      <Subcategories locale={locale} t={t} subcategories={subcategories} />
+      {notice}
 
       {brand === null ? null : (
         <p className="flex flex-wrap items-center gap-3 text-foreground">
@@ -172,8 +202,10 @@ export function CatalogView({
         label={t("catalog.pagination.label")}
         currentPage={page}
         pageCount={pageCount}
-        hrefForPage={(target) =>
-          localizedHref(locale, catalogPath(basePath, { brand: brandSlug, page: target }))
+        hrefForPage={
+          hrefForPage ??
+          ((target) =>
+            localizedHref(locale, catalogPath(basePath, { brand: brandSlug, page: target })))
         }
         previousLabel={t("catalog.pagination.previous")}
         nextLabel={t("catalog.pagination.next")}

@@ -7,6 +7,7 @@ import {
 import { retryAfterSeconds } from "./failure";
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 import type { SearchQuery } from "./search-query";
+import { STORE_TAGS } from "./store-data";
 
 /**
  * The results page's server-side read of `GET /store/search` (plan 2026-10-29-search.md, section 9). Server code only
@@ -14,9 +15,11 @@ import type { SearchQuery } from "./search-query";
  *
  * - Never in the Next data cache (`cache: "no-store"`): the address holds free text, and `next start` writes every cached
  *   answer to disk and never deletes one (the same reason `GET /store/products?brand=` is not cached, `store-data.ts`).
- *   The API's own `Cache-Control: public, max-age=30` is for a shared cache in front of it.
+ *   The API's own `Cache-Control: public, max-age=30` is for a shared cache in front of it. The one exception is a read
+ *   with `cacheSeconds` (the unfiltered catalog and category lists, `catalog-search.ts`): bounded keys, the catalog's minute.
  * - The shopper's forwarded address goes along (`forwarded-address.ts`), so the API's 60 a minute window counts shoppers
- *   and not this one server.
+ *   and not this one server. Not on a cached read: the header would be part of the cache key (one entry per shopper), and
+ *   a cached answer is read by this server once a minute, not by the shopper.
  * - An answer is a value, never a thrown error, for the states the page explains: search off (404), a selection the API
  *   refuses (400), a limit (429) and the engine being down (503, or an API that cannot be reached). A refusal by the engine
  *   (500) and everything unexpected throw, loud, and the route's error page renders.
@@ -47,15 +50,22 @@ export interface SearchDataDependencies {
   forwardedFor?: () => Promise<string | null>;
 }
 
+export interface SearchReadOptions {
+  /** Keep the answer in the Next data cache this long (bounded addresses only); without it the read is `no-store`. */
+  cacheSeconds?: number;
+}
+
 export interface SearchData {
-  search(locale: string, query: SearchQuery): Promise<SearchOutcome>;
+  search(locale: string, query: SearchQuery, read?: SearchReadOptions): Promise<SearchOutcome>;
 }
 
 export function createSearchData(dependencies: SearchDataDependencies): SearchData {
   return {
-    async search(locale, query) {
+    async search(locale, query, read) {
       await dependencies.beforeRequest?.();
-      const forwarded = (await dependencies.forwardedFor?.()) ?? null;
+      const cacheSeconds = read?.cacheSeconds;
+      const forwarded =
+        cacheSeconds === undefined ? ((await dependencies.forwardedFor?.()) ?? null) : null;
       const inner: FetchLike = dependencies.fetch ?? globalThis.fetch.bind(globalThis);
       const client = createStoreClient({
         baseUrl: dependencies.baseUrl(),
@@ -86,7 +96,11 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
           ...(query.sort === null ? {} : { sort: query.sort }),
           ...(query.page > 1 ? { page: query.page } : {}),
           signal: AbortSignal.timeout(dependencies.readTimeoutMs ?? SERVER_READ_TIMEOUT_MS),
-          fetchOptions: { cache: "no-store" },
+          // Next warns when both `cache: "no-store"` and `next.revalidate` are given, so a read carries one of them.
+          fetchOptions:
+            cacheSeconds === undefined
+              ? { cache: "no-store" }
+              : { next: { revalidate: cacheSeconds, tags: [STORE_TAGS.all, STORE_TAGS.search] } },
         });
       } catch (thrown) {
         if (thrown instanceof NetworkError) {
