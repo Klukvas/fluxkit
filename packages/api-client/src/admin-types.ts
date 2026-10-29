@@ -1322,3 +1322,60 @@ export interface RejectPrivacyRequestBody {
   reasonCode: string;
   note?: string;
 }
+
+/** `GET /admin/search/status` (only with search on). */
+export interface AdminSearchStatus {
+  engine: { reachable: boolean; code: string | null };
+  locales: {
+    locale: string;
+    liveIndex: string | null;
+    documents: number | null;
+    builtAt: string | null;
+    /** The live index has the settings the current definitions and synonyms derive. */
+    settingsFresh: boolean;
+    /** The live index was built for the current document version and currency; false means a rebuild is due. */
+    documentsFresh: boolean;
+    rebuildRequestedAt: string | null;
+    build: { index: string; startedAt: string; documents: number } | null;
+    failedAttempts: number;
+    lastErrorCode: string | null;
+    lastErrorAt: string | null;
+    nextAttemptAt: string | null;
+  }[];
+  queue: {
+    depth: number;
+    due: number;
+    leased: number;
+    /** Products that failed 10 times or more; they keep retrying hourly. */
+    dead: number;
+    oldestEnqueuedAt: string | null;
+    oldestDueAt: string | null;
+    errorCodes: { code: string; count: number }[];
+  };
+}
+
+export interface AdminSearchRebuild {
+  requestedAt: string;
+  locales: string[];
+}
+
+/** Terms that find each other; stored normalized like a search query. */
+export interface AdminSynonymGroup {
+  id: string;
+  locale: string;
+  terms: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminSynonymGroupList = Paginated<AdminSynonymGroup>;
+
+/** 2 to 20 distinct terms of at most 50 characters each. */
+export interface CreateSynonymGroupBody {
+  locale: string;
+  terms: string[];
+}
+
+export interface UpdateSynonymGroupBody {
+  terms: string[];
+}

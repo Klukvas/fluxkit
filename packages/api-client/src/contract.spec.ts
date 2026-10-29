@@ -36,6 +36,8 @@ import type {
   ProductDetail,
   ProductList,
   RegisterBody,
+  SearchResult,
+  SearchSuggestions,
   SetCartItemQuantityBody,
   ShippingChanged,
   ShippingCityPage,
@@ -448,6 +450,46 @@ const productList: Shape<ProductList> = {
   },
 };
 
+const searchResult: Shape<SearchResult> = {
+  object: {
+    items: productList.object.items,
+    total: "integer",
+    page: "integer",
+    pageCount: "integer",
+    limit: "integer",
+    sort: { enum: ["relevance", "newest", "price_asc", "price_desc"] },
+    relaxed: "boolean",
+    query: { object: { normalized: "string" } },
+    facets: {
+      array: {
+        object: {
+          key: "string",
+          kind: { enum: ["slug", "uuid", "code", "boolean", "range"] },
+          level: { enum: ["product", "variant"] },
+          label: { nullable: "string" },
+          counted: "boolean",
+          values: {
+            array: {
+              object: {
+                code: "string",
+                label: { nullable: "string" },
+                count: { nullable: "integer" },
+                selected: "boolean",
+              },
+            },
+          },
+          range: { nullable: { object: { min: "number", max: "number" } } },
+        },
+      },
+    },
+    price: { nullable: { object: { min: "integer", max: "integer" } } },
+  },
+};
+
+const searchSuggestions: Shape<SearchSuggestions> = {
+  object: { items: { array: { object: { slug: "string", title: "string" } } } },
+};
+
 const labelledCode = { object: { code: "string", label: "string" } } as const;
 const attributeValue: Shape<AttributeValue> = {
   oneOf: [
@@ -577,6 +619,7 @@ const problemDetails: Shape<ProblemDetails> = {
         "shipping_changed",
         "shipping_provider_unavailable",
         "payment_provider_unavailable",
+        "search_unavailable",
       ],
     },
     detail: "string",
@@ -723,6 +766,8 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getConfig: storeConfig,
   listProducts: productList,
   getProduct: productDetail,
+  searchProducts: searchResult,
+  suggestProducts: searchSuggestions,
   getShippingOptions: shippingOptions,
   listShippingCities: shippingCityPage,
   listShippingPickupPoints: shippingPickupPointPage,
@@ -762,6 +807,8 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getConfig: null,
   listProducts: null,
   getProduct: null,
+  searchProducts: null,
+  suggestProducts: null,
   getShippingOptions: null,
   listShippingCities: null,
   listShippingPickupPoints: null,

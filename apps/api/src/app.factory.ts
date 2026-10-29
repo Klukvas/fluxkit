@@ -243,6 +243,17 @@ export async function createApp(
   return app;
 }
 
+/**
+ * The search setting of the OpenAPI document (export and freshness spec): search ON, so the public search routes are
+ * documented. Nothing connects to the engine at startup, so the address and the key are never used.
+ */
+export const OPENAPI_SEARCH_ENV = Object.freeze({
+  enabled: true,
+  meiliUrl: "http://127.0.0.1:1",
+  meiliApiKey: "openapi-export-unused-key",
+  indexPrefix: "fluxkit_",
+} as const);
+
 export function buildOpenApiDocument(app: NestExpressApplication): OpenAPIObject {
   const config = new DocumentBuilder().setTitle("Fluxkit API").setVersion("0.0.0").build();
   const document = documentStoreContract(SwaggerModule.createDocument(app, config));

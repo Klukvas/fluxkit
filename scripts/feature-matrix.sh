@@ -41,10 +41,15 @@
 #                     a *.monobank.ua host, and the log must show the wrapper active and no such request
 # Catalog search (ADR 0034) has the observable "Search: <disabled|enabled (<prefix>)>" and the public flag `search` of
 # GET /store/config:
-#   search-off   start the API with SEARCH_ENABLED=false, expect "Search: disabled", search false and 404 on every search
-#                route (store and admin)
+#   search-off   migrate and seed with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
+#                search false, 404 on every search route (store and admin), and not one row written to the search tables
+#                by the seed's catalog writes or the scheduler's first tick (no DB side effects)
 #   search-on    start the API with SEARCH_ENABLED=true, an engine that is NOT reachable and an invented key: it must start
-#                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key
+#                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key.
+#                Then, against the real engine (MEILI_URL, MEILI_MASTER_KEY): create a key scoped to a fresh prefix,
+#                migrate and seed (the catalog writes mark products in the queue), `search:reindex` (builds, swaps,
+#                drains the queue), start the API and find a seeded product with GET /store/search and its suggest.
+#                The key and the prefix's indexes are deleted at the end.
 set -euo pipefail
 
 mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank|search-on|search-off}"
@@ -52,6 +57,32 @@ mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|provider
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
 export ORDER_TOKEN_SECRET="${ORDER_TOKEN_SECRET:-feature-matrix-throwaway-secret-0123456789}"
+
+# Rows in the three search tables of migration 0010 (queue, index state, synonyms), read with the API package's pg.
+search_rows() {
+  pnpm --silent --filter @fluxkit/api exec node --input-type=module -e '
+import pg from "pg";
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+await client.connect();
+const { rows } = await client.query(
+  "select (select count(*) from search_sync_queue)::int as queue, (select count(*) from search_index_state)::int as state, (select count(*) from search_synonym_group)::int as synonyms",
+);
+console.log(`queue=${rows[0].queue} state=${rows[0].state} synonyms=${rows[0].synonyms}`);
+await client.end();
+' | tail -n 1
+}
+
+# Calls the engine with the master key: meili_master <method> <path> [json body]; prints the answer.
+meili_master() {
+  : "${MEILI_URL:?MEILI_URL must be set}" "${MEILI_MASTER_KEY:?MEILI_MASTER_KEY must be set}"
+  curl -fsS -X "$1" "${MEILI_URL}$2" -H "Authorization: Bearer ${MEILI_MASTER_KEY}" \
+    -H "Content-Type: application/json" ${3:+-d "$3"}
+}
+
+stop_api() {
+  kill "$api_pid" 2>/dev/null || true
+  wait "$api_pid" 2>/dev/null || true
+}
 
 run_api() {
   local features="$1"
@@ -319,6 +350,13 @@ GUARD
     rm -rf "$guard_dir"
     ;;
   search-off)
+    # The commands run from the built output without the root .env (like run_api): only the variables set here count.
+    pnpm build
+    node apps/api/dist/database/migrate.js
+    before="$(search_rows)"
+    echo "search tables before: $before"
+    # The seed writes the demo catalog through the same services as the admin API (marks would happen here).
+    SEARCH_ENABLED=false node apps/api/dist/seed/seed.js
     MATRIX_SEARCH_ENABLED=false run_api "" "" "none" ""
     grep -F "Search: disabled" /tmp/fluxkit-matrix-api.log \
       || { echo "expected the search module to report disabled" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
@@ -330,6 +368,11 @@ GUARD
       echo "$path -> HTTP $code"
       [ "$code" = "404" ] || { echo "expected 404 on $path with search off" >&2; exit 1; }
     done
+    # Give the scheduler's first tick (jobs 13 and 14 included) a moment to run.
+    sleep 3
+    after="$(search_rows)"
+    echo "search tables after seed and API: $after"
+    [ "$after" = "$before" ] || { echo "search off must not write the search tables ($before -> $after)" >&2; exit 1; }
     ;;
   search-on)
     # An engine address nothing listens on and an invented key: the API must start without calling the engine.
@@ -342,6 +385,48 @@ GUARD
     echo "store/config -> $config"
     echo "$config" | grep -q '"search":true' || { echo "expected search true with SEARCH_ENABLED=true" >&2; exit 1; }
     ! grep -qF "$invented_key" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the search key" >&2; exit 1; }
+    stop_api
+
+    # The real engine: a key scoped to a fresh prefix, as an operator creates it (README, Catalog search).
+    prefix="matrix$(date +%s)_"
+    key_json="$(meili_master POST /keys "{\"description\":\"feature matrix\",\"indexes\":[\"${prefix}*\"],\"expiresAt\":null,\"actions\":[\"search\",\"documents.add\",\"documents.delete\",\"indexes.create\",\"indexes.delete\",\"indexes.swap\",\"settings.update\",\"settings.get\",\"tasks.get\",\"tasks.delete\",\"stats.get\"]}")"
+    scoped_key="$(printf '%s' "$key_json" | node -e 'let t="";process.stdin.on("data",(c)=>{t+=c}).on("end",()=>{process.stdout.write(JSON.parse(t).key)})')"
+    key_uid="$(printf '%s' "$key_json" | node -e 'let t="";process.stdin.on("data",(c)=>{t+=c}).on("end",()=>{process.stdout.write(JSON.parse(t).uid)})')"
+    cleanup_search() {
+      stop_api
+      meili_master DELETE "/keys/${key_uid}" > /dev/null || true
+      for uid in $(meili_master GET "/indexes?limit=1000" | node -e 'let t="";process.stdin.on("data",(c)=>{t+=c}).on("end",()=>{for(const i of JSON.parse(t).results){if(i.uid.startsWith(process.argv[1]))console.log(i.uid)}})' "$prefix"); do
+        meili_master DELETE "/indexes/${uid}" > /dev/null || true
+      done
+    }
+    trap cleanup_search EXIT
+    export SEARCH_ENABLED=true MEILI_API_KEY="$scoped_key" MEILI_INDEX_PREFIX="$prefix"
+    node apps/api/dist/database/migrate.js
+    node apps/api/dist/seed/seed.js
+    marked="$(search_rows)"
+    echo "search tables after the seed: $marked"
+    case "$marked" in
+      "queue=0 "*) echo "expected the seed's catalog writes to mark products for the index" >&2; exit 1 ;;
+    esac
+    node apps/api/dist/search/reindex.js
+    drained="$(search_rows)"
+    echo "search tables after search:reindex: $drained"
+    case "$drained" in
+      "queue=0 "*) ;;
+      *) echo "expected search:reindex to drain the queue" >&2; exit 1 ;;
+    esac
+    MATRIX_SEARCH_ENABLED=true run_api "" "" "none" ""
+    trap cleanup_search EXIT
+    results="$(curl -fsS "http://127.0.0.1:${port}/store/search?q=screwdriver&locale=en")"
+    echo "store/search?q=screwdriver -> $results"
+    echo "$results" | grep -q '"title":"Demo Screwdriver"' \
+      || { echo "expected the seeded screwdriver in the search results" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    suggestions="$(curl -fsS "http://127.0.0.1:${port}/store/search/suggest?q=screw&locale=en")"
+    echo "store/search/suggest?q=screw -> $suggestions"
+    echo "$suggestions" | grep -q '"title":"Demo Screwdriver"' \
+      || { echo "expected the seeded screwdriver among the suggestions" >&2; exit 1; }
+    ! grep -qF "$scoped_key" /tmp/fluxkit-matrix-api.log \
       || { echo "the API log contains the search key" >&2; exit 1; }
     ;;
   *)

@@ -15,6 +15,12 @@ import { SearchIndexer } from "./indexer/index.js";
 import { DISABLED_SEARCH_PORT, SEARCH_PORT, type SearchPort } from "../common/search-port.js";
 import { SearchEngine } from "./engine/index.js";
 import { SearchQueue } from "./queue/search-queue.js";
+import { StoreModule } from "../catalog/store/store.module.js";
+import { StoreService } from "../catalog/store/store.service.js";
+import { AdminSearchController } from "./admin/admin-search.controller.js";
+import { AdminSearchService } from "./admin/admin-search.service.js";
+import { StoreSearchController } from "./store/store-search.controller.js";
+import { StoreSearchService } from "./store/store-search.service.js";
 import { SEARCH_CONFIG, searchStartupLine, type SearchConfig } from "./search-config.js";
 
 /** The engine client, or null with `SEARCH_ENABLED=false` (no client is created and nothing connects). */
@@ -73,9 +79,33 @@ export class SearchModule {
       },
       SearchStartupLog,
     ];
+    if (!config.enabled || engine === null) {
+      // Search off: no route at all (404), no client, no query of the search tables.
+      return {
+        module: SearchModule,
+        providers,
+        exports: [SEARCH_CONFIG, SEARCH_ENGINE, SEARCH_PORT, SearchIndexer],
+      };
+    }
     return {
       module: SearchModule,
-      providers,
+      imports: [StoreModule],
+      controllers: [StoreSearchController, AdminSearchController],
+      providers: [
+        ...providers,
+        {
+          provide: StoreSearchService,
+          inject: [DRIZZLE, StoreService, SEARCH_PORT],
+          useFactory: (database: Database, store: StoreService, port: SearchPort) =>
+            new StoreSearchService(database, engine, config, store, port),
+        },
+        {
+          provide: AdminSearchService,
+          inject: [DRIZZLE, LOCALE_CONFIG, PRICING_CONFIG],
+          useFactory: (database: Database, locale: LocaleConfig, pricing: PricingConfig) =>
+            new AdminSearchService(database, engine, config, locale, pricing),
+        },
+      ],
       exports: [SEARCH_CONFIG, SEARCH_ENGINE, SEARCH_PORT, SearchIndexer],
     };
   }

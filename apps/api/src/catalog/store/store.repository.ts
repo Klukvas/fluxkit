@@ -237,6 +237,29 @@ export class StoreRepository {
     return { rows, total };
   }
 
+  /** The listable products among `productIds` (active, with a sellable variant), in no particular order. */
+  async listProductsByIds(
+    productIds: readonly string[],
+    shopCurrency: string,
+  ): Promise<ProductListRow[]> {
+    const where = and(
+      this.activeProductsWhere({ categoryIds: undefined, brandSlug: undefined, shopCurrency }),
+      inArray(product.id, [...productIds]),
+    );
+    return this.db
+      .select({
+        id: product.id,
+        slug: product.slug,
+        title: product.title,
+        publishedAt: product.publishedAt,
+        brandSlug: brand.slug,
+        brandName: brand.name,
+      })
+      .from(product)
+      .leftJoin(brand, eq(brand.id, product.brandId))
+      .where(where);
+  }
+
   /**
    * Media of many products in one query, in display order. Pass the open transaction as `executor` when the caller
    * holds one (the cart): a second pool connection taken while a transaction is open could starve the pool.

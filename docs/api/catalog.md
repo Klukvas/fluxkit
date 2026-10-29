@@ -28,6 +28,7 @@ No feature flag: the catalog is core.
 | `rule_violation` | 409 | a core rule refuses the change; `rule` is the core reason code (for example `options_frozen`, `product_type_in_use`, `last_variant`) |
 | `too_many_requests` | 429 | too many login attempts from one client address (`POST /admin/auth/login`); `Retry-After` carries the seconds to wait |
 | `internal_error` | 500 | unexpected failure; the detail is generic |
+| `search_unavailable` | 503 | the search engine cannot answer (`GET /store/search`, `/store/search/suggest`); `Retry-After` carries the seconds; `docs/api/search.md` |
 | `storage_unavailable` | 503 | an upload could not be written (`docs/api/media.md`) |
 | `uploads_disabled` | 503 | uploads are switched off, `MEDIA_STORAGE_DRIVER=none` (`docs/api/media.md`) |
 
@@ -63,7 +64,7 @@ No feature flag: the catalog is core.
   - Attributes flagged `isInternal` or not `isVisibleOnStorefront` never leave the API, neither as values nor as definitions. One serializer decides this (core `selectPublicAttributes`, `publicAttributeDefinitions`); unknown attribute keys are dropped.
   - Hidden internals: `optionSignature`, variant `isDefault`, `barcode`, `position` values, status fields, `createdAt`, `updatedAt`.
   - `publishedAt` is the only timestamp.
-- **Filters**: `?category=<slug>` matches the category and all its active descendants; an unknown, inactive or hidden category gives an empty list, not an error. `?brand=<slug>` matches one brand; unknown gives an empty list. No text search or facets; no sorting or filtering by price or availability yet (search plan).
+- **Filters**: `?category=<slug>` matches the category and all its active descendants; an unknown, inactive or hidden category gives an empty list, not an error. `?brand=<slug>` matches one brand; unknown gives an empty list. No text search or facets here, and no sorting or filtering by price or availability: with `SEARCH_ENABLED=true` those are `GET /store/search` (`docs/api/search.md`), which returns the same list item shape; this route stays the fallback when search is off or answers `503`.
 - **Order**: products by `publishedAt` descending, then `id`; categories by position, then slug; variants by position, then sku, then id.
 
 ## Attributes

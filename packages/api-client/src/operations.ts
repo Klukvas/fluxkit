@@ -103,6 +103,10 @@ export const OPERATIONS = {
     query: ["brand", "category", "offset", "limit", "locale"],
   }),
   getProduct: operation("GET", "/store/products/{slug}", [200], { query: LOCALE }),
+  searchProducts: operation("GET", "/store/search", [200], {
+    query: ["q", "locale", "f", "price", "sort", "page", "limit"],
+  }),
+  suggestProducts: operation("GET", "/store/search/suggest", [200], { query: ["q", "locale"] }),
   getShippingOptions: operation("GET", "/store/shipping/options", [200], {
     query: ["country", "locale", "cityRef", "pickupPointRef"],
   }),

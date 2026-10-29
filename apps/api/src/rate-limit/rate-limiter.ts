@@ -49,6 +49,9 @@ export const RATE_LIMITS = Object.freeze({
   privacyExport: { maxAttempts: 30, windowMinutes: 60 },
   // ADR 0033 decision 13: the account deletion per customer, counted by the service (password guessing on a stolen session).
   accountDelete: { maxAttempts: 5, windowMinutes: 60 },
+  // ADR 0034 decision 10: catalog search and suggestions, per address (a suggestion box types, debounced 200 ms).
+  search: { maxAttempts: 120, windowMinutes: 1 },
+  searchSuggest: { maxAttempts: 120, windowMinutes: 1 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -90,6 +93,8 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     dataExport: "account",
     privacyExport: "adminUser",
     accountDelete: "account",
+    search: "clientAddress",
+    searchSuggest: "clientAddress",
   },
 );
 

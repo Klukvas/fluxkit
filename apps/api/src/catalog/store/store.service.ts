@@ -159,6 +159,14 @@ export class StoreService {
       { categoryIds, brandSlug: query.brand, shopCurrency: this.pricing.shopCurrency },
       query,
     );
+    return toPage(await this.toListItems(rows, locale), total, query);
+  }
+
+  /** The list items of product rows: three batched reads for the whole page, whatever its size. */
+  private async toListItems(
+    rows: readonly ProductListRow[],
+    locale: StoreLocale,
+  ): Promise<StoreProductListItem[]> {
     const productIds = rows.map((row) => row.id);
     // Three batched reads for the whole page, whatever its size.
     const [media, variants, levels] = await Promise.all([
@@ -193,7 +201,32 @@ export class StoreService {
         },
       ];
     });
-    return toPage(items, total, query);
+    return items;
+  }
+
+  /**
+   * List items of the given products in the given order, for the search routes (ADR 0034 decision 10: items are hydrated
+   * from Postgres). The same rules as `listProducts`: only active products with a sellable variant; `missing` holds the
+   * ids that are not for sale any more (or never were).
+   */
+  async listItemsByIds(
+    productIds: readonly string[],
+    requestedLocale: string,
+  ): Promise<{ items: StoreProductListItem[]; missing: string[] }> {
+    const locale = this.resolveLocale(requestedLocale);
+    if (productIds.length === 0) {
+      return { items: [], missing: [] };
+    }
+    const rows = await this.store.listProductsByIds(productIds, this.pricing.shopCurrency);
+    const items = await this.toListItems(rows, locale);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return {
+      items: productIds.flatMap((id) => {
+        const item = byId.get(id);
+        return item === undefined ? [] : [item];
+      }),
+      missing: productIds.filter((id) => !byId.has(id)),
+    };
   }
 
   async getProduct(slug: string, requestedLocale: string | undefined): Promise<StoreProductDetail> {

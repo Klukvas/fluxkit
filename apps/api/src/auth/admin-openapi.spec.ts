@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { Controller, Get, Module, Post } from "@nestjs/common";
 import { PERMISSIONS, permissionsOf, type AdminPermission } from "@fluxkit/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { buildOpenApiDocument } from "../app.factory.js";
+import { buildOpenApiDocument, OPENAPI_SEARCH_ENV } from "../app.factory.js";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { testPrincipal } from "../test/allow-all-admin-authenticator.js";
@@ -138,6 +138,9 @@ describe("the admin part of docs/api/openapi.json", () => {
       running = await startApp({
         extraFeatures: probeFeature,
         adminAuthenticator: { authenticate: () => signedIn },
+        // The document is exported with search on, so its admin search routes are mounted here too (the guard runs
+        // before any engine call; the engine address is unreachable on purpose).
+        search: OPENAPI_SEARCH_ENV,
       });
     });
 

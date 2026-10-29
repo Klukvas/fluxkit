@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { buildOpenApiDocument, createApp } from "./app.factory.js";
+import { buildOpenApiDocument, createApp, OPENAPI_SEARCH_ENV } from "./app.factory.js";
 
 // Fails when docs/api/openapi.json is stale. Regenerate with: pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export
 describe("OpenAPI document", () => {
@@ -9,6 +9,7 @@ describe("OpenAPI document", () => {
       databaseUrl: "postgres://openapi-export:unused@127.0.0.1:1/unused",
       enabledFeatures: [],
       featuresDir: undefined,
+      search: OPENAPI_SEARCH_ENV,
     });
     await app.init();
     try {

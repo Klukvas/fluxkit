@@ -8,6 +8,12 @@ import type {
   AdminAttributeOption,
   AdminAttributeWithOptions,
   AdminBrand,
+  AdminSearchRebuild,
+  AdminSearchStatus,
+  AdminSynonymGroup,
+  AdminSynonymGroupList,
+  CreateSynonymGroupBody,
+  UpdateSynonymGroupBody,
   AdminPayment,
   AdminPaymentList,
   AdminPaymentPage,
@@ -137,6 +143,10 @@ export type AdminResult<T> = StoreResult<T>;
 export interface AdminPageOptions extends CallOptions {
   limit?: number;
   offset?: number;
+}
+
+export interface AdminListSynonymGroupsOptions extends AdminPageOptions {
+  locale?: string;
 }
 
 export interface AdminListCustomersOptions extends AdminPageOptions {
@@ -454,6 +464,21 @@ export interface AdminClient {
   getBrand(id: string, options?: CallOptions): Result<AdminBrand>;
   updateBrand(id: string, body: UpdateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
   deleteBrand(id: string, options?: CallOptions): Result<undefined>;
+  /** Search routes: `404` while `getConfig().search` is false. */
+  getSearchStatus(options?: CallOptions): Result<AdminSearchStatus>;
+  /** Records a full rebuild of every locale; job 14 runs it (`202`). */
+  requestSearchRebuild(options?: CallOptions): Result<AdminSearchRebuild>;
+  listSynonymGroups(options?: AdminListSynonymGroupsOptions): Result<AdminSynonymGroupList>;
+  createSynonymGroup(
+    body: CreateSynonymGroupBody,
+    options?: CallOptions,
+  ): Result<AdminSynonymGroup>;
+  updateSynonymGroup(
+    id: string,
+    body: UpdateSynonymGroupBody,
+    options?: CallOptions,
+  ): Result<AdminSynonymGroup>;
+  deleteSynonymGroup(id: string, options?: CallOptions): Result<undefined>;
 
   // categories
   createCategory(body: CreateAdminCategoryBody, options?: CallOptions): Result<AdminCategory>;
@@ -773,6 +798,14 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
     updateBrand: (id, body, opts) =>
       call("updateBrand", { pathParams: { id }, body, options: opts }),
     deleteBrand: (id, opts) => call("deleteBrand", { pathParams: { id }, options: opts }),
+    getSearchStatus: (opts) => call("getSearchStatus", { options: opts }),
+    requestSearchRebuild: (opts) => call("requestSearchRebuild", { options: opts }),
+    listSynonymGroups: (opts) => call("listSynonymGroups", { options: opts }),
+    createSynonymGroup: (body, opts) => call("createSynonymGroup", { body, options: opts }),
+    updateSynonymGroup: (id, body, opts) =>
+      call("updateSynonymGroup", { pathParams: { id }, body, options: opts }),
+    deleteSynonymGroup: (id, opts) =>
+      call("deleteSynonymGroup", { pathParams: { id }, options: opts }),
 
     createCategory: (body, opts) => call("createCategory", { body, options: opts }),
     listCategories: (opts) => call("listCategories", { options: opts }),
