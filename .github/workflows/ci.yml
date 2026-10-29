@@ -95,6 +95,7 @@ jobs:
             providers-email-resend,
             providers-payment-fake,
             providers-payment-none,
+            providers-payment-monobank,
           ]
     services:
       postgres:
