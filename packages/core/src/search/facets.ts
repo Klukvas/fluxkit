@@ -149,17 +149,21 @@ export interface PlannedQuery {
 
 export interface SearchQueryPlan {
   readonly queries: readonly PlannedQuery[];
+  /** The query whose `facetStats.price` is the price range: its own query only when a price is selected. */
+  readonly priceRangeFrom: "price_range" | "variant_facets";
   /** Selected product-level facets beyond the cap: their counts come from the `hits` query (conjunctive). */
   readonly countsFromMainQuery: readonly string[];
 }
 
 /**
- * The engine queries of one search page (ADR 0034 decision 4), to be sent next to the text queries in one multi-search.
+ * The engine queries of one search page (ADR 0034 decision 4). The API sends them in one multi-search when there is at
+ * most one text query, else each as a federation of the text queries (ADR 0036).
  *
  * - `hits`: the page, grouped by product, with the counts of the product-level facets.
  * - `variant_facets`: the values of the variant-level facets, WITHOUT distinct (with distinct they lose values) and
  *   without hits, which is the cheap path.
- * - `price_range`: min and max price (`facetStats`), ignoring the price selection itself.
+ * - `price_range`: min and max price (`facetStats`), ignoring the price selection itself. Without a price selection its
+ *   filter is the `variant_facets` one, so the price field is counted there instead (one engine query fewer).
  * - `disjunctive`: for each selected facet the counts without its own filter, so its other values stay visible.
  *   Product-level ones use distinct with `page`/`hitsPerPage` 0: with distinct the engine counts products exactly only on
  *   the exhaustive path, `limit` 0 would count variants (spike S1, E3). At most three, the rest is reported in
@@ -174,6 +178,7 @@ export function planSearchQueries(input: {
   const { selection, specs } = input;
   const productFields = specs.filter((spec) => spec.level === "product").map((spec) => spec.field);
   const variantFields = specs.filter((spec) => spec.level === "variant").map((spec) => spec.field);
+  const priceSelected = selection.price !== undefined;
   const queries: PlannedQuery[] = [
     {
       purpose: "hits",
@@ -187,16 +192,18 @@ export function planSearchQueries(input: {
       distinct: false,
       pagination: { kind: "limit", limit: 0 },
       filter: buildSearchFilter(selection),
-      facets: variantFields,
+      facets: priceSelected ? variantFields : [...variantFields, SEARCH_FIELDS.price],
     },
-    {
+  ];
+  if (priceSelected) {
+    queries.push({
       purpose: "price_range",
       distinct: false,
       pagination: { kind: "limit", limit: 0 },
       filter: buildSearchFilter(selection, { omit: "price" }),
       facets: [SEARCH_FIELDS.price],
-    },
-  ];
+    });
+  }
   const countsFromMainQuery: string[] = [];
   let distinctQueries = 0;
   for (const key of selectedGroupKeys(selection)) {
@@ -231,5 +238,9 @@ export function planSearchQueries(input: {
       countsFromMainQuery.push(key);
     }
   }
-  return { queries, countsFromMainQuery };
+  return {
+    queries,
+    priceRangeFrom: priceSelected ? "price_range" : "variant_facets",
+    countsFromMainQuery,
+  };
 }

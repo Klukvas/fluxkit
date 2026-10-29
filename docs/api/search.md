@@ -12,7 +12,7 @@ Source of truth for shapes: `docs/api/openapi.json`. Facet keys, sort names and 
 
 | Endpoint | Auth | Purpose | Request | Response | Errors | Flag |
 |---|---|---|---|---|---|---|
-| `GET /store/search` | public; window `search` (120 per minute per client address) | Products for a text query (empty `q` browses), with facets, price range, sort and pages | query `q`, `locale`, `f` (repeated), `price`, `sort`, `page`, `limit` (below) | 200 `{items, total, page, pageCount, limit, sort, relaxed, query: {normalized}, facets, price}` (below); `Cache-Control: public, max-age=30` | 400, 404 (off), 429, 500 (engine refused the search, see Errors), 503 | `SEARCH_ENABLED` |
+| `GET /store/search` | public; window `search` (60 per minute per client address; ADR 0036) | Products for a text query (empty `q` browses), with facets, price range, sort and pages | query `q`, `locale`, `f` (repeated), `price`, `sort`, `page`, `limit` (below) | 200 `{items, total, page, pageCount, limit, sort, relaxed, query: {normalized}, facets, price}` (below); `Cache-Control: public, max-age=30` | 400, 404 (off), 429, 500 (engine refused the search, see Errors), 503 | `SEARCH_ENABLED` |
 | `GET /store/search/suggest` | public; window `searchSuggest` (120 per minute per client address) | At most 6 products for text typed so far | query `q` (required, 2 characters or more after normalization), `locale` | 200 `{items: [{slug, title}]}`, best first, titles from Postgres in the locale; `Cache-Control: no-store` | 400 (`too_short` and the `q` codes below), 404 (off), 429, 503 | `SEARCH_ENABLED` |
 
 ### `GET /store/search` parameters

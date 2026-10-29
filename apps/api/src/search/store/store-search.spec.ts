@@ -15,6 +15,7 @@ import { ensureMigrated } from "../../test/migrate.js";
 import { indexSettings, updateIndexSettingsAsMaster } from "../../test/search-engine.js";
 import { SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { StockWorld } from "../../test/stock-world.js";
+import { SearchEngine } from "../engine/index.js";
 import { SearchIndexer } from "../indexer/index.js";
 
 interface Item {
@@ -403,6 +404,56 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     ]);
     expect(marked.rows).toEqual([{ reason: "stale_hit" }]);
     await syncIndex();
+  });
+
+  it("costs one engine request per pass when the text is one query, and a measured number otherwise (review F3)", async () => {
+    const searches = vi.spyOn(SearchEngine.prototype, "multiSearch");
+    const settingsReads = vi.spyOn(SearchEngine.prototype, "filterableAttributes");
+    const heavy = [
+      `f=brand:${brandA}`,
+      "f=inStock:true",
+      `f=opt.${fx.size.code}:m`,
+      `f=opt.${fx.color.code}:red`,
+      `f=opt.${fx.finish.code}:matte`,
+      `f=opt.${fx.extra.code}:x1`,
+      `f=${encodeURIComponent(`attr.weight_${fx.runId}:1..2`)}`,
+      "price=..5000",
+    ].join("&");
+    const costOf = async (path: string): Promise<number> => {
+      searches.mockClear();
+      const result = await get(path);
+      expect(result.status, `${path}: ${JSON.stringify(result.body)}`).toBe(200);
+      return searches.mock.calls.length;
+    };
+    try {
+      const measured = {
+        browse: await costOf("/store/search"),
+        browseHeavy: await costOf(`/store/search?${heavy}`),
+        // English words whose stems are the words themselves: one text query.
+        oneTextQuery: await costOf("/store/search?q=shirt&locale=en"),
+        oneTextQueryHeavyRelaxed: await costOf(`/store/search?q=shirt%20qqqq&locale=en&${heavy}`),
+        // Ukrainian: the words, their stems and their prefixes are three text queries, merged by one federation per
+        // planned query; the engine carries one federation per request (plan, review fixes F3).
+        threeTextQueries: await costOf(`/store/search?q=${encodeURIComponent("сорочку")}`),
+        threeTextQueriesHeavyRelaxed: await costOf(
+          `/store/search?q=${encodeURIComponent("сорочку неіснуючеслово")}&${heavy}`,
+        ),
+      };
+      expect(measured).toEqual({
+        browse: 1,
+        browseHeavy: 1,
+        oneTextQuery: 1,
+        oneTextQueryHeavyRelaxed: 2,
+        threeTextQueries: 2,
+        // hits, variant facets, price range and 7 disjunctive queries (the price group has none), twice (relaxed).
+        threeTextQueriesHeavyRelaxed: 20,
+      });
+      // The live filterable fields are read at most once per 30 s and index.
+      expect(settingsReads.mock.calls.length).toBeLessThanOrEqual(1);
+    } finally {
+      searches.mockRestore();
+      settingsReads.mockRestore();
+    }
   });
 
   it("keeps answering while a definition change waits for job 13, and offers the new facets once applied (review F1)", async () => {

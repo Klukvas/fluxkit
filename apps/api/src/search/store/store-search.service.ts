@@ -151,8 +151,8 @@ export class StoreSearchService {
       );
     }
     const facets = await this.facets(results, specs, selection, definitions, locale);
-    const priceStats = results.find((entry) => entry.planned.purpose === "price_range")?.result
-      .facetStats?.["price"];
+    const priceStats = results.find((entry) => entry.planned.purpose === plan.priceRangeFrom)
+      ?.result.facetStats?.["price"];
     return {
       items: hydrated.items,
       total: main.totalHits ?? 0,
@@ -222,7 +222,12 @@ export class StoreSearchService {
     return this.cached;
   }
 
-  /** Every planned query as a federation of the text queries, in parallel, each within the search timeout. */
+  /**
+   * One pass of the planned queries (ADR 0036). With at most one text query (browsing, or words whose stems and
+   * prefixes read like the words) every planned query goes in ONE non-federated `POST /multi-search`. With several text
+   * queries each planned query is a federation of them (the federation merges their matches, so counts and pages are
+   * exact for the union), and the engine carries one federation per request: one request per planned query, in parallel.
+   */
   private async run(
     uid: string,
     textQueries: readonly TextQuery[],
@@ -231,9 +236,43 @@ export class StoreSearchService {
     strategy: Strategy,
     text: NormalizedSearchQuery,
   ): Promise<{ planned: PlannedQuery; result: EngineSearchResult }[]> {
-    const texts: readonly TextQuery[] =
-      textQueries.length > 0 ? textQueries : [{ role: "original", q: "" }];
     const rules = engineSort(sort);
+    const [single, ...others] = textQueries;
+    if (others.length === 0) {
+      const textQuery: TextQuery = single ?? { role: "original", q: "" };
+      const queries = planned.map((entry) => ({
+        indexUid: uid,
+        q: textQuery.q,
+        ...(textQuery.attributesToSearchOn === undefined
+          ? {}
+          : { attributesToSearchOn: [...textQuery.attributesToSearchOn] }),
+        ...(entry.filter === null ? {} : { filter: entry.filter }),
+        ...(entry.purpose === "hits" && rules !== undefined ? { sort: rules } : {}),
+        ...(entry.distinct ? { distinct: "productId" } : {}),
+        ...(entry.pagination.kind === "page"
+          ? { page: entry.pagination.page, hitsPerPage: entry.pagination.hitsPerPage }
+          : { limit: 0 }),
+        ...(entry.facets.length > 0 ? { facets: [...entry.facets] } : {}),
+        matchingStrategy: strategy,
+        attributesToRetrieve: ["productId"],
+      }));
+      const results = await this.guard(
+        uid,
+        async () => {
+          const answer = await this.engine.multiSearch<{ results?: unknown }>(
+            { queries },
+            this.config.tuning.searchTimeoutMs,
+          );
+          if (!Array.isArray(answer.results) || answer.results.length !== planned.length) {
+            throw new SearchEngineError("engine_bad_response", { operation: "search" });
+          }
+          return answer.results as EngineSearchResult[];
+        },
+        text,
+      );
+      return planned.map((entry, index) => ({ planned: entry, result: results[index] ?? {} }));
+    }
+    const texts = textQueries;
     return Promise.all(
       planned.map(async (entry) => {
         const body = {

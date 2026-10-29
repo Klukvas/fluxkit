@@ -31,7 +31,7 @@ describe("RATE_LIMITS (internal defaults of ADR 0016 and the cart plan)", () => 
       dataExport: { maxAttempts: 5, windowMinutes: 1440 },
       privacyExport: { maxAttempts: 30, windowMinutes: 60 },
       accountDelete: { maxAttempts: 5, windowMinutes: 60 },
-      search: { maxAttempts: 120, windowMinutes: 1 },
+      search: { maxAttempts: 60, windowMinutes: 1 },
       searchSuggest: { maxAttempts: 120, windowMinutes: 1 },
     });
     expect([...RATE_LIMIT_NAMES].sort()).toEqual(Object.keys(RATE_LIMITS).sort());
