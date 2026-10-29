@@ -85,6 +85,7 @@ describe("route table", () => {
       orderDetail: "orders.read",
       customers: "customers.read",
       customerDetail: "customers.read",
+      payments: "orders.read",
       shipping: "shipping.manage",
       shippingMethodNew: "shipping.manage",
       shippingMethodDetail: "shipping.manage",
@@ -144,8 +145,10 @@ describe("lazy pages and their message files", () => {
     expect(declared.attributes).toEqual(["catalog-dictionaries"]);
     expect(declared.categoryDetail).toEqual(["catalog-dictionaries"]);
     expect(declared.account).toEqual([]);
-    expect(declared.orders).toEqual(["orders"]);
-    expect(declared.orderDetail).toEqual(["orders"]);
+    // The order detail carries the payment panel (payments plan step 10), so both order screens load its messages too.
+    expect(declared.orders).toEqual(["orders", "payments"]);
+    expect(declared.orderDetail).toEqual(["orders", "payments"]);
+    expect(declared.payments).toEqual(["orders", "payments"]);
     expect(declared.customers).toEqual(["customers"]);
     expect(declared.customerDetail).toEqual(["customers"]);
     expect(declared.users).toEqual(["users"]);

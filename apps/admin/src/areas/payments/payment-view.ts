@@ -17,7 +17,7 @@ import type { HistoryActor } from "../orders/order-view";
  * How the order detail and the attention list present and gate the payments of an order (payments plan step 10; ADR 0032
  * decisions 11 and 18, `docs/api/payments.md`, "Admin routes"). Pure. The offered actions are HINTS: the API decides under
  * its row locks and its refusal is shown. Each action needs the permission of its own operation (read from
- * `ADMIN_OPERATIONS`, never from a role name), so a session without `payments.refund` is offered no refund and no clear.
+ * `ADMIN_OPERATIONS`, never from a role name), so a session without the refund permission is offered no refund and no clear.
  */
 
 export const PAYMENT_STATUS_LIST = [
@@ -43,7 +43,7 @@ export const PAYMENT_STATUS_TONES: Record<PaymentAttemptStatus, StatusTone> = {
 };
 
 export function paymentStatusLabelKey(status: PaymentAttemptStatus): string {
-  return `payments.status.${status}`;
+  return `payment.status.${status}`;
 }
 
 export const REFUND_STATUS_LIST = [
@@ -63,7 +63,7 @@ export const REFUND_STATUS_TONES: Record<PaymentRefundStatus, StatusTone> = {
 };
 
 export function refundStatusLabelKey(status: PaymentRefundStatus): string {
-  return `payments.refundStatus.${status}`;
+  return `payment.refundStatus.${status}`;
 }
 
 export const REFUND_REASON_LIST = [
@@ -124,9 +124,9 @@ export const PAYMENT_ACTION_OPERATIONS = {
 
 /**
  * The actions to offer for one payment, in display order:
- * - refund: only a `succeeded` attempt with something left to refund, and only with `payments.refund`;
+ * - refund: only a `succeeded` attempt with something left to refund, and only with the refund permission;
  * - resync ("check status"): an attempt the provider knows (it has a provider id), with `orders.write`;
- * - clear attention: only while the item is open, with `payments.refund`.
+ * - clear attention: only while the item is open, with the refund permission.
  */
 export function offeredPaymentActions(
   payment: Pick<

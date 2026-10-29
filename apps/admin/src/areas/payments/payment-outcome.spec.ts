@@ -26,7 +26,7 @@ describe("the refusals of the payment routes", () => {
     for (const rule of PAYMENT_RULE_VIOLATIONS) {
       expect(PAYMENT_REFUSAL_RULES as readonly string[], rule).toContain(rule);
       expect(describePaymentProblem(409, problem({ rule }), null)).toEqual({
-        key: `payments.refusal.${rule}`,
+        key: `payment.refusal.${rule}`,
       });
     }
   });
@@ -34,36 +34,36 @@ describe("the refusals of the payment routes", () => {
   it("explains an over-refund, a payment that cannot be refunded and a provider that cannot do partial refunds", () => {
     expect(
       describePaymentProblem(409, problem({ rule: "refund_exceeds_remaining" }), null).key,
-    ).toBe("payments.refusal.refund_exceeds_remaining");
+    ).toBe("payment.refusal.refund_exceeds_remaining");
     expect(describePaymentProblem(409, problem({ rule: "refund_not_allowed" }), null).key).toBe(
-      "payments.refusal.refund_not_allowed",
+      "payment.refusal.refund_not_allowed",
     );
     expect(
       describePaymentProblem(409, problem({ rule: "partial_refund_not_supported" }), null).key,
-    ).toBe("payments.refusal.partial_refund_not_supported");
+    ).toBe("payment.refusal.partial_refund_not_supported");
   });
 
   it("says a payment_in_progress refusal in the payments words", () => {
     expect(describePaymentProblem(409, problem({ rule: "payment_in_progress" }), null).key).toBe(
-      "payments.refusal.payment_in_progress",
+      "payment.refusal.payment_in_progress",
     );
   });
 
   it("explains a repeated key with another request", () => {
     expect(describePaymentProblem(409, problem({ code: "idempotency_key_reused" }), null)).toEqual({
-      key: "payments.refusal.keyReused",
+      key: "payment.refusal.keyReused",
     });
   });
 
   it("says a 503 from the provider, with the wait only when Retry-After is a plausible number of seconds", () => {
     const unavailable = problem({ status: 503, code: "payment_provider_unavailable" });
-    expect(describePaymentProblem(503, unavailable, null)).toEqual({ key: "payments.unavailable" });
+    expect(describePaymentProblem(503, unavailable, null)).toEqual({ key: "payment.unavailable" });
     expect(describePaymentProblem(503, unavailable, "30")).toEqual({
-      key: "payments.unavailableRetry",
+      key: "payment.unavailableRetry",
       values: { seconds: 30 },
     });
     expect(describePaymentProblem(503, unavailable, "soon")).toEqual({
-      key: "payments.unavailable",
+      key: "payment.unavailable",
     });
     expect(waitSeconds("0")).toBeNull();
     expect(waitSeconds("99999")).toBeNull();
@@ -100,7 +100,7 @@ describe("a 400 on the refund body", () => {
         ],
       }),
     );
-    expect(found.amount).toEqual({ key: "payments.field.invalid_amount" });
+    expect(found.amount).toEqual({ key: "payment.fieldError.invalid_amount" });
     expect(found.note).toEqual({ key: "errors.reason.too_long" });
     expect(found.other).toEqual([{ key: "errors.reason.unknown_field" }]);
   });
@@ -113,7 +113,7 @@ describe("a 400 on the refund body", () => {
         errors: [{ path: "amount", code: "currency_mismatch" }],
       }),
     );
-    expect(found.amount).toEqual({ key: "payments.field.currency_mismatch" });
+    expect(found.amount).toEqual({ key: "payment.fieldError.currency_mismatch" });
   });
 });
 

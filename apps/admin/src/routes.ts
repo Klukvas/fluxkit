@@ -273,6 +273,15 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "payments",
+    "listPayments",
+    "page.payments.title",
+    areaPage(
+      () => import("./areas/payments"),
+      (module) => module.PaymentsPage,
+    ),
+  ),
+  route(
     "shipping",
     "listShippingMethods",
     "page.shipping.title",

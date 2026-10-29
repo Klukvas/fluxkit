@@ -49,13 +49,13 @@ export function describePaymentProblem(
   if (problem.code === "payment_provider_unavailable") {
     const seconds = waitSeconds(retryAfter);
     return seconds === null
-      ? { key: "payments.unavailable" }
-      : { key: "payments.unavailableRetry", values: { seconds } };
+      ? { key: "payment.unavailable" }
+      : { key: "payment.unavailableRetry", values: { seconds } };
   }
-  if (problem.code === "idempotency_key_reused") return { key: "payments.refusal.keyReused" };
+  if (problem.code === "idempotency_key_reused") return { key: "payment.refusal.keyReused" };
   const rule = problem.code === "rule_violation" ? problem.rule : undefined;
   if (rule !== undefined && (PAYMENT_REFUSAL_RULES as readonly string[]).includes(rule)) {
-    return { key: `payments.refusal.${rule}` };
+    return { key: `payment.refusal.${rule}` };
   }
   return describeProblem(status, problem);
 }
@@ -65,7 +65,7 @@ const REFUND_FIELD_CODES = ["invalid_amount", "currency_mismatch"] as const;
 
 export function describeRefundFieldCode(code: string): MessageDescriptor {
   return (REFUND_FIELD_CODES as readonly string[]).includes(code)
-    ? { key: `payments.field.${code}` }
+    ? { key: `payment.fieldError.${code}` }
     : describeFieldError(code);
 }
 
