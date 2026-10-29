@@ -16,6 +16,7 @@ export {
   type AdminClient,
   type AdminClientOptions,
   type AdminListCategoriesOptions,
+  type AdminListAuditEventsOptions,
   type AdminListCustomersOptions,
   type AdminListEmailMessagesOptions,
   type AdminListOrdersOptions,

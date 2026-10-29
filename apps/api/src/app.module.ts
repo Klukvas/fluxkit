@@ -38,6 +38,7 @@ import { OrdersModule } from "./orders/orders.module.js";
 import { PaymentRegistryModule, type LoadedPaymentProvider } from "./payments/registry/index.js";
 import { DEFAULT_PAYMENTS_CONFIG, type PaymentsConfig } from "./payments/payments-config.js";
 import { PaymentsModule } from "./payments/payments.module.js";
+import { AdminAuditModule } from "./privacy/audit/admin-audit.module.js";
 import { RateLimitModule } from "./rate-limit/rate-limit.module.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { ShippingAdminModule } from "./shipping/admin/shipping-admin.module.js";
@@ -116,6 +117,7 @@ export class AppModule {
           cleanExpiredSessionsOnBootstrap: options.cleanExpiredSessionsOnBootstrap,
         }),
         RateLimitModule.register(options.rateLimits),
+        AdminAuditModule,
         CustomerAuthModule.register({
           config: options.customerAuth ?? DEFAULT_CUSTOMER_AUTH_CONFIG,
         }),

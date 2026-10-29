@@ -21,6 +21,9 @@ import type {
   AdminEmailMessageDetail,
   AdminEmailMessageId,
   AdminEmailMessageList,
+  AdminAuditAction,
+  AdminAuditEventList,
+  AdminAuditTargetKind,
   AdminEmailMessageStatus,
   AdminEmailPreview,
   AdminEmailStatus,
@@ -158,6 +161,17 @@ export interface AdminListCategoriesOptions extends AdminPageOptions {
 
 export interface AdminListReservationsOptions extends AdminPageOptions {
   status?: ReservationStatus;
+}
+
+export interface AdminListAuditEventsOptions extends AdminPageOptions {
+  action?: AdminAuditAction;
+  adminUserId?: string;
+  targetKind?: AdminAuditTargetKind;
+  targetId?: string;
+  /** ISO 8601 instant, inclusive. */
+  from?: string;
+  /** ISO 8601 instant, exclusive. */
+  to?: string;
 }
 
 export interface AdminListEmailMessagesOptions extends AdminPageOptions {
@@ -367,6 +381,9 @@ export interface AdminClient {
   ): Result<AdminShippingProviderSettings>;
   /** A failed check is still a `200` with `{ok: false, reason, providerCodes}`. */
   checkShippingProvider(code: string, options?: CallOptions): Result<AdminShippingProviderCheck>;
+
+  // audit log (ADR 0033 decision 9; `users.manage`, owner only)
+  listAuditEvents(options?: AdminListAuditEventsOptions): Result<AdminAuditEventList>;
 
   // email (ADR 0031 decision 15; every operation needs `email.manage`)
   getEmailStatus(options?: CallOptions): Result<AdminEmailStatus>;
@@ -675,6 +692,8 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("putShippingProviderSettings", { pathParams: { code }, body, options: opts }),
     checkShippingProvider: (code, opts) =>
       call("checkShippingProvider", { pathParams: { code }, options: opts }),
+
+    listAuditEvents: (opts) => call("listAuditEvents", { options: opts }),
 
     getEmailStatus: (opts) => call("getEmailStatus", { options: opts }),
     sendTestEmail: (body, opts) => call("sendTestEmail", { body, options: opts }),

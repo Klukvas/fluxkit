@@ -55,6 +55,9 @@ const USERS_ROUTES = [
   "POST /admin/users/:id/reset-password",
 ];
 
+/** The admin audit log (ADR 0033 decision 9): read only, owner only, declared once on the controller. */
+const AUDIT_ROUTES = ["GET /admin/audit-events"];
+
 /** Customer management: declared once on the controller with its own default pair (`customers.read`, `customers.write`). */
 const CUSTOMERS_ROUTES = [
   "GET /admin/customers",
@@ -122,6 +125,7 @@ const RESERVATIONS_ROUTE = "GET /admin/products/:id/variants/:variantId/inventor
 function expectedPermission(method: string, pattern: string): AdminPermission {
   if (`${method} ${pattern}` === RESERVATIONS_ROUTE) return "orders.read";
   if (USERS_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
+  if (AUDIT_ROUTES.includes(`${method} ${pattern}`)) return "users.manage";
   if (PAYMENTS_ROUTES.includes(`${method} ${pattern}`)) {
     return method === "GET" ? "orders.read" : "payments.refund";
   }
