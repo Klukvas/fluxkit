@@ -3,6 +3,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Add the remaining privacy documents (privacy plan step 11; docs and one spec only, no API, schema, configuration or dependency change): `docs/privacy/data-inventory.md` (generated from the inventory registry; `data-inventory-doc.spec.ts` fails when it is stale), `ropa-template.md`, `processors.md`, `breach-procedure.md`, the Nova Post record in `docs/dependencies.md` and the proxy-log and backup notes in `README.md`. Legal fields are `TODO(fluxkit): legal review`.
 - Fix the keys of the storefront's selected-filter chips (search UI review F6; no API change): keyed by facet key and value (`SelectedFilter.key`), so two facets with the same title and value label no longer share a React key.
 - Fix the storefront's range filters (search UI review F4; no API change): a range box refuses a number the API cannot read (one JavaScript prints with an exponent, such as `0.0000001`, or above 10^15) and names the box, and an address whose range the API refuses (`invalid_range`) says "This range cannot be used" instead of "These filters are not available" (new messages `search.invalidRange.*` in uk and en; `searchForm.error.range` now names the rule).
 - Fix the storefront results page without a script (search UI review F3; no API change): a filter form submit whose price or range box is refused (too many fraction digits, a reversed range) now shows the page of the rest of the address with the form's "Check the filters" message instead of a 404 page; a malformed shared parameter is still a 404.
