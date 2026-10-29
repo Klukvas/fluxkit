@@ -4,6 +4,7 @@ import type { StoreApi } from "../support/api.ts";
 import { E2E_ORIGIN } from "../support/env.ts";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
 import { orderNumberOnPage, tabTo, tokenOf, waitForHydration } from "../support/flows.ts";
+import { PROVIDER_HOST, captureCreate, stubProviderPages } from "../support/payment-pages.ts";
 
 /**
  * Online payment in the storefront (payments plan step 9). The API of this suite runs with the test-only `fake` payment
@@ -21,22 +22,6 @@ import { orderNumberOnPage, tabTo, tokenOf, waitForHydration } from "../support/
  *
  * The API's own behaviour for paid/failed is covered by the API's integration tests, not here.
  */
-
-const PROVIDER_HOST = "https://pay.fake.invalid";
-
-/** Answers the provider's host with a stub page, so the redirect has somewhere to land and nothing leaves the machine. */
-async function stubProviderPages(page: Page): Promise<string[]> {
-  const visited: string[] = [];
-  await page.route(`${PROVIDER_HOST}/**`, async (route) => {
-    visited.push(route.request().url());
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Stub provider</title><h1>Stub provider page</h1>",
-    });
-  });
-  return visited;
-}
 
 interface PlacedGuestOrder {
   number: string;
@@ -68,33 +53,6 @@ async function openGuestOrder(page: Page, order: PlacedGuestOrder): Promise<void
     page.getByRole("heading", { level: 1, name: `Order ${order.number}` }),
   ).toBeVisible();
   await waitForHydration(page);
-}
-
-interface CreatedAnswer {
-  paymentId: string;
-  status: string;
-  redirectUrl: string;
-}
-
-/**
- * Lets the create call through to the REAL API and keeps its answer. The browser leaves for the provider's page as soon as
- * the answer arrives, and a response body that is read after that navigation is gone, so the test reads it here.
- */
-async function captureCreate(page: Page, pathEnd: string): Promise<() => Promise<CreatedAnswer>> {
-  let answer: ((value: CreatedAnswer) => void) | null = null;
-  const captured = new Promise<CreatedAnswer>((resolve) => {
-    answer = resolve;
-  });
-  await page.route(`**${pathEnd}`, async (route) => {
-    if (route.request().method() !== "POST") {
-      await route.fallback();
-      return;
-    }
-    const response = await route.fetch();
-    answer?.((await response.json()) as CreatedAnswer);
-    await route.fulfill({ response });
-  });
-  return () => captured;
 }
 
 const paymentSection = (page: Page) => page.getByRole("region", { name: "Payment", exact: true });
