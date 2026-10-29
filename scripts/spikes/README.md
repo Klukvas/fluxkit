@@ -120,6 +120,61 @@ unset RESEND_API_KEY RESEND_SPIKE_FROM RESEND_SPIKE_TO RESEND_SPIKE_REPLY_TO
 
 `--self-test` starts a local stub of Resend on `127.0.0.1` (it echoes the key and the recipient in its texts on purpose) and runs: refusal without a key, without a recipient, without `--confirm` (plan printed, no request), with a malformed sender, an unknown flag (no request in each), `keyless` (three requests, the key never sent, R8a and R9 confirmed), and `send` end to end (exactly one mail accepted by the stub, the replay and the changed body answered as R4 says, the body's members and the `User-Agent` pinned, R1 to R9 as expected, R3 `MANUAL`). After each run it asserts that no key, key fragment, address or name appears in the terminal output or the findings file.
 
+## `monobank-verify.mjs` (payments plan check S1, ADR 0032 decision 15)
+
+Checks the documented Monobank acquiring facts that `packages/providers/monobank` codes against (plan `docs/plans/2026-10-26-payments-monobank.md`, section "Monobank acquiring facts", M1 to M25) with the owner's TEST token. Plain Node 22 ESM, built-in `fetch`, no dependencies. The origin `https://api.monobank.ua` is a constant; redirects are refused. **Not run against Monobank yet** (built 2026-10-29 without a token; only its self-test has run).
+
+| Stage | Needs | What it calls | Changes at Monobank |
+|---|---|---|---|
+| `readonly` (default) | `MONOBANK_TOKEN` | `GET /api/merchant/pubkey` (key type and curve, M12), `GET /api/merchant/details` (member names only, M22), the status of an invented invoice id (`404` shape, M16) and without an id (`400` shape), `pubkey` with an invented token (`403` shape, M1) | none |
+| `invoice` | the token, `--confirm` | `readonly` first, then: a 1.00 UAH test invoice shaped like the plugin's (M3, M4, M23) and its status (M6); the same `reference` again (M5); `validity` 10 s (M19); `ccy` 840 (M18); a refund of the unpaid invoice (M13, `CANCEL_NOT_AVAILABLE`); `remove` of every created invoice, its status after and a second `remove` (M14) | up to four unpaid test invoices, all removed in the same run (a `finally` removes them even after a failure) |
+| `pay` | the token, `--confirm`; `MONOBANK_SPIKE_WEBHOOK_URL` optional (`https`) | `readonly` first, then ONE 2.00 UAH test invoice (with `webHookUrl` when set); prints its payment page for the owner to pay with a Luhn-valid TEST card; polls the status every 5 s for at most 10 minutes; once paid: refund 0.50 UAH with `extRef` A, the same `extRef` and amount again (M13 dedupe), 0.50 UAH with `extRef` B (several partial refunds), the rest with `extRef` C and an explicit amount (full refund; `reversed`?), the status after each; `remove` of the paid invoice (M14) | one test payment (no real money with a test token, M2), refunded |
+| `webhook` | the token, `MONOBANK_SPIKE_WEBHOOK_BODY_FILE`, `MONOBANK_SPIKE_WEBHOOK_SIGN` | `GET /api/merchant/pubkey`, then verifies the saved live webhook body (byte for byte) and its `X-Sign` with that key, and that a changed byte fails (M12 live) | none |
+
+Without `--confirm` the `invoice` and `pay` stages print their plan and exit 2 before any call; a missing token, a non-`https` webhook URL or missing webhook inputs also exit 2 with nothing sent.
+
+### How the owner runs it (S1, with the owner's go)
+
+Prerequisites (`packages/providers/monobank/README.md`, "Plan S1"): a monobank account; a TEST token from https://api.monobank.ua/; for `pay` a public `https` staging URL that reaches a running API's webhook route (or any `https` endpoint that logs raw POST bodies and headers); about 20 minutes.
+
+```bash
+# 0. Self-test (local stub on 127.0.0.1, no network): gating and redaction.
+node scripts/spikes/monobank-verify.mjs --self-test
+
+# 1. The token from a hidden prompt (never as a flag, never in a file in the repository, never in chat).
+read -rs MONOBANK_TOKEN && export MONOBANK_TOKEN
+
+# 2. Read-only, then the plans of the writing stages (each exits 2 without --confirm), then the writing stages.
+node scripts/spikes/monobank-verify.mjs --out monobank-findings-readonly.json
+node scripts/spikes/monobank-verify.mjs --stage invoice
+node scripts/spikes/monobank-verify.mjs --stage invoice --confirm --out monobank-findings-invoice.json
+read -r MONOBANK_SPIKE_WEBHOOK_URL && export MONOBANK_SPIKE_WEBHOOK_URL   # https://<staging>/webhooks/payments/monobank
+node scripts/spikes/monobank-verify.mjs --stage pay
+node scripts/spikes/monobank-verify.mjs --stage pay --confirm --out monobank-findings-pay.json
+#    Open the printed page, pay with a Luhn-valid test card (for example 4242 4242 4242 4242, any future date, any CVV).
+
+# 3. From the staging log: save one webhook's raw body byte for byte and its X-Sign header, then verify it live.
+export MONOBANK_SPIKE_WEBHOOK_BODY_FILE=/path/outside/the/repository/webhook-body.json
+read -r MONOBANK_SPIKE_WEBHOOK_SIGN && export MONOBANK_SPIKE_WEBHOOK_SIGN
+node scripts/spikes/monobank-verify.mjs --stage webhook --out monobank-findings-webhook.json
+
+unset MONOBANK_TOKEN MONOBANK_SPIKE_WEBHOOK_URL MONOBANK_SPIKE_WEBHOOK_BODY_FILE MONOBANK_SPIKE_WEBHOOK_SIGN
+```
+
+- Exit codes: `0` done; `1` a call failed in transport or a stage threw (findings still written); `2` usage error or refusal, nothing sent.
+- Behind an HTTPS proxy, Node's `fetch` may need `NODE_USE_ENV_PROXY=1` (Node 22.21 or later).
+- The staging log is where M8 (which statuses are posted, whether `created` is), M9 (retries) and M10 (order) are read: the tool cannot receive webhooks itself.
+
+### Reading the findings
+
+- The terminal ends with the M-numbers (`M13` split into `a` to `d`), each `CONFIRMED`, `DIFFERENT`, `PARTLY CONFIRMED` (M12 without a live webhook), `RECORDED` (a fact to write down: M2, M10, M13b to d, M14, M17 to M19), `MANUAL` (M8: read the staging log) or `NOT TESTED`. `DIFFERENT` and the recorded facts go into the plan and, where they differ from the plugin's assumptions (its README, "Unverified items"), change the plugin before production.
+- The findings JSON (`--out`, default `./monobank-findings.json`, mode 600, git-ignored by `monobank-findings*.json`) holds `hypotheses`, `facts` per stage and `calls`: per call the label, method, path, which token was sent (`token`, `invented`, `none`), the HTTP status, content type, latency, header names, rate-like headers (numeric values only), the answer's member names, the documented `errCode` (else `[undocumented]`) and the length of `errText`. Status answers are reduced to member names, the status word, amounts, the `modifiedDate` shape, `cancelList` statuses, amounts and our `extRef`s, and of `paymentInfo` the card system, the payment method and whether a mask is present; create answers to the id's shape and the page ORIGIN.
+- Never recorded: the token (scrubbed from every output with every 8-character fragment), `errText`, `failureReason`, `maskedPan`, `rrn`, `approvalCode`, `merchantName`, `merchantId`, `edrpou`, the payment page path (it is printed to the terminal once, for the owner to open). A card mask in any text is replaced by `[card]`.
+
+### Self-test
+
+`--self-test` starts a local stub of Monobank on `127.0.0.1` (its errors echo the token and a card mask on purpose; it "pays" the 2.00 UAH invoice on the second status read) and runs: refusal without a token, `invoice` and `pay` without `--confirm`, `pay` with an `http` webhook URL, an unknown flag (no request in each), `readonly` (five GET requests, the token only in `X-Token`, M1, M16, M22 confirmed), `invoice` (four creates, the body's members pinned, every invoice removed), `pay` (the page printed, `webHookUrl` sent, four refunds with the expected `extRef`s and amounts, `reversed` at the end) and `webhook` (a stub-signed body verifies, a changed byte does not). After each run it asserts that no token, token fragment, card number part, merchant name, `rrn` or `approvalCode` appears in the terminal output or the findings file.
+
 ## `nova-poshta-verify.mjs` (deprecated, legacy API 2.0)
 
 **Deprecated 2026-10-25 (ADR 0030).** It checks the legacy Nova Poshta JSON-RPC API (`https://api.novaposhta.ua/v2.0/json/`), which the plugin no longer targets; the owner's key belongs to the new API. Kept for history (its key-less findings are in the shipping plan, section "Spike 7a — key-less findings (legacy API 2.0, superseded)"); do not extend it. Its usage, unchanged:

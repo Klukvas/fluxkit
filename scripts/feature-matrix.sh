@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Feature and provider matrix (AGENTS.md section 18).
-# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none
+# Usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank
 #   on      build, start the API with FEATURES_ENABLED=example, expect /health and /example/ping
 #   off     build, start the API with no features, expect /health and 404 on /example/ping
 #   deleted remove packages/features/_example, reinstall, then lint, typecheck, boundaries and tests must pass (destructive: CI only)
@@ -9,10 +9,11 @@
 # and so no new public contract.
 #   providers-on      build, start the API with SHIPPING_PROVIDERS_ENABLED=fake, expect the log line to name fake
 #   providers-off     build, start the API with no providers, expect "none" and no mention of fake
-#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post and resend, reinstall, then lint,
-#                     typecheck, boundaries and tests must pass, and an API told to load fake or nova_post (shipping), or
-#                     started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with PAYMENT_PROVIDERS_ENABLED=fake, must
-#                     refuse to start, loudly (destructive: CI only)
+#   providers-deleted remove packages/providers/_fake, _fake-email, _fake-payment, nova-post, resend and monobank, reinstall,
+#                     then lint, typecheck, boundaries and tests must pass, and an API told to load fake or nova_post
+#                     (shipping), or started with EMAIL_PROVIDER=fake or EMAIL_PROVIDER=resend, or with
+#                     PAYMENT_PROVIDERS_ENABLED=fake or PAYMENT_PROVIDERS_ENABLED=monobank, must refuse to start, loudly
+#                     (destructive: CI only)
 #   providers-nova-post build; an API with SHIPPING_PROVIDERS_ENABLED=nova_post and no NOVA_POST_API_KEY must refuse to
 #                     start naming the variable; with an invented key it must start and report nova_post, never print the
 #                     key, and send nothing to Nova Post at startup (the JWT is fetched on first use): the API runs with a
@@ -33,10 +34,14 @@
 #   providers-payment-none start the API without PAYMENT_PROVIDERS_ENABLED, expect "none", onlinePayment false and no
 #                     mention of fake
 #   providers-payment-fake start the API with PAYMENT_PROVIDERS_ENABLED=fake, expect "fake" and onlinePayment true
-#                     (providers-payment-monobank arrives with the Monobank plugin, payments plan step 7)
+#   providers-payment-monobank build; an API with PAYMENT_PROVIDERS_ENABLED=monobank and no MONOBANK_TOKEN must refuse to
+#                     start naming the variable; with an invented token it must start, report monobank and onlinePayment
+#                     true, never print the token, and send nothing to Monobank at startup (the webhook key is fetched on
+#                     the first webhook): the API runs with a preloaded fetch wrapper that logs and refuses any request to
+#                     a *.monobank.ua host, and the log must show the wrapper active and no such request
 set -euo pipefail
 
-mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none}"
+mode="${1:?usage: scripts/feature-matrix.sh on|off|deleted|providers-on|providers-off|providers-deleted|providers-nova-post|providers-email-fake|providers-email-none|providers-email-resend|providers-payment-fake|providers-payment-none|providers-payment-monobank}"
 : "${DATABASE_URL:?DATABASE_URL must be set}"
 port="${MATRIX_PORT:-3999}"
 # The API refuses to start without it (ADR 0023); this one is throwaway and only lives in the process started below.
@@ -101,7 +106,7 @@ case "$mode" in
     ;;
   providers-deleted)
     [ "${CI:-}" = "true" ] || { echo "refusing to delete files outside CI (set CI=true on a throwaway copy)" >&2; exit 1; }
-    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend
+    rm -rf packages/providers/_fake packages/providers/_fake-email packages/providers/_fake-payment packages/providers/nova-post packages/providers/resend packages/providers/monobank
     pnpm install --no-frozen-lockfile
     pnpm lint
     pnpm typecheck
@@ -128,9 +133,9 @@ case "$mode" in
       grep -F "Email provider \"$code\" is enabled in EMAIL_PROVIDER" /tmp/fluxkit-matrix-api.log \
         || { echo "expected a loud startup error naming the missing email provider $code" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
     done
-    # And for the payment providers: an enabled one that is gone stops the startup (monobank joins when its plugin exists).
-    for code in fake; do
-      if PAYMENT_PROVIDERS_ENABLED="$code" PORT="$port" \
+    # And for the payment providers: an enabled one that is gone stops the startup.
+    for code in fake monobank; do
+      if PAYMENT_PROVIDERS_ENABLED="$code" MONOBANK_TOKEN=matrix-invented-monobank-token-0000000000 PORT="$port" \
         timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
         echo "the API started although the enabled payment provider $code is deleted" >&2
         exit 1
@@ -261,6 +266,50 @@ GUARD
     config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
     echo "store/config -> $config"
     echo "$config" | grep -q '"onlinePayment":true' || { echo "expected onlinePayment true with the payment provider loaded" >&2; exit 1; }
+    ;;
+  providers-payment-monobank)
+    pnpm build
+    # Without the token: a loud refusal that names the variable, before anything listens.
+    if env -u MONOBANK_TOKEN PAYMENT_PROVIDERS_ENABLED=monobank STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 PORT="$port" \
+      timeout 60 node apps/api/dist/main.js > /tmp/fluxkit-matrix-api.log 2>&1; then
+      echo "the API started with PAYMENT_PROVIDERS_ENABLED=monobank and no MONOBANK_TOKEN" >&2
+      exit 1
+    fi
+    grep -F "MONOBANK_TOKEN is required when monobank is in PAYMENT_PROVIDERS_ENABLED" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected a startup error naming MONOBANK_TOKEN" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    # With an invented token: it starts, reports monobank, never prints the token. No call is made at startup: a preloaded
+    # wrapper of fetch (the plugin's only way to the network) logs and refuses any request to a Monobank host.
+    guard_dir="$(mktemp -d)"
+    cat > "$guard_dir/no-monobank.mjs" <<'GUARD'
+const realFetch = globalThis.fetch;
+globalThis.fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  const host = new URL(url).hostname;
+  if (host === "monobank.ua" || host.endsWith(".monobank.ua")) {
+    console.log(`matrix-guard: refused a request to ${host}`);
+    return Promise.reject(new TypeError("matrix-guard: no Monobank request at startup"));
+  }
+  return realFetch(input, init);
+};
+console.log("matrix-guard: active");
+GUARD
+    invented_token="matrix-invented-monobank-$(date +%s)-0000000000"
+    MONOBANK_TOKEN="$invented_token" STOREFRONT_PUBLIC_URL=http://127.0.0.1:3001 \
+      MATRIX_NODE_IMPORT="$guard_dir/no-monobank.mjs" run_api "" "" "none" "monobank"
+    # Give anything started in the background at boot (the scheduler's first tick) a moment to run.
+    sleep 3
+    grep -F "Payment providers loaded: monobank" /tmp/fluxkit-matrix-api.log \
+      || { echo "expected the payment registry to report monobank" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    config="$(curl -fsS "http://127.0.0.1:${port}/store/config")"
+    echo "store/config -> $config"
+    echo "$config" | grep -q '"onlinePayment":true' || { echo "expected onlinePayment true with monobank loaded" >&2; exit 1; }
+    ! grep -qF "$invented_token" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API log contains the Monobank token" >&2; exit 1; }
+    grep -F "matrix-guard: active" /tmp/fluxkit-matrix-api.log \
+      || { echo "the fetch wrapper was not loaded into the API" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
+    ! grep -F "matrix-guard: refused" /tmp/fluxkit-matrix-api.log \
+      || { echo "the API sent a request to Monobank at startup" >&2; exit 1; }
+    rm -rf "$guard_dir"
     ;;
   *)
     echo "unknown mode: $mode" >&2
