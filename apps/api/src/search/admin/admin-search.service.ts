@@ -5,8 +5,9 @@ import {
   searchRebuildKey,
   SEARCH_DOCUMENT_VERSION,
 } from "@fluxkit/core";
-import { asc, count, eq, type SQL } from "drizzle-orm";
+import { and, arrayOverlaps, asc, count, eq, type SQL } from "drizzle-orm";
 import type { LocaleConfig } from "../../common/locale.js";
+import type { SearchSynonymSeeder, SeedSynonymOutcome } from "../../common/search-port.js";
 import { toPage, type Page } from "../../common/pagination.js";
 import type { PricingConfig } from "../../common/pricing-config.js";
 import { notFound, validationFailed } from "../../common/problem.js";
@@ -45,7 +46,7 @@ const iso = (value: Date | null): string | null => (value === null ? null : valu
  * request, and the synonym groups (applied by job 13 as an in-place settings update: no rebuild). Mounted only with
  * `SEARCH_ENABLED=true`. Codes only, never an engine message.
  */
-export class AdminSearchService {
+export class AdminSearchService implements SearchSynonymSeeder {
   private readonly states = new SearchIndexStateRepository();
 
   private readonly queue = new SearchQueueRepository();
@@ -176,6 +177,29 @@ export class AdminSearchService {
       throw new Error("An inserted synonym group was not returned.");
     }
     return toSynonymResponse(row);
+  }
+
+  /** The demo seed's groups (`SEARCH_SYNONYM_SEEDER`): created like `createSynonyms` unless one of the terms exists. */
+  async ensureGroup(locale: string, terms: readonly string[]): Promise<SeedSynonymOutcome> {
+    if (!this.locale.locales.includes(locale)) {
+      return "locale_not_served";
+    }
+    const normalized = this.terms(terms);
+    const [existing] = await this.database
+      .select({ id: searchSynonymGroup.id })
+      .from(searchSynonymGroup)
+      .where(
+        and(
+          eq(searchSynonymGroup.locale, locale),
+          arrayOverlaps(searchSynonymGroup.terms, normalized),
+        ),
+      )
+      .limit(1);
+    if (existing !== undefined) {
+      return "existing";
+    }
+    await this.createSynonyms({ locale, terms: normalized }, null);
+    return "created";
   }
 
   async updateSynonyms(id: string, body: UpdateSynonymGroupBody): Promise<SynonymGroupResponse> {
