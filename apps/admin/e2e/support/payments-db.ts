@@ -1,11 +1,11 @@
-// Payment rows for the admin e2e scenarios, written straight into the e2e database.
+// Payment rows for the admin e2e scenarios that need MANY or UNUSUAL attempts, written straight into the e2e database.
 //
-// Why not through the API: the suite's API runs with `PAYMENT_PROVIDERS_ENABLED=""` (no provider), and the only provider that
-// can pay without a bank is the in-process `fake` (`packages/providers/_fake-payment`), whose test hooks cannot cross the
-// process boundary to this browser suite (its README: an HTTP or file bridge arrives with plan step 11). A test-only route in
-// the production API is not an option, so the rows a paying shopper would have made are inserted here, in the database the
-// run owns and wipes. What the SCREENS and the admin ROUTES do with them (reads, refunds, clearing an attention item) is real.
-// Nothing here talks to a payment provider, and a provider is not loaded, so a refund is recorded but never delivered.
+// The payment flow itself is NOT seeded any more (payments plan step 11): `tests/payments.e2e.ts` settles payments through the
+// store API and the fake provider's signed webhook (`support/fake-provider.ts`). A row is inserted here only where a provider
+// would take many steps for little value: an attention item on an order that is paid another way (`duplicate_payment`) and 22
+// attention items for the keyset paging of the list. The rows are `fake` attempts that the fake provider does not hold, so a
+// refund or a status check on them would fail with `not_found`; the scenarios that use them only list, open and close them.
+// No test-only route exists in the API; this runs in the database the run owns and wipes.
 //
 // `pg` is the API's own dependency, resolved from `apps/api` (as `prepare-database.ts` does), so the admin package adds nothing.
 import { randomUUID } from "node:crypto";

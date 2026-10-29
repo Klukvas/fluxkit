@@ -15,6 +15,7 @@ import {
   FAKE_PAYMENT_SIGNATURE_HEADER,
   FakePaymentProvider,
   fakeWebhookInput,
+  parseAdoptWebhooks,
   providerModule,
   signFakeWebhook,
 } from "./index.js";
@@ -700,5 +701,109 @@ describe("FakePaymentProvider", () => {
     const copy = fake.invoice(id);
     (copy?.amount as { amount: number }).amount = 1;
     expect(fake.invoice(id)?.amount.amount).toBe(125_000);
+  });
+  describe("adopting verified webhooks (a second process, FAKE_PAYMENT_ADOPT_WEBHOOKS)", () => {
+    const LATER = "2026-10-29T10:00:00.000Z";
+    const money = (amount: number) => ({ amount, currency: "UAH" as const });
+
+    /** What the provider would POST for an invoice that the test process cannot reach (the API is another process). */
+    function signedBody(id: string, changes: Record<string, unknown>) {
+      const body = JSON.parse(new TextDecoder().decode(fake.webhookFor(id).rawBody)) as Record<
+        string,
+        unknown
+      >;
+      return fakeWebhookInput(JSON.stringify({ ...body, ...changes }));
+    }
+
+    const paid = { status: "success", finalAmount: 125_000, modifiedDate: LATER };
+
+    it("keeps its own state when the option is off (the default): a verified webhook is only read", async () => {
+      const id = await create();
+      expect((await fake.verifyWebhook(signedBody(id, paid), live())).ok).toBe(true);
+      expect(fake.invoice(id)?.status).toBe("created");
+    });
+
+    describe("with the option on", () => {
+      beforeEach(() => {
+        fake = new FakePaymentProvider({ adoptVerifiedWebhooks: true });
+      });
+
+      it("follows a signed success: getPayment then says success and refunds work in order, after the webhook's time", async () => {
+        const id = await create();
+        valueOf(await fake.verifyWebhook(signedBody(id, paid), live()));
+        expect(fake.invoice(id)).toMatchObject({
+          status: "succeeded",
+          finalAmount: money(125_000),
+        });
+        const read = valueOf(await fake.getPayment(id, live()));
+        expect(read.status).toBe("succeeded");
+        expect(read.modifiedAt.toISOString()).toBe(LATER);
+
+        valueOf(
+          await fake.refund(
+            { providerPaymentId: id, refundId: REFUND_ID, amount: money(25_000), full: false },
+            live(),
+          ),
+        );
+        const afterRefund = valueOf(await fake.getPayment(id, live()));
+        expect(afterRefund.finalAmount).toEqual(money(100_000));
+        expect(afterRefund.modifiedAt.getTime()).toBeGreaterThan(Date.parse(LATER));
+      });
+
+      it("ignores a webhook that is not about this invoice as the service knows it", async () => {
+        const id = await create();
+        for (const changes of [
+          { ...paid, amount: 1 }, // another amount than the invoice has
+          { ...paid, reference: OTHER_PAYMENT_ID },
+          { ...paid, invoiceId: "fake-pay-999999" },
+          { ...paid, modifiedDate: "2025-01-01T00:00:00.000Z" }, // older than the invoice
+        ]) {
+          expect((await fake.verifyWebhook(signedBody(id, changes), live())).ok).toBe(true);
+        }
+        expect(fake.invoice(id)?.status).toBe("created");
+        expect(fake.invoice("fake-pay-999999")).toBeUndefined();
+        expect(fake.invoices()).toHaveLength(1);
+      });
+
+      it("adopts nothing from a webhook whose signature fails", async () => {
+        const id = await create();
+        const input = signedBody(id, paid);
+        const forged = {
+          ...input,
+          headers: { ...input.headers, "x-fake-signature": "0".repeat(64) },
+        };
+        expect(failureOf(await fake.verifyWebhook(forged, live())).reason).toBe(
+          "invalid_signature",
+        );
+        expect(fake.invoice(id)?.status).toBe("created");
+      });
+
+      it("follows a failure with its code", async () => {
+        const id = await create();
+        valueOf(
+          await fake.verifyWebhook(
+            signedBody(id, {
+              status: "failure",
+              finalAmount: null,
+              failureCode: "declined",
+              modifiedDate: LATER,
+            }),
+            live(),
+          ),
+        );
+        expect(fake.invoice(id)).toMatchObject({ status: "failed", failureCode: "declined" });
+      });
+    });
+  });
+});
+
+describe("parseAdoptWebhooks (FAKE_PAYMENT_ADOPT_WEBHOOKS)", () => {
+  it("is off when unset, empty or false, on for true, and refuses anything else without echoing it", () => {
+    expect(parseAdoptWebhooks(undefined)).toBe(false);
+    expect(parseAdoptWebhooks("")).toBe(false);
+    expect(parseAdoptWebhooks("false")).toBe(false);
+    expect(parseAdoptWebhooks("true")).toBe(true);
+    expect(() => parseAdoptWebhooks("yes-please")).toThrow(/must be true or false/);
+    expect(() => parseAdoptWebhooks("yes-please")).not.toThrow(/yes-please/);
   });
 });
