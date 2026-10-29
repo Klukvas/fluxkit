@@ -77,3 +77,9 @@ Severity: Blocker (must not ship), Major (fix before a client launch), Minor (fi
 - The admin SPA in a browser beyond the six e2e scenarios (no proxy stack was run for the SPA here); the admin's switched-off state against a real `SEARCH_ENABLED=false` API (the e2e answers the routes `404` from the test).
 - `next dev`; a result set of more than 24 products (the demo catalog has 8: paging past page 1 was checked as a 404 and on the markup only); an engine refusal (`500`) in a browser; the mobile viewport and the filter toggle without a script; other browsers.
 - Whether a stale keep-alive connection from the Next server to a restarted API is reported as "unavailable" (one such answer was seen right after an API restart during this review and not reproduced; the storefront logs only the error's type, so the cause was not recorded).
+
+## Fixes (branch `fix/search-ui-review`)
+
+Developer decisions taken while fixing the findings above; each finding is one commit.
+
+- **F1, decision (ADR 0037):** the forwarding is OFF by default and switched on by the new optional `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (exactly `true` or `false`, parsed by `loadStorefrontEnv`; a typo stops the start). Chosen over "forward when `API_INTERNAL_URL` is loopback or private" (the review's other option): the API's address says nothing about whether the STOREFRONT port is reachable around the edge, so only the operator can state that. Off, the request headers are not read at all. `infra/production.env.example` sets `true` (the Compose example publishes no storefront port; the edge sets the header on every path, F2); the development set-up and `.env.example` leave it off. Not a build variable (read per request), so `turbo.json` and the `Dockerfile` need no entry; the production Compose file passes it to the storefront container. The storefront e2e runs its main `next start` with `true` and a second one with `false`.
