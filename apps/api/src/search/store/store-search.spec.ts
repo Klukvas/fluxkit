@@ -60,6 +60,8 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
   let brandA: string;
   let brandB: string;
   let adminId: string;
+  const extraAttributeIds: string[] = [];
+  const extraOptionIds: string[] = [];
 
   async function get<T = SearchBody>(path: string, base = app.baseUrl) {
     return http<T>(base, "GET", path);
@@ -120,17 +122,45 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     await call("PUT", `/admin/product-types/${fx.teeTypeId}/attributes/${internal.body.id}`, {
       level: "product",
     });
+    // A HIDDEN but searchable attribute: only `isPublicAttribute` keeps its value out of the index (mutation M2).
+    const hidden = await call<{ id: string }>("POST", "/admin/attributes", {
+      code: `hidden_${fx.runId}`,
+      name: { uk: "Прихований" },
+      inputType: "text",
+      isLocalized: false,
+      isSearchable: true,
+      isVisibleOnStorefront: false,
+    });
+    expect(hidden.status, JSON.stringify(hidden.body)).toBe(201);
+    // A public, filterable number attribute (the `attr.<code>:<min>..<max>` range facet).
+    const weight = await call<{ id: string }>("POST", "/admin/attributes", {
+      code: `weight_${fx.runId}`,
+      name: { uk: "Вага" },
+      inputType: "number",
+      isFilterable: true,
+    });
+    expect(weight.status, JSON.stringify(weight.body)).toBe(201);
+    extraAttributeIds.push(internal.body.id, hidden.body.id, weight.body.id);
+    for (const id of [hidden.body.id, weight.body.id]) {
+      const assigned = await call("PUT", `/admin/product-types/${fx.teeTypeId}/attributes/${id}`, {
+        level: "product",
+      });
+      expect(assigned.status, JSON.stringify(assigned.body)).toBeLessThan(300);
+    }
 
     // A shirt with three sizes: S 2000, M 3000, L 4000; brand A; stocked.
     const shirtProduct = await world.createProduct();
-    await call("PATCH", `/admin/products/${shirtProduct.id}`, {
+    const patchedShirt = await call("PATCH", `/admin/products/${shirtProduct.id}`, {
       title: { uk: "Сорочка лляна", en: "Linen shirt" },
       brandId: idOf(brandA),
       attributes: {
         [fx.materialAttributeCode]: "linen",
         [`secret_${fx.runId}`]: SENTINEL,
+        [`hidden_${fx.runId}`]: SENTINEL,
+        [`weight_${fx.runId}`]: 1.5,
       },
     });
+    expect(patchedShirt.status, JSON.stringify(patchedShirt.body)).toBe(200);
     await call("PUT", `/admin/products/${shirtProduct.id}/options`, {
       options: [{ optionId: fx.size.id, valueIds: Object.values(fx.size.values) }],
     });
@@ -168,6 +198,8 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
 
   afterAll(async () => {
     await fx.cleanup(pool);
+    await pool.query("delete from attribute where id = any($1::uuid[])", [extraAttributeIds]);
+    await pool.query("delete from option where id = any($1::uuid[])", [extraOptionIds]);
     await pool.query("delete from brand where slug = any($1)", [[brandA, brandB]]);
     await search.dispose(pool);
     await app.app.close();
@@ -287,6 +319,38 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     expect(result.body.code).toBe("validation_failed");
     if (path !== "") {
       expect(result.body.errors?.[0]?.path).toBe(path);
+    }
+  });
+
+  it("filters a number attribute by range and refuses an end the filter cannot write with 400, never 500 (review F2)", async () => {
+    const key = `attr.weight_${fx.runId}`;
+    for (const range of ["1..2", "-0..2", "0.000001..2", "1.5..1.5", "..1000000000000000"]) {
+      const found = await get(`/store/search?f=${encodeURIComponent(`${key}:${range}`)}`);
+      expect(found.status, `${range}: ${JSON.stringify(found.body)}`).toBe(200);
+      expect(
+        found.body.items.map((item) => item.id),
+        range,
+      ).toEqual([shirt.id]);
+    }
+    expect((await get(`/store/search?f=${encodeURIComponent(`${key}:2..3`)}`)).body.items).toEqual(
+      [],
+    );
+    for (const range of [
+      "0.0000001..2",
+      "-0.0000001..2",
+      "..0.0000001",
+      "0.00000000000000000001..1",
+      "1e-7..2",
+      "1E5..2",
+      "9999999999999999999..",
+      "..-1000000000000001",
+    ]) {
+      const refused = await get<{ code: string; errors?: { path: string; code: string }[] }>(
+        `/store/search?f=${encodeURIComponent(`${key}:${range}`)}`,
+      );
+      expect(refused.status, `${range}: ${JSON.stringify(refused.body)}`).toBe(400);
+      expect(refused.body.code).toBe("validation_failed");
+      expect(refused.body.errors?.[0]).toMatchObject({ path: "f", code: "invalid_range" });
     }
   });
 

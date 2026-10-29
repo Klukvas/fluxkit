@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { SEARCH_LIMITS, deriveFacetSpecs, parseSelectionParams } from "./index.js";
+import {
+  SEARCH_LIMITS,
+  buildSearchFilter,
+  deriveFacetSpecs,
+  parseSelectionParams,
+} from "./index.js";
 import { assignment, attribute, selectAttribute } from "./test-support.js";
 
 const CATEGORY = "0b1c3f5e-5d2a-4a56-8f0e-5f6a3c1d9a01";
@@ -137,6 +142,49 @@ describe("parseSelectionParams", () => {
       ok: false,
       error: { reason: "invalid_range", param: "attr.weight:5..1" },
     });
+  });
+
+  it("accepts exactly the number ranges buildSearchFilter can write (no exponent, no -0)", () => {
+    const refused = [
+      "0.0000001..2", // String(1e-7) is "1e-7": the filter would refuse it (review F2: 500)
+      "-0.0000001..2",
+      "..0.0000001",
+      "0.00000000000000000001..1",
+      "1e5..2",
+      "1E5..2",
+      "9999999999999999999..",
+      "..1000000000000001",
+      "-1000000000000001..",
+    ];
+    for (const range of refused) {
+      expect(parseSelectionParams({ f: [`attr.weight:${range}`] }, specs), range).toEqual({
+        ok: false,
+        error: { reason: "invalid_range", param: `attr.weight:${range}` },
+      });
+    }
+    const accepted: [string, { min?: number; max?: number }][] = [
+      ["0.000001..2", { min: 0.000001, max: 2 }],
+      ["1000000000000000..", { min: 1e15 }],
+      ["..-1000000000000000", { max: -1e15 }],
+      ["123456789012345.6789..", { min: 123456789012345.67 }],
+      ["1.00000000000000000001..2", { min: 1, max: 2 }],
+      ["-0..1", { min: 0, max: 1 }],
+      ["-0.0..0", { min: 0, max: 0 }],
+    ];
+    for (const [range, expected] of accepted) {
+      const result = parseSelectionParams({ f: [`attr.weight:${range}`] }, specs);
+      expect(result, range).toEqual({
+        ok: true,
+        selection: { attributes: { weight: { kind: "range", ...expected } } },
+      });
+      if (!result.ok) continue;
+      const chosen = result.selection.attributes?.["weight"];
+      // A negative zero would print as "0" anyway, but it must not reach the selection at all.
+      if (chosen?.kind === "range" && chosen.min !== undefined) {
+        expect(Object.is(chosen.min, -0), range).toBe(false);
+      }
+      expect(() => buildSearchFilter(result.selection), range).not.toThrow();
+    }
   });
 
   it("caps the number of f parameters and of selected groups", () => {

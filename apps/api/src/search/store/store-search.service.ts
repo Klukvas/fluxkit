@@ -8,6 +8,7 @@ import {
   planSearchQueries,
   planTextQueries,
   resolveTextWithFallback,
+  SearchFilterError,
   SEARCH_LIMITS,
   searchLiveIndexUid,
   selectedGroupKeys,
@@ -111,12 +112,14 @@ export class StoreSearchService {
       ]);
     }
     const selection = selected.selection;
-    const plan = planSearchQueries({
-      selection,
-      specs,
-      page: page.page,
-      pageSize: page.pageSize,
-    });
+    const plan = planOrRefuse(() =>
+      planSearchQueries({
+        selection,
+        specs,
+        page: page.page,
+        pageSize: page.pageSize,
+      }),
+    );
     const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const textQueries = planTextQueries(text, locale.locale, "results");
 
@@ -379,6 +382,21 @@ export class StoreSearchService {
       }
     }
     return facets;
+  }
+}
+
+/**
+ * Defence in depth (docs/api/search.md): `parseSelectionParams` accepts only what `buildSearchFilter` can write, but if
+ * the two ever disagree again the shopper gets `400`, not `500` (review F2).
+ */
+function planOrRefuse<T>(plan: () => T): T {
+  try {
+    return plan();
+  } catch (error) {
+    if (error instanceof SearchFilterError) {
+      throw validationFailed([{ path: "f", code: error.reason }]);
+    }
+    throw error;
   }
 }
 
