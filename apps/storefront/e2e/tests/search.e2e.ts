@@ -329,7 +329,7 @@ test.describe("the results page", () => {
     }
   });
 
-  test("shows nothing found with a way out, and an unknown facet as an explained state", async ({
+  test("shows nothing found with a way out, and an unknown facet and an unreadable range as explained states", async ({
     page,
   }) => {
     await page.goto("/en/search?q=zzzzqqqq");
@@ -344,6 +344,11 @@ test.describe("the results page", () => {
     await expect(page.getByText("These filters are not available")).toBeVisible();
     await page.getByRole("link", { name: "Clear the filters" }).click();
     await expect(page).toHaveURL(/\/en\/search\?q=demo$/);
+
+    // A range the API refuses as invalid_range (1e-7) is named as a range, not as a filter that does not exist (review F4).
+    await page.goto("/en/search?q=demo&f=attr.length%3A0.0000001..");
+    await expect(page.getByText("This range cannot be used")).toBeVisible();
+    await expect(page.getByText("These filters are not available")).toHaveCount(0);
   });
 
   test("renders what was typed as text, never as markup", async ({ page }) => {

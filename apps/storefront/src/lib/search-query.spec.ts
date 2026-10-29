@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  MAX_RANGE_NUMBER,
   MAX_SEARCH_PAGE,
+  RANGE_DECIMAL_PATTERN,
   SEARCH_PAGE_SIZE,
   clearFilters,
   facetEntry,
@@ -364,4 +367,40 @@ describe("resolveSearchAddress (what the results route does with an address, rev
   ])("is a real 404 for the malformed address %j", (raw) => {
     expect(resolveSearchAddress(raw, 2)).toEqual({ kind: "malformed" });
   });
+});
+
+describe("range boxes: only numbers the API accepts (review F4)", () => {
+  // The storefront does not import @fluxkit/core (client-boundary.spec.ts); the two rules are copied and compared here
+  // with core's source, so a change on either side fails this test.
+  const core = readFileSync(
+    new URL("../../../../packages/core/src/search/patterns.ts", import.meta.url),
+    "utf8",
+  );
+
+  it("uses core's decimal pattern and largest magnitude", () => {
+    expect(core).toContain(`export const DECIMAL_PATTERN = ${RANGE_DECIMAL_PATTERN.toString()};`);
+    expect(core).toMatch(/export const MAX_FILTER_NUMBER = 1e15;/);
+    expect(MAX_RANGE_NUMBER).toBe(1e15);
+  });
+
+  it.each(["0.0000001", "-0.0000001", "0.00000010", "1.5e3"])(
+    "refuses %j in a box, which the API would refuse as invalid_range (JavaScript prints it with an exponent)",
+    (box) => {
+      expect(parseSearchParams({ "rmin.attr.length": box }, 2)).toEqual({
+        ok: false,
+        reason: "range:attr.length",
+      });
+      expect(parseSearchParams({ "rmax.attr.length": box }, 2)).toEqual({
+        ok: false,
+        reason: "range:attr.length",
+      });
+    },
+  );
+
+  it.each(["0.000001", "1.0000001", "-0", "999999999999999", "01", "1,25"])(
+    "accepts %j, which the API reads as a plain decimal",
+    (box) => {
+      expect(parseSearchParams({ "rmin.attr.length": box }, 2).ok).toBe(true);
+    },
+  );
 });

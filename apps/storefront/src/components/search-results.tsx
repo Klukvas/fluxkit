@@ -77,9 +77,13 @@ function ProblemState({
       ? outcome.retryAfterSeconds
       : null;
   if (outcome.kind === "invalid") {
+    const range = outcome.reason === "range";
     return (
-      <Alert variant="warning" title={t("search.invalid.title")}>
-        <p>{t("search.invalid.description")}</p>
+      <Alert
+        variant="warning"
+        title={t(range ? "search.invalidRange.title" : "search.invalid.title")}
+      >
+        <p>{t(range ? "search.invalidRange.description" : "search.invalid.description")}</p>
         <p className="mt-3">
           <a href={pageHref(locale, clearFilters(query))} className={linkButton}>
             {t("search.empty.clear")}

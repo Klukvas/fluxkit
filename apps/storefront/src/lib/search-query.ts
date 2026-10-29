@@ -58,6 +58,13 @@ const FACET_KEY = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const PRICE = /^(\d{0,15})\.\.(\d{0,15})$/;
 const PAGE = /^[1-9]\d{0,5}$/;
 const RANGE_NUMBER = /^-?\d{1,15}(?:\.\d{1,10})?$/;
+/**
+ * Core's rules for a number of a range filter (`DECIMAL_PATTERN` and `MAX_FILTER_NUMBER` of
+ * `packages/core/src/search/patterns.ts`; `search-query.spec.ts` compares them with core's source): the API refuses a
+ * number JavaScript prints with an exponent (`0.0000001` is `1e-7`) as `invalid_range`, so a box is refused here first.
+ */
+export const RANGE_DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/;
+export const MAX_RANGE_NUMBER = 1e15;
 
 /** A control character (C0, DEL, C1): the API refuses them in `q`, and they have no place in a facet value. */
 function hasControlCharacter(text: string): boolean {
@@ -101,11 +108,19 @@ export function facetEntry(key: string, code: string): string {
   return `${key}:${code}`;
 }
 
-/** The box's number as text, `null` for an empty or missing box, `undefined` for text that is not a plain decimal. */
+/**
+ * The box's number as text, `null` for an empty or missing box, `undefined` for text that is not a plain decimal or a
+ * number the API would refuse (review F4: the same test as core's `parseSelectionParams`).
+ */
 function parseRangeBox(text: string | undefined): string | null | undefined {
   const clean = (text ?? "").trim().replace(",", ".");
   if (clean === "") return null;
-  return RANGE_NUMBER.test(clean) ? clean : undefined;
+  if (!RANGE_NUMBER.test(clean)) return undefined;
+  // `+ 0` turns -0 into 0, as core does before it prints the number.
+  const value = Number(clean) + 0;
+  return Math.abs(value) <= MAX_RANGE_NUMBER && RANGE_DECIMAL_PATTERN.test(String(value))
+    ? clean
+    : undefined;
 }
 
 /**

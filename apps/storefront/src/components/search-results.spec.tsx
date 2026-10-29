@@ -254,8 +254,22 @@ describe("results page states", () => {
   });
 
   it("explains filters the API refuses and offers to clear them", () => {
-    const html = render({ kind: "invalid" }, { query: { ...query, facets: ["brand:gone"] } });
+    const html = render(
+      { kind: "invalid", reason: "filter" },
+      { query: { ...query, facets: ["brand:gone"] } },
+    );
     expect(html).toContain("§search.invalid.title");
+    expect(html).toContain('href="/uk/search?q=lamp"');
+  });
+
+  it("names a range the API cannot read as a range, not as a missing filter (review F4)", () => {
+    const html = render(
+      { kind: "invalid", reason: "range" },
+      { query: { ...query, facets: ["attr.length:0.0000001.."] } },
+    );
+    expect(html).toContain("§search.invalidRange.title");
+    expect(html).toContain("§search.invalidRange.description");
+    expect(html).not.toContain("§search.invalid.title");
     expect(html).toContain('href="/uk/search?q=lamp"');
   });
 
@@ -300,7 +314,8 @@ describe("no hardcoded words and both locales", () => {
     ["empty", ok({ items: [], total: 0 }), query],
     ["unavailable", { kind: "unavailable", retryAfterSeconds: 30 }, query],
     ["rate limited", { kind: "rate_limited", retryAfterSeconds: 5 }, query],
-    ["invalid", { kind: "invalid" }, query],
+    ["invalid", { kind: "invalid", reason: "filter" }, query],
+    ["invalid range", { kind: "invalid", reason: "range" }, query],
   ];
 
   it.each(states)("%s: every word is a translated message", (_name, outcome, current) => {
