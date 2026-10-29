@@ -5,6 +5,7 @@ import {
   PROVIDER_REFUND_STATUSES,
   type PaymentProviderResult,
   type ProviderPaymentFact,
+  type ProviderRefundFact,
   type ProviderRefundStatus,
 } from "./provider-port.js";
 import type { PaymentAttentionCode } from "./reasons.js";
@@ -29,6 +30,12 @@ import {
 export interface RefundRecord {
   readonly amount: Money;
   readonly status: RefundStatus;
+  /**
+   * A `succeeded` refund that an applied provider fact listed `succeeded` (`payment_refund.provider_modified_at` set), so
+   * the stored final amount already shows it. Absent or `false`: the stored final amount may predate it. Only
+   * `refundableAmount` reads it.
+   */
+  readonly inFinalAmount?: boolean;
 }
 
 export interface RefundCapabilities {
@@ -66,6 +73,140 @@ export function remainingRefundable(amount: Money, refunds: readonly RefundRecor
   return Object.freeze({ amount: amount.amount - active, currency: amount.currency });
 }
 
+/** A stored refund of ours with its id (sent to the provider as the refund's reference, Monobank `extRef`). */
+export interface IdentifiedRefundRecord extends RefundRecord {
+  readonly id: string;
+}
+
+/** A provider's final amount: whole minor units from 0 to the amount, in its currency; anything else is corrupt. */
+function assertFinalAmount(amount: Money, finalAmount: Money): void {
+  if (
+    typeof finalAmount !== "object" ||
+    finalAmount === null ||
+    !Number.isSafeInteger(finalAmount.amount) ||
+    finalAmount.amount < 0 ||
+    finalAmount.amount > amount.amount ||
+    finalAmount.currency !== amount.currency
+  ) {
+    throw new RangeError("A final amount must be 0 to the payment amount, in its currency");
+  }
+}
+
+/**
+ * What the shop may still refund (review F1 of 2026-10-29): `remainingRefundable` less the money the provider returned
+ * outside the shop, so the same money is never refunded twice and nothing above what the provider still holds is
+ * offered. The external part comes from the stored final amount (Monobank `finalAmount`, what the provider holds after
+ * every refund it made): `amount - finalAmount - our succeeded refunds it already shows` (`inFinalAmount`), at least 0.
+ * A refund of ours the stored final amount does not show yet is counted once, by `remainingRefundable`. Without a refund
+ * made elsewhere the answer is exactly `remainingRefundable`; `finalAmount` `null` (not reported) changes nothing. Never
+ * below 0. A final amount outside 0 to the amount or in another currency is corrupt data (RangeError).
+ */
+export function refundableAmount(input: {
+  readonly amount: Money;
+  readonly finalAmount: Money | null;
+  readonly refunds: readonly RefundRecord[];
+}): Money {
+  const remaining = remainingRefundable(input.amount, input.refunds);
+  if (input.finalAmount === null) {
+    return remaining;
+  }
+  assertFinalAmount(input.amount, input.finalAmount);
+  let shown = 0;
+  for (const refund of input.refunds) {
+    if (refund.status === "succeeded" && refund.inFinalAmount === true) {
+      shown += refund.amount.amount;
+    }
+  }
+  const external = Math.max(0, input.amount.amount - input.finalAmount.amount - shown);
+  return Object.freeze({
+    amount: Math.max(0, remaining.amount - external),
+    currency: remaining.currency,
+  });
+}
+
+/**
+ * Money returned to the payer that our own refunds do not explain (a refund made in the provider's cabinet). Two views
+ * of the same money, so the larger one counts, never their sum:
+ * - the final amount: `amount - finalAmount - our requested/processing/succeeded/unknown refunds`, at least 0;
+ * - the provider's refund list: every entry that is not `failed` without our refund id, or with an id that is not one
+ *   of ours (an external refund still `processing` shows here before the final amount drops).
+ * Capped at the amount. A list or final amount in another currency is corrupt (RangeError; `bindFact` refuses such a
+ * fact first).
+ */
+export function externalRefundAmount(input: {
+  readonly amount: Money;
+  readonly finalAmount: Money | null;
+  readonly refunds: readonly IdentifiedRefundRecord[];
+  readonly listed: readonly ProviderRefundFact[];
+}): Money {
+  const { amount } = input;
+  const ourActive = amount.amount - remainingRefundable(amount, input.refunds).amount;
+  let fromFinal = 0;
+  if (input.finalAmount !== null) {
+    assertFinalAmount(amount, input.finalAmount);
+    fromFinal = Math.max(0, amount.amount - input.finalAmount.amount - ourActive);
+  }
+  const ourIds = new Set(input.refunds.map((refund) => refund.id));
+  let fromList = 0;
+  for (const entry of input.listed) {
+    if (entry.amount.currency !== amount.currency) {
+      throw new RangeError("A listed refund is in another currency than its payment");
+    }
+    if (entry.status !== "failed" && (entry.refundId === null || !ourIds.has(entry.refundId))) {
+      fromList += entry.amount.amount;
+    }
+  }
+  return Object.freeze({
+    amount: Math.min(amount.amount, Math.max(fromFinal, fromList)),
+    currency: amount.currency,
+  });
+}
+
+export interface ExternalRefundDecision {
+  readonly externalAmount: Money;
+  /** `external_reversal` when the fact shows more external money than the stored final amount did, else `null`. */
+  readonly attentionCode: Extract<PaymentAttentionCode, "external_reversal"> | null;
+}
+
+/**
+ * Whether a bound, applied fact shows a refund made outside the shop (review F1 of 2026-10-29). Attention
+ * `external_reversal` (a refund made outside the shop, the existing code; no new code or CHECK) when the external amount
+ * of the fact (`externalRefundAmount` with its final amount and refund list) is greater than the one the previously
+ * stored final amount already showed, so a later fact about the same external refund does not raise it again once an
+ * admin cleared it. `refunds`: our refunds after the fact settled them. A fact in another currency is a bug (RangeError).
+ */
+export function decideExternalRefund(input: {
+  readonly amount: Money;
+  /** `payment.final_amount` before this fact; `null` when no fact reported one yet. */
+  readonly previousFinalAmount: Money | null;
+  readonly refunds: readonly IdentifiedRefundRecord[];
+  readonly fact: ProviderPaymentFact;
+}): ExternalRefundDecision {
+  assertPositiveMoney(input.amount, "payment amount");
+  if (
+    input.fact.amount.currency !== input.amount.currency ||
+    (input.fact.finalAmount !== null && input.fact.finalAmount.currency !== input.amount.currency)
+  ) {
+    throw new RangeError("A fact is in another currency than its payment");
+  }
+  const now = externalRefundAmount({
+    amount: input.amount,
+    finalAmount: input.fact.finalAmount,
+    refunds: input.refunds,
+    listed: input.fact.refunds,
+  });
+  const before = externalRefundAmount({
+    amount: input.amount,
+    finalAmount: input.previousFinalAmount,
+    refunds: input.refunds,
+    listed: [],
+  });
+  return Object.freeze({
+    externalAmount: now,
+    attentionCode: now.amount > before.amount ? ("external_reversal" as const) : null,
+  });
+}
+
 export type RefundRefusal =
   | "invalid_amount"
   | "currency_mismatch"
@@ -90,13 +231,19 @@ function refuse(reason: RefundRefusal): RefundDecision {
  * Checks in this order: the requested amount is a whole number of minor units from 1 to `MAX_AMOUNT` (`invalid_amount`,
  * the API's `400 validation_failed`), in the payment's currency (`currency_mismatch`, also a `400`); the payment
  * `succeeded` and, when the provider takes only one refund per payment, has no active refund (`refund_not_allowed`);
- * `0 < amount <= remainingRefundable` (`refund_exceeds_remaining`: exactly the remaining amount is allowed, one minor unit
- * more is not, and nothing after a full refund); a partial amount only when the provider allows partial refunds
+ * `0 < amount <= refundableAmount` (`refund_exceeds_remaining`: exactly the remaining amount is allowed, one minor unit
+ * more is not, and nothing after a full refund; the provider's final amount caps it, so money already returned outside
+ * the shop is never refunded a second time); a partial amount only when the provider allows partial refunds
  * (`partial_refund_not_supported`; PRRO is not linked in v1, so no fiscal items are required, decision 1).
  * Corrupt payment data throws a RangeError.
  */
 export function decideRefund(input: {
-  readonly payment: { readonly status: PaymentStatus; readonly amount: Money };
+  readonly payment: {
+    readonly status: PaymentStatus;
+    readonly amount: Money;
+    /** `payment.final_amount` (the provider's view); absent or `null`: not reported, no cap. */
+    readonly finalAmount?: Money | null;
+  };
   readonly refunds: readonly RefundRecord[];
   readonly amount: Money;
   readonly capabilities: RefundCapabilities;
@@ -105,7 +252,11 @@ export function decideRefund(input: {
   if (!PAYMENT_STATUSES.includes(payment.status)) {
     throw new RangeError(`Unknown payment status: ${String(payment.status)}`);
   }
-  const remaining = remainingRefundable(payment.amount, input.refunds);
+  const remaining = refundableAmount({
+    amount: payment.amount,
+    finalAmount: payment.finalAmount ?? null,
+    refunds: input.refunds,
+  });
   if (
     typeof amount !== "object" ||
     amount === null ||

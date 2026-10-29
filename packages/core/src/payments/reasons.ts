@@ -54,7 +54,8 @@ export type PaymentCreatedBy = (typeof PAYMENT_CREATED_BY)[number];
  * - `fact_not_bound`: a fact names another provider id or reference than the attempt.
  * - `unknown_provider_status`: the provider sent a status the plugin does not know (the attempt keeps its status).
  * - `unexpected_provider_status`: a known status no v1 flow produces (`authorized`), or a newer fact contradicting success.
- * - `external_reversal`: `reversed` that our own refunds do not explain (a refund made outside the shop).
+ * - `external_reversal`: money returned that our own refunds do not explain (a refund made outside the shop): `reversed`,
+ *   or a lowered final amount or a listed refund without our id (review F1 of 2026-10-29, `decideExternalRefund`).
  * - `refund_failed`, `refund_mismatch`: a refund the provider refused, or listed with another amount or twice.
  * - `reconcile_gave_up`: the reconcile schedule ended without a final answer (also a refund that stayed `unknown`).
  */

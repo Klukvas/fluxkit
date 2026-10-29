@@ -346,6 +346,19 @@ export class PaymentsRepository {
     return row;
   }
 
+  /** Only `PaymentChanges` calls this: a provider fact listed a refund that is already `succeeded`. */
+  async setRefundProviderModifiedAt(
+    tx: Transaction,
+    id: string,
+    providerModifiedAt: Date,
+    at: Date,
+  ): Promise<void> {
+    await tx
+      .update(paymentRefund)
+      .set({ providerModifiedAt, updatedAt: at })
+      .where(eq(paymentRefund.id, id));
+  }
+
   /** Marks a refund send as started (`updated_at`), so a claim that never got an answer can be told from one in flight. */
   async touchRefund(tx: Transaction, id: string, at: Date): Promise<void> {
     await tx.update(paymentRefund).set({ updatedAt: at }).where(eq(paymentRefund.id, id));
