@@ -38,6 +38,14 @@ describe("decimalToMinorUnits (the price filter's text to minor units, integer a
     expect(decimalToMinorUnits("1.15", 2)).toBe(115);
     expect(decimalToMinorUnits("4.35", 2)).toBe(435);
   });
+
+  it("stays exact up to the largest safe integer, where a float product is not (review F5)", () => {
+    // `Math.round(Number("90000000000000.01") * 100)` is 9000000000000002, one cent too many.
+    expect(decimalToMinorUnits("90000000000000.01", 2)).toBe(9_000_000_000_000_001);
+    expect(decimalToMinorUnits("9007199254740.991", 3)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(decimalToMinorUnits("90071992547409.91", 2)).toBe(Number.MAX_SAFE_INTEGER);
+    expect(decimalToMinorUnits("90071992547409.92", 2)).toBeNull();
+  });
 });
 
 describe("minorUnitsToInput (minor units back into the price boxes)", () => {

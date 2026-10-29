@@ -156,6 +156,53 @@ describe("selectedFilters", () => {
   });
 });
 
+describe("selectedFilters keys (review F6)", () => {
+  it("keys each chip by its facet key and value, so two facets with the same title and value label never share a key", () => {
+    // A client catalog may have an option and an attribute that are both called "Color" with a value "Black".
+    const twins = [
+      facet({
+        key: "opt.color",
+        kind: "code",
+        label: "Color",
+        values: [value({ code: "black", label: "Black", selected: true })],
+      }),
+      facet({
+        key: "attr.color",
+        kind: "code",
+        label: "Color",
+        values: [value({ code: "black", label: "Black", selected: true })],
+      }),
+      facet({ key: "attr.size_a", kind: "range", label: "Size", range: { min: 1, max: 9 } }),
+      facet({ key: "attr.size_b", kind: "range", label: "Size", range: { min: 1, max: 9 } }),
+    ];
+    const filters = selectedFilters({
+      query: {
+        ...empty,
+        facets: ["opt.color:black", "attr.color:black", "attr.size_a:1..2", "attr.size_b:1..2"],
+        price: { min: 100, max: null },
+      },
+      facets: twins,
+      t,
+      currency: "UAH",
+      exponent: 2,
+    });
+    expect(filters.map((filter) => filter.label)).toEqual([
+      "Color: Black",
+      "Color: Black",
+      "Size: 1–2",
+      "Size: 1–2",
+      "§search.facet.price: §search.facet.min 1",
+    ]);
+    expect(filters.map((filter) => filter.key)).toEqual([
+      "opt.color:black",
+      "attr.color:black",
+      "attr.size_a",
+      "attr.size_b",
+      "price",
+    ]);
+  });
+});
+
 describe("describeFormFailure", () => {
   it("names the message and the box for each way the filter form can be wrong", () => {
     expect(describeFormFailure("price_min")).toEqual({

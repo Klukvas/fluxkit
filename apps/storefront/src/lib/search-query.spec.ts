@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  MAX_RANGE_NUMBER,
   MAX_SEARCH_PAGE,
+  RANGE_DECIMAL_PATTERN,
   SEARCH_PAGE_SIZE,
   clearFilters,
   facetEntry,
@@ -9,6 +12,7 @@ import {
   parseSearchForm,
   parseSearchParams,
   rangeOf,
+  resolveSearchAddress,
   searchPath,
   setPage,
   setPrice,
@@ -88,6 +92,11 @@ describe("parseSearchParams", () => {
     ["f", "brand:"],
     ["f", "bra nd:x"],
     ["f", "brand:x\ny"],
+    // Whitespace that is not a control character (review F5): a space, a leading space, a no-break and an em space.
+    ["f", "brand:a b"],
+    ["f", "brand: a"],
+    ["f", "brand:a\u00a0b"],
+    ["f", "brand:a\u2003b"],
     ["q", "a".repeat(201)],
     ["q", "bad\u0000text"],
     ["q", "bad\u001btext"],
@@ -304,4 +313,99 @@ describe("parseSearchForm (the facet form's fields, in the browser)", () => {
       reason: "range:attr.length",
     });
   });
+});
+
+describe("resolveSearchAddress (what the results route does with an address, review F3)", () => {
+  it("takes a canonical address as it is and a hand-made one as the query to redirect to", () => {
+    expect(resolveSearchAddress({ q: "demo", price: "1250.." }, 2)).toEqual({
+      kind: "query",
+      query: { ...empty, q: "demo", price: { min: 1250, max: null } },
+      canonical: true,
+    });
+    expect(
+      resolveSearchAddress({ q: "demo", priceMin: "12.50", priceMax: "", sort: "", page: "1" }, 2),
+    ).toEqual({
+      kind: "query",
+      query: { ...empty, q: "demo", price: { min: 1250, max: null } },
+      canonical: false,
+    });
+  });
+
+  it.each([
+    [{ q: "demo", priceMin: "12.505" }, "price_min"],
+    [{ q: "demo", priceMax: "ten" }, "price_max"],
+    [{ q: "demo", priceMin: "20", priceMax: "10" }, "price_order"],
+    [{ q: "demo", "rmin.attr.length": "abc" }, "range:attr.length"],
+    [{ q: "demo", "rmin.attr.length": "5", "rmax.attr.length": "1" }, "range:attr.length"],
+  ])(
+    "turns a script-less submit with a refused box %j into the page of the rest with the form's failure %s, not a 404",
+    (raw, reason) => {
+      expect(resolveSearchAddress(raw, 2)).toEqual({
+        kind: "form_error",
+        query: { ...empty, q: "demo" },
+        reason,
+      });
+    },
+  );
+
+  it("keeps the rest of a refused submit: the words, the chosen values and the sort", () => {
+    expect(
+      resolveSearchAddress(
+        { q: "demo", f: ["brand:acme"], sort: "price_asc", priceMin: "1.001", priceMax: "" },
+        2,
+      ),
+    ).toEqual({
+      kind: "form_error",
+      query: { ...empty, q: "demo", facets: ["brand:acme"], sort: "price_asc" },
+      reason: "price_min",
+    });
+  });
+
+  it.each([
+    { q: "demo", price: "abc" },
+    { q: "demo", page: "0" },
+    { f: "no-colon" },
+    { f: "brand:a b" },
+    // A form field does not excuse a malformed shared parameter next to it.
+    { q: "demo", f: "no-colon", priceMin: "12.505" },
+    { q: "demo", page: "418", priceMin: "x" },
+  ])("is a real 404 for the malformed address %j", (raw) => {
+    expect(resolveSearchAddress(raw, 2)).toEqual({ kind: "malformed" });
+  });
+});
+
+describe("range boxes: only numbers the API accepts (review F4)", () => {
+  // The storefront does not import @fluxkit/core (client-boundary.spec.ts); the two rules are copied and compared here
+  // with core's source, so a change on either side fails this test.
+  const core = readFileSync(
+    new URL("../../../../packages/core/src/search/patterns.ts", import.meta.url),
+    "utf8",
+  );
+
+  it("uses core's decimal pattern and largest magnitude", () => {
+    expect(core).toContain(`export const DECIMAL_PATTERN = ${RANGE_DECIMAL_PATTERN.toString()};`);
+    expect(core).toMatch(/export const MAX_FILTER_NUMBER = 1e15;/);
+    expect(MAX_RANGE_NUMBER).toBe(1e15);
+  });
+
+  it.each(["0.0000001", "-0.0000001", "0.00000010", "1.5e3"])(
+    "refuses %j in a box, which the API would refuse as invalid_range (JavaScript prints it with an exponent)",
+    (box) => {
+      expect(parseSearchParams({ "rmin.attr.length": box }, 2)).toEqual({
+        ok: false,
+        reason: "range:attr.length",
+      });
+      expect(parseSearchParams({ "rmax.attr.length": box }, 2)).toEqual({
+        ok: false,
+        reason: "range:attr.length",
+      });
+    },
+  );
+
+  it.each(["0.000001", "1.0000001", "-0", "999999999999999", "01", "1,25"])(
+    "accepts %j, which the API reads as a plain decimal",
+    (box) => {
+      expect(parseSearchParams({ "rmin.attr.length": box }, 2).ok).toBe(true);
+    },
+  );
 });

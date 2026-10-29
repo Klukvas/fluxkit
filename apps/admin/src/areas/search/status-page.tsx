@@ -9,7 +9,7 @@ import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { LoadingView, ResourceFallback } from "../../views/status-views";
 import { SearchFrame, SearchOffView } from "./search-frame";
 import { rebuildNotice, type RebuildNotice } from "./search-outcome";
-import { useCanManageSearch } from "./search-permissions";
+import { useCanManageSearch, whenCanManage } from "./search-permissions";
 import { RebuildPanel, StatusView } from "./search-status-view";
 import { searchScreenState } from "./search-view";
 
@@ -31,10 +31,12 @@ export function SearchStatusPage() {
   }, [notice]);
 
   async function confirmRebuild() {
-    if (!canManage) return;
-    // One request per confirmation, never repeated by the screen: the API treats a request while a build runs as already
-    // recorded, and a lost answer is said as it is (the status below shows whether it was recorded).
-    const running = flight.run(() => runWrite(() => adminClient.requestSearchRebuild()));
+    // Only with the permission (whenCanManage), one request per confirmation, never repeated by the screen: the API treats
+    // a request while a build runs as already recorded, and a lost answer is said as it is (the status below shows whether
+    // it was recorded).
+    const running = whenCanManage(canManage, () =>
+      flight.run(() => runWrite(() => adminClient.requestSearchRebuild())),
+    );
     if (running === null) return;
     setBusy(true);
     const outcome = await running.finally(() => setBusy(false));

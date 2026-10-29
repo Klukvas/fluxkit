@@ -14,8 +14,24 @@ import { describe, expect, it } from "vitest";
 
 const root = fileURLToPath(new URL("../../../../../infra/proxy/", import.meta.url));
 const nginxTemplate = readFileSync(`${root}nginx/templates/fluxkit.conf.template`, "utf8");
-const proxyToApi = readFileSync(`${root}nginx/snippets/proxy-to-api.conf`, "utf8");
+const proxyToApiOwn = readFileSync(`${root}nginx/snippets/proxy-to-api.conf`, "utf8");
 const caddyfile = readFileSync(`${root}caddy/Caddyfile`, "utf8");
+
+/** The snippets of `infra/proxy/nginx/snippets/`, copied to `/etc/nginx/fluxkit/` by the edge image (Dockerfile). */
+const SNIPPET_DIRECTORY = "/etc/nginx/fluxkit/";
+
+/** The text with every `include /etc/nginx/fluxkit/<file>;` replaced by that snippet's text, as nginx reads it. */
+function withSnippets(text: string): string {
+  return text.replace(
+    /^(\s*)include\s+\/etc\/nginx\/fluxkit\/([\w.-]+);[^\n]*$/gm,
+    (_line, indent: string, file: string) =>
+      withSnippets(readFileSync(`${root}nginx/snippets/${file}`, "utf8"))
+        .split("\n")
+        .map((line) => `${indent}${line}`)
+        .join("\n"),
+  );
+}
+const proxyToApi = withSnippets(proxyToApiOwn);
 
 const WEBHOOK_PATHS = [
   "/webhooks/payments/monobank",
@@ -271,5 +287,58 @@ describe("Caddy edge: the payment webhook handle", () => {
       )
       .map((match) => match[1]);
     expect(importers).toEqual(["@adminAssets", "@adminPages"]);
+  });
+});
+
+describe("edge: one X-Forwarded-For rule for the API and the storefront (search UI review F2, ADR 0038)", () => {
+  // The results page forwards the header the edge set on the PAGE request (STOREFRONT_FORWARD_CLIENT_ADDRESS), so the
+  // storefront location must treat it exactly like the API locations: a CDN switch (append and TRUST_PROXY=2) that
+  // reached one path only would put the shoppers of a CDN node into one search window on the other.
+  const forwardedHeaders = readFileSync(`${root}nginx/snippets/forwarded-headers.conf`, "utf8");
+  const forwardedRule = directives(withoutComments(forwardedHeaders), "proxy_set_header").filter(
+    (entry) => /^x-forwarded-for\s/i.test(entry),
+  );
+  const server = httpsServer();
+  const proxied = locationsOf(server).filter((entry) =>
+    /^\s*proxy_pass\s/m.test(withoutComments(withSnippets(entry.body))),
+  );
+  const proxiedPatterns = ["^/(store|media)(/|$)", "^/admin(/|$)", "^/webhooks/payments(/|$)", "/"];
+
+  it("sets the header in one snippet only, replacing what the client sent (the shipped TRUST_PROXY=1)", () => {
+    expect(forwardedRule).toEqual(["X-Forwarded-For $remote_addr"]);
+    const production = readFileSync(`${root}../production.env.example`, "utf8");
+    expect(production).toMatch(/^TRUST_PROXY=1$/m);
+  });
+
+  it("finds the proxied locations it guards: the API ones and the storefront", () => {
+    expect(proxied.map((entry) => entry.pattern)).toEqual(proxiedPatterns);
+  });
+
+  it.each(proxiedPatterns)(
+    "gives the location %s the shared rule and no Host, X-Forwarded-For or X-Forwarded-Proto of its own",
+    (pattern) => {
+      const location = proxied.find((entry) => entry.pattern === pattern);
+      if (location === undefined) throw new Error(`No location ${pattern}.`);
+      const expanded = directives(withoutComments(withSnippets(location.body)), "proxy_set_header");
+      expect(expanded.filter((entry) => /^x-forwarded-for\s/i.test(entry))).toEqual(forwardedRule);
+      expect(withoutComments(location.body)).not.toMatch(
+        /proxy_set_header\s+(X-Forwarded-For|Host|X-Forwarded-Proto)\s/i,
+      );
+    },
+  );
+
+  it("sets the forwarding headers nowhere else: not in the template, not in the API snippet", () => {
+    expect(withoutComments(nginxTemplate)).not.toMatch(/proxy_set_header\s+X-Forwarded-For/i);
+    expect(withoutComments(proxyToApiOwn)).not.toMatch(/proxy_set_header\s+X-Forwarded-For/i);
+    expect(withoutComments(proxyToApiOwn)).toContain(
+      `include ${SNIPPET_DIRECTORY}forwarded-headers.conf;`,
+    );
+  });
+
+  it("Caddy: no handle rewrites the header and no proxy is trusted, so the API and the storefront get the same chain", () => {
+    const text = withoutComments(caddyfile);
+    expect(text).not.toMatch(/header_up\s+[-+]?X-Forwarded-For/i);
+    expect(text).not.toContain("trusted_proxies");
+    expect([...text.matchAll(/reverse_proxy\s/g)]).toHaveLength(2);
   });
 });

@@ -1,5 +1,5 @@
 import type { Locator, Page, Request } from "@playwright/test";
-import { E2E_SEARCH_ENABLED } from "../support/env.ts";
+import { E2E_SEARCH_ENABLED, E2E_STOREFRONT_UNFORWARDED_PORT } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { waitForHydration } from "../support/flows.ts";
 
@@ -298,6 +298,15 @@ test.describe("the results page", () => {
     await page.getByRole("group", { name: "Price, UAH" }).getByLabel("From").fill("1000");
     await page.getByRole("button", { name: "Apply filters" }).click();
     await expect(page).toHaveURL(/\/en\/search\?q=demo&price=100000\.\.$/);
+    // A box the page refuses (the browser's pattern lets a reversed range through) is the form's own state, not a 404.
+    const price = page.getByRole("group", { name: "Price, UAH" });
+    await price.getByLabel("From").fill("20");
+    await price.getByLabel("To").fill("10");
+    await page.getByRole("button", { name: "Apply filters" }).click();
+    await expect(page).toHaveURL(/priceMin=20&priceMax=10/);
+    await expect(page.getByText("Check the filters")).toBeVisible();
+    await expect(page.getByText("The lowest price must not be above the highest.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Results for “demo”");
     await context.close();
   });
 
@@ -320,7 +329,7 @@ test.describe("the results page", () => {
     }
   });
 
-  test("shows nothing found with a way out, and an unknown facet as an explained state", async ({
+  test("shows nothing found with a way out, and an unknown facet and an unreadable range as explained states", async ({
     page,
   }) => {
     await page.goto("/en/search?q=zzzzqqqq");
@@ -335,6 +344,11 @@ test.describe("the results page", () => {
     await expect(page.getByText("These filters are not available")).toBeVisible();
     await page.getByRole("link", { name: "Clear the filters" }).click();
     await expect(page).toHaveURL(/\/en\/search\?q=demo$/);
+
+    // A range the API refuses as invalid_range (1e-7) is named as a range, not as a filter that does not exist (review F4).
+    await page.goto("/en/search?q=demo&f=attr.length%3A0.0000001..");
+    await expect(page.getByText("This range cannot be used")).toBeVisible();
+    await expect(page.getByText("These filters are not available")).toHaveCount(0);
   });
 
   test("renders what was typed as text, never as markup", async ({ page }) => {
@@ -352,7 +366,8 @@ test.describe("the results page", () => {
     page,
   }) => {
     // Every request of this test has the same address (the proxy sets it from the test's marker). The page's own search is
-    // rendered by the Next server, which passes that address on; if it did not, the window used up here would not be seen.
+    // rendered by the Next server, which passes that address on (it runs with STOREFRONT_FORWARD_CLIENT_ADDRESS=true, ADR
+    // 0037); if it did not, the window used up here would not be seen.
     for (let attempt = 0; attempt < 60; attempt += 1) {
       const response = await page.request.get("/store/search?q=demo&locale=en");
       expect(response.status(), `search ${String(attempt + 1)}`).toBe(200);
@@ -364,5 +379,32 @@ test.describe("the results page", () => {
     await expect(page.getByText(/Try again in \d+ seconds?\./)).toBeVisible();
     await expect(page.getByRole("link", { name: "Try again" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Browse the catalog" }).last()).toBeVisible();
+  });
+
+  test("passes no client address on with STOREFRONT_FORWARD_CLIENT_ADDRESS off: an invented one is ignored and every shopper shares the Next server's window", async ({
+    playwright,
+  }) => {
+    // The second `next start` of the config, reached directly as a client that got around the edge would: it names a new
+    // address on every request. Counted per named address, it would never meet the limit; it does, within 61 pages, because
+    // the Next server's own address is counted (one window for everybody, ADR 0038).
+    const direct = `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}`;
+    const client = await playwright.request.newContext();
+    try {
+      let limitedAt = 0;
+      for (let attempt = 1; attempt <= 61 && limitedAt === 0; attempt += 1) {
+        const response = await client.get(`${direct}/en/search?q=demo`, {
+          headers: { "X-Forwarded-For": `203.0.113.${String(attempt)}` },
+        });
+        expect(response.status(), `page ${String(attempt)}`).toBe(200);
+        if ((await response.text()).includes("Too many searches")) limitedAt = attempt;
+      }
+      expect(limitedAt, "the shared window was used up").toBeGreaterThan(0);
+      const another = await client.get(`${direct}/en/search?q=demo`, {
+        headers: { "X-Forwarded-For": "198.51.100.77" },
+      });
+      expect(await another.text()).toContain("Too many searches");
+    } finally {
+      await client.dispose();
+    }
   });
 });

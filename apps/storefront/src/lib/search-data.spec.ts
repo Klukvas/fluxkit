@@ -106,10 +106,30 @@ describe("search data (the results page's server read of GET /store/search)", ()
   });
 
   it.each([
-    [404, "not_found", { kind: "disabled" }],
-    [400, "validation_failed", { kind: "invalid" }],
-  ])("reads a %i %s as %j", async (status, code, expected) => {
-    const { data } = setup(() => problem(status, code));
+    [404, "not_found", [], { kind: "disabled" }],
+    [400, "validation_failed", [], { kind: "invalid", reason: "filter" }],
+    [
+      400,
+      "validation_failed",
+      [{ path: "f", code: "unknown_facet_key" }],
+      { kind: "invalid", reason: "filter" },
+    ],
+    // A range the API cannot read is named as such, not as a filter that does not exist (review F4). The API's shape:
+    // `validation_failed` with the reason in `errors[].code` (apps/api/src/search/store/store-search.spec.ts).
+    [
+      400,
+      "validation_failed",
+      [{ path: "f", code: "invalid_range" }],
+      { kind: "invalid", reason: "range" },
+    ],
+    [
+      400,
+      "validation_failed",
+      [{ path: "price", code: "invalid_range" }],
+      { kind: "invalid", reason: "range" },
+    ],
+  ])("reads a %i %s with the errors %j as %j", async (status, code, errors, expected) => {
+    const { data } = setup(() => problem(status, code, { errors }));
     await expect(data.search("uk", query)).resolves.toEqual(expected);
   });
 

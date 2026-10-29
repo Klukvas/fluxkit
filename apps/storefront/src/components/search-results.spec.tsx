@@ -1,5 +1,6 @@
 import type { SearchFacet, SearchResult } from "@fluxkit/api-client";
 import { createTranslator } from "@fluxkit/ui";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { formatMoney } from "../lib/money";
@@ -198,6 +199,14 @@ describe("results page markup", () => {
   });
 });
 
+describe("selected-filter chips (review F6)", () => {
+  it("are keyed by the chip's facet key and value, never by the label two facets can share", () => {
+    const source = readFileSync(new URL("./search-results.tsx", import.meta.url), "utf8");
+    expect(source).toMatch(/<li key=\{chip\.key\}>/);
+    expect(source).not.toMatch(/key=\{chip\.label\}/);
+  });
+});
+
 describe("results page states", () => {
   it("says so when search found broader results", () => {
     expect(render(ok({ relaxed: true }))).toContain("§search.relaxed");
@@ -254,8 +263,22 @@ describe("results page states", () => {
   });
 
   it("explains filters the API refuses and offers to clear them", () => {
-    const html = render({ kind: "invalid" }, { query: { ...query, facets: ["brand:gone"] } });
+    const html = render(
+      { kind: "invalid", reason: "filter" },
+      { query: { ...query, facets: ["brand:gone"] } },
+    );
     expect(html).toContain("§search.invalid.title");
+    expect(html).toContain('href="/uk/search?q=lamp"');
+  });
+
+  it("names a range the API cannot read as a range, not as a missing filter (review F4)", () => {
+    const html = render(
+      { kind: "invalid", reason: "range" },
+      { query: { ...query, facets: ["attr.length:0.0000001.."] } },
+    );
+    expect(html).toContain("§search.invalidRange.title");
+    expect(html).toContain("§search.invalidRange.description");
+    expect(html).not.toContain("§search.invalid.title");
     expect(html).toContain('href="/uk/search?q=lamp"');
   });
 
@@ -300,7 +323,8 @@ describe("no hardcoded words and both locales", () => {
     ["empty", ok({ items: [], total: 0 }), query],
     ["unavailable", { kind: "unavailable", retryAfterSeconds: 30 }, query],
     ["rate limited", { kind: "rate_limited", retryAfterSeconds: 5 }, query],
-    ["invalid", { kind: "invalid" }, query],
+    ["invalid", { kind: "invalid", reason: "filter" }, query],
+    ["invalid range", { kind: "invalid", reason: "range" }, query],
   ];
 
   it.each(states)("%s: every word is a translated message", (_name, outcome, current) => {

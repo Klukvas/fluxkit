@@ -11,7 +11,7 @@ import {
 } from "@fluxkit/ui";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
-import { selectedFilters, sortChoices } from "../lib/search-facets";
+import { describeFormFailure, selectedFilters, sortChoices } from "../lib/search-facets";
 import { SEARCH_RESULTS_HEADING_ID } from "../lib/search-ids";
 import {
   MAX_SEARCH_PAGE,
@@ -48,6 +48,11 @@ export interface SearchResultsViewProps {
   t: Translator;
   query: SearchQuery;
   outcome: SearchPageOutcome;
+  /**
+   * The `reason` of a script-less filter submit the parser refused (`resolveSearchAddress`), shown as the form's own
+   * "Check the filters" state; `null` (the default) when there is none.
+   */
+  formFailure?: string | null;
   currency: string;
   exponent: number;
   imageHosts: readonly string[];
@@ -72,9 +77,13 @@ function ProblemState({
       ? outcome.retryAfterSeconds
       : null;
   if (outcome.kind === "invalid") {
+    const range = outcome.reason === "range";
     return (
-      <Alert variant="warning" title={t("search.invalid.title")}>
-        <p>{t("search.invalid.description")}</p>
+      <Alert
+        variant="warning"
+        title={t(range ? "search.invalidRange.title" : "search.invalid.title")}
+      >
+        <p>{t(range ? "search.invalidRange.description" : "search.invalid.description")}</p>
         <p className="mt-3">
           <a href={pageHref(locale, clearFilters(query))} className={linkButton}>
             {t("search.empty.clear")}
@@ -137,6 +146,7 @@ function ResultsBody({
   currency,
   exponent,
   imageHosts,
+  formFailure,
 }: Omit<SearchResultsViewProps, "outcome"> & { result: SearchResult }) {
   const chips = selectedFilters({ query, facets: result.facets, t, currency, exponent });
   const sorts = sortChoices(query);
@@ -147,7 +157,15 @@ function ResultsBody({
         <aside aria-label={t("search.filters.title")} className="lg:col-span-1">
           <FiltersDisclosure title={t("search.filters.title")}>
             {/* Keyed by the address: the checkboxes are uncontrolled and must start over with every new result. */}
-            <SearchFilterForm key={searchPath(query)} exponent={exponent}>
+            <SearchFilterForm
+              key={searchPath(query)}
+              exponent={exponent}
+              initialError={
+                formFailure === null || formFailure === undefined
+                  ? null
+                  : t(describeFormFailure(formFailure).messageKey)
+              }
+            >
               <SearchFilters
                 t={t}
                 query={query}
@@ -186,7 +204,7 @@ function ResultsBody({
               {chips.length === 0 ? null : (
                 <ul aria-label={t("search.filters.selected")} className="flex flex-wrap gap-2">
                   {chips.map((chip) => (
-                    <li key={chip.label}>
+                    <li key={chip.key}>
                       <a
                         href={pageHref(locale, chip.remove)}
                         aria-label={t("search.filters.remove", { label: chip.label })}
@@ -273,7 +291,15 @@ export function SearchResultsView(props: SearchResultsViewProps) {
       {outcome.kind === "results" ? (
         <ResultsBody {...props} result={outcome.result} />
       ) : (
-        <ProblemState locale={locale} t={t} query={query} outcome={outcome} />
+        <>
+          {/* Without results there is no filter form to hold the failure: it is said here (review F3). */}
+          {props.formFailure === null || props.formFailure === undefined ? null : (
+            <Alert variant="danger" title={t("searchForm.error.title")}>
+              <p>{t(describeFormFailure(props.formFailure).messageKey)}</p>
+            </Alert>
+          )}
+          <ProblemState locale={locale} t={t} query={query} outcome={outcome} />
+        </>
       )}
     </Container>
   );

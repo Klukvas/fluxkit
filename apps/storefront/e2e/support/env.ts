@@ -6,6 +6,13 @@ import { join } from "node:path";
 /** Ports and credentials of the e2e stack. Throwaway values for a database that is wiped at every run. */
 export const E2E_API_PORT = Number(process.env["E2E_API_PORT"] ?? 3100);
 export const E2E_STOREFRONT_PORT = Number(process.env["E2E_STOREFRONT_PORT"] ?? 3101);
+/**
+ * A second `next start` of the same build with `STOREFRONT_FORWARD_CLIENT_ADDRESS` unset (ADR 0038), reached directly by
+ * `search.e2e.ts` only, to show that it passes no client address on. Started only when the suite runs with search on.
+ */
+export const E2E_STOREFRONT_UNFORWARDED_PORT = Number(
+  process.env["E2E_STOREFRONT_UNFORWARDED_PORT"] ?? 3103,
+);
 /** The only origin a browser sees: the proxy (`proxy.ts`). */
 export const E2E_PORT = Number(process.env["E2E_PORT"] ?? 3102);
 export const E2E_ORIGIN = `http://127.0.0.1:${E2E_PORT}`;

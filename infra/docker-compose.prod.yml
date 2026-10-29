@@ -97,6 +97,8 @@ services:
       API_INTERNAL_URL: http://api:3000
       STOREFRONT_PUBLIC_URL: https://${FLUXKIT_DOMAIN:?set FLUXKIT_DOMAIN}
       STOREFRONT_IMAGE_HOSTS: ${STOREFRONT_IMAGE_HOSTS:-}
+      # Pass the edge's X-Forwarded-For on for the search window (ADR 0038); safe here because only the edge publishes ports.
+      STOREFRONT_FORWARD_CLIENT_ADDRESS: ${STOREFRONT_FORWARD_CLIENT_ADDRESS:-false}
     # Next's fetch and image caches (lost on restart, which is fine).
     tmpfs: ["/tmp", "/app/apps/storefront/.next/cache:uid=1000,gid=1000,mode=0755"]
     mem_limit: 1g

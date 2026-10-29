@@ -227,7 +227,11 @@ describe("no third-party origin and no cookie of its own (ADR 0033 decision 11)"
     );
     // The single header read, handed to the address check; the cookie header and the cookie API stay out of reach.
     expect(text.match(/\bheaders\(\)/g)).toHaveLength(1);
-    expect(text).toMatch(/\(await headers\(\)\)\.get\("x-forwarded-for"\)/);
+    // Only through the address check, and only behind the operator's switch (review F1 and F5, ADR 0038). The behaviour
+    // is pinned by `src/lib/search-data.server.spec.ts`; this keeps the one read readable as one line.
+    expect(text).toMatch(
+      /forwardClientAddress\s*\?\s*forwardableAddresses\(\(await headers\(\)\)\.get\("x-forwarded-for"\)\)\s*:\s*null/,
+    );
     expect(text).not.toMatch(/cookie/i);
   });
 

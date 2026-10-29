@@ -27,8 +27,11 @@ export type SearchOutcome =
   | { kind: "results"; result: SearchResult }
   /** `SEARCH_ENABLED=false` (the API answered 404): the page does not exist. */
   | { kind: "disabled" }
-  /** A parameter the API refuses (400), for example a facet key that is not a facet (any more). */
-  | { kind: "invalid" }
+  /**
+   * A parameter the API refuses (400): `range` for `invalid_range` (a number of a range it cannot read, review F4), `filter`
+   * for anything else, for example a facet key that is not a facet (any more).
+   */
+  | { kind: "invalid"; reason: "range" | "filter" }
   | { kind: "rate_limited"; retryAfterSeconds: number | null }
   /** 503 `search_unavailable`, or the API could not be reached. */
   | { kind: "unavailable"; retryAfterSeconds: number | null };
@@ -104,7 +107,12 @@ export function createSearchData(dependencies: SearchDataDependencies): SearchDa
         case outcome.status === 404:
           return { kind: "disabled" };
         case outcome.status === 400:
-          return { kind: "invalid" };
+          return {
+            kind: "invalid",
+            reason: (outcome.problem.errors ?? []).some((error) => error.code === "invalid_range")
+              ? "range"
+              : "filter",
+          };
         case outcome.status === 429:
           return { kind: "rate_limited", retryAfterSeconds: wait };
         case outcome.status === 503 && outcome.problem.code === "search_unavailable":

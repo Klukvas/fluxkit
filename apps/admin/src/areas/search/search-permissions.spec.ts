@@ -1,9 +1,10 @@
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
-import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { describe, expect, it, vi } from "vitest";
 import { visibleNavigation } from "../../layout/navigation";
 import { canAccess } from "../../permissions";
 import { ROUTES } from "../../routes";
-import { SEARCH_WRITE_OPERATIONS, canManageSearch } from "./search-permissions";
+import { SEARCH_WRITE_OPERATIONS, canManageSearch, whenCanManage } from "./search-permissions";
 
 const SEARCH_ROUTE_IDS = ["search", "searchSynonyms"];
 
@@ -61,5 +62,28 @@ describe("the Search area per role", () => {
     expect(canManageSearch(["catalog.publish", "orders.write", "shipping.manage"])).toBe(false);
     expect(canManageSearch([])).toBe(false);
     expect(canManageSearch(null)).toBe(false);
+  });
+});
+
+describe("whenCanManage (the re-check behind the hidden write controls, review F5)", () => {
+  it("sends nothing for an admin who may not change search, and says so with null", () => {
+    const write = vi.fn(() => Promise.resolve("sent"));
+    expect(whenCanManage(false, write)).toBeNull();
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("runs the write once for an admin who may, and hands back its promise (or the single flight's null)", async () => {
+    const write = vi.fn(() => Promise.resolve("sent"));
+    await expect(whenCanManage(true, write)).resolves.toBe("sent");
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(whenCanManage(true, () => null)).toBeNull();
+  });
+
+  it("is the only way the status screen requests a rebuild", () => {
+    const page = readFileSync(new URL("./status-page.tsx", import.meta.url), "utf8");
+    expect(page.match(/requestSearchRebuild/g)).toHaveLength(1);
+    expect(page).toMatch(
+      /whenCanManage\(canManage,\s*\(\)\s*=>\s*flight\.run\(\(\)\s*=>\s*runWrite\(\(\)\s*=>\s*adminClient\.requestSearchRebuild\(\)\)\)/,
+    );
   });
 });

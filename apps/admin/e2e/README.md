@@ -9,7 +9,7 @@ Browser tests of the admin SPA against the real stack: Postgres, Redis, Meilisea
    ```bash
    createdb -h 127.0.0.1 -U <user> fluxkit_e2e_test
    ```
-3. Chromium once: `pnpm --filter @fluxkit/admin exec playwright install chromium` (add `--with-deps` on a fresh Linux machine). The admin suite pins the same `@playwright/test` (1.56.1, Chromium revision 1194) as the storefront, so one installed browser serves both; with `PLAYWRIGHT_BROWSERS_PATH` pointing at it nothing is downloaded.
+3. Chromium once: `pnpm --filter @fluxkit/admin exec playwright install chromium` (add `--with-deps` on a fresh Linux machine). The admin suite pins the same `@playwright/test` (1.64.1, Chromium revision 1248) as the storefront, so one installed browser serves both; with `PLAYWRIGHT_BROWSERS_PATH` pointing at it nothing is downloaded.
 4. Run, from the repository root:
    ```bash
    ( export E2E_DATABASE_URL=postgres://<user>:<password>@127.0.0.1:5432/fluxkit_e2e_test \
@@ -73,7 +73,7 @@ Ports can be changed with `ADMIN_E2E_PORT` and `ADMIN_E2E_API_PORT` (the storefr
 
 - `E2E_DATABASE_URL must be set` / `Refusing to wipe database ...`: see step 2; the name rule is deliberate.
 - `.../apps/admin/dist/index.html cannot be read`: run `pnpm build` (the proxy serves the build, not the dev server).
-- `Executable doesn't exist ...`: Chromium for Playwright 1.56.1 (revision 1194) is not installed (step 3).
+- `Executable doesn't exist ...`: Chromium for Playwright 1.64.1 (revision 1248) is not installed (step 3).
 - A web server "timed out": run its command from the table by hand to see the error (the API needs `pnpm build`, Redis and Meilisearch).
 - Port in use: another run holds 3110 or 3112 (`reuseExistingServer` is off on purpose): stop it or set the `ADMIN_E2E_*` ports.
 - One Playwright run at a time per database (each suite wipes it at its start).
