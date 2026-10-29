@@ -1,10 +1,14 @@
 import { randomBytes } from "node:crypto";
+import { and, inArray } from "drizzle-orm";
+import { isInPrivacySubjectScope, type PrivacySubjectScope } from "@fluxkit/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ProblemBody } from "../common/problem.filter.js";
+import { emailMessage, salesOrder } from "../database/schema/index.js";
 import type { PlacedForAdmin } from "../test/admin-orders-world.js";
 import { http } from "../test/http.js";
 import { Shopper } from "../test/shopper.js";
 import { ShipmentWorld, TEST_POINT_REF } from "../test/shipment-world.js";
+import { subjectMailCondition, subjectOrdersCondition } from "./subject.js";
 
 const PASSWORD = "privacy-scope-pass-phrase-1";
 
@@ -117,6 +121,20 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
     return id;
   }
 
+  /** An order mail of a customer's order, sent to the contact address typed at checkout. */
+  async function customerMail(to: string, customerId: string): Promise<string> {
+    const result = await world.pool.query<{ id: string }>(
+      `insert into email_message (template_key, template_version, locale, to_address, recipient_kind, customer_id,
+         variables, deadline_at)
+       values ('order.placed', 1, 'uk', $1, 'customer', $2, '{"number":"X"}', now() + interval '1 hour')
+       returning id`,
+      [to, customerId],
+    );
+    const id = result.rows[0]?.id;
+    if (id === undefined) throw new Error("Test setup bug: no mail row");
+    return id;
+  }
+
   async function mailExists(id: string): Promise<boolean> {
     const result = await world.pool.query("select 1 from email_message where id = $1", [id]);
     return result.rowCount === 1;
@@ -200,6 +218,141 @@ describe("privacy subject scope (review F1 to F3, real Postgres)", () => {
       expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
       expect(await orderRow(guestOrder.id)).toMatchObject({ email: null, phone: null });
       expect(await mailExists(mail)).toBe(false);
+    });
+  });
+
+  describe("F2: the address reaches guest rows only, never another account's", () => {
+    const admin = (path: string, body: unknown) =>
+      http<ProblemBody & Row>(owner().baseUrl, "POST", path, { body });
+
+    /** Customer A orders while signed in but types V's address as the contact email; the order is closed. */
+    async function accountOrderWithOtherEmail(otherEmail: string) {
+      const a = await register(nextEmail("account-a"));
+      const order = await cancelled(await pickupOrder(otherEmail, a.shopper));
+      expect((await orderRow(order.id)).customer_id).toBe(a.id);
+      const mail = await customerMail(otherEmail, a.id);
+      return { a, order, mail, before: await orderRow(order.id) };
+    }
+
+    it("R2: the owner's request for an address neither exports, previews, erases nor deletes mail of another live account's order that carries it", async () => {
+      const victimEmail = nextEmail("typed");
+      const { a, order, mail, before } = await accountOrderWithOtherEmail(victimEmail);
+
+      const lookup = await admin("/admin/privacy/lookup", { email: victimEmail });
+      expect(lookup.body).toMatchObject({ customer: null, guestOrders: [], mailCount: 0 });
+
+      const created = await admin("/admin/privacy/requests", {
+        kind: "erasure",
+        subject: { email: victimEmail },
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      const id = String(created.body["id"]);
+      const exported = await http<ExportDoc>(
+        owner().baseUrl,
+        "POST",
+        `/admin/privacy/requests/${id}/export`,
+        { body: { email: victimEmail } },
+      );
+      expect(exported.status, JSON.stringify(exported.body)).toBe(200);
+      expect(exported.body.orders).toEqual([]);
+      expect(exported.body.mail).toEqual([]);
+      expect(JSON.stringify(exported.body)).not.toContain(order.number);
+
+      const preview = await admin(`/admin/privacy/requests/${id}/erase-preview`, {
+        email: victimEmail,
+      });
+      expect(preview.body).toMatchObject({ accountFound: false, orders: 0, mail: 0, blockers: [] });
+
+      const erased = await admin(`/admin/privacy/requests/${id}/erase`, {
+        email: victimEmail,
+        confirm: true,
+      });
+      expect(erased.status, JSON.stringify(erased.body)).toBe(200);
+      expect(erased.body).toMatchObject({ result: { ordersAnonymised: 0, mailDeleted: 0 } });
+      expect(await orderRow(order.id)).toEqual(before);
+      expect(await mailExists(mail)).toBe(true);
+      const own = await a.shopper.get<{ contact: Row }>(`/store/account/orders/${order.number}`);
+      expect(own.status).toBe(200);
+      expect(own.body.contact).toMatchObject({ email: victimEmail, firstName: "Іван" });
+    });
+
+    it("R2: a verified account with that address neither exports nor erases another account's order that carries it", async () => {
+      const email = nextEmail("verified-holder");
+      const { order, mail, before } = await accountOrderWithOtherEmail(email);
+      const holder = await register(email);
+      await verify(holder.id);
+
+      const exported = await holder.shopper.get<ExportDoc>("/store/account/data-export");
+      expect(exported.status).toBe(200);
+      expect(exported.body.orders).toEqual([]);
+      expect(exported.body.mail).toEqual([]);
+
+      const deleted = await deleteAccount(holder.shopper);
+      expect(deleted.status, JSON.stringify(deleted.body)).toBe(204);
+      expect(await orderRow(order.id)).toEqual(before);
+      expect(await mailExists(mail)).toBe(true);
+    });
+
+    it("the SQL conditions select exactly the rows core isInPrivacySubjectScope accepts", async () => {
+      const email = nextEmail("matrix");
+      const a = await register(nextEmail("matrix-a"));
+      const b = await register(nextEmail("matrix-b"));
+      const orders = [
+        await pickupOrder(email), // guest, the address
+        await pickupOrder(nextEmail("matrix-other")), // guest, another address
+        await pickupOrder(email, a.shopper), // account A, typed the address
+        await pickupOrder(nextEmail("matrix-typed"), a.shopper), // account A, another address
+        await pickupOrder(email, b.shopper), // account B, typed the address
+      ];
+      const ids = orders.map((order) => order.id);
+      const mails = [
+        await guestMail(email),
+        await guestMail(nextEmail("matrix-mail")),
+        await customerMail(email, a.id),
+        await customerMail(nextEmail("matrix-mail-a"), a.id),
+        await customerMail(email, b.id),
+      ];
+      const scopes: PrivacySubjectScope[] = [
+        { customerId: null, guestEmail: email },
+        { customerId: a.id, guestEmail: null },
+        { customerId: a.id, guestEmail: email },
+        { customerId: b.id, guestEmail: email },
+      ];
+      const db = world.orders.db;
+      for (const scope of scopes) {
+        const allOrders = await db
+          .select({ id: salesOrder.id, customerId: salesOrder.customerId, email: salesOrder.email })
+          .from(salesOrder)
+          .where(inArray(salesOrder.id, ids));
+        const selectedOrders = await db
+          .select({ id: salesOrder.id })
+          .from(salesOrder)
+          .where(and(inArray(salesOrder.id, ids), subjectOrdersCondition(scope)));
+        expect(selectedOrders.map((row) => row.id).sort(), JSON.stringify(scope)).toEqual(
+          allOrders
+            .filter((row) => isInPrivacySubjectScope(scope, row))
+            .map((row) => row.id)
+            .sort(),
+        );
+        const allMail = await db
+          .select({
+            id: emailMessage.id,
+            customerId: emailMessage.customerId,
+            email: emailMessage.toAddress,
+          })
+          .from(emailMessage)
+          .where(inArray(emailMessage.id, mails));
+        const selectedMail = await db
+          .select({ id: emailMessage.id })
+          .from(emailMessage)
+          .where(and(inArray(emailMessage.id, mails), subjectMailCondition(scope)));
+        expect(selectedMail.map((row) => row.id).sort(), JSON.stringify(scope)).toEqual(
+          allMail
+            .filter((row) => isInPrivacySubjectScope(scope, row))
+            .map((row) => row.id)
+            .sort(),
+        );
+      }
     });
   });
 });

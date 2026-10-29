@@ -130,3 +130,4 @@ Also: `apps/api/src/privacy/inventory/pii-sentinel.spec.ts:97-194` registers, ch
 | ID | Resolution |
 |---|---|
 | F1 | Fixed. Core `privacySubjectScope` (TDD): a customer subject reaches guest orders and guest mail of its address only when `email_verified_at` is set. Recorded in the NEW ADR 0035 (ADR 0033 is accepted and merged, so it is superseded in part, not edited). Regression R1 through the real routes in `apps/api/src/privacy/subject-scope.spec.ts`. |
+| F2 | Fixed. One shared guest condition (`email = X AND customer_id IS NULL`, and the same for mail rows) in `apps/api/src/privacy/subject.ts`, used by the lookup, the export, the preview, the erasure and the blockers; core `isInPrivacySubjectScope` (TDD) states the rule for one row and a spec compares the SQL with it on real rows. Regression R2 (the owner's request and a verified account's self-service, through the real routes). ADR 0035. |

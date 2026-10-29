@@ -64,3 +64,23 @@ export function privacySubjectScope(input: PrivacySubjectInput): PrivacySubjectS
   }
   return { customerId: input.account?.id ?? null, guestEmail: input.email };
 }
+
+/** The columns of an order or a mail row that decide whether a subject reaches it. */
+export interface PrivacyScopedRow {
+  readonly customerId: string | null;
+  /** `sales_order.email` or `email_message.to_address` (normalized; NULL on an erased order). */
+  readonly email: string | null;
+}
+
+/**
+ * Whether a subject reaches one order or mail row: a row of its account, or a guest row with its guest address. The API's
+ * `subjectOrdersCondition` and `subjectMailCondition` are this rule in SQL (their spec compares both on real rows).
+ */
+export function isInPrivacySubjectScope(
+  scope: PrivacySubjectScope,
+  row: PrivacyScopedRow,
+): boolean {
+  if (scope.customerId !== null && row.customerId === scope.customerId) return true;
+  // A row of ANOTHER account that carries the address is that account's record, reached through that account (F2).
+  return scope.guestEmail !== null && row.customerId === null && row.email === scope.guestEmail;
+}

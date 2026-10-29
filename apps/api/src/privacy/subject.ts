@@ -1,4 +1,4 @@
-import { eq, or, type SQL } from "drizzle-orm";
+import { and, eq, isNull, or, type SQL } from "drizzle-orm";
 import { privacySubjectScope, type PrivacySubjectScope } from "@fluxkit/core";
 import { customer, emailMessage, salesOrder } from "../database/schema/index.js";
 
@@ -50,9 +50,18 @@ function either(conditions: SQL[]): SQL {
   return (conditions.length === 1 ? conditions[0] : or(...conditions)) as SQL;
 }
 
-/** The orders a guest address reaches. */
+/**
+ * The GUEST orders of an address (`email = X AND customer_id IS NULL`, core `isInPrivacySubjectScope`): an order of
+ * another account that carries the address is that account's record (a signed-in customer may type any email at
+ * checkout), reached through that account only (privacy review F2).
+ */
 export function guestOrdersCondition(email: string): SQL {
-  return eq(salesOrder.email, email);
+  return and(eq(salesOrder.email, email), isNull(salesOrder.customerId)) as SQL;
+}
+
+/** The GUEST mail rows of an address (`to_address = X AND customer_id IS NULL`), for the same reason. */
+export function guestMailCondition(email: string): SQL {
+  return and(eq(emailMessage.toAddress, email), isNull(emailMessage.customerId)) as SQL;
 }
 
 /**
@@ -70,6 +79,6 @@ export function subjectOrdersCondition(scope: PrivacySubjectScope): SQL {
 export function subjectMailCondition(scope: PrivacySubjectScope): SQL {
   const conditions: SQL[] = [];
   if (scope.customerId !== null) conditions.push(eq(emailMessage.customerId, scope.customerId));
-  if (scope.guestEmail !== null) conditions.push(eq(emailMessage.toAddress, scope.guestEmail));
+  if (scope.guestEmail !== null) conditions.push(guestMailCondition(scope.guestEmail));
   return either(conditions);
 }

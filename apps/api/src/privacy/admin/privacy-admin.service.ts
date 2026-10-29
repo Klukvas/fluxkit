@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, count, desc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 import {
   decideRequestTransition,
   isRequestOverdue,
@@ -28,7 +28,12 @@ import { AdminAuditWriter } from "../audit/admin-audit.writer.js";
 import { PrivacyErasureService } from "../erasure/privacy-erasure.service.js";
 import { PersonalDataExportService } from "../export/personal-data-export.service.js";
 import { PersonalDataReader } from "../export/personal-data.reader.js";
-import { customerSubject, emailSubject, type ResolvedSubject } from "../subject.js";
+import {
+  customerSubject,
+  emailSubject,
+  guestOrdersCondition,
+  type ResolvedSubject,
+} from "../subject.js";
 import { PRIVACY_CONFIG, subjectEmailHash, type PrivacyConfig } from "../privacy-config.js";
 import type {
   CreateRequestBody,
@@ -126,7 +131,7 @@ export class PrivacyAdminService {
           contactErasedAt: salesOrder.contactErasedAt,
         })
         .from(salesOrder)
-        .where(and(eq(salesOrder.email, normalized), isNull(salesOrder.customerId)))
+        .where(guestOrdersCondition(normalized))
         .orderBy(asc(salesOrder.placedAt), asc(salesOrder.id));
       const orderCount =
         account === undefined
