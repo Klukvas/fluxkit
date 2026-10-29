@@ -64,6 +64,8 @@ export interface StartAppOptions {
   storefrontPublicUrl?: string | null;
   /** A shorter send timeout or another pacing of the email sender. */
   emailDeliveryTuning?: Partial<EmailDeliveryTuning>;
+  /** A shorter time limit of one payment provider call, so a hanging provider times out quickly in a spec. */
+  paymentCallTimeoutMs?: number;
   /** Shorter limits for the shipment provider calls, so a hanging carrier times out quickly in a spec. */
   shipmentCallTimeouts?: Partial<ShipmentCallTimeouts>;
   /** Extra modules loaded like enabled features, for probe controllers. */
@@ -163,6 +165,7 @@ export async function startApp(options: StartAppOptions = {}): Promise<RunningAp
       extraPaymentProviders: options.extraPaymentProviders,
       emailDeliveryTuning: options.emailDeliveryTuning,
       shipmentCallTimeouts: options.shipmentCallTimeouts,
+      paymentCallTimeoutMs: options.paymentCallTimeoutMs,
       mediaTuning: options.mediaTuning,
     },
   );

@@ -46,6 +46,7 @@ export const ORDER_REFUSAL_RULES = [
   "awaiting_stock",
   "order_not_payable",
   "payment_reference_conflict",
+  "payment_in_progress",
   "invalid_transition",
 ] as const;
 

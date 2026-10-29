@@ -38,6 +38,7 @@ describe("orders messages built from data", () => {
         "awaiting_stock",
         "invalid_transition",
         "order_not_payable",
+        "payment_in_progress",
         "payment_reference_conflict",
       ].sort(),
     );

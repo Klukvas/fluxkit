@@ -123,6 +123,7 @@
   "errors.reason.order_not_found": "Замовлення не існує.",
   "errors.reason.order_not_payable": "Прострочене чи скасоване замовлення не можна позначити оплаченим.",
   "errors.reason.payment_reference_conflict": "Замовлення вже оплачено з іншим номером платежу.",
+  "errors.reason.payment_in_progress": "Онлайн-оплата цього замовлення ще триває.",
   "errors.reason.idempotency_key_required": "Відсутній ключ запиту.",
   "errors.reason.invalid_idempotency_key": "Ключ запиту неправильний.",
   "errors.reason.shipping_address_required": "Потрібна адреса доставки.",

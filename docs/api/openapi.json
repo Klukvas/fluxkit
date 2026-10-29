@@ -18189,6 +18189,111 @@
         "x-fluxkit-permission": "orders.read"
       }
     },
+    "/webhooks/payments/{provider}": {
+      "post": {
+        "description": "Called by the payment provider, never by a browser. The signature is verified over the exact raw body bytes before anything is parsed. 200 with an empty body once the fact is recorded (also for a duplicate or an unknown payment); 401 for a missing or invalid signature; 404 when the provider is not enabled; 503 when it could not be recorded (the provider retries).",
+        "operationId": "PaymentWebhookController_receive",
+        "parameters": [
+          {
+            "name": "provider",
+            "required": true,
+            "in": "path",
+            "description": "An enabled payment provider code, e.g. `monobank`.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "The provider's own JSON notification, verified by its signature header.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Recorded (or a duplicate, or not ours). Empty body."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The request body is too large.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The request body is not of the content type the route takes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable: a transient failure, try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Receive a payment provider's signed status notification",
+        "tags": ["webhooks"]
+      }
+    },
     "/admin/email/status": {
       "get": {
         "description": "Works with `EMAIL_PROVIDER=none` too (`configured: false`). Counts of the last 24 hours by status, the open queue, the oldest pending mail and the most common error codes. Never the provider key.",

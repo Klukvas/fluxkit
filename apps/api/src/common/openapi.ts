@@ -137,6 +137,8 @@ const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
   403: "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
   404: `${PROBLEM_TITLE.not_found}.`,
   409: "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+  413: "The request body is too large.",
+  415: "The request body is not of the content type the route takes.",
   429: `${PROBLEM_TITLE.too_many_requests}: try again after the number of seconds in the Retry-After header.`,
   500: `${PROBLEM_TITLE.internal_error}. Details are only in the server log.`,
   503: `${PROBLEM_TITLE.service_unavailable}: a transient failure, try again after the number of seconds in the Retry-After header.`,
@@ -144,7 +146,7 @@ const PROBLEM_DESCRIPTION: Readonly<Record<number, string>> = {
 
 /** Adds `application/problem+json` responses for the given statuses to a route or controller. */
 export function ApiProblemResponses(
-  ...statuses: (400 | 401 | 403 | 404 | 409 | 429 | 500 | 503)[]
+  ...statuses: (400 | 401 | 403 | 404 | 409 | 413 | 415 | 429 | 500 | 503)[]
 ): MethodDecorator & ClassDecorator {
   const options = (status: number): ApiResponseOptions => ({
     status,

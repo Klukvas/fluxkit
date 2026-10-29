@@ -4,9 +4,13 @@ import {
   buildOrderEventPayload,
   compareMoney,
   createMoney,
+  decideExpiry,
+  decideOrderPaymentGuard,
   decideTransition,
   isGuestAccessCurrent,
+  isLivePaymentStatus,
   orderEventTypeFor,
+  reservationExpiresAt,
   type MarkPaidOutcome,
   type MarkPaidRequest,
   type OrderActor,
@@ -21,7 +25,10 @@ import { applyJobLimits, type JobLimits } from "../common/job-limits.js";
 import { withTransaction, type Transaction } from "../common/transaction.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import { ReservationsService } from "../inventory/reservations/reservations.service.js";
+import { PaymentChanges, paymentStatusOf } from "../payments/attempts/payment-changes.js";
+import { PaymentsRepository } from "../payments/attempts/payments.repository.js";
 import { accessTokenMatches } from "./access-token.js";
+import { ORDERS_CONFIG, type OrdersConfig } from "./orders-config.js";
 import { OrdersRepository, type OrderRow, type OrderStatusUpdate } from "./orders.repository.js";
 
 /*
@@ -62,9 +69,18 @@ export type TransitionResult =
 
 export type OrderChangeResult =
   | { readonly ok: true; readonly order: OrderRow }
-  | { readonly ok: false; readonly reason: "not_found" | "invalid_transition" };
+  | {
+      readonly ok: false;
+      /** `payment_in_progress`: an online payment of the order is in flight (ADR 0032 decision 10). */
+      readonly reason: "not_found" | "invalid_transition" | "payment_in_progress";
+    };
 
-export type ExpireOutcome = "expired" | "not_due" | "not_found";
+/** `deferred`: an online payment is in flight, so the deadline moved on (ADR 0032 decision 8). */
+export type ExpireOutcome = "expired" | "deferred" | "not_due" | "not_found";
+
+/** What an admin's manual mark paid answers: `markPaid`'s outcome, or the online-payment guard (ADR 0032 decision 10). */
+export type ManualMarkPaidOutcome =
+  MarkPaidOutcome | { readonly ok: false; readonly reason: "payment_in_progress" };
 
 const REASON_MAX = 500;
 const REFERENCE_MAX = 255;
@@ -88,6 +104,12 @@ function toStatus(value: string): OrderStatus {
     throw new RangeError(`The order has an unknown status: ${value}`);
   }
   return value as OrderStatus;
+}
+
+function assertPaymentReference(reference: unknown): asserts reference is string {
+  if (typeof reference !== "string" || reference.length < 1 || reference.length > REFERENCE_MAX) {
+    throw new RangeError(`A payment reference is 1 to ${String(REFERENCE_MAX)} characters`);
+  }
 }
 
 function statusColumnsFor(
@@ -117,6 +139,9 @@ export class OrdersService implements OrderPaymentsPort {
     @Inject(OrdersRepository) private readonly orders: OrdersRepository,
     @Inject(ReservationsService) private readonly reservations: ReservationsService,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(PaymentsRepository) private readonly payments: PaymentsRepository,
+    @Inject(PaymentChanges) private readonly paymentChanges: PaymentChanges,
+    @Inject(ORDERS_CONFIG) private readonly config: OrdersConfig,
   ) {}
 
   /**
@@ -191,47 +216,85 @@ export class OrdersService implements OrderPaymentsPort {
     request: MarkPaidRequest,
     actor: OrderActorRef = { type: "system" },
   ): Promise<MarkPaidOutcome> {
+    assertPaymentReference(request.providerReference);
+    return this.inTransaction((tx) => this.markPaidIn(tx, orderId, request, actor));
+  }
+
+  /**
+   * `markPaid` inside the CALLER's transaction (ADR 0032 decision 7): the payments module applies a verified success in
+   * one transaction, so the payment attempt, its journal and the order commit or roll back together. Same rules and
+   * answers as `markPaid`; it locks the order row (a no-op when the caller already holds it, which the lock order of
+   * ADR 0015 requires: `sales_order` -> `payment` -> reservations). No deadlock retry here: the caller owns the
+   * transaction and retries it as a whole.
+   */
+  async markPaidIn(
+    tx: Transaction,
+    orderId: string,
+    request: MarkPaidRequest,
+    actor: OrderActorRef = { type: "system" },
+  ): Promise<MarkPaidOutcome> {
     const reference = request.providerReference;
-    if (typeof reference !== "string" || reference.length < 1 || reference.length > REFERENCE_MAX) {
-      throw new RangeError(`A payment reference is 1 to ${String(REFERENCE_MAX)} characters`);
-    }
+    assertPaymentReference(reference);
     const now = this.clock.now();
-    return this.inTransaction(async (tx) => {
+    const order = await this.orders.lockById(tx, orderId);
+    if (order === undefined) {
+      return { ok: false, reason: "order_not_found" };
+    }
+    const status = toStatus(order.status);
+    if (status === "cancelled" || status === "expired") {
+      return { ok: false, reason: "order_not_payable" };
+    }
+    const sameReference = order.paymentReference === reference;
+    if ((status === "paid" || status === "fulfilled") && !sameReference) {
+      return { ok: false, reason: "payment_reference_conflict" };
+    }
+    const total = createMoney(order.totalAmount, order.currency);
+    if (!total.ok) {
+      throw new RangeError(`Order ${order.number} has a total core rejects: ${total.reason}`);
+    }
+    const compared = compareMoney(request.amount, total.money);
+    if (!compared.ok || compared.ordering !== 0) {
+      return { ok: false, reason: "amount_mismatch" };
+    }
+    if (status === "paid" || status === "fulfilled") {
+      return { ok: true, orderId: order.id, alreadyPaid: true };
+    }
+    const result = await this.transition(tx, order, "paid", actor, {
+      now,
+      paymentReference: reference,
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        reason: result.reason === "order_not_payable" ? "order_not_payable" : "invalid_transition",
+      };
+    }
+    return { ok: true, orderId: order.id, alreadyPaid: false };
+  }
+
+  /**
+   * An admin's manual mark paid (offline payments such as a bank transfer; ADR 0032 decision 10, owner answer 3): the
+   * online-payment guard first, under the order lock, then `markPaidIn` in the same transaction. Refused
+   * `payment_in_progress` while an online attempt is `processing`, `create_unknown` or `creating`; an
+   * `awaiting_customer` attempt is closed `invalidated` (job 11 invalidates its invoice; a success that still lands is a
+   * `payment_reference_conflict` and is refunded automatically). `markPaid` (the port) keeps its contract unchanged.
+   */
+  async markPaidManually(
+    orderId: string,
+    request: MarkPaidRequest,
+    actor: OrderActorRef,
+  ): Promise<ManualMarkPaidOutcome> {
+    assertPaymentReference(request.providerReference);
+    const now = this.clock.now();
+    return this.inTransaction(async (tx): Promise<ManualMarkPaidOutcome> => {
       const order = await this.orders.lockById(tx, orderId);
       if (order === undefined) {
         return { ok: false, reason: "order_not_found" };
       }
-      const status = toStatus(order.status);
-      if (status === "cancelled" || status === "expired") {
-        return { ok: false, reason: "order_not_payable" };
+      if (!(await this.guardOnlinePayments(tx, order, actor, now))) {
+        return { ok: false, reason: "payment_in_progress" };
       }
-      const sameReference = order.paymentReference === reference;
-      if ((status === "paid" || status === "fulfilled") && !sameReference) {
-        return { ok: false, reason: "payment_reference_conflict" };
-      }
-      const total = createMoney(order.totalAmount, order.currency);
-      if (!total.ok) {
-        throw new RangeError(`Order ${order.number} has a total core rejects: ${total.reason}`);
-      }
-      const compared = compareMoney(request.amount, total.money);
-      if (!compared.ok || compared.ordering !== 0) {
-        return { ok: false, reason: "amount_mismatch" };
-      }
-      if (status === "paid" || status === "fulfilled") {
-        return { ok: true, orderId: order.id, alreadyPaid: true };
-      }
-      const result = await this.transition(tx, order, "paid", actor, {
-        now,
-        paymentReference: reference,
-      });
-      if (!result.ok) {
-        return {
-          ok: false,
-          reason:
-            result.reason === "order_not_payable" ? "order_not_payable" : "invalid_transition",
-        };
-      }
-      return { ok: true, orderId: order.id, alreadyPaid: false };
+      return this.markPaidIn(tx, orderId, request, actor);
     });
   }
 
@@ -239,7 +302,10 @@ export class OrdersService implements OrderPaymentsPort {
   async markFulfilled(
     orderId: string,
     actor: OrderActorRef,
-  ): Promise<OrderChangeResult | { readonly ok: false; readonly reason: "awaiting_stock" }> {
+  ): Promise<
+    | { readonly ok: true; readonly order: OrderRow }
+    | { readonly ok: false; readonly reason: "not_found" | "invalid_transition" | "awaiting_stock" }
+  > {
     const now = this.clock.now();
     return this.inTransaction(async (tx) => {
       const order = await this.orders.lockById(tx, orderId);
@@ -346,6 +412,13 @@ export class OrdersService implements OrderPaymentsPort {
    * Expires one order whose `expires_at <= now` and releases its reservations (the scheduler's job, plan step 5c, calls
    * this per due order). Under the order lock the status and the time are checked again, so a payment or a
    * cancellation that got there first wins and this answers `not_due`.
+   *
+   * An online payment in flight defers it (ADR 0032 decision 8, owner answer 2; core `decideExpiry` with the order's
+   * attempts, locked after the order): while an attempt is live, the deadline and the order's active reservations move
+   * on in 10-minute steps, at most until `placed_at + ORDER_PAYMENT_TTL_MINUTES + 30 minutes`; each step is journaled as
+   * a `system` payment event and makes job 11 read those attempts now. An order whose stock is no longer held cannot be
+   * paid, so it is not deferred. At the cap the order expires anyway: an `awaiting_customer` attempt is closed
+   * `invalidated`; a success that lands later is refunded automatically.
    */
   async expireOne(orderId: string, now: Date, limits?: JobLimits): Promise<ExpireOutcome> {
     return this.inTransaction(async (tx) => {
@@ -358,6 +431,35 @@ export class OrdersService implements OrderPaymentsPort {
       }
       if (order.status !== "awaiting_payment" || order.expiresAt.getTime() > now.getTime()) {
         return "not_due";
+      }
+      const attempts = await this.payments.lockAttemptsOfOrder(tx, order.id);
+      const decision = decideExpiry({
+        now,
+        orderExpiresAt: order.expiresAt,
+        placedAt: order.placedAt,
+        ttlMinutes: this.config.paymentTtlMinutes,
+        attempts: attempts.map((attempt) => ({
+          id: attempt.id,
+          status: paymentStatusOf(attempt.status),
+        })),
+      });
+      if (decision.action === "not_due") {
+        return "not_due";
+      }
+      if (decision.action === "defer") {
+        const held = await this.orders.listReservationsOfOrder(tx, order.id);
+        if (held.every((entry) => entry.status === "active")) {
+          await this.deferExpiry(tx, order, attempts, decision.expiresAt, now);
+          return "deferred";
+        }
+      }
+      if (decision.action === "expire" && decision.capReached) {
+        this.logger.warn(
+          `Order ${order.number}: expired at the payment deferral cap with an online payment still unconfirmed`,
+        );
+      }
+      for (const attempt of attempts.filter((entry) => entry.status === "awaiting_customer")) {
+        await this.invalidateAttempt(tx, attempt, { type: "system" }, now);
       }
       const result = await this.transition(tx, order, "expired", { type: "system" }, { now });
       if (!result.ok) {
@@ -390,10 +492,106 @@ export class OrdersService implements OrderPaymentsPort {
     actor: OrderActorRef,
     options: TransitionOptions,
   ): Promise<OrderChangeResult> {
+    if (
+      to === "cancelled" &&
+      decideTransition(toStatus(order.status), to, actor.type).ok &&
+      !(await this.guardOnlinePayments(tx, order, actor, options.now))
+    ) {
+      return { ok: false, reason: "payment_in_progress" };
+    }
     const result = await this.transition(tx, order, to, actor, options);
     return result.ok
       ? { ok: true, order: result.order }
       : { ok: false, reason: "invalid_transition" };
+  }
+
+  /**
+   * The online-payment guard of a cancel and of a manual mark paid of a LOCKED `awaiting_payment` order (ADR 0032
+   * decision 10; core `decideOrderPaymentGuard` over the order's attempts, locked after the order): `false` while an
+   * attempt is `processing`, `create_unknown` or `creating`; otherwise every `awaiting_customer` attempt is closed
+   * `invalidated` in this transaction and `true`. Any other order status has nothing to guard.
+   */
+  private async guardOnlinePayments(
+    tx: Transaction,
+    order: OrderRow,
+    actor: OrderActorRef,
+    now: Date,
+  ): Promise<boolean> {
+    if (order.status !== "awaiting_payment") {
+      return true;
+    }
+    const attempts = await this.payments.lockAttemptsOfOrder(tx, order.id);
+    const decision = decideOrderPaymentGuard(
+      attempts.map((attempt) => ({ id: attempt.id, status: paymentStatusOf(attempt.status) })),
+    );
+    if (!decision.ok) {
+      return false;
+    }
+    for (const attempt of attempts.filter((entry) => decision.invalidate.includes(entry.id))) {
+      await this.invalidateAttempt(tx, attempt, actor, now);
+    }
+    return true;
+  }
+
+  /** Closes an `awaiting_customer` attempt; job 11 invalidates its invoice at the provider (best effort, M14). */
+  private async invalidateAttempt(
+    tx: Transaction,
+    attempt: Awaited<ReturnType<PaymentsRepository["lockAttemptsOfOrder"]>>[number],
+    actor: OrderActorRef,
+    now: Date,
+  ): Promise<void> {
+    const admin = actor.type === "admin";
+    const changed = await this.paymentChanges.transition(
+      tx,
+      attempt,
+      "invalidated",
+      admin ? "admin" : "system",
+      {
+        now,
+        columns: { redirectUrl: null, nextCheckAt: now, checkAttempts: 0 },
+        entry: admin ? { source: "admin", actorAdminId: actor.adminId } : { source: "system" },
+      },
+    );
+    if (!changed.ok) {
+      throw new Error(`Invalidating a payment attempt was refused: ${changed.reason}`);
+    }
+  }
+
+  /** One deferral step (see `expireOne`): the deadline, the active reservations, the journal and job 11. */
+  private async deferExpiry(
+    tx: Transaction,
+    order: OrderRow,
+    attempts: Awaited<ReturnType<PaymentsRepository["lockAttemptsOfOrder"]>>,
+    expiresAt: Date,
+    now: Date,
+  ): Promise<void> {
+    await this.orders.updateExpiresAt(tx, order.id, expiresAt);
+    const held = await this.orders.listReservationsOfOrder(tx, order.id);
+    const extended = await this.reservations.extendManyIn(
+      tx,
+      held.map((entry) => entry.reservationId),
+      reservationExpiresAt(expiresAt),
+    );
+    for (const entry of extended) {
+      if (!entry.result.ok) {
+        throw new Error(
+          `Extending a reservation of order ${order.number} for a payment in flight failed: ${entry.result.reason}`,
+        );
+      }
+    }
+    for (const attempt of attempts) {
+      if (!isLivePaymentStatus(paymentStatusOf(attempt.status))) {
+        continue;
+      }
+      await this.paymentChanges.note(tx, attempt.id, { source: "system" });
+      // A read of the provider in this tick (job 11 runs after this job); a create in flight keeps its recovery time.
+      if (
+        attempt.providerPaymentId !== null &&
+        (attempt.nextCheckAt === null || attempt.nextCheckAt.getTime() > now.getTime())
+      ) {
+        await this.paymentChanges.update(tx, attempt, { nextCheckAt: now }, now);
+      }
+    }
   }
 
   private async applyStockEffect(

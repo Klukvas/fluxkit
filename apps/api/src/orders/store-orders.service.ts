@@ -134,6 +134,12 @@ export class StoreOrdersService {
       if (result.reason === "not_found") {
         throw notFound("Order");
       }
+      if (result.reason === "payment_in_progress") {
+        throw ruleViolation(
+          "A payment of this order is in progress. Try again once it is confirmed or declined.",
+          "payment_in_progress",
+        );
+      }
       throw ruleViolation("This order can no longer be cancelled.", "invalid_transition");
     }
     return this.view(result.order, requestedLocale);
