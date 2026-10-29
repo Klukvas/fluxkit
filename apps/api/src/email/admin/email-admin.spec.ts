@@ -399,7 +399,7 @@ describe("admin email API (real Postgres, test provider)", () => {
       expect(result.headers.get("cache-control")).toBe("no-store");
     });
 
-    it("redacts the variables of account mails and of any key that names a secret, and cuts long texts", async () => {
+    it("shows only the variables the template declares, none of an account mail, and none of an unregistered template", async () => {
       const tokenRow = randomUUID();
       const reset = await world().enqueued({
         templateKey: "customer.password_reset",
@@ -421,6 +421,33 @@ describe("admin email API (real Postgres, test provider)", () => {
         orderNumber: "AAAA-0003",
         currency: "UAH",
         total: 4200,
+      });
+
+      // Only the keys the template declares (`displayVariables`) are shown; a stored key it does not list is not,
+      // whatever its name (review F3), and neither is any value of a template that is not registered any more.
+      await world().pool.query(
+        `update email_message set variables = variables || '{"code":"123456","href":"https://x.example/m"}' where id = $1`,
+        [paid],
+      );
+      const extra = await ctx.call<MessageBody>("GET", `/admin/email/messages/${paid}`);
+      expect(extra.body.variables).toEqual({
+        orderNumber: "AAAA-0003",
+        currency: "UAH",
+        total: 4200,
+        code: "[redacted]",
+        href: "[redacted]",
+      });
+      await world().pool.query(
+        "update email_message set template_key = 'removed_feature.notice' where id = $1",
+        [paid],
+      );
+      const orphan = await ctx.call<MessageBody>("GET", `/admin/email/messages/${paid}`);
+      expect(orphan.body.variables).toEqual({
+        orderNumber: "[redacted]",
+        currency: "[redacted]",
+        total: "[redacted]",
+        code: "[redacted]",
+        href: "[redacted]",
       });
     });
 
@@ -647,6 +674,30 @@ describe("admin email API (real Postgres, test provider)", () => {
           .provider()
           .sent.map((mail) => mail.message.to.address),
       ).toEqual([second.email.toLowerCase()]);
+    });
+
+    it("limits resends to 30 per hour per admin user (email review F2), and another admin keeps their own window", async () => {
+      const original = await world().enqueued({
+        templateKey: "order.cancelled",
+        recipientKind: "guest",
+        variables: { orderNumber: "AAAA-0009" },
+      });
+      await settle(original, "sent");
+      const path = `/admin/email/messages/${original}/resend`;
+      for (let resent = 0; resent < 30; resent += 1) {
+        expect((await ctx.call("POST", path)).status, `resend ${String(resent)}`).toBe(202);
+      }
+      const before = await world().count();
+      const limited = await ctx.call<ProblemBody>("POST", path);
+      expect(limited.status).toBe(429);
+      expect(limited.body).toMatchObject({ code: "too_many_requests" });
+      expect(Number(limited.headers.get("retry-after"))).toBeGreaterThan(0);
+      expect(await world().count()).toBe(before);
+      await ctx.signInAs("manager");
+      expect((await ctx.call("POST", path)).status).toBe(202);
+      ctx.switchTo(owner);
+      world().clock.advanceMinutes(61);
+      expect((await ctx.call("POST", path)).status).toBe(202);
     });
 
     it("answers 404 for an unknown id", async () => {

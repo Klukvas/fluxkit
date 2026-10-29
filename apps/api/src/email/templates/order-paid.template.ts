@@ -47,6 +47,7 @@ export const orderPaidTemplate: EmailTemplate<OrderPaidVariables> = Object.freez
   category: "order",
   variablesSchema: orderPaidVariablesSchema,
   sampleVariables: Object.freeze({ orderNumber: "7K3M-9QX2", currency: "UAH", total: 248_000 }),
+  displayVariables: Object.freeze(["orderNumber", "currency", "total"]),
   render,
 });
 

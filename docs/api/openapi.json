@@ -2173,7 +2173,7 @@
     },
     "/store/account/password-reset": {
       "post": {
-        "description": "Always the same `202 {}`, with the same headers and no sooner than 400 ms after the request arrived, whether or not an account has this email, is active or is locked: an active account gets a mail with a link valid 60 minutes (`{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>`), an unknown address gets nothing. At most 3 links per account per hour (over it: the same answer, no mail). `locale` (one of `LOCALES`) is the language of the mail. 400 only for a malformed email or locale; 429 per client address and per requested email. Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
+        "description": "Always the same `202 {}`, with the same headers and no sooner than 400 ms after the request arrived, whether or not an account has this email, is active or is locked: an active account gets a mail with a link valid 60 minutes (`{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>`), an unknown address gets nothing. At most 3 links per account per hour (over it: the same answer, no mail); while another request holds the account longer than 200 ms, the same answer and no mail. `locale` (one of `LOCALES`) is the language of the mail. 400 only for a malformed email or locale; 429 per client address and per requested email. Answers 404 (as an unknown route) when no email provider is configured (`EMAIL_PROVIDER=none`; `GET /store/config` says `emailDelivery: false`).",
         "operationId": "AccountEmailController_requestPasswordReset",
         "parameters": [
           {
@@ -24559,7 +24559,7 @@
     },
     "/admin/email/messages/{id}": {
       "get": {
-        "description": "The journal fields, codes and the deadline, and the frozen template variables redacted (`[redacted]`: every value of a `customer.*` mail, any value under a key that names a token, secret, password or link).",
+        "description": "The journal fields, codes and the deadline, and the frozen template variables redacted (`[redacted]`: only the top-level keys the template declares in `displayVariables` keep their value; every other value, every value of a `customer.*` mail and every value of a template that is not registered any more is hidden).",
         "operationId": "EmailMessagesController_get",
         "parameters": [
           {
@@ -24693,7 +24693,7 @@
                     "variables": {
                       "type": "object",
                       "additionalProperties": {},
-                      "description": "The frozen template input, redacted: every value of a `customer.*` mail and any value under a key that names a token, secret, password, key or link is `[redacted]`."
+                      "description": "The frozen template input, redacted: only the top-level keys the template declares in `displayVariables` keep their value; every other value, every value of a `customer.*` mail and every value of a template that is not registered any more is `[redacted]`."
                     }
                   },
                   "required": [
@@ -24786,7 +24786,7 @@
     },
     "/admin/email/messages/{id}/resend": {
       "post": {
-        "description": "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it.",
+        "description": "Creates a NEW row (`resendOf` the original, a fresh id and idempotency key) with the same template, locale and variables and the CURRENT template version, and starts its first attempt after the answer. The original is not changed. 409 `rule_violation`: `message_open` (the original is pending or sending), `not_resendable` (an account mail of a customer: the person asks again), `template_unavailable`, `variables_invalid` (the stored variables fail the current template), `email_not_configured`, `address_undeliverable`. A resent `admin.test` goes to the address of the admin who resends it. 30 per hour per admin user (429 with `Retry-After`).",
         "operationId": "EmailMessagesController_resend",
         "parameters": [
           {
@@ -24872,6 +24872,16 @@
           },
           "409": {
             "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
             "content": {
               "application/problem+json": {
                 "schema": {

@@ -10,6 +10,7 @@ import {
 } from "../../test/account-email-world.js";
 import { customerLogin, customerLoginCookie } from "../../test/customer-http.js";
 import { http } from "../../test/http.js";
+import { PASSWORD_RESET_ANSWER_FLOOR_MS } from "./account-email.service.js";
 
 const RESET = "/store/account/password-reset";
 const CONFIRM = "/store/account/password-reset/confirm";
@@ -150,6 +151,42 @@ describe("customer password reset (ADR 0031 decision 10)", () => {
       }
       // The floor hides the extra work (lock, count, two inserts) of the existing account.
       expect(Math.abs(median(timings.known) - median(timings.unknown))).toBeLessThan(60);
+    });
+
+    it("answers at the floor while another transaction holds the customer's row lock (review F1): that request mails nothing", async () => {
+      const shopper = await world.customer();
+      const holder = await world.pool.connect();
+      try {
+        await holder.query("begin");
+        await holder.query("select id from customer where id = $1 for update", [shopper.id]);
+        // Without a bounded wait the existing address would answer when the lock is given back, the unknown one at the floor.
+        const release = setTimeout(() => void holder.query("rollback"), 1_500);
+        const timings: Record<"known" | "unknown", number> = { known: 0, unknown: 0 };
+        for (const [kind, email] of [
+          ["known", shopper.email],
+          ["unknown", "nobody-while-locked@example.test"],
+        ] as const) {
+          const started = performance.now();
+          const result = await world.requestReset(email);
+          timings[kind] = performance.now() - started;
+          expect(result.status).toBe(202);
+          expect(result.body).toEqual({});
+        }
+        clearTimeout(release);
+        await holder.query("rollback");
+        for (const value of [timings.known, timings.unknown]) {
+          expect(value).toBeGreaterThanOrEqual(395);
+          expect(value).toBeLessThan(PASSWORD_RESET_ANSWER_FLOOR_MS + 150);
+        }
+        expect(Math.abs(timings.known - timings.unknown)).toBeLessThan(100);
+      } finally {
+        holder.release();
+      }
+      expect(await world.tokenRows(shopper.id)).toEqual([]);
+      // With the lock given back the next request issues the link as usual.
+      expect((await world.requestReset(shopper.email)).status).toBe(202);
+      await world.waitForMails(shopper.email, 1);
+      expect(await world.tokenRows(shopper.id)).toHaveLength(1);
     });
 
     it("gives one customer at most 3 links an hour (counted in the database): the 4th request answers the same 202 and sends nothing", async () => {

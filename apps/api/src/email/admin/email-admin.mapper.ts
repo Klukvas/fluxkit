@@ -46,9 +46,13 @@ export function toEmailMessageResponse(row: EmailMessageRow): EmailMessageRespon
   };
 }
 
-export function toEmailMessageDetail(row: EmailMessageRow): EmailMessageDetailResponse {
+/** `displayVariables`: the allowlist of the row's registered template, `undefined` when there is none. */
+export function toEmailMessageDetail(
+  row: EmailMessageRow,
+  displayVariables: readonly string[] | undefined,
+): EmailMessageDetailResponse {
   return {
     ...toEmailMessageResponse(row),
-    variables: redactEmailVariables(row.templateKey, row.variables),
+    variables: redactEmailVariables(row.templateKey, row.variables, displayVariables),
   };
 }

@@ -1,5 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import { sql } from "drizzle-orm";
 import {
   normalizeEmail,
   registerSuccessfulLogin,
@@ -10,6 +11,7 @@ import { CLOCK, type Clock } from "../../auth/clock.js";
 import { PasswordHasher } from "../../auth/password-hasher.js";
 import { passwordPolicyErrors } from "../../auth/password-policy-errors.js";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../common/locale.js";
+import { isLockNotAvailable } from "../../common/postgres-errors.js";
 import {
   ruleViolation,
   tooManyRequests,
@@ -39,6 +41,13 @@ import type {
  */
 export const PASSWORD_RESET_ANSWER_FLOOR_MS = 400;
 
+/**
+ * Longest the reset request waits for a lock (the customer's row, the token index) before it gives up and mails nothing
+ * (`busy`). Well below the floor, so a row another transaction holds cannot stretch the answer for an existing address
+ * past the answer for an unknown one (email review F1). The person asks again; the holder is usually a login.
+ */
+export const PASSWORD_RESET_LOCK_TIMEOUT_MS = 200;
+
 /** At most this many reset tokens per customer per hour, counted in the database (spans instances and addresses). */
 export const PASSWORD_RESETS_PER_HOUR = 3;
 
@@ -53,7 +62,7 @@ const INVALID_TOKEN: FieldError = Object.freeze({
 
 /** Only these codes are logged for a reset request: no email, no id of a possibly unknown account. */
 type ResetRequestOutcome =
-  "issued" | "no_account" | "inactive" | "hourly_limit" | "undeliverable" | "disabled";
+  "issued" | "no_account" | "inactive" | "hourly_limit" | "undeliverable" | "disabled" | "busy";
 
 /**
  * Customer password reset and email verification by mail (ADR 0031 decisions 9, 10 and 16). Rules come from core (email,
@@ -80,7 +89,8 @@ export class AccountEmailService {
 
   /**
    * `POST /store/account/password-reset`. Answers the same (nothing, then `202 {}`) for an unknown address, an inactive
-   * account, a locked account (it gets the mail: a reset clears the lock), an account over the hourly limit and an account that got a mail, no sooner than
+   * account, a locked account (it gets the mail: a reset clears the lock), an account over the hourly limit, an account
+   * whose row another transaction holds longer than `PASSWORD_RESET_LOCK_TIMEOUT_MS` (no mail) and an account that got a mail, no sooner than
    * `PASSWORD_RESET_ANSWER_FLOOR_MS` after `startedAt`. Only the format of the input (400) and the rate limits (429,
    * counted for every address alike) answer otherwise; neither depends on whether an account exists.
    */
@@ -287,10 +297,29 @@ export class AccountEmailService {
       return { code: "inactive" };
     }
     const now = this.clock.now();
+    try {
+      return await this.issueLockedPasswordReset(row.id, locale, now);
+    } catch (error) {
+      if (isLockNotAvailable(error)) {
+        return { code: "busy" };
+      }
+      throw error;
+    }
+  }
+
+  private issueLockedPasswordReset(
+    customerId: string,
+    locale: string,
+    now: Date,
+  ): Promise<{ code: ResetRequestOutcome; messageId?: string }> {
     return withTransaction(this.db, async (tx) => {
+      // Ends with the transaction (is_local); the value is a bound parameter.
+      await tx.execute(
+        sql`select set_config('lock_timeout', ${String(PASSWORD_RESET_LOCK_TIMEOUT_MS)}, true)`,
+      );
       // The row lock serializes concurrent requests of one customer: the count below and the "one unused token per
       // customer and purpose" index then see each other's writes instead of colliding.
-      const locked = await this.customers.findByIdForUpdate(row.id, tx);
+      const locked = await this.customers.findByIdForUpdate(customerId, tx);
       if (locked === undefined || !locked.isActive) {
         return { code: "inactive" as const };
       }

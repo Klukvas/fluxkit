@@ -102,6 +102,22 @@ describe("purge-email-messages (job 10; real Postgres, injected time)", () => {
     expect(PURGEABLE_EMAIL_STATUSES).toEqual(["sent", "failed", "unknown", "cancelled"]);
   });
 
+  it("never deletes a pending or sending mail even when a purge group names its status (the DELETE repeats the final statuses; email review F11)", async () => {
+    const pending = await row("pending", 400 * DAY);
+    const sending = await row("sending", 400 * DAY);
+    const sent = await row("sent", 400 * DAY);
+    const deleted = await world.repository.deleteFinal(
+      world.database,
+      [{ statuses: ["pending", "sending", "sent"], cutoff: new Date(now().getTime() + DAY) }],
+      PURGEABLE_EMAIL_STATUSES,
+      100,
+    );
+    expect(deleted).toBe(1);
+    expect(await exists(sent)).toBe(false);
+    expect(await exists(pending)).toBe(true);
+    expect(await exists(sending)).toBe(true);
+  });
+
   it("works in bounded batches and reports truncated when rows may be left", async () => {
     for (let index = 0; index < 5; index += 1) {
       await row("sent", 40 * DAY + index);

@@ -122,6 +122,19 @@ export const orderPlacedTemplate: EmailTemplate<OrderPlacedVariables> = Object.f
   category: "order",
   variablesSchema: orderPlacedVariablesSchema,
   sampleVariables: ORDER_PLACED_SAMPLE,
+  // Every member: the number, amounts and texts the order already shows; no token or link is stored.
+  displayVariables: Object.freeze([
+    "orderNumber",
+    "currency",
+    "lines",
+    "moreLines",
+    "subtotal",
+    "shipping",
+    "discount",
+    "total",
+    "delivery",
+    "payBefore",
+  ]),
   render,
 });
 
