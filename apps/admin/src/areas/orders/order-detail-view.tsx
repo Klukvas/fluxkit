@@ -119,6 +119,8 @@ export interface OrderDetailViewProps {
   statusLine: ReactNode;
   /** The delivery and shipments section (a slot: it has its own state and writes); omitted in the read-only previews. */
   delivery?: ReactNode;
+  /** The payment section (a slot, like `delivery`): attempts, refunds, attention; omitted in the read-only previews. */
+  payments?: ReactNode;
 }
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -152,6 +154,7 @@ export function OrderDetailView({
   busy,
   statusLine,
   delivery,
+  payments,
 }: OrderDetailViewProps) {
   const lines: LineRow[] = orderLineRows(order, { ...money, orderLocale: order.locale });
   const customerHref = order.customerId === null ? null : customerDetailHref(order.customerId);
@@ -429,6 +432,7 @@ export function OrderDetailView({
           <AddressView t={t} address={order.billingAddress} />
         </Section>
       </div>
+      {payments}
       {delivery}
       <Section id="order-lines" title={t("order.detail.lines")}>
         <DataTable

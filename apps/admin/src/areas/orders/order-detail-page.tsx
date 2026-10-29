@@ -20,6 +20,7 @@ import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { useSession } from "../../session/session-context";
 import { PageHeading, ResourceFallback } from "../../views/status-views";
+import { PaymentSection } from "../payments/payment-section";
 import {
   EMPTY_CANCEL,
   cancelConsequence,
@@ -301,6 +302,17 @@ function OrderDetail({ orderId, config }: { orderId: string; config: AdminConfig
         actions={offeredActions(order.status, permissions)}
         onAction={open}
         busy={busy || resource.refreshing}
+        payments={
+          <PaymentSection
+            key={order.id}
+            order={order}
+            config={config}
+            permissions={permissions}
+            meId={meId}
+            emails={emails}
+            onChanged={resource.reload}
+          />
+        }
         delivery={
           <ShipmentSection
             key={order.id}

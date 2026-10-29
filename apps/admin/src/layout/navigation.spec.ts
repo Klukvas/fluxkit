@@ -19,6 +19,7 @@ describe("navigation configuration", () => {
       "categories",
       "orders",
       "customers",
+      "payments",
       "shipping",
       "email",
       "users",
@@ -65,6 +66,15 @@ describe("navigation configuration", () => {
     );
     expect(ids(["email.manage"])).toEqual(["email"]);
     expect(visibleNavigation(["email.manage"]).map((group) => group.id)).toEqual(["settings"]);
+  });
+
+  it("shows the payment attention list to a session that reads orders: owner and manager, never the viewer, never through the refund permission alone", () => {
+    expect(ids([...ROLE_PERMISSIONS.owner])).toContain("payments");
+    expect(ids([...ROLE_PERMISSIONS.manager])).toContain("payments");
+    expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("payments");
+    expect(ids(["payments.refund", "shipping.manage", "email.manage"])).not.toContain("payments");
+    expect(ids(["orders.read"])).toEqual(["orders", "payments"]);
+    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales"]);
   });
 
   it("shows the owner everything, and drops groups that end up empty", () => {

@@ -31,6 +31,7 @@ export const PATHS = {
   orderDetail: "/orders/:id",
   customers: "/customers",
   customerDetail: "/customers/:id",
+  payments: "/payments",
   shipping: "/shipping",
   shippingMethodNew: "/shipping/methods/new",
   shippingMethodDetail: "/shipping/methods/:id",

@@ -19,7 +19,14 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   const nav = page.getByRole("navigation", { name: "Admin sections" });
   await expect(nav.getByRole("link", { name: "Products" })).toBeVisible();
   await expect(nav.getByRole("link", { name: "Categories" })).toBeVisible();
-  for (const hidden of ["Orders", "Customers", "Admin users", "Shipping", "Email"]) {
+  for (const hidden of [
+    "Orders",
+    "Customers",
+    "Payments to review",
+    "Admin users",
+    "Shipping",
+    "Email",
+  ]) {
     await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
   }
 
