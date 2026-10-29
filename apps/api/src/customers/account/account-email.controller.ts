@@ -46,7 +46,7 @@ export class AccountEmailController {
   @HttpCode(202)
   @ApiOperation({
     summary: "Ask for a password reset link by email",
-    description: `Always the same \`202 {}\`, with the same headers and no sooner than 400 ms after the request arrived, whether or not an account has this email, is active or is locked: an active account gets a mail with a link valid 60 minutes (\`{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>\`), an unknown address gets nothing. At most 3 links per account per hour (over it: the same answer, no mail). \`locale\` (one of \`LOCALES\`) is the language of the mail. 400 only for a malformed email or locale; 429 per client address and per requested email. ${OFF_WITHOUT_PROVIDER}`,
+    description: `Always the same \`202 {}\`, with the same headers and no sooner than 400 ms after the request arrived, whether or not an account has this email, is active or is locked: an active account gets a mail with a link valid 60 minutes (\`{STOREFRONT_PUBLIC_URL}/{locale}/account/reset-password#t=<token>\`), an unknown address gets nothing. At most 3 links per account per hour (over it: the same answer, no mail); while another request holds the account longer than 200 ms, the same answer and no mail. \`locale\` (one of \`LOCALES\`) is the language of the mail. 400 only for a malformed email or locale; 429 per client address and per requested email. ${OFF_WITHOUT_PROVIDER}`,
   })
   @ApiZodBody(passwordResetRequestSchema)
   @ApiZodResponse(202, passwordResetAcceptedSchema, "Accepted; says nothing about the account.")

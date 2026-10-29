@@ -61,6 +61,7 @@ export const shipmentCreatedTemplate: EmailTemplate<ShipmentCreatedVariables> = 
     carrierTitle: "Sample carrier",
     trackingNumber: "20450000000000",
   }),
+  displayVariables: Object.freeze(["orderNumber", "carrierTitle", "trackingNumber"]),
   render,
 });
 

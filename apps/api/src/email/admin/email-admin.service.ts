@@ -164,7 +164,10 @@ export class EmailAdminService {
     if (row === undefined) {
       throw notFound("Email message");
     }
-    return toEmailMessageDetail(row);
+    return toEmailMessageDetail(
+      row,
+      this.templates.get(row.templateKey)?.template.displayVariables,
+    );
   }
 
   /** `pending -> cancelled` by the single writer; exactly one of two cancels, or of a cancel and a claim, wins. */

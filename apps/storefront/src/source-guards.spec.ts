@@ -300,7 +300,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(callers.map((file) => file.path).sort()).toEqual(
       [join("components", "use-fragment-token.ts"), join("lib", "fragment-token.ts")].sort(),
     );
-    const hookUsers = sources.filter((file) => /\buseFragmentToken\(/.test(code(file.text)));
+    const hookUsers = sources.filter((file) => /\buseFragmentToken(Read)?\(/.test(code(file.text)));
     expect(hookUsers.map((file) => file.path).sort()).toEqual(
       [
         join("components", "account-reset-password.tsx"),
