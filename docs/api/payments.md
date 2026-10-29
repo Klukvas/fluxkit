@@ -1,6 +1,6 @@
 # Payments
 
-Online payments (ADR 0032, `docs/plans/2026-10-26-payments-monobank.md`). Core, no feature flag: providers are selected by `PAYMENT_PROVIDERS_ENABLED` (`docs/contracts/config.md`); with none enabled the webhook route answers `404`, a store create is `409 rule_violation payment_not_available`, the admin reads still work and job 11 does nothing. Built: the payment service, the webhook route and job 11 (plan step 5), the Monobank plugin (step 7), the store and admin routes (step 8). **Not built yet:** the storefront pay and return pages (step 9) and the admin payment panel and attention list screens (step 10). Source of truth for the shapes: `docs/api/openapi.json`.
+Online payments (ADR 0032, `docs/plans/2026-10-26-payments-monobank.md`). Core, no feature flag: providers are selected by `PAYMENT_PROVIDERS_ENABLED` (`docs/contracts/config.md`); with none enabled the webhook route answers `404`, a store create is `409 rule_violation payment_not_available`, the admin reads still work and job 11 does nothing. Built: the payment service, the webhook route and job 11 (plan step 5), the Monobank plugin (step 7), the store and admin routes (step 8). The admin payment panel, refund dialogs and attention list (step 10) are built in `apps/admin` (`apps/admin/README.md`, "Payments"). **Not built yet:** the storefront pay and return pages (step 9). Source of truth for the shapes: `docs/api/openapi.json`.
 
 ## Endpoints
 
