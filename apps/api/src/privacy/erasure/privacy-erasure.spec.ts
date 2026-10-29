@@ -226,11 +226,13 @@ describe("erasure (privacy plan step 7, real Postgres)", () => {
       await world.pool.query("delete from email_message where id = $1", [mail]);
     });
 
-    it("deletes the account and anonymises every order of it and with its email; accounting data is unchanged", async () => {
+    it("deletes a verified account and anonymises its orders and the guest orders of its address; accounting data is unchanged", async () => {
       const email = nextEmail("member");
       // A guest order with the same email before the account existed, closed.
       const guestOrder = await cancelled(await addressOrder(email));
       const { shopper, id } = await register(email);
+      // Only a verified address reaches the guest orders of the address (ADR 0035; `subject-scope.spec.ts`).
+      await world.pool.query("update customer set email_verified_at = now() where id = $1", [id]);
       const own = await fulfilled(await addressOrder(email, shopper));
       const ownCancelled = await cancelled(await pickupOrder(email, shopper));
       const stranger = await cancelled(await addressOrder(nextEmail("stranger")));

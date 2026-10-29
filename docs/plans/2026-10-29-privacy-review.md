@@ -124,3 +124,9 @@ Also: `apps/api/src/privacy/inventory/pii-sentinel.spec.ts:97-194` registers, ch
 - The `privacyExport` rate limit (30 per admin per hour) and the `dataExport` counter across two API instances (in memory per process, as documented): not run.
 - Backup re-application from `privacy_request.result`: documented only, no runbook yet (step 11).
 - Legal statements of the plan and the ADR: out of scope for an engineering review.
+
+## Resolution (fixes pushed to `feat/privacy-api-v2`, PR #177)
+
+| ID | Resolution |
+|---|---|
+| F1 | Fixed. Core `privacySubjectScope` (TDD): a customer subject reaches guest orders and guest mail of its address only when `email_verified_at` is set. Recorded in the NEW ADR 0035 (ADR 0033 is accepted and merged, so it is superseded in part, not edited). Regression R1 through the real routes in `apps/api/src/privacy/subject-scope.spec.ts`. |

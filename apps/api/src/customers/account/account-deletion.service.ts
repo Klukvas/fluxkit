@@ -17,6 +17,7 @@ import {
   subjectEmailHash,
   type PrivacyConfig,
 } from "../../privacy/privacy-config.js";
+import { customerSubject } from "../../privacy/subject.js";
 import { RateLimiter } from "../../rate-limit/rate-limiter.js";
 import { CustomerRepository } from "../customer.repository.js";
 
@@ -79,11 +80,7 @@ export class AccountDeletionService {
       if (!locked.isActive || isLocked(locked, now) || locked.passwordHash !== row.passwordHash) {
         throw wrongPassword();
       }
-      const erased = await this.erasure.erase(
-        tx,
-        { kind: "customer", customer: locked, email: locked.email },
-        now,
-      );
+      const erased = await this.erasure.erase(tx, customerSubject(locked), now);
       await tx.insert(privacyRequest).values({
         kind: "erasure",
         subjectKind: "customer",

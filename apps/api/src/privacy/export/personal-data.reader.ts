@@ -1,5 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
-import { and, asc, count, eq, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, count, eq, inArray } from "drizzle-orm";
 import {
   normalizeEmail,
   resolveTextWithFallback,
@@ -33,20 +33,21 @@ import {
 import { EmailProviderRegistry } from "../../email/registry/index.js";
 import { PaymentProviderRegistry } from "../../payments/registry/index.js";
 import { ShippingProviderRegistry } from "../../shipping/registry/index.js";
+import {
+  customerSubject,
+  emailSubject,
+  subjectMailCondition,
+  subjectOrdersCondition,
+  type ResolvedSubject,
+} from "../subject.js";
+
+export type { ResolvedSubject } from "../subject.js";
 
 /** The export is synchronous; a subject with more orders is exported by the shop owner another way (ADR 0033 decision 1). */
 export const EXPORT_MAX_ORDERS = 10_000;
 
 export type CustomerRow = typeof customer.$inferSelect;
 export type OrderRow = typeof salesOrder.$inferSelect;
-
-/** Who an export or an erasure is about: an account (and its email), or an email that may also have an account. */
-export interface ResolvedSubject {
-  readonly kind: "customer" | "email";
-  readonly customer: CustomerRow | undefined;
-  /** The normalized address whose guest orders and mail belong to the subject; the account email for a customer. */
-  readonly email: string;
-}
 
 type Texts = Record<string, string>;
 
@@ -91,9 +92,9 @@ function group<T, K>(rows: readonly T[], key: (row: T) => K): Map<K, T[]> {
 }
 
 /**
- * Reads the personal data of one subject for the export (ADR 0033 decision 7): the account, every order of the account or
- * with the subject's email (guest orders), their lines, adjustments, journal, shipping snapshot, shipments and payments with
- * refunds, the mail rows by customer or address, the sessions and the cart. A fixed number of statements whatever the
+ * Reads the personal data of one subject for the export (ADR 0033 decision 7): the account, every order in the subject's
+ * scope (`subjectOrdersCondition`, ADR 0035), their lines, adjustments, journal, shipping snapshot, shipments and payments with
+ * refunds, the mail rows in scope, the sessions and the cart. A fixed number of statements whatever the
  * number of orders (no N+1). Returns facts for core `buildPersonalDataExport`, which copies only the allowed keys.
  */
 @Injectable()
@@ -108,37 +109,21 @@ export class PersonalDataReader {
   /** The subject of an account id; undefined when the account does not exist. */
   async byCustomer(db: DbExecutor, customerId: string): Promise<ResolvedSubject | undefined> {
     const [row] = await db.select().from(customer).where(eq(customer.id, customerId));
-    return row === undefined ? undefined : { kind: "customer", customer: row, email: row.email };
+    return row === undefined ? undefined : customerSubject(row);
   }
 
   /** The subject of an email: its account if one exists with that address, and its guest data. */
   async byEmail(db: DbExecutor, email: string): Promise<ResolvedSubject> {
     const normalized = normalizeEmail(email);
     const [row] = await db.select().from(customer).where(eq(customer.email, normalized));
-    return { kind: "email", customer: row, email: normalized };
-  }
-
-  /** The orders of the subject: of the account, or with the subject's email. */
-  ordersCondition(subject: ResolvedSubject): SQL {
-    const byEmail = eq(salesOrder.email, subject.email);
-    return subject.customer === undefined
-      ? byEmail
-      : (or(eq(salesOrder.customerId, subject.customer.id), byEmail) as SQL);
-  }
-
-  /** The mail rows of the subject: to the account or to the address. */
-  mailCondition(subject: ResolvedSubject): SQL {
-    const byAddress = eq(emailMessage.toAddress, subject.email);
-    return subject.customer === undefined
-      ? byAddress
-      : (or(eq(emailMessage.customerId, subject.customer.id), byAddress) as SQL);
+    return emailSubject(normalized, row);
   }
 
   async countOrders(db: DbExecutor, subject: ResolvedSubject): Promise<number> {
     const [row] = await db
       .select({ value: count() })
       .from(salesOrder)
-      .where(this.ordersCondition(subject));
+      .where(subjectOrdersCondition(subject.scope));
     return row?.value ?? 0;
   }
 
@@ -146,7 +131,7 @@ export class PersonalDataReader {
     return db
       .select()
       .from(salesOrder)
-      .where(this.ordersCondition(subject))
+      .where(subjectOrdersCondition(subject.scope))
       .orderBy(asc(salesOrder.placedAt), asc(salesOrder.id));
   }
 
@@ -328,7 +313,7 @@ export class PersonalDataReader {
         sentAt: emailMessage.sentAt,
       })
       .from(emailMessage)
-      .where(this.mailCondition(subject))
+      .where(subjectMailCondition(subject.scope))
       .orderBy(asc(emailMessage.createdAt), asc(emailMessage.id));
     return rows;
   }
@@ -337,7 +322,7 @@ export class PersonalDataReader {
     const [row] = await db
       .select({ value: count() })
       .from(emailMessage)
-      .where(this.mailCondition(subject));
+      .where(subjectMailCondition(subject.scope));
     return row?.value ?? 0;
   }
 

@@ -46,7 +46,7 @@ export class AccountDataController {
   @ApiOperation({
     summary: "Download my personal data",
     description:
-      "JSON document `fluxkit.personal-data-export/v1` as an attachment: the account, every order of the account or with its email, mails, sessions, the cart and the providers the shop uses. At most 5 per customer per 24 hours (`429`); `409 rule_violation` `export_too_large` above 10 000 orders.",
+      "JSON document `fluxkit.personal-data-export/v1` as an attachment: the account, its orders (and, once the address is verified, the guest orders placed with it; ADR 0035), mails, sessions, the cart and the providers the shop uses. At most 5 per customer per 24 hours (`429`); `409 rule_violation` `export_too_large` above 10 000 orders.",
   })
   @ApiZodResponse(
     200,
@@ -69,7 +69,7 @@ export class AccountDataController {
   @ApiOperation({
     summary: "Delete my account now",
     description:
-      "Needs the current password and `confirm: true`. Deletes the account, its sessions, cart and tokens and the mails to it; the orders stay as accounting records with their contact data anonymised (ADR 0033). Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while an order, payment, refund, shipment or mail is in progress; nothing changes then. A wrong password is `400` on `password` (`incorrect`) and counts as a failed sign-in. At most 5 per customer per hour.",
+      "Needs the current password and `confirm: true`. Deletes the account, its sessions, cart and tokens and the mails to it; the orders stay as accounting records with their contact data anonymised (ADR 0033); guest orders and mails of the address only when it is verified (ADR 0035). Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while an order, payment, refund, shipment or mail is in progress; nothing changes then. A wrong password is `400` on `password` (`incorrect`) and counts as a failed sign-in. At most 5 per customer per hour.",
   })
   @ApiZodBody(deleteAccountSchema)
   @ApiNoContentResponse({ description: "The account is gone and the session cookie is cleared." })

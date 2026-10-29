@@ -209,7 +209,8 @@ Pure rules for personal data (privacy plan step 3): no I/O; the clock and the ra
 - `src/privacy/retention.ts` - `retentionCutoff(now, days)`, `orderFinalDate`, `isOrderRetentionDue`, `PRIVACY_REQUEST_RETENTION_DAYS` (1095), `AUDIT_EVENT_RETENTION_DAYS` (365). Whole 24-hour days in UTC; a closed order is due when its final date is strictly older than the cut-off.
 - `src/privacy/request.ts` - privacy request kinds, subject kinds, channels and statuses, `requestDueAt` (30 days), `extendRequestDueAt` (reason required, at most 90 days in total), `decideRequestTransition` (`request_closed` for a finished request), `isRequestOverdue`.
 - `src/privacy/audit.ts` - `ADMIN_AUDIT_ACTIONS`, `ADMIN_AUDIT_TARGET_KINDS`, `buildAdminAuditEvent` (a closed action list, a uuid target, a detail of codes, counts and flags only, at most 2 KiB; personal data in a detail is a `RangeError`).
-- `src/privacy/index.ts` - re-exports the six files. Specs sit next to each file.
+- `src/privacy/subject-scope.ts` - `privacySubjectScope(input)` (ADR 0035): what a customer or email subject reaches (`customerId`, `guestEmail`); an unverified account reaches no guest data by address. Inconsistent input is a `RangeError`.
+- `src/privacy/index.ts` - re-exports the seven files. Specs sit next to each file.
 
 ## Test-only and tests
 

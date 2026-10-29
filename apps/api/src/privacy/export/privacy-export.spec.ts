@@ -103,6 +103,11 @@ describe("personal data export and the admin privacy requests (privacy plan step
     });
     expect(registered.status, JSON.stringify(registered.body)).toBe(201);
     memberId = registered.body.customer.id;
+    // A verified address (what `POST /store/account/verify-email` records): only then does the account reach the guest
+    // orders of its address (ADR 0035; an unverified account is covered by `subject-scope.spec.ts`).
+    await world.pool.query("update customer set email_verified_at = now() where id = $1", [
+      memberId,
+    ]);
     memberOrder = await pickupOrder(memberEmail, member);
     // A guest who never had an account, and a stranger.
     loneOrder = await pickupOrder(loneEmail);

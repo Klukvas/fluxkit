@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Injectable } from "@nestjs/common";
-import { asc, eq, inArray, or, type SQL } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import {
   decideErasure,
   planOrderAnonymisation,
@@ -21,7 +21,7 @@ import {
   salesOrder,
   shipment,
 } from "../../database/schema/index.js";
-import type { ResolvedSubject } from "../export/personal-data.reader.js";
+import { subjectMailCondition, subjectOrdersCondition, type ResolvedSubject } from "../subject.js";
 
 /** A mail to the subject that a sender holds under a live lease: wait for it (the lease is 2 minutes) and try again. */
 export const MAIL_SENDING_REASON = "mail_sending";
@@ -87,20 +87,6 @@ interface Gathered {
  */
 @Injectable()
 export class PrivacyErasureService {
-  private ordersCondition(subject: ResolvedSubject): SQL {
-    const byEmail = eq(salesOrder.email, subject.email);
-    return subject.customer === undefined
-      ? byEmail
-      : (or(eq(salesOrder.customerId, subject.customer.id), byEmail) as SQL);
-  }
-
-  private mailCondition(subject: ResolvedSubject): SQL {
-    const byAddress = eq(emailMessage.toAddress, subject.email);
-    return subject.customer === undefined
-      ? byAddress
-      : (or(eq(emailMessage.customerId, subject.customer.id), byAddress) as SQL);
-  }
-
   /** Reads (and with `lock`, locks) what the decision needs. The customer row must already be locked by the caller. */
   private async gather(
     tx: Transaction,
@@ -111,7 +97,7 @@ export class PrivacyErasureService {
     const orderQuery = tx
       .select()
       .from(salesOrder)
-      .where(this.ordersCondition(subject))
+      .where(subjectOrdersCondition(subject.scope))
       .orderBy(asc(salesOrder.id));
     const orders = lock ? await orderQuery.for("update") : await orderQuery;
     const { facts } = await this.orderFacts(tx, orders);
@@ -122,7 +108,7 @@ export class PrivacyErasureService {
         leaseUntil: emailMessage.leaseUntil,
       })
       .from(emailMessage)
-      .where(this.mailCondition(subject))
+      .where(subjectMailCondition(subject.scope))
       .orderBy(asc(emailMessage.id));
     const mail = lock ? await mailQuery.for("update") : await mailQuery;
     const sendingMail = mail.some(

@@ -27,7 +27,8 @@ import { privacyRequest, salesOrder } from "../../database/schema/index.js";
 import { AdminAuditWriter } from "../audit/admin-audit.writer.js";
 import { PrivacyErasureService } from "../erasure/privacy-erasure.service.js";
 import { PersonalDataExportService } from "../export/personal-data-export.service.js";
-import { PersonalDataReader, type ResolvedSubject } from "../export/personal-data.reader.js";
+import { PersonalDataReader } from "../export/personal-data.reader.js";
+import { customerSubject, emailSubject, type ResolvedSubject } from "../subject.js";
 import { PRIVACY_CONFIG, subjectEmailHash, type PrivacyConfig } from "../privacy-config.js";
 import type {
   CreateRequestBody,
@@ -402,10 +403,16 @@ export class PrivacyAdminService {
       let subject = resolved;
       if (resolved.customer !== undefined) {
         const customerRow = await this.erasure.lockCustomer(tx, resolved.customer.id);
-        subject = { ...resolved, customer: customerRow };
         if (customerRow === undefined && resolved.kind === "customer") {
           throw subjectNotFound();
         }
+        // The scope is taken again from the locked row (a parallel deletion may have removed the account).
+        subject =
+          customerRow === undefined
+            ? emailSubject(resolved.email, undefined)
+            : resolved.kind === "customer"
+              ? customerSubject(customerRow)
+              : emailSubject(resolved.email, customerRow);
       }
       const result = await this.erasure.erase(tx, subject, now);
       const [updated] = await tx
