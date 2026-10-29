@@ -4,8 +4,8 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { loadSearchEnabled } from "./catalog-data";
 import { forwardableAddresses } from "./forwarded-address";
-import { createSearchData } from "./search-data";
-import { createSharedSearchCache, type SharedSearchCache } from "./shared-search-cache";
+import { createSearchData, type SharedSearchCache } from "./search-data";
+import { createSharedSearchCache } from "./shared-search-cache";
 import { CATALOG_REVALIDATE_SECONDS, StoreUnavailableError } from "./store-data";
 import { storeData } from "./store-data.server";
 

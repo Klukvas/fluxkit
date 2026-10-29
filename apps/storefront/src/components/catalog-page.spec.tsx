@@ -298,7 +298,7 @@ describe("the catalog route with search on", () => {
     });
   }
 
-  for (const address of [{ f: "brand:demo-brand" }, { brand: "demo-brand" }]) {
+  for (const address of [{ f: "brand:demo-brand" }, { brand: "demo-brand" }] as Params[]) {
     it(`keeps the brand line and its 'Clear the filter' link in the SQL fallback of ${JSON.stringify(address)} (review F3)`, async () => {
       reads.outcome = { kind: "unavailable", retryAfterSeconds: null };
       const html = await catalog(address);

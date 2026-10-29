@@ -1,4 +1,4 @@
-import type { SearchOutcome } from "./search-data";
+import type { SearchOutcome, SharedSearchCache } from "./search-data";
 
 /**
  * The storefront's own cache of the unfiltered catalog and category lists (review F1 of the search finish, ADR 0040). Pure:
@@ -24,11 +24,6 @@ export interface SharedSearchCacheOptions {
   freshMs: number;
   staleMs: number;
   now?: () => number;
-}
-
-export interface SharedSearchCache {
-  read(key: string, load: () => Promise<SearchOutcome>): Promise<SearchOutcome>;
-  size(): number;
 }
 
 type Entry = { outcome: Extract<SearchOutcome, { kind: "results" }>; storedAt: number };

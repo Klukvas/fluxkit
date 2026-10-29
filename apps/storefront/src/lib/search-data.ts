@@ -7,7 +7,6 @@ import {
 import { retryAfterSeconds } from "./failure";
 import { SERVER_READ_TIMEOUT_MS } from "./request-timeout";
 import type { SearchQuery } from "./search-query";
-import type { SharedSearchCache } from "./shared-search-cache";
 
 /**
  * The results page's server-side read of `GET /store/search` (plan 2026-10-29-search.md, section 9). Server code only
@@ -40,6 +39,15 @@ export type SearchOutcome =
   | { kind: "rate_limited"; retryAfterSeconds: number | null }
   /** 503 `search_unavailable`, or the API could not be reached. */
   | { kind: "unavailable"; retryAfterSeconds: number | null };
+
+/**
+ * Where `shared` reads are kept (`shared-search-cache.ts` implements it; declared here, by its user, so that module depends
+ * on this one and not the other way round).
+ */
+export interface SharedSearchCache {
+  read(key: string, load: () => Promise<SearchOutcome>): Promise<SearchOutcome>;
+  size(): number;
+}
 
 export interface SearchDataDependencies {
   /** Resolved after `beforeRequest`, at request time; throws (loudly) when `API_INTERNAL_URL` is missing or invalid. */
