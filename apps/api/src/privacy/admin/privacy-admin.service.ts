@@ -25,11 +25,16 @@ import { withTransaction, type Transaction } from "../../common/transaction.js";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { privacyRequest, salesOrder } from "../../database/schema/index.js";
 import { AdminAuditWriter } from "../audit/admin-audit.writer.js";
+import { PrivacyErasureService } from "../erasure/privacy-erasure.service.js";
 import { PersonalDataExportService } from "../export/personal-data-export.service.js";
 import { PersonalDataReader, type ResolvedSubject } from "../export/personal-data.reader.js";
 import { PRIVACY_CONFIG, subjectEmailHash, type PrivacyConfig } from "../privacy-config.js";
 import type {
   CreateRequestBody,
+  EraseBody,
+  ErasePreviewBody,
+  ErasePreviewView,
+  RejectBody,
   ExportBody,
   ListRequestsQuery,
   LookupResult,
@@ -39,6 +44,13 @@ import type {
 export type PrivacyRequestRow = typeof privacyRequest.$inferSelect;
 
 const OPEN_STATUSES: readonly PrivacyRequestStatus[] = ["received", "in_progress"];
+
+export function subjectNotFound(): ProblemException {
+  return ruleViolation(
+    "The account of this request no longer exists; reject the request or open one by email.",
+    "subject_not_found",
+  );
+}
 
 export function requestClosed(): ProblemException {
   return ruleViolation("The request is completed or rejected; open a new one.", "request_closed");
@@ -76,6 +88,7 @@ export class PrivacyAdminService {
     @Inject(AdminAuditWriter) private readonly audit: AdminAuditWriter,
     @Inject(CLOCK) private readonly clock: Clock,
     @Inject(PRIVACY_CONFIG) private readonly config: PrivacyConfig,
+    @Inject(PrivacyErasureService) private readonly erasure: PrivacyErasureService,
   ) {}
 
   view(row: PrivacyRequestRow, now: Date = this.clock.now()): PrivacyRequestView {
@@ -311,10 +324,7 @@ export class PrivacyAdminService {
       }
       const subject = await this.subjectOf(tx, row, body.email);
       if (subject === undefined) {
-        throw ruleViolation(
-          "The account of this request no longer exists; reject the request or open one by email.",
-          "subject_not_found",
-        );
+        throw subjectNotFound();
       }
       const built = await this.exports.build(tx, subject, now);
       const next: PrivacyRequestStatus = row.kind === "export" ? "completed" : "in_progress";
@@ -340,5 +350,123 @@ export class PrivacyAdminService {
       });
       return built.document;
     });
+  }
+
+  /** An open erasure request, locked; anything else is refused before the subject is read. */
+  private async openErasureRequest(tx: Transaction, id: string): Promise<PrivacyRequestRow> {
+    const row = await this.lockRequest(tx, id);
+    if (row.kind !== "erasure") {
+      throw ruleViolation("Only an erasure request can erase.", "not_an_erasure_request");
+    }
+    if (!OPEN_STATUSES.includes(row.status as PrivacyRequestStatus)) {
+      throw requestClosed();
+    }
+    return row;
+  }
+
+  /** `POST .../erase-preview`: counts and blockers, nothing changed. */
+  async erasePreview(id: string, body: ErasePreviewBody): Promise<ErasePreviewView> {
+    const now = this.clock.now();
+    return withTransaction(this.db, async (tx) => {
+      const row = await this.openErasureRequest(tx, id);
+      const subject = await this.subjectOf(tx, row, body.email);
+      if (subject === undefined) {
+        throw subjectNotFound();
+      }
+      const preview = await this.erasure.preview(tx, subject, now);
+      return {
+        ...preview,
+        blockers: preview.blockers.map((entry) => ({ ...entry })),
+        reasons: [...preview.reasons],
+      };
+    });
+  }
+
+  /**
+   * `POST .../erase` (ADR 0033 decision 6): locks the request, then the customer, then the orders and mail rows (inside
+   * the erasure), erases, completes the request with the result and audits it, all in one transaction. A completed
+   * erasure request answers its stored result again (idempotent per request id); a rejected one is `request_closed`.
+   */
+  async erase(id: string, body: EraseBody, actorAdminId: string): Promise<PrivacyRequestView> {
+    const now = this.clock.now();
+    const row = await withTransaction(this.db, async (tx) => {
+      const locked = await this.lockRequest(tx, id);
+      if (locked.kind === "erasure" && locked.status === "completed") {
+        return locked;
+      }
+      await this.openErasureRequest(tx, id);
+      const resolved = await this.subjectOf(tx, locked, body.email);
+      if (resolved === undefined) {
+        throw subjectNotFound();
+      }
+      let subject = resolved;
+      if (resolved.customer !== undefined) {
+        const customerRow = await this.erasure.lockCustomer(tx, resolved.customer.id);
+        subject = { ...resolved, customer: customerRow };
+        if (customerRow === undefined && resolved.kind === "customer") {
+          throw subjectNotFound();
+        }
+      }
+      const result = await this.erasure.erase(tx, subject, now);
+      const [updated] = await tx
+        .update(privacyRequest)
+        .set({
+          status: "completed",
+          completedAt: now,
+          handledBy: actorAdminId,
+          result: { ...result, orderNumbers: [...result.orderNumbers] },
+        })
+        .where(eq(privacyRequest.id, id))
+        .returning();
+      if (updated === undefined) {
+        throw new Error(`Privacy request ${id} vanished under its lock`);
+      }
+      await this.audit.record(tx, actorAdminId, {
+        action: "privacy.erased",
+        targetKind: "privacy_request",
+        targetId: id,
+        detail: {
+          orders: result.ordersAnonymised,
+          mail: result.mailDeleted,
+          customerDeleted: result.customerDeleted,
+        },
+      });
+      return updated;
+    });
+    return this.view(row, now);
+  }
+
+  /** `POST .../reject`: closes an open request with a reason code (and optionally a note). */
+  async reject(id: string, body: RejectBody, actorAdminId: string): Promise<PrivacyRequestView> {
+    const now = this.clock.now();
+    const row = await withTransaction(this.db, async (tx) => {
+      const locked = await this.lockRequest(tx, id);
+      const decision = decideRequestTransition(locked.status as PrivacyRequestStatus, "rejected");
+      if (!decision.ok) {
+        throw requestClosed();
+      }
+      const [updated] = await tx
+        .update(privacyRequest)
+        .set({
+          status: "rejected",
+          completedAt: now,
+          handledBy: actorAdminId,
+          result: { rejectReason: body.reasonCode },
+          ...(body.note === undefined ? {} : { note: body.note }),
+        })
+        .where(eq(privacyRequest.id, id))
+        .returning();
+      if (updated === undefined) {
+        throw new Error(`Privacy request ${id} vanished under its lock`);
+      }
+      await this.audit.record(tx, actorAdminId, {
+        action: "privacy.request_changed",
+        targetKind: "privacy_request",
+        targetId: id,
+        detail: { toStatus: "rejected", reason: body.reasonCode },
+      });
+      return updated;
+    });
+    return this.view(row, now);
   }
 }

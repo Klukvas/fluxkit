@@ -65,6 +65,17 @@ export function parseAddress(value: unknown): z.output<typeof address> | null {
   return value === null || value === undefined ? null : address.parse(value);
 }
 
+/**
+ * An address as the order views show it. An erased order (ADR 0033 decision 5) keeps only `{countryCode}` for accounting;
+ * the views show no address for it (the export shows the country), so the address shape of the API stays as it is.
+ */
+export function viewAddress(
+  order: { readonly contactErasedAt: Date | null },
+  value: unknown,
+): z.output<typeof address> | null {
+  return order.contactErasedAt === null ? parseAddress(value) : null;
+}
+
 function money(amount: number, currency: string) {
   return { amount, currency };
 }
@@ -143,8 +154,8 @@ export function toStoreOrder(
       firstName: order.firstName,
       lastName: order.lastName,
     },
-    shippingAddress: parseAddress(order.shippingAddress),
-    billingAddress: parseAddress(order.billingAddress),
+    shippingAddress: viewAddress(order, order.shippingAddress),
+    billingAddress: viewAddress(order, order.billingAddress),
     shipping:
       shipping === undefined
         ? null

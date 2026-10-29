@@ -24,6 +24,7 @@ import type {
   PasswordResetConfirmBody,
   PasswordResetRequestBody,
   PersonalDataExport,
+  DeleteAccountBody,
   ProductDetail,
   ProductList,
   PickupPointKind,
@@ -105,6 +106,11 @@ export interface StoreClient {
   changePassword(body: ChangePasswordBody, options?: CallOptions): Result<undefined>;
   /** The signed-in customer's personal data (`fluxkit.personal-data-export/v1`); `429` above 5 a day. */
   getDataExport(options?: CallOptions): Result<PersonalDataExport>;
+  /**
+   * Deletes the account now (irreversible). `400` on `password` (`incorrect`), `409 rule_violation` `erasure_blocked`
+   * with `reasons` while something is in progress, `429` above 5 an hour.
+   */
+  deleteAccount(body: DeleteAccountBody, options?: CallOptions): Result<undefined>;
   /**
    * Asks for a reset link by mail. Always `202 {}` for any address (no account enumeration); `404` without a mail
    * provider (`getConfig().emailDelivery` is false then).
@@ -210,6 +216,7 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     updateAccount: (body, opts) => call("updateAccount", { body, options: opts }),
     changePassword: (body, opts) => call("changePassword", { body, options: opts }),
     getDataExport: (opts) => call("getDataExport", { options: opts }),
+    deleteAccount: (body, opts) => call("deleteAccount", { body, options: opts }),
     requestPasswordReset: (body, opts) => call("requestPasswordReset", { body, options: opts }),
     confirmPasswordReset: (body, opts) => call("confirmPasswordReset", { body, options: opts }),
     confirmEmailVerification: (body, opts) =>

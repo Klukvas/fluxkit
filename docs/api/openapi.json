@@ -2968,6 +2968,115 @@
         "tags": ["store"]
       }
     },
+    "/store/account/delete": {
+      "post": {
+        "description": "Needs the current password and `confirm: true`. Deletes the account, its sessions, cart and tokens and the mails to it; the orders stay as accounting records with their contact data anonymised (ADR 0033). Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while an order, payment, refund, shipment or mail is in progress; nothing changes then. A wrong password is `400` on `password` (`incorrect`) and counts as a failed sign-in. At most 5 per customer per hour.",
+        "operationId": "AccountDataController_deleteAccount",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing store request (CSRF defence, ADR 0016). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [true],
+                    "description": "Must be true: the deletion is immediate and cannot be undone."
+                  }
+                },
+                "required": ["password", "confirm"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "The account is gone and the session cookie is cleared."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the X-Fluxkit-CSRF: 1 header is missing or not `1`, or a request with a body is not `Content-Type: application/json`. Checked before anything else.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests: try again after the number of seconds in the Retry-After header.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete my account now",
+        "tags": ["store"]
+      }
+    },
     "/admin/customers": {
       "get": {
         "operationId": "AdminCustomersController_list",
@@ -26951,6 +27060,637 @@
           }
         },
         "summary": "Download the personal data of the request's subject",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/erase-preview": {
+      "post": {
+        "description": "Counts and blockers; nothing changes. An email subject needs its email again in the body.",
+        "operationId": "PrivacyAdminController_erasePreview",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Counts and blockers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accountFound": {
+                      "type": "boolean"
+                    },
+                    "orders": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "ordersToAnonymise": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "mail": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "orderNumber": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "open_order",
+                              "payment_in_progress",
+                              "refund_in_progress",
+                              "active_shipment",
+                              "mail_sending"
+                            ]
+                          }
+                        },
+                        "required": ["orderNumber", "reason"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "reasons": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "open_order",
+                          "payment_in_progress",
+                          "refund_in_progress",
+                          "active_shipment",
+                          "mail_sending"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "accountFound",
+                    "orders",
+                    "ordersToAnonymise",
+                    "mail",
+                    "blockers",
+                    "reasons"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "What an erasure of the request's subject would do now",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/erase": {
+      "post": {
+        "description": "Deletes the account (if any) and the mails, anonymises the contact fields of every order; orders, payments, refunds and shipments stay. `confirm: true` is required. Refused with `409 rule_violation` `erasure_blocked` (members `reasons`, `blockers`) while anything is in progress. Idempotent: a completed erasure request answers its stored result. Audited (`privacy.erased`).",
+        "operationId": "PrivacyAdminController_erase",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "confirm": {
+                    "type": "boolean",
+                    "enum": [true],
+                    "description": "Must be true: the erasure cannot be undone."
+                  }
+                },
+                "required": ["confirm"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The completed request with its result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Erase the request's subject (irreversible)",
+        "tags": ["admin-privacy"],
+        "x-fluxkit-permission": "privacy.manage"
+      }
+    },
+    "/admin/privacy/requests/{id}/reject": {
+      "post": {
+        "description": "Audited (`privacy.request_changed`). A closed request is `409 request_closed`.",
+        "operationId": "PrivacyAdminController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Privacy request id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reasonCode": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "description": "A code, for example `identity_not_confirmed` or `duplicate`."
+                  },
+                  "note": {
+                    "type": "string"
+                  }
+                },
+                "required": ["reasonCode"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The rejected request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["export", "erasure"]
+                    },
+                    "subjectKind": {
+                      "type": "string",
+                      "enum": ["customer", "email"]
+                    },
+                    "subjectCustomerId": {
+                      "nullable": true,
+                      "description": "The account of a customer subject (it may no longer exist after an erasure).",
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "channel": {
+                      "type": "string",
+                      "enum": ["self_service", "admin"]
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["received", "in_progress", "completed", "rejected"]
+                    },
+                    "receivedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "dueAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "completedAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "overdue": {
+                      "type": "boolean",
+                      "description": "Open and past its due time."
+                    },
+                    "result": {
+                      "nullable": true,
+                      "description": "Counts, codes and erased order numbers; never contact data.",
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    "note": {
+                      "nullable": true,
+                      "type": "string"
+                    },
+                    "handledBy": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "subjectKind",
+                    "subjectCustomerId",
+                    "channel",
+                    "status",
+                    "receivedAt",
+                    "dueAt",
+                    "completedAt",
+                    "overdue",
+                    "result",
+                    "note",
+                    "handledBy"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reject an open request with a reason code",
         "tags": ["admin-privacy"],
         "x-fluxkit-permission": "privacy.manage"
       }

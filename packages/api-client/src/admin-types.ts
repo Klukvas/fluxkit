@@ -1294,3 +1294,28 @@ export interface CreatePrivacyRequestBody {
 export interface ExportPrivacyRequestBody {
   email?: string;
 }
+
+export type ErasureReason =
+  "open_order" | "payment_in_progress" | "refund_in_progress" | "active_shipment" | "mail_sending";
+
+export interface AdminErasurePreview {
+  accountFound: boolean;
+  orders: number;
+  ordersToAnonymise: number;
+  mail: number;
+  /** `orderNumber` is null for `mail_sending`. */
+  blockers: { orderNumber: string | null; reason: ErasureReason }[];
+  reasons: ErasureReason[];
+}
+
+export interface ErasePrivacyRequestBody {
+  /** Required for an email subject (only an HMAC is stored). */
+  email?: string;
+  confirm: true;
+}
+
+export interface RejectPrivacyRequestBody {
+  /** A lower-case code, for example `identity_not_confirmed`. */
+  reasonCode: string;
+  note?: string;
+}

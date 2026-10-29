@@ -46,6 +46,7 @@ export const OPERATIONS = {
   updateAccount: operation("PATCH", "/store/account/me", [200], { hasBody: true }),
   changePassword: operation("POST", "/store/account/change-password", [204], { hasBody: true }),
   getDataExport: operation("GET", "/store/account/data-export", [200]),
+  deleteAccount: operation("POST", "/store/account/delete", [204], { hasBody: true }),
   requestPasswordReset: operation("POST", "/store/account/password-reset", [202], {
     hasBody: true,
   }),

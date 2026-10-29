@@ -46,6 +46,56 @@ export type CreateRequestBody = z.output<typeof createRequestBodySchema>;
 export const exportBodySchema = z.strictObject({ email: emailInput.optional() });
 export type ExportBody = z.output<typeof exportBodySchema>;
 
+/** `POST /admin/privacy/requests/{id}/erase-preview`: the email again for an email subject, as for the export. */
+export const erasePreviewBodySchema = exportBodySchema;
+export type ErasePreviewBody = ExportBody;
+
+/** `POST /admin/privacy/requests/{id}/erase`: irreversible, so `confirm: true` is required. */
+export const eraseBodySchema = z.strictObject({
+  email: emailInput.optional(),
+  confirm: z.literal(true).meta({ description: "Must be true: the erasure cannot be undone." }),
+});
+export type EraseBody = z.output<typeof eraseBodySchema>;
+
+/** `POST /admin/privacy/requests/{id}/reject`. */
+export const rejectBodySchema = z.strictObject({
+  reasonCode: z
+    .string()
+    .regex(/^[a-z][a-z0-9_]{0,63}$/, "must be a lower-case code")
+    .meta({ description: "A code, for example `identity_not_confirmed` or `duplicate`." }),
+  note: trimmedText(PRIVACY_NOTE_MAX_LENGTH).optional(),
+});
+export type RejectBody = z.output<typeof rejectBodySchema>;
+
+export const erasePreviewSchema = z.object({
+  accountFound: z.boolean(),
+  orders: z.number().int().min(0),
+  ordersToAnonymise: z.number().int().min(0),
+  mail: z.number().int().min(0),
+  blockers: z.array(
+    z.object({
+      orderNumber: z.string().nullable(),
+      reason: z.enum([
+        "open_order",
+        "payment_in_progress",
+        "refund_in_progress",
+        "active_shipment",
+        "mail_sending",
+      ]),
+    }),
+  ),
+  reasons: z.array(
+    z.enum([
+      "open_order",
+      "payment_in_progress",
+      "refund_in_progress",
+      "active_shipment",
+      "mail_sending",
+    ]),
+  ),
+});
+export type ErasePreviewView = z.output<typeof erasePreviewSchema>;
+
 /** `GET /admin/privacy/requests`. */
 export const listRequestsQuerySchema = z.strictObject({
   limit: integerString

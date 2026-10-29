@@ -343,6 +343,27 @@ export const ADMIN_OPERATIONS = {
     "privacy.manage",
     { body: "json" },
   ),
+  previewPrivacyErasure: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase-preview",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  erasePrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  rejectPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/reject",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
   listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
     query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
   }),

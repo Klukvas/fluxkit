@@ -1046,6 +1046,25 @@ const privacyLookup: Shape<Admin.AdminPrivacyLookup> = {
     openRequests: { array: privacyRequest },
   },
 };
+const erasureReason = {
+  enum: [
+    "open_order",
+    "payment_in_progress",
+    "refund_in_progress",
+    "active_shipment",
+    "mail_sending",
+  ],
+} as const;
+const erasurePreview: Shape<Admin.AdminErasurePreview> = {
+  object: {
+    accountFound: "boolean",
+    orders: "integer",
+    ordersToAnonymise: "integer",
+    mail: "integer",
+    blockers: { array: { object: { orderNumber: { nullable: "string" }, reason: erasureReason } } },
+    reasons: { array: erasureReason },
+  },
+};
 const exportRecord = { record: "any" } as const;
 const personalDataExport: Shape<PersonalDataExport> = {
   object: {
@@ -1075,6 +1094,12 @@ const body = {
   exportPrivacyRequest: {
     object: { email: { optional: "string" } },
   } satisfies Shape<Admin.ExportPrivacyRequestBody>,
+  erasePrivacyRequest: {
+    object: { email: { optional: "string" }, confirm: { literal: true } },
+  } satisfies Shape<Admin.ErasePrivacyRequestBody>,
+  rejectPrivacyRequest: {
+    object: { reasonCode: "string", note: { optional: "string" } },
+  } satisfies Shape<Admin.RejectPrivacyRequestBody>,
   login: { object: { email: "string", password: "string" } } satisfies Shape<Admin.AdminLoginBody>,
   changePassword: {
     object: { currentPassword: "string", newPassword: "string" },
@@ -1446,6 +1471,9 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   createPrivacyRequest: privacyRequest,
   getPrivacyRequest: privacyRequest,
   exportPrivacyRequest: personalDataExport,
+  previewPrivacyErasure: erasurePreview,
+  erasePrivacyRequest: privacyRequest,
+  rejectPrivacyRequest: privacyRequest,
   getEmailMessage: emailMessageDetail,
   resendEmailMessage: emailMessageId,
   cancelEmailMessage: emailMessage,
@@ -1569,6 +1597,9 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   createPrivacyRequest: body.createPrivacyRequest,
   getPrivacyRequest: null,
   exportPrivacyRequest: body.exportPrivacyRequest,
+  previewPrivacyErasure: body.exportPrivacyRequest,
+  erasePrivacyRequest: body.erasePrivacyRequest,
+  rejectPrivacyRequest: body.rejectPrivacyRequest,
   getEmailMessage: null,
   resendEmailMessage: null,
   cancelEmailMessage: null,

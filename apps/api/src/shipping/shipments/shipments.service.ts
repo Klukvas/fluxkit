@@ -302,6 +302,12 @@ export class ShipmentsService {
     if (order === undefined) {
       throw notFound("Order");
     }
+    if (order.contactErasedAt !== null) {
+      throw ruleViolation(
+        "The order's contact data was erased; it cannot be tracked.",
+        "contact_erased",
+      );
+    }
     const trackingNumber = row.trackingNumber;
     const outcome = await this.tracking.poll(provider, [trackingNumber], [recipientPhoneOf(order)]);
     if (outcome.kind !== "ok") {
@@ -367,6 +373,13 @@ export class ShipmentsService {
     }
     if (order.status !== "paid") {
       throw orderNotPaid();
+    }
+    if (order.contactErasedAt !== null) {
+      // An erased order has no recipient (ADR 0033 decision 5); erasure refuses paid orders, so only a manual change gets here.
+      throw ruleViolation(
+        "The order's contact data was erased; it cannot be shipped.",
+        "contact_erased",
+      );
     }
     const [snapshot] = await this.orders.listShipping(tx, [order.id]);
     if (snapshot === undefined || snapshot.providerCode === null) {
