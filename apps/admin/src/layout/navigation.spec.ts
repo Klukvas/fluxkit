@@ -22,6 +22,8 @@ describe("navigation configuration", () => {
       "payments",
       "shipping",
       "email",
+      "privacy",
+      "auditLog",
       "users",
     ]);
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {

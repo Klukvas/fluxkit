@@ -41,5 +41,9 @@
   "page.shippingMethodNew.title": "New delivery method",
   "page.shippingMethodDetail.title": "Delivery method",
   "page.shippingProviders.title": "Carriers",
-  "page.shippingProviderDetail.title": "Carrier"
+  "page.shippingProviderDetail.title": "Carrier",
+  "page.privacy.title": "Personal data",
+  "page.privacyLookup.title": "Look up by email",
+  "page.privacyRequestDetail.title": "Privacy request",
+  "page.auditLog.title": "Audit log"
 }

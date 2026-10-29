@@ -26,6 +26,8 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
     "Admin users",
     "Shipping",
     "Email",
+    "Personal data",
+    "Audit log",
   ]) {
     await expect(nav.getByRole("link", { name: hidden })).toHaveCount(0);
   }
@@ -93,10 +95,15 @@ test("the viewer browses the catalog read-only and is not allowed in orders", as
   await expectNotAllowed(page, "/email/messages/0b5f8a52-7a9e-4c7a-9d0e-1a2b3c4d5e6f");
   await expectNotAllowed(page, "/email/templates");
   await expectNotAllowed(page, "/email/templates/order.placed");
+  await expectNotAllowed(page, "/privacy");
+  await expectNotAllowed(page, "/privacy/lookup");
+  await expectNotAllowed(page, "/audit");
 
   expect(guard.writes(), "the viewer's pages send no write").toEqual([]);
   const forbiddenReads = guard.requests.filter((request) =>
-    /^\/admin\/(orders|customers|users|shipping|email)/.test(new URL(request.url).pathname),
+    /^\/admin\/(orders|customers|users|shipping|email|privacy|audit-events)/.test(
+      new URL(request.url).pathname,
+    ),
   );
   expect(forbiddenReads, "no request for data the role cannot read").toEqual([]);
 });

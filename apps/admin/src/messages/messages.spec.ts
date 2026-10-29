@@ -3,11 +3,13 @@ import { join, relative, sep } from "node:path";
 import { messagePlaceholders, type Locale, type Messages } from "@fluxkit/ui";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as account from "../areas/account/account-page";
+import * as audit from "../areas/audit";
 import * as catalogDictionaries from "../areas/catalog-dictionaries";
 import * as customers from "../areas/customers";
 import * as email from "../areas/email";
 import * as orders from "../areas/orders";
 import * as payments from "../areas/payments";
+import * as privacy from "../areas/privacy";
 import * as products from "../areas/products";
 import * as shipping from "../areas/shipping";
 import * as users from "../areas/users";
@@ -180,6 +182,8 @@ describe("the lazy file loader", () => {
       shipping: { uk: unused, en: unused },
       email: { uk: unused, en: unused },
       payments: { uk: unused, en: unused },
+      privacy: { uk: unused, en: unused },
+      audit: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
@@ -212,6 +216,7 @@ const sourceRoot = join(directory, "..");
  */
 const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   account: account.MESSAGE_FILES,
+  audit: audit.MESSAGE_FILES,
   auth: [],
   "catalog-dictionaries": catalogDictionaries.MESSAGE_FILES,
   customers: customers.MESSAGE_FILES,
@@ -219,6 +224,7 @@ const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   home: [],
   orders: orders.MESSAGE_FILES,
   payments: payments.MESSAGE_FILES,
+  privacy: privacy.MESSAGE_FILES,
   products: products.MESSAGE_FILES,
   shipping: shipping.MESSAGE_FILES,
   users: users.MESSAGE_FILES,

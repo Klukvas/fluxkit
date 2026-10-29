@@ -70,6 +70,7 @@ describe("describeShipmentProblem", () => {
         "carrier_invalid_credentials",
         "carrier_not_supported",
         "carrier_rejected",
+        "contact_erased",
         "invalid_transition",
         "label_not_available",
         "no_carrier",
