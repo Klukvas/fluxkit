@@ -6488,20 +6488,25 @@
                           "type": "object",
                           "properties": {
                             "email": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "phone": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "firstName": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "lastName": {
+                              "nullable": true,
                               "type": "string"
                             }
                           },
                           "required": ["email", "phone", "firstName", "lastName"],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                         },
                         "shippingAddress": {
                           "nullable": true,
@@ -7105,20 +7110,25 @@
                           "type": "object",
                           "properties": {
                             "email": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "phone": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "firstName": {
+                              "nullable": true,
                               "type": "string"
                             },
                             "lastName": {
+                              "nullable": true,
                               "type": "string"
                             }
                           },
                           "required": ["email", "phone", "firstName", "lastName"],
-                          "additionalProperties": false
+                          "additionalProperties": false,
+                          "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                         },
                         "shippingAddress": {
                           "nullable": true,
@@ -7831,20 +7841,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -8539,20 +8554,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -9395,20 +9415,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -10080,20 +10105,25 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -10652,6 +10682,8 @@
                             "format": "uuid"
                           },
                           "email": {
+                            "nullable": true,
+                            "description": "Null once the contact data of the order was erased (ADR 0033).",
                             "type": "string"
                           },
                           "itemCount": {
@@ -10798,20 +10830,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -12021,6 +12064,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -12186,20 +12230,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -13409,6 +13464,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -13600,20 +13656,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -14823,6 +14890,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",
@@ -14980,20 +15048,31 @@
                       "type": "object",
                       "properties": {
                         "email": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "phone": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "firstName": {
+                          "nullable": true,
                           "type": "string"
                         },
                         "lastName": {
+                          "nullable": true,
                           "type": "string"
                         }
                       },
                       "required": ["email", "phone", "firstName", "lastName"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set."
+                    },
+                    "contactErasedAt": {
+                      "nullable": true,
+                      "description": "When the contact data was anonymised; null for a live contact.",
+                      "type": "string",
+                      "format": "date-time"
                     },
                     "shippingAddress": {
                       "nullable": true,
@@ -16203,6 +16282,7 @@
                     "customerId",
                     "isGuest",
                     "contact",
+                    "contactErasedAt",
                     "shippingAddress",
                     "billingAddress",
                     "items",

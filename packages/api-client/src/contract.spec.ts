@@ -369,7 +369,12 @@ const order: Shape<Order> = {
       },
     },
     contact: {
-      object: { email: "string", phone: "string", firstName: "string", lastName: "string" },
+      object: {
+        email: { nullable: "string" },
+        phone: { nullable: "string" },
+        firstName: { nullable: "string" },
+        lastName: { nullable: "string" },
+      },
     },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },

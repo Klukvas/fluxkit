@@ -271,7 +271,8 @@ export interface AdminOrderSummary {
   total: Money;
   currency: string;
   customerId: string | null;
-  email: string;
+  /** Null once the contact data of the order was erased (ADR 0033). */
+  email: string | null;
   itemCount: number;
 }
 
@@ -330,6 +331,8 @@ export interface AdminOrder {
   customerId: string | null;
   isGuest: boolean;
   contact: OrderContact;
+  /** ISO 8601: when the contact data was anonymised; null for a live contact. */
+  contactErasedAt: string | null;
   shippingAddress: Address | null;
   billingAddress: Address | null;
   items: AdminOrderItem[];

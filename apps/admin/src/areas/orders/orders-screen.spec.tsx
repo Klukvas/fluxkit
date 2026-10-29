@@ -73,6 +73,7 @@ function order(overrides: Partial<AdminOrder> = {}): AdminOrder {
       firstName: "<b>Olena</b>",
       lastName: "Shevchenko",
     },
+    contactErasedAt: null,
     shippingAddress: {
       countryCode: "UA",
       city: "Kyiv",
@@ -221,7 +222,7 @@ describe("order list screen", () => {
     const rowData = [
       summary.number,
       formatDateTime(summary.placedAt, "en"),
-      summary.email,
+      summary.email ?? "",
       "UAH 39.98",
     ];
     for (const state of states) {
@@ -288,10 +289,10 @@ describe("order detail screen", () => {
     const html = detail(sentinel, paid, [...ROLE_PERMISSIONS.manager]);
     const data = [
       paid.number,
-      paid.contact.email,
-      paid.contact.phone,
-      paid.contact.lastName,
-      paid.contact.firstName,
+      paid.contact.email ?? "",
+      paid.contact.phone ?? "",
+      paid.contact.lastName ?? "",
+      paid.contact.firstName ?? "",
       "<script>alert(1)</script> Street 1",
       "01001 Kyiv",
       "R-1",

@@ -96,6 +96,7 @@ export function buildAdminOrderView(parts: AdminOrderParts): AdminOrderDetail {
       firstName: order.firstName,
       lastName: order.lastName,
     },
+    contactErasedAt: instant(order.contactErasedAt),
     shippingAddress: parseAddress(order.shippingAddress),
     billingAddress: parseAddress(order.billingAddress),
     items: parts.items.map((row) => ({

@@ -126,7 +126,12 @@ const address: Shape<Address> = {
   },
 };
 const contact: Shape<OrderContact> = {
-  object: { email: "string", phone: "string", firstName: "string", lastName: "string" },
+  object: {
+    email: { nullable: "string" },
+    phone: { nullable: "string" },
+    firstName: { nullable: "string" },
+    lastName: { nullable: "string" },
+  },
 };
 
 // auth and users
@@ -303,7 +308,7 @@ const orderList: Shape<AdminOrderList> = paginated({
     total: money,
     currency: "string",
     customerId: { nullable: "string" },
-    email: "string",
+    email: { nullable: "string" },
     itemCount: "integer",
   },
 } as const);
@@ -489,6 +494,7 @@ const order: Shape<AdminOrder> = {
     customerId: { nullable: "string" },
     isGuest: "boolean",
     contact,
+    contactErasedAt: { nullable: "string" },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
     items: {

@@ -245,9 +245,10 @@ export function OrderDetailView({
       term: t("order.detail.name"),
       description: (
         <span className="break-words">
+          {/* An erased contact (ADR 0033) has no names; TODO(fluxkit): privacy plan step 9 labels it. */}
           {t("order.detail.fullName", {
-            first: order.contact.firstName,
-            last: order.contact.lastName,
+            first: order.contact.firstName ?? "",
+            last: order.contact.lastName ?? "",
           })}
         </span>
       ),

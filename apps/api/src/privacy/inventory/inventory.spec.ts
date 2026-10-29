@@ -59,6 +59,22 @@ describe("the core inventory against the Drizzle schema", () => {
     }
   });
 
+  it("classifies the privacy tables without a personal column (ADR 0033 decision 9)", () => {
+    for (const table of ["privacy_request", "admin_audit_event"]) {
+      const columns = Object.entries(coreInventory[table] ?? {});
+      expect(columns.length, table).toBeGreaterThan(5);
+      for (const [column, entry] of columns) {
+        expect(entry.class, `${table}.${column}`).not.toBe("personal");
+      }
+    }
+    expect(entryOf("privacy_request", "subject_email_hash")).toMatchObject({
+      class: "secret_hash",
+      export: "excluded",
+    });
+    expect(entryOf("privacy_request", "handled_by").erasure).toBe("set_null");
+    expect(entryOf("admin_audit_event", "admin_user_id").erasure).toBe("set_null");
+  });
+
   it("clears the guest access and replaces the request fingerprint of an erased order", () => {
     expect(entryOf("sales_order", "access_token_hash").erasure).toBe("clear");
     expect(entryOf("sales_order", "access_expires_at").erasure).toBe("clear");
@@ -88,11 +104,7 @@ describe("the core inventory against the Drizzle schema", () => {
 });
 
 describe("the inventory against the core anonymisation plan (ADR 0033 decision 6)", () => {
-  // `contact_erased_at` is added by the privacy migration (plan step 4); until then it is in the plan only.
-  const NOT_YET_IN_SCHEMA = ["contact_erased_at"];
-  const planned = ORDER_ANONYMISATION_PLAN.map((step) => step.column).filter(
-    (column) => !NOT_YET_IN_SCHEMA.includes(column),
-  );
+  const planned = ORDER_ANONYMISATION_PLAN.map((step) => step.column);
 
   it("changes exactly the sales_order columns the inventory anonymises or clears", () => {
     const inventoried = Object.entries(coreInventory["sales_order"] ?? {})

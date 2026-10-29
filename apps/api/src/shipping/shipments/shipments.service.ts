@@ -653,15 +653,28 @@ function labelProblem(value: { bytes: unknown; contentType: unknown }): string |
 /** The recipient the carrier needs: the address's recipient when the shopper gave one, else the order contact. */
 function recipientOf(order: OrderRow): WaybillRequest["recipient"] {
   const address = parseAddress(order.shippingAddress);
+  const contact = liveContactOf(order);
   return {
-    firstName: address?.recipientFirstName ?? order.firstName,
-    lastName: address?.recipientLastName ?? order.lastName,
+    firstName: address?.recipientFirstName ?? contact.firstName,
+    lastName: address?.recipientLastName ?? contact.lastName,
     phone: recipientPhoneOf(order),
   };
 }
 
 function recipientPhoneOf(order: OrderRow): string {
-  return parseAddress(order.shippingAddress)?.recipientPhone ?? order.phone;
+  return parseAddress(order.shippingAddress)?.recipientPhone ?? liveContactOf(order).phone;
+}
+
+/**
+ * The order contact of a live order. An erased contact (ADR 0033 decision 5) exists only on a closed order without an
+ * active shipment (the erasure blockers), which create and refresh refuse before they get here: reaching it is a bug.
+ */
+function liveContactOf(order: OrderRow): { firstName: string; lastName: string; phone: string } {
+  const { firstName, lastName, phone } = order;
+  if (firstName === null || lastName === null || phone === null) {
+    throw new Error(`Order ${order.number} has an erased contact; it cannot be shipped`);
+  }
+  return { firstName, lastName, phone };
 }
 
 function destinationOf(order: OrderRow, kind: string, destination: unknown): ShippingDestination {
