@@ -23,6 +23,7 @@ import {
   type ResetPasswordFormViewProps,
 } from "./account-reset-password";
 import {
+  VerifyEmailConfirmView,
   VerifyEmailDoneView,
   VerifyEmailErrorView,
   VerifyEmailInvalidView,
@@ -254,6 +255,14 @@ describe("the outcome states of the reset page", () => {
 });
 
 describe("the states of the verify page", () => {
+  it("ready: explains what the button does and confirms nothing until it is pressed (email review F4)", () => {
+    const html = render(<VerifyEmailConfirmView t={t} onConfirm={vi.fn()} />);
+    expect(html).toMatch(/<h1[^>]*tabindex="-1"[^>]*>§account\.verify\.ready\.title/);
+    expect(html).toContain("§account.verify.ready.description");
+    expect(html).toMatch(/<button[^>]*type="button"[^>]*>§account\.verify\.confirm<\/button>/);
+    expect(html).not.toContain("<form");
+  });
+
   it("verified: heading, status message, link to the account", () => {
     const html = render(<VerifyEmailDoneView t={t} accountHref="/en/account" />);
     expect(html).toMatch(/<h1[^>]*tabindex="-1"[^>]*>§account\.verify\.done\.title/);
@@ -421,6 +430,7 @@ describe("translation and theming of the emailed-link views", () => {
     />,
     <EmailUnavailableView key="9" t={t} signInHref="/uk" />,
     <ResendVerificationView key="10" t={t} state={{ status: "sent" }} onSend={vi.fn()} />,
+    <VerifyEmailConfirmView key="11" t={t} onConfirm={vi.fn()} />,
   ];
 
   it("hardcodes no words: after removing the sentinels no text or text attribute is left", () => {

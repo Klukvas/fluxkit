@@ -12,4 +12,7 @@ export {
   type PresentedAuthToken,
 } from "./customer-auth-tokens.service.js";
 export { EmailAuthModule } from "./email-auth.module.js";
-export { emailProviderStartupWarning } from "./email-startup-warning.js";
+export {
+  emailProviderStartupWarning,
+  storefrontUrlStartupWarning,
+} from "./email-startup-warning.js";

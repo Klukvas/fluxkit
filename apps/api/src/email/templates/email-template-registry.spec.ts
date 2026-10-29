@@ -242,6 +242,44 @@ describe("EmailTemplateRegistry (discovery in the application)", () => {
       "shipment.created",
     ]);
     expect(registry.get("fixture.greeting")?.template.version).toBe(1);
+    // What the admin outbox shows (review F3): the account mails nothing, the others every member of their variables.
+    const display = Object.fromEntries(
+      registry
+        .keys()
+        .filter((key) => key !== "fixture.greeting")
+        .map((key) => {
+          const template = registry.get(key)?.template;
+          return [key, template?.displayVariables ?? null];
+        }),
+    );
+    expect(display).toEqual({
+      "admin.test": ["providerCode"],
+      "customer.password_changed": null,
+      "customer.password_reset": null,
+      "customer.verify_email": null,
+      "order.cancelled": ["orderNumber"],
+      "order.expired": ["orderNumber"],
+      "order.paid": ["orderNumber", "currency", "total"],
+      "order.placed": [
+        "orderNumber",
+        "currency",
+        "lines",
+        "moreLines",
+        "subtotal",
+        "shipping",
+        "discount",
+        "total",
+        "delivery",
+        "payBefore",
+      ],
+      "shipment.created": ["orderNumber", "carrierTitle", "trackingNumber"],
+    });
+    for (const key of registry.keys()) {
+      const template = registry.get(key)?.template;
+      expect(Object.keys(template?.sampleVariables as object), key).toEqual(
+        expect.arrayContaining([...(template?.displayVariables ?? [])]),
+      );
+    }
     const overridden = await startApp({ extraFeatures: [fixtureEmailTemplates("override")] });
     apps.push(overridden);
     const replaced = overridden.app.get(EmailTemplateRegistry).get("fixture.greeting");

@@ -8,6 +8,16 @@ const NEW_PASSWORD = "the brand new e2e password 456";
 /** A well-formed token no mail ever held: the API answers `invalid_or_expired` for it. */
 const UNKNOWN_TOKEN = "Zm9yLXRlc3RzLW9ubHktbm90LWEtcmVhbC10b2tlbi0wMDAw";
 
+/** Opens a verification link and presses its confirm button (the page sends nothing before the press). */
+async function confirmVerificationLink(page: Page, url: string): Promise<void> {
+  await page.goto(url);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Confirm your email address" }),
+  ).toBeVisible();
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Confirm my email address" }).click();
+}
+
 /** The visible text of the page's `main`, for comparing two answers word for word. */
 async function mainText(page: Page): Promise<string> {
   return (await page.locator("main").innerText()).replace(/\s+/g, " ").trim();
@@ -167,24 +177,31 @@ test("email verification: the notice, send again, the newest link confirms, the 
   const second = await newestLink(email, "verify-email", 2);
   expect(second.token).not.toBe(first.token);
 
-  // The older link was replaced: signed in, the page offers a new one.
-  await page.goto(inLocale(first, "en"));
+  // The older link was replaced: signed in, after the press the page offers a new one.
+  await confirmVerificationLink(page, inLocale(first, "en"));
   await expect(
     page.getByRole("heading", { level: 1, name: "This link does not work" }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/en\/account\/verify-email$/);
   await expect(page.getByRole("button", { name: "Send the link again" })).toBeVisible();
 
-  // The newest one confirms, once, on load; the fragment is gone.
+  // The newest one confirms, once, and only when the button is pressed (email review F4); the fragment is gone.
   const confirms: string[] = [];
   page.on("request", (request) => {
     if (request.url().endsWith("/store/account/verify-email")) confirms.push(request.method());
   });
   await page.goto(inLocale(second, "en"));
   await expect(
+    page.getByRole("heading", { level: 1, name: "Confirm your email address" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/en\/account\/verify-email$/);
+  await page.waitForLoadState("networkidle");
+  expect(confirms).toEqual([]);
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Confirm my email address" }).click();
+  await expect(
     page.getByRole("heading", { level: 1, name: "Email address confirmed" }),
   ).toBeFocused();
-  await expect(page).toHaveURL(/\/en\/account\/verify-email$/);
   expect(confirms).toEqual(["POST"]);
 
   // The notice is gone from the account page and the address is marked confirmed.
@@ -194,12 +211,12 @@ test("email verification: the notice, send again, the newest link confirms, the 
   await expect(page.getByText("Email address confirmed")).toBeVisible();
 
   // A used link of a verified customer is not an error.
-  await page.goto(inLocale(second, "en"));
+  await confirmVerificationLink(page, inLocale(second, "en"));
   await expect(
     page.getByRole("heading", { level: 1, name: "Email address confirmed" }),
   ).toBeVisible();
   // Even the replaced link is harmless now that the address is confirmed (the API answers 204 for a confirmed customer).
-  await page.goto(inLocale(first, "en"));
+  await confirmVerificationLink(page, inLocale(first, "en"));
   await expect(
     page.getByRole("heading", { level: 1, name: "Email address confirmed" }),
   ).toBeVisible();
@@ -209,7 +226,7 @@ test("email verification: the notice, send again, the newest link confirms, the 
 test("a verification link opened by a guest or with an unknown token explains itself and offers to sign in", async ({
   page,
 }) => {
-  await page.goto(`/en/account/verify-email#t=${UNKNOWN_TOKEN}`);
+  await confirmVerificationLink(page, `/en/account/verify-email#t=${UNKNOWN_TOKEN}`);
   await expect(
     page.getByRole("heading", { level: 1, name: "This link does not work" }),
   ).toBeVisible();

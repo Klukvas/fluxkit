@@ -23,6 +23,7 @@ export class BackInStockTemplate {
 | `template.category` | `account` or `order`: chooses the footer text and the provider tag |
 | `template.variablesSchema` | an object with `safeParse` (a strict zod object fits); checked when the mail is enqueued and again when it is rendered |
 | `template.sampleVariables` | pass the schema; rendered at startup in every required locale and by the admin preview (plan step 9) |
+| `template.displayVariables` | optional list of distinct top-level variable keys whose stored values an `email.manage` admin may see in the outbox detail (`GET /admin/email/messages/{id}`). An allowlist: every key not listed shows `[redacted]`, and without the member no value is shown. Never list a key that holds a token, a one-time code, a link or anything else a reader could use; `customer.*` keys show no value even when listed (added after email review F3; it replaced a key-name denylist) |
 | `template.render(variables, context)` | pure, synchronous, deterministic (the same input gives the same bytes: the provider refuses another body under the same idempotency key); returns `{subject, html, text}`: `html` built with the core `html` tag (`SafeHtml`), a non-blank plain-text `text`, a subject (sanitized by the API: header-safe, at most 200 code points) |
 | `catalogs` | locale to texts; at least `uk` and `en`; every locale has the same keys; every key is `<template key>.<name>` with lower-case segments; no text is blank |
 
@@ -45,7 +46,7 @@ export class BackInStockTemplate {
 | `customer.password_changed` | account | `{}` | none | a successful reset confirmation |
 | `customer.verify_email` | account | `{tokenId}` | `{STOREFRONT_PUBLIC_URL}/{locale}/account/verify-email#t=<token>` | registration and `POST /store/account/verify-email/resend` |
 
-An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`.
+An override of `customer.password_reset` or `customer.verify_email` must print `context.links.action` (the page the token is for) and must not print `tokenId`. `admin.test` declares `providerCode` displayable; the `customer.*` templates declare nothing.
 
 ### Order and shipment mails (email plan step 8)
 
@@ -60,6 +61,7 @@ Category `order`. The variables are frozen when the mail is enqueued: ids, the o
 | `shipment.created` | `orderNumber`, `carrierTitle` (the shipping method's title of the order snapshot, or `null`), `trackingNumber` | as `order.placed` | `shipment.created` (the carrier accepted the waybill) |
 
 Rules for all of them:
+- **Outbox display:** each declares every member of its variables in `displayVariables` (the number, amounts and texts the order already shows; no token or link is stored).
 - **One row per event and template:** `dedupe_key = <eventId>:<template key>`, so a redelivered event makes no second mail. `order.fulfilled`, `shipment.status_changed` and `shipment.cancelled` send nothing in v1.
 - **Recipient** is the order's contact email (a guest's or a customer's; an order of a deactivated or deleted account still gets its mails), `recipient_kind` is `guest` when the order has a guest token and `customer` otherwise, the locale is the order's. An order without an address, an address no mail header can carry (non-ASCII) and `EMAIL_PROVIDER=none` enqueue nothing (a code-only log).
 - **Guest link:** the API derives it while rendering and checks that the derived token's hash equals the order's stored hash; a mismatch (the secret changed since checkout) fails the mail `render_failed` instead of sending a link that opens nothing. A temporary database failure while reading the order retries the mail (it is not recorded `failed`).

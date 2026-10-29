@@ -133,6 +133,18 @@ describe("checkEmailTemplateDefinition", () => {
     } as unknown as EmailTemplate<unknown>;
     expect(checkEmailTemplateDefinition(schemaless)).toEqual(["variablesSchema has no safeParse"]);
   });
+
+  it("accepts displayVariables as a list of distinct keys, and refuses anything else", () => {
+    const withDisplay = (displayVariables: unknown) =>
+      checkEmailTemplateDefinition({ ...orderPaid, displayVariables } as EmailTemplate<unknown>);
+    expect(withDisplay(["number"])).toEqual([]);
+    expect(withDisplay([])).toEqual([]);
+    for (const bad of ["number", [1], [""], ["number", "number"], null]) {
+      expect(withDisplay(bad), JSON.stringify(bad)).toEqual([
+        "displayVariables is not a list of distinct, non-empty keys",
+      ]);
+    }
+  });
 });
 
 describe("checkEmailRenderOutput", () => {

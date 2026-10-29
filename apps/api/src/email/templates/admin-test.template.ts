@@ -52,6 +52,7 @@ export const adminTestTemplate: EmailTemplate<AdminTestVariables> = Object.freez
   category: "account",
   variablesSchema,
   sampleVariables: Object.freeze({ providerCode: "resend" }),
+  displayVariables: Object.freeze(["providerCode"]),
   render,
 });
 
