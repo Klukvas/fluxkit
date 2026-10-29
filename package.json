@@ -15,6 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:boundaries": "node scripts/check-boundaries.mjs",
+    "check:env": "node scripts/check-env-example.mjs",
     "test": "pnpm build && turbo run test",
     "test:e2e": "pnpm build && pnpm --filter @fluxkit/storefront test:e2e && pnpm --filter @fluxkit/admin test:e2e",
     "db:migrate": "pnpm build && pnpm --filter @fluxkit/api db:migrate",

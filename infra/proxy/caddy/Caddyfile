@@ -1,0 +1,90 @@
+# Fluxkit edge proxy, Caddy 2 alternative to the nginx edge of infra/docker-compose.prod.yml (docs/deployment.md).
+# Same routing and headers as infra/proxy/nginx; Caddy obtains and renews the certificate itself (ACME, ports 80 and 443).
+# Checked with `caddy validate` and a run against the built admin SPA (docs/deployment.md, "Caddy"); the full stack
+# smoke test runs the nginx edge only.
+#
+# Environment (read when Caddy loads this file):
+#   FLUXKIT_DOMAIN              the shop host name
+#   FLUXKIT_API_UPSTREAM        default api:3000
+#   FLUXKIT_STOREFRONT_UPSTREAM default storefront:3001
+#   FLUXKIT_ADMIN_SITE          directory that holds admin-ui/ (the built apps/admin/dist), default /srv/fluxkit/site
+#   FLUXKIT_ADMIN_IMG_SRC       " https://<host>" for each STOREFRONT_IMAGE_HOSTS entry, with the leading space; empty
+#                               when there are none (the nginx edge derives it itself; here you write it)
+# The API runs with TRUST_PROXY=1: Caddy replaces the X-Forwarded-For of a client it does not trust. Do NOT configure
+# `trusted_proxies` and do NOT remove the header with `header_up` (the API would lose the client address).
+
+(admin_security) {
+	header Strict-Transport-Security "max-age=31536000"
+	header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data:{$FLUXKIT_ADMIN_IMG_SRC}; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+	header X-Frame-Options DENY
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy no-referrer
+	header Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	header Cross-Origin-Opener-Policy same-origin
+}
+
+(to_api) {
+	reverse_proxy {$FLUXKIT_API_UPSTREAM:api:3000} {
+		# The edge owns HSTS (the API sends none today; this keeps it one header if it ever does).
+		header_down -Strict-Transport-Security
+		header_down -X-Powered-By
+	}
+}
+
+{$FLUXKIT_DOMAIN} {
+	# The one place HSTS is set (the storefront's own copy is removed below).
+	header Strict-Transport-Security "max-age=31536000"
+
+	# The shop API and uploaded images. /media: the API sets Cache-Control itself; no header or cache rule here.
+	@store path /store /store/* /media /media/*
+	handle @store {
+		import to_api
+	}
+
+	# The admin API. Image uploads up to MEDIA_MAX_BYTES (10 MiB by default); Caddy streams request bodies.
+	@admin path /admin /admin/*
+	handle @admin {
+		request_body {
+			max_size 12MB
+		}
+		import to_api
+	}
+
+	# Payment provider notifications (ADR 0032): the API checks the signature over the exact bytes; 64 KiB is its limit.
+	@webhooks path /webhooks/payments /webhooks/payments/*
+	handle @webhooks {
+		request_body {
+			max_size 64KB
+		}
+		import to_api
+	}
+
+	# The admin SPA (ADR 0027). Hashed assets: a missing file is a 404, never the HTML, and only an existing file is
+	# marked immutable (a 404 cached for a year would break a tab left open across a deployment).
+	@adminAssets path /admin-ui/assets/*
+	handle @adminAssets {
+		root * {$FLUXKIT_ADMIN_SITE:/srv/fluxkit/site}
+		import admin_security
+		@assetExists file
+		header @assetExists Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Every other /admin-ui path (the start page without a slash too): the file, else index.html.
+	@adminPages path /admin-ui /admin-ui/*
+	handle @adminPages {
+		root * {$FLUXKIT_ADMIN_SITE:/srv/fluxkit/site}
+		import admin_security
+		header Cache-Control no-cache
+		try_files {path} /admin-ui/index.html
+		file_server
+	}
+
+	# Everything else: the storefront. /docs, /docs-json and /health are not routed to the API (they answer 404 here).
+	handle {
+		reverse_proxy {$FLUXKIT_STOREFRONT_UPSTREAM:storefront:3001} {
+			header_down -Strict-Transport-Security
+			header_down -X-Powered-By
+		}
+	}
+}

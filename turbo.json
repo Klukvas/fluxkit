@@ -5,6 +5,11 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", ".next/**", "!.next/cache/**"]
     },
+    "@fluxkit/storefront#build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "!.next/cache/**"],
+      "env": ["STOREFRONT_IMAGE_HOSTS"]
+    },
     "typecheck": {
       "dependsOn": ["^build"]
     },

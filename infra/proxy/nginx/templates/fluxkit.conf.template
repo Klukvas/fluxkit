@@ -1,0 +1,127 @@
+# Fluxkit edge proxy (nginx, http context). Rendered at container start from /etc/nginx/templates by the image's
+# entrypoint; only FLUXKIT_* and NGINX_LOCAL_RESOLVERS are substituted (NGINX_ENVSUBST_FILTER), so $host, $remote_addr
+# and the other nginx variables stay as written. Routing (ADR 0026, 0027, 0028, 0032):
+#   /store, /admin, /media, /webhooks/payments  -> the API
+#   /admin-ui                                   -> the built admin SPA (files in this image, index.html fallback)
+#   everything else                             -> the storefront (next start)
+# /docs, /docs-json and /health are NOT routed: they reach the storefront and answer 404 (docs/deployment.md).
+# Tested by scripts/deploy-smoke.sh; the /admin-ui headers by apps/admin/edge-proxy-headers.spec.ts.
+
+server_tokens off;
+
+# Docker's resolver (or whatever /etc/resolv.conf names): the upstreams are resolved again while nginx runs, so a
+# recreated API or storefront container with a new address is found without restarting the edge.
+resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+
+upstream fluxkit_api {
+    zone fluxkit_api 64k;
+    server ${FLUXKIT_API_UPSTREAM} resolve;
+    keepalive 16;
+}
+
+upstream fluxkit_storefront {
+    zone fluxkit_storefront 64k;
+    server ${FLUXKIT_STOREFRONT_UPSTREAM} resolve;
+    keepalive 16;
+}
+
+# The container health check, on loopback only (never published). Not an allow/deny location on a public port: nginx
+# runs `return` before access checks, so allow/deny would not protect it.
+server {
+    listen 127.0.0.1:8081;
+    access_log off;
+
+    location = /.edge-health {
+        return 204;
+    }
+
+    location / {
+        return 404;
+    }
+}
+
+# Port 80 (published as 80): ACME http-01 challenges for a certificate client that uses a webroot, and a redirect of
+# everything else to https on the configured host (never to the Host header a client sent).
+server {
+    listen 8080;
+    server_name _;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/acme;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://${FLUXKIT_DOMAIN}$request_uri;
+    }
+}
+
+server {
+    listen 8443 ssl;
+    http2 on;
+    server_name ${FLUXKIT_DOMAIN};
+
+    # The certificate files are mounted, never built into the image (docs/deployment.md, "TLS").
+    ssl_certificate /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:fluxkit_tls:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # The edge is the ONE place that sets HSTS (no includeSubDomains or preload without the owner's decision). Inherited
+    # by the locations below that have no add_header of their own; the /admin-ui locations repeat it.
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    # The shop API (ADR 0026). No add_header here, so the HSTS line above is inherited.
+    location ~ ^/(store|media)(/|$) {
+        # /media/*: the API sets Cache-Control itself (a year, immutable on a file; no-store on a 404). No cache rule here.
+        include /etc/nginx/fluxkit/proxy-to-api.conf;
+    }
+
+    # The admin API. An image upload is a raw body of up to MEDIA_MAX_BYTES (10 MiB by default): allow a little more,
+    # here only, and stream it so the API's early 401, 403, 411, 413 and 503 reach the client before the whole body.
+    location ~ ^/admin(/|$) {
+        client_max_body_size 12m;
+        proxy_request_buffering off;
+        include /etc/nginx/fluxkit/proxy-to-api.conf;
+    }
+
+    # Payment provider notifications (ADR 0032 decision 12). The API verifies the signature over the exact body bytes;
+    # nginx forwards them unchanged. 64k is the API's own limit (PAYMENT_LIMITS.webhookBodyMaxBytes): a larger body is
+    # refused here. Buffering stays on (the bodies are small), so the API gets the body in one piece.
+    location ~ ^/webhooks/payments(/|$) {
+        client_max_body_size 64k;
+        include /etc/nginx/fluxkit/proxy-to-api.conf;
+    }
+
+    # The admin SPA (ADR 0027). Hashed assets first: a missing file is a 404, never the HTML.
+    location ~ ^/admin-ui/assets/ {
+        root /srv/fluxkit/site;
+        try_files $uri =404;
+        # Without "always": successful answers only, so a 404 of an asset a deployment removed is never cached for a year.
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        include /etc/nginx/conf.d/fluxkit/admin-ui-headers.conf;
+    }
+
+    # Every other /admin-ui path (the start page without a slash too): the file when there is one, else index.html.
+    location ~ ^/admin-ui(/|$) {
+        root /srv/fluxkit/site;
+        try_files $uri /admin-ui/index.html;
+        add_header Cache-Control "no-cache" always;
+        include /etc/nginx/conf.d/fluxkit/admin-ui-headers.conf;
+    }
+
+    # Everything else: the storefront. Next sends its own HSTS in production; it is hidden so that every answer carries
+    # exactly the one header the edge sets (inherited from the server, since this location has no add_header).
+    location / {
+        proxy_pass http://fluxkit_storefront;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_hide_header Strict-Transport-Security;
+        proxy_hide_header X-Powered-By;
+    }
+}
