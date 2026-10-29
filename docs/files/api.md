@@ -371,4 +371,6 @@ Core module (no feature flag), docs in `docs/api/inventory.md`. `inventory.modul
 - `src/health/` - `GET /health` (`health.controller.ts`, `health.module.ts`, `health.spec.ts`).
 - `src/spikes/queue.spec.ts` - BullMQ spike against real Redis.
 - `src/spikes/search.spec.ts` - Meilisearch spike (Ukrainian text, variant filters, facets); findings in `docs/adr/0005-search-notes.md`.
+- `src/spikes/search-s1.spec.ts` - Meilisearch spike S1 of the search plan (`docs/plans/2026-10-29-search.md`): per-request `distinct`, exact and lazy facet counts, federation, prefix off for the last word, atomic index swap under load, scoped keys. Plain REST against the real engine; findings in the plan and `docs/adr/0034-catalog-search.md`.
+- `src/spikes/search-corpus.ts` - the deterministic synthetic Ukrainian corpus of spike S1 (320 invented product titles in five niches with inflected forms, 100 queries with ground truth, no client data); `search-corpus.spec.ts` checks its size and shape.
 - `vitest.config.ts` - Vitest with SWC (needed for Nest decorator metadata); spec files run one at a time (`fileParallelism: false`).
