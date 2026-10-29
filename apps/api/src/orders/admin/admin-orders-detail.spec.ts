@@ -122,6 +122,7 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
           "cancelledAt",
           "cancellationReason",
           "contact",
+          "contactErasedAt",
           "currency",
           "customerId",
           "discountTotal",
@@ -156,6 +157,7 @@ describe("GET /admin/orders/:id and the OrderReadPort (real Postgres)", () => {
         currency: "UAH",
         customerId: null,
         isGuest: true,
+        contactErasedAt: null,
         contact: {
           email: "rich.buyer@example.test",
           phone: "+380501234567",

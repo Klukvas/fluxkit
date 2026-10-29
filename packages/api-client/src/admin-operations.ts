@@ -326,6 +326,47 @@ export const ADMIN_OPERATIONS = {
     [200],
     "shipping.manage",
   ),
+  privacyLookup: operation("POST", "/admin/privacy/lookup", [200], "privacy.manage", {
+    body: "json",
+  }),
+  listPrivacyRequests: operation("GET", "/admin/privacy/requests", [200], "privacy.manage", {
+    query: ["limit", "offset", "status"],
+  }),
+  createPrivacyRequest: operation("POST", "/admin/privacy/requests", [201], "privacy.manage", {
+    body: "json",
+  }),
+  getPrivacyRequest: operation("GET", "/admin/privacy/requests/{id}", [200], "privacy.manage"),
+  exportPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/export",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  previewPrivacyErasure: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase-preview",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  erasePrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/erase",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  rejectPrivacyRequest: operation(
+    "POST",
+    "/admin/privacy/requests/{id}/reject",
+    [200],
+    "privacy.manage",
+    { body: "json" },
+  ),
+  listAuditEvents: operation("GET", "/admin/audit-events", [200], "users.manage", {
+    query: ["limit", "offset", "action", "adminUserId", "targetKind", "targetId", "from", "to"],
+  }),
   getEmailStatus: operation("GET", "/admin/email/status", [200], "email.manage"),
   sendTestEmail: operation("POST", "/admin/email/test", [202], "email.manage", { body: "json" }),
   listEmailMessages: operation("GET", "/admin/email/messages", [200], "email.manage", {

@@ -262,11 +262,12 @@ export interface OrderAdjustment {
   includedInPrice: boolean;
 }
 
+/** All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set. */
 export interface OrderContact {
-  email: string;
-  phone: string;
-  firstName: string;
-  lastName: string;
+  email: string | null;
+  phone: string | null;
+  firstName: string | null;
+  lastName: string | null;
 }
 
 export interface OrderHistoryEntry {
@@ -661,4 +662,30 @@ export interface ProductDetail {
   price: PriceRange;
   availability: Availability;
   media: ProductMedia[];
+}
+
+// ---- personal data export (ADR 0033 decision 7; docs/contracts/personal-data-export.md)
+
+export type ExportJsonValue =
+  string | number | boolean | null | ExportJsonValue[] | { [key: string]: ExportJsonValue };
+
+export type ExportJsonObject = Record<string, ExportJsonValue>;
+
+/** `fluxkit.personal-data-export/v1`: keys and rules in `docs/contracts/personal-data-export.md`. */
+export interface PersonalDataExport {
+  format: "fluxkit.personal-data-export/v1";
+  generatedAt: string;
+  subject: { kind: "customer" | "email" };
+  account: ExportJsonObject | null;
+  orders: ExportJsonObject[];
+  mail: ExportJsonObject[];
+  sessions: ExportJsonObject[];
+  cart: ExportJsonObject | null;
+  processors: { kind: "email" | "payment" | "shipping"; name: string }[];
+}
+
+/** `POST /store/account/delete`: the current password and an explicit confirmation. */
+export interface DeleteAccountBody {
+  password: string;
+  confirm: true;
 }

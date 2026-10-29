@@ -528,8 +528,8 @@ describe("delete-abandoned-uploads (real Postgres, real temp MEDIA_DIR, injected
         result: { deleted: 1, truncated: false, fileErrors: 0 },
       });
       // Job 7 is the last cleanup before the outbound calls: the shipment tracking (job 8), the mail jobs (9, 10), then
-      // the payment reconcile (11).
-      expect(reports.map((entry) => entry.name).slice(-5)).toEqual([
+      // the payment reconcile (11) and the privacy retention (12).
+      expect(reports.map((entry) => entry.name).slice(-6, -1)).toEqual([
         "delete-abandoned-uploads",
         "track-shipments",
         "send-emails",

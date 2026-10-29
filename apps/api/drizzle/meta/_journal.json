@@ -64,6 +64,13 @@
       "when": 1793057500182,
       "tag": "0008_payments",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793255597426,
+      "tag": "0009_privacy",
+      "breakpoints": true
     }
   ]
 }

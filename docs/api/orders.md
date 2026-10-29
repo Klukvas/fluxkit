@@ -66,7 +66,7 @@ A deadlock (`40P01`) is retried once by re-running the transaction; a second one
            unitPrice, compareAtAmount | null, quantity, lineTotal}],
   subtotal, shippingTotal, discountTotal, taxTotal, total,
   adjustments: [{kind, code, label, amount, includedInPrice}],
-  contact: {email, phone, firstName, lastName}, shippingAddress | null, billingAddress | null,
+  contact: {email | null, phone | null, firstName | null, lastName | null}, shippingAddress | null, billingAddress | null,
   shipping: {methodCode, kind, title, providerCode | null, amount, payer, estimatedCarrierAmount | null,
              destination: {providerRef, number, kind, cityRef, cityName, description} | null} | null,
   shipments: [{providerCode, trackingNumber, status, createdAt, updatedAt, deliveredAt | null, cancelledAt | null}],
@@ -113,7 +113,7 @@ All need an admin session; the permission is the default pair of the controller 
 
 | Endpoint | Auth | Purpose | Request | Response | Errors |
 |---|---|---|---|---|---|
-| `GET /admin/orders` | `orders.read` | List orders, newest first | `?limit` (1 to 100, default 20), `?offset` (0 to 10 000), `?status` (one of the five), `?placedFrom` (inclusive) and `?placedTo` (exclusive): ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01, `placedFrom` not after `placedTo`; `?q` (at most 254 characters, below); `?customerId` (the exact id of the customer account that placed the order, a UUID; guest orders never match; `400` when malformed). Filters combine (AND). A parameter that is not listed is `400` | `200 {items, total, limit, offset}`; item `{id, number, status, placedAt, expiresAt, total, currency, customerId, email, itemCount}` (`itemCount` = units over all lines; `customerId` is `null` for a guest and for a deleted account) | `400` |
+| `GET /admin/orders` | `orders.read` | List orders, newest first | `?limit` (1 to 100, default 20), `?offset` (0 to 10 000), `?status` (one of the five), `?placedFrom` (inclusive) and `?placedTo` (exclusive): ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01, `placedFrom` not after `placedTo`; `?q` (at most 254 characters, below); `?customerId` (the exact id of the customer account that placed the order, a UUID; guest orders never match; `400` when malformed). Filters combine (AND). A parameter that is not listed is `400` | `200 {items, total, limit, offset}`; item `{id, number, status, placedAt, expiresAt, total, currency, customerId, email, itemCount}` (`itemCount` = units over all lines; `customerId` is `null` for a guest and for a deleted account; `email` is `null` once the order's contact was erased) | `400` |
 | `GET /admin/orders/{id}` | `orders.read` | The order in full (below) | none | `200` the admin order | `400` malformed id; `404` |
 | `POST /admin/orders/{id}/cancel` | `orders.write` | Cancel an `awaiting_payment` order (its reservations are released) or, admin only, a `paid` one | `{reason}`: trimmed, 1 to 500 characters, no control characters other than tab and line breaks (strict) | `200` the admin order | `400`; `404`; `409 rule_violation` `invalid_transition` (already cancelled, expired or fulfilled), `payment_in_progress` (an online payment of the `awaiting_payment` order is in flight) |
 | `POST /admin/orders/{id}/mark-paid` | `orders.write` | Record a payment received outside the system, through the same `OrdersService.markPaid` entry point a payment plugin uses | `{reference, amount: {amount, currency}}` (strict): `reference` trimmed, 1 to 255 characters, no control characters; `amount` an integer of minor units, 0 to 10^12, a supported currency | `200` the admin order. The same `reference` on an order that is already paid (or fulfilled) answers `200` with the order unchanged | `400`; `404`; `409 rule_violation` `order_not_payable` (expired or cancelled, or a reservation is no longer held), `amount_mismatch` (not the total, or another currency; also checked on an already paid order), `payment_reference_conflict` (already paid with another reference), `invalid_transition`, `payment_in_progress` (an online payment is `processing`, `create_unknown` or `creating`; an `awaiting_customer` one is closed instead and a later online success is refunded automatically) |
@@ -127,7 +127,8 @@ All need an admin session; the permission is the default pair of the controller 
 
 ```
 { id, number, status, locale, currency, customerId | null, isGuest,
-  contact: {email, phone, firstName, lastName}, shippingAddress | null, billingAddress | null,
+  contact: {email | null, phone | null, firstName | null, lastName | null}, contactErasedAt | null,
+  shippingAddress | null, billingAddress | null,
   items: [{position, productId | null, variantId | null, sku, productTitle {locale: text}, variantTitle {locale: text} | null,
            optionValues: [{option {locale: text}, value {locale: text}}], imageUrl | null, unitPrice, compareAtAmount | null,
            quantity, lineTotal, requiresShipping, reservations: [{status, quantity}]}],
@@ -161,4 +162,5 @@ Shipping (shipping plan step 6, `docs/api/shipping.md`): `400` `shipping_method_
 - Stock location: the default location only, one reservation per line (ADR 0015). A shop with more locations sees `in_stock` but `insufficient_stock` at checkout until multi-location allocation is planned.
 - The number of statements of a checkout grows with the number of lines (a lock, an update and an insert per tracked line inside `reserveMany`); the reads do not.
 - Stock probing by repeated checkouts is bounded by the rate limits (`checkout` 10 per 10 minutes per address, single process) and the 999 cap.
+- **Erased contact (migration 0009, ADR 0033 decision 5):** once an order's contact data is anonymised (the privacy erasure of `docs/api/privacy.md`, or job 12 `anonymise-orders` once `ORDER_CONTACT_RETENTION_DAYS` is set), all four `contact` fields are `null`, both addresses are `null` (the database keeps only the country) and the admin order's `contactErasedAt` holds the time; on a live order all four are set and `contactErasedAt` is `null`. The order mail handler sends no mail to an erased order (it logs the reason no_recipient; not a problem code). Erasure rules: `docs/api/privacy.md`.
 - The order contact data is personal data. Logs, events and problem bodies carry none of it (tested by capturing the log output of a refused, a placed and an invalid checkout).

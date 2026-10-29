@@ -43,6 +43,12 @@ export const RATE_LIMITS = Object.freeze({
   paymentStatus: { maxAttempts: 60, windowMinutes: 10 },
   paymentRefund: { maxAttempts: 20, windowMinutes: 10 },
   paymentResync: { maxAttempts: 30, windowMinutes: 10 },
+  // ADR 0033 decision 13 (plan section 7): the self-service export per customer, counted by the service (5 a day); the
+  // admin export of a request's subject per signed-in admin user.
+  dataExport: { maxAttempts: 5, windowMinutes: 24 * 60 },
+  privacyExport: { maxAttempts: 30, windowMinutes: 60 },
+  // ADR 0033 decision 13: the account deletion per customer, counted by the service (password guessing on a stolen session).
+  accountDelete: { maxAttempts: 5, windowMinutes: 60 },
 } satisfies Record<string, WindowLimit>);
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -81,6 +87,9 @@ export const RATE_LIMIT_SUBJECTS: Readonly<Record<RateLimitName, RateLimitSubjec
     paymentStatus: "clientAddress",
     paymentRefund: "adminUser",
     paymentResync: "adminUser",
+    dataExport: "account",
+    privacyExport: "adminUser",
+    accountDelete: "account",
   },
 );
 

@@ -73,7 +73,7 @@ import type {
   LocalizedText,
 } from "./admin-types.js";
 import type * as Admin from "./admin-types.js";
-import type { Address, Money, OrderContact } from "./types.js";
+import type { Address, Money, OrderContact, PersonalDataExport } from "./types.js";
 import {
   compareShape,
   type OpenApiDocument,
@@ -126,7 +126,12 @@ const address: Shape<Address> = {
   },
 };
 const contact: Shape<OrderContact> = {
-  object: { email: "string", phone: "string", firstName: "string", lastName: "string" },
+  object: {
+    email: { nullable: "string" },
+    phone: { nullable: "string" },
+    firstName: { nullable: "string" },
+    lastName: { nullable: "string" },
+  },
 };
 
 // auth and users
@@ -157,6 +162,7 @@ const me: Shape<AdminMe> = {
           "shipping.manage",
           "email.manage",
           "payments.refund",
+          "privacy.manage",
         ],
       },
     },
@@ -303,7 +309,7 @@ const orderList: Shape<AdminOrderList> = paginated({
     total: money,
     currency: "string",
     customerId: { nullable: "string" },
-    email: "string",
+    email: { nullable: "string" },
     itemCount: "integer",
   },
 } as const);
@@ -489,6 +495,7 @@ const order: Shape<AdminOrder> = {
     customerId: { nullable: "string" },
     isGuest: "boolean",
     contact,
+    contactErasedAt: { nullable: "string" },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
     items: {
@@ -733,6 +740,31 @@ const emailMessageDetail: Shape<AdminEmailMessageDetail> = {
   object: { ...emailMessage.object, variables: json },
 };
 const emailMessageList: Shape<AdminEmailMessageList> = paginated(emailMessage);
+const auditEventList: Shape<Admin.AdminAuditEventList> = paginated({
+  object: {
+    id: "string",
+    createdAt: "string",
+    adminUserId: { nullable: "string" },
+    action: {
+      enum: [
+        "customer.deactivated",
+        "customer.activated",
+        "customer.unlocked",
+        "admin_user.created",
+        "admin_user.role_changed",
+        "admin_user.deactivated",
+        "admin_user.password_reset",
+        "privacy.lookup",
+        "privacy.exported",
+        "privacy.erased",
+        "privacy.request_changed",
+      ],
+    },
+    targetKind: { enum: ["customer", "order", "admin_user", "privacy_request"] },
+    targetId: "string",
+    detail: { record: { oneOf: ["string", "number", "boolean", { array: "string" }] } },
+  },
+});
 const emailMessageId: Shape<AdminEmailMessageId> = { object: { messageId: "string" } };
 const emailTemplateList: Shape<AdminEmailTemplateList> = {
   object: {
@@ -960,7 +992,114 @@ const product: Shape<AdminProduct> = {
 // ------------------------------------------------------------ request bodies
 
 const uuid = "string";
+const privacyRequestStatus = {
+  enum: ["received", "in_progress", "completed", "rejected"],
+} as const;
+const privacyRequest: Shape<Admin.AdminPrivacyRequest> = {
+  object: {
+    id: "string",
+    kind: { enum: ["export", "erasure"] },
+    subjectKind: { enum: ["customer", "email"] },
+    subjectCustomerId: { nullable: "string" },
+    channel: { enum: ["self_service", "admin"] },
+    status: privacyRequestStatus,
+    receivedAt: "string",
+    dueAt: "string",
+    completedAt: { nullable: "string" },
+    overdue: "boolean",
+    result: {
+      nullable: {
+        record: { oneOf: ["string", "number", "boolean", { array: "string" }] },
+      },
+    },
+    note: { nullable: "string" },
+    handledBy: { nullable: "string" },
+  },
+};
+const privacyLookup: Shape<Admin.AdminPrivacyLookup> = {
+  object: {
+    customer: {
+      nullable: {
+        object: {
+          id: "string",
+          email: "string",
+          firstName: "string",
+          lastName: "string",
+          isActive: "boolean",
+          createdAt: "string",
+          orderCount: "integer",
+        },
+      },
+    },
+    guestOrders: {
+      array: {
+        object: {
+          id: "string",
+          number: "string",
+          status: orderStatus,
+          placedAt: "string",
+          contactErased: "boolean",
+        },
+      },
+    },
+    mailCount: "integer",
+    openRequests: { array: privacyRequest },
+  },
+};
+const erasureReason = {
+  enum: [
+    "open_order",
+    "payment_in_progress",
+    "refund_in_progress",
+    "active_shipment",
+    "mail_sending",
+  ],
+} as const;
+const erasurePreview: Shape<Admin.AdminErasurePreview> = {
+  object: {
+    accountFound: "boolean",
+    orders: "integer",
+    ordersToAnonymise: "integer",
+    mail: "integer",
+    blockers: { array: { object: { orderNumber: { nullable: "string" }, reason: erasureReason } } },
+    reasons: { array: erasureReason },
+  },
+};
+const exportRecord = { record: "any" } as const;
+const personalDataExport: Shape<PersonalDataExport> = {
+  object: {
+    format: { enum: ["fluxkit.personal-data-export/v1"] },
+    generatedAt: "string",
+    subject: { object: { kind: { enum: ["customer", "email"] } } },
+    account: { nullable: exportRecord },
+    orders: { array: exportRecord },
+    mail: { array: exportRecord },
+    sessions: { array: exportRecord },
+    cart: { nullable: exportRecord },
+    processors: {
+      array: { object: { kind: { enum: ["email", "payment", "shipping"] }, name: "string" } },
+    },
+  },
+};
+
 const body = {
+  privacyLookup: { object: { email: "string" } } satisfies Shape<Admin.AdminPrivacyLookupBody>,
+  createPrivacyRequest: {
+    object: {
+      kind: { enum: ["export", "erasure"] },
+      subject: { oneOf: [{ object: { customerId: "string" } }, { object: { email: "string" } }] },
+      note: { optional: "string" },
+    },
+  } satisfies Shape<Admin.CreatePrivacyRequestBody>,
+  exportPrivacyRequest: {
+    object: { email: { optional: "string" } },
+  } satisfies Shape<Admin.ExportPrivacyRequestBody>,
+  erasePrivacyRequest: {
+    object: { email: { optional: "string" }, confirm: { literal: true } },
+  } satisfies Shape<Admin.ErasePrivacyRequestBody>,
+  rejectPrivacyRequest: {
+    object: { reasonCode: "string", note: { optional: "string" } },
+  } satisfies Shape<Admin.RejectPrivacyRequestBody>,
   login: { object: { email: "string", password: "string" } } satisfies Shape<Admin.AdminLoginBody>,
   changePassword: {
     object: { currentPassword: "string", newPassword: "string" },
@@ -1326,6 +1465,15 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getEmailStatus: emailStatusResult,
   sendTestEmail: emailMessageId,
   listEmailMessages: emailMessageList,
+  listAuditEvents: auditEventList,
+  privacyLookup,
+  listPrivacyRequests: paginated(privacyRequest),
+  createPrivacyRequest: privacyRequest,
+  getPrivacyRequest: privacyRequest,
+  exportPrivacyRequest: personalDataExport,
+  previewPrivacyErasure: erasurePreview,
+  erasePrivacyRequest: privacyRequest,
+  rejectPrivacyRequest: privacyRequest,
   getEmailMessage: emailMessageDetail,
   resendEmailMessage: emailMessageId,
   cancelEmailMessage: emailMessage,
@@ -1443,6 +1591,15 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getEmailStatus: null,
   sendTestEmail: body.sendTestEmail,
   listEmailMessages: null,
+  listAuditEvents: null,
+  privacyLookup: body.privacyLookup,
+  listPrivacyRequests: null,
+  createPrivacyRequest: body.createPrivacyRequest,
+  getPrivacyRequest: null,
+  exportPrivacyRequest: body.exportPrivacyRequest,
+  previewPrivacyErasure: body.exportPrivacyRequest,
+  erasePrivacyRequest: body.erasePrivacyRequest,
+  rejectPrivacyRequest: body.rejectPrivacyRequest,
   getEmailMessage: null,
   resendEmailMessage: null,
   cancelEmailMessage: null,
@@ -1539,6 +1696,7 @@ const KNOWN_PERMISSIONS: readonly AdminOperationPermission[] = [
   "shipping.manage",
   "email.manage",
   "payments.refund",
+  "privacy.manage",
   "authenticated",
   "public",
   "denied",

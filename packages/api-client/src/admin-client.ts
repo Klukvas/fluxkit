@@ -21,6 +21,19 @@ import type {
   AdminEmailMessageDetail,
   AdminEmailMessageId,
   AdminEmailMessageList,
+  AdminAuditAction,
+  AdminAuditEventList,
+  AdminErasurePreview,
+  AdminPrivacyLookup,
+  ErasePrivacyRequestBody,
+  RejectPrivacyRequestBody,
+  AdminPrivacyLookupBody,
+  AdminPrivacyRequest,
+  AdminPrivacyRequestList,
+  CreatePrivacyRequestBody,
+  ExportPrivacyRequestBody,
+  PrivacyRequestStatus,
+  AdminAuditTargetKind,
   AdminEmailMessageStatus,
   AdminEmailPreview,
   AdminEmailStatus,
@@ -108,7 +121,7 @@ import { InvalidRequestError } from "./errors.js";
 import { BINARY_CONTENT_TYPE, type RawBytes } from "./request.js";
 import type { StoreResult } from "./response.js";
 import { createTransport, type CallOptions, type CallParts, type FetchLike } from "./transport.js";
-import type { OrderStatus } from "./types.js";
+import type { OrderStatus, PersonalDataExport } from "./types.js";
 
 export interface AdminClientOptions {
   /** `""` in the browser (the SPA and the API share one origin, ADR 0027); an http(s) origin elsewhere. */
@@ -158,6 +171,21 @@ export interface AdminListCategoriesOptions extends AdminPageOptions {
 
 export interface AdminListReservationsOptions extends AdminPageOptions {
   status?: ReservationStatus;
+}
+
+export interface AdminListPrivacyRequestsOptions extends AdminPageOptions {
+  status?: PrivacyRequestStatus;
+}
+
+export interface AdminListAuditEventsOptions extends AdminPageOptions {
+  action?: AdminAuditAction;
+  adminUserId?: string;
+  targetKind?: AdminAuditTargetKind;
+  targetId?: string;
+  /** ISO 8601 instant, inclusive. */
+  from?: string;
+  /** ISO 8601 instant, exclusive. */
+  to?: string;
 }
 
 export interface AdminListEmailMessagesOptions extends AdminPageOptions {
@@ -367,6 +395,42 @@ export interface AdminClient {
   ): Result<AdminShippingProviderSettings>;
   /** A failed check is still a `200` with `{ok: false, reason, providerCodes}`. */
   checkShippingProvider(code: string, options?: CallOptions): Result<AdminShippingProviderCheck>;
+
+  // privacy (ADR 0033 decisions 9 and 10; `privacy.manage`, owner only). Emails travel in bodies, never in URLs.
+  privacyLookup(body: AdminPrivacyLookupBody, options?: CallOptions): Result<AdminPrivacyLookup>;
+  listPrivacyRequests(options?: AdminListPrivacyRequestsOptions): Result<AdminPrivacyRequestList>;
+  createPrivacyRequest(
+    body: CreatePrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminPrivacyRequest>;
+  getPrivacyRequest(id: string, options?: CallOptions): Result<AdminPrivacyRequest>;
+  /** The subject's `fluxkit.personal-data-export/v1`; `409 rule_violation` `request_closed`, `export_too_large`, `subject_not_found`. */
+  exportPrivacyRequest(
+    id: string,
+    body: ExportPrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<PersonalDataExport>;
+
+  /** Counts and blockers; nothing changes. */
+  previewPrivacyErasure(
+    id: string,
+    body: ExportPrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminErasurePreview>;
+  /** Irreversible. `409 rule_violation` `erasure_blocked` (with `reasons`), `request_closed`, `not_an_erasure_request`. */
+  erasePrivacyRequest(
+    id: string,
+    body: ErasePrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminPrivacyRequest>;
+  rejectPrivacyRequest(
+    id: string,
+    body: RejectPrivacyRequestBody,
+    options?: CallOptions,
+  ): Result<AdminPrivacyRequest>;
+
+  // audit log (ADR 0033 decision 9; `users.manage`, owner only)
+  listAuditEvents(options?: AdminListAuditEventsOptions): Result<AdminAuditEventList>;
 
   // email (ADR 0031 decision 15; every operation needs `email.manage`)
   getEmailStatus(options?: CallOptions): Result<AdminEmailStatus>;
@@ -675,6 +739,21 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
       call("putShippingProviderSettings", { pathParams: { code }, body, options: opts }),
     checkShippingProvider: (code, opts) =>
       call("checkShippingProvider", { pathParams: { code }, options: opts }),
+
+    privacyLookup: (body, opts) => call("privacyLookup", { body, options: opts }),
+    listPrivacyRequests: (opts) => call("listPrivacyRequests", { options: opts }),
+    createPrivacyRequest: (body, opts) => call("createPrivacyRequest", { body, options: opts }),
+    getPrivacyRequest: (id, opts) =>
+      call("getPrivacyRequest", { pathParams: { id }, options: opts }),
+    exportPrivacyRequest: (id, body, opts) =>
+      call("exportPrivacyRequest", { pathParams: { id }, body, options: opts }),
+    previewPrivacyErasure: (id, body, opts) =>
+      call("previewPrivacyErasure", { pathParams: { id }, body, options: opts }),
+    erasePrivacyRequest: (id, body, opts) =>
+      call("erasePrivacyRequest", { pathParams: { id }, body, options: opts }),
+    rejectPrivacyRequest: (id, body, opts) =>
+      call("rejectPrivacyRequest", { pathParams: { id }, body, options: opts }),
+    listAuditEvents: (opts) => call("listAuditEvents", { options: opts }),
 
     getEmailStatus: (opts) => call("getEmailStatus", { options: opts }),
     sendTestEmail: (body, opts) => call("sendTestEmail", { body, options: opts }),

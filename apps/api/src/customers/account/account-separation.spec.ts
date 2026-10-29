@@ -82,12 +82,14 @@ describe("customer and admin principals are separate on the real routes", () => 
         customerAuthenticated && pattern.startsWith("/store/account"),
     );
     expect(routes.map(({ method, pattern }) => `${method} ${pattern}`).sort()).toEqual([
+      "GET /store/account/data-export",
       "GET /store/account/me",
       "GET /store/account/orders",
       "GET /store/account/orders/:number",
       "GET /store/account/orders/:number/payments/:paymentId",
       "PATCH /store/account/me",
       "POST /store/account/change-password",
+      "POST /store/account/delete",
       "POST /store/account/logout",
       "POST /store/account/orders/:number/cancel",
       "POST /store/account/orders/:number/payments",

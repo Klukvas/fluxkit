@@ -44,6 +44,7 @@ import type {
   ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
+  PersonalDataExport,
 } from "./types.js";
 import {
   compareShape,
@@ -369,7 +370,12 @@ const order: Shape<Order> = {
       },
     },
     contact: {
-      object: { email: "string", phone: "string", firstName: "string", lastName: "string" },
+      object: {
+        email: { nullable: "string" },
+        phone: { nullable: "string" },
+        firstName: { nullable: "string" },
+        lastName: { nullable: "string" },
+      },
     },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
@@ -609,6 +615,24 @@ const updateAccountBody: Shape<UpdateAccountBody> = {
     phone: { optional: { nullable: "string" } },
   },
 };
+const exportRecord = { record: "any" } as const;
+const personalDataExport: Shape<PersonalDataExport> = {
+  object: {
+    format: { enum: ["fluxkit.personal-data-export/v1"] },
+    generatedAt: "string",
+    subject: { object: { kind: { enum: ["customer", "email"] } } },
+    account: { nullable: exportRecord },
+    orders: { array: exportRecord },
+    mail: { array: exportRecord },
+    sessions: { array: exportRecord },
+    cart: { nullable: exportRecord },
+    processors: {
+      array: {
+        object: { kind: { enum: ["email", "payment", "shipping"] }, name: "string" },
+      },
+    },
+  },
+};
 const changePasswordBody: Shape<ChangePasswordBody> = {
   object: { currentPassword: "string", newPassword: "string" },
 };
@@ -672,6 +696,8 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getAccount: accountResult,
   updateAccount: accountResult,
   changePassword: "none",
+  getDataExport: personalDataExport,
+  deleteAccount: "none",
   requestPasswordReset: passwordResetAccepted,
   confirmPasswordReset: "none",
   confirmEmailVerification: "none",
@@ -709,6 +735,8 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getAccount: null,
   updateAccount: updateAccountBody,
   changePassword: changePasswordBody,
+  getDataExport: null,
+  deleteAccount: { object: { password: "string", confirm: { literal: true } } },
   requestPasswordReset: passwordResetRequestBody,
   confirmPasswordReset: passwordResetConfirmBody,
   confirmEmailVerification: verifyEmailBody,
