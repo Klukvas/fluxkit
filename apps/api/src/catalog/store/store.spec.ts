@@ -930,9 +930,13 @@ describe("store API (public, real app, real Postgres)", () => {
       const client = await pool.connect();
       try {
         await client.query("begin");
-        // Make the planner's choice depend on the index order, not on the size of the fixture.
+        // Make the planner's choice depend on the index order, not on the size or the statistics of the tables:
+        // on empty or stale statistics it otherwise sorts a tiny result (and merge-joins sorted inputs) because
+        // that is cheaper there. With sorting made unattractive, a Sort node left in the plan means that no
+        // index order could serve the ORDER BY, which is what this test is about.
         await client.query("set local enable_seqscan = off");
         await client.query("set local enable_bitmapscan = off");
+        await client.query("set local enable_sort = off");
         const plan = await client.query<{ "QUERY PLAN": string }>(
           `explain ${statement.text}`,
           statement.values,
@@ -1683,6 +1687,7 @@ describe("store API (public, real app, real Postgres)", () => {
           locales: ["uk", "en"],
           emailDelivery: false,
           onlinePayment: false,
+          search: false,
         });
       });
 
@@ -1699,6 +1704,7 @@ describe("store API (public, real app, real Postgres)", () => {
             locales: ["uk", "en"],
             emailDelivery: false,
             onlinePayment: false,
+            search: false,
           });
         } finally {
           await jpy.app.close();

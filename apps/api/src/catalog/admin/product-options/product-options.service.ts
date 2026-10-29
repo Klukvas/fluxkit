@@ -7,7 +7,8 @@ import {
 } from "@fluxkit/core";
 import { translatePostgresError } from "../../../common/postgres-errors.js";
 import { notFound, ruleViolation, validationFailed } from "../../../common/problem.js";
-import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { withTransaction, type DbExecutor, type Transaction } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import type { ProposalLog } from "../../shared/retry.js";
 import { toStatus } from "../products/products.mapper.js";
@@ -43,6 +44,7 @@ export class ProductOptionsService {
     private readonly generation: VariantGenerationService,
     private readonly variants: VariantsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   /**
@@ -73,6 +75,7 @@ export class ProductOptionsService {
       }
       await this.assertValuesBelongToOptions(tx, desired);
       await this.apply(tx, log, product, current, desired, planned.plan);
+      await this.search.productsChanged(tx, [productId], "variant_changed");
       return this.productDetails.getIn(tx, productId);
     });
   }
@@ -125,12 +128,13 @@ export class ProductOptionsService {
         );
       }
       await this.apply(tx, log, product, current, desired, planned.plan);
+      await this.search.productsChanged(tx, [productId], "variant_changed");
       return this.productDetails.getIn(tx, productId);
     });
   }
 
   /** One transaction, run again when a proposed SKU lost a race; constraint violations become problems last. */
-  private async run<T>(work: (tx: DbExecutor, log: ProposalLog) => Promise<T>): Promise<T> {
+  private async run<T>(work: (tx: Transaction, log: ProposalLog) => Promise<T>): Promise<T> {
     try {
       return await retryOnProposedSkuCollision((log) =>
         withTransaction(this.database, (tx) => work(tx, log)),

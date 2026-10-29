@@ -2,7 +2,14 @@ import type { ProductDetail } from "@fluxkit/api-client";
 import { defaultLocale, locales, type Translator } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { catalogPath, type CatalogQuery } from "./catalog-query";
-import { languageAlternates, listingRobots, socialImageUrl, trimDescription } from "./seo";
+import { searchPath, type SearchQuery } from "./search-query";
+import {
+  absoluteUrl,
+  languageAlternates,
+  listingRobots,
+  socialImageUrl,
+  trimDescription,
+} from "./seo";
 
 /**
  * `generateMetadata` results, built from data (plan, "SEO"). Pure: the route passes the public origin, the translator and
@@ -64,6 +71,31 @@ export function listingMetadata(input: ListingMetadataInput): Metadata {
   };
 }
 
+/**
+ * The results page: `noindex, follow` in every state (a result is a view of the catalog, not a page to rank; the products
+ * are reachable from the catalog, the category pages and the sitemap). The canonical is the page for the words alone (no
+ * filter, sort or page), in the page's own locale and with no hreflang: the same words in another language are another
+ * search. The words are in the title as plain text; Next escapes them.
+ */
+export function searchMetadata(input: {
+  origin: string;
+  locale: string;
+  t: Translator;
+  query: SearchQuery;
+}): Metadata {
+  const { t, query } = input;
+  const heading = query.q === "" ? t("search.title") : `${t("search.title")}: ${query.q}`;
+  const wordsOnly: SearchQuery = { q: query.q, facets: [], price: null, sort: null, page: 1 };
+  return {
+    title: pageTitle(t, heading),
+    description: t("search.metaDescription"),
+    alternates: {
+      canonical: absoluteUrl(input.origin, `/${input.locale}${searchPath(wordsOnly)}`),
+    },
+    robots: { index: false, follow: true },
+  };
+}
+
 export function productMetadata(input: {
   origin: string;
   locale: string;
@@ -94,6 +126,22 @@ export function productMetadata(input: {
         : { images: [{ url: imageUrl, alt: product.media[0]?.alt ?? product.title }] }),
     },
   };
+}
+
+/**
+ * Metadata of a legal page (privacy plan step 10): a title and the page's own canonical, no robots opinion. The text is
+ * the shop's to supply; master ships placeholders (`config/legal.ts`).
+ */
+export function legalMetadata(input: {
+  origin: string;
+  locale: string;
+  t: Translator;
+  titleKey: string;
+  slug: string;
+}): Metadata {
+  const title = pageTitle(input.t, input.t(input.titleKey));
+  const alternates = alternatesFor(input.origin, input.locale, `/legal/${input.slug}`);
+  return { title, alternates };
 }
 
 /**

@@ -36,6 +36,8 @@ import type {
   ProductDetail,
   ProductList,
   RegisterBody,
+  SearchResult,
+  SearchSuggestions,
   SetCartItemQuantityBody,
   ShippingChanged,
   ShippingCityPage,
@@ -44,6 +46,7 @@ import type {
   ShippingPickupPointPage,
   StoreConfig,
   UpdateAccountBody,
+  PersonalDataExport,
 } from "./types.js";
 import {
   compareShape,
@@ -369,7 +372,12 @@ const order: Shape<Order> = {
       },
     },
     contact: {
-      object: { email: "string", phone: "string", firstName: "string", lastName: "string" },
+      object: {
+        email: { nullable: "string" },
+        phone: { nullable: "string" },
+        firstName: { nullable: "string" },
+        lastName: { nullable: "string" },
+      },
     },
     shippingAddress: { nullable: address },
     billingAddress: { nullable: address },
@@ -413,6 +421,7 @@ const storeConfig: Shape<StoreConfig> = {
     locales: { array: "string" },
     emailDelivery: "boolean",
     onlinePayment: "boolean",
+    search: "boolean",
   },
 };
 
@@ -439,6 +448,46 @@ const productList: Shape<ProductList> = {
     limit: "integer",
     offset: "integer",
   },
+};
+
+const searchResult: Shape<SearchResult> = {
+  object: {
+    items: productList.object.items,
+    total: "integer",
+    page: "integer",
+    pageCount: "integer",
+    limit: "integer",
+    sort: { enum: ["relevance", "newest", "price_asc", "price_desc"] },
+    relaxed: "boolean",
+    query: { object: { normalized: "string" } },
+    facets: {
+      array: {
+        object: {
+          key: "string",
+          kind: { enum: ["slug", "uuid", "code", "boolean", "range"] },
+          level: { enum: ["product", "variant"] },
+          label: { nullable: "string" },
+          counted: "boolean",
+          values: {
+            array: {
+              object: {
+                code: "string",
+                label: { nullable: "string" },
+                count: { nullable: "integer" },
+                selected: "boolean",
+              },
+            },
+          },
+          range: { nullable: { object: { min: "number", max: "number" } } },
+        },
+      },
+    },
+    price: { nullable: { object: { min: "integer", max: "integer" } } },
+  },
+};
+
+const searchSuggestions: Shape<SearchSuggestions> = {
+  object: { items: { array: { object: { slug: "string", title: "string" } } } },
 };
 
 const labelledCode = { object: { code: "string", label: "string" } } as const;
@@ -570,6 +619,7 @@ const problemDetails: Shape<ProblemDetails> = {
         "shipping_changed",
         "shipping_provider_unavailable",
         "payment_provider_unavailable",
+        "search_unavailable",
       ],
     },
     detail: "string",
@@ -607,6 +657,24 @@ const updateAccountBody: Shape<UpdateAccountBody> = {
     firstName: { optional: "string" },
     lastName: { optional: "string" },
     phone: { optional: { nullable: "string" } },
+  },
+};
+const exportRecord = { record: "any" } as const;
+const personalDataExport: Shape<PersonalDataExport> = {
+  object: {
+    format: { enum: ["fluxkit.personal-data-export/v1"] },
+    generatedAt: "string",
+    subject: { object: { kind: { enum: ["customer", "email"] } } },
+    account: { nullable: exportRecord },
+    orders: { array: exportRecord },
+    mail: { array: exportRecord },
+    sessions: { array: exportRecord },
+    cart: { nullable: exportRecord },
+    processors: {
+      array: {
+        object: { kind: { enum: ["email", "payment", "shipping"] }, name: "string" },
+      },
+    },
   },
 };
 const changePasswordBody: Shape<ChangePasswordBody> = {
@@ -672,6 +740,8 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getAccount: accountResult,
   updateAccount: accountResult,
   changePassword: "none",
+  getDataExport: personalDataExport,
+  deleteAccount: "none",
   requestPasswordReset: passwordResetAccepted,
   confirmPasswordReset: "none",
   confirmEmailVerification: "none",
@@ -696,6 +766,8 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getConfig: storeConfig,
   listProducts: productList,
   getProduct: productDetail,
+  searchProducts: searchResult,
+  suggestProducts: searchSuggestions,
   getShippingOptions: shippingOptions,
   listShippingCities: shippingCityPage,
   listShippingPickupPoints: shippingPickupPointPage,
@@ -709,6 +781,8 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getAccount: null,
   updateAccount: updateAccountBody,
   changePassword: changePasswordBody,
+  getDataExport: null,
+  deleteAccount: { object: { password: "string", confirm: { literal: true } } },
   requestPasswordReset: passwordResetRequestBody,
   confirmPasswordReset: passwordResetConfirmBody,
   confirmEmailVerification: verifyEmailBody,
@@ -733,6 +807,8 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getConfig: null,
   listProducts: null,
   getProduct: null,
+  searchProducts: null,
+  suggestProducts: null,
   getShippingOptions: null,
   listShippingCities: null,
   listShippingPickupPoints: null,

@@ -216,14 +216,26 @@ describe("checkout page: the form", () => {
     expect(html).toContain("§checkout.submitting");
   });
 
-  it("states the neutral payment wording and never offers paying online", () => {
+  it("states the neutral payment wording while the shop takes no payment online", () => {
     const html = render();
     expect(html).toContain("§checkout.payment.note");
+    expect(html).not.toContain("§checkout.payment.noteOnline");
     expect(en["checkout.payment.note"]).toMatch(/contact you to arrange payment/);
     expect(en["checkout.payment.note"]).toMatch(/No payment is taken on this site/);
+  });
+
+  it("states the online payment wording only when the shop takes payments online, and never asks for card details", () => {
+    const html = renderToStaticMarkup(CheckoutPageView(props({ onlinePayment: true })));
+    expect(html).toContain("§checkout.payment.noteOnline");
+    expect(html).not.toContain("§checkout.payment.note<");
+    expect(en["checkout.payment.noteOnline"]).toMatch(/does not take or store card details/);
+    // The wording that says "no payment is taken" must not be shown beside a pay button.
+    expect(en["checkout.payment.noteOnline"]).not.toMatch(/No payment is taken/);
     for (const messages of [en, uk]) {
-      expect(JSON.stringify(messages)).not.toMatch(/pay online|card number|оплатити онлайн/i);
+      expect(JSON.stringify(messages)).not.toMatch(/card number|номер картки/i);
     }
+    // The checkout form itself has no card field (the card is entered on the provider's page).
+    expect(html).not.toMatch(/autocomplete="cc-|name="card/);
   });
 });
 

@@ -19,9 +19,11 @@ function create(
   orderStatus: OrderStatus = "awaiting_payment",
   providerAvailable = true,
   expiresAt = orderExpiresAt,
+  orderTotal = 125_000,
 ) {
   return decideNewPaymentAttempt({
     orderStatus,
+    orderTotal,
     attempts,
     providerAvailable,
     now,
@@ -75,6 +77,39 @@ describe("decideNewPaymentAttempt (ADR 0032 decision 6)", () => {
       ok: false,
       rule: "payment_not_available",
     });
+  });
+
+  it("refuses an order with nothing to pay online: payment_not_available, never an attempt of 0 (review F2)", () => {
+    expect(create([], "awaiting_payment", true, orderExpiresAt, 0)).toEqual({
+      ok: false,
+      rule: "payment_not_available",
+    });
+    // One minor unit is something to pay.
+    expect(create([], "awaiting_payment", true, orderExpiresAt, 1)).toMatchObject({ ok: true });
+    // A negative total cannot be stored (CHECK >= 0); if it ever reached here it is not payable online either.
+    expect(create([], "awaiting_payment", true, orderExpiresAt, -1)).toEqual({
+      ok: false,
+      rule: "payment_not_available",
+    });
+    // A paid or cancelled free order stays `order_not_payable` (the status is checked first).
+    expect(create([], "paid", true, orderExpiresAt, 0)).toEqual({
+      ok: false,
+      rule: "order_not_payable",
+    });
+    // Nothing to pay wins over a short window: the shopper must not be told to hurry.
+    expect(create([], "awaiting_payment", true, now, 0)).toEqual({
+      ok: false,
+      rule: "payment_not_available",
+    });
+  });
+
+  it("throws on a total that is not a whole number of minor units (a bug, not data)", () => {
+    for (const total of [1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(
+        () => create([], "awaiting_payment", true, orderExpiresAt, total),
+        String(total),
+      ).toThrow(RangeError);
+    }
   });
 
   it("checks in the ADR's order: not payable, in progress, window, not available", () => {

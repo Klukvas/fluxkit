@@ -35,6 +35,7 @@ export const KNOWN_PROBLEM_CODES = [
   "shipping_changed",
   "shipping_provider_unavailable",
   "payment_provider_unavailable",
+  "search_unavailable",
 ] as const;
 
 /** Rules of `rule_violation` the store routes answer (docs/api/cart.md, docs/api/orders.md). */
@@ -45,6 +46,13 @@ export const KNOWN_RULES = [
   "line_total_out_of_range",
   "subtotal_out_of_range",
   "invalid_transition",
+  "order_not_payable",
+  "payment_in_progress",
+  "payment_window_too_short",
+  "payment_not_available",
+  // the privacy routes (docs/api/privacy.md)
+  "erasure_blocked",
+  "export_too_large",
 ] as const;
 
 /** Codes of `errors[]` entries the storefront's forms and cart can receive (docs/api/{cart,customers,orders}.md). */

@@ -17,6 +17,7 @@ import {
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page } from "../../../common/pagination.js";
 import { PRICING_CONFIG, type PricingConfig } from "../../../common/pricing-config.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { translatePostgresError } from "../../../common/postgres-errors.js";
 import {
   notFound,
@@ -79,6 +80,7 @@ export class VariantsService {
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(PRICING_CONFIG) private readonly pricing: PricingConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async list(productId: string, query: ListVariantsQuery): Promise<Page<VariantResponse>> {
@@ -299,6 +301,7 @@ export class VariantsService {
         if (Object.keys(changes).length > 0) {
           await this.variants.update(tx, variantId, changes);
         }
+        await this.search.productsChanged(tx, [productId], "variant_changed");
         return this.load(tx, productId, variantId);
       });
     } catch (error) {
@@ -327,6 +330,7 @@ export class VariantsService {
           "This variant cannot be deleted; switch it off instead.",
         );
         await this.variants.delete(tx, variantId);
+        await this.search.productsChanged(tx, [productId], "variant_changed");
       });
     } catch (error) {
       throw translatePostgresError(error, { detail: FK_DETAIL });
@@ -339,6 +343,7 @@ export class VariantsService {
       withTransaction(this.database, async (tx) => {
         const product = await this.lockProduct(tx, productId);
         const outcome = await this.generation.generateMissing(tx, product, log);
+        await this.search.productsChanged(tx, [productId], "variant_changed");
         const rows = await this.products.listVariants(tx, productId);
         const optionValues = await this.products.listVariantOptionValues(tx, productId);
         return { ...outcome, variants: toVariantResponses(rows, optionValues) };

@@ -8,6 +8,8 @@ import { failureFromResult, failureFromThrown, type Failure } from "./failure";
  * - Typing is debounced (300 ms by default) and a query shorter than `minChars` sends nothing and drops the old results.
  * - Requests are numbered when they START. Only the newest query's answer is applied, so a slow older answer cannot replace
  *   the results of what the shopper typed since.
+ * - The request in flight is ABORTED (its `AbortSignal`) when the text changes, on `reset` and on `dispose`, so a stale
+ *   answer is dropped by the browser and never read; the numbering above stays as the second line of defence.
  * - The old results are cleared as soon as the query changes: an option is never offered for text it does not match.
  * - A failed lookup is a value (`failure`, translated by the view) with a retry; a caller's abort or a bug is rethrown.
  * - `stale` is the API's flag: the carrier is unreachable and saved data is shown.
@@ -33,8 +35,11 @@ export interface LookupPage<T> {
 }
 
 export interface LookupSourceOptions<T> {
-  /** One call to the typed client for the (trimmed) query. */
-  search(query: string): Promise<StoreResult<LookupPage<T>>>;
+  /**
+   * One call to the typed client for the (trimmed) query. `signal` is aborted when the answer is no longer wanted (the
+   * text changed, `reset`, `dispose`): pass it on, so the browser drops the request instead of reading a stale answer.
+   */
+  search(query: string, signal: AbortSignal): Promise<StoreResult<LookupPage<T>>>;
   /** Fewest characters that start a search (the cities API needs 2). */
   minChars: number;
   /** An empty query lists everything at once (the points of a chosen city) instead of waiting for text. Default false. */
@@ -76,6 +81,7 @@ export function createLookupSource<T>(options: LookupSourceOptions<T>): LookupSo
   let state = initialLookupState<T>();
   let seq = 0;
   let timer: unknown = null;
+  let inFlight: AbortController | null = null;
   const listeners = new Set<() => void>();
 
   function set(next: LookupState<T>): void {
@@ -88,16 +94,26 @@ export function createLookupSource<T>(options: LookupSourceOptions<T>): LookupSo
     timer = null;
   }
 
+  /** Ends the request in flight, if any; call it AFTER `seq` moved on, so the rejection it causes is recognised as stale. */
+  function abortInFlight(): void {
+    inFlight?.abort();
+    inFlight = null;
+  }
+
   async function run(query: string): Promise<void> {
     cancelTimer();
     seq += 1;
+    abortInFlight();
     const mine = seq;
+    const controller = new AbortController();
+    inFlight = controller;
     set({ ...initialLookupState<T>(), status: "loading", query });
     let result: StoreResult<LookupPage<T>>;
     try {
-      result = await options.search(query);
+      result = await options.search(query, controller.signal);
     } catch (thrown) {
       if (mine !== seq) return;
+      if (inFlight === controller) inFlight = null;
       try {
         set({
           ...initialLookupState<T>(),
@@ -112,6 +128,7 @@ export function createLookupSource<T>(options: LookupSourceOptions<T>): LookupSo
       return;
     }
     if (mine !== seq) return;
+    if (inFlight === controller) inFlight = null;
     if (result.ok) {
       set({
         status: "ready",
@@ -144,6 +161,7 @@ export function createLookupSource<T>(options: LookupSourceOptions<T>): LookupSo
       cancelTimer();
       // Invalidates a request in flight: its answer is for text that is gone.
       seq += 1;
+      abortInFlight();
       if (query === "" && options.searchEmpty === true) {
         void run("");
         return;
@@ -164,11 +182,13 @@ export function createLookupSource<T>(options: LookupSourceOptions<T>): LookupSo
     reset() {
       cancelTimer();
       seq += 1;
+      abortInFlight();
       set(initialLookupState<T>());
     },
     dispose() {
       cancelTimer();
       seq += 1;
+      abortInFlight();
     },
   };
 }

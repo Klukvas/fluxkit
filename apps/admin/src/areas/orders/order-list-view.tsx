@@ -256,7 +256,11 @@ export function OrderResultsView({
       header: t("order.list.columnCustomer"),
       cell: (row) => (
         <span className="flex flex-col">
-          <span className="break-all">{row.email}</span>
+          {row.email === null ? (
+            <span className="text-muted-foreground">{t("order.list.contactErased")}</span>
+          ) : (
+            <span className="break-all">{row.email}</span>
+          )}
           {row.customerId === null ? (
             <small className="text-muted-foreground">{t("order.list.noAccount")}</small>
           ) : null}

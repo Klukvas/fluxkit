@@ -51,7 +51,8 @@ export type AdminPermission =
   | "customers.write"
   | "shipping.manage"
   | "email.manage"
-  | "payments.refund";
+  | "payments.refund"
+  | "privacy.manage";
 
 export interface AdminLoginBody {
   email: string;
@@ -123,6 +124,8 @@ export interface AdminConfig {
   emailDelivery: boolean;
   /** False when no payment provider is enabled (`PAYMENT_PROVIDERS_ENABLED` empty): no online payment, orders are paid by hand. */
   onlinePayment: boolean;
+  /** False with `SEARCH_ENABLED=false`: the admin search routes answer 404, the Search area shows setup steps. */
+  search: boolean;
   media: AdminMediaConfig;
 }
 
@@ -271,7 +274,8 @@ export interface AdminOrderSummary {
   total: Money;
   currency: string;
   customerId: string | null;
-  email: string;
+  /** Null once the contact data of the order was erased (ADR 0033). */
+  email: string | null;
   itemCount: number;
 }
 
@@ -330,6 +334,8 @@ export interface AdminOrder {
   customerId: string | null;
   isGuest: boolean;
   contact: OrderContact;
+  /** ISO 8601: when the contact data was anonymised; null for a live contact. */
+  contactErasedAt: string | null;
   shippingAddress: Address | null;
   billingAddress: Address | null;
   items: AdminOrderItem[];
@@ -438,7 +444,8 @@ export interface AdminPaymentHistoryEntry {
 
 /**
  * A payment attempt as the admin sees it (ADR 0032). No page URL; card data is the system and the last four digits only.
- * `refundableAmount` is what a new refund may take (the amount less every refund that is not `failed`).
+ * `refundableAmount` is what a new refund may take (the amount less every refund that is not `failed` and less money the
+ * provider returned outside the shop).
  */
 export interface AdminPayment {
   id: string;
@@ -830,6 +837,38 @@ export interface AdminEmailMessageDetail extends AdminEmailMessage {
 
 export type AdminEmailMessageList = Paginated<AdminEmailMessage>;
 
+// ---- admin audit log (ADR 0033 decision 9; `users.manage`)
+
+export type AdminAuditAction =
+  | "customer.deactivated"
+  | "customer.activated"
+  | "customer.unlocked"
+  | "admin_user.created"
+  | "admin_user.role_changed"
+  | "admin_user.deactivated"
+  | "admin_user.password_reset"
+  | "privacy.lookup"
+  | "privacy.exported"
+  | "privacy.erased"
+  | "privacy.request_changed";
+
+export type AdminAuditTargetKind = "customer" | "order" | "admin_user" | "privacy_request";
+
+/** What an admin did; codes and ids only, never personal data. */
+export interface AdminAuditEvent {
+  id: string;
+  createdAt: string;
+  /** Null once that admin user was deleted. */
+  adminUserId: string | null;
+  action: AdminAuditAction;
+  targetKind: AdminAuditTargetKind;
+  targetId: string;
+  /** Codes, counts, flags and lists of codes only. */
+  detail: Record<string, string | number | boolean | string[]>;
+}
+
+export type AdminAuditEventList = Paginated<AdminAuditEvent>;
+
 /** There is no recipient: the test goes to the signed-in admin's own address. */
 export interface SendAdminTestEmailBody {
   /** One of `LOCALES`. Default: `DEFAULT_LOCALE`. */
@@ -1196,4 +1235,152 @@ export interface GenerateVariantsResult {
   created: number;
   skipped: number;
   variants: AdminVariant[];
+}
+
+// ---- privacy (ADR 0033 decisions 9 and 10; every operation needs `privacy.manage`, owner only)
+
+export type PrivacyRequestKind = "export" | "erasure";
+export type PrivacyRequestStatus = "received" | "in_progress" | "completed" | "rejected";
+
+export interface AdminPrivacyRequest {
+  id: string;
+  kind: PrivacyRequestKind;
+  subjectKind: "customer" | "email";
+  subjectCustomerId: string | null;
+  channel: "self_service" | "admin";
+  status: PrivacyRequestStatus;
+  receivedAt: string;
+  dueAt: string;
+  completedAt: string | null;
+  overdue: boolean;
+  /** Counts, codes and erased order numbers; never contact data. */
+  result: Record<string, string | number | boolean | string[]> | null;
+  note: string | null;
+  handledBy: string | null;
+}
+
+export type AdminPrivacyRequestList = Paginated<AdminPrivacyRequest>;
+
+export interface AdminPrivacyLookupBody {
+  email: string;
+}
+
+export interface AdminPrivacyLookup {
+  customer: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isActive: boolean;
+    createdAt: string;
+    orderCount: number;
+  } | null;
+  guestOrders: {
+    id: string;
+    number: string;
+    status: OrderStatus;
+    placedAt: string;
+    contactErased: boolean;
+  }[];
+  mailCount: number;
+  openRequests: AdminPrivacyRequest[];
+}
+
+export interface CreatePrivacyRequestBody {
+  kind: PrivacyRequestKind;
+  subject: { customerId: string } | { email: string };
+  /** How the identity was checked; no personal data. */
+  note?: string;
+}
+
+/** An email subject sends its email again (only an HMAC is stored); a customer subject sends `{}`. */
+export interface ExportPrivacyRequestBody {
+  email?: string;
+}
+
+export type ErasureReason =
+  "open_order" | "payment_in_progress" | "refund_in_progress" | "active_shipment" | "mail_sending";
+
+export interface AdminErasurePreview {
+  accountFound: boolean;
+  orders: number;
+  ordersToAnonymise: number;
+  mail: number;
+  /** `orderNumber` is null for `mail_sending`. */
+  blockers: { orderNumber: string | null; reason: ErasureReason }[];
+  reasons: ErasureReason[];
+}
+
+export interface ErasePrivacyRequestBody {
+  /** Required for an email subject (only an HMAC is stored). */
+  email?: string;
+  confirm: true;
+}
+
+export interface RejectPrivacyRequestBody {
+  /** A lower-case code, for example `identity_not_confirmed`. */
+  reasonCode: string;
+  note?: string;
+}
+
+/** `GET /admin/search/status` (only with search on). */
+export interface AdminSearchStatus {
+  engine: {
+    reachable: boolean;
+    code: string | null;
+    /** Store searches the engine refused (HTTP 400) since this API process started; per process. */
+    rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
+  };
+  locales: {
+    locale: string;
+    liveIndex: string | null;
+    documents: number | null;
+    builtAt: string | null;
+    /** The live index has the settings the current definitions and synonyms derive. */
+    settingsFresh: boolean;
+    /** The live index was built for the current document version and currency; false means a rebuild is due. */
+    documentsFresh: boolean;
+    rebuildRequestedAt: string | null;
+    build: { index: string; startedAt: string; documents: number } | null;
+    failedAttempts: number;
+    lastErrorCode: string | null;
+    lastErrorAt: string | null;
+    nextAttemptAt: string | null;
+  }[];
+  queue: {
+    depth: number;
+    due: number;
+    leased: number;
+    /** Products that failed 10 times or more; they keep retrying hourly. */
+    dead: number;
+    oldestEnqueuedAt: string | null;
+    oldestDueAt: string | null;
+    errorCodes: { code: string; count: number }[];
+  };
+}
+
+export interface AdminSearchRebuild {
+  requestedAt: string;
+  locales: string[];
+}
+
+/** Terms that find each other; stored normalized like a search query. */
+export interface AdminSynonymGroup {
+  id: string;
+  locale: string;
+  terms: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AdminSynonymGroupList = Paginated<AdminSynonymGroup>;
+
+/** 2 to 20 distinct terms of at most 50 characters each. */
+export interface CreateSynonymGroupBody {
+  locale: string;
+  terms: string[];
+}
+
+export interface UpdateSynonymGroupBody {
+  terms: string[];
 }

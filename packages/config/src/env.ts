@@ -11,6 +11,15 @@ import {
 } from "./email.js";
 import { parseEnabledFeatures } from "./features.js";
 import {
+  DEFAULT_MEILI_INDEX_PREFIX,
+  describeMeiliUrlProblem,
+  isPrivateMeiliHost,
+  isValidMeiliApiKey,
+  MEILI_INDEX_PREFIX_PATTERN,
+  normalizeMeiliUrl,
+  type SearchEnv,
+} from "./search.js";
+import {
   MIN_ORDER_PAYMENT_TTL_MINUTES_WITH_PAYMENT_PROVIDER,
   parsePaymentProvidersVariable,
   TEST_ONLY_PAYMENT_PROVIDERS,
@@ -62,6 +71,8 @@ export const DEFAULT_ORDER_PAYMENT_TTL_MINUTES = 30;
 const MIN_ORDER_PAYMENT_TTL_MINUTES = 5;
 const MAX_ORDER_PAYMENT_TTL_MINUTES = 1440;
 export const DEFAULT_ORDER_GUEST_ACCESS_DAYS = 90;
+/** The longest retention period of order contact data (core `retentionCutoff` refuses more). */
+const MAX_ORDER_CONTACT_RETENTION_DAYS = 36_500;
 const MAX_ORDER_GUEST_ACCESS_DAYS = 3650;
 
 /**
@@ -278,6 +289,9 @@ const envSchema = z
     ORDER_GUEST_ACCESS_DAYS: positiveInteger(MAX_ORDER_GUEST_ACCESS_DAYS).default(
       DEFAULT_ORDER_GUEST_ACCESS_DAYS,
     ),
+    // No default (ADR 0033 decision 8): unset keeps order contact data without a period and job 12 off; the owner sets it
+    // with an accountant. TODO(fluxkit): legal review of the period per market.
+    ORDER_CONTACT_RETENTION_DAYS: positiveInteger(MAX_ORDER_CONTACT_RETENTION_DAYS).optional(),
     // No default and no trimming: a secret that is silently weak or silently altered is worse than a refusal to start.
     ORDER_TOKEN_SECRET: z
       .string()
@@ -320,6 +334,12 @@ const envSchema = z
     MEDIA_MAX_PIXELS: positiveInteger(MAX_MEDIA_MAX_PIXELS)
       .pipe(z.number().min(MIN_MEDIA_MAX_PIXELS, `must be at least ${MIN_MEDIA_MAX_PIXELS}`))
       .default(DEFAULT_MEDIA_MAX_PIXELS),
+    // Catalog search (ADR 0034 decision 9). The MEILI_* values are checked in `superRefine` and only when search is on, so
+    // a deployment without search is not affected by them; a message never contains a value (URL or key).
+    SEARCH_ENABLED: strictBoolean.default(false),
+    MEILI_URL: z.preprocess(blankToUndefined, z.string().optional()),
+    MEILI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
+    MEILI_INDEX_PREFIX: z.preprocess(blankToUndefined, z.string().optional()),
   })
   .superRefine((env, context) => {
     const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
@@ -446,6 +466,56 @@ const envSchema = z
         });
       }
     }
+    if (env.SEARCH_ENABLED) {
+      if (env.MEILI_URL === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEILI_URL"],
+          message:
+            "is required when SEARCH_ENABLED is true (the engine's base URL, for example http://127.0.0.1:7700)",
+        });
+      } else {
+        const problem = describeMeiliUrlProblem(env.MEILI_URL);
+        if (problem !== undefined) {
+          context.addIssue({ code: "custom", path: ["MEILI_URL"], message: problem });
+        } else if (
+          inProduction &&
+          !env.MEILI_URL.startsWith("https://") &&
+          !isPrivateMeiliHost(new URL(env.MEILI_URL).hostname)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: ["MEILI_URL"],
+            message:
+              "must use https or a private address when NODE_ENV is production (the engine must not be reached over the public internet in plain http)",
+          });
+        }
+      }
+      if (env.MEILI_API_KEY === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEILI_API_KEY"],
+          message:
+            "is required when SEARCH_ENABLED is true (a key scoped to the index prefix, see README, never the master key)",
+        });
+      } else if (!isValidMeiliApiKey(env.MEILI_API_KEY)) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEILI_API_KEY"],
+          message: "must be 16 to 256 visible ASCII characters (no spaces)",
+        });
+      }
+      if (
+        env.MEILI_INDEX_PREFIX !== undefined &&
+        !MEILI_INDEX_PREFIX_PATTERN.test(env.MEILI_INDEX_PREFIX)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["MEILI_INDEX_PREFIX"],
+          message: `must match ${MEILI_INDEX_PREFIX_PATTERN.source} (lower case, ending with an underscore, at most 33 characters)`,
+        });
+      }
+    }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
       context.addIssue({
         code: "custom",
@@ -514,6 +584,11 @@ export interface AppEnv {
   /** A guest can open their order with its access token for this many days (1 to 3650). */
   orderGuestAccessDays: number;
   /**
+   * Days after an order closed (or its newest refund) before job 12 anonymises its contact data (1 to 36 500); with it, job
+   * 12 also purges old privacy requests and audit events. Unset: job 12 is off (ADR 0033 decision 8).
+   */
+  orderContactRetentionDays?: number;
+  /**
    * Secret of the derived guest access tokens (ADR 0023); at least 32 characters. Required when `NODE_ENV` is
    * production; the API refuses to start without it in every environment. Never log it.
    */
@@ -553,6 +628,29 @@ export interface AppEnv {
   mediaMaxBytes: number;
   /** Largest accepted input width times height (1 to 100 000 000). */
   mediaMaxPixels: number;
+  /**
+   * Catalog search (ADR 0034): off by default; then nothing of `MEILI_*` is read, no client exists, the search routes
+   * answer 404 and nothing is enqueued. On: the engine URL, the scoped key (never logged) and the index prefix.
+   */
+  search: SearchEnv;
+}
+
+function searchEnv(env: {
+  SEARCH_ENABLED: boolean;
+  MEILI_URL?: string | undefined;
+  MEILI_API_KEY?: string | undefined;
+  MEILI_INDEX_PREFIX?: string | undefined;
+}): SearchEnv {
+  // Both are present when search is on: the schema refused anything else.
+  if (!env.SEARCH_ENABLED || env.MEILI_URL === undefined || env.MEILI_API_KEY === undefined) {
+    return { enabled: false };
+  }
+  return {
+    enabled: true,
+    meiliUrl: normalizeMeiliUrl(env.MEILI_URL),
+    meiliApiKey: env.MEILI_API_KEY,
+    indexPrefix: env.MEILI_INDEX_PREFIX ?? DEFAULT_MEILI_INDEX_PREFIX,
+  };
 }
 
 /** The list was validated by the schema; an invalid one cannot get here. */
@@ -599,6 +697,9 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
     cartTtlDays: env.CART_TTL_DAYS,
     orderPaymentTtlMinutes: env.ORDER_PAYMENT_TTL_MINUTES,
     orderGuestAccessDays: env.ORDER_GUEST_ACCESS_DAYS,
+    ...(env.ORDER_CONTACT_RETENTION_DAYS === undefined
+      ? {}
+      : { orderContactRetentionDays: env.ORDER_CONTACT_RETENTION_DAYS }),
     orderTokenSecret: env.ORDER_TOKEN_SECRET,
     maxOpenOrders: env.MAX_OPEN_ORDERS,
     trustProxy: env.TRUST_PROXY,
@@ -616,5 +717,6 @@ export function loadEnv(source: Record<string, string | undefined>): AppEnv {
       (inProduction ? undefined : `http://127.0.0.1:${env.PORT}/media`),
     mediaMaxBytes: env.MEDIA_MAX_BYTES,
     mediaMaxPixels: env.MEDIA_MAX_PIXELS,
+    search: searchEnv(env),
   };
 }

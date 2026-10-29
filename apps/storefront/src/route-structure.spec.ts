@@ -14,6 +14,7 @@ const mustAnswerRealNotFound = [
   "(catalog)/catalog/page.tsx",
   "(catalog)/c/[slug]/page.tsx",
   "(catalog)/p/[slug]/page.tsx",
+  "(catalog)/search/page.tsx",
   "[...rest]/page.tsx",
 ];
 
@@ -61,10 +62,14 @@ describe("route structure", () => {
       });
     const personal = pages(localeRoot).filter(
       (page) =>
-        /^\(site\)\/(cart|checkout|account|order)\//.test(relative(localeRoot, page)) ||
-        /^\(site\)\/(cart|checkout|account|order)$/.test(dirname(relative(localeRoot, page))),
+        /^\(site\)\/(cart|checkout|account|order|payment)\//.test(relative(localeRoot, page)) ||
+        /^\(site\)\/(cart|checkout|account|order|payment)$/.test(
+          dirname(relative(localeRoot, page)),
+        ),
     );
     expect(personal.map((page) => relative(localeRoot, page)).sort()).toEqual([
+      "(site)/account/data/page.tsx",
+      "(site)/account/deleted/page.tsx",
       "(site)/account/forgot-password/page.tsx",
       "(site)/account/login/page.tsx",
       "(site)/account/orders/[number]/page.tsx",
@@ -77,6 +82,7 @@ describe("route structure", () => {
       "(site)/cart/page.tsx",
       "(site)/checkout/page.tsx",
       "(site)/order/[number]/page.tsx",
+      "(site)/payment/return/page.tsx",
     ]);
     for (const page of personal) {
       const source = readFileSync(page, "utf8");

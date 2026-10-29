@@ -23,6 +23,7 @@
     "admin:create": "pnpm build && pnpm --filter @fluxkit/api admin:create",
     "admin:unlock": "pnpm build && pnpm --filter @fluxkit/api admin:unlock",
     "jobs:run-once": "pnpm build && pnpm --filter @fluxkit/api jobs:run-once",
+    "search:reindex": "pnpm build && pnpm --filter @fluxkit/api search:reindex",
     "openapi:export": "pnpm --filter @fluxkit/api build && pnpm --filter @fluxkit/api openapi:export",
     "check:licenses": "node scripts/check-licenses.mjs",
     "check:docs": "node scripts/check-docs.mjs --base origin/main",

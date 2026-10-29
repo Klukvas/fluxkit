@@ -2,9 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 import { resolve } from "node:path";
 import {
   E2E_API_PORT,
+  E2E_MEILI_KEY_FILE,
+  E2E_SEARCH_ENABLED,
   E2E_ORIGIN,
   E2E_PORT,
   E2E_STOREFRONT_PORT,
+  E2E_STOREFRONT_UNFORWARDED_PORT,
   apiEnvironment,
 } from "./support/env.ts";
 
@@ -21,8 +24,10 @@ const ports = {
  * from the repository root, after `pnpm build`. Three servers are started here, and nothing else is reused
  * (`reuseExistingServer: false`: a leftover server could hide a broken start):
  *   1. the BUILT API on a wiped, migrated and seeded `*_e2e_test` database (`e2e/prepare-database.ts` runs first),
- *   2. the BUILT storefront (`next start`),
- *   3. `e2e/proxy.ts`, the same-origin proxy the browser talks to (ADR 0026).
+ *   2. the BUILT storefront (`next start`), with `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` like the production example: the
+ *      proxy below is the only way in for the browser and sets `X-Forwarded-For` (ADR 0038),
+ *   3. `e2e/proxy.ts`, the same-origin proxy the browser talks to (ADR 0026),
+ *   4. with search on only: the same build again with the forwarding left off, reached directly by one search test.
  * `apiEnvironment()` throws before anything starts when a required variable is missing.
  */
 export default defineConfig({
@@ -58,8 +63,12 @@ export default defineConfig({
     {
       name: "api",
       // Wipe, migrate, seed and create the owner, then become the API (exec: the server itself receives the shutdown signal).
-      command:
-        "node --experimental-strip-types e2e/prepare-database.ts && exec node ../api/dist/main.js",
+      command: `node --experimental-strip-types e2e/prepare-database.ts && ${
+        // The scoped engine key is created by the line above and read here, so it never appears in a process list or a log.
+        E2E_SEARCH_ENABLED
+          ? `MEILI_API_KEY="$(node -p "JSON.parse(require('node:fs').readFileSync(process.argv[1],'utf8')).key" ${JSON.stringify(E2E_MEILI_KEY_FILE)})" `
+          : ""
+      }exec node ../api/dist/main.js`,
       cwd: storefrontRoot,
       env: { ...apiEnvironment() } as Record<string, string>,
       url: `${apiOrigin}/health`,
@@ -78,6 +87,7 @@ export default defineConfig({
         API_INTERNAL_URL: apiOrigin,
         STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
         STOREFRONT_IMAGE_HOSTS: "",
+        STOREFRONT_FORWARD_CLIENT_ADDRESS: "true",
         NEXT_TELEMETRY_DISABLED: "1",
       },
       // The home page reads the API on the server: this answers 200 only once the API is up too.
@@ -96,5 +106,27 @@ export default defineConfig({
       reuseExistingServer: false,
       stderr: "pipe",
     },
+    ...(E2E_SEARCH_ENABLED
+      ? [
+          {
+            name: "storefront-unforwarded",
+            // Started after the first one, which cleared the fetch cache. The forwarding is off, written out so that neither
+            // the shell nor the root `.env` can switch it on (the default is the same).
+            command: `pnpm start -p ${String(E2E_STOREFRONT_UNFORWARDED_PORT)} -H 127.0.0.1`,
+            cwd: storefrontRoot,
+            env: {
+              API_INTERNAL_URL: apiOrigin,
+              STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
+              STOREFRONT_IMAGE_HOSTS: "",
+              STOREFRONT_FORWARD_CLIENT_ADDRESS: "false",
+              NEXT_TELEMETRY_DISABLED: "1",
+            },
+            url: `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}/en`,
+            timeout: 180_000,
+            reuseExistingServer: false,
+            stderr: "pipe" as const,
+          },
+        ]
+      : []),
   ],
 });

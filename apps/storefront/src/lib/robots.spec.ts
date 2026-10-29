@@ -9,7 +9,7 @@ describe("buildRobots", () => {
   );
 
   it("disallows cart, checkout, account and order pages in every locale, and the API path", () => {
-    expect(PRIVATE_PATHS).toEqual(["/cart", "/checkout", "/account", "/order"]);
+    expect(PRIVATE_PATHS).toEqual(["/cart", "/checkout", "/account", "/order", "/payment"]);
     for (const locale of ["uk", "en"]) {
       for (const path of PRIVATE_PATHS) expect(disallow).toContain(`/${locale}${path}`);
     }

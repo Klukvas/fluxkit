@@ -69,6 +69,8 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
   getAccount: (c) => c.getAccount(),
   updateAccount: (c) => c.updateAccount({ firstName: "N" }),
   changePassword: (c) => c.changePassword({ currentPassword: "a", newPassword: "b" }),
+  getDataExport: (c) => c.getDataExport(),
+  deleteAccount: (c) => c.deleteAccount({ password: "pw", confirm: true }),
   requestPasswordReset: (c) => c.requestPasswordReset({ email: "a@b.c", locale: "uk" }),
   confirmPasswordReset: (c) => c.confirmPasswordReset({ token: "t", newPassword: "b" }),
   confirmEmailVerification: (c) => c.confirmEmailVerification({ token: "t" }),
@@ -104,6 +106,8 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
   getConfig: (c) => c.getConfig(),
   listProducts: (c) => c.listProducts(),
   getProduct: (c) => c.getProduct("shirt"),
+  searchProducts: (c) => c.searchProducts({ q: "shirt", f: ["brand:acme", "opt.size:m"] }),
+  suggestProducts: (c) => c.suggestProducts("sh"),
   getShippingOptions: (c) => c.getShippingOptions({ country: "UA" }),
   listShippingCities: (c) => c.listShippingCities("nova_poshta", "Ки"),
   listShippingPickupPoints: (c) =>
@@ -187,6 +191,29 @@ describe("every store operation", () => {
       ).fetch,
     });
     await expect(INVOCATIONS[name](client)).rejects.toBeInstanceOf(InvalidResponseError);
+  });
+});
+
+describe("search", () => {
+  it("sends the facet selection as repeated f parameters and suggest's text as q", async () => {
+    const { fetch, calls } = fakeFetch(() => jsonOk({}));
+    const client = createStoreClient({ baseUrl: "", fetch });
+    await client.searchProducts({
+      q: "shirt",
+      f: ["brand:acme", "opt.size:m", "opt.size:l"],
+      price: "100..",
+      sort: "price_asc",
+      page: 2,
+      limit: 12,
+      locale: "en",
+    });
+    await client.suggestProducts("sh", { locale: "uk" });
+    await client.searchProducts();
+    expect(calls.map((call) => call.url)).toEqual([
+      "/store/search?q=shirt&locale=en&f=brand%3Aacme&f=opt.size%3Am&f=opt.size%3Al&price=100..&sort=price_asc&page=2&limit=12",
+      "/store/search/suggest?q=sh&locale=uk",
+      "/store/search",
+    ]);
   });
 });
 

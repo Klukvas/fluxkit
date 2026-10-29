@@ -10,6 +10,7 @@ import { FormErrorSummary, TextField } from "./form-parts";
 import { useI18n } from "./i18n-provider";
 import { AlreadySignedInView } from "./login-form";
 import { useAccount } from "./session-provider";
+import { LegalNotice, noticeLinks } from "./legal-notice";
 import { useForm } from "./use-form";
 
 export const REGISTER_FIELDS = ["email", "password", "firstName", "lastName", "phone"] as const;
@@ -33,6 +34,8 @@ export interface RegisterFormViewProps {
   failure: Failure | null;
   summaryRef: Ref<HTMLDivElement>;
   loginHref: string;
+  /** The Terms and Privacy notice pages for the information sentence above the button; omitted: no sentence. */
+  noticeLinks?: { terms: string; privacy: string };
 }
 
 /**
@@ -48,6 +51,7 @@ export function RegisterFormView({
   failure,
   summaryRef,
   loginHref,
+  noticeLinks: legalLinks,
 }: RegisterFormViewProps) {
   const labels = {
     email: t("account.field.email"),
@@ -100,6 +104,7 @@ export function RegisterFormView({
         autoComplete="tel"
         required={false}
       />
+      {legalLinks === undefined ? null : <LegalNotice t={t} kind="register" links={legalLinks} />}
       <Button type="submit" disabled={pending}>
         {pending ? t("account.register.submitting") : t("account.register.submit")}
       </Button>
@@ -135,6 +140,7 @@ export function RegisterForm({ next }: { next: string | undefined }) {
       failure={form.failure}
       summaryRef={form.summaryRef}
       loginHref={authHref(locale, "login", next)}
+      noticeLinks={noticeLinks(locale)}
       onSubmit={(event) =>
         form.submit(event, {
           required: REQUIRED,

@@ -24,7 +24,7 @@ export const NOT_IN_ENV_EXAMPLE = new Map([
   ],
   [
     "OPENAPI_FEATURES",
-    "tooling of `pnpm openapi:export` only (which features to include in the exported document); apps/api/README.md",
+    "read only by apps/api/src/openapi-export.ts (`pnpm openapi:export`: which features the exported document includes), never by the API",
   ],
   ["CI", "set by the CI runner; switches tooling behaviour only"],
   [

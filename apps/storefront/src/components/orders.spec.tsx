@@ -277,7 +277,14 @@ describe("the guest order page on the server", () => {
   it("renders the loading shell only: the token is unknown to the server and never in its HTML", () => {
     const messages = Object.fromEntries(Object.keys(uk).map((key) => [key, `§${key}`]));
     const html = renderToStaticMarkup(
-      <SiteShell locale="uk" messages={messages} t={t} categories={[]} year={2026}>
+      <SiteShell
+        locale="uk"
+        messages={messages}
+        t={t}
+        categories={[]}
+        searchEnabled={false}
+        year={2026}
+      >
         <GuestOrderPage number="7K3M-9QX2" shop={shop} />
       </SiteShell>,
     );

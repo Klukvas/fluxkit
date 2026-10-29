@@ -73,6 +73,9 @@ export function createTransport(options: TransportOptions) {
     for (const key of operation.query) {
       const value = given[key];
       if (typeof value === "string" || typeof value === "number") query[key] = value;
+      else if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+        query[key] = value as readonly string[];
+      }
     }
 
     // The binary kind is the one exception to the JSON rules and must never leak to another operation or the reverse.

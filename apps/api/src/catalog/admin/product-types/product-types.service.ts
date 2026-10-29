@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { sql } from "drizzle-orm";
 import {
   CATALOG_LIMITS,
   TEXT_LIMITS,
@@ -12,6 +13,7 @@ import { toPage, type Page, type PaginationQuery } from "../../../common/paginat
 import { translatePostgresError } from "../../../common/postgres-errors.js";
 import { notFound, validationFailed } from "../../../common/problem.js";
 import { withTransaction } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { attributeHasValues } from "../../shared/attribute-usage.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
@@ -41,6 +43,7 @@ export class ProductTypesService {
     private readonly productTypes: ProductTypesRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async create(body: CreateProductTypeBody): Promise<ProductTypeResponse> {
@@ -172,6 +175,12 @@ export class ProductTypesService {
       const saved = required(
         await this.productTypes.findAttributeAssignment(tx, productTypeId, attributeId),
       );
+      // The assignment and its level decide which attribute values the documents of the type's products carry.
+      await this.search.productsChangedWhere(
+        tx,
+        sql`select id from product where product_type_id = ${productTypeId}`,
+        "attribute_changed",
+      );
       return { assignment: toAttributeAssignmentResponse(saved), created: existing === undefined };
     });
   }
@@ -197,6 +206,11 @@ export class ProductTypesService {
         "Products or variants of this type still hold values of the attribute; clear them first.",
       );
       await this.productTypes.deleteAttributeAssignment(tx, productTypeId, attributeId);
+      await this.search.productsChangedWhere(
+        tx,
+        sql`select id from product where product_type_id = ${productTypeId}`,
+        "attribute_changed",
+      );
     });
   }
 

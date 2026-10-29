@@ -173,7 +173,10 @@ export const adminOrderSummarySchema = z.object({
   customerId: uuidSchema.nullable().meta({
     description: "Null for a guest order and for an order whose customer account was deleted.",
   }),
-  email: z.string(),
+  email: z
+    .string()
+    .nullable()
+    .meta({ description: "Null once the contact data of the order was erased (ADR 0033)." }),
   itemCount: z.number().int().min(0).meta({ description: "Units over all lines." }),
 });
 
@@ -206,11 +209,19 @@ export const adminOrderSchema = z.object({
   isGuest: z
     .boolean()
     .meta({ description: "Placed without an account (the shopper holds a guest token)." }),
-  contact: z.object({
-    email: z.string(),
-    phone: z.string(),
-    firstName: z.string(),
-    lastName: z.string(),
+  contact: z
+    .object({
+      email: z.string().nullable(),
+      phone: z.string().nullable(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+    })
+    .meta({
+      description:
+        "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set.",
+    }),
+  contactErasedAt: timestampSchema.nullable().meta({
+    description: "When the contact data was anonymised; null for a live contact.",
   }),
   shippingAddress: addressOutput.nullable(),
   billingAddress: addressOutput.nullable(),

@@ -85,7 +85,9 @@ export class OrderMailHandler implements DomainEventHandler {
       this.logger.warn(`${type} ${event.id}: no mail (order_not_found)`);
       return;
     }
-    if (view.contact.email.trim() === "") {
+    const to = view.contact.email;
+    // An erased contact (ADR 0033 decision 5) has no address: never mail it.
+    if (to === null || to.trim() === "") {
       this.logger.warn(`${type} ${event.id}: no mail (no_recipient)`);
       return;
     }
@@ -98,7 +100,7 @@ export class OrderMailHandler implements DomainEventHandler {
       this.outbox.enqueue(tx, {
         templateKey,
         locale: view.locale,
-        to: view.contact.email,
+        to,
         recipientKind: view.isGuest ? "guest" : "customer",
         customerId: view.customerId,
         orderId: view.id,

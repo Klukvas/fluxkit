@@ -1,3 +1,4 @@
+import type { AdminPayment, AdminPaymentRefund } from "@fluxkit/api-client";
 import type { Locale, Messages, Translator } from "@fluxkit/ui";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -76,6 +77,50 @@ export function uploadControls(overrides: Partial<UploadControls> = {}): UploadC
     dismiss: nothing,
     limits: TEST_UPLOAD_LIMITS,
     maxFiles: 20,
+    ...overrides,
+  };
+}
+
+/** A succeeded 189.00 UAH payment with nothing refunded (the admin payment view); `overrides` set what a test needs. */
+export function paymentFixture(overrides: Partial<AdminPayment> = {}): AdminPayment {
+  return {
+    id: "22222222-2222-4222-8222-222222222222",
+    providerCode: "fake",
+    providerPaymentId: "fake-invoice-1",
+    status: "succeeded",
+    amount: { amount: 18900, currency: "UAH" },
+    finalAmount: { amount: 18900, currency: "UAH" },
+    refundedAmount: { amount: 0, currency: "UAH" },
+    refundableAmount: { amount: 18900, currency: "UAH" },
+    providerStatus: "success",
+    providerModifiedAt: "2026-10-29T10:01:00.000Z",
+    failureCode: null,
+    orderOutcome: "applied",
+    needsAttention: false,
+    attentionCode: null,
+    card: { system: "visa", last4: "4242" },
+    createdBy: "guest",
+    expiresAt: "2026-10-29T10:30:00.000Z",
+    createdAt: "2026-10-29T10:00:00.000Z",
+    updatedAt: "2026-10-29T10:01:00.000Z",
+    nextCheckAt: null,
+    refunds: [],
+    history: [],
+    ...overrides,
+  };
+}
+
+export function refundFixture(overrides: Partial<AdminPaymentRefund> = {}): AdminPaymentRefund {
+  return {
+    id: "33333333-3333-4333-8333-333333333333",
+    amount: { amount: 5000, currency: "UAH" },
+    status: "succeeded",
+    reason: "admin",
+    note: "Damaged item",
+    actorAdminId: "11111111-1111-4111-8111-111111111111",
+    failureCode: null,
+    createdAt: "2026-10-29T11:00:00.000Z",
+    updatedAt: "2026-10-29T11:00:05.000Z",
     ...overrides,
   };
 }

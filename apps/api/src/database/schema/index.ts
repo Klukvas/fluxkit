@@ -10,3 +10,5 @@ export * from "./media.js";
 export * from "./shipping.js";
 export * from "./email.js";
 export * from "./payments.js";
+export * from "./privacy.js";
+export * from "./search.js";

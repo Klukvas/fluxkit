@@ -1,4 +1,5 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { sql } from "drizzle-orm";
 import {
   CATALOG_LIMITS,
   TEXT_LIMITS,
@@ -10,6 +11,7 @@ import { toPage, type Page, type PaginationQuery } from "../../../common/paginat
 import { translatePostgresError } from "../../../common/postgres-errors.js";
 import { notFound, validationFailed } from "../../../common/problem.js";
 import { withTransaction } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
 import { assertAllowed } from "../../shared/rules.js";
@@ -35,6 +37,7 @@ export class OptionsService {
     private readonly options: OptionsRepository,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async create(body: CreateOptionBody): Promise<OptionResponse> {
@@ -154,11 +157,21 @@ export class OptionsService {
     if (Object.keys(changes).length === 0) {
       return toOptionValueResponse(current);
     }
-    const row = await this.options.updateValue(this.database, valueId, changes);
-    if (row === undefined) {
-      throw notFound("Option value");
-    }
-    return toOptionValueResponse(row);
+    return withTransaction(this.database, async (tx) => {
+      const row = await this.options.updateValue(tx, valueId, changes);
+      if (row === undefined) {
+        throw notFound("Option value");
+      }
+      // The label is an `optionLabels` entry of every variant document that uses the value.
+      if (body.label !== undefined) {
+        await this.search.productsChangedWhere(
+          tx,
+          sql`select product_id from variant_option_value where option_value_id = ${valueId}`,
+          "option_changed",
+        );
+      }
+      return toOptionValueResponse(row);
+    });
   }
 
   async deleteValue(optionId: string, valueId: string): Promise<void> {

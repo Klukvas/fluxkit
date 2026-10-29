@@ -26,7 +26,14 @@ const categories = [
 
 function renderShell(children = "§child") {
   return renderToStaticMarkup(
-    <SiteShell locale="uk" messages={sentinelMessages} t={t} categories={categories} year={2026}>
+    <SiteShell
+      locale="uk"
+      messages={sentinelMessages}
+      t={t}
+      categories={categories}
+      searchEnabled={false}
+      year={2026}
+    >
       {children}
     </SiteShell>,
   );
@@ -73,7 +80,14 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("renders without categories when the API could not be read", () => {
     const degraded = renderToStaticMarkup(
-      <SiteShell locale="en" messages={sentinelMessages} t={t} categories={null} year={2026}>
+      <SiteShell
+        locale="en"
+        messages={sentinelMessages}
+        t={t}
+        categories={null}
+        searchEnabled={false}
+        year={2026}
+      >
         §child
       </SiteShell>,
     );

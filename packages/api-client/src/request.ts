@@ -22,7 +22,8 @@ export interface RawBody {
   contentType: typeof BINARY_CONTENT_TYPE;
 }
 
-export type QueryValue = string | number | undefined;
+/** A list is sent as the same name repeated (`f=a&f=b`). */
+export type QueryValue = string | number | readonly string[] | undefined;
 
 export interface RequestInput {
   /** `""` (same origin, the browser) or an http(s) origin (the Next server). */
@@ -91,7 +92,12 @@ function buildQuery(query: Readonly<Record<string, QueryValue>>): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined) continue;
-    parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+    const values: readonly (string | number)[] = Array.isArray(value)
+      ? (value as readonly string[])
+      : [value as string | number];
+    for (const entry of values) {
+      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(entry))}`);
+    }
   }
   return parts.length === 0 ? "" : `?${parts.join("&")}`;
 }

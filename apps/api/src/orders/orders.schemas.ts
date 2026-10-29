@@ -304,7 +304,7 @@ export const adminPaymentSchema = z.object({
   refundedAmount: moneySchema.meta({ description: "The sum of the succeeded refunds." }),
   refundableAmount: moneySchema.meta({
     description:
-      "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed, else 0.",
+      "What a new refund may still take: for a succeeded payment the amount less every refund that is not failed and less money the provider returned outside the shop (from its final amount), at least 0; else 0.",
   }),
   providerStatus: z.string().nullable(),
   providerModifiedAt: timestampSchema.nullable(),
@@ -412,12 +412,17 @@ export const storeOrderSchema = z.object({
       includedInPrice: z.boolean(),
     }),
   ),
-  contact: z.object({
-    email: z.string(),
-    phone: z.string(),
-    firstName: z.string(),
-    lastName: z.string(),
-  }),
+  contact: z
+    .object({
+      email: z.string().nullable(),
+      phone: z.string().nullable(),
+      firstName: z.string().nullable(),
+      lastName: z.string().nullable(),
+    })
+    .meta({
+      description:
+        "All four are null once the contact data was erased (privacy erasure or retention, ADR 0033); otherwise all four are set.",
+    }),
   shippingAddress: addressOutput.nullable(),
   billingAddress: addressOutput.nullable(),
   shipping: storeOrderShippingSchema.nullable().meta({

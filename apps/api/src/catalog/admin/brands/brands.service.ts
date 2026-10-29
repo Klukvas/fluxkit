@@ -1,10 +1,12 @@
 import { Inject, Injectable } from "@nestjs/common";
+import { sql } from "drizzle-orm";
 import { generateUniqueSlug, slugLookupPrefix, TEXT_LIMITS } from "@fluxkit/core";
 import { LOCALE_CONFIG, type LocaleConfig } from "../../../common/locale.js";
 import { toPage, type Page, type PaginationQuery } from "../../../common/pagination.js";
 import { isUniqueViolation, translatePostgresError } from "../../../common/postgres-errors.js";
 import { conflict, notFound, validationFailed, type FieldError } from "../../../common/problem.js";
 import { withTransaction, type DbExecutor } from "../../../common/transaction.js";
+import { SEARCH_PORT, type SearchPort } from "../../../common/search-port.js";
 import { DRIZZLE, type Database } from "../../../database/database.module.js";
 import { MediaAttachService } from "../../../media/media-attach.service.js";
 import { i18nFieldErrors } from "../../shared/i18n-validation.js";
@@ -25,6 +27,7 @@ export class BrandsService {
     @Inject(LOCALE_CONFIG) private readonly locale: LocaleConfig,
     @Inject(DRIZZLE) private readonly database: Database,
     @Inject(MediaAttachService) private readonly mediaAttachments: MediaAttachService,
+    @Inject(SEARCH_PORT) private readonly search: SearchPort,
   ) {}
 
   async create(body: CreateBrandBody): Promise<BrandResponse> {
@@ -71,6 +74,14 @@ export class BrandsService {
           throw notFound("Brand");
         }
         await this.markLogoAttached(tx, body.logoUrl);
+        // The name and the slug are in the search documents of the brand's products (the logo and description are not).
+        if (body.name !== undefined || body.slug !== undefined) {
+          await this.search.productsChangedWhere(
+            tx,
+            sql`select id from product where brand_id = ${id}`,
+            "brand_changed",
+          );
+        }
         return toBrandResponse(row);
       });
     } catch (error) {

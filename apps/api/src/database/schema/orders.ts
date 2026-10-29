@@ -68,10 +68,11 @@ export const salesOrder = pgTable(
     status: text("status").notNull(),
     // SET NULL when the customer is deleted: the order keeps the contact data below (ADR 0019).
     customerId: uuid("customer_id"),
-    email: text("email").notNull(),
-    phone: text("phone").notNull(),
-    firstName: text("first_name").notNull(),
-    lastName: text("last_name").notNull(),
+    // NULL only on an order whose contact was erased (contact_erased_at set; ADR 0033 decision 5, migration 0009).
+    email: text("email"),
+    phone: text("phone"),
+    firstName: text("first_name"),
+    lastName: text("last_name"),
     shippingAddress: jsonb("shipping_address"),
     billingAddress: jsonb("billing_address"),
     locale: text("locale").notNull(),
@@ -96,6 +97,8 @@ export const salesOrder = pgTable(
     expiredAt: timestamp("expired_at", { withTimezone: true }),
     cancellationReason: text("cancellation_reason"),
     paymentReference: text("payment_reference"),
+    // When the contact data was anonymised (privacy erasure or retention, ADR 0033 decision 6); NULL for a live contact.
+    contactErasedAt: timestamp("contact_erased_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -122,6 +125,17 @@ export const salesOrder = pgTable(
     check(
       "sales_order_last_name_check",
       sql`char_length(${t.lastName}) BETWEEN 1 AND ${sql.raw(`${NAME_MAX_LENGTH}`)}`,
+    ),
+    // All four contact columns are set on a live order and all four are NULL once the contact is erased. The format
+    // CHECKs above pass a NULL, so this CHECK alone decides when NULL is allowed.
+    check(
+      "sales_order_contact_check",
+      sql`(${t.contactErasedAt} IS NULL AND ${t.email} IS NOT NULL AND ${t.phone} IS NOT NULL AND ${t.firstName} IS NOT NULL AND ${t.lastName} IS NOT NULL) OR (${t.contactErasedAt} IS NOT NULL AND ${t.email} IS NULL AND ${t.phone} IS NULL AND ${t.firstName} IS NULL AND ${t.lastName} IS NULL)`,
+    ),
+    // An erased order has no guest link (the token would open an order without a contact).
+    check(
+      "sales_order_erased_access_check",
+      sql`${t.contactErasedAt} IS NULL OR ${t.accessTokenHash} IS NULL`,
     ),
     check(
       "sales_order_shipping_address_check",
