@@ -1,4 +1,4 @@
-import { none } from "./builders.js";
+import { classified, none } from "./builders.js";
 import type { Inventory } from "./types.js";
 
 /**
@@ -178,4 +178,46 @@ export const noPersonalDataTables: Inventory = {
     "option_value_id",
     "created_at",
   ),
+  // Catalog search bookkeeping (migration 0010, ADR 0034): product ids, index names, codes and counts.
+  search_index_state: none(
+    "D24",
+    "locale",
+    "live_index_uid",
+    "build_index_uid",
+    "settings_hash",
+    "document_version",
+    "currency",
+    "rebuild_requested_at",
+    "build_started_at",
+    "build_cursor",
+    "build_documents_count",
+    "built_at",
+    "documents_count",
+    "failed_attempts",
+    "last_error_code",
+    "last_error_at",
+    "next_attempt_at",
+    "updated_at",
+  ),
+  search_sync_queue: none(
+    "D24",
+    "product_id",
+    "reason",
+    "change_seq",
+    "enqueued_at",
+    "next_attempt_at",
+    "lease_until",
+    "attempts",
+    "last_error_code",
+  ),
+  search_synonym_group: {
+    ...none("D24", "id", "locale", "terms", "created_at", "updated_at"),
+    created_by_admin_id: classified(
+      "staff",
+      "D24",
+      "excluded",
+      "set_null",
+      "Admin actor id; admin ids are not exported.",
+    ),
+  },
 };

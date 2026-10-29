@@ -8,6 +8,7 @@ import {
   SORTABLE_FIELDS,
 } from "./fields.js";
 import { SEARCH_DOCUMENT_VERSION, SEARCH_LIMITS } from "./limits.js";
+import { searchRebuildKey } from "./indexing.js";
 import { normalizeSearchWords } from "./query.js";
 
 export interface IndexSettings {
@@ -135,6 +136,6 @@ export function deriveIndexSettings(input: IndexSettingsInput): DerivedIndexSett
   return {
     settings,
     settingsHash: hash53(stableJson(settings)),
-    rebuildKey: `${SEARCH_DOCUMENT_VERSION}:${input.currency}:${input.locale}`,
+    rebuildKey: searchRebuildKey(SEARCH_DOCUMENT_VERSION, input.currency, input.locale),
   };
 }
