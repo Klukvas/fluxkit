@@ -631,7 +631,7 @@ export interface SearchResult {
   pageCount: number;
   limit: number;
   sort: SearchSort;
-  /** Nothing matched every word: the items match some of them (show them as partial matches). */
+  /** The complete words matched nothing: the items match the last word as a prefix or only some words (show them as partial matches). */
   relaxed: boolean;
   query: { normalized: string };
   facets: SearchFacet[];

@@ -34,7 +34,7 @@ The engine filter is built only by core `buildSearchFilter` from these typed val
 
 - `items`: list items exactly as `GET /store/products` (`{id, slug, title, brand, image, publishedAt, price, availability}`), in hit order, one per product.
 - `total`, `pageCount`: the engine's count of matching products (approximate by at most the number of stale products dropped). `page`, `limit`, `sort`: the values applied.
-- `relaxed`: nothing matched every word of `q` (2 words or more), so a second pass matched the products that contain the most words, dropping words from the end. The storefront shows them as partial matches. Always `false` when the page is empty.
+- `relaxed`: nothing matched the complete words of `q`, so a second pass answered (ADR 0037): the last word is matched as a prefix (an unfinished word: `screw` finds `screwdriver`) and, with 2 words or more, the products that contain the most words count, dropping words from the end. The storefront shows them as partial matches. Always `false` when the page is empty. The second pass runs at most once and only after an empty strict pass, so complete words that find something answer as before.
 - `query.normalized`: the text that was searched (the normalized `q`). It is the only echo of the request.
 - `facets`: at most 20, in this order: `brand`, `category`, `inStock`, then options and attributes by code. A facet is listed when it has a value in the result or is selected. Each is `{key, kind, level, label, counted, values: [{code, label, count, selected}], range}`:
   - `kind`: `slug` (brand), `uuid` (category), `code` (option or select attribute), `boolean`, `range` (number attribute: `values` empty, `range {min, max}` of the result, else `null`).
