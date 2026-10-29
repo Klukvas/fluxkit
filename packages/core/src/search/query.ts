@@ -29,7 +29,7 @@ export function normalizeSearchWords(text: string): string[] {
 }
 
 /**
- * Validates and normalizes the text a shopper typed (ADR 0033 decision 3). Refuses what does not belong in a search box
+ * Validates and normalizes the text a shopper typed (ADR 0034 decision 3). Refuses what does not belong in a search box
  * (not text, control characters, more than 200 characters); keeps at most the first ten words, because the engine ignores
  * later ones.
  */
@@ -56,7 +56,7 @@ export interface TextQuery {
 }
 
 /**
- * The text queries of one search (ADR 0033 decision 3), to be sent as one federated multi-search.
+ * The text queries of one search (ADR 0034 decision 3), to be sent as one federated multi-search.
  *
  * Results page: the original words, the Snowball stems on `stems` and, for Ukrainian, the five-letter prefixes on
  * `stems5`. Every query ends with a space, so the last word is not prefix-matched (spike S1, E8). A stem query that would

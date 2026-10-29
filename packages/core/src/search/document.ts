@@ -86,7 +86,7 @@ export interface SearchDocumentFields {
   readonly publishedAt: number;
 }
 
-/** One document per sellable variant (ADR 0033 decision 2), public data only. */
+/** One document per sellable variant (ADR 0034 decision 2), public data only. */
 export type SearchDocument = SearchDocumentFields & {
   readonly [field in OptionFieldName]?: string;
 } & {
@@ -192,7 +192,7 @@ function cut(text: string, length: number): string {
 }
 
 /**
- * The search documents of one product (ADR 0033 decision 2): one per sellable variant, none for a product that is not
+ * The search documents of one product (ADR 0034 decision 2): one per sellable variant, none for a product that is not
  * `active`. The ONLY place that decides what reaches the index: attributes pass `isPublicAttribute` (visible on the
  * storefront and not internal) and then their own `isFilterable` / `isSearchable` flag, whatever else the definition says.
  * Stored values that do not fit their definition are left out. Pure: the caller supplies the facts and the definitions.

@@ -30,7 +30,7 @@ export function stemTokens(tokens: readonly string[], language: StemLanguage): s
 
 /**
  * The first five letters of a Cyrillic token (shorter tokens stay whole). Together with the Snowball stem it covers
- * forms the stemmer treats differently, such as `сорочка` and `сорочці` (spike S1, ADR 0033 decision 6).
+ * forms the stemmer treats differently, such as `сорочка` and `сорочці` (spike S1, ADR 0034 decision 6).
  */
 export function prefixToken(token: string): string {
   return CYRILLIC_TOKEN.test(token) ? token.slice(0, SEARCH_LIMITS.prefixStemLength) : token;

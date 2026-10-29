@@ -4,7 +4,7 @@ import { requireEnv } from "../test/env.js";
 /**
  * Spike S1 (docs/plans/2026-10-29-search.md, step 1), engine facts: how `distinct`, facets, federation, index swaps and
  * scoped keys behave on Meilisearch v1.55.0. The measured numbers and the decisions are in the plan (section "Spike S1
- * results") and in docs/adr/0033-catalog-search.md. Talks plain REST on purpose: this is the wire format the indexer and
+ * results") and in docs/adr/0034-catalog-search.md. Talks plain REST on purpose: this is the wire format the indexer and
  * the store routes will use. Tests marked KNOWN LIMITATION pin today's behavior: if an engine upgrade changes it, the
  * test fails and the ADR must be revisited.
  */

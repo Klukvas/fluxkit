@@ -193,7 +193,7 @@ export function selectedGroupKeys(selection: SearchSelection): string[] {
 }
 
 /**
- * The engine filter for a selection, or null when nothing is selected (ADR 0033 decision 3). The only way a filter string
+ * The engine filter for a selection, or null when nothing is selected (ADR 0034 decision 3). The only way a filter string
  * is made: every value is checked against its shape (slug, uuid, code, number) and quoted, so client text can not change
  * the structure of the filter. `omit` leaves one group out, for the disjunctive facet queries.
  * Throws `SearchFilterError`; the API answers 400.

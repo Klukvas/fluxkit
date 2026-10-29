@@ -1,6 +1,6 @@
 # Snowball stemmers (vendored)
 
-Ukrainian and English stemmers for the catalog search (ADR 0033 decisions 6 and 7). They turn `сорочки` and `сорочка`, or `batteries` and `battery`, into one stem, so a shopper's inflected word finds the product. The search index stores the stems next to the original text; the query side sends the stems of the shopper's words (`planTextQueries`).
+Ukrainian and English stemmers for the catalog search (ADR 0034 decisions 6 and 7). They turn `сорочки` and `сорочка`, or `batteries` and `battery`, into one stem, so a shopper's inflected word finds the product. The search index stores the stems next to the original text; the query side sends the stems of the shopper's words (`planTextQueries`).
 
 ## What is third-party
 
@@ -45,4 +45,4 @@ The Ukrainian algorithm gives some forms of one word different stems (`соро�
 
 ## Removing it
 
-Delete this folder and the `stems`/`stems5` fields of `document.ts` and `settings.ts`; the rest of the search keeps working on the original text (ADR 0033 decision 6).
+Delete this folder and the `stems`/`stems5` fields of `document.ts` and `settings.ts`; the rest of the search keeps working on the original text (ADR 0034 decision 6).

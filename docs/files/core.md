@@ -179,7 +179,7 @@ Pure rules of online payments (payments plan step 2, `docs/plans/2026-10-26-paym
 - `src/payments/test-support.ts` - fact and id fixtures of the specs (excluded from the build).
 - `src/payments/*.spec.ts` - Vitest specs; `status.spec.ts` checks the whole start x target x actor matrices against literal copies of both tables; boundaries at one minor unit and one millisecond.
 
-## Search rules (ADR 0033)
+## Search rules (ADR 0034)
 
 Pure rules for the catalog search; no I/O, no engine client (the Meilisearch client lives in `apps/api`). Nothing calls them yet.
 

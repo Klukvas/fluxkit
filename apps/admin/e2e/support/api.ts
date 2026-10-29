@@ -18,6 +18,21 @@ export interface AdminUser {
   isActive: boolean;
 }
 
+/** The admin view of one payment attempt, the members the payment scenarios read (`docs/api/payments.md`). */
+export interface AdminPaymentView {
+  id: string;
+  status: string;
+  amount: Money;
+  finalAmount: Money | null;
+  refundedAmount: Money;
+  refundableAmount: Money;
+  orderOutcome: string | null;
+  needsAttention: boolean;
+  attentionCode: string | null;
+  refunds: { id: string; status: string; amount: Money; reason: string; note: string | null }[];
+  history: { source: string; applied: boolean; toStatus: string | null }[];
+}
+
 /** Reads a JSON answer and fails with the whole body when the status is not one of the expected ones. */
 export async function json<T>(
   response: APIResponse,
@@ -93,6 +108,37 @@ export class AdminApi {
     await this.post(`/admin/orders/${orderId}/mark-paid`, { reference, amount: total }, 200);
   }
 
+  /** The payment attempts of an order, oldest first (`docs/api/payments.md`): the members the payment scenarios check. */
+  async payments(orderId: string): Promise<AdminPaymentView[]> {
+    const answer = await this.get<{ items: AdminPaymentView[] }>(
+      `/admin/orders/${orderId}/payments`,
+    );
+    return answer.items;
+  }
+
+  async orderStatus(orderId: string): Promise<string> {
+    return (await this.get<{ status: string }>(`/admin/orders/${orderId}`)).status;
+  }
+
+  /**
+   * A refund request with an explicit `Idempotency-Key`, to prove what the server does with a repeat or a refusal. The status
+   * is checked by the caller's `expected`; the parsed body is returned (a problem document for a refusal).
+   */
+  async refund<T = unknown>(
+    orderId: string,
+    paymentId: string,
+    options: { key: string; amount: Money; note: string; expected: number | number[] },
+  ): Promise<{ status: number; body: T }> {
+    const response = await this.context.post(
+      `/admin/orders/${orderId}/payments/${paymentId}/refunds`,
+      {
+        headers: { ...CSRF, "Idempotency-Key": options.key },
+        data: { amount: options.amount, note: options.note },
+      },
+    );
+    return { status: response.status(), body: await json<T>(response, options.expected) };
+  }
+
   /** A delivery method made through the API (setup of a scenario that is about something else). */
   async createShippingMethod(body: Record<string, unknown>): Promise<{ id: string; code: string }> {
     return this.post<{ id: string; code: string }>("/admin/shipping/methods", body, 201);
@@ -122,6 +168,8 @@ export interface PlacedOrder {
   number: string;
   total: Money;
   email: string;
+  /** The guest order's access token (what the shopper's order link holds). */
+  accessToken: string;
 }
 
 /**
@@ -198,7 +246,10 @@ export class StoreApi {
     if (option === undefined || !option.available || option.total === null) {
       throw new Error(`The method ${methodCode} is not offered: ${JSON.stringify(answer.options)}`);
     }
-    const result = await json<{ order: { id: string; number: string; total: Money } }>(
+    const result = await json<{
+      order: { id: string; number: string; total: Money };
+      accessToken: string;
+    }>(
       await this.context.post("/store/checkout", {
         headers: { ...CSRF, "Idempotency-Key": randomUUID() },
         data: {
@@ -213,14 +264,17 @@ export class StoreApi {
       }),
       201,
     );
-    return { ...result.order, email };
+    return { ...result.order, email, accessToken: result.accessToken };
   }
 
   /** A guest order for one unit of a physical seed product, shipped to a demo address; a fresh Idempotency-Key each time. */
   async placeGuestOrder(email: string, slug: string, sku: string): Promise<PlacedOrder> {
     await this.addToCart(await this.variantIdBySku(slug, sku), 1);
     const cart = await json<{ total: Money }>(await this.context.get("/store/cart"), 200);
-    const result = await json<{ order: { id: string; number: string; total: Money } }>(
+    const result = await json<{
+      order: { id: string; number: string; total: Money };
+      accessToken: string;
+    }>(
       await this.context.post("/store/checkout", {
         headers: { ...CSRF, "Idempotency-Key": randomUUID() },
         data: {
@@ -234,6 +288,30 @@ export class StoreApi {
       }),
       201,
     );
-    return { ...result.order, email };
+    return { ...result.order, email, accessToken: result.accessToken };
+  }
+
+  /** Cancels an unpaid guest order (the shopper's own cancel, by the order number and token). */
+  async cancelGuestOrder(order: PlacedOrder): Promise<void> {
+    await json(
+      await this.context.post("/store/orders/cancel", {
+        headers: CSRF,
+        data: { number: order.number, accessToken: order.accessToken },
+      }),
+      200,
+    );
+  }
+
+  /** Starts the online payment of a guest order (the storefront's Pay now call); answers the page URL the shopper is sent to. */
+  async startGuestPayment(
+    order: PlacedOrder,
+  ): Promise<{ paymentId: string; status: string; redirectUrl: string }> {
+    return json(
+      await this.context.post("/store/orders/payments", {
+        headers: { ...CSRF, "Idempotency-Key": randomUUID() },
+        data: { number: order.number, accessToken: order.accessToken },
+      }),
+      201,
+    );
   }
 }

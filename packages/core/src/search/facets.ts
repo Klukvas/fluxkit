@@ -16,7 +16,7 @@ export type FacetKind = "slug" | "uuid" | "code" | "boolean" | "range";
 /**
  * One facet the search offers. `key` is the public name in URLs (`brand`, `category`, `inStock`, `opt.<code>`,
  * `attr.<code>`), `field` the field of the index. A product-level facet has the same value on every variant of a product,
- * so its counts are exact product counts; a variant-level facet is listed without counts (ADR 0033 decision 4).
+ * so its counts are exact product counts; a variant-level facet is listed without counts (ADR 0034 decision 4).
  */
 export interface FacetSpec {
   readonly key: string;
@@ -140,7 +140,7 @@ export interface SearchQueryPlan {
 }
 
 /**
- * The engine queries of one search page (ADR 0033 decision 4), to be sent next to the text queries in one multi-search.
+ * The engine queries of one search page (ADR 0034 decision 4), to be sent next to the text queries in one multi-search.
  *
  * - `hits`: the page, grouped by product, with the counts of the product-level facets.
  * - `variant_facets`: the values of the variant-level facets, WITHOUT distinct (with distinct they lose values) and

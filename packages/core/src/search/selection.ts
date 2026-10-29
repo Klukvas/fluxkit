@@ -57,7 +57,7 @@ function parseRange(text: string, pattern: RegExp, integersOnly: boolean): Numbe
 }
 
 /**
- * Turns the request parameters of a search into a typed selection (ADR 0033 decision 10). Every `f` value is
+ * Turns the request parameters of a search into a typed selection (ADR 0034 decision 10). Every `f` value is
  * `<facetKey>:<value>` and its key must be one of the facets of the index (`specs`): an unknown key is an error, never
  * ignored. The value must fit the kind of its facet (slug, uuid, code, `true`/`false`, number range). Nothing here is
  * trusted further than its shape; `buildSearchFilter` still quotes every value.

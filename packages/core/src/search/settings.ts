@@ -105,7 +105,7 @@ function hash53(text: string): string {
 }
 
 /**
- * The index settings of one locale, derived from the catalog definitions (ADR 0033 decision 2) so adding an option or a
+ * The index settings of one locale, derived from the catalog definitions (ADR 0034 decision 2) so adding an option or a
  * filterable attribute needs no code change. Only public, filterable attributes become filters; nothing about an
  * internal attribute appears. No `distinctAttribute`: a request can not switch it off again, so `distinct` is sent per
  * request (spike S1, E1).

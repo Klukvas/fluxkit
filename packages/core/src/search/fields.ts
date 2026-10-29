@@ -1,6 +1,6 @@
 import type { AttributeInputType } from "../catalog/types.js";
 
-/** Field names of a search document (ADR 0033 decision 2). The names the engine knows; nothing else is ever indexed. */
+/** Field names of a search document (ADR 0034 decision 2). The names the engine knows; nothing else is ever indexed. */
 export const SEARCH_FIELDS = Object.freeze({
   id: "id",
   productId: "productId",

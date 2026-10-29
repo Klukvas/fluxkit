@@ -1,4 +1,4 @@
-/** The public sort names of the search routes (ADR 0033 decision 10). Engine syntax is never accepted from clients. */
+/** The public sort names of the search routes (ADR 0034 decision 10). Engine syntax is never accepted from clients. */
 export const SEARCH_SORTS = ["relevance", "newest", "price_asc", "price_desc"] as const;
 
 export type SearchSort = (typeof SEARCH_SORTS)[number];

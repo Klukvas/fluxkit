@@ -5,7 +5,7 @@ Purpose: a TEST-ONLY payment provider with code `fake` (ADR 0032, payments plan 
 - Flag: `PAYMENT_PROVIDERS_ENABLED=fake` (with a provider enabled `ORDER_PAYMENT_TTL_MINUTES` must be at least 8).
 - Manifest: `"fluxkit": { "provider": "fake", "kind": "payment" }` in `package.json`. Codes are unique per kind, so this does not clash with the shipping `fake` (`packages/providers/_fake`) or the email `fake` (`packages/providers/_fake-email`).
 - Entry: `src/index.ts` exports `providerModule`, loaded dynamically by `apps/api` only when `PAYMENT_PROVIDERS_ENABLED` names `fake`.
-- Variables: none. The hooks below act inside one process; a separate API process (e2e) needs an HTTP or file bridge, which arrives with the e2e step of the plan (`FAKE_PAYMENT_*` names are decided there), together with the test-only hosted payment page.
+- Variable: `FAKE_PAYMENT_ADOPT_WEBHOOKS` (optional, `true` or `false`, default off; `docs/contracts/config.md`). The hooks below act inside one process; a separate API process (the e2e suites) is driven through signed webhooks instead, see "Driving it from another process". No hosted payment page exists: the page host is reserved and the e2e suites answer it with a browser stub.
 - Routes, DB tables, migrations: none.
 - Extension points used: the payment provider loader and registry (`apps/api/src/payments/registry`).
 
@@ -24,6 +24,13 @@ Purpose: a TEST-ONLY payment provider with code `fake` (ADR 0032, payments plan 
 - Status transitions, each moving `modifiedAt` forward and refusing (`RangeError`) what the real service would not do from the current status: `process(id)`, `complete(id, card?)`, `fail(id, code?)`, `expire(id)` (the real service sends no webhook for `expired`, M8; `webhookFor` still builds one), `reverse(id)`, `addExternalRefund(id, amount)` (a refund made outside the shop, `refundId` null), `setRefundMode("succeeded" | "processing")`, `settleRefund(id, refundId, "succeeded" | "failed")`.
 - `webhookFor(id)`: the signed `PaymentWebhookInput` of the invoice's current state; `fakeWebhookInput(body)`, `signFakeWebhook(bytes)` and `FAKE_PAYMENT_SIGNATURE_HEADER` build or check others.
 - `invoices()`, `invoice(id)` (copies), `requests()` (every call that passed local validation), `reset()` (forgets everything; numbering, the logical clock and the refund mode restart).
+
+## Driving it from another process (the e2e suites)
+The hooks above need the test and the API in one process. The e2e suites run the BUILT API in its own process, and the production API gets no test-only route, so the suites speak to it the way a real provider does: through the public routes and the signed webhook.
+- The shopper creates a payment through the store API; the answer's `redirectUrl` is `https://pay.fake.invalid/pay/<providerPaymentId>`, which is how the test learns the invoice id (ids are `fake-pay-000001`, ... per process).
+- The test POSTs the provider's webhook to the real `POST /webhooks/payments/fake` (through the suite's proxy) with the exact body bytes and the header `x-fake-signature` = hex HMAC-SHA256 of those bytes with the public test key above. The body is the fake's JSON shape (`invoiceId`, `reference`, `status`, `amount`, `currency`, `finalAmount`, `modifiedDate`, `failureCode`, `cancelList`, `card`); `reference` is the attempt id (`paymentId`) the store create answered. The API verifies the signature over the raw bytes exactly as for any provider, so a forged, unsigned or altered body is `401`.
+- With `FAKE_PAYMENT_ADOPT_WEBHOOKS=true` a verified webhook also moves the fake's own invoice to the state it announces, so a later admin refund (which the API sends to the fake) finds a paid invoice. Only a webhook about an invoice the fake holds, with that invoice's reference and amount and a `modifiedDate` not older than the invoice's, is adopted; a mismatching amount, an unknown invoice or an older time changes nothing (the API still sees the fact and decides). The logical clock is moved past an adopted time, so refunds made afterwards stay newer.
+- Not possible this way: `failNext`, `process`, `expire`, `setRefundMode` and the other hooks (no bridge), and the real service sends no `expired` webhook anyway.
 
 ## How to remove it
 Delete `packages/providers/_fake-payment` and take `fake` out of `PAYMENT_PROVIDERS_ENABLED`. Nothing in core or `apps/api` references it (CI: `scripts/feature-matrix.sh providers-deleted` removes it and checks that `PAYMENT_PROVIDERS_ENABLED=fake` then refuses to start while lint, types, boundaries and tests stay green).
