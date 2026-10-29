@@ -512,7 +512,7 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   // Search plan step 10a: the header box, the results page and the filter form.
   const searchFiles = sources.filter(
     (file) =>
-      /(^|\/)(search-[\w.-]+|suggest-source|forwarded-address)\.tsx?$/.test(file.path) ||
+      /(^|\/)(search[-][\w.-]+|suggest-source|forwarded-address)\.tsx?$/.test(file.path) ||
       file.path === join("app", "[locale]", "(catalog)", "search", "page.tsx"),
   );
 
