@@ -59,6 +59,7 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
   let tee: { id: string; slug: string };
   let brandA: string;
   let brandB: string;
+  let adminId: string;
 
   async function get<T = SearchBody>(path: string, base = app.baseUrl) {
     return http<T>(base, "GET", path);
@@ -79,9 +80,10 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     await pool.query("delete from search_sync_queue");
     await pool.query("delete from search_index_state");
     search = await SearchWorld.create("store");
+    adminId = await insertAdminUserRow(pool);
     app = await startApp({
       search: search.env,
-      adminAuthenticator: ownerAuthenticator(await insertAdminUserRow(pool)),
+      adminAuthenticator: ownerAuthenticator(adminId),
       rateLimits: {
         search: { maxAttempts: 10_000, windowMinutes: 1 },
         searchSuggest: { maxAttempts: 10_000, windowMinutes: 1 },
@@ -169,6 +171,8 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     await pool.query("delete from brand where slug = any($1)", [[brandA, brandB]]);
     await search.dispose(pool);
     await app.app.close();
+    // An owner left behind would change the last-owner rule for later spec files of the shared database.
+    await pool.query("delete from admin_user where id = $1", [adminId]);
     await pool.end();
   });
 

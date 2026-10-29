@@ -36,9 +36,11 @@ describe("search write path under concurrent reservations (real app, real Postgr
   let productId: string;
   let otherProductId: string;
   let variantIds: string[];
+  let adminId: string;
 
   beforeAll(async () => {
     await ensureMigrated();
+    adminId = await insertAdminUserRow(pool);
     app = await startApp({
       search: {
         enabled: true,
@@ -46,7 +48,7 @@ describe("search write path under concurrent reservations (real app, real Postgr
         meiliApiKey: "races-spec-key-0123456789",
         indexPrefix: "races_",
       },
-      adminAuthenticator: ownerAuthenticator(await insertAdminUserRow(pool)),
+      adminAuthenticator: ownerAuthenticator(adminId),
     });
     call = caller(() => app.baseUrl);
     fx = await createCatalogFixture(call);
@@ -80,6 +82,8 @@ describe("search write path under concurrent reservations (real app, real Postgr
     await fx.cleanup(pool);
     await pool.query("delete from search_sync_queue");
     await app.app.close();
+    // An owner left behind would change the last-owner rule for later spec files of the shared database.
+    await pool.query("delete from admin_user where id = $1", [adminId]);
     await pool.end();
   });
 

@@ -34,6 +34,7 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
   let search: SearchWorld;
   let owner: RunningApp;
   let viewer: RunningApp;
+  let adminId: string;
 
   beforeAll(async () => {
     await ensureMigrated();
@@ -41,9 +42,10 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
     await pool.query("delete from search_index_state");
     await pool.query("delete from search_synonym_group");
     search = await SearchWorld.create("adm");
+    adminId = await insertAdminUserRow(pool);
     owner = await startApp({
       search: search.env,
-      adminAuthenticator: ownerAuthenticator(await insertAdminUserRow(pool)),
+      adminAuthenticator: ownerAuthenticator(adminId),
     });
     viewer = await startApp({ search: search.env, adminPrincipal: { role: "viewer" } });
   }, 60_000);
@@ -52,6 +54,8 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
     await search.dispose(pool);
     await owner.app.close();
     await viewer.app.close();
+    // An owner left behind would change the last-owner rule for later spec files of the shared database.
+    await pool.query("delete from admin_user where id = $1", [adminId]);
     await pool.end();
   });
 

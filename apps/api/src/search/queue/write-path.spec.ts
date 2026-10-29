@@ -38,11 +38,13 @@ describe("search write path (real app, real Postgres)", () => {
   let callSmall: Call;
   let fx: CatalogFixture;
   let world: StockWorld;
+  let adminId: string;
 
   beforeAll(async () => {
     await ensureMigrated();
     // Stock adjustments record the admin as the movement's actor: a real user row.
-    const adminAuthenticator = ownerAuthenticator(await insertAdminUserRow(pool));
+    adminId = await insertAdminUserRow(pool);
+    const adminAuthenticator = ownerAuthenticator(adminId);
     on = await startApp({ search: searchOn("writepath_"), adminAuthenticator });
     off = await startApp({ adminAuthenticator });
     small = await startApp({
@@ -69,6 +71,8 @@ describe("search write path (real app, real Postgres)", () => {
     await on.app.close();
     await off.app.close();
     await small.app.close();
+    // An owner left behind would change the last-owner rule for later spec files of the shared database.
+    await pool.query("delete from admin_user where id = $1", [adminId]);
     await pool.end();
   });
 

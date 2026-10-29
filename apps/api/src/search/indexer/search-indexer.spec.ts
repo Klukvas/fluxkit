@@ -43,6 +43,7 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
   let world: StockWorld;
   let database: Database;
   let indexer: SearchIndexer;
+  let adminId: string;
   const queue = new SearchQueueRepository();
   const SENTINEL = `zzsentinel${Date.now().toString(36)}`;
 
@@ -51,9 +52,10 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
     await pool.query("delete from search_sync_queue");
     await pool.query("delete from search_index_state");
     search = await SearchWorld.create("idx");
+    adminId = await insertAdminUserRow(pool);
     app = await startApp({
       search: search.env,
-      adminAuthenticator: ownerAuthenticator(await insertAdminUserRow(pool)),
+      adminAuthenticator: ownerAuthenticator(adminId),
     });
     call = caller(() => app.baseUrl);
     fx = await createCatalogFixture(call);
@@ -66,6 +68,8 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
     await fx.cleanup(pool);
     await search.dispose(pool);
     await app.app.close();
+    // An owner left behind would change the last-owner rule for later spec files of the shared database.
+    await pool.query("delete from admin_user where id = $1", [adminId]);
     await pool.end();
   });
 
