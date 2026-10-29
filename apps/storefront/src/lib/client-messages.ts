@@ -20,6 +20,7 @@ export const CLIENT_MESSAGE_PREFIXES = [
   "account.",
   "checkout.",
   "order.",
+  "payment.",
 ] as const;
 
 export function pickClientMessages(messages: Messages): Messages {
