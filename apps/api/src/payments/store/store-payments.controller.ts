@@ -4,7 +4,7 @@ import type { Response } from "express";
 import { z } from "zod";
 import { StoreController } from "../../catalog/store/store-controller.decorator.js";
 import { ApiProblemResponses, ApiZodBody, ApiZodResponse } from "../../common/openapi.js";
-import { ZodValidationPipe } from "../../common/zod-validation.pipe.js";
+import { uuidParam, ZodValidationPipe } from "../../common/zod-validation.pipe.js";
 import { CurrentCustomer } from "../../customers/auth/current-customer.js";
 import { CustomerAuthenticated } from "../../customers/auth/customer-authenticated.decorator.js";
 import type { CustomerPrincipal } from "../../customers/auth/customer-authenticator.js";
@@ -24,7 +24,6 @@ import {
 import { StorePaymentsService } from "./store-payments.service.js";
 
 const numberParam = new ZodValidationPipe(z.string().min(1).max(64), "number");
-const paymentIdParam = new ZodValidationPipe(z.string().min(1).max(64), "paymentId");
 
 const IDEMPOTENCY_HEADER = {
   name: "Idempotency-Key",
@@ -144,7 +143,7 @@ export class AccountPaymentsController {
   status(
     @CurrentCustomer() customer: CustomerPrincipal,
     @Param("number", numberParam) number: string,
-    @Param("paymentId", paymentIdParam) paymentId: string,
+    @Param("paymentId", uuidParam("paymentId")) paymentId: string,
   ): Promise<StorePaymentStatus> {
     return this.payments.statusAsCustomer(customer.customerId, number, paymentId);
   }
