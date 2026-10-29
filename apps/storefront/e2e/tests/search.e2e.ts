@@ -298,6 +298,15 @@ test.describe("the results page", () => {
     await page.getByRole("group", { name: "Price, UAH" }).getByLabel("From").fill("1000");
     await page.getByRole("button", { name: "Apply filters" }).click();
     await expect(page).toHaveURL(/\/en\/search\?q=demo&price=100000\.\.$/);
+    // A box the page refuses (the browser's pattern lets a reversed range through) is the form's own state, not a 404.
+    const price = page.getByRole("group", { name: "Price, UAH" });
+    await price.getByLabel("From").fill("20");
+    await price.getByLabel("To").fill("10");
+    await page.getByRole("button", { name: "Apply filters" }).click();
+    await expect(page).toHaveURL(/priceMin=20&priceMax=10/);
+    await expect(page.getByText("Check the filters")).toBeVisible();
+    await expect(page.getByText("The lowest price must not be above the highest.")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toHaveText("Results for “demo”");
     await context.close();
   });
 

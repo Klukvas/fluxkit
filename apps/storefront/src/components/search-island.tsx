@@ -92,14 +92,17 @@ export function SearchResultsRegion({ children }: { children: ReactNode }) {
 
 export function SearchFilterForm({
   exponent,
+  initialError = null,
   children,
 }: {
   exponent: number;
+  /** A failure the server already found (a script-less submit with a refused box, review F3), in the shop's words. */
+  initialError?: string | null;
   children: ReactNode;
 }) {
   const { navigate } = usePending();
   const { t } = useI18n();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError);
   // Before the script runs the browser's own pattern check on the price boxes applies; once it runs, the form's own check
   // does (it says which box and in the shop's words), so the native one must not stop the submit first.
   const [scripted, setScripted] = useState(false);

@@ -103,7 +103,7 @@ describe("the results route", () => {
   it("answers a real 404 when search is off, before it reads anything else, and renders no search when off", () => {
     expect(page.indexOf("getSearchEnabled()")).toBeGreaterThan(-1);
     expect(page).toMatch(/if \(!\(await getSearchEnabled\(\)\)\) notFound\(\);/);
-    expect(page.indexOf("getSearchEnabled()")).toBeLessThan(page.indexOf("parseSearchParams("));
+    expect(page.indexOf("getSearchEnabled()")).toBeLessThan(page.indexOf("resolveSearchAddress("));
     expect(page).toMatch(/outcome\.kind === "disabled"\) notFound\(\)/);
   });
 

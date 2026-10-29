@@ -9,6 +9,7 @@ import {
   parseSearchForm,
   parseSearchParams,
   rangeOf,
+  resolveSearchAddress,
   searchPath,
   setPage,
   setPrice,
@@ -303,5 +304,64 @@ describe("parseSearchForm (the facet form's fields, in the browser)", () => {
       ok: false,
       reason: "range:attr.length",
     });
+  });
+});
+
+describe("resolveSearchAddress (what the results route does with an address, review F3)", () => {
+  it("takes a canonical address as it is and a hand-made one as the query to redirect to", () => {
+    expect(resolveSearchAddress({ q: "demo", price: "1250.." }, 2)).toEqual({
+      kind: "query",
+      query: { ...empty, q: "demo", price: { min: 1250, max: null } },
+      canonical: true,
+    });
+    expect(
+      resolveSearchAddress({ q: "demo", priceMin: "12.50", priceMax: "", sort: "", page: "1" }, 2),
+    ).toEqual({
+      kind: "query",
+      query: { ...empty, q: "demo", price: { min: 1250, max: null } },
+      canonical: false,
+    });
+  });
+
+  it.each([
+    [{ q: "demo", priceMin: "12.505" }, "price_min"],
+    [{ q: "demo", priceMax: "ten" }, "price_max"],
+    [{ q: "demo", priceMin: "20", priceMax: "10" }, "price_order"],
+    [{ q: "demo", "rmin.attr.length": "abc" }, "range:attr.length"],
+    [{ q: "demo", "rmin.attr.length": "5", "rmax.attr.length": "1" }, "range:attr.length"],
+  ])(
+    "turns a script-less submit with a refused box %j into the page of the rest with the form's failure %s, not a 404",
+    (raw, reason) => {
+      expect(resolveSearchAddress(raw, 2)).toEqual({
+        kind: "form_error",
+        query: { ...empty, q: "demo" },
+        reason,
+      });
+    },
+  );
+
+  it("keeps the rest of a refused submit: the words, the chosen values and the sort", () => {
+    expect(
+      resolveSearchAddress(
+        { q: "demo", f: ["brand:acme"], sort: "price_asc", priceMin: "1.001", priceMax: "" },
+        2,
+      ),
+    ).toEqual({
+      kind: "form_error",
+      query: { ...empty, q: "demo", facets: ["brand:acme"], sort: "price_asc" },
+      reason: "price_min",
+    });
+  });
+
+  it.each([
+    { q: "demo", price: "abc" },
+    { q: "demo", page: "0" },
+    { f: "no-colon" },
+    { f: "brand:a b" },
+    // A form field does not excuse a malformed shared parameter next to it.
+    { q: "demo", f: "no-colon", priceMin: "12.505" },
+    { q: "demo", page: "418", priceMin: "x" },
+  ])("is a real 404 for the malformed address %j", (raw) => {
+    expect(resolveSearchAddress(raw, 2)).toEqual({ kind: "malformed" });
   });
 });

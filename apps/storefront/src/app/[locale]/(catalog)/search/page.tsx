@@ -8,7 +8,7 @@ import { localizedHref } from "../../../../lib/locale-path";
 import { searchMetadata } from "../../../../lib/page-metadata";
 import { publicOrigin } from "../../../../lib/public-url.server";
 import { searchData, getSearchEnabled } from "../../../../lib/search-data.server";
-import { isCanonicalSearch, parseSearchParams, searchPath } from "../../../../lib/search-query";
+import { resolveSearchAddress, searchPath } from "../../../../lib/search-query";
 import { messagesByLocale } from "../../../../messages";
 
 interface SearchProps {
@@ -19,20 +19,21 @@ interface SearchProps {
 /**
  * Shared by the page and `generateMetadata`. Real 404s (this route has no `loading.tsx` above it): search is off, or a
  * parameter is malformed (a shared link must show what it says, never a silently different search). A script-less form
- * submit and other non-canonical addresses redirect to the short address of the same search.
+ * submit and other non-canonical addresses redirect to the short address of the same search; a script-less submit whose
+ * box is refused shows the rest of the address with the form's "Check the filters" state (review F3).
  */
 async function resolve({ params, searchParams }: SearchProps) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
   if (!(await getSearchEnabled())) notFound();
   const shop = await getShopMoney();
-  const raw = await searchParams;
-  const parsed = parseSearchParams(raw, shop.exponent);
-  if (!parsed.ok) notFound();
-  if (!isCanonicalSearch(raw, parsed.query)) {
-    redirect(localizedHref(locale, searchPath(parsed.query)));
+  const address = resolveSearchAddress(await searchParams, shop.exponent);
+  if (address.kind === "malformed") notFound();
+  if (address.kind === "query" && !address.canonical) {
+    redirect(localizedHref(locale, searchPath(address.query)));
   }
-  return { locale, query: parsed.query, shop };
+  const formFailure = address.kind === "form_error" ? address.reason : null;
+  return { locale, query: address.query, shop, formFailure };
 }
 
 export async function generateMetadata(props: SearchProps): Promise<Metadata> {
@@ -42,7 +43,7 @@ export async function generateMetadata(props: SearchProps): Promise<Metadata> {
 }
 
 export default async function SearchPage(props: SearchProps) {
-  const { locale, query, shop } = await resolve(props);
+  const { locale, query, shop, formFailure } = await resolve(props);
   const t = createTranslator(messagesByLocale[locale], locale);
   const outcome = await searchData.search(locale, query);
   // The API says search is off (the cached config was a minute behind): the same 404.
@@ -57,6 +58,7 @@ export default async function SearchPage(props: SearchProps) {
       t={t}
       query={query}
       outcome={outcome}
+      formFailure={formFailure}
       currency={shop.currency}
       exponent={shop.exponent}
       imageHosts={imageHosts()}

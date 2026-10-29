@@ -242,6 +242,35 @@ export function isCanonicalSearch(raw: RawSearchParams, query: SearchQuery): boo
   );
 }
 
+/** The fields only the facet form sends (major-unit price and range boxes); never part of a shared address. */
+const FORM_FIELD = /^(priceMin|priceMax|rmin\..*|rmax\..*)$/;
+
+export type SearchAddress =
+  /** A query to search; `canonical: false` means the page redirects to `searchPath(query)` first. */
+  | { kind: "query"; query: SearchQuery; canonical: boolean }
+  /**
+   * A script-less submit of the filter form whose box the parser refuses (`priceMin=12.505`, a reversed range): the page of
+   * the rest of the address, with the form's failure (`describeFormFailure(reason)`) instead of a 404 (review F3).
+   */
+  | { kind: "form_error"; query: SearchQuery; reason: string }
+  /** A malformed shared parameter: the page is a real 404 (a link must show what it says). */
+  | { kind: "malformed" };
+
+/** What the results route does with an address: search it, redirect it, explain a refused form box, or 404. */
+export function resolveSearchAddress(raw: RawSearchParams, exponent: number): SearchAddress {
+  const parsed = parseSearchParams(raw, exponent);
+  if (parsed.ok) {
+    return { kind: "query", query: parsed.query, canonical: isCanonicalSearch(raw, parsed.query) };
+  }
+  if (!Object.keys(raw).some((name) => FORM_FIELD.test(name))) return { kind: "malformed" };
+  const rest = parseSearchParams(
+    Object.fromEntries(Object.entries(raw).filter(([name]) => !FORM_FIELD.test(name))),
+    exponent,
+  );
+  if (!rest.ok) return { kind: "malformed" };
+  return { kind: "form_error", query: { ...rest.query, page: 1 }, reason: parsed.reason };
+}
+
 export function isFacetSelected(query: SearchQuery, key: string, code: string): boolean {
   return query.facets.includes(facetEntry(key, code));
 }
