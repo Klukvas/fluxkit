@@ -308,6 +308,27 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     expect(none.body).toMatchObject({ items: [], total: 0, relaxed: false });
   });
 
+  it("finds a product by a partial last word in the second pass when the whole words find nothing, and says so (ADR 0037)", async () => {
+    // The storefront e2e case: a shopper presses Enter on "screw" and expects the screwdriver.
+    const ids = (result: { body: SearchBody }) => result.body.items.map((item) => item.id);
+    const partial = await get(`/store/search?q=shir&locale=en`);
+    expect(partial.status, JSON.stringify(partial.body)).toBe(200);
+    expect(ids(partial)).toContain(shirt.id);
+    expect(partial.body.relaxed).toBe(true);
+    const lastWordPartial = await get(
+      `/store/search?q=${encodeURIComponent("linen shi")}&locale=en`,
+    );
+    expect(ids(lastWordPartial)[0]).toBe(shirt.id);
+    expect(lastWordPartial.body.relaxed).toBe(true);
+    const ukrainian = await get(`/store/search?q=${encodeURIComponent("футб")}`);
+    expect(ids(ukrainian)).toContain(tee.id);
+    expect(ukrainian.body.relaxed).toBe(true);
+    // Whole words keep the strict pass: no prefix matching, no relaxed flag.
+    const whole = await get(`/store/search?q=shirt&locale=en`);
+    expect(ids(whole)).toContain(shirt.id);
+    expect(whole.body.relaxed).toBe(false);
+  });
+
   it.each([
     ["an unknown facet key", "f=color:red", "f"],
     ["an internal attribute as a facet", "f=attr.secret_x:1", "f"],
@@ -453,11 +474,16 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
         // English words whose stems are the words themselves: one text query.
         oneTextQuery: await costOf("/store/search?q=shirt&locale=en"),
         oneTextQueryHeavyRelaxed: await costOf(`/store/search?q=shirt%20qqqq&locale=en&${heavy}`),
+        // One word that finds nothing gets the prefix pass too (ADR 0037): two passes, never more.
+        oneWordHeavyRelaxed: await costOf(`/store/search?q=qqqq&locale=en&${heavy}`),
         // Ukrainian: the words, their stems and their prefixes are three text queries, merged by one federation per
         // planned query; the engine carries one federation per request (plan, review fixes F3).
         threeTextQueries: await costOf(`/store/search?q=${encodeURIComponent("сорочку")}`),
         threeTextQueriesHeavyRelaxed: await costOf(
           `/store/search?q=${encodeURIComponent("сорочку неіснуючеслово")}&${heavy}`,
+        ),
+        threeTextQueriesOneWordHeavyRelaxed: await costOf(
+          `/store/search?q=${encodeURIComponent("неіснуючеслово")}&${heavy}`,
         ),
       };
       expect(measured).toEqual({
@@ -465,9 +491,11 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
         browseHeavy: 1,
         oneTextQuery: 1,
         oneTextQueryHeavyRelaxed: 2,
+        oneWordHeavyRelaxed: 2,
         threeTextQueries: 2,
         // hits, variant facets, price range and 7 disjunctive queries (the price group has none), twice (relaxed).
         threeTextQueriesHeavyRelaxed: 20,
+        threeTextQueriesOneWordHeavyRelaxed: 20,
       });
       // The live filterable fields are read at most once per 30 s and index.
       expect(settingsReads.mock.calls.length).toBeLessThanOrEqual(1);

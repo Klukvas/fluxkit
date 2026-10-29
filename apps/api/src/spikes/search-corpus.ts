@@ -440,7 +440,13 @@ export interface CorpusProduct {
 export interface CorpusQuery {
   readonly text: string;
   readonly kind:
-    "inflected-noun" | "inflected-noun-adjective" | "nominative" | "typo" | "prefix" | "brand";
+    | "inflected-noun"
+    | "inflected-noun-adjective"
+    | "nominative"
+    | "typo"
+    | "prefix"
+    | "brand"
+    | "partial";
   /** Product ids that are relevant by construction. */
   readonly relevant: readonly string[];
 }
@@ -620,6 +626,28 @@ export function buildCorpus(productCount = 320): {
       kind: "brand",
       relevant: relevantTo(null, [], brandName),
     });
+  }
+  // a partial last word on the results page (the shopper pressed Enter mid-word, ADR 0037): a noun cut to 3 to 6
+  // letters, alone or after a complete agreeing adjective. Relevant: the products with a title or brand word that starts
+  // with the cut word (and the adjective's lemma). Generated after every other kind, so their queries stay as they were.
+  const words = (product: CorpusProduct): string[] =>
+    `${product.title} ${product.brandName}`.toLowerCase().split(/\s+/);
+  while (queries.filter((query) => query.kind === "partial").length < 20) {
+    const entry = pick(usedNouns);
+    const length = Math.min(3 + Math.floor(random() * 4), entry.lemma.length - 1);
+    const cut = entry.lemma.slice(0, length);
+    const withAdjective = queries.filter((query) => query.kind === "partial").length >= 10;
+    const stem = pick(adjectiveStems[entry.niche]);
+    const text = withAdjective ? `${adjectiveForm(stem, entry.gender, 0)} ${cut}` : cut;
+    const relevant = products
+      .filter(
+        (product) =>
+          words(product).some((word) => word.startsWith(cut)) &&
+          (!withAdjective || product.adjectiveLemmas.includes(adjectiveLemma(stem))),
+      )
+      .map((product) => product.id);
+    if (relevant.length === 0 || queries.some((query) => query.text === text)) continue;
+    queries.push({ text, kind: "partial", relevant });
   }
   return { products, documents, queries };
 }

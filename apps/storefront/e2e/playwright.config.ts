@@ -25,7 +25,7 @@ const ports = {
  * (`reuseExistingServer: false`: a leftover server could hide a broken start):
  *   1. the BUILT API on a wiped, migrated and seeded `*_e2e_test` database (`e2e/prepare-database.ts` runs first),
  *   2. the BUILT storefront (`next start`), with `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` like the production example: the
- *      proxy below is the only way in for the browser and sets `X-Forwarded-For` (ADR 0037),
+ *      proxy below is the only way in for the browser and sets `X-Forwarded-For` (ADR 0038),
  *   3. `e2e/proxy.ts`, the same-origin proxy the browser talks to (ADR 0026),
  *   4. with search on only: the same build again with the forwarding left off, reached directly by one search test.
  * `apiEnvironment()` throws before anything starts when a required variable is missing.

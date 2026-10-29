@@ -290,7 +290,7 @@ describe("Caddy edge: the payment webhook handle", () => {
   });
 });
 
-describe("edge: one X-Forwarded-For rule for the API and the storefront (search UI review F2, ADR 0037)", () => {
+describe("edge: one X-Forwarded-For rule for the API and the storefront (search UI review F2, ADR 0038)", () => {
   // The results page forwards the header the edge set on the PAGE request (STOREFRONT_FORWARD_CLIENT_ADDRESS), so the
   // storefront location must treat it exactly like the API locations: a CDN switch (append and TRUST_PROXY=2) that
   // reached one path only would put the shoppers of a CDN node into one search window on the other.

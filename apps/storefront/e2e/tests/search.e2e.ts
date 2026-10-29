@@ -386,7 +386,7 @@ test.describe("the results page", () => {
   }) => {
     // The second `next start` of the config, reached directly as a client that got around the edge would: it names a new
     // address on every request. Counted per named address, it would never meet the limit; it does, within 61 pages, because
-    // the Next server's own address is counted (one window for everybody, ADR 0037).
+    // the Next server's own address is counted (one window for everybody, ADR 0038).
     const direct = `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}`;
     const client = await playwright.request.newContext();
     try {

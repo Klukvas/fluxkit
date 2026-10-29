@@ -74,7 +74,7 @@ const storefrontEnvSchema = z
       originUrl("STOREFRONT_PUBLIC_URL").optional(),
     ),
     STOREFRONT_IMAGE_HOSTS: z.preprocess(blankToUndefined, imageHosts.optional()),
-    // Exactly `true` or `false` (blank is unset): a typo in a trust switch must fail loudly, not pick a side (ADR 0037).
+    // Exactly `true` or `false` (blank is unset): a typo in a trust switch must fail loudly, not pick a side (ADR 0038).
     STOREFRONT_FORWARD_CLIENT_ADDRESS: z.preprocess(
       blankToUndefined,
       z
@@ -106,7 +106,7 @@ export interface StorefrontEnv {
   imageHosts: string[];
   /**
    * Whether the Next server passes the page request's (checked) `X-Forwarded-For` on to the API, for the per-address search
-   * window (ADR 0037). Off unless `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`: only safe when the storefront is reachable
+   * window (ADR 0038). Off unless `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`: only safe when the storefront is reachable
    * through the edge proxy alone, which sets or replaces that header.
    */
   forwardClientAddress: boolean;

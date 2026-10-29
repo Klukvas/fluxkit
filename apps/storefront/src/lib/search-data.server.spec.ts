@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SearchQuery } from "./search-query";
 
 /*
- * The wiring of the results page's read to the request (review F1, ADR 0037): which `X-Forwarded-For` the API receives
+ * The wiring of the results page's read to the request (review F1, ADR 0038): which `X-Forwarded-For` the API receives
  * for the page request's header, with `STOREFRONT_FORWARD_CLIENT_ADDRESS` off and on. The module itself is loaded, with
  * Next's request APIs replaced and the API answered by a stub `fetch`; nothing else is mocked.
  */

@@ -1,4 +1,4 @@
-# 0037. The storefront forwards the client address only when the operator switches it on
+# 0038. The storefront forwards the client address only when the operator switches it on
 
 Status: accepted 2026-10-29 (search UI review F1 and F2, `docs/plans/2026-10-29-search-ui-review.md`). Refines ADR 0024 ("Trusted proxy hops": the Next server becomes an optional hop on one path) and ADR 0036 decision 3 (the `search` window is reached through the results page too); changes nothing else in them.
 

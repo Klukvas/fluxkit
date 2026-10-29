@@ -11,7 +11,7 @@ import { storeData } from "./store-data.server";
 /**
  * The search reads of the running app. Server code only (a test keeps `.server` modules out of client files). `headers()`
  * is read here and nowhere else, for the forwarded address, and only when the operator switched the forwarding on
- * (`STOREFRONT_FORWARD_CLIENT_ADDRESS=true`, ADR 0037): a storefront reachable around the edge would otherwise let a client
+ * (`STOREFRONT_FORWARD_CLIENT_ADDRESS=true`, ADR 0038): a storefront reachable around the edge would otherwise let a client
  * choose its own rate-limit key. Off, every page read counts as the Next server's one address.
  */
 export const searchData = createSearchData({

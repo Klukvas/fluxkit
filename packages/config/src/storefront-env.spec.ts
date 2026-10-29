@@ -172,7 +172,7 @@ describe("loadStorefrontEnv errors", () => {
   });
 });
 
-describe("loadStorefrontEnv STOREFRONT_FORWARD_CLIENT_ADDRESS (ADR 0037)", () => {
+describe("loadStorefrontEnv STOREFRONT_FORWARD_CLIENT_ADDRESS (ADR 0038)", () => {
   it("is off when unset or blank: the Next server passes no client header on unless the operator says so", () => {
     expect(loadStorefrontEnv(base).forwardClientAddress).toBe(false);
     expect(

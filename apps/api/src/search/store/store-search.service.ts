@@ -137,8 +137,12 @@ export class StoreSearchService {
     let results = await this.run(uid, textQueries, plan.queries, sort, "all", text);
     let relaxed = false;
     const hits = results.find((entry) => entry.planned.purpose === "hits")?.result;
-    if ((hits?.totalHits ?? 0) === 0 && text.words.length >= 2) {
-      results = await this.run(uid, textQueries, plan.queries, sort, "last", text);
+    if ((hits?.totalHits ?? 0) === 0 && text.words.length >= 1) {
+      // One retry (ADR 0037): the last word may be unfinished, so it is prefix-matched; with several words the engine
+      // may also drop words from the end. Complete words that found something never reach this pass.
+      const relaxedQueries = planTextQueries(text, locale.locale, "relaxed");
+      const strategy: Strategy = text.words.length >= 2 ? "last" : "all";
+      results = await this.run(uid, relaxedQueries, plan.queries, sort, strategy, text);
       relaxed = true;
     }
     const main = results.find((entry) => entry.planned.purpose === "hits")?.result ?? {};

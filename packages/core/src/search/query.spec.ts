@@ -104,8 +104,39 @@ describe("planTextQueries", () => {
     ]);
   });
 
+  it("relaxed pass (ADR 0037): the original words end without the space, so the last word is prefix-matched; stems and prefixes keep it", () => {
+    expect(planTextQueries(parsed("Сорочці чоловічі"), "uk", "relaxed")).toEqual([
+      { role: "original", q: "сорочці чоловічі" },
+      { role: "stems", q: "сорочц чоловіч ", attributesToSearchOn: ["stems"] },
+      { role: "prefixes", q: "сороч чолов ", attributesToSearchOn: ["stems5"] },
+    ]);
+    expect(planTextQueries(parsed("футб"), "uk", "relaxed")).toEqual([
+      { role: "original", q: "футб" },
+    ]);
+  });
+
+  it("relaxed pass: as many text queries as the strict pass, so the engine request count of a pass stays (ADR 0036)", () => {
+    // "screw" stems to itself: one text query in both passes, never a stems query that only differs by the space.
+    expect(planTextQueries(parsed("Screw"), "en", "relaxed")).toEqual([
+      { role: "original", q: "screw" },
+    ]);
+    for (const [text, locale] of [
+      ["screw", "en"],
+      ["linen shirts", "en"],
+      ["X200 PH2", "uk"],
+      ["Сорочці чоловічі", "uk"],
+      ["футб", "uk"],
+      ["Jacken", "de"],
+    ] as const) {
+      expect(planTextQueries(parsed(text), locale, "relaxed").length, text).toBe(
+        planTextQueries(parsed(text), locale, "results").length,
+      );
+    }
+  });
+
   it("a browse request has no text queries", () => {
     expect(planTextQueries(parsed(""), "uk", "results")).toEqual([]);
+    expect(planTextQueries(parsed(""), "uk", "relaxed")).toEqual([]);
     expect(planTextQueries(parsed(""), "uk", "suggest")).toEqual([]);
   });
 });

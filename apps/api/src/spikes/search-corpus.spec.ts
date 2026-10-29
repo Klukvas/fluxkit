@@ -29,7 +29,7 @@ describe("spike S1 corpus", () => {
     }
   });
 
-  it("covers inflected, adjective, nominative, typo, prefix and brand queries", () => {
+  it("covers inflected, adjective, nominative, typo, prefix, brand and partial queries", () => {
     const kinds = new Set(corpus.queries.map((query) => query.kind));
     expect([...kinds].sort()).toEqual(
       [
@@ -37,6 +37,7 @@ describe("spike S1 corpus", () => {
         "inflected-noun",
         "inflected-noun-adjective",
         "nominative",
+        "partial",
         "prefix",
         "typo",
       ].sort(),

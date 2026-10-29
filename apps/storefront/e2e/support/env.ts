@@ -7,7 +7,7 @@ import { join } from "node:path";
 export const E2E_API_PORT = Number(process.env["E2E_API_PORT"] ?? 3100);
 export const E2E_STOREFRONT_PORT = Number(process.env["E2E_STOREFRONT_PORT"] ?? 3101);
 /**
- * A second `next start` of the same build with `STOREFRONT_FORWARD_CLIENT_ADDRESS` unset (ADR 0037), reached directly by
+ * A second `next start` of the same build with `STOREFRONT_FORWARD_CLIENT_ADDRESS` unset (ADR 0038), reached directly by
  * `search.e2e.ts` only, to show that it passes no client address on. Started only when the suite runs with search on.
  */
 export const E2E_STOREFRONT_UNFORWARDED_PORT = Number(

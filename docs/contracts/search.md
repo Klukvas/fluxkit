@@ -14,7 +14,7 @@ Routes, shapes and errors: `docs/api/search.md` and `docs/api/openapi.json`. Con
 | Facet kinds and levels | unreleased | `kind` in `slug`, `uuid`, `code`, `boolean`, `range`; `level` in `product` (values with `count`) and `variant` (values with `count: null`) |
 | Sort names | unreleased | `relevance`, `newest`, `price_asc`, `price_desc`. Engine sort or filter syntax is never accepted |
 | Request limits | unreleased | `q` at most 200 characters (10 words used), suggest `q` at least 2 characters and at most 6 suggestions, at most 50 `f` values and 8 keys, `limit` 1 to 48 (default 24), `(page - 1) * limit < 10000`. Raising a limit is minor, lowering one is breaking |
-| `relaxed` flag | unreleased | `true` only when the page holds products that match some, not all, words of `q` |
+| `relaxed` flag | unreleased | `true` only when the page holds products of the second pass: the complete words of `q` matched nothing, and the products match the last word as a prefix or (2 words or more) only some of the words (ADR 0037) |
 | Public data rule | unreleased | the index and every search answer hold only published, sellable products, shop-currency prices and public attributes (never internal or not-visible attributes, stock quantities, locations, other currencies) |
 | Command `pnpm search:reindex` | unreleased | rebuilds every locale's index now, swaps it in and drains the queue; exit codes `0` done, `1` failure or search off, `2` a running scheduler holds the lock (`docs/api/jobs.md`) |
 

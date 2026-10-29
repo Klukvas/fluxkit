@@ -93,7 +93,7 @@ export const storeSearchResponseSchema = z.object({
   sort: z.enum(SEARCH_SORTS),
   relaxed: z.boolean().meta({
     description:
-      "True when nothing matched every word and the results match only some of them (two or more words): show it as partial matches.",
+      "True when the complete words matched nothing and a second pass answered: the last word matched as a prefix (an unfinished word) and, with two or more words, only some of the words: show it as partial matches.",
   }),
   query: z.object({ normalized: z.string() }),
   facets: z.array(storeSearchFacetSchema),
