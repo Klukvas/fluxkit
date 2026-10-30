@@ -1,6 +1,7 @@
 import type { Page } from "@playwright/test";
 import { AdminApi } from "../support/api.ts";
 import { SPA } from "../support/env.ts";
+import { delayAnimationFrames } from "../support/late-frames.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
 
 async function fillNewUser(page: Page, email: string, password: string): Promise<void> {
@@ -94,4 +95,30 @@ test("the owner creates a manager: password policy feedback, the password never 
   await expect(
     main.getByRole("table", { name: "Admin users" }).getByRole("link", { name: email }),
   ).toHaveCount(1);
+});
+
+test("the owner creates a user: a refused form focuses its field at once, so what is typed next stays in that field (late frames)", async ({
+  page,
+  signIn,
+}, testInfo) => {
+  const u = unique(testInfo);
+  // Regression of the CI run of PR #191: a focus moved from an animation frame arrives after the test has moved on.
+  await delayAnimationFrames(page);
+  await signIn("owner");
+  await page.goto(`${SPA}/users/new`);
+  const main = page.getByRole("main");
+  await expect(page.getByRole("heading", { level: 1, name: "New admin user" })).toBeVisible();
+  await fillNewUser(page, `e2e-late-${u}@example.com`, "short");
+  await main.getByRole("button", { name: "Create user" }).click();
+  await expect(main.getByText("This value is too short.")).toBeVisible();
+  // Read once, no waiting: the first invalid field has the focus as soon as its message is shown.
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe("user-password");
+
+  // The admin goes on to the email at once and types: every key stays in the email.
+  const email = main.getByRole("textbox", { name: "Email" });
+  await email.focus();
+  await page.keyboard.type("-more", { delay: 40 });
+  await expect(email).toHaveValue(`e2e-late-${u}@example.com-more`);
+  await expect(main.getByLabel("Initial password")).toHaveValue("short");
+  await expect(email).toBeFocused();
 });

@@ -6,6 +6,7 @@ import type { MessageDescriptor } from "../../lib/problem-messages";
 import { runWrite } from "../../lib/run-write";
 import { createSingleFlight } from "../../lib/single-flight";
 import { useCrash } from "../../lib/use-crash";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { generatePassword } from "./password-generator";
@@ -56,6 +57,7 @@ export function UserCreatePage() {
   const panelRef = useRef<HTMLDivElement>(null);
   const unknownRef = useRef<HTMLDivElement>(null);
   const crash = useCrash();
+  const focusAfterCommit = useFocusAfterCommit();
   const blocker = useUnsavedChangesGuard(created === null && isCreateDirty(values) && !busy);
 
   useEffect(() => {
@@ -77,13 +79,11 @@ export function UserCreatePage() {
   ) {
     setFieldErrors(fields);
     setSummary(other);
-    requestAnimationFrame(() => {
-      if (other.length > 0) summaryRef.current?.focus();
-      else {
-        const first = FIELD_ORDER.find((field) => fields[field] !== undefined);
-        if (first !== undefined) document.getElementById(FIELD_IDS[first])?.focus();
-      }
-    });
+    if (other.length > 0) focusAfterCommit(summaryRef);
+    else {
+      const first = FIELD_ORDER.find((field) => fields[field] !== undefined);
+      if (first !== undefined) focusAfterCommit(FIELD_IDS[first]);
+    }
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {

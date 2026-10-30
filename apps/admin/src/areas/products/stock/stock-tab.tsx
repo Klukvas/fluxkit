@@ -29,6 +29,7 @@ import { formatDateTime } from "../../../lib/format";
 import type { MessageDescriptor } from "../../../lib/problem-messages";
 import { runWrite } from "../../../lib/run-write";
 import { useAdminEmails } from "../../../lib/use-admin-emails";
+import { useFocusAfterCommit } from "../../../lib/use-focus-after-commit";
 import { createSingleFlight } from "../../../lib/single-flight";
 import { useRefreshingResource } from "../../../lib/use-refreshing-resource";
 import { useResource } from "../../../lib/use-resource";
@@ -848,6 +849,7 @@ function VariantStock({
   const [reservationOffset, setReservationOffset] = useState(0);
   const flight = useRef(createSingleFlight());
   const resultRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const form = useFormSubmit(["quantity", "locationId", "reason", "reference"], (problem, status) =>
     adjustmentErrorsFromProblem(problem, status),
   );
@@ -940,7 +942,7 @@ function VariantStock({
     } else {
       setResult(await checkJournal(previousTopId));
     }
-    requestAnimationFrame(() => resultRef.current?.focus());
+    focusAfterCommit(resultRef);
   }
 
   /**

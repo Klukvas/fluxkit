@@ -2,6 +2,7 @@ import { Alert, Button, type Translator } from "@fluxkit/ui";
 import { useEffect, useRef, useState, type FormEvent, type Ref } from "react";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import type { WriteOutcome } from "../../lib/run-write";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { generatePassword } from "./password-generator";
 import { ResetPasswordDialog } from "./user-dialogs";
 import { resetErrorsFromProblem, resetFormErrors } from "./user-form";
@@ -110,6 +111,7 @@ export function ResetPasswordSection({
   const [summary, setSummary] = useState<MessageDescriptor[]>([]);
   const [confirming, setConfirming] = useState(false);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const dirty = value !== "";
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
@@ -126,7 +128,7 @@ export function ResetPasswordSection({
     setSummary([]);
     if (local.newPassword !== undefined) {
       setError(local.newPassword);
-      requestAnimationFrame(() => document.getElementById("user-new-password")?.focus());
+      focusAfterCommit("user-new-password");
       return;
     }
     setError(undefined);
@@ -143,9 +145,7 @@ export function ResetPasswordSection({
       const mapped = resetErrorsFromProblem(outcome.status, outcome.problem);
       setError(mapped.fields.newPassword);
       setSummary(mapped.other);
-      requestAnimationFrame(() => {
-        if (mapped.other.length > 0) summaryRef.current?.focus();
-      });
+      if (mapped.other.length > 0) focusAfterCommit(summaryRef);
     } else {
       setError(undefined);
       setSummary([]);

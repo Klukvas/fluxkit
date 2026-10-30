@@ -21,6 +21,7 @@ import { jsonEqual } from "../../../lib/diff-for-patch";
 import { describeProblem, type MessageDescriptor } from "../../../lib/problem-messages";
 import { runWrite } from "../../../lib/run-write";
 import { useCrash } from "../../../lib/use-crash";
+import { useFocusAfterCommit } from "../../../lib/use-focus-after-commit";
 import { useUnsavedChangesGuard } from "../../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
 import { FailureMessage } from "../../../views/status-views";
@@ -860,6 +861,7 @@ export function VariantsTab({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
   const failureRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const known = new Set(product.variants.map((variant) => variant.id));
   const orphans = problems.filter(
     (problem) =>
@@ -884,7 +886,7 @@ export function VariantsTab({
     else if (outcome.kind === "unknown") onChanged("unknown");
     else if (outcome.kind === "problem") {
       setFailure(describeProblem(outcome.status, outcome.problem));
-      requestAnimationFrame(() => failureRef.current?.focus());
+      focusAfterCommit(failureRef);
     }
   }
 

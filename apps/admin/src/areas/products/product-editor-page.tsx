@@ -9,6 +9,7 @@ import { describeProblem, type MessageDescriptor } from "../../lib/problem-messa
 import { runWrite } from "../../lib/run-write";
 import { createSingleFlight } from "../../lib/single-flight";
 import { useCrash } from "../../lib/use-crash";
+import { focusWhenPresent, useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { useSession } from "../../session/session-context";
@@ -36,8 +37,8 @@ import { LIFECYCLE_CONFIRMATION, permittedActions, type LifecycleAction } from "
 import { mapPublishProblems, type EditorTabId, type PublishProblem } from "./publish-problems";
 import type { ChangeDetail } from "./tab-props";
 
-/** Frames to wait for a problem's field to appear after its tab opened (about five seconds at 60 frames a second). */
-const FOCUS_ATTEMPTS = 300;
+/** How long to wait for a problem's field to appear after its tab opened. */
+const FOCUS_WAIT_MS = 5000;
 
 interface EditorData {
   product: AdminProduct;
@@ -96,6 +97,7 @@ function ProductEditor({ id }: { id: string }) {
   const problemsRef = useRef<HTMLDivElement>(null);
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
   const failureRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const [busy, setBusy] = useState<LifecycleAction | null>(null);
   const [flight] = useState(createSingleFlight);
   const [confirming, setConfirming] = useState<LifecycleAction | null>(null);
@@ -122,9 +124,9 @@ function ProductEditor({ id }: { id: string }) {
           ),
         );
       }
-      requestAnimationFrame(() => noticeRef.current?.focus());
+      focusAfterCommit(noticeRef);
     },
-    [reload, selected],
+    [reload, selected, focusAfterCommit],
   );
 
   const reportDirty = useCallback(
@@ -138,20 +140,7 @@ function ProductEditor({ id }: { id: string }) {
     if (pendingFocus === null || pendingFocus.tab !== selected) return undefined;
     // A tab that reads its own data (Prices, Stock) renders the target only after its read: wait for it, a few seconds
     // at most (then the problem list stays where it is).
-    let frame = 0;
-    let attempts = 0;
-    const tryFocus = () => {
-      const element = document.getElementById(pendingFocus.id);
-      attempts += 1;
-      if (element !== null || attempts > FOCUS_ATTEMPTS) {
-        element?.focus();
-        setPendingFocus(null);
-        return;
-      }
-      frame = requestAnimationFrame(tryFocus);
-    };
-    frame = requestAnimationFrame(tryFocus);
-    return () => cancelAnimationFrame(frame);
+    return focusWhenPresent(pendingFocus.id, () => setPendingFocus(null), FOCUS_WAIT_MS);
   }, [pendingFocus, selected]);
 
   const data = resource.data;
@@ -209,10 +198,10 @@ function ProductEditor({ id }: { id: string }) {
             : [];
         if (mapped.length > 0) {
           setProblems(mapped);
-          requestAnimationFrame(() => problemsRef.current?.focus());
+          focusAfterCommit(problemsRef);
         } else {
           setFailure(describeProblem(outcome.status, outcome.problem));
-          requestAnimationFrame(() => failureRef.current?.focus());
+          focusAfterCommit(failureRef);
         }
         return;
       }

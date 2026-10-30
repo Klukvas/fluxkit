@@ -283,7 +283,9 @@ export const test = base.extend<Fixtures>({
         `The admin e2e suite talks to the proxy at ${ADMIN_E2E_ORIGIN}, not to ${String(baseURL)}.`,
       );
     }
-    await use({ "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry) });
+    await use({
+      "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, testInfo.repeatEachIndex),
+    });
   },
   guard: async ({ context }, use) => {
     const guard = new Guard();
@@ -313,7 +315,12 @@ export const test = base.extend<Fixtures>({
         locale: "en-US",
         timezoneId: "UTC",
         extraHTTPHeaders: {
-          "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, `browser-${role}`),
+          "x-e2e-client": clientMarker(
+            testInfo.testId,
+            testInfo.retry,
+            testInfo.repeatEachIndex,
+            `browser-${role}`,
+          ),
         },
       });
       contexts.push(context);
@@ -332,7 +339,7 @@ export const test = base.extend<Fixtures>({
     await use(async (role) => {
       const context = await newApiContext(
         playwright,
-        clientMarker(testInfo.testId, testInfo.retry, role),
+        clientMarker(testInfo.testId, testInfo.retry, testInfo.repeatEachIndex, role),
       );
       contexts.push(context);
       return context;

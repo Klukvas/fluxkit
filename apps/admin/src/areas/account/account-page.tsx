@@ -16,6 +16,7 @@ import { adminClient } from "../../lib/api";
 import { failureFromError } from "../../lib/failure";
 import { formatDateTime } from "../../lib/format";
 import { createSingleFlight } from "../../lib/single-flight";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { fieldErrorsFromProblem } from "../../lib/form-errors";
 import { describeFailure, type MessageDescriptor } from "../../lib/problem-messages";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
@@ -184,6 +185,7 @@ export function AccountPage() {
   const [done, setDone] = useState(false);
   const [crash, setCrash] = useState<{ error: unknown } | null>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   // Two submits in one task (before React renders the busy button) send one change.
   const [flight] = useState(createSingleFlight);
   const blocker = useUnsavedChangesGuard(isPasswordFormDirty(values) && !busy);
@@ -197,13 +199,11 @@ export function AccountPage() {
   ) {
     setFieldErrors(fields);
     setSummary(other);
-    requestAnimationFrame(() => {
-      if (other.length > 0) summaryRef.current?.focus();
-      else {
-        const first = FIELDS.find((field) => fields[field.name] !== undefined);
-        if (first !== undefined) document.getElementById(`account-${first.name}`)?.focus();
-      }
-    });
+    if (other.length > 0) focusAfterCommit(summaryRef);
+    else {
+      const first = FIELDS.find((field) => fields[field.name] !== undefined);
+      if (first !== undefined) focusAfterCommit(`account-${first.name}`);
+    }
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {

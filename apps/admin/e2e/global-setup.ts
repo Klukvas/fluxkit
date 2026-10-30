@@ -17,7 +17,7 @@ import {
 export default async function globalSetup(): Promise<void> {
   const context = await request.newContext({
     baseURL: ADMIN_E2E_ORIGIN,
-    extraHTTPHeaders: { "x-e2e-client": clientMarker("global-setup", 0) },
+    extraHTTPHeaders: { "x-e2e-client": clientMarker("global-setup", 0, 0) },
   });
   try {
     const owner = await AdminApi.signIn(context, OWNER_EMAIL, OWNER_PASSWORD);

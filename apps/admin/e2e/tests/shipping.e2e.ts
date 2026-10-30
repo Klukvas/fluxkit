@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { SPA } from "../support/env.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
+import { delayAnimationFrames } from "../support/late-frames.ts";
 
 /**
  * Shipping (plan step 11). The API of this suite runs with `SHIPPING_PROVIDERS_ENABLED=fake` (the test-only carrier of the
@@ -373,6 +374,57 @@ test("waybill: only a paid order ships; create, track, print the label, cancel",
     // A cancelled waybill is not active: a new one can be created, and the order is still paid and unfulfilled.
     await expect(delivery.getByRole("textbox", { name: "Weight, g" })).toBeEnabled();
     await expect(main.getByText("Paid", { exact: true }).first()).toBeVisible();
+  } finally {
+    await owner.deactivateAllShippingMethods();
+  }
+});
+
+test("waybill: a refused form focuses its summary at once, so what is typed next stays in that field (late frames)", async ({
+  page,
+  signIn,
+  owner,
+  shopper,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const code = `late_${u}`;
+  try {
+    await owner.createShippingMethod({
+      code,
+      title: { uk: `Кур'єр ${u}`, en: `Courier ${u}` },
+      kind: "address",
+      providerCode: "fake",
+      pricing: { type: "flat", amount: 5000 },
+      countryCodes: ["UA"],
+      isActive: true,
+    });
+    const placed = await shopper.placeGuestOrderWithShipping(
+      `e2e-waybill-late-${u}@example.com`,
+      "demo-screwdriver",
+      "DEMO-SCREWDRIVER",
+      code,
+    );
+    const orderId = await owner.orderIdByNumber(placed.number);
+    await owner.markPaid(orderId, `BANK-${u}`, placed.total);
+
+    // Regression of the CI run of PR #191: a focus moved from an animation frame arrives after the test has moved on.
+    await delayAnimationFrames(page);
+    await signIn("manager");
+    await page.goto(`${SPA}/orders/${orderId}`);
+    const delivery = page.getByRole("main").getByRole("region", { name: "Delivery and shipments" });
+    const weight = delivery.getByRole("textbox", { name: "Weight, g" });
+    await expect(weight).toBeEnabled();
+    await delivery.getByRole("button", { name: "Create the waybill" }).click();
+    await expect(delivery.getByText("Fill in this field.").first()).toBeVisible();
+    // Read once, no waiting: the summary of the refusal has the focus as soon as it is shown.
+    expect(await page.evaluate(() => document.activeElement?.textContent ?? "")).toContain(
+      "Nothing was sent.",
+    );
+
+    // The admin goes on to the weight at once and types: every key stays in the weight.
+    await weight.focus();
+    await page.keyboard.type("1500", { delay: 40 });
+    await expect(weight).toHaveValue("1500");
+    await expect(weight).toBeFocused();
   } finally {
     await owner.deactivateAllShippingMethods();
   }

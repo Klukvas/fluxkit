@@ -1,4 +1,5 @@
 import { Button, Field, Input, Select, type Translator } from "@fluxkit/ui";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import type { FormIssues } from "../catalog-dictionaries/form-rules";
 import { describe } from "../catalog-dictionaries/form-parts";
 import { MAX_TIERS, PRICING_TYPES, type PricingType, type PricingValues } from "./pricing-form";
@@ -77,6 +78,7 @@ export function PricingFields({
   notice,
 }: PricingFieldsProps) {
   const addId = `${idPrefix}-add-tier`;
+  const focusAfterCommit = useFocusAfterCommit();
   const hint = t("ship.pricing.amountHint", { currency, decimals: exponent });
   const setTier = (index: number, field: "fromSubtotal" | "amount", value: string) =>
     onChange({
@@ -184,7 +186,7 @@ export function PricingFields({
                           ...values,
                           tiers: values.tiers.filter((_, position) => position !== index),
                         });
-                        requestAnimationFrame(() => document.getElementById(addId)?.focus());
+                        focusAfterCommit(addId);
                       }}
                     >
                       {t("ship.pricing.removeTier", { number: index + 1 })}
@@ -206,9 +208,7 @@ export function PricingFields({
                     ...values,
                     tiers: [...values.tiers, { fromSubtotal: "", amount: "" }],
                   });
-                  requestAnimationFrame(() =>
-                    document.getElementById(`${idPrefix}-tier-${String(next)}-from`)?.focus(),
-                  );
+                  focusAfterCommit(`${idPrefix}-tier-${String(next)}-from`);
                 }}
               >
                 {t("ship.pricing.addTier")}
