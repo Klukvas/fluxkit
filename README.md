@@ -134,6 +134,14 @@ The store rate limits (checkout, registration, login, order lookup, guest cancel
 - The same holds for the storefront when `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (ADR 0038): the search results page then passes the page request's `X-Forwarded-For` on to the API, so the storefront port must be reachable only through the edge, and the edge must set or replace that header on page requests exactly as on `/store/*`. Leave the setting off (the default) for a storefront that can be reached directly; every results page then counts as the Next server's one address.
 - IPv6 clients are counted per /64 prefix after this step too. The counters are in memory per API process (ADR 0009, ADR 0016).
 
+### Privacy: proxy logs and backups
+
+Operator guide: `docs/privacy/README.md`.
+
+- **Proxy logs.** The admin's list searches put an email into the URL (`GET /admin/orders?q=`, `GET /admin/customers?q=`, `GET /admin/email/messages?recipient=`), and the shop's search puts the shopper's terms into it (`GET /store/search?q=`). An access log that records the query string therefore stores addresses and search terms. Configure the edge proxy not to log the query string for `/admin` (log the path only; the example nginx template `infra/proxy/nginx/templates/fluxkit.conf.template` does not set this yet), and keep the access-log retention short. The privacy screens never put an address in a URL.
+- **Backups.** An erasure changes the live database only: a backup taken before it still holds the erased data until it ages out, and a restore brings it back. After a restore, erase again every subject erased since the backup; the completed erasure requests list them. There is no tool that re-applies them yet (`docs/privacy/README.md` section 4). Back up and restore as in `docs/deployment.md` (Backups).
+- **Database role.** Run the API with a database role that does not own the tables and has no `TRUNCATE` right (`docs/privacy/README.md` section 4).
+
 ### Example edge proxy: the API, the admin SPA and the storefront
 
 These examples are **not tested in this repository**: neither Caddy nor nginx is installed in the build sandbox, and no Docker daemon was running. The routing that the suites test is in the two e2e proxies: `apps/storefront/e2e/proxy.ts` (`/store/*`, `/admin/*` and `/media/*` to the API, everything else to the storefront, `X-Forwarded-For` set the same way) and `apps/admin/e2e/proxy.ts` (`/admin-ui` and `/admin-ui/*` from the built SPA with the `index.html` fallback and the headers of `apps/admin/security-headers.ts`; `/admin/*`, `/store/*` and `/media/*` to the API). Both pass the API's answers back unchanged and add no cookie; the browser e2e of uploads (`apps/admin/e2e/tests/media-upload.e2e.ts`) runs through the admin one. The `/admin-ui` blocks below follow the rules of `apps/admin/e2e/proxy.ts`. They are **untested** here: check the directives against your proxy's version before you rely on them.

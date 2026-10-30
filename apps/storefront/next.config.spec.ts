@@ -4,7 +4,7 @@ import {
   PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import config, { LEGAL_MARKER, assertNoLegalPlaceholders, loadRootEnvFile } from "./next.config.js";
@@ -183,46 +183,167 @@ describe("next.config images", () => {
 
 describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   const masterMessages = join(import.meta.dirname, "src", "messages");
+  const masterIdentity = join(import.meta.dirname, "src", "config", "legal-identity.json");
+  const placeholderTextKeys = ["legal.privacy.intro", "legal.terms.intro", "legal.cookies.intro"];
+  const filledIdentity = {
+    shopLegalName: "Example Shop Ltd",
+    shopLegalAddress: "1 Example Street, Kyiv",
+    privacyContact: "privacy@example.test",
+    lastUpdated: "2026-10-29",
+  };
 
-  it("uses the marker the legal config names, and master carries it in both languages", () => {
+  /** A scratch copy of master's messages plus an identity file, for a case that edits some of them. */
+  function scratch(
+    edit: (messages: Record<string, string>) => void,
+    identity: Record<string, unknown> = filledIdentity,
+  ) {
+    const directory = mkdtempSync(join(tmpdir(), "storefront-legal-"));
+    for (const language of ["en", "uk"]) {
+      const messages = JSON.parse(
+        readFileSync(join(masterMessages, `${language}.json`), "utf8"),
+      ) as Record<string, string>;
+      edit(messages);
+      writeFileSync(join(directory, `${language}.json`), JSON.stringify(messages));
+    }
+    const identityFile = join(directory, "legal-identity.json");
+    writeFileSync(identityFile, JSON.stringify(identity));
+    return { directory, identityFile };
+  }
+
+  function failureOf(options: { messagesDir: string; identityFile: string }): string {
+    try {
+      assertNoLegalPlaceholders({ enabled: true, ...options });
+    } catch (error) {
+      return (error as Error).message;
+    }
+    return "";
+  }
+
+  /** Master's messages with the marker taken out of every legal text (what a fork that wrote its own texts has). */
+  function withoutMarkers(messages: Record<string, string>) {
+    for (const [key, value] of Object.entries(messages)) {
+      if (key.startsWith("legal.")) messages[key] = value.replace(LEGAL_MARKER, "").trim();
+    }
+  }
+
+  it("uses the marker the legal config names, and master carries it in the intro of every legal page in both languages", () => {
     expect(LEGAL_MARKER).toBe(LEGAL_PLACEHOLDER_MARKER);
-    expect(() => assertNoLegalPlaceholders({ enabled: true, messagesDir: masterMessages })).toThrow(
-      /legal\.placeholder\.marker/,
-    );
+    const message = failureOf({ messagesDir: masterMessages, identityFile: masterIdentity });
+    for (const file of ["en.json", "uk.json"]) {
+      for (const key of placeholderTextKeys) expect(message).toContain(`${file}: ${key}`);
+    }
   });
 
   it("names the files and keys of every message that still carries the marker, and no other", () => {
-    let message = "";
-    try {
-      assertNoLegalPlaceholders({ enabled: true, messagesDir: masterMessages });
-    } catch (error) {
-      message = (error as Error).message;
-    }
-    expect(message).toContain("en.json: legal.placeholder.marker");
-    expect(message).toContain("uk.json: legal.placeholder.marker");
+    const message = failureOf({ messagesDir: masterMessages, identityFile: masterIdentity });
     expect(message).not.toContain("legal.privacy.title");
+    expect(message).not.toContain("legal.placeholder");
   });
 
-  it("does nothing while the check is off (master builds with its placeholders)", () => {
-    expect(() =>
-      assertNoLegalPlaceholders({ enabled: false, messagesDir: masterMessages }),
-    ).not.toThrow();
-    expect(() => config(PHASE_PRODUCTION_BUILD)).not.toThrow();
+  it("refuses while one legal text still carries the marker, however the placeholder box messages were edited", () => {
+    for (const key of placeholderTextKeys) {
+      const { directory, identityFile } = scratch((messages) => {
+        withoutMarkers(messages);
+        messages[key] = `${LEGAL_MARKER} ${messages[key]}`;
+        for (const box of ["legal.placeholder.title", "legal.placeholder.body"]) messages[box] = "";
+      });
+      try {
+        expect(failureOf({ messagesDir: directory, identityFile }), key).toContain(
+          `en.json: ${key}`,
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
   });
 
-  it("passes when no legal message carries the marker, and only legal messages count", () => {
-    const directory = mkdtempSync(join(tmpdir(), "storefront-legal-"));
+  it("refuses a controller identity that is unset, empty or blank, naming the field", () => {
+    for (const field of Object.keys(filledIdentity)) {
+      for (const bad of [null, "", "   "]) {
+        const { directory, identityFile } = scratch(withoutMarkers, {
+          ...filledIdentity,
+          [field]: bad,
+        });
+        try {
+          const message = failureOf({ messagesDir: directory, identityFile });
+          expect(message, `${field}=${JSON.stringify(bad)}`).toContain(field);
+          expect(message).not.toContain("en.json");
+        } finally {
+          rmSync(directory, { recursive: true, force: true });
+        }
+      }
+    }
+  });
+
+  it("refuses an identity file that lacks a field", () => {
+    const { directory, identityFile } = scratch(withoutMarkers, {});
     try {
-      writeFileSync(
-        join(directory, "en.json"),
-        JSON.stringify({ "legal.privacy.title": "Privacy", "site.note": `x ${LEGAL_MARKER} y` }),
-      );
+      const message = failureOf({ messagesDir: directory, identityFile });
+      for (const field of Object.keys(filledIdentity)) expect(message).toContain(field);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses master's own identity file, where every field is unset", () => {
+    const { directory } = scratch(withoutMarkers);
+    try {
+      const message = failureOf({ messagesDir: directory, identityFile: masterIdentity });
+      for (const field of Object.keys(filledIdentity)) expect(message).toContain(field);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed when the identity file cannot be read", () => {
+    const { directory } = scratch(withoutMarkers);
+    try {
       expect(() =>
-        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory }),
+        assertNoLegalPlaceholders({
+          enabled: true,
+          messagesDir: directory,
+          identityFile: join(directory, "missing.json"),
+        }),
+      ).toThrow(/identity/);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("passes for a fully filled-in set: no marker in any legal text and a complete identity", () => {
+    const { directory, identityFile } = scratch(withoutMarkers);
+    try {
+      expect(() =>
+        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory, identityFile }),
       ).not.toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+
+  it("looks only at legal messages for the marker", () => {
+    const { directory, identityFile } = scratch((messages) => {
+      withoutMarkers(messages);
+      messages["site.note"] = `x ${LEGAL_MARKER} y`;
+    });
+    try {
+      expect(() =>
+        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory, identityFile }),
+      ).not.toThrow();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("does nothing while the check is off (master builds with its placeholders)", () => {
+    expect(() =>
+      assertNoLegalPlaceholders({
+        enabled: false,
+        messagesDir: masterMessages,
+        identityFile: masterIdentity,
+      }),
+    ).not.toThrow();
+    expect(() => config(PHASE_PRODUCTION_BUILD)).not.toThrow();
   });
 
   it("fails closed when asked to check and the messages cannot be read", () => {

@@ -148,9 +148,11 @@ export function RequestNoticeView({ t, notice }: { t: Translator; notice: Reques
           <p>
             {t("personal.notice.exported", {
               file: notice.file,
-              orders: notice.orders,
-              mail: notice.mail,
-              sessions: notice.sessions,
+              counts: [
+                t.plural("personal.notice.exportedOrders", notice.orders),
+                t.plural("personal.notice.exportedMail", notice.mail),
+                t.plural("personal.notice.exportedSessions", notice.sessions),
+              ].join(", "),
             })}
           </p>
           <p className="mt-1">{t("personal.notice.exportedCare")}</p>
@@ -162,7 +164,8 @@ export function RequestNoticeView({ t, notice }: { t: Translator; notice: Reques
           <p>{t("personal.notice.erased")}</p>
           {notice.orders === null || notice.mail === null ? null : (
             <p className="mt-1">
-              {t("personal.notice.erasedCounts", { orders: notice.orders, mail: notice.mail })}
+              {t.plural("personal.notice.erasedOrders", notice.orders)}{" "}
+              {t.plural("personal.notice.erasedMail", notice.mail)}
             </p>
           )}
           {notice.accountDeleted === null ? null : (

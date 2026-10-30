@@ -15,7 +15,7 @@ Nothing here is legal advice. TODO(fluxkit): legal review of this guide, the ret
 | Staff accounts: email, role, sign-in details | PostgreSQL (`admin_user`) | owner only (Admin users) |
 | Privacy requests and the audit log: ids, codes and counts, never contact data | PostgreSQL (`privacy_request`, `admin_audit_event`) | owner only (Personal data, Audit log) |
 
-The exact list of every column, with its class and what an export and an erasure do with it, is code: `apps/api/src/privacy/inventory/`. A new column fails CI until someone classifies it. Redis and Meilisearch hold no personal data today.
+The exact list of every column, with its class and what an export and an erasure do with it, is code: `apps/api/src/privacy/inventory/`, and `docs/privacy/data-inventory.md` is generated from it (a spec fails when they differ). A new column fails CI until someone classifies it. Redis and Meilisearch hold no personal data today.
 
 Outside the database: the mail provider, the carrier and the payment provider receive part of the data when you enable them (section 6). Server logs and the edge proxy's access logs are the host's.
 
@@ -56,11 +56,13 @@ What the screens say after an action is only what the server confirmed. If the c
 
 ## 5. Cookies and the legal pages
 
-The shop sets only the cookies it needs for the cart and for signing in, all first-party and `HttpOnly`: `fluxkit_cart` and `fluxkit_customer_session` for shoppers (and `fluxkit_admin_session` for staff). The storefront itself sets none, loads no third-party script and has no cookie banner; a guard fails CI if the API sets another cookie or the storefront touches `document.cookie`. The cookie page (`/{locale}/legal/cookies`) lists them from one table in `apps/storefront/src/config/legal.ts`. TODO(fluxkit): legal review of the no-banner reading.
+The shop sets only the cookies it needs for the cart and for signing in, all first-party and `HttpOnly`: `fluxkit_cart` and `fluxkit_customer_session` for shoppers (and `fluxkit_admin_session` for staff). The storefront itself sets none, loads no third-party script and has no cookie banner; a guard fails CI if the API sets another cookie (`apps/api/src/privacy/inventory/source-guards.spec.ts`, the whole API tree) or any non-spec file under `apps/storefront/src` writes `document.cookie` or uses the Cookie Store API (`apps/storefront/src/source-guards.spec.ts`). Server-side cookies set by a storefront route handler are not scanned for; the storefront has none. The cookie page (`/{locale}/legal/cookies`) lists them from one table in `apps/storefront/src/config/legal.ts`. TODO(fluxkit): legal review of the no-banner reading.
 
-The privacy notice, the terms and the cookie statement are **placeholders** that say the shop must supply its own text (marker `TODO(fluxkit): replace with the shop's own legal text`). To publish: put your texts in the `legal.*` messages (both languages), fill the controller identity and the last-updated day in `apps/storefront/src/config/legal.ts`, and build the storefront with `STOREFRONT_REQUIRE_LEGAL_TEXT=true`, which refuses the build while any `legal.*` message still carries the marker.
+The privacy notice, the terms and the cookie statement are **placeholders** that say the shop must supply its own text (marker `TODO(fluxkit): replace with the shop's own legal text`). The marker starts the intro text of every legal page (privacy, terms, cookies) in both languages, and the "Template placeholder" box on a page shows only while that page's intro carries it. To publish: put your texts in the `legal.*` messages (both languages, replacing the whole intro so the marker is gone), fill the controller identity and the last-updated day in `apps/storefront/src/config/legal-identity.json`, and build the storefront with `STOREFRONT_REQUIRE_LEGAL_TEXT=true`, which refuses the build while any `legal.*` message still carries the marker or any identity value (name, address, contact, last-updated day) is `null`, empty or blank.
 
 ## 6. Processors (placeholders)
+
+The detailed table (what data goes where, the code paths, the transfer questions) is `docs/privacy/processors.md`; a record of processing template is `docs/privacy/ropa-template.md` and a breach procedure skeleton is `docs/privacy/breach-procedure.md`.
 
 Fill this in with the owner's lawyer. Every cell marked UNKNOWN is unknown to the template.
 

@@ -113,6 +113,8 @@ export function OrderDetailsView({
       : [["order.totals.tax", money(order.taxTotal)] as [string, string]]),
   ];
   const point = order.shipping?.destination ?? null;
+  // The four contact fields are null together once the contact data was erased (retention or a privacy request).
+  const contactErased = order.contact.email === null;
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-foreground">
@@ -325,14 +327,20 @@ export function OrderDetailsView({
         <h2 id="order-contact-heading" className="text-xl font-semibold text-foreground">
           {t("order.contact.title")}
         </h2>
-        <p className="text-foreground">
-          {order.contact.firstName} {order.contact.lastName}
-        </p>
-        <p className="break-all text-foreground">{order.contact.email}</p>
-        <p className="text-foreground">{order.contact.phone}</p>
+        {contactErased ? (
+          <p className="text-muted-foreground">{t("order.contact.erased")}</p>
+        ) : (
+          <>
+            <p className="text-foreground">
+              {order.contact.firstName} {order.contact.lastName}
+            </p>
+            <p className="break-all text-foreground">{order.contact.email}</p>
+            <p className="text-foreground">{order.contact.phone}</p>
+          </>
+        )}
       </section>
 
-      {order.shippingAddress === null || point !== null ? null : (
+      {order.shippingAddress === null || point !== null || contactErased ? null : (
         <section aria-labelledby="order-address-heading" className="flex flex-col gap-2">
           <h2 id="order-address-heading" className="text-xl font-semibold text-foreground">
             {t("order.address.title")}

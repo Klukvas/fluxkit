@@ -9,12 +9,12 @@ import { createSingleFlight } from "../../lib/single-flight";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback } from "../../views/status-views";
+import { attemptErase } from "./erase-flow";
 import { browserDownloadEnvironment, downloadBlob } from "./export-download";
 import { describePrivacyProblem, readErasureReasons } from "./privacy-errors";
 import { ErrorBox, PrivacyFrame, StatusLine, linkClass } from "./privacy-frame";
 import { useCanManagePrivacy } from "./privacy-permissions";
 import {
-  confirmationMatches,
   eraseNotice,
   exportBlob,
   exportBody,
@@ -181,20 +181,23 @@ function RequestDetail({ id }: { id: string }) {
   }
 
   async function confirmErase() {
-    // The typed word is checked before anything is sent: a dialog without it never reaches the API.
-    if (!confirmationMatches(typed, t("personal.erase.word"))) {
+    // The typed word is checked before anything is sent (`erase-flow.ts`): a dialog without it never reaches the API.
+    const attempt = await attemptErase({
+      typed,
+      expectedWord: t("personal.erase.word"),
+      buildBody: bodyOrComplain,
+      send: (body) => send(() => adminClient.erasePrivacyRequest(id, { ...body, confirm: true })),
+    });
+    if (attempt.kind === "word_mismatch") {
       setTypedError({ key: "personal.erase.typedMismatch" });
       return;
     }
     setTypedError(null);
-    const body = bodyOrComplain();
-    if (body === null) {
+    if (attempt.kind === "no_body") {
       setAsking(null);
       return;
     }
-    const outcome = await send(() =>
-      adminClient.erasePrivacyRequest(id, { ...body, confirm: true }),
-    );
+    const outcome = attempt.outcome;
     if (outcome === null || outcome.kind === "aborted") return;
     if (outcome.kind === "problem") {
       // The dialog stays open with the reason (and the blockers); the request is read again.

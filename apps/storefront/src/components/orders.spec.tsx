@@ -123,6 +123,30 @@ describe("OrderDetailsView", () => {
     }
   });
 
+  it("says once that the contact data was removed, and shows no empty lines or address, for an erased order (privacy UI review F2)", () => {
+    const erased = anOrder({
+      contact: { email: null, phone: null, firstName: null, lastName: null },
+    });
+    const html = renderToStaticMarkup(details(erased));
+    expect(html.match(/§order\.contact\.erased/g)).toHaveLength(1);
+    expect(html).toContain("§order.contact.title");
+    expect(html).not.toContain("§order.address.title");
+    expect(html).not.toMatch(/<p[^>]*>\s*<\/p>/);
+    expect(html).not.toMatch(/<p[^>]*>\s+<\/p>/);
+    // The same view with its contact intact shows the three lines and no such message.
+    const intact = renderToStaticMarkup(details(anOrder()));
+    expect(intact).not.toContain("§order.contact.erased");
+    expect(intact).toContain("§email");
+    expect(intact).toContain("§order.address.title");
+    // Real messages exist in both languages and read as a sentence.
+    for (const [locale, messages] of [
+      ["uk", uk],
+      ["en", en],
+    ] as const) {
+      expect((messages as Record<string, string>)["order.contact.erased"], locale).toBeTruthy();
+    }
+  });
+
   it("shows the API's totals, never a sum of the lines, and hides zero shipping, discount and tax", () => {
     const html = renderToStaticMarkup(details(anOrder()));
     expect(html).toContain(formatMoney({ amount: 5555, currency: "UAH" }, 2, "uk"));
