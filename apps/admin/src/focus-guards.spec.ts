@@ -16,7 +16,7 @@ const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*
 /**
  * Files that may still move the focus from an animation frame callback. Empty on purpose: a focus deferred to the next
  * frame lands after whatever the admin (or a test) did in the meantime, e.g. after the next field was focused, so the
- * typed text went into the wrong field (CI run of PR #191). Use `useFocusAfterCommit` (`src/lib/use-focus-after-commit.ts`).
+ * typed text went into the wrong field (CI run of PR 191). Use `useFocusAfterCommit` (`src/lib/use-focus-after-commit.ts`).
  */
 const ALLOWED: readonly string[] = [];
 

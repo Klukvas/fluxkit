@@ -20,7 +20,7 @@ function resolve(target: FocusTarget): HTMLElement | null {
  *
  * Why not `requestAnimationFrame(() => el.focus())`: the frame can come late (a loaded machine, a CI runner). A late frame
  * focuses its element after the admin, or a test, has already moved on to the next field, so what is typed there lands in
- * the wrong field (CI run of PR #191: "50.50Damaged in transit" in the amount). `src/focus-guards.spec.ts` forbids it.
+ * the wrong field (CI run of PR 191: "50.50Damaged in transit" in the amount). `src/focus-guards.spec.ts` forbids it.
  *
  * The target is read in the commit (a ref's current value, an id looked up then), so it may be rendered by the same update.
  * A target that is not in the page is ignored. The function is stable, so it can be a dependency of other callbacks.
