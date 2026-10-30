@@ -140,6 +140,11 @@ Also added to `apps/admin`, no new external package: `vitest` 5.0.4 (dev, same p
 Found by `scripts/check-licenses.mjs` (plan step 8): `argparse` is a RUNTIME transitive dependency (`@nestjs/swagger` -> `js-yaml` -> `argparse`). Approved by the owner for this package only
 (permissive PSF-style license; notice goes into `THIRD_PARTY_NOTICES.md`). Machine-readable policy: `scripts/license-policy.json`.
 
+## Decision 2026-10-30: PSF-2.0 for `argparse` 3.x at runtime
+`@nestjs/swagger` 12.0.4 resolves `argparse@3.0.4` (still `@nestjs/swagger` -> `js-yaml` -> `argparse`, runtime), published under the SPDX id `PSF-2.0` (Python Software Foundation License 2.0) instead of the `Python-2.0` approved on 2026-10-14.
+Approved by the owner on 2026-10-30 for this package only (permissive; the notice goes into `THIRD_PARTY_NOTICES.md`). Machine-readable policy: `scripts/license-policy.json`. The `Python-2.0` exception stays for argparse 2.x (devDependency of eslint).
+`AGENTS.md` section 16 should get the matching line (owner edit): "PSF-2.0 for `argparse` (runtime transitive of `@nestjs/swagger` -> `js-yaml`), approved 2026-10-30".
+
 ## Audit (2026-10-14)
 `pnpm audit`: 1 moderate finding, `esbuild <=0.24.2` (dev server request exposure) via `drizzle-kit` -> `@esbuild-kit/*` (dev tooling only, not shipped). CI fails only on high severity in production dependencies
 and reports the rest.

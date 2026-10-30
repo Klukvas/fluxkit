@@ -3,6 +3,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Allow the `PSF-2.0` license for the runtime package `argparse` (3.x, transitive of `@nestjs/swagger`), owner-approved 2026-10-30 (`scripts/license-policy.json`, `docs/dependencies.md`); unblocks the `@nestjs/swagger` 12.0.4 bump.
 - Add unit specs that close the privacy UI review's surviving mutations (privacy UI review F5; no API, schema, dependency or contract change): the admin erase gate moved to `areas/privacy/erase-flow.ts` and the shell's permission gate to `layout/route-gate.ts` so their direction is unit tested (a WRONG typed word sends nothing, the right one sends once; a route without the permission is not opened); the storefront deletion form's word check is covered in `lib/delete-account.spec.ts`.
 - Fix the plural forms of the admin personal-data notices (privacy UI review F4; no API, schema, dependency or contract change): "downloaded: 1 order, 0 mails, 0 sessions" and the erasure counts use `t.plural` (uk one/few/many/other, en one/other) instead of "1 orders"; the admin e2e expects the new sentences.
 - Fix the storefront account deletion form and its claims (privacy UI review F3, F5; no API, schema, dependency or contract change): the password is now cleared after every failed answer and after a lost answer (it stayed after a blocked or rate-limited answer), the flow moved to `lib/delete-account.ts` with unit tests (typed word polarity, one call, every branch), and a guard fails when any storefront source file writes `document.cookie`.
