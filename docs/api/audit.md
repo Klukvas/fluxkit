@@ -16,12 +16,13 @@ There is no write route: events are written by the services they audit, in the s
 |---|---|---|---|
 | `customer.deactivated`, `customer.activated` | `PATCH /admin/customers/{id}` (every successful call, by the value sent) | `customer` | `{}` |
 | `customer.unlocked` | `POST /admin/customers/{id}/unlock` | `customer` | `{}` |
-| `admin_user.created` | `POST /admin/users` | `admin_user` | `{role}` |
+| `admin_user.created` | `POST /admin/users`; `pnpm admin:create` (no acting admin: `adminUserId` is `null`) | `admin_user` | `{role}`; from the command `{role, source: "cli"}` |
 | `admin_user.role_changed` | `PATCH /admin/users/{id}` when the role really changes | `admin_user` | `{fromRole, toRole}` |
 | `admin_user.deactivated` | `PATCH /admin/users/{id}` when an active user is deactivated | `admin_user` | `{}` |
+| `admin_user.activated` | `PATCH /admin/users/{id}` when an inactive user is activated (an already active user records nothing) | `admin_user` | `{}` |
 | `admin_user.password_reset` | `POST /admin/users/{id}/reset-password` | `admin_user` | `{}` |
 | `privacy.lookup`, `privacy.exported`, `privacy.erased`, `privacy.request_changed` | the privacy routes (`docs/api/privacy.md`, later steps) | `privacy_request` or `customer` | codes and counts |
 
 - `detail` holds codes, counts, flags and lists of codes only (core `buildAdminAuditEvent`, at most 2 KiB); never an email, name, phone, address or free text. An audit row therefore survives the erasure of the person it is about.
-- `adminUserId` is the signed-in admin; `null` once that admin user is deleted (the foreign key's SET NULL). The table is append-only (trigger in migration 0009); rows older than 365 days may be purged (job 12, privacy plan step 8).
-- Not audited (recorded gaps): reads of customer or order details (ADR 0033 decision 9), re-activating an admin user (no action in the core list), the command-line tools `pnpm admin:create` and `pnpm admin:unlock` (no signed-in admin), and order, shipment, payment and stock writes (they have their own journals with the acting admin).
+- `adminUserId` is the signed-in admin; `null` once that admin user is deleted (the foreign key's SET NULL), and for `pnpm admin:create` (`detail.source` is `cli`). The table is append-only (row trigger in migration 0009; `TRUNCATE` refused by a statement trigger since migration 0011); rows older than 365 days may be purged (job 12, privacy plan step 8).
+- Not audited (recorded gaps): reads of customer or order details (ADR 0033 decision 9), the command-line tool `pnpm admin:unlock` (the core list has no action for unlocking an admin user; only `admin_user.activated` was approved for migration 0011), and order, shipment, payment and stock writes (they have their own journals with the acting admin).

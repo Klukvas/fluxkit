@@ -4,6 +4,9 @@ import { ROLES, isAdminRole, validateEmail, type AdminRole } from "@fluxkit/core
 import { AppModule } from "../app.module.js";
 import { findPostgresError } from "../common/postgres-errors.js";
 import { ProblemException } from "../common/problem.js";
+import { withTransaction } from "../common/transaction.js";
+import { DRIZZLE, type Database } from "../database/database.module.js";
+import { AdminAuditWriter } from "../privacy/audit/admin-audit.writer.js";
 import { AdminUserRepository } from "./admin-user.repository.js";
 import { PasswordHasher, type ScryptParams } from "./password-hasher.js";
 import { passwordPolicyErrors } from "./password-policy-errors.js";
@@ -185,9 +188,10 @@ export interface RunCreateAdminOptions {
 }
 
 /**
- * Creates one admin user. Everything that can be checked without the database is checked first, so bad input
- * never opens a connection. Never updates or deletes: an existing email is refused. The password and the hash
- * are never printed; unexpected errors are redacted before they leave this function.
+ * Creates one admin user and its `admin_user.created` audit event in one transaction. Everything that can be checked
+ * without the database is checked first, so bad input never opens a connection. Never updates or deletes: an existing
+ * email is refused. The password and the hash are never printed; unexpected errors are redacted before they leave this
+ * function.
  */
 export async function runCreateAdminCommand(
   argv: readonly string[],
@@ -220,6 +224,8 @@ export async function runCreateAdminCommand(
     try {
       const users = app.get(AdminUserRepository, { strict: false });
       const hasher = app.get(PasswordHasher, { strict: false });
+      const audit = app.get(AdminAuditWriter, { strict: false });
+      const database = app.get<Database>(DRIZZLE, { strict: false });
       const alreadyExists = new CreateAdminUsageError(
         `A user with the email ${email} already exists. This command never changes existing users.`,
       );
@@ -229,7 +235,18 @@ export async function runCreateAdminCommand(
       const passwordHash = await hasher.hash(password);
       secrets.push(passwordHash);
       try {
-        const row = await users.insert({ email, passwordHash, role });
+        // The audit event commits with the user or not at all. There is no acting admin (the operator runs this on the
+        // server), so the actor is NULL and `source: cli` says where the change came from (ADR 0033 decision 9).
+        const row = await withTransaction(database, async (transaction) => {
+          const inserted = await users.insert({ email, passwordHash, role }, transaction);
+          await audit.record(transaction, null, {
+            action: "admin_user.created",
+            targetKind: "admin_user",
+            targetId: inserted.id,
+            detail: { role: inserted.role, source: "cli" },
+          });
+          return inserted;
+        });
         return { id: row.id, email: row.email, role };
       } catch (error) {
         // Another process created the same email between the check and the insert.

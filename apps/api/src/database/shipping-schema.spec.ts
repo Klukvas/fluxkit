@@ -1251,7 +1251,7 @@ describe("shipping schema (migration 0006, real Postgres)", () => {
       const result = await client.query<{ table: string; name: string; definition: string }>(
         `select c.relname as "table", t.tgname as name, pg_get_triggerdef(t.oid) as definition
          from pg_trigger t join pg_class c on c.oid = t.tgrelid
-         where not t.tgisinternal and c.relname = any($1) order by c.relname`,
+         where not t.tgisinternal and c.relname = any($1) order by c.relname, t.tgname`,
         [
           [
             "shipping_method",
@@ -1264,11 +1264,19 @@ describe("shipping schema (migration 0006, real Postgres)", () => {
       );
       expect(result.rows.map((row) => [row.table, row.name])).toEqual([
         ["order_shipping", "order_shipping_immutable"],
+        ["order_shipping", "order_shipping_no_truncate"],
         ["shipment_status_change", "shipment_status_change_append_only"],
+        ["shipment_status_change", "shipment_status_change_no_truncate"],
       ]);
       for (const row of result.rows) {
-        expect(row.definition).toContain("BEFORE DELETE OR UPDATE");
-        expect(row.definition).toContain("FOR EACH ROW");
+        // Migration 0011 adds a statement-level BEFORE TRUNCATE trigger to each append-only table.
+        if (row.name.endsWith("_no_truncate")) {
+          expect(row.definition).toContain("BEFORE TRUNCATE");
+          expect(row.definition).toContain("FOR EACH STATEMENT");
+        } else {
+          expect(row.definition).toContain("BEFORE DELETE OR UPDATE");
+          expect(row.definition).toContain("FOR EACH ROW");
+        }
       }
     });
 

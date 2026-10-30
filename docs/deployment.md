@@ -104,6 +104,36 @@ The edge offers TLS 1.2 and 1.3, sends `Strict-Transport-Security: max-age=31536
 
 `infra/proxy/caddy/Caddyfile`: the same routes and headers, automatic HTTPS. Run the official `caddy:2.10-alpine` image with ports 80 and 443, the file at `/etc/caddy/Caddyfile`, a volume for `/data` (certificates), `apps/admin/dist` at `/srv/fluxkit/site/admin-ui` (build it with `pnpm --filter @fluxkit/admin build`, or copy it out of the edge image from `/srv/fluxkit/site/admin-ui`), and `FLUXKIT_DOMAIN`, `FLUXKIT_ADMIN_IMG_SRC` (written by hand: `" https://<host>"` per image host) in its environment. It is not wired into the Compose example and was not run with the real API or storefront (see the table above). Caddy replaces a client's `X-Forwarded-For` for the API and the storefront alike (`trusted_proxies` is a server option, so a CDN set-up changes both paths at once); do not configure it for the single-edge set-up. A missing hashed asset is a 404 without the immutable header (checked with the `file` matcher).
 
+## Database roles
+
+The example connects the `migrate` and `api` containers as `POSTGRES_USER`, the role that owns every table. Recommended for a live shop: keep that owner role for migrations only and run the API (and `run-once`, `admin:create`, `admin:unlock`) as a second role that owns nothing (privacy plan risk R11).
+
+- Why: the append-only audit log and journals (`admin_audit_event`, `stock_movement`, `order_item`, `order_adjustment`, `order_status_change`, `order_shipping`, `shipment_status_change`, `payment_event`) are guarded by triggers. Migration `0011` added a `BEFORE TRUNCATE` trigger to each, so `TRUNCATE` (also through `CASCADE`) is refused for every role. A table OWNER can still `ALTER TABLE ... DISABLE TRIGGER` or `DROP TABLE`, and a superuser can do anything; a role without ownership cannot.
+- Migrations run as the owner role (the `migrate` container keeps `DATABASE_URL` with `POSTGRES_USER`). A migration that adds a table gets the grants below automatically through the default privileges.
+- The API needs only `SELECT, INSERT, UPDATE, DELETE` on the tables and `USAGE, SELECT` on the sequences. Foreign key actions (`SET NULL`, `CASCADE`) run with the table owner's rights, so the application role needs nothing extra for them.
+
+Create the role once, as the owner role, after the first `migrate` run (`docker compose ... exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1`); replace `<owner>` with `POSTGRES_USER` and choose the password with `openssl rand -hex 32`:
+
+```sql
+CREATE ROLE fluxkit_app LOGIN PASSWORD '<hex password>' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+GRANT CONNECT ON DATABASE "<POSTGRES_DB>" TO fluxkit_app;
+GRANT USAGE ON SCHEMA public TO fluxkit_app;
+REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fluxkit_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO fluxkit_app;
+-- Tables and sequences of later migrations (created by the owner role) get the same rights.
+ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fluxkit_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO fluxkit_app;
+-- Never TRUNCATE, TRIGGER or REFERENCES for the application (the GRANT above gives none of them; this documents it).
+REVOKE TRUNCATE, TRIGGER, REFERENCES ON ALL TABLES IN SCHEMA public FROM fluxkit_app;
+```
+
+Optional hardening of the journals (the application never updates them, and deletes only audit events older than 365 days in job 12; a client statement is refused by the triggers anyway): `REVOKE UPDATE, DELETE ON stock_movement, order_item, order_adjustment, order_status_change, order_shipping, shipment_status_change, payment_event FROM fluxkit_app; REVOKE UPDATE ON admin_audit_event FROM fluxkit_app;`. Not run against the full test suite: check it in staging before production.
+
+Then give the `api` container its own `DATABASE_URL` with `fluxkit_app` (an override of the `api` service's `environment` in `infra/docker-compose.prod.yml`), keep `POSTGRES_PASSWORD` for `postgres` and `migrate` only, and keep the owner password out of the API's environment. The example Compose file does not do this split yet: it is a manual step.
+
+What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 16, the grants above plus the optional hardening): the role reads and writes the shop tables, uses the search sequence, inserts an audit event, writes into a table created later by the owner (default privileges), and deleting an admin user still sets `admin_audit_event.admin_user_id` to NULL; it is refused `TRUNCATE` (journal and mutable table), `ALTER TABLE ... DISABLE TRIGGER`, `DROP TABLE`, `UPDATE` of an audit event, `CREATE TABLE` and `SET session_replication_role`. The API, the jobs and the e2e suites were not run under this role.
+
 ## Updates and migrations
 
 1. Back up (next section). Migrations are forward only; a rollback is manual.
@@ -133,6 +163,7 @@ The edge offers TLS 1.2 and 1.3, sends `Strict-Transport-Security: max-age=31536
 - [ ] `TRUST_PROXY` equals the number of proxies in front of the API; from two different networks a limited route (for example the admin login) is counted separately.
 - [ ] Exactly one `api` container; `SCHEDULER_ENABLED=true` there (or a cron running `run-once`).
 - [ ] First owner created; `pnpm seed` NOT run; demo methods or products not present.
+- [ ] The API runs as a database role that owns no table and has no `TRUNCATE` (Database roles); the owner role's password is not in the API's environment.
 - [ ] `EMAIL_PROVIDER`, `PAYMENT_PROVIDERS_ENABLED` and `SHIPPING_PROVIDERS_ENABLED` decided (the fakes are refused in production); for Monobank the webhook URL `https://<domain>/webhooks/payments/monobank` reachable from the internet.
 - [ ] `STOREFRONT_IMAGE_HOSTS` set before the storefront image was built; an uploaded image shows in the storefront (hairpin works).
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.

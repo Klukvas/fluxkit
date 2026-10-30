@@ -721,6 +721,28 @@ describe("payments: admin routes (real Postgres)", () => {
       expect(open.body.items.map((item) => item.payment.id)).not.toContain(second.paymentId);
     });
 
+    it("pages through attempts of the same instant by id: a cursor inside the tie loses and repeats nothing", async () => {
+      world.clock.advanceMinutes(1);
+      // Same clock instant for all three, so only the id orders them (the `(created_at, id)` keyset of migration 0011).
+      const tied = [await mismatch(), await mismatch(), await mismatch()].map(
+        (made) => made.paymentId,
+      );
+      const seen: string[] = [];
+      let cursor: string | null = "";
+      while (cursor !== null) {
+        const page: { status: number; body: AdminPaymentPage } = await http<AdminPaymentPage>(
+          world.orders.owner.baseUrl,
+          "GET",
+          `/admin/payments?needsAttention=true&limit=1${cursor === "" ? "" : `&cursor=${encodeURIComponent(cursor)}`}`,
+        );
+        expect(page.status).toBe(200);
+        seen.push(...page.body.items.map((item) => item.payment.id));
+        cursor = page.body.nextCursor;
+      }
+      expect(new Set(seen).size).toBe(seen.length);
+      expect(seen.filter((id) => tied.includes(id))).toEqual([...tied].sort().reverse());
+    });
+
     it("refuses a misspelt filter, a damaged cursor and an unknown payment", async () => {
       const get = (query: string) =>
         http<Problem>(world.orders.owner.baseUrl, "GET", `/admin/payments${query}`);

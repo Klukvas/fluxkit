@@ -92,6 +92,7 @@ describe("pricing and inventory schema (real Postgres)", () => {
       await pool.query(`drop table if exists "${name}"`);
     }
     await pool.query('drop sequence if exists "search_sync_seq"');
+    await pool.query('drop function if exists "append_only_refuse_truncate"()');
     await pool.query('drop function if exists "admin_audit_event_append_only"()');
     await pool.query('drop function if exists "payment_event_append_only"()');
     await pool.query('drop function if exists "shipment_status_change_append_only"()');

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { and, asc, desc, eq, gt, inArray, isNotNull, like, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, like, lte, or, sql } from "drizzle-orm";
 import type { DbExecutor, Transaction } from "../../common/transaction.js";
 import {
   domainEvent,
@@ -256,7 +256,9 @@ export class PaymentsRepository {
 
   /**
    * The admin payment list, newest first, keyset paged by `(created_at, id)`; `needsAttention` filters the open attention
-   * items. No index serves the attention filter yet (plan step 3 (h)): the payment table is read in creation order.
+   * items. Migration 0011 indexes both shapes: `payment_attention_created_at_id_idx` (partial, open items) and
+   * `payment_created_at_id_idx`. The keyset is a row comparison so that the index seeks to the cursor; the equivalent
+   * `created_at < t OR (created_at = t AND id < i)` is not an index condition and reads every row before the cursor.
    */
   async listPage(
     db: DbExecutor,
@@ -275,10 +277,7 @@ export class PaymentsRepository {
             : eq(payment.needsAttention, filter.needsAttention),
           after === undefined
             ? undefined
-            : or(
-                lt(payment.createdAt, after.createdAt),
-                and(eq(payment.createdAt, after.createdAt), lt(payment.id, after.id)),
-              ),
+            : sql`(${payment.createdAt}, ${payment.id}) < (${after.createdAt.toISOString()}::timestamptz, ${after.id}::uuid)`,
         ),
       )
       .orderBy(desc(payment.createdAt), desc(payment.id))

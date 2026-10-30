@@ -18,6 +18,7 @@ describe("the admin audit action list (ADR 0033 decision 9)", () => {
       "admin_user.created",
       "admin_user.role_changed",
       "admin_user.deactivated",
+      "admin_user.activated",
       "admin_user.password_reset",
       "privacy.lookup",
       "privacy.exported",

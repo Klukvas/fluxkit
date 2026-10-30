@@ -61,7 +61,8 @@ export const auditEventSchema = z.object({
   id: uuidSchema,
   createdAt: timestampSchema,
   adminUserId: uuidSchema.nullable().meta({
-    description: "The acting admin; null once that admin user was deleted.",
+    description:
+      "The acting admin; null once that admin user was deleted, and for `pnpm admin:create` (no acting admin; `detail.source` is `cli`).",
   }),
   action: z.enum(ADMIN_AUDIT_ACTIONS),
   targetKind: z.enum(ADMIN_AUDIT_TARGET_KINDS),

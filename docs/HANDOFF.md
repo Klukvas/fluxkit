@@ -3,11 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0040, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-10-30, `origin/main` at `b120a02`.
+Last updated: 2026-10-30, `origin/main` at `b456bca`.
 
 ## 1. Current state
 
-Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Drizzle/Postgres, Meilisearch, Redis/BullMQ, Next.js storefront, React/Vite admin SPA served under `/admin-ui/`. Migrations `0001` to `0010`. Quick start: `README.md`.
+Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Drizzle/Postgres, Meilisearch, Redis/BullMQ, Next.js storefront, React/Vite admin SPA served under `/admin-ui/`. Migrations `0001` to `0011`. Quick start: `README.md`.
 
 - **Core commerce (complete):** catalog (ADR 0006), auth and roles, pricing and inventory, cart, checkout, orders, customers, scheduler jobs 1 to 14 (`docs/api/jobs.md`). Review follow-ups: `docs/plans/2026-10-16-catalog-review-findings.md`, `docs/plans/2026-10-18-cart-orders-review-fixes.md`.
 - **Storefront v1 and Admin UI v1 (complete):** storefront catalog, cart, accounts, checkout, payment and emailed-link pages, "Your data", legal placeholders, search and facets; admin catalog, prices and stock, orders, customers, users, media (ADR 0028), Shipping, Email, Payments, Personal data, Audit log and Search areas. Playwright e2e in both.
@@ -38,20 +38,19 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 
 Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contracts, lawyers).
 
-**AGENTS.md edits (everything merged so far; sources: plans, `CHANGELOG.md`):**
-- Section 1, root scripts: `pnpm test:e2e`, `pnpm jobs:run-once`, `pnpm check:env`, `pnpm search:reindex`. Tooling line: Playwright is set up for storefront and admin, no longer "planned".
-- Section 1, configuration: `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`, `ORDER_TOKEN_SECRET`, `MAX_OPEN_ORDERS`, `TRUST_PROXY`, `ADMIN_DEV_API_URL`; e2e-only `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`, `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`; `SHIPPING_PROVIDERS_ENABLED`, `NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`; `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_REPLY_TO`, `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`, `FAKE_EMAIL_CAPTURE_FILE` (test); `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`, `FAKE_PAYMENT_ADOPT_WEBHOOKS` (test); `ORDER_CONTACT_RETENTION_DAYS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time); `SEARCH_ENABLED`, `MEILI_URL` (now also read by the API), `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; `STOREFRONT_FORWARD_CLIENT_ADDRESS`.
-- Section 1, Stack: Nova Post REST API (ADR 0030); email (ADR 0031); payments (ADR 0032); the Search line points to ADR 0034 and 0036 to 0040 instead of ADR 0005; the Deployment line says an example exists (`docs/deployment.md`).
-- Section 2.1: core includes transactional email, the payments port and catalog search (the extension point is `SEARCH_PORT` in `apps/api/src/common/`, switched by `SEARCH_ENABLED`, not a feature package). Section 2.3: the price table sentence mentions a customer group the schema does not have (ADR 0012). A personal-data rule (inventory classification; none in logs, events or URLs); section 6 likewise.
-- Section 11: mail links only from `STOREFRONT_PUBLIC_URL`; webhook verification over the raw body; erasure needs the password; the search engine is never reachable from browsers and the index holds public data only. Section 15: legal placeholders, a production build refuses them.
-- Section 5 layout: `packages/providers` (fake, nova-post, email and payment providers), `docs/privacy/`, `apps/api/src/privacy/`, `apps/api/src/search/`, `infra/` production example and proxies.
-- Section 16: PSF-2.0 for `argparse` (runtime transitive of `@nestjs/swagger` -> `js-yaml`), approved 2026-10-30 (text in `docs/dependencies.md`); `@playwright/test` 1.64.1 and `react-router` 8.4.0; the `@img/sharp-libvips-*` LGPL exception widened to API image re-encoding (`scripts/license-policy.json`); vendored Snowball stemmers (BSD-3-Clause, `docs/dependencies.md`); Resend, Monobank and Nova Post as external services and processors.
-- Section 18: CI jobs `e2e` and `deploy-smoke`, `check:env` in `verify`; the matrix modes of section 1 above including `search-on` and `search-off`.
+**DECIDED 2026-10-30 (owner answers to explicit questions):**
+- ADR 0038 accepted: client-address forwarding is enabled behind the edge (`STOREFRONT_FORWARD_CLIENT_ADDRESS=true` there), off by default.
+- ADR 0037 and ADR 0040 accepted (the 5 minute stale window is accepted).
+- Free orders (total 0) stay manual: an admin marks them paid; no change to the totals logic (payments review F2).
+- `TRUNCATE` protection: statement-level triggers on the append-only tables (migration `0011`) plus the non-owner database role recommendation (`docs/deployment.md`, "Database roles").
+- Payments attention-list and admin list indexes (migration `0011`).
+- Audit action `admin_user.activated` (migration `0011` release; `pnpm admin:create` is audited too).
+
+**AGENTS.md edits:** done in #196.
 
 **Acceptances needed from the owner:**
 - Migrations `0009_privacy` and `0010_search` and the vendored Snowball code were approved by the orchestrator under the owner's standing autonomy grant of 2026-10-29, not by the owner personally. Confirm or reverse.
-- ADR 0038 trust model: the storefront forwards the client address only when `STOREFRONT_FORWARD_CLIENT_ADDRESS=true`, which is correct only when the storefront is reachable through the edge alone and the edge replaces `X-Forwarded-For`. Decide whether to switch it on in every deployment.
-- ADR 0037 (a cut last word uses no stems; Ukrainian partial precision 88.2%), ADR 0040 (stale lists are served from the shared cache when the engine fails; is a 5 minute stale window acceptable) and the ADR 0034 CONFIRM items (morphology acceptance).
+- The ADR 0034 CONFIRM items (morphology acceptance).
 
 **Live checks that need the owner's keys or go:**
 - Resend S1 (`scripts/spikes/resend-verify.mjs`, a test API key in the environment only) and the Reply-To assumption (plugin README, R3).
@@ -68,10 +67,6 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 - A human check for client traces before any release (AGENTS.md section 15); branch protection on `main`.
 
 **Pending owner decisions:**
-- Free-order settlement: should an order of total 0 be marked paid automatically (payments review F2).
-- A migration for the attention-list index on `payment` (payments review, open items).
-- An audit code for `admin_user.activated`.
-- DB-level `TRUNCATE` protection of the append-only journals including `admin_audit_event` (privacy review F5; recommended: a non-owner application role without `TRUNCATE`).
 - Shipping review m-10: cancelling a paid order with an active waybill.
 - Swagger UI and `/docs-json` in production.
 

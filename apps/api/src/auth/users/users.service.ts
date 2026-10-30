@@ -136,7 +136,7 @@ export class UsersService {
       if (body.isActive === false) {
         await this.sessions.revokeAllForUser(id, undefined, transaction);
       }
-      // Audit (ADR 0033): one event per real change. Re-activating an admin has no action in the core list.
+      // Audit (ADR 0033): one event per real change, none for a value that did not change.
       if (body.role !== undefined && body.role !== target.role) {
         await this.audit.record(transaction, actorAdminId, {
           action: "admin_user.role_changed",
@@ -148,6 +148,13 @@ export class UsersService {
       if (body.isActive === false && target.isActive) {
         await this.audit.record(transaction, actorAdminId, {
           action: "admin_user.deactivated",
+          targetKind: "admin_user",
+          targetId: id,
+        });
+      }
+      if (body.isActive === true && !target.isActive) {
+        await this.audit.record(transaction, actorAdminId, {
+          action: "admin_user.activated",
           targetKind: "admin_user",
           targetId: id,
         });

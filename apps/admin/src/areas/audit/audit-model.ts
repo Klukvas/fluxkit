@@ -21,7 +21,7 @@ import { MAX_OFFSET, readEnum, writeQuery } from "../../router/query";
  */
 const ACTION_VERBS = {
   customer: ["deactivated", "activated", "unlocked"],
-  admin_user: ["created", "role_changed", "deactivated", "password_reset"],
+  admin_user: ["created", "role_changed", "deactivated", "activated", "password_reset"],
   privacy: ["lookup", "exported", "erased", "request_changed"],
 } as const;
 

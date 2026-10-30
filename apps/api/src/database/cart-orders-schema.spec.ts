@@ -113,6 +113,7 @@ describe("cart, customers and orders schema (real Postgres)", () => {
     }
     await pool.query('drop sequence if exists "search_sync_seq"');
     for (const name of [
+      "append_only_refuse_truncate",
       "admin_audit_event_append_only",
       "payment_event_append_only",
       "shipment_status_change_append_only",

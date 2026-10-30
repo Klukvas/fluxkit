@@ -699,11 +699,13 @@ describe("privacy schema (migration 0009, real Postgres)", () => {
       const result = await client.query<{ table: string; name: string; definition: string }>(
         `select c.relname as "table", t.tgname as name, pg_get_triggerdef(t.oid) as definition
          from pg_trigger t join pg_class c on c.oid = t.tgrelid
-         where not t.tgisinternal and c.relname = any($1) order by c.relname`,
+         where not t.tgisinternal and c.relname = any($1) order by c.relname, t.tgname`,
         [["privacy_request", "admin_audit_event", "sales_order"]],
       );
       expect(result.rows.map((row) => [row.table, row.name])).toEqual([
         ["admin_audit_event", "admin_audit_event_append_only"],
+        // Migration 0011 (statement level, BEFORE TRUNCATE; migration-0011-schema.spec.ts).
+        ["admin_audit_event", "admin_audit_event_no_truncate"],
       ]);
       expect(result.rows[0]?.definition).toContain("BEFORE DELETE OR UPDATE");
       expect(result.rows[0]?.definition).toContain("FOR EACH ROW");

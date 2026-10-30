@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { permissionsOf } from "@fluxkit/core";
+import { sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DRIZZLE, type Database } from "../../database/database.module.js";
 import { testPrincipal } from "../../test/allow-all-admin-authenticator.js";
@@ -231,6 +232,144 @@ describe("admin audit log (ADR 0033 decision 9, privacy plan step 5)", () => {
       ).toBe(200);
       expect((await eventsOf(target.id)).map((event) => event.action)).toEqual([
         "admin_user.role_changed",
+        "admin_user.deactivated",
+      ]);
+    });
+
+    it("records admin_user.activated when an inactive user is activated, and nothing for an already active one", async () => {
+      const target = await newAdmin("viewer");
+      for (const isActive of [false, true, true]) {
+        expect(
+          (await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, { body: { isActive } }))
+            .status,
+        ).toBe(200);
+      }
+      const events = await eventsOf(target.id);
+      expect(
+        events.map(({ action, targetKind, adminUserId, detail }) => ({
+          action,
+          targetKind,
+          adminUserId,
+          detail,
+        })),
+      ).toEqual([
+        {
+          action: "admin_user.deactivated",
+          targetKind: "admin_user",
+          adminUserId: actor.id,
+          detail: {},
+        },
+        {
+          action: "admin_user.activated",
+          targetKind: "admin_user",
+          adminUserId: actor.id,
+          detail: {},
+        },
+      ]);
+      const filtered = await http<Page<AuditEvent>>(
+        owner.baseUrl,
+        "GET",
+        `/admin/audit-events?action=admin_user.activated&targetId=${target.id}`,
+      );
+      expect(filtered.status, JSON.stringify(filtered.body)).toBe(200);
+      expect(filtered.body.items.map((event) => event.action)).toEqual(["admin_user.activated"]);
+    });
+
+    it("writes the activation and its audit event in one transaction: a refused audit insert keeps the user inactive", async () => {
+      const target = await newAdmin("viewer");
+      expect(
+        (
+          await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, {
+            body: { isActive: false },
+          })
+        ).status,
+      ).toBe(200);
+      // A test-only trigger refuses the audit row of this target, so the transaction must roll the activation back.
+      await db.execute(
+        sql.raw(`
+          create function test_refuse_activation_audit() returns trigger language plpgsql as $$
+          begin
+            if new.action = 'admin_user.activated' and new.target_id = '${target.id}' then
+              raise exception 'test: audit insert refused';
+            end if;
+            return new;
+          end;
+          $$;
+          create trigger test_refuse_activation_audit before insert on admin_audit_event
+            for each row execute function test_refuse_activation_audit();`),
+      );
+      try {
+        expect(
+          (
+            await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, {
+              body: { isActive: true },
+            })
+          ).status,
+        ).toBe(500);
+      } finally {
+        await db.execute(
+          sql.raw(`
+            drop trigger if exists test_refuse_activation_audit on admin_audit_event;
+            drop function if exists test_refuse_activation_audit();`),
+        );
+      }
+      const stored = await http<{ isActive: boolean }>(
+        owner.baseUrl,
+        "GET",
+        `/admin/users/${target.id}`,
+      );
+      expect(stored.body.isActive).toBe(false);
+      expect((await eventsOf(target.id)).map((event) => event.action)).toEqual([
+        "admin_user.deactivated",
+      ]);
+    });
+
+    it("records no admin_user.activated event when the activation does not commit", async () => {
+      const target = await newAdmin("viewer");
+      expect(
+        (
+          await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, {
+            body: { isActive: false },
+          })
+        ).status,
+      ).toBe(200);
+      // A test-only deferred constraint trigger fails the COMMIT of this target's activation, after the audit insert:
+      // an event written outside the transaction would survive the rollback.
+      await db.execute(
+        sql.raw(`
+          create function test_refuse_activation_commit() returns trigger language plpgsql as $$
+          begin
+            if new.id = '${target.id}' and new.is_active then
+              raise exception 'test: activation commit refused';
+            end if;
+            return null;
+          end;
+          $$;
+          create constraint trigger test_refuse_activation_commit after update on admin_user
+            deferrable initially deferred for each row execute function test_refuse_activation_commit();`),
+      );
+      try {
+        expect(
+          (
+            await http(owner.baseUrl, "PATCH", `/admin/users/${target.id}`, {
+              body: { isActive: true },
+            })
+          ).status,
+        ).toBe(500);
+      } finally {
+        await db.execute(
+          sql.raw(`
+            drop trigger if exists test_refuse_activation_commit on admin_user;
+            drop function if exists test_refuse_activation_commit();`),
+        );
+      }
+      const stored = await http<{ isActive: boolean }>(
+        owner.baseUrl,
+        "GET",
+        `/admin/users/${target.id}`,
+      );
+      expect(stored.body.isActive).toBe(false);
+      expect((await eventsOf(target.id)).map((event) => event.action)).toEqual([
         "admin_user.deactivated",
       ]);
     });
