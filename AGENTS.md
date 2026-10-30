@@ -23,30 +23,42 @@ Every decision must keep these facts in mind:
 - Language: TypeScript everywhere (monorepo, shared types and validation schemas).
 - Backend: NestJS (modules map to core domains and feature modules). Public API: REST + OpenAPI.
 - DB: PostgreSQL + Drizzle ORM. Migrations via Drizzle, reversible.
-- Search/filters: Meilisearch (typo tolerance, filters, facets), fed from Postgres via events/queues. Spike findings and open decisions (Ukrainian morphology,
-  variant-level facet counts) are in `docs/adr/0005-search-notes.md`; one document per variant + `distinctAttribute: productId`.
+- Search/filters: Meilisearch (typo tolerance, filters, facets), fed from Postgres via events/queues. Decisions: ADR 0034 and 0036 to 0040
+  (they resolve ADR 0005's open decisions); one document per sellable variant, `distinct` per request (no `distinctAttribute`).
 - Queues/cache: Redis + BullMQ.
 - Storefront: Next.js (App Router) + Tailwind, design tokens as CSS variables.
 - Admin: React SPA (Vite), shares the UI library and tokens with the storefront.
-- Deployment: `infra/docker-compose.yml` runs Postgres, Redis and Meilisearch today (verified in CI). API/worker images and a production deployment are not built yet.
+- Deployment: `infra/docker-compose.yml` runs Postgres, Redis and Meilisearch for development (verified in CI). A production example exists (`docs/deployment.md`: `Dockerfile`,
+  `infra/docker-compose.prod.yml`, edge proxies in `infra/proxy/`); smoke-tested by `deploy-smoke`, not yet run on a real host.
 - First market: Ukraine (UAH, `uk`/`en`, Ukrainian payment and shipping providers as plugins), then EU/US.
   Currencies, locales, payment and shipping providers are core abstractions, not hardcoded.
+- Provider plugins (`packages/providers`): Nova Post shipping (ADR 0030), Resend email (ADR 0031), Monobank payments (ADR 0032).
 
 ## Tooling (decided, see `docs/adr/0003-tooling.md`)
 
 - Package manager / monorepo: pnpm workspaces + Turborepo.
-- Tests: Vitest (unit, integration); Playwright (e2e) is planned, not set up yet. Integration tests use real Postgres, Redis and Meilisearch (CI service containers), not mocks.
+- Tests: Vitest (unit, integration); Playwright (e2e, Chromium) for storefront and admin. Integration tests use real Postgres, Redis and Meilisearch (CI service containers), not mocks.
 - Lint/format: ESLint (strict TS rules) + Prettier; dependency-cruiser for module boundaries.
 - Hosting/CI: GitHub + GitHub Actions (CI requirements in section 18).
 
 Root scripts (always check `package.json` before using; do not invent commands):
 - Available now: `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm format:check` (`pnpm format` to fix), `pnpm check:boundaries`,
   `pnpm test` (builds first, then runs Vitest in every package), `pnpm openapi:export` (regenerates `docs/api/openapi.json`),
-  `pnpm db:migrate` (applies the pending migrations to `DATABASE_URL`, forward only; see `README.md`), `pnpm seed` (demo catalog into the migrated `DATABASE_URL` database, idempotent, refuses `NODE_ENV=production`; see `seeds/README.md`), `pnpm admin:create` (creates one admin user, first owner; see `README.md`), `pnpm admin:unlock` (clears the lockout of one admin user; see `README.md`), `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`, `pnpm feature-matrix on|off|deleted` (`deleted` only with `CI=true`, it removes files).
+  `pnpm db:migrate` (applies the pending migrations to `DATABASE_URL`, forward only; see `README.md`), `pnpm seed` (demo catalog into the migrated `DATABASE_URL` database, idempotent, refuses `NODE_ENV=production`; see `seeds/README.md`), `pnpm admin:create` (creates one admin user, first owner; see `README.md`), `pnpm admin:unlock` (clears the lockout of one admin user; see `README.md`), `pnpm check:licenses`, `pnpm check:docs` (vs `origin/main`), `pnpm audit:prod`, `pnpm notices`,
+  `pnpm check:env` (code reads no variable missing from `.env.example`), `pnpm test:e2e` (builds, then storefront and admin Playwright suites; see `apps/storefront/e2e/README.md`),
+  `pnpm jobs:run-once` (builds, runs the scheduled jobs once), `pnpm search:reindex` (builds, rebuilds the search index),
+  `pnpm feature-matrix <mode>`: `on`, `off`, `deleted`, `providers-on`, `providers-off`, `providers-deleted`, `providers-nova-post`, `providers-email-none`, `providers-email-fake`, `providers-email-resend`,
+  `providers-payment-none`, `providers-payment-fake`, `providers-payment-monobank`, `search-off`, `search-on` (`deleted` and `providers-deleted` only with `CI=true`, they remove files).
 - App dev servers (no root `dev` yet): `pnpm --filter @fluxkit/storefront dev`, `pnpm --filter @fluxkit/admin dev` (run `pnpm build` once first so workspace packages exist).
 - Run the built API: `pnpm build && pnpm --filter @fluxkit/api start` (reads the root `.env`; variables already set in your shell take precedence).
-- Planned, added later: root `pnpm dev`, `pnpm test:e2e`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
+- Planned, added later: root `pnpm dev`. Until a script exists it is intentionally absent, not stubbed: a script that always passes would mask missing checks.
 - Integration tests need real services and fail (not skip) without `DATABASE_URL` (database name must end in `_test`), `REDIS_URL`, `MEILI_URL` and `MEILI_MASTER_KEY`; see the README quick start.
+- Configuration (all in `.env.example` and `docs/contracts/config.md`), besides the services: `FEATURES_ENABLED`, `ORDER_TOKEN_SECRET`, `MAX_OPEN_ORDERS`, `TRUST_PROXY`,
+  `SCHEDULER_ENABLED`, `SCHEDULER_INTERVAL_SECONDS`; shipping `SHIPPING_PROVIDERS_ENABLED`, `NOVA_POST_API_KEY`, `NOVA_POST_ENVIRONMENT`; email `EMAIL_PROVIDER`, `EMAIL_FROM`, `EMAIL_REPLY_TO`,
+  `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
+  `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; storefront `STOREFRONT_FORWARD_CLIENT_ADDRESS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time only); admin dev server `ADMIN_DEV_API_URL`.
+  Test only (fake providers): `FAKE_EMAIL_CAPTURE_FILE`, `FAKE_PAYMENT_ADOPT_WEBHOOKS`. E2E only: `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`,
+  `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`.
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
 Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), **TypeScript pinned to 6.0.3** (see below), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
@@ -66,6 +78,8 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Mechanism (see `docs/contracts/config.md`): a feature package declares `"fluxkit": {"feature": "<name>"}` and exports `featureModule`; `apps/api` discovers and
   dynamically imports only enabled ones from `FEATURES_ENABLED`. Feature tests live inside the feature package so they disappear with it; core tests use a fixture feature.
 - Core = catalog, cart, checkout, orders, customers, admin basics. Everything else is a feature.
+  Core also includes transactional email, the payments port, privacy and catalog search. Search is not a feature package: other code reaches it only through
+  the `SEARCH_PORT` extension point (`apps/api/src/common/search-port.ts`), switched by `SEARCH_ENABLED`.
 
 ### 2.2 Design is replaceable (theming)
 - No hardcoded colors, fonts, spacing, radii, shadows in components. Use **design tokens** only
@@ -89,7 +103,8 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Catalog filters operate on variants and group results by product. Search runs through a search index, not ad-hoc SQL JOINs.
 - Money is stored in minor units (integers) with a currency code. Never floats.
 - Order items store a **snapshot** (title, SKU, price, image) at purchase time.
-- Prices live in a `price` table (variant, currency, minor-unit amount, optional customer group). Inventory lives in `inventory_level` per `variant_id + location_id`
+- Prices live in a `price` table (variant, currency, minor-unit amount, optional compare-at amount; one row per variant and currency); no customer group
+  column yet (added later by an additive migration). Inventory lives in `inventory_level` per `variant_id + location_id`
   (`on_hand`, `reserved`) with reservations and an append-only `stock_movement` journal, so multi-warehouse needs no migration. Details: `docs/adr/0004-core-data-model.md`.
 
 ## 3. Working rules for agents
@@ -138,21 +153,23 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 
 ```
 /apps
-  /api               # NestJS: health, feature loader, DB; core domains to come (REST/OpenAPI)
-  /storefront        # Next.js customer site (placeholder home page)
-  /admin             # React SPA (Vite) (placeholder screen)
+  /api               # NestJS: core domains, REST/OpenAPI, feature loader, jobs
+    /src/privacy     # export, erasure, retention, audit; personal-data inventory (ADR 0033)
+    /src/search      # catalog search behind SEARCH_PORT
+  /storefront        # Next.js customer site (catalog, search, cart, checkout, account, legal pages); e2e in /e2e
+  /admin             # React SPA (Vite): admin areas; e2e in /e2e
 /packages
-  /core              # domain logic: catalog rules implemented (docs/files/core.md); pricing, inventory, cart, checkout, orders, customers not yet
+  /core              # pure domain rules (docs/files/core.md): catalog, pricing, inventory, cart, orders, auth, media, shipping, email, payments, privacy, search
   /features          # optional modules, one package each (only the sample `_example` so far)
-  /providers         # payment and shipping provider plugins (none yet)
+  /providers         # provider plugins: nova-post, resend (email), monobank (payments), test-only fakes `_fake`, `_fake-email`, `_fake-payment`
   /ui                # token-based component library (shared by storefront and admin)
   /theme             # design tokens + tests/guards
   /config            # env parsing and feature flag parsing
-  /api-client        # typed client generated from OpenAPI (empty scaffold)
-/docs                # api, files, adr, plans, contracts, migrations, dependencies
+  /api-client        # typed client for the store and admin APIs
+/docs                # api, files, adr, plans, contracts, migrations, privacy, dependencies, deployment.md
 /seeds               # @fluxkit/seeds: demo data and product type presets (pure data; runner in apps/api/src/seed)
-/infra               # docker compose for Postgres, Redis, Meilisearch
-/scripts             # CI and policy scripts (licenses, docs check, feature matrix, notices)
+/infra               # docker compose for Postgres, Redis, Meilisearch; production example (docker-compose.prod.yml, proxy/ nginx and Caddy)
+/scripts             # CI and policy scripts (licenses, env and docs checks, feature matrix, notices, deploy smoke)
 /.github             # CI workflow and Dependabot
 ```
 
@@ -164,6 +181,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Lint, types, and tests pass; new behavior is covered.
 - Docs, `.env.example`, and seeds updated; `docs/HANDOFF.md` updated when project state changed.
 - No client-specific code in the template.
+- New tables and columns are classified in the personal-data inventory; no personal data in logs, events or URLs (section 11).
 
 ## 7. Workflow (mandatory for every non-trivial task)
 
@@ -231,9 +249,13 @@ Rules:
 - Authorization on every admin endpoint and on every customer resource (owner checks). Default deny.
 - Parameterized queries only. Escape/sanitize rendered user content (reviews, descriptions).
 - Do not log secrets, tokens, full card data, or unnecessary personal data.
-- Payment webhooks: verify signatures, be idempotent.
+- Payment webhooks: verify signatures over the raw request body (never re-serialized JSON), be idempotent.
 - Uploads/imports: validate type, size, and structure; never execute uploaded content.
 - Add rate limits to auth, search, and checkout endpoints.
+- Links in mails are built only from `STOREFRONT_PUBLIC_URL`, never from a request's `Host` (ADR 0031, 0032).
+- Self-service account deletion (erasure) requires the customer's password (`docs/api/customers.md`).
+- Personal data: every table and column is classified in `apps/api/src/privacy/inventory`; logs, events, job payloads, error codes and URLs carry ids and codes only (ADR 0033, 0035).
+- The search engine is never reachable from browsers (only through `/store/search*`), and the index holds public data only (ADR 0034).
 
 ## 12. Git and review
 
@@ -273,6 +295,7 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 - Generic improvements made for a client are ported back to master as a separate, cleaned PR.
 - Master receives updates from forks only through reviewed PRs; client forks pull upstream releases (SemVer, section 17).
 - Before any release of master, a human confirms there are no client traces (names, secrets, assets).
+- Legal pages ship as placeholders. A client fork's release build sets `STOREFRONT_REQUIRE_LEGAL_TEXT=true` so `next build` refuses while one remains (opt-in).
 
 ## 16. Dependencies
 
@@ -281,12 +304,16 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 - Approved for **development tooling only** (devDependencies, never shipped to clients' runtime): MPL-2.0 (e.g. lightningcss, unmodified), Python-2.0 (argparse),
   BlueOak-1.0.0 (minimatch) and "Apache-2.0 AND MIT" combined expressions (@swc/core binaries). Approved by the owner on 2026-10-14. Runtime dependencies stay on the strict list.
 - Approved 2026-10-14 for ONE runtime package: **Python-2.0** for `argparse` (transitive of `@nestjs/swagger` -> `js-yaml`). `scripts/license-policy.json` is the machine-readable copy of this policy.
+- Approved 2026-10-30 for the same package: **PSF-2.0** for `argparse` 3.x (runtime transitive of `@nestjs/swagger` -> `js-yaml`); the Python-2.0 entry stays for argparse 2.x (`docs/dependencies.md`).
 - Also approved by the owner on 2026-10-14, each for ONE specific case: **LGPL-3.0-or-later** for the unmodified, dynamically loaded prebuilt `@img/sharp-libvips-*` binaries
-  (Next.js image optimization; never copy or modify their code; keep the notices), and **CC-BY-4.0** for the `caniuse-lite` browser-data package (keep attribution).
+  (Next.js image optimization and, since 2026-10-23, `sharp` in `apps/api`, ADR 0028; never copy or modify their code; keep the notices), and **CC-BY-4.0** for the `caniuse-lite` browser-data package (keep attribution).
   Any other LGPL/GPL-family or CC-BY package still needs its own approval. Third-party notices must be shipped with a client delivery.
 - External services run as separate unmodified processes (Docker Compose) are tracked in `docs/dependencies.md` with an explicit decision.
   Approved exception: **Redis 8+ under AGPLv3** (legal sign-off given by the owner's lawyer, 2026-10-14). We run it unmodified and never
   fork or patch it. If the license choice or how we ship it changes, re-confirm with legal.
+- Vendored code: Snowball stemmers (BSD-3-Clause, `packages/core/src/search/stemmers/snowball/`, `docs/dependencies.md`); keep their `COPYING`.
+- External HTTP services that receive personal data (Resend, Monobank, Nova Post; no npm package) are recorded in `docs/dependencies.md` and `docs/privacy/processors.md`.
+- Pinned of note: `@playwright/test` 1.64.1 (dev, Apache-2.0), `react-router` 8.4.0 (admin runtime, MIT).
 - Commit the lockfile. Pin exact versions for production dependencies.
 - Dependency audit (vulnerabilities + license check) runs in CI and must pass.
 - Prefer fewer, well-maintained dependencies. Do not add a library for something small.
@@ -306,14 +333,17 @@ Everything else the agent decides itself and mentions in the report. Do not ask 
 
 CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jobs must pass before merge:
 
-- `verify`: lint, format check, type check, module boundary check, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
+- `verify`: lint, format check, type check, schema drift check, module boundary check, `pnpm check:env`, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
 - `feature-matrix` (`scripts/feature-matrix.sh`): `on` (API started with `FEATURES_ENABLED=example`, route exists), `off` (404), `deleted`
-  (feature folder removed, lint/types/boundaries/tests still pass). Core must never depend on a feature.
+  (feature folder removed, lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
+  provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: starts without calling the engine).
 - `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
+- `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch.
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
+- `deploy-smoke` (`scripts/deploy-smoke.sh`): builds the production images and checks `infra/docker-compose.prod.yml` behind the edge proxy.
 - Dependabot (`.github/dependabot.yml`) updates npm, GitHub Actions and Docker images weekly; TypeScript major bumps are ignored until the linters support them.
-- Local equivalents: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `test`, `feature-matrix`, `check:licenses`, `audit:prod`, `notices`, `check:docs`.
+- Local equivalents: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `test`, `test:e2e`, `feature-matrix`, `check:licenses`, `audit:prod`, `notices`, `check:docs`.
   There is no script for the `compose` job; run `docker compose --env-file .env -f infra/docker-compose.yml up -d --wait` yourself.
