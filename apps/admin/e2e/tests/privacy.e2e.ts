@@ -134,6 +134,8 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
 
   // --- The closed guest: preview, then the dialog. The typed word is required; without it nothing is sent.
   await recordRequest(page, closedEmail, "Erasure of personal data", "replied from the address");
+  const closedRequestId = new URL(page.url()).pathname.split("/").pop() ?? "";
+  expect(closedRequestId).toMatch(/^[0-9a-f-]{36}$/);
   await main.getByLabel("The person's email address").fill(closedEmail);
   await main.getByRole("button", { name: "Preview the erasure" }).click();
   await expect(main.getByText("Nothing is in the way. You can erase now.")).toBeVisible();
@@ -204,18 +206,32 @@ test("privacy: the owner exports a guest's data, sees what blocks an open order 
   await expect(main.getByText("Contact data erased").first()).toBeVisible();
   await expect(main.getByText(openEmail)).toBeVisible();
 
-  // --- The audit log lists the actions, newest first, and filters by action.
+  // --- The audit log lists the actions, newest first, and filters by action and by what an event concerns.
   await nav.getByRole("link", { name: "Audit log" }).click();
   await expect(main.getByRole("heading", { level: 1, name: "Audit log" })).toBeVisible();
   const log = main.getByRole("table", { name: "Audit log" });
   await expect(log.getByRole("row", { name: /Privacy lookup by email/ }).first()).toBeVisible();
   await expect(log.getByRole("row", { name: /Personal data exported/ }).first()).toBeVisible();
   await expect(log.getByRole("row", { name: /Personal data erased/ }).first()).toBeVisible();
+  // The log is shared by every test of the run (and by a retry), so the scenario filters down to ITS erasure: the answer is
+  // known exactly (one event), which is what proves the filtered list is shown. The address changes before the list does,
+  // so reading "the first rows" right after the URL could read the unfiltered list that is about to be replaced.
   await main.getByLabel("Action", { exact: true }).selectOption({ label: "Personal data erased" });
+  await main.getByLabel("Id of what it concerns", { exact: true }).fill(closedRequestId);
   await main.getByRole("button", { name: "Apply" }).click();
-  await expect(page).toHaveURL(/\/audit\?action=privacy\.erased$/);
+  await expect(page).toHaveURL(
+    new RegExp(`/audit\\?action=privacy\\.erased&targetId=${closedRequestId}$`),
+  );
+  // One filter form: the form of the previous filters is replaced, not left in the page next to the new one.
+  await expect(main.getByRole("form", { name: "Filter the audit log" })).toHaveCount(1);
   const rows = log.getByRole("row");
+  await expect(rows).toHaveCount(2);
+  await expect(main.getByText("Showing 1 of 1.", { exact: true })).toBeVisible();
   await expect(rows.nth(1)).toContainText("Personal data erased");
+  await expect(rows.nth(1).getByRole("link", { name: /^Privacy request / })).toHaveAttribute(
+    "href",
+    `/admin-ui/privacy/requests/${closedRequestId}`,
+  );
   for (const row of await rows.all()) {
     const text = (await row.textContent()) ?? "";
     expect(text).not.toMatch(/Privacy lookup|Personal data exported/);

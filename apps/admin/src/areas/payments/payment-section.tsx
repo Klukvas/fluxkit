@@ -1,6 +1,6 @@
 import type { AdminConfig, AdminOrder, AdminPayment, AdminResult } from "@fluxkit/api-client";
 import { LiveRegion } from "@fluxkit/ui";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
 import { exponentOf } from "../../lib/currency-exponent";
@@ -85,6 +85,8 @@ export function PaymentSection({
   const [lost, setLost] = useState<LostRefundAttempt | null>(null);
   const [clearing, setClearing] = useState<AdminPayment | null>(null);
   const [clearError, setClearError] = useState<MessageDescriptor | null>(null);
+  /** The field to focus after a review found issues; `n` makes a second review of the same field focus it again. */
+  const [issueFocus, setIssueFocus] = useState<{ id: string; n: number } | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const dialogErrorRef = useRef<HTMLDivElement>(null);
 
@@ -104,6 +106,12 @@ export function PaymentSection({
   useEffect(() => {
     if (refund?.error != null || clearError !== null) dialogErrorRef.current?.focus();
   }, [refund?.error, clearError]);
+  // The field of the first issue gets the focus in the commit that shows the issue (the field exists then, also when the
+  // dialog came back from the confirmation step), never later: a focus deferred to the next animation frame landed after
+  // the admin (or a test) had already moved on to the next field, and what was typed there went into the amount.
+  useLayoutEffect(() => {
+    if (issueFocus !== null) document.getElementById(issueFocus.id)?.focus();
+  }, [issueFocus]);
 
   function announce(value: PaymentNotice) {
     setError(null);
@@ -160,7 +168,7 @@ export function PaymentSection({
 
   function focusFirstIssue(issues: RefundIssues) {
     const id = issues.amount !== undefined ? "payment-refund-amount" : "payment-refund-note";
-    requestAnimationFrame(() => document.getElementById(id)?.focus());
+    setIssueFocus((current) => ({ id, n: (current?.n ?? 0) + 1 }));
   }
 
   function review() {

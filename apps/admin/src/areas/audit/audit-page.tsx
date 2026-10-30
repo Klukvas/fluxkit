@@ -105,12 +105,14 @@ export function AuditLogPage() {
   const [timeZone] = useState(browserTimeZone);
   const adminEmails = useAdminEmails(true);
   const request = auditRequest(query, timeZone, 0);
+  // The form and the results are siblings, so their keys must differ: with the same key React could not tell them apart
+  // when the filters changed and left the old form in the page (two forms, the stale one focused).
   return (
     <div className="flex flex-col gap-6">
       <PageHeading>{t("page.auditLog.title")}</PageHeading>
       <p className="max-w-prose text-muted-foreground">{t("audit.list.intro")}</p>
       <AuditFilterForm
-        key={queryKey}
+        key={`filters${queryKey}`}
         t={t}
         query={query}
         adminEmails={adminEmails}
@@ -119,7 +121,12 @@ export function AuditLogPage() {
       />
       <p className="text-sm text-muted-foreground">{t("audit.list.timeZoneHint")}</p>
       {request.ok ? (
-        <AuditResults key={queryKey} query={query} timeZone={timeZone} adminEmails={adminEmails} />
+        <AuditResults
+          key={`results${queryKey}`}
+          query={query}
+          timeZone={timeZone}
+          adminEmails={adminEmails}
+        />
       ) : (
         <p role="alert" className="text-muted-foreground">
           {t("audit.list.rangeNotSent")}
