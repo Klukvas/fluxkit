@@ -91,11 +91,9 @@ describe("payment section source guards", () => {
     // A focus deferred to the next animation frame landed after the next field had been focused, so what was typed there
     // went into the amount (CI run of PR 191: the amount read "50.50Damaged in transit", the reason stayed empty).
     expect(section).not.toMatch(/requestAnimationFrame|setTimeout|queueMicrotask/);
-    expect(body("focusFirstIssue")).toContain("setIssueFocus(");
+    expect(section).toContain("useFocusAfterCommit()");
+    expect(body("focusFirstIssue")).toContain("focusAfterCommit(id)");
     expect(body("focusFirstIssue")).not.toContain(".focus()");
-    expect(section).toMatch(
-      /useLayoutEffect\(\(\) => \{\s*if \(issueFocus !== null\) document\.getElementById\(issueFocus\.id\)\?\.focus\(\);\s*\}, \[issueFocus\]\);/,
-    );
     expect(body("review")).toContain("focusFirstIssue(plan.issues)");
     expect(body("confirmRefund")).toContain("focusFirstIssue(plan.issues)");
   });

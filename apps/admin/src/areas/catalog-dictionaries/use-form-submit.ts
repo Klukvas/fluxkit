@@ -3,6 +3,7 @@ import { useCallback, useRef, useState, type RefObject } from "react";
 import { runWrite, type WriteOutcome } from "../../lib/run-write";
 import { createSingleFlight } from "../../lib/single-flight";
 import { useCrash } from "../../lib/use-crash";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import type { FormIssues } from "./form-rules";
 import {
   IDLE_SUBMIT,
@@ -82,10 +83,10 @@ export function useFormSubmit(
   const mapRef = useRef(mapProblem);
   mapRef.current = mapProblem;
   const crash = useCrash();
+  const focusAfterCommit = useFocusAfterCommit();
 
-  const focusSummary = useCallback(() => {
-    requestAnimationFrame(() => summaryRef.current?.focus());
-  }, []);
+  // The summary is shown by the same update that asks for the focus (`stateWithIssues`), so it is focused in that commit.
+  const focusSummary = useCallback(() => focusAfterCommit(summaryRef), [focusAfterCommit]);
 
   const showIssues = useCallback(
     (issues: FormIssues) => {

@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState, type RefObject } from "react";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import type { NoticeKind } from "./dictionary-frame";
 
 export interface EditorState {
@@ -21,13 +22,14 @@ export function useEditorState(reload: () => void): EditorState {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleted, setDeleted] = useState(false);
   const noticeRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
   const changed = useCallback(
     (kind: NoticeKind) => {
       setNotice((current) => ({ kind, n: (current?.n ?? 0) + 1 }));
       if (kind !== "noChanges") reload();
-      requestAnimationFrame(() => noticeRef.current?.focus());
+      focusAfterCommit(noticeRef);
     },
-    [reload],
+    [reload, focusAfterCommit],
   );
   return { notice, noticeRef, changed, confirmingDelete, setConfirmingDelete, deleted, setDeleted };
 }

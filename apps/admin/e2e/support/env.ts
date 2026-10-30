@@ -84,11 +84,17 @@ export function requireE2eDatabaseUrl(env: Env = process.env): string {
 
 /**
  * The marker a test puts on its requests (`x-e2e-client`); the proxy turns it into the client address the API sees. One
- * number per test attempt and per role inside it, so no two tests (and no retry) share a login rate-limit window.
+ * number per test attempt, per repeat (`--repeat-each`: the test id is the same in every repeat) and per role inside it, so
+ * no two tests, retries or repeats share a rate-limit window (login, refunds).
  */
-export function clientMarker(testId: string, retry: number, role = "browser"): string {
+export function clientMarker(
+  testId: string,
+  retry: number,
+  repeatEachIndex: number,
+  role = "browser",
+): string {
   const digest = createHash("sha256")
-    .update(`admin:${testId}:${String(retry)}:${role}`)
+    .update(`admin:${testId}:${String(retry)}:${String(repeatEachIndex)}:${role}`)
     .digest();
   // 24 bits: the proxy maps the number to 10.a.b.c. Collisions between the ~100 contexts of one run are astronomically rare.
   return String(

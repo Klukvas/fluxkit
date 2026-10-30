@@ -3,6 +3,7 @@ import type { Page, Request } from "@playwright/test";
 import { SPA } from "../support/env.ts";
 import { expect, test, unique } from "../support/fixtures.ts";
 import type { AdminApi, PlacedOrder, StoreApi } from "../support/api.ts";
+import { delayAnimationFrames } from "../support/late-frames.ts";
 import { providerPaymentIdOf, webhookBody, type FakeProvider } from "../support/fake-provider.ts";
 import { seedSucceededPayment } from "../support/payments-db.ts";
 
@@ -22,6 +23,9 @@ import { seedSucceededPayment } from "../support/payments-db.ts";
  * tests), the automatic refund of a late payment being SENT (job 11 is a worker job; the scheduler is off in this suite, so
  * the scenario asserts it is queued), and the 429 limits.
  */
+
+/** More pages than any run leaves behind (20 items a page); a loop that never ends fails here instead of timing out. */
+const MAX_PAGES = 100;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -308,14 +312,9 @@ test("payments: a refused review focuses its field at once, so what is typed nex
     provider,
     `e2e-focus-${u}@example.com`,
   );
-  // TEST-ONLY emulation of a loaded machine (a CI runner) whose next frame comes late: every animation frame callback of the
-  // page runs 300 ms later. Regression of the CI run of PR #191: the focus of the first issue waited for the next frame and
-  // arrived after the test had moved on to the reason, so the reason was typed into the amount ("50.50Damaged in transit").
-  await page.addInitScript(() => {
-    window.requestAnimationFrame = (callback) =>
-      window.setTimeout(() => callback(performance.now()), 300);
-    window.cancelAnimationFrame = (handle) => window.clearTimeout(handle);
-  });
+  // Regression of the CI run of PR #191: the focus of the first issue waited for the next frame and arrived after the test
+  // had moved on to the reason, so the reason was typed into the amount ("50.50Damaged in transit").
+  await delayAnimationFrames(page);
   await signIn("manager");
   await page.goto(`${SPA}/orders/${orderId}`);
   const card = page
@@ -512,13 +511,25 @@ test("payments: the attention list pages with keyset 'Load more'", async ({
   expect(new URL(requests[0]?.url() ?? "").searchParams.get("cursor")).toBeNull();
   expect(new URL(requests[0]?.url() ?? "").searchParams.get("needsAttention")).toBe("true");
 
-  await main.getByRole("button", { name: "Load more" }).click();
+  // The attention list is global and the suite's database outlives a test (a CI retry, a repeat or an earlier run in the same
+  // API process leave their own items), so it can hold more than two pages: page on until the button is gone instead of
+  // assuming the 22 seeded items are all there is. Every step adds rows and sends one request with a new cursor.
+  const loadMore = main.getByRole("button", { name: "Load more" });
+  const cursors: string[] = [];
+  for (let step = 1; step <= MAX_PAGES && (await loadMore.count()) > 0; step += 1) {
+    const rowsBefore = await list.getByRole("row").count();
+    await loadMore.click();
+    await expect(list.getByRole("row")).not.toHaveCount(rowsBefore);
+    expect(requests).toHaveLength(step + 1);
+    const cursor = new URL(requests[step]?.url() ?? "").searchParams.get("cursor");
+    expect(cursor).not.toBeNull();
+    expect(cursors).not.toContain(cursor);
+    cursors.push(cursor ?? "");
+  }
   await expect(main.getByText(/shown\. That is all of them\./)).toBeVisible();
-  await expect(main.getByRole("button", { name: "Load more" })).toHaveCount(0);
-  expect(requests).toHaveLength(2);
-  const cursor = new URL(requests[1]?.url() ?? "").searchParams.get("cursor");
-  expect(cursor).not.toBeNull();
+  await expect(loadMore).toHaveCount(0);
+  expect(cursors.length).toBeGreaterThanOrEqual(1);
   expect((await list.getByRole("row").count()) - 1).toBeGreaterThanOrEqual(22);
-  // Every row of the seeded order, once.
+  // Every row of the seeded order, once, wherever the page break fell.
   await expect(list.getByRole("row").filter({ hasText: `Order ${placed.number}` })).toHaveCount(22);
 });

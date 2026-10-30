@@ -26,7 +26,12 @@ test("a session ended elsewhere: the next save opens the re-sign-in dialog and t
     baseURL: ADMIN_E2E_ORIGIN,
     storageState: await page.context().storageState(),
     extraHTTPHeaders: {
-      "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, "elsewhere"),
+      "x-e2e-client": clientMarker(
+        testInfo.testId,
+        testInfo.retry,
+        testInfo.repeatEachIndex,
+        "elsewhere",
+      ),
     },
   });
   expect((await elsewhere.post("/admin/auth/logout", { headers: CSRF })).status()).toBe(204);
@@ -92,7 +97,12 @@ test("sign-out asks before unsaved input is discarded: from the header and from 
     baseURL: ADMIN_E2E_ORIGIN,
     storageState: await page.context().storageState(),
     extraHTTPHeaders: {
-      "x-e2e-client": clientMarker(testInfo.testId, testInfo.retry, "elsewhere"),
+      "x-e2e-client": clientMarker(
+        testInfo.testId,
+        testInfo.retry,
+        testInfo.repeatEachIndex,
+        "elsewhere",
+      ),
     },
   });
   expect((await elsewhere.post("/admin/auth/logout", { headers: CSRF })).status()).toBe(204);

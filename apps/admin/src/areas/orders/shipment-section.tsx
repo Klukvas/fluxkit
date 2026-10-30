@@ -7,6 +7,7 @@ import { exponentOf } from "../../lib/currency-exponent";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { runWrite, type WriteOutcome } from "../../lib/run-write";
 import { createSingleFlight } from "../../lib/single-flight";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { browserDownloadEnvironment, downloadBlob, labelFileName } from "./label-download";
@@ -73,6 +74,7 @@ export function ShipmentSection({
   const statusRef = useRef<HTMLDivElement>(null);
   const summaryRef = useRef<HTMLDivElement>(null);
   const dialogErrorRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   const gate = createGate(order, permissions);
   const blocker = useUnsavedChangesGuard(
@@ -120,7 +122,7 @@ export function ShipmentSection({
     if (!plan.ok) {
       setIssues(plan.issues);
       setSummary([{ key: "shipment.error.checkFields" }]);
-      requestAnimationFrame(() => summaryRef.current?.focus());
+      focusAfterCommit(summaryRef);
       return;
     }
     setIssues({});
@@ -138,7 +140,7 @@ export function ShipmentSection({
         const mapped = createFieldErrors(outcome.problem, SHIPMENT_FIELDS);
         setIssues(mapped.fields as ShipmentIssues);
         setSummary([{ key: "shipment.error.checkFields" }, ...mapped.other]);
-        requestAnimationFrame(() => summaryRef.current?.focus());
+        focusAfterCommit(summaryRef);
       } else {
         refused(outcome.status, outcome.problem, outcome.retryAfter);
       }

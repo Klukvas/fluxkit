@@ -18,6 +18,7 @@ import { adminClient } from "../../../lib/api";
 import { describeProblem, type MessageDescriptor } from "../../../lib/problem-messages";
 import { runWrite } from "../../../lib/run-write";
 import { useCrash } from "../../../lib/use-crash";
+import { useFocusAfterCommit } from "../../../lib/use-focus-after-commit";
 import { useUnsavedChangesGuard } from "../../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
 import { FailureMessage, LoadingView } from "../../../views/status-views";
@@ -384,6 +385,7 @@ function AddValueSection({
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
   const failureRef = useRef<HTMLDivElement>(null);
+  const focusAfterCommit = useFocusAfterCommit();
 
   async function add(target: { optionId: string; valueId: string }) {
     setBusy(true);
@@ -403,7 +405,7 @@ function AddValueSection({
     else if (outcome.kind === "unknown") onChanged("unknown");
     else if (outcome.kind === "problem") {
       setFailure(describeProblem(outcome.status, outcome.problem));
-      requestAnimationFrame(() => failureRef.current?.focus());
+      focusAfterCommit(failureRef);
     }
   }
 
