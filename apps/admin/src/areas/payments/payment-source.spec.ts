@@ -89,7 +89,7 @@ describe("payment section source guards", () => {
 
   it("focuses the field of the first issue in the commit that shows it, never in a later frame", () => {
     // A focus deferred to the next animation frame landed after the next field had been focused, so what was typed there
-    // went into the amount (CI run of PR #191: the amount read "50.50Damaged in transit", the reason stayed empty).
+    // went into the amount (CI run of PR 191: the amount read "50.50Damaged in transit", the reason stayed empty).
     expect(section).not.toMatch(/requestAnimationFrame|setTimeout|queueMicrotask/);
     expect(section).toContain("useFocusAfterCommit()");
     expect(body("focusFirstIssue")).toContain("focusAfterCommit(id)");
