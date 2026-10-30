@@ -104,7 +104,7 @@ until both support it and `pnpm lint` and `pnpm check:boundaries` are verified; 
 - Money is stored in minor units (integers) with a currency code. Never floats.
 - Order items store a **snapshot** (title, SKU, price, image) at purchase time.
 - Prices live in a `price` table (variant, currency, minor-unit amount, optional compare-at amount; one row per variant and currency); no customer group
-  column yet (added later by an additive migration). Inventory lives in `inventory_level` per `variant_id + location_id`
+  column. Inventory lives in `inventory_level` per `variant_id + location_id`
   (`on_hand`, `reserved`) with reservations and an append-only `stock_movement` journal, so multi-warehouse needs no migration. Details: `docs/adr/0004-core-data-model.md`.
 
 ## 3. Working rules for agents
@@ -336,7 +336,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
 - `verify`: lint, format check, type check, schema drift check, module boundary check, `pnpm check:env`, unit/integration tests (service containers: Postgres 17, Redis 8, Meilisearch v1.55.0).
 - `feature-matrix` (`scripts/feature-matrix.sh`): `on` (API started with `FEATURES_ENABLED=example`, route exists), `off` (404), `deleted`
   (feature folder removed, lint/types/boundaries/tests still pass). Core must never depend on a feature. The other modes (section 1) check
-  provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: starts without calling the engine).
+  provider plugins (`providers-*`) and search (`search-off`: routes 404, no search table writes; `search-on`: seeds, reindexes against a real engine and finds the seeded product).
 - `policy`: `pnpm check:licenses` (policy in `scripts/license-policy.json`), `pnpm audit:prod` (fails on high severity in production dependencies),
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,
