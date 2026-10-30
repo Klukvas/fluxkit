@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -93,6 +94,20 @@ const privacyFunctions = ["admin_audit_event_append_only"] as const;
 
 // Creation order of 0010 (ADR 0034; the drop order is the reverse), plus the sequence of search_sync_queue.change_seq.
 const searchTables = ["search_index_state", "search_sync_queue", "search_synonym_group"] as const;
+
+// Migration 0011: a BEFORE TRUNCATE trigger on each append-only table, and the two payment list indexes.
+const TRUNCATE_GUARDED_TABLES = [
+  "admin_audit_event",
+  "order_adjustment",
+  "order_item",
+  "order_shipping",
+  "order_status_change",
+  "payment_event",
+  "shipment_status_change",
+  "stock_movement",
+] as const;
+
+const PAYMENT_LIST_INDEXES = ["payment_attention_created_at_id_idx", "payment_created_at_id_idx"];
 
 const NULLABLE_CONTACT = {
   contact_erased_at: "YES",
@@ -206,6 +221,29 @@ describe("migrations", () => {
     return result.rows.map((row: { proname: string }) => row.proname);
   }
 
+  /** The BEFORE TRUNCATE triggers of 0011 (statement level, tgtype bit 32) and their function. */
+  async function truncateGuards(): Promise<{ triggers: string[]; functions: string[] }> {
+    const triggers = await pool.query(
+      `select t.tgname from pg_trigger t join pg_class c on c.oid = t.tgrelid
+       where not t.tgisinternal and (t.tgtype & 32) <> 0 order by 1`,
+    );
+    const functions = await pool.query(
+      "select proname from pg_proc where proname = 'append_only_refuse_truncate'",
+    );
+    return {
+      triggers: triggers.rows.map((row: { tgname: string }) => row.tgname),
+      functions: functions.rows.map((row: { proname: string }) => row.proname),
+    };
+  }
+
+  async function paymentListIndexes(): Promise<string[]> {
+    const result = await pool.query(
+      `select indexname from pg_indexes where schemaname = 'public'
+         and indexname in ('payment_attention_created_at_id_idx', 'payment_created_at_id_idx') order by 1`,
+    );
+    return result.rows.map((row: { indexname: string }) => row.indexname);
+  }
+
   /** contact_erased_at and the nullability of the four contact columns of sales_order. */
   async function orderContactShape(): Promise<Record<string, string>> {
     const result = await pool.query(
@@ -260,6 +298,14 @@ describe("migrations", () => {
       "select count(*)::int as count from pg_proc where proname = 'stock_movement_append_only'",
     );
     return result.rows[0].count > 0;
+  }
+
+  async function auditActions(targetId: string): Promise<string[]> {
+    const result = await pool.query(
+      'select "action" from "admin_audit_event" where "target_id" = $1 order by "created_at"',
+      [targetId],
+    );
+    return result.rows.map((row: { action: string }) => row.action);
   }
 
   async function journalRowCount(createdAt: number): Promise<number> {
@@ -339,6 +385,8 @@ describe("migrations", () => {
       await pool.query(`drop table if exists "${name}"`);
     }
     await pool.query('drop table if exists "health_check"');
+    // Used by triggers on tables of 0003 to 0009 (migration 0011), so it can only go once they are gone.
+    await pool.query('drop function if exists "append_only_refuse_truncate"()');
   }
 
   beforeAll(async () => {
@@ -357,7 +405,7 @@ describe("migrations", () => {
     }
   });
 
-  it("applies 0000 to 0010, rolls back 0010, 0009, 0008, 0007, 0006, 0005, 0004, 0003, 0002, 0001 then 0000, applies again and rolls back again", async () => {
+  it("applies 0000 to 0011, rolls back 0011 (twice, with data), 0010, 0009, 0008, 0007, 0006, 0005, 0004, 0003, 0002, 0001 then 0000, applies again and rolls back again", async () => {
     expect(await tableExists("health_check")).toBe(false);
     expect(await existingCatalogTables()).toEqual([]);
     expect(await existingAdminAuthTables()).toEqual([]);
@@ -384,6 +432,11 @@ describe("migrations", () => {
     const paymentWhen = whenOf("0008_payments");
     const privacyWhen = whenOf("0009_privacy");
     const searchWhen = whenOf("0010_search");
+    const truncateWhen = whenOf("0011_append_only_truncate_payment_list");
+    const TRUNCATE_GUARDS = {
+      triggers: [...TRUNCATE_GUARDED_TABLES].map((table) => `${table}_no_truncate`).sort(),
+      functions: ["append_only_refuse_truncate"],
+    };
 
     for (let round = 1; round <= 2; round += 1) {
       await migrate(drizzle(pool), { migrationsFolder });
@@ -403,7 +456,7 @@ describe("migrations", () => {
         "allow_backorder",
         "track_inventory",
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: up`).toBe(12);
       expect(await journalRowCount(cartCustomersOrdersWhen), `round ${round}: up`).toBe(1);
       expect(await existingMediaTables(), `round ${round}: up`).toEqual([...mediaTables]);
       expect(await journalRowCount(mediaWhen), `round ${round}: up`).toBe(1);
@@ -424,8 +477,46 @@ describe("migrations", () => {
       expect(await existingSearchTables(), `round ${round}: up`).toEqual([...searchTables]);
       expect(await searchSequenceExists(), `round ${round}: up`).toBe(true);
       expect(await journalRowCount(searchWhen), `round ${round}: up`).toBe(1);
+      expect(await truncateGuards(), `round ${round}: up`).toEqual(TRUNCATE_GUARDS);
+      expect(await paymentListIndexes(), `round ${round}: up`).toEqual(PAYMENT_LIST_INDEXES);
+      expect(await journalRowCount(truncateWhen), `round ${round}: up`).toBe(1);
 
-      // Down 0010 only: its tables, sequence and journal row are gone, 0009 stays applied.
+      // Down 0011 only, with data present: an audit event of the new action admin_user.activated and a payment journal
+      // row. The triggers, their function, the two indexes and the journal row go; every row stays. Then up and down
+      // again (the down script refuses nothing: 0011 added no CHECK value).
+      const auditTarget = randomUUID();
+      await pool.query(
+        `insert into "admin_audit_event" ("action", "target_kind", "target_id", "detail")
+         values ('admin_user.activated', 'admin_user', $1, '{}'::jsonb)`,
+        [auditTarget],
+      );
+      for (let pass = 1; pass <= 2; pass += 1) {
+        const label = `round ${round}: down 0011 (pass ${pass})`;
+        await rollback("0011_append_only_truncate_payment_list.down.sql");
+        expect(await truncateGuards(), label).toEqual({ triggers: [], functions: [] });
+        expect(await paymentListIndexes(), label).toEqual([]);
+        expect(await appliedMigrationCount(), label).toBe(11);
+        expect(await journalRowCount(truncateWhen), label).toBe(0);
+        expect(await journalRowCount(searchWhen), label).toBe(1);
+        expect(await auditActions(auditTarget), label).toEqual(["admin_user.activated"]);
+
+        // Up again: only 0011 may run. This fails if the down script forgot its bookkeeping row.
+        await migrate(drizzle(pool), { migrationsFolder });
+        expect(await truncateGuards(), `round ${round}: re-up 0011 (pass ${pass})`).toEqual(
+          TRUNCATE_GUARDS,
+        );
+        expect(await paymentListIndexes(), `round ${round}: re-up 0011 (pass ${pass})`).toEqual(
+          PAYMENT_LIST_INDEXES,
+        );
+        expect(await appliedMigrationCount(), `round ${round}: re-up 0011 (pass ${pass})`).toBe(12);
+        expect(
+          await auditActions(auditTarget),
+          `round ${round}: re-up 0011 (pass ${pass})`,
+        ).toEqual(["admin_user.activated"]);
+      }
+
+      // Down 0010 (after 0011): its tables, sequence and journal row are gone, 0009 stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       expect(await existingSearchTables(), `round ${round}: down 0010`).toEqual([]);
       expect(await searchSequenceExists(), `round ${round}: down 0010`).toBe(false);
@@ -436,14 +527,15 @@ describe("migrations", () => {
       expect(await journalRowCount(searchWhen), `round ${round}: down 0010`).toBe(0);
       expect(await journalRowCount(privacyWhen), `round ${round}: down 0010`).toBe(1);
 
-      // Up again: only 0010 may run. This fails if the down script forgot its bookkeeping row.
+      // Up again: only 0010 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingSearchTables(), `round ${round}: re-up 0010`).toEqual([...searchTables]);
       expect(await searchSequenceExists(), `round ${round}: re-up 0010`).toBe(true);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0010`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0010`).toBe(12);
       expect(await journalRowCount(searchWhen), `round ${round}: re-up 0010`).toBe(1);
 
       // Down 0009 only: its tables, function, column and journal row are gone, the contact columns are NOT NULL again.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       expect(await existingPrivacyTables(), `round ${round}: down 0009`).toEqual([]);
@@ -459,16 +551,17 @@ describe("migrations", () => {
       expect(await journalRowCount(privacyWhen), `round ${round}: down 0009`).toBe(0);
       expect(await journalRowCount(paymentWhen), `round ${round}: down 0009`).toBe(1);
 
-      // Up again: only 0009 may run. This fails if the down script forgot its bookkeeping row.
+      // Up again: only 0009 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingPrivacyTables(), `round ${round}: re-up 0009`).toEqual([
         ...privacyTables,
       ]);
       expect(await orderContactShape(), `round ${round}: re-up 0009`).toEqual(NULLABLE_CONTACT);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0009`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0009`).toBe(12);
       expect(await journalRowCount(privacyWhen), `round ${round}: re-up 0009`).toBe(1);
 
       // Down 0008 only: its tables, function and journal row are gone, everything else stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -488,7 +581,7 @@ describe("migrations", () => {
       expect(await journalRowCount(paymentWhen), `round ${round}: down 0008`).toBe(0);
       expect(await journalRowCount(emailWhen), `round ${round}: down 0008`).toBe(1);
 
-      // Up again: only 0008 may run. This fails if the down script forgot its bookkeeping row.
+      // Up again: only 0008 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingPaymentTables(), `round ${round}: re-up 0008`).toEqual([
         ...paymentTables,
@@ -496,10 +589,11 @@ describe("migrations", () => {
       expect(await existingPaymentFunctions(), `round ${round}: re-up 0008`).toEqual([
         ...paymentFunctions,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0008`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0008`).toBe(12);
       expect(await journalRowCount(paymentWhen), `round ${round}: re-up 0008`).toBe(1);
 
       // Down 0007 (after 0008): its tables and journal row are gone, everything else stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -521,13 +615,14 @@ describe("migrations", () => {
       expect(await journalRowCount(emailWhen), `round ${round}: down 0007`).toBe(0);
       expect(await journalRowCount(shippingWhen), `round ${round}: down 0007`).toBe(1);
 
-      // Up again: only 0007 may run. This fails if the down script forgot its bookkeeping row.
+      // Up again: only 0007 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingEmailTables(), `round ${round}: re-up 0007`).toEqual([...emailTables]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0007`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0007`).toBe(12);
       expect(await journalRowCount(emailWhen), `round ${round}: re-up 0007`).toBe(1);
 
       // Down 0006 (after 0007): its tables, functions and journal row are gone, everything else stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -554,11 +649,12 @@ describe("migrations", () => {
       expect(await existingShippingFunctions(), `round ${round}: re-up 0006`).toEqual(
         [...shippingFunctions].sort(),
       );
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0006`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0006`).toBe(12);
       expect(await journalRowCount(shippingWhen), `round ${round}: re-up 0006`).toBe(1);
       expect(await existingEmailTables(), `round ${round}: re-up 0006`).toEqual([...emailTables]);
 
       // Down 0005 (after 0007 and 0006): its table and its journal row are gone, everything else stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -582,10 +678,11 @@ describe("migrations", () => {
       // Up again: only 0005, 0006 and 0007 may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingMediaTables(), `round ${round}: re-up 0005`).toEqual([...mediaTables]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0005`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0005`).toBe(12);
       expect(await journalRowCount(mediaWhen), `round ${round}: re-up 0005`).toBe(1);
 
       // Down 0004 only: its tables and functions and its journal row are gone, the rest stays applied.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -602,12 +699,14 @@ describe("migrations", () => {
       expect(await appliedMigrationCount(), `round ${round}: down 0004`).toBe(4);
       expect(await journalRowCount(cartCustomersOrdersWhen), `round ${round}: down 0004`).toBe(0);
 
-      // Up again: only 0004 may run. This fails if the down script forgot its bookkeeping row.
+      // Up again: only 0004 and the later ones rolled back with it may run. This fails if the down script forgot its bookkeeping row.
       await migrate(drizzle(pool), { migrationsFolder });
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0004`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0004`).toBe(12);
+
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
 
       await rollback("0010_search.down.sql");
 
@@ -641,7 +740,9 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0003`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0003`).toBe(12);
+
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
 
       await rollback("0010_search.down.sql");
 
@@ -669,7 +770,9 @@ describe("migrations", () => {
       expect(await existingAdminAuthTables(), `round ${round}: re-up 0002`).toEqual([
         ...adminAuthTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0002`).toBe(12);
+
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
 
       await rollback("0010_search.down.sql");
 
@@ -703,7 +806,9 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersTables(), `round ${round}: re-up 0001`).toEqual([
         ...cartCustomersOrdersTables,
       ]);
-      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(11);
+      expect(await appliedMigrationCount(), `round ${round}: re-up 0001`).toBe(12);
+
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
 
       await rollback("0010_search.down.sql");
 
@@ -741,6 +846,7 @@ describe("migrations", () => {
     await pool.query('create view "catalog_down_probe" as select id from "product"');
     try {
       // 0008 to 0002 are rolled back first: 0004, 0003 and 0002 hold foreign keys to variant.
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await rollback("0009_privacy.down.sql");
       await rollback("0008_payments.down.sql");
@@ -771,10 +877,11 @@ describe("migrations", () => {
       expect(await existingCartCustomersOrdersFunctions()).toEqual(
         [...cartCustomersOrdersFunctions].sort(),
       );
-      expect(await appliedMigrationCount()).toBe(11);
+      expect(await appliedMigrationCount()).toBe(12);
     } finally {
       await pool.query('drop view if exists "orders_down_probe"');
     }
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -796,10 +903,11 @@ describe("migrations", () => {
         code: "2BP01",
       });
       expect(await existingMediaTables()).toEqual([...mediaTables]);
-      expect(await appliedMigrationCount()).toBe(11);
+      expect(await appliedMigrationCount()).toBe(12);
     } finally {
       await pool.query('drop view if exists "media_down_probe"');
     }
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -822,10 +930,11 @@ describe("migrations", () => {
       // One multi-statement query is atomic: the tables dropped before shipping_method are back, the journal row stays.
       expect(await existingShippingTables()).toEqual([...shippingTables]);
       expect(await existingShippingFunctions()).toEqual([...shippingFunctions].sort());
-      expect(await appliedMigrationCount()).toBe(11);
+      expect(await appliedMigrationCount()).toBe(12);
     } finally {
       await pool.query('drop view if exists "shipping_down_probe"');
     }
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -844,6 +953,7 @@ describe("migrations", () => {
     await migrate(drizzle(pool), { migrationsFolder });
     // customer_auth_token is dropped last, so email_message is already dropped when the script fails.
     await pool.query('create view "email_down_probe" as select id from "customer_auth_token"');
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -870,6 +980,7 @@ describe("migrations", () => {
     await migrate(drizzle(pool), { migrationsFolder });
     // payment is dropped last, so payment_refund and payment_event are already dropped when the script fails.
     await pool.query('create view "payment_down_probe" as select id from "payment"');
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     try {
@@ -897,6 +1008,7 @@ describe("migrations", () => {
     await migrate(drizzle(pool), { migrationsFolder });
     await pool.query('create view "privacy_down_probe" as select id from "privacy_request"');
     try {
+      await rollback("0011_append_only_truncate_payment_list.down.sql");
       await rollback("0010_search.down.sql");
       await expect(rollback("0009_privacy.down.sql")).rejects.toMatchObject({ code: "2BP01" });
       // One multi-statement query is atomic: admin_audit_event (dropped first) is back, the columns and the row stay.
@@ -930,10 +1042,11 @@ describe("migrations", () => {
       // One multi-statement query is atomic: search_synonym_group (dropped first) is back, the journal row stays.
       expect(await existingSearchTables()).toEqual([...searchTables]);
       expect(await searchSequenceExists()).toBe(true);
-      expect(await appliedMigrationCount()).toBe(11);
+      expect(await appliedMigrationCount()).toBe(12);
     } finally {
       await pool.query('drop view if exists "search_down_probe"');
     }
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     expect(await existingSearchTables()).toEqual([]);
     expect(await searchSequenceExists()).toBe(false);
@@ -952,6 +1065,7 @@ describe("migrations", () => {
   it("upgrades a database with orders to 0009 without touching them, refuses the down script while an order is erased, and the down script leaves live orders intact", async () => {
     // A database exactly as release 0008 left it: everything applied, then 0009 rolled back.
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     expect(await appliedMigrationCount()).toBe(9);
@@ -983,7 +1097,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0009; the existing rows are untouched apart from the new NULL column.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(11);
+    expect(await appliedMigrationCount()).toBe(12);
     expect(await keptOrder()).toEqual({ ...before, contact_erased_at: null });
 
     // Anonymise one order and use the new tables.
@@ -1002,6 +1116,7 @@ describe("migrations", () => {
     );
 
     // The down script refuses: the erased contact cannot be restored. Nothing changed.
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await expect(rollback("0009_privacy.down.sql")).rejects.toMatchObject({ code: "23001" });
     expect(await existingPrivacyTables()).toEqual([...privacyTables]);
@@ -1031,6 +1146,7 @@ describe("migrations", () => {
   it("upgrades a database that already holds orders, their journal and mails to 0008 without touching them, and the down script leaves them intact", async () => {
     // A database exactly as release 0007 left it: everything applied, then 0008 rolled back.
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1083,7 +1199,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0008; the existing rows are untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(11);
+    expect(await appliedMigrationCount()).toBe(12);
     expect(await existingPaymentTables()).toEqual([...paymentTables]);
     expect(await ordersSnapshot()).toEqual(before);
 
@@ -1121,6 +1237,7 @@ describe("migrations", () => {
     ).rejects.toMatchObject({ code: "23503" });
 
     // Down 0008: the payment rows are gone; every order, journal, mail and admin row is exactly as before.
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1142,6 +1259,7 @@ describe("migrations", () => {
   it("upgrades a database that already holds customers, orders and admin users to 0007 without touching them, and the down script leaves them intact", async () => {
     // A database exactly as release 0006 left it: everything applied, then 0008 and 0007 rolled back.
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1189,7 +1307,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0007 and 0008; the existing rows are untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(11);
+    expect(await appliedMigrationCount()).toBe(12);
     expect(await existingEmailTables()).toEqual([...emailTables]);
     expect(await accountsSnapshot()).toEqual(before);
 
@@ -1213,6 +1331,7 @@ describe("migrations", () => {
     );
 
     // Down 0007: the mails and tokens are gone; every customer, session, admin and order row is exactly as before.
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1233,6 +1352,7 @@ describe("migrations", () => {
   it("upgrades a database that already holds orders to 0006 without touching them, and the down script leaves them intact", async () => {
     // A database exactly as release 0005 left it: everything applied, then 0008 to 0006 rolled back.
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1274,7 +1394,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0006 to 0008; the existing order rows are untouched.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(11);
+    expect(await appliedMigrationCount()).toBe(12);
     expect(await existingShippingTables()).toEqual([...shippingTables]);
     expect(await ordersSnapshot()).toEqual(before);
 
@@ -1305,6 +1425,7 @@ describe("migrations", () => {
     ).rejects.toMatchObject({ code: "23503" });
 
     // Down 0007 and 0006: the shipping rows are gone; every order row is exactly as before.
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1325,6 +1446,7 @@ describe("migrations", () => {
   it("upgrades a database that already holds 0003 data without touching it, and the down script leaves it intact", async () => {
     // A database exactly as release 0003 left it: everything applied, then 0004 rolled back (tables and bookkeeping row).
     await migrate(drizzle(pool), { migrationsFolder });
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");
@@ -1385,7 +1507,7 @@ describe("migrations", () => {
 
     // The real migrator applies only 0004 to 0008 to this database.
     await migrate(drizzle(pool), { migrationsFolder });
-    expect(await appliedMigrationCount()).toBe(11);
+    expect(await appliedMigrationCount()).toBe(12);
     expect(await existingCartCustomersOrdersTables()).toEqual([...cartCustomersOrdersTables]);
     expect(await pricingInventorySnapshot()).toEqual(before);
 
@@ -1413,6 +1535,7 @@ describe("migrations", () => {
     ).rejects.toMatchObject({ code: "23503" });
 
     // Down 0004: the new tables and their data are gone; every 0003 row is exactly as before.
+    await rollback("0011_append_only_truncate_payment_list.down.sql");
     await rollback("0010_search.down.sql");
     await rollback("0009_privacy.down.sql");
     await rollback("0008_payments.down.sql");

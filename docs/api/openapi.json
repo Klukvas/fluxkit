@@ -2424,6 +2424,7 @@
                 "admin_user.created",
                 "admin_user.role_changed",
                 "admin_user.deactivated",
+                "admin_user.activated",
                 "admin_user.password_reset",
                 "privacy.lookup",
                 "privacy.exported",
@@ -2479,7 +2480,7 @@
                           },
                           "adminUserId": {
                             "nullable": true,
-                            "description": "The acting admin; null once that admin user was deleted.",
+                            "description": "The acting admin; null once that admin user was deleted, and for `pnpm admin:create` (no acting admin; `detail.source` is `cli`).",
                             "type": "string",
                             "format": "uuid"
                           },
@@ -2492,6 +2493,7 @@
                               "admin_user.created",
                               "admin_user.role_changed",
                               "admin_user.deactivated",
+                              "admin_user.activated",
                               "admin_user.password_reset",
                               "privacy.lookup",
                               "privacy.exported",

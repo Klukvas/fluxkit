@@ -846,6 +846,7 @@ export type AdminAuditAction =
   | "admin_user.created"
   | "admin_user.role_changed"
   | "admin_user.deactivated"
+  | "admin_user.activated"
   | "admin_user.password_reset"
   | "privacy.lookup"
   | "privacy.exported"

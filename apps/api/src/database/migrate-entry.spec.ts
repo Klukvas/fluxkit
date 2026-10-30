@@ -193,7 +193,7 @@ describe("built db:migrate entry (real process, real Postgres)", () => {
     expect(await appliedRows(database)).toEqual(before);
   });
 
-  it("applies only 0002 to 0010 to a database migrated up to 0001", async () => {
+  it("applies only 0002 to 0011 to a database migrated up to 0001", async () => {
     const database = await freshDatabase();
     await migrateUpTo(database, 2);
     expect(await tableExists(database, "admin_user")).toBe(false);
@@ -202,7 +202,7 @@ describe("built db:migrate entry (real process, real Postgres)", () => {
 
     expect(outcome.code).toBe(0);
     expect(outcome.stdout).toBe(
-      `Migrating database "${database.name}"\nApplied 9 migrations:\n  0002_admin_auth\n  0003_pricing_inventory\n  0004_cart_customers_orders\n  0005_media_upload\n  0006_shipping\n  0007_email\n  0008_payments\n  0009_privacy\n  0010_search\n`,
+      `Migrating database "${database.name}"\nApplied 10 migrations:\n  0002_admin_auth\n  0003_pricing_inventory\n  0004_cart_customers_orders\n  0005_media_upload\n  0006_shipping\n  0007_email\n  0008_payments\n  0009_privacy\n  0010_search\n  0011_append_only_truncate_payment_list\n`,
     );
     expect(await appliedRows(database)).toEqual(journal.map((entry) => entry.when));
     expect(await tableExists(database, "admin_user")).toBe(true);

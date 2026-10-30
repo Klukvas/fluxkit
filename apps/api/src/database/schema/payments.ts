@@ -234,6 +234,17 @@ export const payment = pgTable(
     index("payment_next_check_at_idx")
       .on(t.nextCheckAt)
       .where(sql`${t.nextCheckAt} IS NOT NULL`),
+    // The admin payment list (`PaymentsRepository.listPage`, migration 0011): newest first, keyset `(created_at, id) <
+    // cursor`. NULLS FIRST is the default of DESC in an ORDER BY; with NULLS LAST the planner could not use the index
+    // for that order and would sort. The partial index serves the attention list, the full one the unfiltered list and
+    // `needsAttention=false`.
+    index("payment_attention_created_at_id_idx")
+      .on(t.createdAt.desc().nullsFirst(), t.id.desc().nullsFirst())
+      .where(sql`${t.needsAttention}`),
+    index("payment_created_at_id_idx").on(
+      t.createdAt.desc().nullsFirst(),
+      t.id.desc().nullsFirst(),
+    ),
   ],
 );
 

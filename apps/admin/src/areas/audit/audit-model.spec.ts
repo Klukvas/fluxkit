@@ -142,6 +142,7 @@ describe("the audit query in the URL", () => {
       [
         "admin_user.created",
         "admin_user.deactivated",
+        "admin_user.activated",
         "admin_user.password_reset",
         "admin_user.role_changed",
         "customer.activated",

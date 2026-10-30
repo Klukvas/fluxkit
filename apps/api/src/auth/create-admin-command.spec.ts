@@ -279,6 +279,58 @@ describe("runCreateAdminCommand (real app, real Postgres)", () => {
     expect((await rows())[0]?.role).toBe("viewer");
   });
 
+  it("records admin_user.created with no actor and source cli in the same transaction (ADR 0033 decision 9)", async () => {
+    const result = await runCreateAdminCommand(
+      ["--email", `${prefix}audited@example.com`, "--role", "manager"],
+      env,
+      io,
+      options,
+    );
+    const events = await pool.query<{
+      admin_user_id: string | null;
+      action: string;
+      target_kind: string;
+      detail: unknown;
+    }>(
+      "select admin_user_id, action, target_kind, detail from admin_audit_event where target_id = $1",
+      [result.id],
+    );
+    expect(events.rows).toEqual([
+      {
+        admin_user_id: null,
+        action: "admin_user.created",
+        target_kind: "admin_user",
+        detail: { role: "manager", source: "cli" },
+      },
+    ]);
+    expect(JSON.stringify(events.rows)).not.toContain(`${prefix}audited`);
+  });
+
+  it("creates nothing when its audit event cannot be written", async () => {
+    // A test-only trigger refuses the audit row of this one email (the new user is visible inside the transaction).
+    await pool.query(`
+      create function test_refuse_cli_audit() returns trigger language plpgsql as $$
+      begin
+        if exists (select 1 from admin_user where id = new.target_id and email = '${prefix}atomic@example.com') then
+          raise exception 'test: audit insert refused';
+        end if;
+        return new;
+      end;
+      $$;
+      create trigger test_refuse_cli_audit before insert on admin_audit_event
+        for each row execute function test_refuse_cli_audit();`);
+    try {
+      await expect(
+        runCreateAdminCommand(["--email", `${prefix}atomic@example.com`], env, io, options),
+      ).rejects.toThrow(/audit insert refused/);
+    } finally {
+      await pool.query(`
+        drop trigger if exists test_refuse_cli_audit on admin_audit_event;
+        drop function if exists test_refuse_cli_audit();`);
+    }
+    expect(await rows()).toEqual([]);
+  });
+
   it("formats only the created line", async () => {
     const result = await runCreateAdminCommand(
       ["--email", `${prefix}p@example.com`],
