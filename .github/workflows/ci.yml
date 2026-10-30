@@ -27,7 +27,7 @@ jobs:
   verify:
     name: Lint, types, boundaries, tests
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     services:
       postgres:
         image: postgres:17-alpine
@@ -78,7 +78,7 @@ jobs:
   feature-matrix:
     name: Feature matrix (${{ matrix.mode }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:

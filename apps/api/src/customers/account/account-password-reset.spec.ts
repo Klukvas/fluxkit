@@ -10,7 +10,10 @@ import {
 } from "../../test/account-email-world.js";
 import { customerLogin, customerLoginCookie } from "../../test/customer-http.js";
 import { http } from "../../test/http.js";
-import { PASSWORD_RESET_ANSWER_FLOOR_MS } from "./account-email.service.js";
+import {
+  PASSWORD_RESET_ANSWER_FLOOR_MS,
+  PASSWORD_RESETS_PER_HOUR,
+} from "./account-email.service.js";
 
 const RESET = "/store/account/password-reset";
 const CONFIRM = "/store/account/password-reset/confirm";
@@ -215,12 +218,44 @@ describe("customer password reset (ADR 0031 decision 10)", () => {
         const answers = await Promise.all(
           Array.from({ length: 5 }, () => world.requestReset(shopper.email)),
         );
+        // A unique-index collision would answer 500.
         expect(answers.map((answer) => answer.status)).toEqual(Array(5).fill(202));
         const rows = await world.tokenRows(shopper.id);
-        expect(rows).toHaveLength(3);
+        // Not always exactly 3: each request waits at most PASSWORD_RESET_LOCK_TIMEOUT_MS for the row, so the ones queued
+        // behind slower transactions of the same burst give up (`busy`, no token, the same 202). On a loaded CI runner
+        // this ended with 2 tokens (2 issued, 3 busy). The first request to take the lock never waits: at least one.
+        expect(rows.length).toBeGreaterThanOrEqual(1);
+        expect(rows.length).toBeLessThanOrEqual(PASSWORD_RESETS_PER_HOUR);
+        expect(new Set(rows.map((row) => row.token_hash)).size).toBe(rows.length);
         expect(rows.filter((row) => row.used_at === null)).toHaveLength(1);
+        // One mail per token, written in the token's transaction; none for a request that gave up or hit the limit.
+        expect(await world.outboxRows(shopper.id)).toHaveLength(rows.length);
         world.clock.advanceMinutes(61);
       }
+    });
+
+    it("answers 202 and issues nothing for every request of a burst queued longer than the lock timeout; the next request issues one", async () => {
+      const shopper = await world.customer();
+      const holder = await world.pool.connect();
+      try {
+        await holder.query("begin");
+        await holder.query("select id from customer where id = $1 for update", [shopper.id]);
+        // Held until every request answered, not for a fixed time: a waiter that moves up to the head of the queue
+        // starts a new wait of its own, so a fixed hold would let one of them through.
+        const answers = await Promise.all(
+          Array.from({ length: 5 }, () => world.requestReset(shopper.email)),
+        );
+        expect(answers.map((answer) => answer.status)).toEqual(Array(5).fill(202));
+      } finally {
+        await holder.query("rollback");
+        holder.release();
+      }
+      expect(await world.tokenRows(shopper.id)).toEqual([]);
+      expect(await world.outboxRows(shopper.id)).toEqual([]);
+      // Past the per-email window (5 in 15 minutes) the five used up.
+      world.clock.advanceMinutes(16);
+      expect((await world.requestReset(shopper.email)).status).toBe(202);
+      expect(await world.tokenRows(shopper.id)).toHaveLength(1);
     });
 
     it("allows 5 requests per requested email in 15 minutes, existing or not, then the same 429 for both", async () => {
