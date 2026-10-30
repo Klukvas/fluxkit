@@ -22,6 +22,11 @@
       "package": "argparse",
       "license": "Python-2.0",
       "reason": "owner 2026-10-14: runtime transitive of @nestjs/swagger -> js-yaml, permissive"
+    },
+    {
+      "package": "argparse",
+      "license": "PSF-2.0",
+      "reason": "owner 2026-10-30: argparse 3.x (runtime transitive of @nestjs/swagger -> js-yaml) is published as PSF-2.0, the same Python Software Foundation family as the Python-2.0 approved on 2026-10-14, permissive"
     }
   ]
 }
