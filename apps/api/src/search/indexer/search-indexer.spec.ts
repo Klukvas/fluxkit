@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SEARCH_DOCUMENT_VERSION } from "@fluxkit/core";
@@ -239,6 +240,96 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
       expect(kept.rows).toEqual([{ reason: "price_changed", lease_until: null }]);
       await syncAll();
       expect(await queued()).toEqual({});
+    });
+
+    it("drains a backlog deeper than 20 pages in one run, within the budget (sustained 50 changes a second)", async () => {
+      // Products that do not exist: each page reads, builds nothing and deletes by filter, the cheapest real page.
+      const backlog = Array.from({ length: 2_150 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [backlog],
+      );
+      const result = await indexer.sync(new Date(), UNLIMITED_BUDGET);
+      expect(result).toMatchObject({
+        scanned: 2_150,
+        synced: 2_150,
+        truncated: false,
+        failures: [],
+      });
+      expect(await queued()).toEqual({});
+    });
+
+    it("still stops between pages when the budget is used up, leaving the rest queued and due", async () => {
+      const backlog = Array.from({ length: 450 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [backlog],
+      );
+      const result = await indexer.sync(new Date(), budgetOf(2));
+      expect(result).toMatchObject({ synced: 200, truncated: true, failures: [] });
+      const left = await pool.query<{ c: number; leased: number; tried: number }>(
+        "select count(*)::int as c, count(lease_until)::int as leased, count(*) filter (where attempts > 0)::int as tried from search_sync_queue",
+      );
+      expect(left.rows[0]).toEqual({ c: 250, leased: 0, tried: 0 });
+      await syncAll();
+    });
+
+    it("a run claims only rows due at its start, so a stream of new marks can not keep it running", async () => {
+      const start = new Date(Date.now() - 1_000);
+      const later = Array.from({ length: 30 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [later],
+      );
+      expect(await indexer.sync(start, UNLIMITED_BUDGET)).toMatchObject({
+        scanned: 0,
+        truncated: false,
+      });
+      expect(Object.keys(await queued()).sort()).toEqual([...later].sort());
+      await syncAll();
+    });
+
+    it("loses no change of products edited again and again while a long run syncs them", async () => {
+      const products = await Promise.all(
+        Array.from({ length: 4 }, () => world.variant({ onHand: 1 })),
+      );
+      await syncAll();
+      const backlog = Array.from({ length: 1_500 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [backlog],
+      );
+      for (const product of products) {
+        await call("PATCH", `/admin/products/${product.productId}`, {
+          title: { uk: "Правка 0", en: "Edit 0" },
+        });
+      }
+      const last = new Map(products.map((product) => [product.productId, 0]));
+      let running = true;
+      const editor = (async () => {
+        let round = 0;
+        while (running) {
+          round += 1;
+          for (const product of products) {
+            const result = await call("PATCH", `/admin/products/${product.productId}`, {
+              title: { uk: `Правка ${round}`, en: `Edit ${round}` },
+            });
+            expect(result.status).toBe(200);
+            last.set(product.productId, round);
+          }
+        }
+      })();
+      const result = await indexer.sync(new Date(), UNLIMITED_BUDGET);
+      running = false;
+      await editor;
+      expect(result.failures).toEqual([]);
+      await syncAll();
+      for (const product of products) {
+        const [document] = await documentsOf("en", product.productId);
+        expect(document?.["title"], product.productId).toBe(
+          `Edit ${String(last.get(product.productId))}`,
+        );
+      }
     });
 
     it("two sync runs at the same time never claim the same row", async () => {

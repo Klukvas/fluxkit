@@ -9,9 +9,8 @@ import { normalizeSearchWords } from "./query.js";
 export const SEARCH_INDEXING = Object.freeze({
   /** A claimed queue row belongs to its job run for this long; a crashed run's rows are claimed again afterwards. */
   syncLeaseSeconds: 120,
-  /** Product ids per sync page and pages per run. */
+  /** Product ids per sync page; a run takes pages until the due rows are gone or its time budget is used up. */
   syncPageSize: 100,
-  syncMaxPages: 20,
   /** How long a sync or rebuild waits for one engine task. */
   taskTimeoutMs: 20_000,
   /** Products read per rebuild page; documents are sent in batches of at most `rebuildBatchDocuments`. */

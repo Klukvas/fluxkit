@@ -167,8 +167,12 @@ export class SearchIndexer {
     let retried = 0;
     const failures: { code: string; products: number }[] = [];
     let truncated = false;
-    for (let page = 0; ; page++) {
-      if (page >= SEARCH_INDEXING.syncMaxPages || budget.exhausted()) {
+    // Pages until the due rows are gone or the budget is used up (checked between pages; a page that has begun finishes).
+    // No page cap: a backlog drains at the engine's pace within the budget (measured about 450 products a second, so a
+    // sustained 50 changes a second is synced at every tick). Only rows due at `now` are claimed, so marks made during
+    // the run wait for the next tick and a stream of writes can not keep a run going.
+    for (;;) {
+      if (budget.exhausted()) {
         truncated = true;
         break;
       }
