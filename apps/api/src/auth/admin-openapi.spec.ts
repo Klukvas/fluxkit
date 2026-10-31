@@ -1,11 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { Controller, Get, Module, Post } from "@nestjs/common";
 import { PERMISSIONS, permissionsOf, type AdminPermission } from "@fluxkit/core";
+import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildOpenApiDocument, OPENAPI_SEARCH_ENV } from "../app.factory.js";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { testPrincipal } from "../test/allow-all-admin-authenticator.js";
+import { requireTestDatabaseUrl } from "../test/env.js";
 import { http, type HttpOptions } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { SOME_ID, sweepRequest } from "../test/routes.js";
@@ -112,6 +114,16 @@ describe("the admin part of docs/api/openapi.json", () => {
     /** Who the app signs in as, per call: `undefined` is anonymous. */
     let signedIn: AdminPrincipal | undefined;
     let running: RunningApp;
+    const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
+    /** The locales of `search_index_state` before the sweep (see afterAll). */
+    let localesBefore: string[] = [];
+
+    async function indexStateLocales(): Promise<string[]> {
+      const result = await pool.query<{ locale: string }>(
+        "select locale from search_index_state order by locale",
+      );
+      return result.rows.map((row) => row.locale);
+    }
 
     const probeFeature = (() => {
       @Controller("admin/probe-docs")
@@ -135,6 +147,7 @@ describe("the admin part of docs/api/openapi.json", () => {
     beforeAll(async () => {
       await ensureMigrated();
       paths = await committedPaths();
+      localesBefore = await indexStateLocales();
       running = await startApp({
         extraFeatures: probeFeature,
         adminAuthenticator: { authenticate: () => signedIn },
@@ -146,6 +159,16 @@ describe("the admin part of docs/api/openapi.json", () => {
 
     afterAll(async () => {
       await running.app.close();
+      // The sweep's `POST /admin/search/rebuild` succeeds and commits a `search_index_state` row per locale. Left behind,
+      // it made a later spec file of the shared database fail (search-schema.spec inserts its own `uk` row). Only the
+      // rows this file created go: a row that was there before belongs to someone else's cleanup.
+      try {
+        await pool.query("delete from search_index_state where not (locale = any($1::text[]))", [
+          localesBefore,
+        ]);
+      } finally {
+        await pool.end();
+      }
     });
 
     it("is on EVERY admin operation, as a permission name or one of the markers authenticated, public, denied", () => {

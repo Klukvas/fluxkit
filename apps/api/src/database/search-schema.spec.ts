@@ -18,6 +18,9 @@ const CHECK_VIOLATION = "23514";
 const NOT_NULL_VIOLATION = "23502";
 const UNIQUE_VIOLATION = "23505";
 
+/** The `search_index_state` locales the tests below insert (in rolled-back transactions). */
+const OWN_STATE_LOCALES = ["uk", "en-us"];
+
 type Value = string | number | boolean | null | readonly string[];
 type Row = Record<string, Value>;
 
@@ -33,6 +36,18 @@ describe("search schema (migration 0010, real Postgres)", () => {
 
   beforeAll(async () => {
     await ensureMigrated();
+    // The tests insert these locales (one row per locale), so a row committed by an earlier spec file of the shared
+    // database fails them with a duplicate key. Say which rows are left over instead of three puzzling failures.
+    const leftover = await pool.query<{ locale: string; rebuild_requested_at: Date | null }>(
+      "select locale, rebuild_requested_at from search_index_state where locale = any($1::text[]) order by locale",
+      [OWN_STATE_LOCALES],
+    );
+    if (leftover.rows.length > 0) {
+      throw new Error(
+        `search_index_state already holds ${JSON.stringify(leftover.rows)}: an earlier spec file left committed rows ` +
+          "behind (it must delete what it creates, as SearchWorld.dispose does)",
+      );
+    }
   }, 120_000);
 
   afterAll(async () => {
