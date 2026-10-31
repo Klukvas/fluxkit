@@ -1,5 +1,9 @@
-import { MEILI_INDEX_PREFIX_PATTERN, loadEnv } from "@fluxkit/config";
-import { SEARCH_INDEX_PREFIX_PATTERN } from "@fluxkit/core";
+import {
+  MEILI_INDEX_PREFIX_PATTERN,
+  SEARCH_MAX_PARALLEL_ENGINE_CALLS,
+  loadEnv,
+} from "@fluxkit/config";
+import { SEARCH_INDEX_PREFIX_PATTERN, SEARCH_LIMITS } from "@fluxkit/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type RunningApp } from "../test/app.js";
 import { http } from "../test/http.js";
@@ -10,6 +14,12 @@ import { DEFAULT_SEARCH_TUNING, searchConfigOf, searchStartupLine } from "./sear
 describe("search configuration", () => {
   it("uses the same index prefix pattern in config and core", () => {
     expect(MEILI_INDEX_PREFIX_PATTERN.source).toBe(SEARCH_INDEX_PREFIX_PATTERN.source);
+  });
+
+  it("knows how many engine calls one search sends at once (core planSearchQueries: hits, variant facets, one per group)", () => {
+    // A price selection counts as one of the selected groups (parseSelectionParams) and plans `price_range` instead of a
+    // disjunctive query, so the most is the two fixed queries plus one per group.
+    expect(SEARCH_MAX_PARALLEL_ENGINE_CALLS).toBe(2 + SEARCH_LIMITS.maxSelectedGroups);
   });
 
   it("maps the environment to the module config and never prints the key or the URL at startup", () => {

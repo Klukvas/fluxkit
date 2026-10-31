@@ -726,9 +726,11 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
 
   it("answers 503 search_unavailable at once when the engine client's interactive lane is full (engine_busy, ADR 0041)", async () => {
     const warn = vi.spyOn(Logger.prototype, "warn");
-    // One slot, no queue: the two settings reads of a fresh process run in parallel, so the second is refused at once.
+    // One slot and no time to wait for it: the two settings reads of a fresh process run in parallel, so the second is
+    // refused at once. (Concurrency 1 without a queue is refused by the configuration; a zero wait is a test tuning.)
     const saturated = await startApp({
-      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 0 },
+      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 1 },
+      searchTuning: { engineQueueWaitMs: 0 },
     });
     // The same with a queue of one: the second read waits for the first and the search answers.
     const queued = await startApp({

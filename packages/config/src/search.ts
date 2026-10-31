@@ -21,6 +21,14 @@ export const SEARCH_ENGINE_MAX_CONCURRENCY_RANGE = Object.freeze({ min: 1, max: 
  */
 export const DEFAULT_SEARCH_ENGINE_MAX_QUEUE = 512;
 export const SEARCH_ENGINE_MAX_QUEUE_RANGE = Object.freeze({ min: 0, max: 10_000 });
+/**
+ * Engine calls one store search can send at once: with several text queries every planned query is its own call, and a
+ * plan has at most `hits` + `variant_facets` + one query per selected facet group (core `SEARCH_LIMITS.maxSelectedGroups`
+ * = 8, a price selection's `price_range` counting as its group): 10. Without a queue the concurrency must reach it, or
+ * such a search can never be answered. Repeated here because this package does not depend on core; `apps/api`
+ * `search-config.spec.ts` derives it from core and compares.
+ */
+export const SEARCH_MAX_PARALLEL_ENGINE_CALLS = 10;
 
 export type SearchEnv =
   | { readonly enabled: false }

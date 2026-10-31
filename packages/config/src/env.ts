@@ -22,6 +22,7 @@ import {
   parseEngineLimit,
   SEARCH_ENGINE_MAX_CONCURRENCY_RANGE,
   SEARCH_ENGINE_MAX_QUEUE_RANGE,
+  SEARCH_MAX_PARALLEL_ENGINE_CALLS,
   type SearchEnv,
 } from "./search.js";
 import {
@@ -535,6 +536,28 @@ const envSchema = z
             message: `must be a whole number from ${String(range.min)} to ${String(range.max)}`,
           });
         }
+      }
+      const concurrency =
+        env.SEARCH_ENGINE_MAX_CONCURRENCY === undefined
+          ? DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY
+          : parseEngineLimit(
+              env.SEARCH_ENGINE_MAX_CONCURRENCY,
+              SEARCH_ENGINE_MAX_CONCURRENCY_RANGE,
+            );
+      const queue =
+        env.SEARCH_ENGINE_MAX_QUEUE === undefined
+          ? DEFAULT_SEARCH_ENGINE_MAX_QUEUE
+          : parseEngineLimit(env.SEARCH_ENGINE_MAX_QUEUE, SEARCH_ENGINE_MAX_QUEUE_RANGE);
+      if (
+        queue === 0 &&
+        concurrency !== undefined &&
+        concurrency < SEARCH_MAX_PARALLEL_ENGINE_CALLS
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["SEARCH_ENGINE_MAX_QUEUE"],
+          message: `must be at least 1 when SEARCH_ENGINE_MAX_CONCURRENCY is below ${String(SEARCH_MAX_PARALLEL_ENGINE_CALLS)} (one search can send that many engine calls at once; without a queue it could never be answered)`,
+        });
       }
     }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
