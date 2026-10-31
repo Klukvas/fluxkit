@@ -27,7 +27,7 @@ describe("search configuration", () => {
       meiliApiKey: "secret-search-key-0123456789",
       indexPrefix: "shop_",
       engineMaxConcurrency: 8,
-      engineMaxQueue: 64,
+      engineMaxQueue: 512,
       tuning: DEFAULT_SEARCH_TUNING,
     });
     expect(

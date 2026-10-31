@@ -150,7 +150,7 @@ describe("SearchEngine transport (loopback servers)", () => {
     expect(search?.url).toBe("/multi-search");
     expect(search?.headers["authorization"]).toBe(`Bearer ${KEY}`);
     expect(search?.headers["content-type"]).toBe("application/json");
-    expect(search?.headers["content-length"]).toBe(String(Buffer.byteLength(search.body)));
+    expect(search?.headers["content-length"]).toBe(String(Buffer.byteLength(search?.body ?? "")));
     expect(JSON.parse(search?.body ?? "")).toEqual({ queries: [{ indexUid: "x", q: "q0" }] });
     const health = stub.requests.at(-1);
     expect(health?.method).toBe("GET");

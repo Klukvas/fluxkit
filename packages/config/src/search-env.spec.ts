@@ -62,7 +62,7 @@ describe("SEARCH_ENABLED", () => {
       engineMaxQueue: DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
     });
     expect([DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY, DEFAULT_SEARCH_ENGINE_MAX_QUEUE]).toEqual([
-      8, 64,
+      8, 512,
     ]);
   });
 
@@ -184,7 +184,7 @@ describe("SEARCH_ENGINE_MAX_CONCURRENCY and SEARCH_ENGINE_MAX_QUEUE", () => {
     expect(
       loadEnv({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: "", SEARCH_ENGINE_MAX_QUEUE: " " })
         .search,
-    ).toMatchObject({ engineMaxConcurrency: 8, engineMaxQueue: 64 });
+    ).toMatchObject({ engineMaxConcurrency: 8, engineMaxQueue: 512 });
     expect(
       loadEnv({
         ...enabled,

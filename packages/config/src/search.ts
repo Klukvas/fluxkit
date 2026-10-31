@@ -14,8 +14,12 @@ const MEILI_API_KEY_PATTERN = /^[\x21-\x7e]{16,256}$/;
  */
 export const DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY = 8;
 export const SEARCH_ENGINE_MAX_CONCURRENCY_RANGE = Object.freeze({ min: 1, max: 256 });
-/** Interactive calls that may wait for a slot; past it a call fails at once (the store answers 503, ADR 0041). */
-export const DEFAULT_SEARCH_ENGINE_MAX_QUEUE = 64;
+/**
+ * Interactive calls that may wait for a slot; past it a call fails at once (the store answers 503, ADR 0041). Large on
+ * purpose: one search fans out into up to about 7 parallel engine calls, and the 1 s maximum wait, not the length, is
+ * what sheds load (64 refused a quarter of the searches at a load the engine could serve).
+ */
+export const DEFAULT_SEARCH_ENGINE_MAX_QUEUE = 512;
 export const SEARCH_ENGINE_MAX_QUEUE_RANGE = Object.freeze({ min: 0, max: 10_000 });
 
 export type SearchEnv =
