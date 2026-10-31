@@ -91,7 +91,10 @@ export const DEFAULT_INTERACTIVE_LIMITS: InteractiveLimits = Object.freeze({
 
 /** Sockets of the background lane: the indexer works one batch at a time, so a few are plenty. */
 const BACKGROUND_MAX_SOCKETS = 8;
-/** An idle kept-alive socket is closed after this (undici's default, below the engine's own idle limit). */
+/**
+ * An idle kept-alive socket is closed after this: undici's default. Meilisearch v1.55.0 kept an idle connection open for
+ * at least 7 s in a probe; its exact idle limit was not measured.
+ */
 const IDLE_SOCKET_TIMEOUT_MS = 4_000;
 /** What `fetch` with `redirect: "error"` refused as a network error (the Fetch standard's "redirect status"). */
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -137,6 +140,7 @@ export class SearchEngine {
   private readonly agents: Readonly<Record<Lane, http.Agent>>;
   private readonly limits: InteractiveLimits;
   private readonly limiter: ConcurrencyLimiter;
+  private closed = false;
 
   constructor(private readonly options: SearchEngineOptions) {
     const secure = new URL(options.url).protocol === "https:";
@@ -163,10 +167,13 @@ export class SearchEngine {
   }
 
   /**
-   * Closes every pooled connection and refuses the calls still waiting for a slot (`engine_busy`). Calls already sent end
-   * as their destroyed sockets make them end (usually `engine_unreachable`). Idempotent.
+   * Final: closes every pooled connection and nothing is sent afterwards. Calls waiting for an interactive slot, and every
+   * later interactive call, fail with `engine_busy`; a later background call fails with `engine_unreachable` without
+   * connecting; a call in flight ends with its destroyed socket (`engine_unreachable`) and is not sent again, even when it
+   * is a read on a reused socket. Idempotent.
    */
   close(): void {
+    this.closed = true;
     this.limiter.close();
     this.agents.interactive.destroy();
     this.agents.background.destroy();
@@ -222,6 +229,9 @@ export class SearchEngine {
   ): Promise<{ status: number; text: string }> {
     const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
     for (let attempt = 1; ; attempt += 1) {
+      if (this.closed) {
+        throw new SearchEngineError("engine_unreachable", { operation });
+      }
       const outcome = await this.attempt(
         method,
         path,
@@ -232,7 +242,13 @@ export class SearchEngine {
       if (outcome.kind === "answer") {
         return outcome;
       }
-      if (outcome.staleSocket && idempotent && attempt === 1 && Date.now() < deadline) {
+      if (
+        outcome.staleSocket &&
+        idempotent &&
+        attempt === 1 &&
+        !this.closed &&
+        Date.now() < deadline
+      ) {
         continue;
       }
       throw new SearchEngineError(outcome.code, {

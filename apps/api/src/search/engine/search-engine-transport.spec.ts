@@ -347,6 +347,31 @@ describe("SearchEngine transport (loopback servers)", () => {
     expect(stub.requests.filter((entry) => entry.url === "/indexes")).toHaveLength(2);
   });
 
+  it("close() is final: a read cut by it on a reused connection is not sent again, and later calls are refused", async () => {
+    let held = 0;
+    const stub = await stubEngine((_request, response) => {
+      if (stub.requests.length === 1) {
+        json(response, 200, { results: [] });
+        return;
+      }
+      held += 1; // never answered: close() has to end it
+    });
+    const engine = engineFor(stub.url);
+    await engine.multiSearch({ queries: [] });
+    const cut = engineError(() => engine.multiSearch({ queries: [] }, 5_000));
+    await eventually(() => held === 1);
+    engine.close();
+    expect((await cut).code).toBe("engine_unreachable");
+    // Give a wrongly retried request time to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(stub.requests).toHaveLength(2);
+    expect(stub.connections).toBe(1);
+    const later = await engineError(() => engine.documentCount("idx"));
+    expect(later.code).toBe("engine_unreachable");
+    expect((await engineError(() => engine.multiSearch({ queries: [] }))).code).toBe("engine_busy");
+    expect(stub.requests).toHaveLength(2);
+  });
+
   it("close() closes the kept-alive connections", async () => {
     const stub = await stubEngine((_request, response) =>
       json(response, 200, { status: "available" }),
@@ -470,18 +495,18 @@ describe("SearchEngine interactive lane (loopback servers)", () => {
     const holding = engine.multiSearch({ queries: [] }, 5_000);
     await eventually(() => arrived() === 1);
     const started = Date.now();
-    // 600 ms in all; 400 of them are spent waiting for the slot, the engine then never answers the call.
-    const waiting = engineError(() => engine.multiSearch({ queries: [] }, 600));
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // 1 000 ms in all; 800 of them are spent waiting for the slot, the engine then never answers the call.
+    const waiting = engineError(() => engine.multiSearch({ queries: [] }, 1_000));
+    await new Promise((resolve) => setTimeout(resolve, 800));
     answerAll();
     await holding;
     const error = await waiting;
     const elapsed = Date.now() - started;
     expect(error.code).toBe("engine_timeout");
     expect(arrived()).toBe(2);
-    // With a restarted timeout it would end near 400 + 600 ms.
-    expect(elapsed).toBeGreaterThanOrEqual(590);
-    expect(elapsed).toBeLessThan(900);
+    // With a restarted timeout it would end near 800 + 1 000 ms; the bound only has to tell the two apart on a busy machine.
+    expect(elapsed).toBeGreaterThanOrEqual(990);
+    expect(elapsed).toBeLessThan(1_500);
   });
 
   it("frees the slot of a call that timed out, failed or was cut, so the next call runs", async () => {
