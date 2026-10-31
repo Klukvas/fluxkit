@@ -173,16 +173,26 @@ export class SearchIndexer {
     let retried = 0;
     const failures: { code: string; products: number }[] = [];
     let truncated = false;
-    // Pages until the due rows are gone or the budget is used up (checked between pages; a page that has begun finishes).
-    // No page cap: a backlog drains at the engine's pace within the budget (measured about 450 products a second, so a
-    // sustained 50 changes a second is synced at every tick). Only rows due at `now` are claimed, so marks made during
-    // the run wait for the next tick and a stream of writes can not keep a run going.
+    // Pages until the rows due at the start of the run are done or the budget is used up (checked between pages; a page
+    // that has begun finishes). No page cap: a backlog drains at the engine's pace within the budget (measured about 450
+    // products a second, so a sustained 50 changes a second is synced at every tick). A run claims only rows due at `now`
+    // whose `change_seq` it saw at its start: a new row, or a row marked again during the run (a newer `change_seq`, kept
+    // by the settle guard), waits for the next run, so each row is claimed at most once per run and a stream of writes
+    // can not keep a run going (review F1).
+    const boundary = await this.queue.lastChangeSeq(this.database);
     for (;;) {
       if (budget.exhausted()) {
-        truncated = true;
+        // `truncated` means rows of this run are left, not merely that the time is up.
+        truncated = await this.queue.hasDue(this.database, now, boundary);
         break;
       }
-      const claimed = await this.queue.claimDue(this.database, now, SEARCH_INDEXING.syncPageSize);
+      const claimed = await this.queue.claimDue(
+        this.database,
+        now,
+        SEARCH_INDEXING.syncPageSize,
+        SEARCH_INDEXING.syncLeaseSeconds,
+        boundary,
+      );
       if (claimed.length === 0) {
         break;
       }

@@ -1,4 +1,6 @@
 import { randomUUID } from "node:crypto";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { SEARCH_DOCUMENT_VERSION } from "@fluxkit/core";
@@ -266,7 +268,11 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         [backlog],
       );
       const result = await indexer.sync(new Date(), budgetOf(2));
-      expect(result).toMatchObject({ synced: 200, truncated: true, failures: [] });
+      expect(result, JSON.stringify(result)).toMatchObject({
+        synced: 200,
+        truncated: true,
+        failures: [],
+      });
       const left = await pool.query<{ c: number; leased: number; tried: number }>(
         "select count(*)::int as c, count(lease_until)::int as leased, count(*) filter (where attempts > 0)::int as tried from search_sync_queue",
       );
@@ -305,12 +311,13 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
         });
       }
       const last = new Map(products.map((product) => [product.productId, 0]));
-      let running = true;
-      const editor = (async () => {
-        let round = 0;
-        while (running) {
-          round += 1;
-          for (const product of products) {
+      // A pass-through proxy in front of the engine edits a product at the exact moment its documents are sent: after
+      // the run claimed its row and before it settles it. Deterministic, no race with the run.
+      let round = 0;
+      const proxy = await startEditingProxy(async (body) => {
+        for (const product of products) {
+          if (body.includes(product.productId)) {
+            round += 1;
             const result = await call("PATCH", `/admin/products/${product.productId}`, {
               title: { uk: `Правка ${round}`, en: `Edit ${round}` },
             });
@@ -318,11 +325,20 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
             last.set(product.productId, round);
           }
         }
-      })();
-      const result = await indexer.sync(new Date(), UNLIMITED_BUDGET);
-      running = false;
-      await editor;
-      expect(result.failures).toEqual([]);
+      });
+      try {
+        // Bounded even if the run did not end by itself (it does: rows marked during the run wait for the next one).
+        const result = await search
+          .indexer(database, { url: proxy.url })
+          .sync(new Date(), budgetOf(200));
+        expect(result, JSON.stringify(result)).toMatchObject({ truncated: false, failures: [] });
+      } finally {
+        await proxy.close();
+      }
+      // Every product was edited inside its claim window (twice: one add per locale).
+      for (const product of products) {
+        expect(last.get(product.productId)).toBeGreaterThan(0);
+      }
       await syncAll();
       for (const product of products) {
         const [document] = await documentsOf("en", product.productId);
@@ -330,6 +346,68 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
           `Edit ${String(last.get(product.productId))}`,
         );
       }
+    });
+
+    it("claims a product re-marked during the run only once: the run ends, the new mark waits for the next run", async () => {
+      const hot = await Promise.all(Array.from({ length: 4 }, () => world.variant({ onHand: 1 })));
+      await syncAll();
+      const backlog = Array.from({ length: 1_500 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [backlog],
+      );
+      const last = new Map(hot.map((product) => [product.productId, 0]));
+      for (const product of hot) {
+        await call("PATCH", `/admin/products/${product.productId}`, {
+          title: { uk: "Гаряча 0", en: "Hot 0" },
+        });
+      }
+      let running = true;
+      const editor = (async () => {
+        for (let round = 1; running; round++) {
+          for (const product of hot) {
+            const result = await call("PATCH", `/admin/products/${product.productId}`, {
+              title: { uk: `Гаряча ${round}`, en: `Hot ${round}` },
+            });
+            expect(result.status).toBe(200);
+            last.set(product.productId, round);
+          }
+        }
+      })();
+      // 60 pages of budget for 16 pages of work: before the fix the pages kept claiming the re-marked products again (one
+      // engine round trip each) until the budget ended, and reported truncated although nothing old was left.
+      const startedAt = performance.now();
+      const result = await indexer.sync(new Date(), budgetOf(60));
+      const ms = performance.now() - startedAt;
+      running = false;
+      await editor;
+      const detail = `${JSON.stringify(result)} in ${ms.toFixed(0)} ms`;
+      expect(result.failures, detail).toEqual([]);
+      expect(result.truncated, detail).toBe(false);
+      // Each queued row is claimed at most once in a run (a hot row locked by its writer at the claim is skipped).
+      expect(result.scanned, detail).toBeGreaterThanOrEqual(1_500);
+      expect(result.scanned, detail).toBeLessThanOrEqual(1_504);
+      // The latest marks wait for the next run, which syncs the latest titles.
+      await syncAll();
+      for (const product of hot) {
+        expect((await documentsOf("en", product.productId))[0]?.["title"]).toBe(
+          `Hot ${String(last.get(product.productId))}`,
+        );
+      }
+    });
+
+    it("reports truncated only when due rows are left after the budget", async () => {
+      const backlog = Array.from({ length: 200 }, () => randomUUID());
+      await pool.query(
+        "insert into search_sync_queue (product_id, reason) select unnest($1::uuid[]), 'product_changed'",
+        [backlog],
+      );
+      // Two units of budget for exactly two pages: the budget ends with nothing left.
+      expect(await indexer.sync(new Date(), budgetOf(2))).toMatchObject({
+        synced: 200,
+        truncated: false,
+        failures: [],
+      });
     });
 
     it("two sync runs at the same time never claim the same row", async () => {
@@ -637,3 +715,54 @@ describe("SearchIndexer (real Postgres, real Meilisearch)", () => {
     });
   });
 });
+
+/**
+ * TEST ONLY: a loopback HTTP proxy to the real engine that awaits `beforeWrite(body)` before forwarding each document
+ * write (`POST .../documents` and `.../documents/delete`), so a spec can act inside the indexer's claim window.
+ */
+async function startEditingProxy(
+  beforeWrite: (body: string) => Promise<void>,
+): Promise<{ url: string; close: () => Promise<void> }> {
+  const target = meiliUrl();
+  const server = createServer((request, response) => {
+    const chunks: Buffer[] = [];
+    request.on("data", (chunk: Buffer) => chunks.push(chunk));
+    request.on("end", () => {
+      void (async () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        if (request.method === "POST" && /\/documents(\/delete)?(\?|$)/.test(request.url ?? "")) {
+          await beforeWrite(body);
+        }
+        const headers: Record<string, string> = {};
+        for (const name of ["authorization", "content-type"]) {
+          const value = request.headers[name];
+          if (typeof value === "string") headers[name] = value;
+        }
+        const answer = await fetch(`${target}${request.url ?? "/"}`, {
+          method: request.method ?? "GET",
+          headers,
+          ...(body === "" ? {} : { body }),
+        });
+        const text = await answer.text();
+        response.writeHead(answer.status, {
+          "content-type": answer.headers.get("content-type") ?? "application/json",
+        });
+        response.end(text);
+      })().catch((error: unknown) => {
+        response.writeHead(599);
+        response.end(String(error));
+      });
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo;
+  return {
+    url: `http://127.0.0.1:${String(address.port)}`,
+    close: () =>
+      new Promise<void>((resolve) => {
+        server.close(() => resolve());
+        // The engine client keeps connections alive: end them so close does not wait for its idle timeout.
+        server.closeAllConnections();
+      }),
+  };
+}
