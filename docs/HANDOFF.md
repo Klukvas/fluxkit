@@ -3,11 +3,11 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0040, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-10-31, `origin/main` at `40629ea`.
+Last updated: 2026-10-31, `origin/main` at `32e7ed7`.
 
 ## 1. Current state
 
-Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Drizzle/Postgres, Meilisearch, Redis/BullMQ, Next.js storefront, React/Vite admin SPA served under `/admin-ui/`. Migrations `0001` to `0011`. Quick start: `README.md`.
+Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Drizzle/Postgres, Meilisearch, Redis/BullMQ, Next.js storefront, React/Vite admin SPA served under `/admin-ui/`. Migrations `0001` to `0011` (all owner-approved; see section 3). Quick start: `README.md`.
 
 - **Core commerce (complete):** catalog (ADR 0006), auth and roles, pricing and inventory, cart, checkout, orders, customers, scheduler jobs 1 to 14 (`docs/api/jobs.md`). Review follow-ups: `docs/plans/2026-10-16-catalog-review-findings.md`, `docs/plans/2026-10-18-cart-orders-review-fixes.md`.
 - **Storefront v1 and Admin UI v1 (complete):** storefront catalog, cart, accounts, checkout, payment and emailed-link pages, "Your data", legal placeholders, search and facets; admin catalog, prices and stock, orders, customers, users, media (ADR 0028), Shipping, Email, Payments, Personal data, Audit log and Search areas. Playwright e2e in both.
@@ -25,7 +25,7 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 
 ## 2. Next steps (in order)
 
-1. Owner-only items of section 3 (the AGENTS.md sync was merged in #196 and the owner decisions of 2026-10-30 are recorded): confirm or reverse migrations `0009_privacy` and `0010_search` and the vendored Snowball code (approved by the orchestrator under the owner's standing autonomy grant); live provider checks; legal review. Migration `0011` was approved by the owner personally on 2026-10-30. Nothing below replaces these.
+1. Owner-only items of section 3 (the AGENTS.md sync was merged in #196 and the owner decisions of 2026-10-30 are recorded): live provider checks; legal review. Migrations `0009_privacy` and `0010_search` and the vendored Snowball code were confirmed by the owner on 2026-10-31 (first approved by the orchestrator on 2026-10-29 under the standing autonomy grant); migration `0011` was approved by the owner personally on 2026-10-30. Nothing below replaces these.
 2. Measure search at scale (plan section 13 targets: 10 000 products, 100 000 documents, `GET /store/search` p95 150 ms, rebuild at most 10 minutes); step 11 recorded no numbers beyond spike S1. Also measure the hydration cost of a page and test the engine-down fallback in a real browser (unit level only).
 3. Production deployment: owner approval of the plan, an independent review of the images and proxy, a first green `deploy-smoke` run on GitHub (it passed locally only, per `docs/deployment.md`), then a dry run on a real host.
 4. Live provider checks once the owner supplies keys (section 3).
@@ -48,8 +48,9 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 
 **AGENTS.md edits:** done in #196.
 
+**Approvals:** migrations `0001` to `0011` are all approved or confirmed by the owner; `0009_privacy`, `0010_search` and the vendored Snowball code (BSD-3-Clause, ADR 0034 decision 7) were confirmed by the owner personally on 2026-10-31 (first approved by the orchestrator on 2026-10-29 under the standing autonomy grant).
+
 **Acceptances needed from the owner:**
-- Migrations `0009_privacy` and `0010_search` and the vendored Snowball code were approved by the orchestrator under the owner's standing autonomy grant of 2026-10-29, not by the owner personally. Confirm or reverse.
 - The ADR 0034 CONFIRM items (morphology acceptance).
 
 **Live checks that need the owner's keys or go:**
