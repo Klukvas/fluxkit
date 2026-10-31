@@ -16,7 +16,7 @@ Source: `docs/plans/2026-10-29-search.md`, "Measurements at scale (2026-10-31)":
 
 ## Decisions
 - **Transport:** `node:http` / `node:https` by the URL scheme, inside `SearchEngine.request`; no new dependency. One overall deadline per call (queue wait, connect, send, headers, body), as `AbortSignal.timeout` did; on expiry the request and its socket are destroyed (never returned to the pool). Body decoded with `TextDecoder` (what `Response.text()` does). Headers: `authorization: Bearer`, `content-type` and `content-length` only with a body. Error taxonomy and messages unchanged (no URL, key or engine message).
-- **Pools (lanes):** two keep-alive agents per engine: `interactive` (store search, suggest and their two settings reads: `multiSearch`, `filterableAttributes`, `sortableAttributes`), with `maxSockets` = the concurrency limit; `background` (indexer writes, task polling, stats, health of the admin status), `maxSockets` 8 (the indexer works one batch at a time). Idle sockets close after 4 s (undici's default keep-alive timeout, under Meilisearch's) and are unreferenced while idle, so they never hold the process open.
+- **Pools (lanes):** two keep-alive agents per engine: `interactive` (store search, suggest and their two settings reads: `multiSearch`, `filterableAttributes`, `sortableAttributes`), with `maxSockets` = the concurrency limit; `background` (indexer writes, task polling, stats, health of the admin status), `maxSockets` 8 (the indexer works one batch at a time). Idle sockets close after 4 s (undici's default keep-alive timeout; Meilisearch v1.55.0 kept an idle connection open for at least 7 s in a probe, its exact idle limit was not measured) and are unreferenced while idle, so they never hold the process open.
 - **Stale keep-alive socket:** a READ (GET or `multi-search`) that fails with `ECONNRESET`/`EPIPE` on a REUSED socket before any answer is retried once on a new socket within the same deadline (the race where the server closes an idle socket as we write; Node's documented `reusedSocket` pattern). Writes are never retried (an enqueue might have happened).
 - **Limiter:** a FIFO concurrency limiter on the interactive lane only. At most N calls in flight; up to Q waiting; a call that finds the queue full, or waits longer than `min(max wait, remaining deadline)`, fails with the new code `engine_busy` (the engine was not asked). The queue wait counts against the call's deadline: the transport gets only what is left. The background lane bypasses it, so the indexer and task polling are never queued behind shoppers and never take shoppers' slots.
 - **`engine_busy`** is a new `SearchEngineErrorCode`; the store's `guard` already maps every non-`engine_rejected` engine error to `503 search_unavailable`, so the degraded behaviour is the same as `engine_unavailable`/`engine_timeout` today (pinned by a spec). It is never stored (the indexer and the admin status do not use the interactive lane).
@@ -32,7 +32,7 @@ Source: `docs/plans/2026-10-29-search.md`, "Measurements at scale (2026-10-31)":
 
 ## Risks
 - A behaviour difference between undici and `node:http` that no spec covers (compression: fetch asked for gzip, the new client asks for nothing and the engine answers plain; proxies: neither honours `HTTP_PROXY`).
-- Keep-alive race on a socket the server closes: mitigated by the 4 s idle timeout and the single retry of reads.
+- Keep-alive race on a socket the server closes: mitigated by the 4 s idle timeout and the single retry of reads (never after `close()`).
 - N too low for a bigger engine: operators raise `SEARCH_ENGINE_MAX_CONCURRENCY`; too high brings back the timeouts.
 - The limiter is per process, like the rate limits (run one API instance, HANDOFF section 2).
 
@@ -70,3 +70,10 @@ Method: the scratch load loop of the 20 000-product measurement (closed loop, 2 
 | full search mix, 192 | limited 8-512 | 16 % | 139 to 140 | 1 451 to 1 995 ms |
 
 Reading: below saturation the limit refuses nothing and lowers p95; under overload the old client collapses on the catalog mix (the engine keeps working on calls whose 2 s timeout has passed, so almost every search fails) while the limited one keeps the engine's capacity (~85 successful searches a second) and sheds the rest to the SQL fallback within 1 s. The price is the last row: where the old client still answered every search of the full mix, slowly, the limited one sends 16 % to the fallback. With the fallback-free loop of the first attempt (instant retries) the limited client showed 92 % `503`: that loop measures retry storms, not shoppers, and is not used for the verdict. Other limits tried at 192 (8-64, 16-64, 32-256) were within the noise of 8-512 on the catalog mix. The transport alone (limit off: 256-10000) changed nothing under overload (engine-bound), as F1 predicted. Not measured: the 20 000-product catalog (disk), a real storefront in the loop, several API instances.
+
+## Independent review of PR 204 (2026-10-31)
+Verdict: safe to merge, low findings. Fixed in the PR: F1 (`close()` is final: no stale-socket retry and no new attempt after it; spec red then green), F3 (`SEARCH_ENGINE_MAX_QUEUE=0` refused while `SEARCH_ENGINE_MAX_CONCURRENCY` is below 10, the most engine calls one search sends at once: `hits`, `variant_facets` and one per selected group, at most 8), F6 (docs: `engineQueueWaitMs` in `docs/files/api.md`, the admin `ENGINE_CODES` comment, the 4 s idle timeout no longer claimed to be under Meilisearch's limit). The deadline spec's upper bound was loosened (it now waits 800 of 1 000 ms and only has to tell 1 000 from 1 800 ms).
+
+Open follow-ups (not fixed here):
+- Review F2: deferred follow-up (see the review of PR 204).
+- Review F4: deferred follow-up (see the review of PR 204).
