@@ -27,7 +27,7 @@ Checked on 2026-10-14. npm package data comes from `npm view` (registry metadata
 | @vitejs/plugin-react | 6.1.2 | MIT | OK |
 | react-router | 8.4.0 (pinned, see "Added in admin UI plan step 4b") | MIT | OK, runtime dependency of `apps/admin` only |
 | vitest | 5.0.4 | MIT | OK |
-| @playwright/test | 1.56.1 (pinned, see "Added in storefront plan step 8"; 1.64.1 was the latest seen) | Apache-2.0 | OK, devDependency of `apps/storefront` and, at the same exact version, of `apps/admin` (admin UI plan step 11, owner answer 7; no new package in the lockfile) (browser binaries are downloaded separately and are not part of any delivery) |
+| @playwright/test | 1.64.1 (pinned, see "Decision 2026-10-31" under "Added in storefront plan step 8"; was 1.56.1) | Apache-2.0 | OK, devDependency of `apps/storefront` and, at the same exact version, of `apps/admin` (admin UI plan step 11, owner answer 7; no new package in the lockfile) (browser binaries are downloaded separately and are not part of any delivery) |
 | eslint | 10.12.0 | MIT | OK |
 | typescript-eslint | 8.71.2 | MIT | OK |
 | prettier | 3.9.10 | MIT | OK |
@@ -118,6 +118,8 @@ Approved by the owner 2026-10-18 (quiz, recommended answers): `@playwright/test`
 | Browser | not an npm package: `playwright install chromium` downloads Chromium and its headless shell (about 0.9 GB unpacked on disk: 597 MB + 323 MB + ffmpeg 5 MB for revision 1194) into the user cache or `PLAYWRIGHT_BROWSERS_PATH`; development and CI only, never shipped. Chromium's own third-party licenses are those of the browser build and are not redistributed by us |
 | Policy scripts | `pnpm check:licenses` allows it as a dev dependency on the strict list (Apache-2.0); `pnpm audit:prod` covers production dependencies only and never sees it; the `policy` job's report-only `pnpm audit` does |
 | Services | none added: the CI job uses the same Postgres, Redis and Meilisearch containers as `verify` (its own database, `fluxkit_e2e_test`) |
+
+Decision 2026-10-31: the pin moved from 1.56.1 to 1.64.1 in both `apps/storefront` and `apps/admin` (PR #158). Its Chromium revision is 1248 (`browsers.json` of `playwright-core` 1.64.1; the 1194 above is the history of the first approval). The license stays Apache-2.0 for `@playwright/test`, `playwright` and `playwright-core` (checked in the npm registry metadata; the local `node_modules` still holds 1.56.1).
 
 ## Added in admin UI plan step 4b (admin shell)
 Approved by the owner in principle on 2026-10-19 (admin UI plan, owner answer 4: `react-router` for routing; data hook, forms, validation, permission table and i18n stay hand-written; no `@tanstack/react-query`). Runtime dependency of `apps/admin` only; the storefront does not use it.
