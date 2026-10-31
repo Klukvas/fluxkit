@@ -51,6 +51,11 @@ export interface RebuildResult {
   readonly enabled: boolean;
   /** Locales whose build started in this run. */
   readonly started: number;
+  /**
+   * Locales whose running build started over from the first product in this run, because a rebuild was requested while
+   * it ran: one build then answers every request, never a second build after the swap (finding F2).
+   */
+  readonly restarted: number;
   readonly documents: number;
   readonly swapped: number;
   /** A failed run waits for its backoff (`search_index_state.next_attempt_at`). */
@@ -81,6 +86,7 @@ const DISABLED_SYNC: SyncResult = {
 const DISABLED_REBUILD: RebuildResult = {
   enabled: false,
   started: 0,
+  restarted: 0,
   documents: 0,
   swapped: 0,
   waiting: false,
@@ -217,6 +223,11 @@ export class SearchIndexer {
     if (!config.enabled || engine === null) {
       return DISABLED_REBUILD;
     }
+    // The rebuild requests are read BEFORE the definitions: a writer commits its definition change and its request
+    // together, so every request seen here is in the definitions read next. Only these exact values are answered by this
+    // run; a later request stays and starts the build over at the next run.
+    await this.states.ensureRows(this.database, this.locale.locales);
+    const requests = await this.states.loadRequests(this.database);
     const definitions = await readSearchDefinitions(this.database);
     let plans = await this.plan(definitions, now);
     // A live index the engine lost (a wiped volume) is rebuilt like a missing one.
@@ -241,11 +252,22 @@ export class SearchIndexer {
     // Every locale is rebuilt together: they swap in one request.
     const locales = plans.map((plan) => plan.locale);
     let started = 0;
+    let restarted = 0;
     let documents = 0;
+    // Starting over delays the swap; while a locale has no live index at all, a working index comes first and a request
+    // made meanwhile is built after the swap instead.
+    const mayStartOver = plans.every((plan) => plan.state?.liveIndexUid != null);
     try {
       for (const plan of plans) {
+        const requested = requests.get(plan.locale) ?? null;
         if (plan.action.kind === "continue_build" && plan.state?.buildIndexUid != null) {
           if (!(await this.indexMissing(plan.state.buildIndexUid))) {
+            if (requested !== null && mayStartOver) {
+              // Requested while this build ran: its earlier pages may predate the change. Start over in the same build
+              // index (documents are replaced by id) instead of a second full build after the swap.
+              await this.states.restartBuild(this.database, plan.locale, requested, now);
+              restarted += 1;
+            }
             continue;
           }
           // The build index is gone (engine restarted empty): start that locale again.
@@ -254,7 +276,7 @@ export class SearchIndexer {
           await this.deleteOwnedIndex(plan.state.buildIndexUid);
           await this.states.dropBuild(this.database, plan.locale, now);
         }
-        await this.startBuild(plan, now);
+        await this.startBuild(plan, requested, now);
         started += 1;
       }
 
@@ -297,6 +319,7 @@ export class SearchIndexer {
         return {
           enabled: true,
           started,
+          restarted,
           documents,
           swapped: 0,
           waiting: false,
@@ -308,6 +331,7 @@ export class SearchIndexer {
       return {
         enabled: true,
         started,
+        restarted,
         documents,
         swapped,
         waiting: false,
@@ -321,6 +345,7 @@ export class SearchIndexer {
       return {
         enabled: true,
         started,
+        restarted,
         documents,
         swapped: 0,
         waiting: false,
@@ -417,7 +442,8 @@ export class SearchIndexer {
     }
   }
 
-  private async startBuild(plan: LocalePlan, now: Date): Promise<void> {
+  /** Creates the build index with the derived settings and records it; answers the request this run read, if any. */
+  private async startBuild(plan: LocalePlan, requested: string | null, now: Date): Promise<void> {
     const engine = this.requireEngine();
     if (!this.config.enabled) {
       return;
@@ -428,7 +454,7 @@ export class SearchIndexer {
       await engine.updateSettings(uid, plan.derived.settings),
       this.taskTimeoutMs(),
     );
-    await this.states.startBuild(this.database, plan.locale, uid, now);
+    await this.states.startBuild(this.database, plan.locale, uid, requested, now);
   }
 
   private async addDocuments(

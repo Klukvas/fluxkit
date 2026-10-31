@@ -98,13 +98,18 @@ export class SearchQueue implements SearchPort {
     await this.productsChanged(tx, ids, reason);
   }
 
-  /** Asks for a full rebuild of every locale. The latest request wins, so a request made while a build runs survives its swap. */
+  /**
+   * Asks for a full rebuild of every locale, in the writer's transaction (so the request becomes visible together with
+   * the definition change). The stamp is strictly later than the row's previous one, even within one transaction, so job
+   * 14 can answer exactly the request it read (`SearchIndexStateRepository.startBuild`/`restartBuild`); a request made
+   * while a build runs starts that build over at its next run.
+   */
   async requestRebuild(tx: Transaction): Promise<void> {
     await tx.execute(sql`
       insert into search_index_state (locale, rebuild_requested_at)
       select unnest(${sql.param([...this.options.locales])}::text[]), now()
       on conflict (locale) do update set
-        rebuild_requested_at = now(),
+        rebuild_requested_at = greatest(now(), search_index_state.rebuild_requested_at + interval '1 microsecond'),
         updated_at = now()`);
   }
 }
