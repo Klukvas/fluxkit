@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MEILI_INDEX_PREFIX, loadEnv } from "./index.js";
+import {
+  DEFAULT_MEILI_INDEX_PREFIX,
+  DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
+  loadEnv,
+} from "./index.js";
 
 const base = { DATABASE_URL: "postgres://x" };
 const production = {
@@ -53,7 +58,12 @@ describe("SEARCH_ENABLED", () => {
       meiliUrl: "http://127.0.0.1:7700",
       meiliApiKey: KEY,
       indexPrefix: "fluxkit_",
+      engineMaxConcurrency: DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+      engineMaxQueue: DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
     });
+    expect([DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY, DEFAULT_SEARCH_ENGINE_MAX_QUEUE]).toEqual([
+      8, 64,
+    ]);
   });
 
   it("drops one trailing slash of the URL and keeps a path prefix", () => {
@@ -163,4 +173,46 @@ describe("MEILI_INDEX_PREFIX", () => {
       );
     },
   );
+});
+
+describe("SEARCH_ENGINE_MAX_CONCURRENCY and SEARCH_ENGINE_MAX_QUEUE", () => {
+  it("are read when search is on, blank counting as unset", () => {
+    expect(
+      loadEnv({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: "16", SEARCH_ENGINE_MAX_QUEUE: "0" })
+        .search,
+    ).toMatchObject({ engineMaxConcurrency: 16, engineMaxQueue: 0 });
+    expect(
+      loadEnv({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: "", SEARCH_ENGINE_MAX_QUEUE: " " })
+        .search,
+    ).toMatchObject({ engineMaxConcurrency: 8, engineMaxQueue: 64 });
+    expect(
+      loadEnv({
+        ...enabled,
+        SEARCH_ENGINE_MAX_CONCURRENCY: "256",
+        SEARCH_ENGINE_MAX_QUEUE: "10000",
+      }).search,
+    ).toMatchObject({ engineMaxConcurrency: 256, engineMaxQueue: 10_000 });
+  });
+
+  it("are ignored, valid or not, when search is off", () => {
+    expect(
+      loadEnv({ ...base, SEARCH_ENGINE_MAX_CONCURRENCY: "0", SEARCH_ENGINE_MAX_QUEUE: "-1" })
+        .search,
+    ).toEqual({ enabled: false });
+  });
+
+  it.each(["0", "257", "-1", "1.5", "08", "1e2", "eight"])(
+    "refuses a concurrency of %j",
+    (value) => {
+      expect(messageOf({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: value })).toMatch(
+        /SEARCH_ENGINE_MAX_CONCURRENCY: must be a whole number from 1 to 256/,
+      );
+    },
+  );
+
+  it.each(["10001", "-1", "2.0", "007", "lots"])("refuses a queue of %j", (value) => {
+    expect(messageOf({ ...enabled, SEARCH_ENGINE_MAX_QUEUE: value })).toMatch(
+      /SEARCH_ENGINE_MAX_QUEUE: must be a whole number from 0 to 10000/,
+    );
+  });
 });

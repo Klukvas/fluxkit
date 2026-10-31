@@ -12,11 +12,16 @@ import {
 import { parseEnabledFeatures } from "./features.js";
 import {
   DEFAULT_MEILI_INDEX_PREFIX,
+  DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
   describeMeiliUrlProblem,
   isPrivateMeiliHost,
   isValidMeiliApiKey,
   MEILI_INDEX_PREFIX_PATTERN,
   normalizeMeiliUrl,
+  parseEngineLimit,
+  SEARCH_ENGINE_MAX_CONCURRENCY_RANGE,
+  SEARCH_ENGINE_MAX_QUEUE_RANGE,
   type SearchEnv,
 } from "./search.js";
 import {
@@ -340,6 +345,9 @@ const envSchema = z
     MEILI_URL: z.preprocess(blankToUndefined, z.string().optional()),
     MEILI_API_KEY: z.preprocess(blankToUndefined, z.string().optional()),
     MEILI_INDEX_PREFIX: z.preprocess(blankToUndefined, z.string().optional()),
+    // The interactive lane of the engine client (ADR 0041); checked in `superRefine`, only when search is on.
+    SEARCH_ENGINE_MAX_CONCURRENCY: z.preprocess(blankToUndefined, z.string().optional()),
+    SEARCH_ENGINE_MAX_QUEUE: z.preprocess(blankToUndefined, z.string().optional()),
   })
   .superRefine((env, context) => {
     const inProduction = (env.NODE_ENV ?? "").trim().toLowerCase() === "production";
@@ -515,6 +523,19 @@ const envSchema = z
           message: `must match ${MEILI_INDEX_PREFIX_PATTERN.source} (lower case, ending with an underscore, at most 33 characters)`,
         });
       }
+      for (const [name, range] of [
+        ["SEARCH_ENGINE_MAX_CONCURRENCY", SEARCH_ENGINE_MAX_CONCURRENCY_RANGE],
+        ["SEARCH_ENGINE_MAX_QUEUE", SEARCH_ENGINE_MAX_QUEUE_RANGE],
+      ] as const) {
+        const value = env[name];
+        if (value !== undefined && parseEngineLimit(value, range) === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [name],
+            message: `must be a whole number from ${String(range.min)} to ${String(range.max)}`,
+          });
+        }
+      }
     }
     if (new Set(env.LOCALES).size !== env.LOCALES.length) {
       context.addIssue({
@@ -640,16 +661,34 @@ function searchEnv(env: {
   MEILI_URL?: string | undefined;
   MEILI_API_KEY?: string | undefined;
   MEILI_INDEX_PREFIX?: string | undefined;
+  SEARCH_ENGINE_MAX_CONCURRENCY?: string | undefined;
+  SEARCH_ENGINE_MAX_QUEUE?: string | undefined;
 }): SearchEnv {
   // Both are present when search is on: the schema refused anything else.
   if (!env.SEARCH_ENABLED || env.MEILI_URL === undefined || env.MEILI_API_KEY === undefined) {
     return { enabled: false };
   }
+  // Valid when set: `superRefine` refused anything else.
+  const limit = (
+    value: string | undefined,
+    range: { readonly min: number; readonly max: number },
+    fallback: number,
+  ): number => (value === undefined ? fallback : (parseEngineLimit(value, range) ?? fallback));
   return {
     enabled: true,
     meiliUrl: normalizeMeiliUrl(env.MEILI_URL),
     meiliApiKey: env.MEILI_API_KEY,
     indexPrefix: env.MEILI_INDEX_PREFIX ?? DEFAULT_MEILI_INDEX_PREFIX,
+    engineMaxConcurrency: limit(
+      env.SEARCH_ENGINE_MAX_CONCURRENCY,
+      SEARCH_ENGINE_MAX_CONCURRENCY_RANGE,
+      DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+    ),
+    engineMaxQueue: limit(
+      env.SEARCH_ENGINE_MAX_QUEUE,
+      SEARCH_ENGINE_MAX_QUEUE_RANGE,
+      DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
+    ),
   };
 }
 

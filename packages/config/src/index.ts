@@ -35,8 +35,12 @@ export {
 export { parseEnabledFeatures } from "./features.js";
 export {
   DEFAULT_MEILI_INDEX_PREFIX,
+  DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
   isPrivateMeiliHost,
   MEILI_INDEX_PREFIX_PATTERN,
+  SEARCH_ENGINE_MAX_CONCURRENCY_RANGE,
+  SEARCH_ENGINE_MAX_QUEUE_RANGE,
   type SearchEnv,
 } from "./search.js";
 export {
