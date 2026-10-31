@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0040, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-10-30, `origin/main` at `b456bca`.
+Last updated: 2026-10-31, `origin/main` at `40629ea`.
 
 ## 1. Current state
 
@@ -25,7 +25,7 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 
 ## 2. Next steps (in order)
 
-1. Owner-only items of section 3: AGENTS.md edits, acceptances, live checks, legal review. Nothing below replaces them.
+1. Owner-only items of section 3 (the AGENTS.md sync was merged in #196 and the owner decisions of 2026-10-30 are recorded): confirm or reverse migrations `0009_privacy` and `0010_search` and the vendored Snowball code (approved by the orchestrator under the owner's standing autonomy grant); live provider checks; legal review. Migration `0011` was approved by the owner personally on 2026-10-30. Nothing below replaces these.
 2. Measure search at scale (plan section 13 targets: 10 000 products, 100 000 documents, `GET /store/search` p95 150 ms, rebuild at most 10 minutes); step 11 recorded no numbers beyond spike S1. Also measure the hydration cost of a page and test the engine-down fallback in a real browser (unit level only).
 3. Production deployment: owner approval of the plan, an independent review of the images and proxy, a first green `deploy-smoke` run on GitHub (it passed locally only, per `docs/deployment.md`), then a dry run on a real host.
 4. Live provider checks once the owner supplies keys (section 3).
@@ -44,7 +44,7 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 - Free orders (total 0) stay manual: an admin marks them paid; no change to the totals logic (payments review F2).
 - `TRUNCATE` protection: statement-level triggers on the append-only tables (migration `0011`) plus the non-owner database role recommendation (`docs/deployment.md`, "Database roles").
 - Payments attention-list and admin list indexes (migration `0011`).
-- Audit action `admin_user.activated` (migration `0011` release; `pnpm admin:create` is audited too).
+- Audit action `admin_user.activated` (migration `0011` release, approved by the owner personally; `pnpm admin:create` is audited too).
 
 **AGENTS.md edits:** done in #196.
 
@@ -77,7 +77,7 @@ Agents must not do these (AGENTS.md is the owner's file) or cannot (keys, contra
 - The admin product search by slug is a table scan; a `text_pattern_ops` index needs a migration.
 - Nova Post choices where the evidence was silent (ADR 0030, plan step 7b): `ids[]` filter, no `PUDO`, capped list pages, no address delivery. A note superseding ADR 0029 decision 9 in part may be wanted.
 - Per-area known-gap lists are archived in `docs/HISTORY.md`; the maintained copies are in `apps/storefront/README.md`, `apps/admin/README.md`, `docs/api/shipping.md`, `docs/api/media.md`.
-- Limits worth knowing: in-memory rate limits and the shared catalog list cache are per process (run one API instance); append-only journals can be bypassed by `TRUNCATE` or plain SQL at database-privilege level; order headers are not immutable at the database level; the example proxies never ran on a real host.
+- Limits worth knowing: in-memory rate limits and the shared catalog list cache are per process (run one API instance); the append-only journals are guarded by `BEFORE TRUNCATE` triggers on the 8 append-only tables (migration `0011`), but a table owner or superuser can still disable or drop the triggers, and the erased-contact rule of `sales_order` can still be reversed by plain SQL (no trigger approved); `docs/deployment.md` "Database roles" describes the non-owner app role without `TRUNCATE`, not yet exercised by the API, jobs or e2e; order headers are not immutable at the database level; the example proxies never ran on a real host.
 
 ## 5. Working agreements (the owner's process)
 
