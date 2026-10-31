@@ -1,5 +1,5 @@
 import { nextSearchSyncAttemptAt, SEARCH_INDEXING } from "@fluxkit/core";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import type { DbExecutor } from "../../common/transaction.js";
 
 /** A queue row the sync job holds: the product and the `change_seq` it saw when it claimed the row. */
@@ -33,6 +33,7 @@ export class SearchQueueRepository {
     now: Date,
     limit: number,
     leaseSeconds: number = SEARCH_INDEXING.syncLeaseSeconds,
+    maxChangeSeq?: number,
   ): Promise<ClaimedSync[]> {
     const leaseUntil = new Date(now.getTime() + leaseSeconds * 1000);
     const result = await db.execute<{
@@ -43,7 +44,7 @@ export class SearchQueueRepository {
       update search_sync_queue queued set lease_until = ${leaseUntil}
       from (
         select product_id from search_sync_queue
-        where next_attempt_at <= ${now} and (lease_until is null or lease_until <= ${now})
+        where ${dueAt(now, maxChangeSeq)}
         order by next_attempt_at, product_id
         limit ${limit}
         for update skip locked
@@ -57,6 +58,26 @@ export class SearchQueueRepository {
         attempts: row.attempts,
       }))
       .sort((a, b) => (a.productId < b.productId ? -1 : a.productId > b.productId ? 1 : 0));
+  }
+
+  /**
+   * The last `change_seq` handed out so far (0 before the first). A sync run claims only rows at or below the value it
+   * read at its start: a row marked again during the run gets a newer `change_seq` and waits for the next run, so a
+   * product edited over and over can not keep one run going (review F1).
+   */
+  async lastChangeSeq(db: DbExecutor): Promise<number> {
+    const result = await db.execute<{ last: string }>(
+      sql`select (case when is_called then last_value else 0 end)::text as last from search_sync_seq`,
+    );
+    return Number(result.rows[0]?.last ?? 0);
+  }
+
+  /** Whether a row is still due for the run that read `maxChangeSeq` (decides `truncated` when the budget ends). */
+  async hasDue(db: DbExecutor, now: Date, maxChangeSeq?: number): Promise<boolean> {
+    const result = await db.execute(
+      sql`select 1 from search_sync_queue where ${dueAt(now, maxChangeSeq)} limit 1`,
+    );
+    return (result.rowCount ?? 0) > 0;
   }
 
   /**
@@ -141,6 +162,12 @@ export class SearchQueueRepository {
       errorCodes: codes.rows,
     };
   }
+}
+
+/** Due at `now`, not leased by a live run, and (for a run) not marked again after its start. */
+function dueAt(now: Date, maxChangeSeq: number | undefined): SQL {
+  const due = sql`next_attempt_at <= ${now} and (lease_until is null or lease_until <= ${now})`;
+  return maxChangeSeq === undefined ? due : sql`${due} and change_seq <= ${maxChangeSeq}`;
 }
 
 function toDate(value: Date | string | null | undefined): Date | null {

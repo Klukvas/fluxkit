@@ -198,8 +198,10 @@ function cut(text: string, length: number): string {
 /**
  * The search documents of one product (ADR 0034 decision 2): one per sellable variant, none for a product that is not
  * `active`. The ONLY place that decides what reaches the index: attributes pass `isPublicAttribute` (visible on the
- * storefront and not internal) and then their own `isFilterable` / `isSearchable` flag, whatever else the definition says.
- * Stored values that do not fit their definition are left out. Pure: the caller supplies the facts and the definitions.
+ * storefront and not internal); their searchable text follows `isSearchable`; a select, multiselect, boolean or number
+ * value is always stored as its `attr_<code>` field (document version 3), and only the index settings decide whether it
+ * can be filtered (`isFilterable`, `deriveIndexSettings`). Stored values that do not fit their definition are left out.
+ * Pure: the caller supplies the facts and the definitions.
  */
 export function buildSearchDocuments(
   product: SearchProductFacts,
@@ -259,7 +261,9 @@ export function buildSearchDocuments(
       if (definition.isSearchable) {
         attributeText.push(...searchableText(definition, raw, context));
       }
-      if (definition.isFilterable && FILTERABLE_INPUT_TYPES.includes(definition.inputType)) {
+      // Filterable or not: whether the field can be filtered is the index's `filterableAttributes` setting, so flipping
+      // `isFilterable` changes the settings in place and never needs new documents (finding F2 of the measurements).
+      if (FILTERABLE_INPUT_TYPES.includes(definition.inputType)) {
         const value = filterValue(definition, raw);
         if (value !== undefined) {
           attributeFields[attributeField(definition.code)] = value;
@@ -296,4 +300,38 @@ export function buildSearchDocuments(
     documents.push(document);
   }
   return documents;
+}
+
+/**
+ * The parts of an attribute definition that `buildSearchDocuments` reads (besides the option labels). `inputType` is a
+ * plain string so a stored row can be passed as it is.
+ */
+export interface SearchDocumentAttributeFacts {
+  readonly inputType: string;
+  readonly isLocalized: boolean;
+  readonly unit: string | null;
+  readonly isSearchable: boolean;
+  readonly isVisibleOnStorefront: boolean;
+  readonly isInternal: boolean;
+}
+
+/**
+ * Whether an attribute change can change any search document, so its products must be synced or the index rebuilt
+ * (finding F2): the public-data rule (`isVisibleOnStorefront`, `isInternal`), the searchable text (`isSearchable`, the
+ * `unit` of a number) and the value form (`inputType`, `isLocalized`, which the API never changes). `isFilterable` only
+ * changes the index settings (applied in place by job 13); `isComparable`, `isSortable`, the name, the description and
+ * the validation reach neither. Option labels have their own route and always reach documents.
+ */
+export function attributeChangeAffectsSearchDocuments(
+  before: SearchDocumentAttributeFacts,
+  after: SearchDocumentAttributeFacts,
+): boolean {
+  return (
+    before.inputType !== after.inputType ||
+    before.isLocalized !== after.isLocalized ||
+    before.unit !== after.unit ||
+    before.isSearchable !== after.isSearchable ||
+    before.isVisibleOnStorefront !== after.isVisibleOnStorefront ||
+    before.isInternal !== after.isInternal
+  );
 }

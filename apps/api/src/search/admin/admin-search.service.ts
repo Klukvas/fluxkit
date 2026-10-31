@@ -133,7 +133,7 @@ export class AdminSearchService implements SearchSynonymSeeder {
     };
   }
 
-  /** Idempotent: a request while a build runs is kept and answered by another build after that one swaps. */
+  /** Idempotent: a request while a build runs makes that build start over at its next run; one swap answers both. */
   async requestRebuild(now: Date): Promise<AdminSearchRebuild> {
     await this.states.requestRebuild(this.database, this.locale.locales, now);
     return { requestedAt: now.toISOString(), locales: [...this.locale.locales] };

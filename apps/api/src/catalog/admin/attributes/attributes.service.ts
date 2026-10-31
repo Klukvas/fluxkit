@@ -3,6 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import {
   CATALOG_LIMITS,
   TEXT_LIMITS,
+  attributeChangeAffectsSearchDocuments,
   decideDeleteAttribute,
   decideDeleteAttributeOption,
   decideInputTypeChange,
@@ -189,9 +190,10 @@ export class AttributesService {
         Object.keys(changes).length === 0
           ? current
           : ((await this.attributes.update(tx, id, changes)) ?? current);
-      if (Object.keys(changes).length > 0) {
-        // Flags and the unit decide what the documents of every product of a type with this attribute carry; the
-        // filterable list of the index follows through the settings hash.
+      // Only what documents carry needs the products synced (above the fan-out limit: a full rebuild). `isFilterable`
+      // changes the index settings alone, which job 13 applies in place through the settings hash (finding F2);
+      // `isComparable`, `isSortable`, the texts and the validation reach no document and no setting.
+      if (attributeChangeAffectsSearchDocuments(current, row)) {
         await this.search.productsChangedWhere(tx, productsWithAttribute(id), "attribute_changed");
       }
       return toAttributeResponse(row);
