@@ -47,6 +47,8 @@ describe("search write path under concurrent reservations (real app, real Postgr
         meiliUrl: meiliUrl(),
         meiliApiKey: "races-spec-key-0123456789",
         indexPrefix: "races_",
+        engineMaxConcurrency: 8,
+        engineMaxQueue: 64,
       },
       adminAuthenticator: ownerAuthenticator(adminId),
     });

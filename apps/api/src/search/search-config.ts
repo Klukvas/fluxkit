@@ -1,5 +1,6 @@
 import type { SearchEnv } from "@fluxkit/config";
 import { SEARCH_INDEXING } from "@fluxkit/core";
+import { DEFAULT_INTERACTIVE_LIMITS } from "./engine/index.js";
 
 /** How long the API waits for the engine (ADR 0034 decision 11). Tests shorten them. */
 export interface SearchTuning {
@@ -13,6 +14,8 @@ export interface SearchTuning {
   readonly taskTimeoutMs: number;
   /** A fan-out writer above this many products requests a rebuild instead (core `SEARCH_INDEXING`). */
   readonly fanOutRebuildThreshold: number;
+  /** Longest wait of a store search or suggest call for a slot of the engine client (ADR 0041); within its timeout. */
+  readonly engineQueueWaitMs: number;
 }
 
 export const DEFAULT_SEARCH_TUNING: SearchTuning = Object.freeze({
@@ -21,6 +24,7 @@ export const DEFAULT_SEARCH_TUNING: SearchTuning = Object.freeze({
   healthTimeoutMs: 2_000,
   taskTimeoutMs: 20_000,
   fanOutRebuildThreshold: SEARCH_INDEXING.fanOutRebuildThreshold,
+  engineQueueWaitMs: DEFAULT_INTERACTIVE_LIMITS.maxQueueWaitMs,
 });
 
 export const SEARCH_CONFIG = Symbol("SEARCH_CONFIG");
@@ -33,6 +37,9 @@ export type SearchConfig =
       /** Never logged, never in an error or a response. */
       readonly meiliApiKey: string;
       readonly indexPrefix: string;
+      /** Store search and suggest calls in flight at once, and waiting (`SEARCH_ENGINE_MAX_*`, ADR 0041). */
+      readonly engineMaxConcurrency: number;
+      readonly engineMaxQueue: number;
       readonly tuning: SearchTuning;
     };
 
@@ -51,6 +58,8 @@ export function searchConfigOf(
     meiliUrl: env.meiliUrl,
     meiliApiKey: env.meiliApiKey,
     indexPrefix: env.indexPrefix,
+    engineMaxConcurrency: env.engineMaxConcurrency,
+    engineMaxQueue: env.engineMaxQueue,
     tuning: { ...DEFAULT_SEARCH_TUNING, ...tuning },
   };
 }

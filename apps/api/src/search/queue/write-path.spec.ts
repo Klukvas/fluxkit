@@ -26,6 +26,8 @@ const searchOn = (prefix: string) => ({
   meiliUrl: meiliUrl(),
   meiliApiKey: "write-path-spec-key-0123456789",
   indexPrefix: prefix,
+  engineMaxConcurrency: 8,
+  engineMaxQueue: 64,
 });
 
 describe("search write path (real app, real Postgres)", () => {

@@ -2,7 +2,14 @@ import type { LogLevel } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
 import { DocumentBuilder, SwaggerModule, type OpenAPIObject } from "@nestjs/swagger";
-import { DEFAULT_LOCALE, DEFAULT_LOCALES, DEFAULT_TRUST_PROXY, type AppEnv } from "@fluxkit/config";
+import {
+  DEFAULT_LOCALE,
+  DEFAULT_LOCALES,
+  DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
+  DEFAULT_TRUST_PROXY,
+  type AppEnv,
+} from "@fluxkit/config";
 import { AppModule } from "./app.module.js";
 import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG } from "./auth/auth-config.js";
@@ -252,6 +259,8 @@ export const OPENAPI_SEARCH_ENV = Object.freeze({
   meiliUrl: "http://127.0.0.1:1",
   meiliApiKey: "openapi-export-unused-key",
   indexPrefix: "fluxkit_",
+  engineMaxConcurrency: DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  engineMaxQueue: DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
 } as const);
 
 export function buildOpenApiDocument(app: NestExpressApplication): OpenAPIObject {

@@ -26,8 +26,22 @@ describe("search configuration", () => {
       meiliUrl: "http://127.0.0.1:7700",
       meiliApiKey: "secret-search-key-0123456789",
       indexPrefix: "shop_",
+      engineMaxConcurrency: 8,
+      engineMaxQueue: 64,
       tuning: DEFAULT_SEARCH_TUNING,
     });
+    expect(
+      searchConfigOf(
+        loadEnv({
+          DATABASE_URL: "postgres://x",
+          SEARCH_ENABLED: "true",
+          MEILI_URL: "http://127.0.0.1:7700",
+          MEILI_API_KEY: "secret-search-key-0123456789",
+          SEARCH_ENGINE_MAX_CONCURRENCY: "3",
+          SEARCH_ENGINE_MAX_QUEUE: "5",
+        }).search,
+      ),
+    ).toMatchObject({ engineMaxConcurrency: 3, engineMaxQueue: 5 });
     expect(searchStartupLine(config)).toBe("Search: enabled (shop_)");
     expect(searchStartupLine(searchConfigOf(undefined))).toBe("Search: disabled");
     expect(searchConfigOf(loadEnv({ DATABASE_URL: "postgres://x" }).search)).toEqual({
@@ -50,6 +64,8 @@ describe("search in GET /store/config and GET /admin/config (real app, real Post
         meiliUrl: meiliUrl(),
         meiliApiKey: "config-spec-key-0123456789",
         indexPrefix: "cfgspec_",
+        engineMaxConcurrency: 8,
+        engineMaxQueue: 64,
       },
     });
   });
