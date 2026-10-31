@@ -6,6 +6,7 @@ import {
   Module,
   type DynamicModule,
   type OnApplicationBootstrap,
+  type OnApplicationShutdown,
   type Provider,
 } from "@nestjs/common";
 import { LOCALE_CONFIG, type LocaleConfig } from "../common/locale.js";
@@ -42,6 +43,16 @@ class SearchStartupLog implements OnApplicationBootstrap {
   }
 }
 
+/** Closes the engine client's kept-alive connections once the app has stopped serving (ADR 0041). */
+@Injectable()
+class SearchEngineShutdown implements OnApplicationShutdown {
+  constructor(@Inject(SEARCH_ENGINE) private readonly engine: SearchEngine | null) {}
+
+  onApplicationShutdown(): void {
+    this.engine?.close();
+  }
+}
+
 /**
  * Catalog search (ADR 0034). Global so that the catalog, price, stock and order modules can inject `SEARCH_PORT` without
  * importing anything from this folder. With search off the port reports `enabled: false` and nothing else is mounted.
@@ -55,6 +66,11 @@ export class SearchModule {
           url: config.meiliUrl,
           apiKey: config.meiliApiKey,
           requestTimeoutMs: config.tuning.requestTimeoutMs,
+          interactive: {
+            maxConcurrency: config.engineMaxConcurrency,
+            maxQueue: config.engineMaxQueue,
+            maxQueueWaitMs: config.tuning.engineQueueWaitMs,
+          },
         })
       : null;
     const providers: Provider[] = [
@@ -84,6 +100,7 @@ export class SearchModule {
         ) => new SearchIndexer(database, engine, config, locale, pricing),
       },
       SearchStartupLog,
+      SearchEngineShutdown,
     ];
     if (!config.enabled || engine === null) {
       // Search off: no route at all (404), no client, no query of the search tables.

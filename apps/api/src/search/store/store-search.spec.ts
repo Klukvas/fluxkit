@@ -724,6 +724,41 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     }
   });
 
+  it("answers 503 search_unavailable at once when the engine client's interactive lane is full (engine_busy, ADR 0041)", async () => {
+    const warn = vi.spyOn(Logger.prototype, "warn");
+    // One slot and no time to wait for it: the two settings reads of a fresh process run in parallel, so the second is
+    // refused at once. (Concurrency 1 without a queue is refused by the configuration; a zero wait is a test tuning.)
+    const saturated = await startApp({
+      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 1 },
+      searchTuning: { engineQueueWaitMs: 0 },
+    });
+    // The same with a queue of one: the second read waits for the first and the search answers.
+    const queued = await startApp({
+      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 1 },
+    });
+    try {
+      const refused = await get<{ code: string }>(
+        `/store/search?q=${encodeURIComponent("секретний запит")}`,
+        saturated.baseUrl,
+      );
+      expect(refused.status, JSON.stringify(refused.body)).toBe(503);
+      expect(refused.body.code).toBe("search_unavailable");
+      expect(refused.headers.get("retry-after")).toBe("30");
+      const logged = warn.mock.calls.map((args) => String(args[0])).join("\n");
+      expect(logged).toContain("engine_busy");
+      expect(logged).not.toContain("секретний");
+      const answered = await get(
+        `/store/search?q=${encodeURIComponent("сорочка")}`,
+        queued.baseUrl,
+      );
+      expect(answered.status, JSON.stringify(answered.body)).toBe(200);
+    } finally {
+      warn.mockRestore();
+      await saturated.app.close();
+      await queued.app.close();
+    }
+  });
+
   it("is rate limited per address", async () => {
     const limited = await startApp({
       search: search.env,
