@@ -75,5 +75,5 @@ Reading: below saturation the limit refuses nothing and lowers p95; under overlo
 Verdict: safe to merge, low findings. Fixed in the PR: F1 (`close()` is final: no stale-socket retry and no new attempt after it; spec red then green), F3 (`SEARCH_ENGINE_MAX_QUEUE=0` refused while `SEARCH_ENGINE_MAX_CONCURRENCY` is below 10, the most engine calls one search sends at once: `hits`, `variant_facets` and one per selected group, at most 8), F6 (docs: `engineQueueWaitMs` in `docs/files/api.md`, the admin `ENGINE_CODES` comment, the 4 s idle timeout no longer claimed to be under Meilisearch's limit). The deadline spec's upper bound was loosened (it now waits 800 of 1 000 ms and only has to tell 1 000 from 1 800 ms).
 
 Open follow-ups (not fixed here):
-- Review F2: deferred follow-up (see the review of PR 204).
-- Review F4: deferred follow-up (see the review of PR 204).
+- Review F2: deferred follow-up. A refused search still spends engine work on its sibling calls (up to 10 parallel calls per search; the others are not cancelled when one is refused). Fix: one shared slot per search, or an AbortSignal into `multiSearch`.
+- Review F4: deferred follow-up. `engine_busy` refusals are visible only as warn log lines; add a per-process counter to `GET /admin/search/status` and sample the log.
