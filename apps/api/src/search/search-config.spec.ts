@@ -1,5 +1,9 @@
-import { MEILI_INDEX_PREFIX_PATTERN, loadEnv } from "@fluxkit/config";
-import { SEARCH_INDEX_PREFIX_PATTERN } from "@fluxkit/core";
+import {
+  MEILI_INDEX_PREFIX_PATTERN,
+  SEARCH_MAX_PARALLEL_ENGINE_CALLS,
+  loadEnv,
+} from "@fluxkit/config";
+import { SEARCH_INDEX_PREFIX_PATTERN, SEARCH_LIMITS } from "@fluxkit/core";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startApp, type RunningApp } from "../test/app.js";
 import { http } from "../test/http.js";
@@ -10,6 +14,12 @@ import { DEFAULT_SEARCH_TUNING, searchConfigOf, searchStartupLine } from "./sear
 describe("search configuration", () => {
   it("uses the same index prefix pattern in config and core", () => {
     expect(MEILI_INDEX_PREFIX_PATTERN.source).toBe(SEARCH_INDEX_PREFIX_PATTERN.source);
+  });
+
+  it("knows how many engine calls one search sends at once (core planSearchQueries: hits, variant facets, one per group)", () => {
+    // A price selection counts as one of the selected groups (parseSelectionParams) and plans `price_range` instead of a
+    // disjunctive query, so the most is the two fixed queries plus one per group.
+    expect(SEARCH_MAX_PARALLEL_ENGINE_CALLS).toBe(2 + SEARCH_LIMITS.maxSelectedGroups);
   });
 
   it("maps the environment to the module config and never prints the key or the URL at startup", () => {
@@ -26,8 +36,22 @@ describe("search configuration", () => {
       meiliUrl: "http://127.0.0.1:7700",
       meiliApiKey: "secret-search-key-0123456789",
       indexPrefix: "shop_",
+      engineMaxConcurrency: 8,
+      engineMaxQueue: 512,
       tuning: DEFAULT_SEARCH_TUNING,
     });
+    expect(
+      searchConfigOf(
+        loadEnv({
+          DATABASE_URL: "postgres://x",
+          SEARCH_ENABLED: "true",
+          MEILI_URL: "http://127.0.0.1:7700",
+          MEILI_API_KEY: "secret-search-key-0123456789",
+          SEARCH_ENGINE_MAX_CONCURRENCY: "3",
+          SEARCH_ENGINE_MAX_QUEUE: "5",
+        }).search,
+      ),
+    ).toMatchObject({ engineMaxConcurrency: 3, engineMaxQueue: 5 });
     expect(searchStartupLine(config)).toBe("Search: enabled (shop_)");
     expect(searchStartupLine(searchConfigOf(undefined))).toBe("Search: disabled");
     expect(searchConfigOf(loadEnv({ DATABASE_URL: "postgres://x" }).search)).toEqual({
@@ -50,6 +74,8 @@ describe("search in GET /store/config and GET /admin/config (real app, real Post
         meiliUrl: meiliUrl(),
         meiliApiKey: "config-spec-key-0123456789",
         indexPrefix: "cfgspec_",
+        engineMaxConcurrency: 8,
+        engineMaxQueue: 64,
       },
     });
   });

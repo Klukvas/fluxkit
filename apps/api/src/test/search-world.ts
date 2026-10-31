@@ -1,6 +1,11 @@
 import type { SearchEnv } from "@fluxkit/config";
 import type pg from "pg";
-import { DEFAULT_LOCALE, DEFAULT_LOCALES } from "@fluxkit/config";
+import {
+  DEFAULT_LOCALE,
+  DEFAULT_LOCALES,
+  DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+  DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
+} from "@fluxkit/config";
 import { DEFAULT_PRICING_CONFIG } from "../common/pricing-config.js";
 import type { Database } from "../database/database.module.js";
 import { SearchEngine } from "../search/engine/index.js";
@@ -37,7 +42,14 @@ export class SearchWorld {
   }
 
   get env(): Extract<SearchEnv, { enabled: true }> {
-    return { enabled: true, meiliUrl: meiliUrl(), meiliApiKey: this.key, indexPrefix: this.prefix };
+    return {
+      enabled: true,
+      meiliUrl: meiliUrl(),
+      meiliApiKey: this.key,
+      indexPrefix: this.prefix,
+      engineMaxConcurrency: DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
+      engineMaxQueue: DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
+    };
   }
 
   liveUid(locale: string): string {

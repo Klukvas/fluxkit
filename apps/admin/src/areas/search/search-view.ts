@@ -8,7 +8,10 @@ import type { MessageDescriptor } from "../../lib/problem-messages";
  * screen: the API sends CODES only, and an unknown code is shown as it is, in small print, like the shell's problem map.
  */
 
-/** The error codes of the engine client (`SearchEngineErrorCode`), which the status and the queue store and return. */
+/**
+ * The error codes of the engine client that the status and the queue store and return: `SearchEngineErrorCode` without
+ * `engine_busy` (store search calls only, never stored; ADR 0041).
+ */
 export const ENGINE_CODES = [
   "engine_unreachable",
   "engine_timeout",
