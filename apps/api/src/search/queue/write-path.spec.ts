@@ -401,6 +401,34 @@ describe("search write path (real app, real Postgres)", () => {
       expect((await marked())[product.id]).toBe("attribute_changed");
     });
 
+    it("an attribute change that reaches no document marks nothing and requests no rebuild, even above the fan-out limit", async () => {
+      const product = await world.createProduct();
+      const attribute = await pool.query<{ id: string; is_searchable: boolean }>(
+        "select id, is_searchable from attribute where code = $1",
+        [fx.materialAttributeCode],
+      );
+      const attributeId = attribute.rows[0]?.id ?? "";
+      await clear();
+      // isFilterable is an index setting (job 13 applies it in place); the others are not indexed at all.
+      for (const body of [
+        { isFilterable: true },
+        { isFilterable: false },
+        { isComparable: true },
+        { name: { uk: "Матеріал виробу" } },
+      ]) {
+        await ok(await callSmall("PATCH", `/admin/attributes/${attributeId}`, body));
+      }
+      expect(await marked()).toEqual({});
+      expect((await pool.query("select * from search_index_state")).rows).toEqual([]);
+      // A document change of the same attribute still reaches its products.
+      await ok(
+        await call("PATCH", `/admin/attributes/${attributeId}`, {
+          isSearchable: attribute.rows[0]?.is_searchable !== true,
+        }),
+      );
+      expect((await marked())[product.id]).toBe("attribute_changed");
+    });
+
     it("product type attribute assignments reach the products of the type; option assignments mark nothing", async () => {
       const product = await world.createProduct();
       const attribute = await call<{ id: string }>("POST", "/admin/attributes", {
