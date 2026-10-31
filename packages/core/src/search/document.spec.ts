@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { isVariantSellable } from "../catalog/index.js";
-import { SEARCH_DOCUMENT_VERSION, SEARCH_LIMITS, buildSearchDocuments } from "./index.js";
+import {
+  SEARCH_DOCUMENT_VERSION,
+  SEARCH_LIMITS,
+  attributeChangeAffectsSearchDocuments,
+  buildSearchDocuments,
+} from "./index.js";
 import type { SearchBuildContext, SearchProductFacts, SearchVariantFacts } from "./index.js";
 import { assignment, attribute, selectAttribute } from "./test-support.js";
 
@@ -361,8 +366,116 @@ describe("buildSearchDocuments", () => {
     expect(buildSearchDocuments(product(), context)).toEqual(first);
   });
 
+  it("carries the filter value of a public attribute whether or not it is filterable (F2: the flag is a setting)", () => {
+    const flags = { isFilterable: false, isSearchable: false };
+    const notFilterable: SearchBuildContext = {
+      ...context,
+      attributes: [
+        assignment(selectAttribute("material", ["cotton", "wool"], flags)),
+        assignment(attribute("waterproof", "boolean", flags)),
+        assignment(
+          attribute("tags", "multiselect", {
+            ...flags,
+            options: [
+              { code: "a", label: { uk: "перший" } },
+              { code: "b", label: { uk: "другий" } },
+            ],
+          }),
+        ),
+        assignment(attribute("weight", "number", { ...flags, unit: "kg" }), "variant"),
+        assignment(attribute("notes", "text", { ...flags, isLocalized: true })),
+      ],
+    };
+    const [plain] = buildSearchDocuments(product(), notFilterable);
+    expect(plain).toMatchObject({
+      attr_material: "cotton",
+      attr_waterproof: false,
+      attr_tags: ["a", "b"],
+      attr_weight: 0.4,
+      attributeText: [],
+    });
+    // A text attribute has no filter field; searchable text still follows isSearchable only.
+    expect(plain).not.toHaveProperty("attr_notes");
+    // Toggling isFilterable changes no document: only the index settings.
+    const filterable: SearchBuildContext = {
+      ...notFilterable,
+      attributes: notFilterable.attributes.map(({ definition, level }) =>
+        assignment({ ...definition, isFilterable: true }, level),
+      ),
+    };
+    expect(buildSearchDocuments(product(), filterable)).toEqual(
+      buildSearchDocuments(product(), notFilterable),
+    );
+  });
+
   it("exports the document version that triggers a rebuild when it changes", () => {
     // 2: `publishedAt` in milliseconds (search finish review F2).
-    expect(SEARCH_DOCUMENT_VERSION).toBe(2);
+    // 3: filter values of every public attribute, filterable or not (F2 of the measurements at scale).
+    expect(SEARCH_DOCUMENT_VERSION).toBe(3);
+  });
+});
+
+describe("attributeChangeAffectsSearchDocuments", () => {
+  const base = attribute("material", "select", {
+    isFilterable: true,
+    isSearchable: true,
+    unit: null,
+  });
+
+  it("is false when nothing a document carries changed: isFilterable is a setting, the rest is not indexed", () => {
+    expect(attributeChangeAffectsSearchDocuments(base, base)).toBe(false);
+    for (const change of [
+      { isFilterable: false },
+      { isComparable: true },
+      { isSortable: true },
+      { validation: { maxLength: 10 } },
+    ] as const) {
+      expect(
+        attributeChangeAffectsSearchDocuments(base, { ...base, ...change }),
+        JSON.stringify(change),
+      ).toBe(false);
+    }
+  });
+
+  it("is true when the searchable text, the public-data rule or the value form changes", () => {
+    for (const change of [
+      { isSearchable: false },
+      { isVisibleOnStorefront: false },
+      { isInternal: true, isVisibleOnStorefront: false },
+      { unit: "kg" },
+      { inputType: "multiselect" },
+      { isLocalized: true },
+    ] as const) {
+      expect(
+        attributeChangeAffectsSearchDocuments(base, { ...base, ...change }),
+        JSON.stringify(change),
+      ).toBe(true);
+    }
+  });
+
+  it("agrees with buildSearchDocuments: when it says false the documents are identical", () => {
+    const flags = [
+      "isFilterable",
+      "isSearchable",
+      "isVisibleOnStorefront",
+      "isInternal",
+      "isComparable",
+      "isSortable",
+    ] as const;
+    const facts = product({
+      attributes: { material: "cotton" },
+      variants: [variant({ id: "v1", attributes: {} })],
+    });
+    const build = (definition: typeof base): unknown =>
+      buildSearchDocuments(facts, { ...context, attributes: [assignment(definition)] });
+    for (const flag of flags) {
+      for (const value of [true, false]) {
+        const before = { ...base, options: [{ code: "cotton", label: { uk: "бавовна" } }] };
+        const after = { ...before, [flag]: value };
+        if (!attributeChangeAffectsSearchDocuments(before, after)) {
+          expect(build(after), `${flag}=${String(value)}`).toEqual(build(before));
+        }
+      }
+    }
   });
 });
