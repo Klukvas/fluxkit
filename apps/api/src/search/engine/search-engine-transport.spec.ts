@@ -611,9 +611,7 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
       interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
     });
     const pass = engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
-      Promise.all(
-        ["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission })),
-      ),
+      Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
     );
     await eventually(() => held.length === 2);
     await pause(50);
@@ -690,9 +688,7 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     });
     const pass = engineError(() =>
       engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
-        Promise.all(
-          ["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission })),
-        ),
+        Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
       ),
     );
     await eventually(() => held.length === 2);
@@ -732,7 +728,10 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     await holder;
     await pause(100);
     expect(held).toHaveLength(1);
-    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, refused: { queueFull: 0, waitExceeded: 0 } });
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      refused: { queueFull: 0, waitExceeded: 0 },
+    });
   });
 
   it("an abort signal destroys the running calls of an admitted pass and frees its slots", async () => {
@@ -844,9 +843,7 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     const since = engine.interactiveLane().since;
     expect(Date.parse(since)).not.toBeNaN();
     const first = engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
-      Promise.all(
-        ["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission })),
-      ),
+      Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
     );
     await eventually(() => held.length === 3);
     const second = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
@@ -892,8 +889,6 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
 
   it("refuses an admission of no calls", async () => {
     const engine = engineFor("http://127.0.0.1:9");
-    await expect(engine.withAdmission(0, {}, () => Promise.resolve(1))).rejects.toThrow(
-      RangeError,
-    );
+    await expect(engine.withAdmission(0, {}, () => Promise.resolve(1))).rejects.toThrow(RangeError);
   });
 });

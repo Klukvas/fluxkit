@@ -436,9 +436,7 @@ describe("ConcurrencyLimiter: weights, abort signals and counters", () => {
     expect(((await rejectionOf(limiter.acquire(10_000))) as LimiterRejection).reason).toBe(
       "queue_full",
     );
-    expect(((await rejectionOf(limiter.acquire(0))) as LimiterRejection).reason).toBe(
-      "queue_full",
-    );
+    expect(((await rejectionOf(limiter.acquire(0))) as LimiterRejection).reason).toBe("queue_full");
     controller.abort();
     await abandoned;
     expect(((await rejectionOf(limiter.acquire(0))) as LimiterRejection).reason).toBe(
