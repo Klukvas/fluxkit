@@ -18,5 +18,6 @@ Status: accepted 2026-11-01 (the owner asked to fix every finding of the indepen
 ## Consequences
 
 - No slot idles while a pass waits, and a heavy pass is no longer refused for waiting for N slots together: it needs one free slot at the head of the queue, like a one-call pass.
-- A heavy pass admitted on fewer slots than calls runs part of its calls in series; when they do not fit in the 2 s deadline it ends in `engine_timeout` (logged as a failed search, `503`) instead of `engine_busy`, after spending some engine work. Not measured at scale (plan, "Results").
+- A heavy pass admitted on fewer slots than calls runs part of its calls in series; when they do not fit in the 2 s deadline it ends in `engine_timeout` (logged as a failed search, `503`) instead of `engine_busy`, after spending some engine work.
+- Reduced load run (3 000 products, concurrency 192, one shared sandbox; plan "Results", indicative): in the full search mix the `503` share fell from 18.6 to 24.2 % to 13.7 to 16.0 % with throughput and p95 within the noise, and no `engine_timeout` was logged; one-call passes (catalog pages) are unchanged. Not measured at 20 000 products or on production hardware.
 - The admin screen and `docs/api/search.md` describe admission on the free slots.

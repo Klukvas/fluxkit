@@ -1,6 +1,6 @@
 # Search admission: review follow-ups of PR 206 (2026-11-01)
 
-Status: the owner asked to fix every finding of the independent review of PR 206 (ADR 0042), through the orchestrator, 2026-11-01. Branch `fix/search-admission-review-followups`.
+Status: the owner asked to fix every finding of the independent review of PR 206 (ADR 0042), through the orchestrator, 2026-11-01. Implemented on branch `fix/search-admission-review-followups` (results below); no independent review yet.
 Source: the review of `fix/search-per-search-slot-and-refusals` (findings F1 to F7, recorded in `docs/plans/2026-11-01-search-per-search-slot.md`, "Review follow-ups").
 
 ## What exists (checked before building)
@@ -41,5 +41,25 @@ Source: the review of `fix/search-per-search-slot-and-refusals` (findings F1 to 
 - Failing first per finding, then green; mutation checks for F2.
 - `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `check:docs`; search tests, full API suite, admin, api-client and config tests against real services; `pnpm openapi:export` and the freshness test.
 
-## Results
-(filled in after the work)
+## Results (2026-11-01)
+- **Failing first** (the spec red against the code before the fix, green after):
+  - F1: limiter 5 new specs red (`acquireUpTo` missing); transport "admits a waiting pass on the first free slot" red against the old engine (the pass was still waiting when the freed slot came: `condition not reached in time`, then `engine_busy`). Mutant "grant only the whole weight" (the ADR 0042 rule, in `drain()` or on arrival): killed by the review-scenario spec, the FIFO spec and the empty-queue spec. The review scenario with the old rule ends in `wait_exceeded` at 1 700 ms while a slot is free from 1 200 ms; with the new rule the head is granted 1 slot at 1 200 ms.
+  - F2 (tests of existing behaviour, so mutation-checked instead): release before `settle()` killed by "releases a pass's slots only after every call settled"; no sibling abort in `call()` killed by the `Promise.allSettled` spec; `withAdmission` keeping its listener killed by 2 specs; the limiter never detaching killed by 3 specs (one in the limiter spec); an attempt keeping its listener killed by the 10-call spec. All five survived before (review), all killed now.
+  - F3: transport spec red (`expected 'engine_busy' to be 'engine_timeout'`), green after.
+  - F4: transport 2 red (`abandoned` missing), api-client contract 1 red, admin view 1 red, admin screen 1 red; green after `openapi.json` was regenerated.
+  - F5: copy only (the screen spec checks the keys, not the wording).
+  - F6: store admission spec red (the 400 during a disconnect was not counted: `condition not reached in time`), green after.
+- **No starvation, no overtaking, bound kept:** limiter specs "keeps strict FIFO: the partly granted head does not grow, and the caller behind it gets the next free slot without overtaking" and "never holds more than maxInFlight under a burst of mixed weights" (60 acquisitions of weights 1 to 4 on 4 slots); transport spec: the pass's second call runs on its own slot after its first, the one-call pass queued behind it gets a slot only after the pass, `inFlightHighWater` stays at N.
+- **Reduced load run** (indicative; same shared 4-vCPU sandbox runs the engine, Postgres, the API and the load loop; 3 000 products, 19 664 documents; the PR 206 load loop and mixes, 15 s per run, two rounds alternated). "before" = this branch with only the old admission rule restored (a pass waits for all its slots), "after" = this branch; both 8-512. The sandbox was slower than during the PR 206 run (fewer successful searches a second at concurrency 32), so compare within this table only.
+
+| Mix, concurrency | Client | search `503` | successful searches/s | engine requests | page p95 |
+|---|---|---|---|---|---|
+| catalog through search, 32 | before / after | 0 % / 0 % | 79 to 81 / 78 to 82 | 1 223 to 1 240 / 1 197 to 1 248 | 600 to 603 / 614 to 616 ms |
+| catalog through search, 192 | before | 34.2 to 38.9 % | 66 to 74 | 1 101 to 1 195 | 2 074 to 2 422 ms |
+| catalog through search, 192 | after | 36.7 to 40.1 % | 70 to 76 | 1 140 to 1 232 | 1 936 to 2 222 ms |
+| full search mix, 32 | before / after | 0 % / 0 % | 126 to 130 / 131 to 132 | 3 570 to 3 701 / 3 710 to 3 736 | 369 to 377 / 362 to 371 ms |
+| full search mix, 192 | before | 18.6 to 24.2 % (mean 22.2) | 105 to 112 | 2 861 to 3 034 | 1 589 to 2 663 ms |
+| full search mix, 192 | after | 13.7 to 16.0 % (mean 14.8) | 106 to 114 | 3 110 to 3 427 | 1 730 to 2 912 ms |
+
+- Reading: in the full mix (where passes of several calls exist) the `503` share fell from 18.6 to 24.2 % to 13.7 to 16.0 % (four runs each, ranges do not overlap) and the engine did more work (more passes admitted), with successful searches a second and p95 within the run-to-run noise. The catalog mix sends one call per pass, so the change cannot apply there; its numbers overlap. No `engine_timeout` line was logged in any run (the cost named under "Price" did not show here). Indicative only: one shared sandbox, short runs.
+- Not measured: the 20 000-product catalog, a real storefront in the loop, client disconnects under load, several API instances.
