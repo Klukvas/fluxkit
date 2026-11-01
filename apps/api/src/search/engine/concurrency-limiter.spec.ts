@@ -1,3 +1,4 @@
+import { getEventListeners } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConcurrencyLimiter, LimiterRejection } from "./concurrency-limiter.js";
 
@@ -537,6 +538,30 @@ describe("ConcurrencyLimiter: weights, abort signals and counters", () => {
     expect(peak).toBeLessThanOrEqual(4);
     expect(limiter.inFlight).toBe(0);
     expect(limiter.waiting).toBe(0);
+  });
+
+  it("detaches its abort listener from a waiter that was granted, refused or closed", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 1, maxQueue: 10 });
+    const holder = await limiter.acquire(10_000);
+    const granted = new AbortController().signal;
+    const timedOut = new AbortController().signal;
+    const closed = new AbortController().signal;
+    const waiting = limiter.acquireUpTo(10_000, { signal: granted });
+    const refused = rejectionOf(limiter.acquire(50, { signal: timedOut }));
+    await settle();
+    expect(getEventListeners(granted, "abort")).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(((await refused) as LimiterRejection).reason).toBe("wait_exceeded");
+    expect(getEventListeners(timedOut, "abort")).toHaveLength(0);
+    holder();
+    const grant = await waiting;
+    expect(getEventListeners(granted, "abort")).toHaveLength(0);
+    const shut = rejectionOf(limiter.acquire(10_000, { signal: closed }));
+    await settle();
+    limiter.close();
+    expect(((await shut) as LimiterRejection).reason).toBe("closed");
+    expect(getEventListeners(closed, "abort")).toHaveLength(0);
+    grant.release();
   });
 
   it("counts grants, refusals by reason and abandoned waiters, and keeps the high-water marks", async () => {
