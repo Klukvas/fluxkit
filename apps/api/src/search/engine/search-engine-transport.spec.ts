@@ -1061,6 +1061,39 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0, calls: 9 });
   });
 
+  it("a call of an admitted pass that starts after the pass's deadline ends in engine_timeout, not engine_busy, and counts no lane refusal", async () => {
+    const { stub, held } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    // A free slot of the admission, but the deadline is gone.
+    const late = await engineError(() =>
+      engine.withAdmission(1, { timeoutMs: 50 }, async (admission) => {
+        await pause(80);
+        return engine.multiSearch(body("late"), 5_000, { admission });
+      }),
+    );
+    expect(late.code).toBe("engine_timeout");
+    // The wait for one of the admission's own slots runs out with the deadline: the same code.
+    const waited = await engineError(() =>
+      engine.withAdmission(2, { timeoutMs: 150 }, async (admission) => {
+        await admission.call("probe", () => pause(30));
+        const busy = admission.call("hold", () => pause(1_000));
+        const other = admission.call("hold", () => pause(1_000));
+        const third = engine.multiSearch(body("waits"), 5_000, { admission });
+        return Promise.all([busy, other, third]);
+      }),
+    );
+    expect(waited.code).toBe("engine_timeout");
+    expect(held).toHaveLength(0);
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      queued: 0,
+      calls: 0,
+      refused: { queueFull: 0, waitExceeded: 0 },
+    });
+  });
+
   it("refuses an admission of no calls", async () => {
     const engine = engineFor("http://127.0.0.1:9");
     await expect(engine.withAdmission(0, {}, () => Promise.resolve(1))).rejects.toThrow(RangeError);

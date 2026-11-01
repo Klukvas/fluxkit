@@ -224,8 +224,9 @@ export class InteractiveAdmission {
       }
       try {
         if (this.#deadline - Date.now() <= 0) {
-          // The wait for the slots used the whole deadline: the engine was not asked.
-          throw new SearchEngineError("engine_busy", { operation });
+          // The pass's deadline ran out before this call started (not the lane: the pass holds its slots), as when the
+          // wait for one of its slots above runs out: the engine was not asked.
+          throw new SearchEngineError("engine_timeout", { operation });
         }
         return await task(this.#deadline, signal);
       } finally {
