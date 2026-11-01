@@ -169,24 +169,50 @@ type Attempt =
     };
 
 /**
- * One admission to the interactive lane (ADR 0042): the slots one search pass needs, taken at once by
+ * One admission to the interactive lane (ADR 0042, ADR 0043, ADR 0044): the slots one search pass was granted by
  * `SearchEngine.withAdmission` before any of its calls starts, so the pass is admitted or refused as a whole. Its calls
- * run on these slots only (at most as many at once as it holds), share one deadline, and are aborted together: by the
- * first call that fails, by the caller's signal, and when the work ends. Only the engine that granted it can use it.
+ * run on the slots it holds only (never more at once), share one deadline, and are aborted together: by the first call
+ * that fails, by the caller's signal, and when the work ends. While a call of the pass waits for one of its slots, the
+ * pass grows by spare lane slots, one per waiting call, but only while nobody waits in the lane's queue (so it never
+ * takes a slot a queued pass is waiting for) and never beyond the slots it asked for; a spare is given back as soon as no
+ * call of the pass waits, and the rest with the grant once every call settled. Only the engine that granted it can use it.
  */
 export class InteractiveAdmission {
   readonly #owner: SearchEngine;
+  readonly #lane: ConcurrencyLimiter;
+  /** One slot per slot the pass asked for; the ones it does not hold are taken by `#placeholders`. */
   readonly #slots: ConcurrencyLimiter;
+  /** Private slots kept from the calls: one per lane slot asked for but not held. */
+  readonly #placeholders: Release[] = [];
+  /** Lane slots taken beyond the grant, each standing in for a released placeholder. */
+  readonly #spares: Release[] = [];
+  readonly #stopWatching: () => void;
   readonly #controller = new AbortController();
   readonly #running = new Set<Promise<unknown>>();
   readonly #deadline: number;
   #open = true;
 
-  /** Created by `SearchEngine.withAdmission` only. */
-  constructor(owner: SearchEngine, slots: number, deadline: number) {
+  /** Created by `SearchEngine.withAdmission` only: `granted` lane slots held of the `asked` (`granted <= asked`). */
+  constructor(
+    owner: SearchEngine,
+    lane: ConcurrencyLimiter,
+    granted: number,
+    asked: number,
+    deadline: number,
+  ) {
     this.#owner = owner;
+    this.#lane = lane;
     // No wait of its own beyond the deadline, and room for any number of calls: the pass already holds its slots.
-    this.#slots = new ConcurrencyLimiter({ maxInFlight: slots, maxQueue: Number.MAX_SAFE_INTEGER });
+    this.#slots = new ConcurrencyLimiter({ maxInFlight: asked, maxQueue: Number.MAX_SAFE_INTEGER });
+    for (let index = granted; index < asked; index += 1) {
+      const placeholder = this.#slots.takeSpare();
+      if (placeholder === undefined) {
+        throw new Error("a new admission's private slots must all be free");
+      }
+      this.#placeholders.push(placeholder);
+    }
+    this.#stopWatching =
+      this.#placeholders.length > 0 ? lane.watchSpare(() => this.#grow()) : () => undefined;
     this.#deadline = deadline;
   }
 
@@ -214,7 +240,10 @@ export class InteractiveAdmission {
     const running = (async () => {
       let release: Release;
       try {
-        release = await this.#slots.acquire(this.#deadline - Date.now(), { signal });
+        const slot = this.#slots.acquire(this.#deadline - Date.now(), { signal });
+        // With no slot of its own free, the call waits: a spare lane slot (if nobody waits there) starts it now.
+        this.#grow();
+        release = await slot;
       } catch (error) {
         if (error instanceof LimiterRejection) {
           throw new SearchEngineError(
@@ -233,6 +262,7 @@ export class InteractiveAdmission {
         return await task(this.#deadline, signal);
       } finally {
         release();
+        this.#shrink();
       }
     })();
     this.#running.add(running);
@@ -246,11 +276,44 @@ export class InteractiveAdmission {
     }
   }
 
-  /** Closes the admission: aborts whatever still runs and resolves once every call has settled. */
+  /**
+   * Closes the admission: stops growing, aborts whatever still runs and resolves once every call has settled. No spare is
+   * left by then: each is given back by the call that ends while no call of the pass waits (`#shrink`), so the last call
+   * to end gives back the rest; the caller gives back the grant.
+   */
   async settle(): Promise<void> {
     this.#open = false;
+    this.#stopWatching();
     this.#controller.abort();
     await Promise.allSettled([...this.#running]);
+  }
+
+  /**
+   * One spare lane slot per waiting call while the lane has one to spare: each frees a private slot for that call. (An
+   * aborted call is no longer waiting: the private limiter removes it at once.)
+   */
+  #grow(): void {
+    while (this.#slots.waiting > 0 && this.#placeholders.length > 0) {
+      const spare = this.#lane.takeSpare();
+      if (spare === undefined) {
+        return;
+      }
+      this.#spares.push(spare);
+      // Frees a private slot: the oldest waiting call of the pass is granted it at once.
+      this.#placeholders.pop()?.();
+    }
+  }
+
+  /** After a call ended: while a private slot is free and no call of the pass waits, gives a spare lane slot back. */
+  #shrink(): void {
+    while (this.#spares.length > 0) {
+      const placeholder = this.#slots.takeSpare();
+      if (placeholder === undefined) {
+        return;
+      }
+      this.#placeholders.push(placeholder);
+      this.#spares.pop()?.();
+    }
   }
 }
 
@@ -334,10 +397,11 @@ export class SearchEngine {
       throw new RangeError("an admission is for at least one call");
     }
     const deadline = Date.now() + timeoutMs;
+    const weight = Math.min(calls, this.limits.maxConcurrency);
     let grant: Grant;
     try {
       grant = await this.limiter.acquireUpTo(Math.min(this.limits.maxQueueWaitMs, timeoutMs), {
-        weight: Math.min(calls, this.limits.maxConcurrency),
+        weight,
         signal,
       });
     } catch (error) {
@@ -348,8 +412,9 @@ export class SearchEngine {
       }
       throw error;
     }
-    // Sized by the grant: with fewer slots than calls, the pass runs its calls in series on them inside its deadline.
-    const admission = new InteractiveAdmission(this, grant.slots, deadline);
+    // Sized by the grant, growing by spare slots while nobody waits (ADR 0044): with fewer slots than calls, the pass runs
+    // its calls in series on them inside its deadline.
+    const admission = new InteractiveAdmission(this, this.limiter, grant.slots, weight, deadline);
     const onAbort = (): void => admission.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted === true) {
