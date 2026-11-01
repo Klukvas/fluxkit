@@ -63,7 +63,7 @@ export const adminSearchStatusSchema = z.object({
       })
       .meta({
         description:
-          "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused).",
+          "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused): a share of admissions (a store search asks for up to 3, a suggestion for 1); each refusal ends one search.",
       }),
   }),
   locales: z.array(
