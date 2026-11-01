@@ -56,6 +56,7 @@ const IDLE_LANE = {
   admitted: 0,
   calls: 0,
   refused: { queueFull: 0, waitExceeded: 0 },
+  abandoned: 0,
   since: expect.any(String) as unknown as string,
 };
 describe("admin search routes (real Postgres, real Meilisearch)", () => {
