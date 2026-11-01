@@ -43,7 +43,7 @@ export const adminSearchStatusSchema = z.object({
         }),
         admitted: z.number().int().min(0).meta({
           description:
-            "Admissions granted: one per search pass, suggestion or settings read (a pass takes the slots of all its parallel calls at once).",
+            "Admissions granted: one per search pass, suggestion or settings read (a pass runs its parallel calls on the slots it was granted).",
         }),
         calls: z.number().int().min(0).meta({ description: "Engine calls sent on the lane." }),
         refused: z

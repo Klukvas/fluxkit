@@ -1628,7 +1628,7 @@
                               "type": "integer",
                               "minimum": 0,
                               "maximum": 9007199254740991,
-                              "description": "Admissions granted: one per search pass, suggestion or settings read (a pass takes the slots of all its parallel calls at once)."
+                              "description": "Admissions granted: one per search pass, suggestion or settings read (a pass runs its parallel calls on the slots it was granted)."
                             },
                             "calls": {
                               "type": "integer",
