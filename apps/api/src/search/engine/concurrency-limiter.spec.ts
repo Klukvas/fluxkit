@@ -473,6 +473,39 @@ describe("ConcurrencyLimiter: weights, abort signals and counters", () => {
     release();
   });
 
+  it("watchSpare takes turns per slot: slots freed together are shared among the watchers, none left idle (review F5 of PR 208)", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 3, maxQueue: 10 });
+    const whole = await limiter.acquire(10_000, { weight: 3 });
+    const taken: string[] = [];
+    const spares: (() => void)[] = [];
+    // Each watcher wants two slots and takes at most one per offer (the contract of a listener).
+    const watcher = (name: string) => {
+      let wanted = 2;
+      return (): void => {
+        if (wanted === 0) {
+          return;
+        }
+        const spare = limiter.takeSpare();
+        if (spare !== undefined) {
+          wanted -= 1;
+          taken.push(name);
+          spares.push(spare);
+        }
+      };
+    };
+    const stopA = limiter.watchSpare(watcher("a"));
+    const stopB = limiter.watchSpare(watcher("b"));
+    whole();
+    expect(taken).toEqual(["a", "b", "a"]);
+    expect(limiter.inFlight).toBe(3);
+    stopA();
+    stopB();
+    for (const spare of spares) {
+      spare();
+    }
+    expect(limiter.inFlight).toBe(0);
+  });
+
   it("watchSpare offers a slot freed while nobody waits, never one a waiter is waiting for, and takes turns among watchers", async () => {
     const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
     const holders = [await limiter.acquire(10_000), await limiter.acquire(10_000)];

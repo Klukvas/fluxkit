@@ -212,7 +212,7 @@ export class InteractiveAdmission {
       this.#placeholders.push(placeholder);
     }
     this.#stopWatching =
-      this.#placeholders.length > 0 ? lane.watchSpare(() => this.#grow()) : () => undefined;
+      this.#placeholders.length > 0 ? lane.watchSpare(() => this.#grow(1)) : () => undefined;
     this.#deadline = deadline;
   }
 
@@ -261,8 +261,15 @@ export class InteractiveAdmission {
         }
         return await task(this.#deadline, signal);
       } finally {
-        release();
-        this.#shrink();
+        if (this.#spares.length > 0 && this.#lane.waiting > 0) {
+          // Another pass queues in the lane: it gets this call's lane slot now (FIFO), instead of the next call of this
+          // pass; the private slot becomes a placeholder, and the pass grows again once nobody waits.
+          this.#placeholders.push(release);
+          this.#spares.pop()?.();
+        } else {
+          release();
+          this.#shrink();
+        }
       }
     })();
     this.#running.add(running);
@@ -289,11 +296,15 @@ export class InteractiveAdmission {
   }
 
   /**
-   * One spare lane slot per waiting call while the lane has one to spare: each frees a private slot for that call. (An
-   * aborted call is no longer waiting: the private limiter removes it at once.)
+   * One spare lane slot per waiting call (at most `limit`) while the lane has one to spare: each frees a private slot for
+   * that call. (An aborted call is no longer waiting: the private limiter removes it at once.)
    */
-  #grow(): void {
-    while (this.#slots.waiting > 0 && this.#placeholders.length > 0) {
+  #grow(limit = Number.POSITIVE_INFINITY): void {
+    for (
+      let taken = 0;
+      taken < limit && this.#slots.waiting > 0 && this.#placeholders.length > 0;
+      taken += 1
+    ) {
       const spare = this.#lane.takeSpare();
       if (spare === undefined) {
         return;
@@ -414,17 +425,18 @@ export class SearchEngine {
     }
     // Sized by the grant, growing by spare slots while nobody waits (ADR 0044): with fewer slots than calls, the pass runs
     // its calls in series on them inside its deadline.
-    const admission = new InteractiveAdmission(this, this.limiter, grant.slots, weight, deadline);
-    const onAbort = (): void => admission.abort();
-    signal?.addEventListener("abort", onAbort, { once: true });
-    if (signal?.aborted === true) {
-      admission.abort();
-    }
+    let admission: InteractiveAdmission | undefined;
+    const onAbort = (): void => admission?.abort();
     try {
+      admission = new InteractiveAdmission(this, this.limiter, grant.slots, weight, deadline);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      if (signal?.aborted === true) {
+        admission.abort();
+      }
       return await work(admission);
     } finally {
       signal?.removeEventListener("abort", onAbort);
-      await admission.settle();
+      await admission?.settle();
       grant.release();
     }
   }

@@ -302,9 +302,11 @@ describe("InteractiveAdmission: a granted pass grows on spare slots (ADR 0044)",
       await wait(100);
       return Promise.all([first, run()]);
     });
-    await vi.advanceTimersByTimeAsync(300);
-    await outcome;
+    await vi.advanceTimersByTimeAsync(150);
+    // Asserted before waiting for the pass: without growth the second call starts only at 200 ms.
     expect(started).toEqual([0, 100]);
+    await vi.advanceTimersByTimeAsync(400);
+    await outcome;
     await Promise.all(holders);
     expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
   });
@@ -395,5 +397,74 @@ describe("InteractiveAdmission: a granted pass grows on spare slots (ADR 0044)",
     expect((await heavy).code).toBe("ok");
     expect(watched).toBe(1);
     expect(stopped).toBe(1);
+  });
+
+  it("a pass with more calls than N gives a spare back to a pass that queues behind it after one call, instead of running its backlog on it (review F1 of PR 208)", async () => {
+    engine.close();
+    engine = new SearchEngine({
+      url: "http://127.0.0.1:9",
+      apiKey: "admission-spec-key-0123456789",
+      requestTimeoutMs: DEADLINE_MS,
+      interactive: { maxConcurrency: 2, maxQueue: 512, maxQueueWaitMs: 1_000 },
+    });
+    const holder = pass(1, 10);
+    await vi.advanceTimersByTimeAsync(0);
+    // Ten calls of 250 ms on N = 2: admitted on one slot, grown onto the second when the holder ends at 10 ms.
+    const heavy = pass(10, 250);
+    await vi.advanceTimersByTimeAsync(11);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 2, queued: 0 });
+    // A catalog page arrives and queues.
+    let page: PassOutcome | undefined;
+    void pass(1, 50).then((outcome) => {
+      page = outcome;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(engine.interactiveLane().queued).toBe(1);
+    // At 250 ms the pass's first call ends: the spare goes to the page, not to the pass's third call.
+    await vi.advanceTimersByTimeAsync(300);
+    expect(page?.code).toBe("ok");
+    expect((page?.endedAt ?? 0) - (page?.startedAt ?? 0)).toBeLessThanOrEqual(300);
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS);
+    const outcome = await heavy;
+    expect(outcome.code).toBe("ok");
+    expect(outcome.widest).toBe(2);
+    await holder;
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      queued: 0,
+      refused: { queueFull: 0, waitExceeded: 0 },
+    });
+  });
+
+  it("slots freed together go round the growing passes one at a time (review F5 of PR 208)", async () => {
+    engine.close();
+    engine = new SearchEngine({
+      url: "http://127.0.0.1:9",
+      apiKey: "admission-spec-key-0123456789",
+      requestTimeoutMs: DEADLINE_MS,
+      interactive: { maxConcurrency: 4, maxQueue: 512, maxQueueWaitMs: 1_000 },
+    });
+    // A two-call pass holds two slots, a one-call pass a third; a three-call pass gets the fourth, another queues and
+    // gets the one-call pass's slot at 30 ms: each three-call pass runs on one slot with two calls waiting.
+    const holder = pass(2, 100);
+    await vi.advanceTimersByTimeAsync(0);
+    const short = pass(1, 30);
+    await vi.advanceTimersByTimeAsync(0);
+    const first = pass(3, 500);
+    await vi.advanceTimersByTimeAsync(0);
+    const second = pass(3, 500);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 4, queued: 3 });
+    await vi.advanceTimersByTimeAsync(30);
+    await short;
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 4, queued: 0 });
+    // At 100 ms the holder gives back both slots at once while nobody queues: one to each growing pass.
+    await vi.advanceTimersByTimeAsync(70);
+    await holder;
+    await vi.advanceTimersByTimeAsync(DEADLINE_MS);
+    const [a, b] = await Promise.all([first, second]);
+    expect([a.code, b.code]).toEqual(["ok", "ok"]);
+    expect([a.widest, b.widest]).toEqual([2, 2]);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
   });
 });

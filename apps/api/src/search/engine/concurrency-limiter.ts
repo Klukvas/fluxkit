@@ -207,8 +207,9 @@ export class ConcurrencyLimiter {
   }
 
   /**
-   * Calls `listener` whenever a slot frees while nobody waits, so it can take it with `takeSpare` at once (watchers take
-   * turns: one that took a slot goes to the back). Returns the function that stops watching.
+   * Calls `listener` whenever a slot frees while nobody waits, so it can take it with `takeSpare` at once. A listener
+   * takes at most one slot per call; watchers take turns per slot (one that took a slot goes to the back, and the offer
+   * goes round again while slots stay free). Returns the function that stops watching.
    */
   watchSpare(listener: () => void): () => void {
     this.spareWatchers.add(listener);
@@ -279,19 +280,31 @@ export class ConcurrencyLimiter {
     }
   }
 
-  /** Each watcher in turn while a slot is free and nobody waits; one that took a slot goes to the back of the turn. */
+  /**
+   * Rounds over the watchers while a slot is free and nobody waits; one that took a slot goes to the back of the turn.
+   * Ends when a round takes nothing (each round that goes on took a slot, so at most `maxInFlight` rounds).
+   */
   private offerSpares(): void {
-    for (const watcher of [...this.spareWatchers]) {
-      if (this.closed || this.queue.length > 0 || this.active >= this.options.maxInFlight) {
+    for (;;) {
+      let took = false;
+      for (const watcher of [...this.spareWatchers]) {
+        if (this.closed || this.queue.length > 0 || this.active >= this.options.maxInFlight) {
+          return;
+        }
+        if (!this.spareWatchers.has(watcher)) {
+          continue;
+        }
+        const before = this.active;
+        watcher();
+        if (this.active > before) {
+          took = true;
+          if (this.spareWatchers.delete(watcher)) {
+            this.spareWatchers.add(watcher);
+          }
+        }
+      }
+      if (!took) {
         return;
-      }
-      if (!this.spareWatchers.has(watcher)) {
-        continue;
-      }
-      const before = this.active;
-      watcher();
-      if (this.active > before && this.spareWatchers.delete(watcher)) {
-        this.spareWatchers.add(watcher);
       }
     }
   }
