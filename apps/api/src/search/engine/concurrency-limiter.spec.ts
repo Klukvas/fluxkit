@@ -392,6 +392,152 @@ describe("ConcurrencyLimiter: weights, abort signals and counters", () => {
     controller.abort();
     const refused = await rejectionOf(limiter.acquire(10_000, { signal: controller.signal }));
     expect((refused as LimiterRejection).reason).toBe("aborted");
+    const upTo = await rejectionOf(limiter.acquireUpTo(10_000, { signal: controller.signal }));
+    expect((upTo as LimiterRejection).reason).toBe("aborted");
+    expect(limiter.inFlight).toBe(0);
+    // It never waited, so it is not an abandoned waiter (review F2 of PR 207), and it is no refusal of load either.
+    expect(limiter.counters()).toMatchObject({
+      abandoned: 0,
+      granted: 0,
+      refusedQueueFull: 0,
+      refusedWaitExceeded: 0,
+    });
+  });
+
+  it("drain() grants every waiter that fits on one release, not only the head (review F3 of PR 207)", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 4, maxQueue: 10 });
+    const whole = await limiter.acquireUpTo(10_000, { weight: 4 });
+    expect(whole.slots).toBe(4);
+    const granted: number[] = [];
+    const waiters = Array.from({ length: 4 }, (_, index) =>
+      limiter.acquire(10_000).then((release) => {
+        granted.push(index);
+        return release;
+      }),
+    );
+    await settle();
+    expect(limiter.waiting).toBe(4);
+    whole.release();
+    await settle();
+    expect(granted).toEqual([0, 1, 2, 3]);
+    expect(limiter.inFlight).toBe(4);
+    expect(limiter.waiting).toBe(0);
+    for (const release of await Promise.all(waiters)) {
+      release();
+    }
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("takeSpare takes one free slot only while nobody waits: never a slot a waiter is waiting for, never above maxInFlight", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    const holder = await limiter.acquire(10_000);
+    const spare = limiter.takeSpare();
+    expect(spare).toBeDefined();
+    expect(limiter.inFlight).toBe(2);
+    // No slot free: nothing to take, and nothing queued.
+    expect(limiter.takeSpare()).toBeUndefined();
+    expect(limiter.waiting).toBe(0);
+    const order: string[] = [];
+    const waiter = limiter.acquire(10_000).then((release) => {
+      order.push("waiter");
+      return release;
+    });
+    await settle();
+    holder();
+    // The freed slot went to the waiter at once; a spare is refused while it waits or holds it.
+    await settle();
+    expect(order).toEqual(["waiter"]);
+    expect(limiter.takeSpare()).toBeUndefined();
+    spare?.();
+    spare?.();
+    expect(limiter.inFlight).toBe(1);
+    // A spare is no admission: `granted` counts the two acquisitions only, `inFlight` counted the spare while held.
+    expect(limiter.counters()).toMatchObject({ granted: 2, inFlightHighWater: 2 });
+    (await waiter)();
+    expect(limiter.inFlight).toBe(0);
+    limiter.close();
+    expect(limiter.takeSpare()).toBeUndefined();
+  });
+
+  it("takeSpare leaves a free slot to a waiter that needs more than is free (it waits for it)", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    const holder = await limiter.acquire(10_000);
+    const whole = limiter.acquire(10_000, { weight: 2 });
+    await settle();
+    // One slot is free, but the head of the queue is waiting for it (and one more).
+    expect(limiter.inFlight).toBe(1);
+    expect(limiter.takeSpare()).toBeUndefined();
+    holder();
+    const release = await whole;
+    expect(limiter.inFlight).toBe(2);
+    release();
+  });
+
+  it("watchSpare takes turns per slot: slots freed together are shared among the watchers, none left idle (review F5 of PR 208)", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 3, maxQueue: 10 });
+    const whole = await limiter.acquire(10_000, { weight: 3 });
+    const taken: string[] = [];
+    const spares: (() => void)[] = [];
+    // Each watcher wants two slots and takes at most one per offer (the contract of a listener).
+    const watcher = (name: string) => {
+      let wanted = 2;
+      return (): void => {
+        if (wanted === 0) {
+          return;
+        }
+        const spare = limiter.takeSpare();
+        if (spare !== undefined) {
+          wanted -= 1;
+          taken.push(name);
+          spares.push(spare);
+        }
+      };
+    };
+    const stopA = limiter.watchSpare(watcher("a"));
+    const stopB = limiter.watchSpare(watcher("b"));
+    whole();
+    expect(taken).toEqual(["a", "b", "a"]);
+    expect(limiter.inFlight).toBe(3);
+    stopA();
+    stopB();
+    for (const spare of spares) {
+      spare();
+    }
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("watchSpare offers a slot freed while nobody waits, never one a waiter is waiting for, and takes turns among watchers", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    const holders = [await limiter.acquire(10_000), await limiter.acquire(10_000)];
+    const taken: string[] = [];
+    const spares: (() => void)[] = [];
+    const watcher = (name: string) => (): void => {
+      const spare = limiter.takeSpare();
+      if (spare !== undefined) {
+        taken.push(name);
+        spares.push(spare);
+      }
+    };
+    const stopA = limiter.watchSpare(watcher("a"));
+    const stopB = limiter.watchSpare(watcher("b"));
+    const waiter = limiter.acquire(10_000);
+    await settle();
+    holders[0]?.();
+    // A waiter was in the queue: it got the slot, no watcher was offered it.
+    expect(taken).toEqual([]);
+    const releaseWaiter = await waiter;
+    holders[1]?.();
+    expect(taken).toEqual(["a"]);
+    releaseWaiter();
+    // Round robin: the watcher that took last goes to the back.
+    expect(taken).toEqual(["a", "b"]);
+    expect(limiter.inFlight).toBe(2);
+    stopA();
+    stopB();
+    spares[0]?.();
+    expect(taken).toEqual(["a", "b"]);
+    expect(limiter.inFlight).toBe(1);
+    spares[1]?.();
     expect(limiter.inFlight).toBe(0);
   });
 
