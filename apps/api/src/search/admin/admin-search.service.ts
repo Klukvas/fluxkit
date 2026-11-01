@@ -119,7 +119,12 @@ export class AdminSearchService implements SearchSynonymSeeder {
     }
     const summary = await this.queue.summary(this.database, now);
     return {
-      engine: { reachable, code, rejectedSearches: this.rejections.snapshot() },
+      engine: {
+        reachable,
+        code,
+        rejectedSearches: this.rejections.snapshot(),
+        interactiveLane: this.engine.interactiveLane(),
+      },
       locales,
       queue: {
         depth: summary.depth,

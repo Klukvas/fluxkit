@@ -817,6 +817,20 @@ const searchStatus: Shape<Admin.AdminSearchStatus> = {
         rejectedSearches: {
           object: { count: "integer", lastCode: { nullable: "string" }, lastAt: nullableTimestamp },
         },
+        interactiveLane: {
+          object: {
+            maxConcurrency: "integer",
+            maxQueue: "integer",
+            inFlight: "integer",
+            queued: "integer",
+            inFlightHighWater: "integer",
+            queuedHighWater: "integer",
+            admitted: "integer",
+            calls: "integer",
+            refused: { object: { queueFull: "integer", waitExceeded: "integer" } },
+            since: "string",
+          },
+        },
       },
     },
     locales: {

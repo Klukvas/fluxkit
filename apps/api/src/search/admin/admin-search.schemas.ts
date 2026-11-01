@@ -25,6 +25,42 @@ export const adminSearchStatusSchema = z.object({
         description:
           "Store searches the engine refused with HTTP 400 since this API process started (a bug or a drift between the API and the live index settings; the store answered 500). Per process.",
       }),
+    interactiveLane: z
+      .object({
+        maxConcurrency: z.number().int().min(1).meta({
+          description: "`SEARCH_ENGINE_MAX_CONCURRENCY`: slots, one per engine call in flight.",
+        }),
+        maxQueue: z.number().int().min(0).meta({
+          description: "`SEARCH_ENGINE_MAX_QUEUE`: slots that may be waited for.",
+        }),
+        inFlight: z.number().int().min(0).meta({ description: "Slots held now." }),
+        queued: z.number().int().min(0).meta({ description: "Slots waited for now." }),
+        inFlightHighWater: z.number().int().min(0).meta({
+          description: "Most slots held at once since the process started.",
+        }),
+        queuedHighWater: z.number().int().min(0).meta({
+          description: "Most slots waited for at once since the process started.",
+        }),
+        admitted: z.number().int().min(0).meta({
+          description:
+            "Admissions granted: one per search pass, suggestion or settings read (a pass takes the slots of all its parallel calls at once).",
+        }),
+        calls: z.number().int().min(0).meta({ description: "Engine calls sent on the lane." }),
+        refused: z
+          .object({
+            queueFull: z.number().int().min(0),
+            waitExceeded: z.number().int().min(0),
+          })
+          .meta({
+            description:
+              "Admissions refused (`engine_busy`; the store answered 503 and the storefront fell back), by reason: the queue had no room, or no slots came within 1 s.",
+          }),
+        since: timestamp.meta({ description: "When counting started (with the process)." }),
+      })
+      .meta({
+        description:
+          "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused).",
+      }),
   }),
   locales: z.array(
     z.object({
