@@ -111,7 +111,7 @@ function storeMeiliKey(key) {
 
 async function createSearchKey(values) {
   const prefix = values.MEILI_INDEX_PREFIX || "fluxkit_";
-  const response = await fetch(`${values.MEILI_URL}/keys`, {
+  const response = await globalThis.fetch(`${values.MEILI_URL}/keys`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${values.MEILI_MASTER_KEY}`,

@@ -38,10 +38,9 @@ export function readEnvFile() {
  * would otherwise make the demo seed the test database.)
  */
 export function childEnv(fileValues, extra = {}) {
-  const env = { ...process.env };
-  for (const key of Object.keys(fileValues)) {
-    delete env[key];
-  }
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !Object.hasOwn(fileValues, key)),
+  );
   return { ...env, ...extra };
 }
 

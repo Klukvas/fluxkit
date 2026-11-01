@@ -37,3 +37,10 @@ Goal: the owner clicks through the shop on their own computer: a demo catalog wi
 - `seeds/assets/*.webp`, `seeds/src/types.ts`, `seeds/src/products.ts`, `seeds/src/catalog-seed.spec.ts`, `seeds/README.md`.
 - `apps/api/src/seed/catalog-seeder.ts`, `seed-command.ts`, `seed.spec.ts`, `apps/api/src/test/seed-rows.ts`, `apps/api/src/media/media-upload.service.ts` (+ spec).
 - Docs: `README.md` ("Try it locally"), `CHANGELOG.md`, `docs/files/seeds.md`, `docs/files/workspace.md`, `docs/files/api.md`, `docs/HANDOFF.md`, this plan.
+
+## Outcome (2026-11-01)
+- Built as planned (decision 3 as amended). 11 images, 74 470 bytes in total (800 x 800 WebP, quality 82), well under the 2 MB aim.
+- TDD: the new seed spec cases (uploads through the media service, a second run uploads nothing, a missing file stops the run before any write, the `none` driver) and the seeds data checks (files, no URL) failed first (6 and 3 failures), then passed.
+- Run in the agent sandbox with native Postgres 16, Redis and Meilisearch (no Docker daemon there): `pnpm demo:up --skip-docker` against a scratch `_dev` database (first run: everything created, 11 images uploaded, admin created; second run: nothing created, nothing uploaded, admin left alone), then the API, `next dev` and `vite` and a Playwright click-through: admin sign-in, product media with the uploaded images loading, a delivery method activated in the admin, storefront home, categories, product, cart, checkout with the courier step, "Pay now" to the fake page, `pnpm demo:pay`, "Payment received" and the order paid, search in `en` and `uk`.
+- Not verified: the Docker steps of `demo:up` and `demo:down` (no daemon in the sandbox); the e2e suites (they now seed with images; not run).
+- As expected, the storefront shows its placeholder for the uploaded images on `http` (open question above).

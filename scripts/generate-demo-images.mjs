@@ -10,6 +10,7 @@
 //
 // `pnpm install` must have run (sharp is resolved from apps/api). SVG rendering goes through the local librsvg, so the
 // bytes can differ slightly between machines; that is why the files are committed instead of generated on every seed.
+import { Buffer } from "node:buffer";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";

@@ -82,7 +82,7 @@ async function main() {
   const api = `http://127.0.0.1:${values.PORT || "3000"}`;
   let response;
   try {
-    response = await fetch(`${api}/webhooks/payments/fake`, {
+    response = await globalThis.fetch(`${api}/webhooks/payments/fake`, {
       method: "POST",
       headers: { "content-type": "application/json", "x-fake-signature": signature },
       body,
