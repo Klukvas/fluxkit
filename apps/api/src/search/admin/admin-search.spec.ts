@@ -14,6 +14,14 @@ interface Status {
     reachable: boolean;
     code: string | null;
     rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
+    interactiveLane: {
+      inFlight: number;
+      queued: number;
+      admitted: number;
+      calls: number;
+      refused: { queueFull: number; waitExceeded: number };
+      since: string;
+    };
   };
   locales: {
     locale: string;
@@ -36,6 +44,19 @@ interface Group {
 
 /** The store has not been refused by the engine (store-search.spec.ts provokes a refusal). */
 const NO_REJECTIONS = { count: 0, lastCode: null, lastAt: null };
+/** A fresh process's interactive lane with the default limits: nothing admitted, refused or held yet. */
+const IDLE_LANE = {
+  maxConcurrency: 8,
+  maxQueue: 512,
+  inFlight: 0,
+  queued: 0,
+  inFlightHighWater: 0,
+  queuedHighWater: 0,
+  admitted: 0,
+  calls: 0,
+  refused: { queueFull: 0, waitExceeded: 0 },
+  since: expect.any(String) as unknown as string,
+};
 describe("admin search routes (real Postgres, real Meilisearch)", () => {
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
   let search: SearchWorld;
@@ -74,7 +95,9 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
       reachable: true,
       code: null,
       rejectedSearches: NO_REJECTIONS,
+      interactiveLane: IDLE_LANE,
     });
+    expect(Date.parse(result.body.engine.interactiveLane.since)).not.toBeNaN();
     expect(result.body.locales.map((entry) => [entry.locale, entry.liveIndex])).toEqual([
       ["uk", null],
       ["en", null],
@@ -95,6 +118,16 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
       [search.liveUid("uk"), true, true],
       [search.liveUid("en"), true, true],
     ]);
+    // A store search on this process is counted by the lane: one admission for the two settings reads, one per pass.
+    expect((await http(owner.baseUrl, "GET", "/store/search")).status).toBe(200);
+    const counted = await http<Status>(owner.baseUrl, "GET", "/admin/search/status");
+    expect(counted.body.engine.interactiveLane).toMatchObject({
+      inFlight: 0,
+      queued: 0,
+      admitted: 2,
+      calls: 3,
+      refused: { queueFull: 0, waitExceeded: 0 },
+    });
     await pool.query(
       `insert into search_sync_queue (product_id, reason, attempts, last_error_code)
        values (gen_random_uuid(), 'product_changed', 10, 'engine_timeout')`,
@@ -115,6 +148,7 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
         reachable: false,
         code: "engine_unreachable",
         rejectedSearches: NO_REJECTIONS,
+        interactiveLane: IDLE_LANE,
       });
     } finally {
       await down.app.close();

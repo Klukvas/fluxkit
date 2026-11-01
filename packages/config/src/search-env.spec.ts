@@ -212,35 +212,25 @@ describe("SEARCH_ENGINE_MAX_CONCURRENCY and SEARCH_ENGINE_MAX_QUEUE", () => {
   );
 
   it.each([
-    ["1", "0"],
-    ["9", "0"],
-    [undefined, "0"],
+    ["1", 1],
+    ["9", 9],
+    ["10", 10],
+    [undefined, DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY],
   ])(
-    "refuses no queue with a concurrency (%j) below what one search sends at once",
-    (concurrency, queue) => {
+    "accepts no queue with any concurrency (%j): one admission covers a whole search pass (ADR 0042)",
+    (concurrency, expected) => {
+      // A search sends up to this many engine calls at once, but takes their slots as one admission, so on an idle lane
+      // it is admitted whatever the limits; `0` only means "refuse whenever no slot is free".
       expect(SEARCH_MAX_PARALLEL_ENGINE_CALLS).toBe(10);
       expect(
-        messageOf({
+        loadEnv({
           ...enabled,
           SEARCH_ENGINE_MAX_CONCURRENCY: concurrency,
-          SEARCH_ENGINE_MAX_QUEUE: queue,
-        }),
-      ).toMatch(
-        /SEARCH_ENGINE_MAX_QUEUE: must be at least 1 when SEARCH_ENGINE_MAX_CONCURRENCY is below 10/,
-      );
+          SEARCH_ENGINE_MAX_QUEUE: "0",
+        }).search,
+      ).toMatchObject({ engineMaxConcurrency: expected, engineMaxQueue: 0 });
     },
   );
-
-  it("accepts no queue from a concurrency of 10, and a queue of 1 with a concurrency of 1", () => {
-    expect(
-      loadEnv({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: "10", SEARCH_ENGINE_MAX_QUEUE: "0" })
-        .search,
-    ).toMatchObject({ engineMaxConcurrency: 10, engineMaxQueue: 0 });
-    expect(
-      loadEnv({ ...enabled, SEARCH_ENGINE_MAX_CONCURRENCY: "1", SEARCH_ENGINE_MAX_QUEUE: "1" })
-        .search,
-    ).toMatchObject({ engineMaxConcurrency: 1, engineMaxQueue: 1 });
-  });
 
   it.each(["10001", "-1", "2.0", "007", "lots"])("refuses a queue of %j", (value) => {
     expect(messageOf({ ...enabled, SEARCH_ENGINE_MAX_QUEUE: value })).toMatch(

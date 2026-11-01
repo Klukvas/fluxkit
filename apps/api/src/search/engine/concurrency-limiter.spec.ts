@@ -278,3 +278,185 @@ describe("ConcurrencyLimiter", () => {
     expect(() => new ConcurrencyLimiter({ maxInFlight: 1, maxQueue: -1 })).toThrow(RangeError);
   });
 });
+
+/** Weighted admissions (one per search pass, ADR 0042), abort signals and the counters of the admin status. */
+describe("ConcurrencyLimiter: weights, abort signals and counters", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("grants a weight only when that many slots are free, and releases them all at once", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 3, maxQueue: 10 });
+    const one = await limiter.acquire(10_000, { weight: 1 });
+    const granted: string[] = [];
+    const three = limiter.acquire(10_000, { weight: 3 }).then((release) => {
+      granted.push("three");
+      return release;
+    });
+    await settle();
+    expect(granted).toEqual([]);
+    expect(limiter.inFlight).toBe(1);
+    expect(limiter.waiting).toBe(3);
+    one();
+    const releaseThree = await three;
+    expect(granted).toEqual(["three"]);
+    expect(limiter.inFlight).toBe(3);
+    expect(limiter.waiting).toBe(0);
+    releaseThree();
+    releaseThree();
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("keeps FIFO across weights: a small caller never overtakes a larger one that waits", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    const first = await limiter.acquire(10_000, { weight: 1 });
+    const order: string[] = [];
+    const large = limiter.acquire(10_000, { weight: 2 }).then((release) => {
+      order.push("large");
+      return release;
+    });
+    const small = limiter.acquire(10_000, { weight: 1 }).then((release) => {
+      order.push("small");
+      return release;
+    });
+    await settle();
+    // One slot is free, but the large caller came first: the small one waits behind it.
+    expect(order).toEqual([]);
+    first();
+    const releaseLarge = await large;
+    await settle();
+    expect(order).toEqual(["large"]);
+    releaseLarge();
+    (await small)();
+    expect(order).toEqual(["large", "small"]);
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("counts the queue in slots: a weight that does not fit in the room left is refused with queue_full", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 3 });
+    const holder = await limiter.acquire(10_000, { weight: 2 });
+    const waiting = limiter.acquire(10_000, { weight: 2 });
+    await settle();
+    expect(limiter.waiting).toBe(2);
+    const refused = await rejectionOf(limiter.acquire(10_000, { weight: 2 }));
+    expect((refused as LimiterRejection).reason).toBe("queue_full");
+    const fits = limiter.acquire(10_000, { weight: 1 });
+    await settle();
+    expect(limiter.waiting).toBe(3);
+    holder();
+    (await waiting)();
+    (await fits)();
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("refuses a weight above maxInFlight or below 1", () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    expect(() => limiter.acquire(10_000, { weight: 3 })).toThrow(RangeError);
+    expect(() => limiter.acquire(10_000, { weight: 0 })).toThrow(RangeError);
+    expect(() => limiter.acquire(10_000, { weight: 1.5 })).toThrow(RangeError);
+  });
+
+  it("an abort signal removes a waiter at once, frees its room and lets the callers behind it in", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 4 });
+    const holder = await limiter.acquire(10_000, { weight: 1 });
+    const controller = new AbortController();
+    const large = rejectionOf(limiter.acquire(10_000, { weight: 2, signal: controller.signal }));
+    const order: string[] = [];
+    const small = limiter.acquire(10_000, { weight: 1 }).then((release) => {
+      order.push("small");
+      return release;
+    });
+    await settle();
+    expect(limiter.waiting).toBe(3);
+    controller.abort();
+    expect(((await large) as LimiterRejection).reason).toBe("aborted");
+    // The aborted head no longer blocks: the free slot goes to the small caller behind it.
+    const releaseSmall = await small;
+    expect(order).toEqual(["small"]);
+    expect(limiter.waiting).toBe(0);
+    expect(limiter.inFlight).toBe(2);
+    expect(vi.getTimerCount()).toBe(0);
+    releaseSmall();
+    holder();
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("refuses an already aborted signal at once with aborted, without taking a slot", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 1, maxQueue: 1 });
+    const controller = new AbortController();
+    controller.abort();
+    const refused = await rejectionOf(limiter.acquire(10_000, { signal: controller.signal }));
+    expect((refused as LimiterRejection).reason).toBe("aborted");
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("an abort after the grant changes nothing: the holder keeps its slots until it releases them", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 1, maxQueue: 1 });
+    const controller = new AbortController();
+    const release = await limiter.acquire(10_000, { signal: controller.signal });
+    controller.abort();
+    expect(limiter.inFlight).toBe(1);
+    release();
+    expect(limiter.inFlight).toBe(0);
+  });
+
+  it("a head that gives up waiting lets the smaller callers behind it in", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 10 });
+    const holder = await limiter.acquire(10_000, { weight: 1 });
+    const large = rejectionOf(limiter.acquire(100, { weight: 2 }));
+    const small = limiter.acquire(10_000, { weight: 1 });
+    await settle();
+    await vi.advanceTimersByTimeAsync(100);
+    expect(((await large) as LimiterRejection).reason).toBe("wait_exceeded");
+    const releaseSmall = await small;
+    expect(limiter.inFlight).toBe(2);
+    releaseSmall();
+    holder();
+  });
+
+  it("counts grants, refusals by reason and abandoned waiters, and keeps the high-water marks", async () => {
+    const limiter = new ConcurrencyLimiter({ maxInFlight: 2, maxQueue: 2 });
+    expect(limiter.counters()).toEqual({
+      granted: 0,
+      refusedQueueFull: 0,
+      refusedWaitExceeded: 0,
+      abandoned: 0,
+      inFlightHighWater: 0,
+      waitingHighWater: 0,
+    });
+    const holder = await limiter.acquire(10_000, { weight: 2 });
+    const timedOut = rejectionOf(limiter.acquire(50, { weight: 1 }));
+    const controller = new AbortController();
+    const abandoned = rejectionOf(limiter.acquire(10_000, { signal: controller.signal }));
+    await settle();
+    expect(((await rejectionOf(limiter.acquire(10_000))) as LimiterRejection).reason).toBe(
+      "queue_full",
+    );
+    expect(((await rejectionOf(limiter.acquire(0))) as LimiterRejection).reason).toBe("queue_full");
+    controller.abort();
+    await abandoned;
+    expect(((await rejectionOf(limiter.acquire(0))) as LimiterRejection).reason).toBe(
+      "wait_exceeded",
+    );
+    await vi.advanceTimersByTimeAsync(50);
+    await timedOut;
+    holder();
+    (await limiter.acquire(10_000))();
+    expect(limiter.counters()).toEqual({
+      granted: 2,
+      refusedQueueFull: 2,
+      refusedWaitExceeded: 2,
+      abandoned: 1,
+      inFlightHighWater: 2,
+      waitingHighWater: 2,
+    });
+    // A refusal by close() is a shutdown, not a refusal of load.
+    limiter.close();
+    await rejectionOf(limiter.acquire(10_000));
+    expect(limiter.counters().refusedQueueFull).toBe(2);
+  });
+});

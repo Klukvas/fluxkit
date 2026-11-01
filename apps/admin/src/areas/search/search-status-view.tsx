@@ -17,9 +17,11 @@ import type { RebuildNotice } from "./search-outcome";
 import {
   ageText,
   engineView,
+  laneView,
   localeView,
   queueView,
   rejectedView,
+  type LaneView,
   type LocaleView,
   type QueueView,
 } from "./search-view";
@@ -97,6 +99,75 @@ function EngineSection({
           </p>
         </Alert>
       )}
+      <LaneBlock t={t} uiLocale={uiLocale} lane={laneView(engine.interactiveLane)} />
+    </section>
+  );
+}
+
+/** The engine client's interactive lane (ADR 0041, 0042): how full it is, how full it got, what it refused. */
+function LaneBlock({ t, uiLocale, lane }: { t: Translator; uiLocale: string; lane: LaneView }) {
+  const number = new Intl.NumberFormat(uiLocale);
+  const percent = new Intl.NumberFormat(uiLocale, { style: "percent", maximumFractionDigits: 1 });
+  const facts = [
+    {
+      id: "inFlight",
+      term: t("search.lane.inFlight"),
+      description: t("search.lane.ofLimit", {
+        value: number.format(lane.inFlight),
+        limit: number.format(lane.maxConcurrency),
+      }),
+    },
+    {
+      id: "queued",
+      term: t("search.lane.queued"),
+      description: t("search.lane.ofLimit", {
+        value: number.format(lane.queued),
+        limit: number.format(lane.maxQueue),
+      }),
+    },
+    {
+      id: "peaks",
+      term: t("search.lane.peaks"),
+      description: t("search.lane.peaksValue", {
+        inFlight: number.format(lane.inFlightHighWater),
+        queued: number.format(lane.queuedHighWater),
+      }),
+    },
+    { id: "admitted", term: t("search.lane.admitted"), description: number.format(lane.admitted) },
+    { id: "calls", term: t("search.lane.calls"), description: number.format(lane.calls) },
+    {
+      id: "refusedQueueFull",
+      term: t("search.lane.refusedQueueFull"),
+      description: number.format(lane.queueFull),
+    },
+    {
+      id: "refusedWaitExceeded",
+      term: t("search.lane.refusedWaitExceeded"),
+      description: number.format(lane.waitExceeded),
+    },
+  ];
+  return (
+    <section aria-labelledby="search-lane" className="flex flex-col gap-3">
+      <h3 id="search-lane" className="text-base font-semibold text-foreground">
+        {t("search.lane.title")}
+      </h3>
+      <p className="text-muted-foreground">
+        {t("search.lane.intro", { time: formatDateTime(lane.since, uiLocale) })}
+      </p>
+      {lane.state === "refused" ? (
+        <Alert variant="warning" title={t("search.lane.refusedTitle")}>
+          <p>
+            {t("search.lane.refusedBody", {
+              count: number.format(lane.refused),
+              share: percent.format(lane.refusedShare ?? 0),
+            })}
+          </p>
+          <p>{t("search.lane.advice")}</p>
+        </Alert>
+      ) : (
+        <p className="text-muted-foreground">{t("search.lane.noneRefused")}</p>
+      )}
+      <DescriptionList items={facts} />
     </section>
   );
 }

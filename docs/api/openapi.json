@@ -1584,9 +1584,99 @@
                           "required": ["count", "lastCode", "lastAt"],
                           "additionalProperties": false,
                           "description": "Store searches the engine refused with HTTP 400 since this API process started (a bug or a drift between the API and the live index settings; the store answered 500). Per process."
+                        },
+                        "interactiveLane": {
+                          "type": "object",
+                          "properties": {
+                            "maxConcurrency": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991,
+                              "description": "`SEARCH_ENGINE_MAX_CONCURRENCY`: slots, one per engine call in flight."
+                            },
+                            "maxQueue": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "`SEARCH_ENGINE_MAX_QUEUE`: slots that may be waited for."
+                            },
+                            "inFlight": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Slots held now."
+                            },
+                            "queued": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Slots waited for now."
+                            },
+                            "inFlightHighWater": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Most slots held at once since the process started."
+                            },
+                            "queuedHighWater": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Most slots waited for at once since the process started."
+                            },
+                            "admitted": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Admissions granted: one per search pass, suggestion or settings read (a pass takes the slots of all its parallel calls at once)."
+                            },
+                            "calls": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Engine calls sent on the lane."
+                            },
+                            "refused": {
+                              "type": "object",
+                              "properties": {
+                                "queueFull": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "waitExceeded": {
+                                  "type": "integer",
+                                  "minimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": ["queueFull", "waitExceeded"],
+                              "additionalProperties": false,
+                              "description": "Admissions refused (`engine_busy`; the store answered 503 and the storefront fell back), by reason: the queue had no room, or no slots came within 1 s."
+                            },
+                            "since": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "When counting started (with the process)."
+                            }
+                          },
+                          "required": [
+                            "maxConcurrency",
+                            "maxQueue",
+                            "inFlight",
+                            "queued",
+                            "inFlightHighWater",
+                            "queuedHighWater",
+                            "admitted",
+                            "calls",
+                            "refused",
+                            "since"
+                          ],
+                          "additionalProperties": false,
+                          "description": "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused)."
                         }
                       },
-                      "required": ["reachable", "code", "rejectedSearches"],
+                      "required": ["reachable", "code", "rejectedSearches", "interactiveLane"],
                       "additionalProperties": false
                     },
                     "locales": {

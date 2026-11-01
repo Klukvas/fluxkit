@@ -1331,6 +1331,22 @@ export interface AdminSearchStatus {
     code: string | null;
     /** Store searches the engine refused (HTTP 400) since this API process started; per process. */
     rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
+    /**
+     * The engine client's interactive lane (store search and suggest) since this API process started; per process.
+     * `inFlight`/`queued` are slots held/waited for now; one admission per search pass takes the slots of all its calls.
+     */
+    interactiveLane: {
+      maxConcurrency: number;
+      maxQueue: number;
+      inFlight: number;
+      queued: number;
+      inFlightHighWater: number;
+      queuedHighWater: number;
+      admitted: number;
+      calls: number;
+      refused: { queueFull: number; waitExceeded: number };
+      since: string;
+    };
   };
   locales: {
     locale: string;

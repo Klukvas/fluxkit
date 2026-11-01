@@ -15,18 +15,19 @@ const MEILI_API_KEY_PATTERN = /^[\x21-\x7e]{16,256}$/;
 export const DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY = 8;
 export const SEARCH_ENGINE_MAX_CONCURRENCY_RANGE = Object.freeze({ min: 1, max: 256 });
 /**
- * Interactive calls that may wait for a slot; past it a call fails at once (the store answers 503, ADR 0041). Large on
- * purpose: one search fans out into up to about 7 parallel engine calls, and the 1 s maximum wait, not the length, is
- * what sheds load (64 refused a quarter of the searches at a load the engine could serve).
+ * Interactive slots that may be waited for; past it a search pass fails at once (the store answers 503, ADR 0041). A pass
+ * of k parallel calls waits for min(k, concurrency) slots as one admission (ADR 0042). Large on purpose: the 1 s maximum
+ * wait, not the length, is what sheds load (64 refused a quarter of the searches at a load the engine could serve).
  */
 export const DEFAULT_SEARCH_ENGINE_MAX_QUEUE = 512;
 export const SEARCH_ENGINE_MAX_QUEUE_RANGE = Object.freeze({ min: 0, max: 10_000 });
 /**
  * Engine calls one store search can send at once: with several text queries every planned query is its own call, and a
  * plan has at most `hits` + `variant_facets` + one query per selected facet group (core `SEARCH_LIMITS.maxSelectedGroups`
- * = 8, a price selection's `price_range` counting as its group): 10. Without a queue the concurrency must reach it, or
- * such a search can never be answered. Repeated here because this package does not depend on core; `apps/api`
- * `search-config.spec.ts` derives it from core and compares.
+ * = 8, a price selection's `price_range` counting as its group): 10. No limit depends on it any more: the engine client
+ * admits a pass of up to this many calls as a whole (ADR 0042), so a search on an idle lane is admitted whatever the
+ * limits (until 2026-11-01 a queue of 0 was refused below a concurrency of 10). Repeated here because this package does
+ * not depend on core; `apps/api` `search-config.spec.ts` derives it from core and compares.
  */
 export const SEARCH_MAX_PARALLEL_ENGINE_CALLS = 10;
 

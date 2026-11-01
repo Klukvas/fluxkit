@@ -14,8 +14,9 @@ import { ConcurrencyLimiter, LimiterRejection, type Release } from "./concurrenc
  * (search plan, "Measurements at scale", F1).
  *
  * Two lanes, each with its own connection pool: `interactive` (store search, suggest and their settings reads) goes
- * through a FIFO concurrency limit and fails fast with `engine_busy` when it cannot start in time; `background` (indexer
- * writes, task polling, stats, the admin health check) is never queued behind shoppers.
+ * through a FIFO concurrency limit, one admission per search pass (ADR 0042), and fails fast with `engine_busy` when it
+ * cannot start in time; `background` (indexer writes, task polling, stats, the admin health check) is never queued
+ * behind shoppers.
  *
  * Errors carry a CODE, the HTTP status and the engine's own error code (a snake_case identifier such as
  * `index_not_found`), never the engine's message, the URL with a query or the key: they are stored in the database and
@@ -33,7 +34,12 @@ export type SearchEngineErrorCode =
   | "engine_task_failed"
   | "engine_task_timeout"
   /** The interactive lane is full (queue full or no slot within the wait): the engine was not asked. Never stored. */
-  | "engine_busy";
+  | "engine_busy"
+  /**
+   * The caller gave the call up (a sibling call of its admission failed, or its abort signal fired: the shopper left);
+   * a waiting call was never sent, a running one was destroyed. Interactive lane only; never stored.
+   */
+  | "engine_aborted";
 
 const ENGINE_CODE = /^[a-z][a-z0-9_]{0,63}$/;
 
@@ -102,22 +108,143 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 type Lane = "interactive" | "background";
 type Method = "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
 
+/** Options of an interactive call (`multiSearch`, `filterableAttributes`, `sortableAttributes`). */
+export interface InteractiveCallOptions {
+  /** Run on the slots of this admission (one search pass) instead of taking a slot of its own. */
+  readonly admission?: InteractiveAdmission | undefined;
+  /** Without an admission: aborting it gives the call up (`engine_aborted`). With one, the admission's signal counts. */
+  readonly signal?: AbortSignal | undefined;
+}
+
+export interface AdmissionOptions {
+  /** One deadline for the wait for the slots and every call of the admission (default: the request timeout). */
+  readonly timeoutMs?: number | undefined;
+  /** Aborting it takes a waiting admission out of the queue, or aborts the calls of a granted one (`engine_aborted`). */
+  readonly signal?: AbortSignal | undefined;
+}
+
+/** `GET /admin/search/status` (`engine.interactiveLane`): the interactive lane of this process since it started. */
+export interface InteractiveLaneSnapshot {
+  readonly maxConcurrency: number;
+  readonly maxQueue: number;
+  /** Slots held now (one per engine call an admission may run at once). */
+  readonly inFlight: number;
+  /** Slots waited for now. */
+  readonly queued: number;
+  readonly inFlightHighWater: number;
+  readonly queuedHighWater: number;
+  /** Admissions granted: one per search pass, suggest or settings read (a single call is an admission of one). */
+  readonly admitted: number;
+  /** Engine calls sent on the lane. */
+  readonly calls: number;
+  /** Admissions refused with `engine_busy`, by reason. */
+  readonly refused: { readonly queueFull: number; readonly waitExceeded: number };
+  /** When counting started (the client was created with the process). */
+  readonly since: string;
+}
+
 interface RequestOptions {
   readonly timeoutMs?: number | undefined;
   readonly lane?: Lane;
   /** A read: safe to send again when a reused keep-alive socket turned out closed before any answer. */
   readonly idempotent?: boolean;
+  readonly interactive?: InteractiveCallOptions | undefined;
 }
 
 type Attempt =
   | { readonly kind: "answer"; readonly status: number; readonly text: string }
   | {
       readonly kind: "failed";
-      readonly code: "engine_timeout" | "engine_unreachable";
+      readonly code: "engine_timeout" | "engine_unreachable" | "engine_aborted";
       readonly status: number | undefined;
       /** A reused keep-alive socket was reset before any answer. */
       readonly staleSocket: boolean;
     };
+
+/**
+ * One admission to the interactive lane (ADR 0042): the slots one search pass needs, taken at once by
+ * `SearchEngine.withAdmission` before any of its calls starts, so the pass is admitted or refused as a whole. Its calls
+ * run on these slots only (at most as many at once as it holds), share one deadline, and are aborted together: by the
+ * first call that fails, by the caller's signal, and when the work ends. Only the engine that granted it can use it.
+ */
+export class InteractiveAdmission {
+  readonly #owner: SearchEngine;
+  readonly #slots: ConcurrencyLimiter;
+  readonly #controller = new AbortController();
+  readonly #running = new Set<Promise<unknown>>();
+  readonly #deadline: number;
+  #open = true;
+
+  /** Created by `SearchEngine.withAdmission` only. */
+  constructor(owner: SearchEngine, slots: number, deadline: number) {
+    this.#owner = owner;
+    // No wait of its own beyond the deadline, and room for any number of calls: the pass already holds its slots.
+    this.#slots = new ConcurrencyLimiter({ maxInFlight: slots, maxQueue: Number.MAX_SAFE_INTEGER });
+    this.#deadline = deadline;
+  }
+
+  belongsTo(engine: SearchEngine): boolean {
+    return this.#owner === engine;
+  }
+
+  /** Aborts every call of the admission that is waiting or running. */
+  abort(): void {
+    this.#controller.abort();
+  }
+
+  /**
+   * Runs `task` on one of the admission's slots, with what is left of the deadline and the admission's signal. The first
+   * call that fails aborts the others.
+   */
+  async call<T>(
+    operation: string,
+    task: (deadline: number, signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const signal = this.#controller.signal;
+    if (!this.#open || signal.aborted) {
+      throw new SearchEngineError("engine_aborted", { operation });
+    }
+    const running = (async () => {
+      let release: Release;
+      try {
+        release = await this.#slots.acquire(this.#deadline - Date.now(), { signal });
+      } catch (error) {
+        if (error instanceof LimiterRejection) {
+          throw new SearchEngineError(
+            error.reason === "wait_exceeded" ? "engine_timeout" : "engine_aborted",
+            { operation },
+          );
+        }
+        throw error;
+      }
+      try {
+        if (this.#deadline - Date.now() <= 0) {
+          // The wait for the slots used the whole deadline: the engine was not asked.
+          throw new SearchEngineError("engine_busy", { operation });
+        }
+        return await task(this.#deadline, signal);
+      } finally {
+        release();
+      }
+    })();
+    this.#running.add(running);
+    try {
+      return await running;
+    } catch (error) {
+      this.#controller.abort();
+      throw error;
+    } finally {
+      this.#running.delete(running);
+    }
+  }
+
+  /** Closes the admission: aborts whatever still runs and resolves once every call has settled. */
+  async settle(): Promise<void> {
+    this.#open = false;
+    this.#controller.abort();
+    await Promise.allSettled([...this.#running]);
+  }
+}
 
 /** A task the engine enqueued. */
 export type TaskUid = number;
@@ -140,6 +267,8 @@ export class SearchEngine {
   private readonly agents: Readonly<Record<Lane, http.Agent>>;
   private readonly limits: InteractiveLimits;
   private readonly limiter: ConcurrencyLimiter;
+  private readonly since = new Date();
+  private interactiveCalls = 0;
   private closed = false;
 
   constructor(private readonly options: SearchEngineOptions) {
@@ -180,8 +309,76 @@ export class SearchEngine {
   }
 
   /**
+   * One admission to the interactive lane for a pass of `calls` parallel calls (ADR 0042): `min(calls, maxConcurrency)`
+   * slots taken at once, FIFO, before `work` runs, so the pass is admitted or refused as a whole (`engine_busy`: queue
+   * full, no slots within the wait or the deadline, or after `close`; `engine_aborted` when the signal fired while it
+   * waited). `work` must pass the admission to its calls (`{admission}`): they then run on its slots only, never on the
+   * shared queue (admissions never nest, so they cannot deadlock). The first failing call aborts the others; whatever
+   * `work` left running when it ended is aborted too, and the slots are released only once every call has settled.
+   */
+  async withAdmission<T>(
+    calls: number,
+    { timeoutMs = this.options.requestTimeoutMs, signal }: AdmissionOptions,
+    work: (admission: InteractiveAdmission) => Promise<T>,
+  ): Promise<T> {
+    if (!Number.isInteger(calls) || calls < 1) {
+      throw new RangeError("an admission is for at least one call");
+    }
+    const deadline = Date.now() + timeoutMs;
+    const slots = Math.min(calls, this.limits.maxConcurrency);
+    let release: Release;
+    try {
+      release = await this.limiter.acquire(Math.min(this.limits.maxQueueWaitMs, timeoutMs), {
+        weight: slots,
+        signal,
+      });
+    } catch (error) {
+      if (error instanceof LimiterRejection) {
+        throw new SearchEngineError(error.reason === "aborted" ? "engine_aborted" : "engine_busy", {
+          operation: "search",
+        });
+      }
+      throw error;
+    }
+    const admission = new InteractiveAdmission(this, slots, deadline);
+    const onAbort = (): void => admission.abort();
+    signal?.addEventListener("abort", onAbort, { once: true });
+    if (signal?.aborted === true) {
+      admission.abort();
+    }
+    try {
+      return await work(admission);
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
+      await admission.settle();
+      release();
+    }
+  }
+
+  /** The interactive lane's limits, gauges and counters since this client was created (per process). */
+  interactiveLane(): InteractiveLaneSnapshot {
+    const counters = this.limiter.counters();
+    return {
+      maxConcurrency: this.limits.maxConcurrency,
+      maxQueue: this.limits.maxQueue,
+      inFlight: this.limiter.inFlight,
+      queued: this.limiter.waiting,
+      inFlightHighWater: counters.inFlightHighWater,
+      queuedHighWater: counters.waitingHighWater,
+      admitted: counters.granted,
+      calls: this.interactiveCalls,
+      refused: {
+        queueFull: counters.refusedQueueFull,
+        waitExceeded: counters.refusedWaitExceeded,
+      },
+      since: this.since.toISOString(),
+    };
+  }
+
+  /**
    * One call; `operation` names it in errors (never the URL). One deadline covers the wait for an interactive slot, the
-   * connection, the request and the whole answer: a call that waited gets only what is left of its time.
+   * connection, the request and the whole answer: a call that waited gets only what is left of its time. An interactive
+   * call runs on its admission, or on an admission of one call of its own.
    */
   private async request<T>(
     method: Method,
@@ -192,29 +389,46 @@ export class SearchEngine {
       timeoutMs = this.options.requestTimeoutMs,
       lane = "background",
       idempotent = false,
+      interactive = {},
     }: RequestOptions = {},
   ): Promise<T> {
-    const deadline = Date.now() + timeoutMs;
-    let release: Release | undefined;
-    if (lane === "interactive") {
-      try {
-        release = await this.limiter.acquire(Math.min(this.limits.maxQueueWaitMs, timeoutMs));
-      } catch (error) {
-        if (error instanceof LimiterRejection) {
-          throw new SearchEngineError("engine_busy", { operation });
-        }
-        throw error;
-      }
-    }
-    try {
-      if (deadline - Date.now() <= 0) {
-        throw new SearchEngineError("engine_busy", { operation });
-      }
-      const answer = await this.send(method, path, body, operation, deadline, lane, idempotent);
+    if (lane === "background") {
+      const answer = await this.send(
+        method,
+        path,
+        body,
+        operation,
+        Date.now() + timeoutMs,
+        lane,
+        idempotent,
+        undefined,
+      );
       return interpret<T>(answer, operation);
-    } finally {
-      release?.();
     }
+    const run = (admission: InteractiveAdmission): Promise<T> => {
+      if (!admission.belongsTo(this)) {
+        throw new RangeError("the admission belongs to another engine client");
+      }
+      const ownDeadline = Date.now() + timeoutMs;
+      return admission.call(operation, async (deadline, signal) => {
+        this.interactiveCalls += 1;
+        const answer = await this.send(
+          method,
+          path,
+          body,
+          operation,
+          Math.min(deadline, ownDeadline),
+          lane,
+          idempotent,
+          signal,
+        );
+        return interpret<T>(answer, operation);
+      });
+    };
+    if (interactive.admission !== undefined) {
+      return run(interactive.admission);
+    }
+    return this.withAdmission(1, { timeoutMs, signal: interactive.signal }, run);
   }
 
   /** The exchange, tried once more for a read whose reused keep-alive socket the engine had already closed. */
@@ -226,6 +440,7 @@ export class SearchEngine {
     deadline: number,
     lane: Lane,
     idempotent: boolean,
+    signal: AbortSignal | undefined,
   ): Promise<{ status: number; text: string }> {
     const payload = body === undefined ? undefined : Buffer.from(JSON.stringify(body), "utf8");
     for (let attempt = 1; ; attempt += 1) {
@@ -238,6 +453,7 @@ export class SearchEngine {
         payload,
         Math.max(deadline - Date.now(), 1),
         lane,
+        signal,
       );
       if (outcome.kind === "answer") {
         return outcome;
@@ -247,6 +463,7 @@ export class SearchEngine {
         idempotent &&
         attempt === 1 &&
         !this.closed &&
+        signal?.aborted !== true &&
         Date.now() < deadline
       ) {
         continue;
@@ -259,8 +476,8 @@ export class SearchEngine {
   }
 
   /**
-   * One HTTP exchange; never throws, the outcome says what happened. On timeout the request and its socket are destroyed,
-   * so a late answer can never be read by the next call on that socket.
+   * One HTTP exchange; never throws, the outcome says what happened. On timeout or abort the request and its socket are
+   * destroyed, so a late answer can never be read by the next call on that socket.
    */
   private attempt(
     method: Method,
@@ -268,24 +485,40 @@ export class SearchEngine {
     payload: Buffer | undefined,
     timeoutMs: number,
     lane: Lane,
+    signal: AbortSignal | undefined,
   ): Promise<Attempt> {
+    if (signal?.aborted === true) {
+      return Promise.resolve({
+        kind: "failed",
+        code: "engine_aborted",
+        status: undefined,
+        staleSocket: false,
+      });
+    }
     return new Promise<Attempt>((resolve) => {
       let settled = false;
       let timedOut = false;
+      let aborted = false;
       let status: number | undefined;
       const finish = (outcome: Attempt): void => {
         if (!settled) {
           settled = true;
           clearTimeout(timer);
+          signal?.removeEventListener("abort", onAbort);
           resolve(outcome);
         }
       };
       const failed = (staleSocket = false): Attempt => ({
         kind: "failed",
-        code: timedOut ? "engine_timeout" : "engine_unreachable",
+        code: timedOut ? "engine_timeout" : aborted ? "engine_aborted" : "engine_unreachable",
         status,
         staleSocket,
       });
+      const onAbort = (): void => {
+        aborted = true;
+        finish(failed());
+        request.destroy();
+      };
       // Appended, not resolved: `new URL(path, base)` would drop a path prefix of the base URL.
       const request = this.client.request(
         new URL(`${this.options.url}${path}`),
@@ -331,13 +564,16 @@ export class SearchEngine {
       );
       request.on("error", (error: NodeJS.ErrnoException) => {
         const reset = error.code === "ECONNRESET" || error.code === "EPIPE";
-        finish(failed(status === undefined && request.reusedSocket && reset && !timedOut));
+        finish(
+          failed(status === undefined && request.reusedSocket && reset && !timedOut && !aborted),
+        );
       });
       const timer = setTimeout(() => {
         timedOut = true;
         finish(failed());
         request.destroy();
       }, timeoutMs);
+      signal?.addEventListener("abort", onAbort, { once: true });
       request.end(payload);
     });
   }
@@ -398,13 +634,17 @@ export class SearchEngine {
    * store asks only for facets in this list (review F1). Only plain field names count: the API never writes the
    * object form, so an object entry (set by someone else) offers nothing. Interactive lane (the store's call).
    */
-  async filterableAttributes(uid: string, timeoutMs?: number): Promise<string[]> {
+  async filterableAttributes(
+    uid: string,
+    timeoutMs?: number,
+    interactive?: InteractiveCallOptions,
+  ): Promise<string[]> {
     const answer = await this.request<unknown>(
       "GET",
       `/indexes/${encodeURIComponent(uid)}/settings/filterable-attributes`,
       undefined,
       "settings",
-      { timeoutMs, lane: "interactive", idempotent: true },
+      { timeoutMs, lane: "interactive", idempotent: true, interactive },
     );
     if (!Array.isArray(answer)) {
       throw new SearchEngineError("engine_bad_response", { operation: "settings" });
@@ -417,13 +657,17 @@ export class SearchEngine {
    * store asks for the product id tie-break of `newest` only when it is in this list (review F2 of the search finish).
    * Interactive lane (the store's call).
    */
-  async sortableAttributes(uid: string, timeoutMs?: number): Promise<string[]> {
+  async sortableAttributes(
+    uid: string,
+    timeoutMs?: number,
+    interactive?: InteractiveCallOptions,
+  ): Promise<string[]> {
     const answer = await this.request<unknown>(
       "GET",
       `/indexes/${encodeURIComponent(uid)}/settings/sortable-attributes`,
       undefined,
       "settings",
-      { timeoutMs, lane: "interactive", idempotent: true },
+      { timeoutMs, lane: "interactive", idempotent: true, interactive },
     );
     if (!Array.isArray(answer)) {
       throw new SearchEngineError("engine_bad_response", { operation: "settings" });
@@ -495,12 +739,20 @@ export class SearchEngine {
     return this.enqueue("DELETE", `/tasks?${query.toString()}`, undefined, "prune tasks");
   }
 
-  /** `POST /multi-search` on the interactive lane: a read, so safe to resend on a stale keep-alive socket. */
-  async multiSearch<T = unknown>(body: object, timeoutMs?: number): Promise<T> {
+  /**
+   * `POST /multi-search` on the interactive lane: a read, so safe to resend on a stale keep-alive socket. Each call of a
+   * search pass passes the pass's `admission`.
+   */
+  async multiSearch<T = unknown>(
+    body: object,
+    timeoutMs?: number,
+    interactive?: InteractiveCallOptions,
+  ): Promise<T> {
     return this.request<T>("POST", "/multi-search", body, "search", {
       timeoutMs,
       lane: "interactive",
       idempotent: true,
+      interactive,
     });
   }
 

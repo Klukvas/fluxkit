@@ -557,3 +557,339 @@ describe("SearchEngine interactive lane (loopback servers)", () => {
     expect(((await holding) as SearchEngineError).code).toBe("engine_unreachable");
   });
 });
+
+describe("SearchEngine admissions: one per search pass (ADR 0042, loopback servers)", () => {
+  interface Held {
+    readonly query: string;
+    readonly response: ServerResponse;
+    /** The client gave the request up (its socket closed before an answer). */
+    abandoned: boolean;
+  }
+
+  /** Holds every `/multi-search` until the spec answers it by index; other paths answer at once. */
+  async function controlledEngine(): Promise<{
+    stub: Stub;
+    held: Held[];
+    answer: (index: number, status?: number) => void;
+  }> {
+    const held: Held[] = [];
+    const stub = await stubEngine((request, response, body) => {
+      if (request.url !== "/multi-search") {
+        json(response, 200, request.url?.includes("/settings/") ? [] : { status: "available" });
+        return;
+      }
+      const entry: Held = {
+        query: (JSON.parse(body) as { queries?: { q?: string }[] }).queries?.[0]?.q ?? "",
+        response,
+        abandoned: false,
+      };
+      response.on("close", () => {
+        entry.abandoned = !response.writableFinished;
+      });
+      held.push(entry);
+    });
+    return {
+      stub,
+      held,
+      answer: (index, status = 200) => {
+        const entry = held[index];
+        if (entry === undefined) throw new Error(`no request ${String(index)}`);
+        json(entry.response, status, status === 200 ? { results: [] } : { code: "internal" });
+      },
+    };
+  }
+
+  const body = (q: string) => ({ queries: [{ indexUid: "idx", q }] });
+
+  async function pause(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  it("admits a pass as a whole and never runs more of its calls at once than maxConcurrency", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const pass = engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await eventually(() => held.length === 2);
+    await pause(50);
+    expect(held.map((entry) => entry.query)).toEqual(["a", "b"]);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 2, queued: 0 });
+    answer(0);
+    await eventually(() => held.length === 3);
+    answer(1);
+    answer(2);
+    expect(await pass).toEqual([{ results: [] }, { results: [] }, { results: [] }]);
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      queued: 0,
+      admitted: 1,
+      calls: 3,
+      inFlightHighWater: 2,
+    });
+  });
+
+  it("refuses a pass whose slots do not fit in the queue at once: no call of it ever reaches the engine and nothing waits", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 1, maxQueueWaitMs: 5_000 },
+    });
+    const holders = [engine.multiSearch(body("h1"), 5_000), engine.multiSearch(body("h2"), 5_000)];
+    await eventually(() => held.length === 2);
+    let worked = false;
+    const started = Date.now();
+    const refused = await engineError(() =>
+      engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) => {
+        worked = true;
+        return Promise.all(
+          ["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission })),
+        );
+      }),
+    );
+    expect(refused.code).toBe("engine_busy");
+    expect(Date.now() - started).toBeLessThan(100);
+    expect(worked).toBe(false);
+    expect(engine.interactiveLane()).toMatchObject({ queued: 0, refused: { queueFull: 1 } });
+    answer(0);
+    answer(1);
+    await Promise.all(holders);
+    await pause(100);
+    expect(held).toHaveLength(2);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
+  });
+
+  it("refuses a pass that waited longer than maxQueueWaitMs, and runs nothing of it afterwards", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 100 },
+    });
+    const holders = [engine.multiSearch(body("h1"), 5_000), engine.multiSearch(body("h2"), 5_000)];
+    await eventually(() => held.length === 2);
+    const refused = await engineError(() =>
+      engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
+        Promise.all(["a", "b"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+      ),
+    );
+    expect(refused.code).toBe("engine_busy");
+    expect(engine.interactiveLane()).toMatchObject({ queued: 0, refused: { waitExceeded: 1 } });
+    answer(0);
+    answer(1);
+    await Promise.all(holders);
+    await pause(100);
+    expect(held).toHaveLength(2);
+  });
+
+  it("the first failing call aborts its siblings: a waiting one never starts, a running one is destroyed, then the slots are free", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const pass = engineError(() =>
+      engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
+        Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+      ),
+    );
+    await eventually(() => held.length === 2);
+    answer(0, 500);
+    expect((await pass).code).toBe("engine_unavailable");
+    // The slots are released only after every call of the pass has settled.
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
+    await eventually(() => held[1]?.abandoned === true);
+    await pause(100);
+    expect(held.map((entry) => entry.query)).toEqual(["a", "b"]);
+  });
+
+  it("an abort signal takes a waiting pass out of the queue: nothing of it runs later", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 1, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const holder = engine.multiSearch(body("h"), 5_000);
+    await eventually(() => held.length === 1);
+    const controller = new AbortController();
+    const pass = engineError(() =>
+      engine.withAdmission(1, { timeoutMs: 5_000, signal: controller.signal }, (admission) =>
+        engine.multiSearch(body("a"), 5_000, { admission }),
+      ),
+    );
+    // A call without an admission takes the signal too.
+    const single = engineError(() =>
+      engine.multiSearch(body("s"), 5_000, { signal: controller.signal }),
+    );
+    await pause(20);
+    expect(engine.interactiveLane().queued).toBe(2);
+    controller.abort();
+    expect((await pass).code).toBe("engine_aborted");
+    expect((await single).code).toBe("engine_aborted");
+    expect(engine.interactiveLane().queued).toBe(0);
+    answer(0);
+    await holder;
+    await pause(100);
+    expect(held).toHaveLength(1);
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      refused: { queueFull: 0, waitExceeded: 0 },
+    });
+  });
+
+  it("an abort signal destroys the running calls of an admitted pass and frees its slots", async () => {
+    const { stub, held } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const controller = new AbortController();
+    const pass = engineError(() =>
+      engine.withAdmission(2, { timeoutMs: 5_000, signal: controller.signal }, (admission) =>
+        Promise.all(["a", "b"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+      ),
+    );
+    await eventually(() => held.length === 2);
+    controller.abort();
+    expect((await pass).code).toBe("engine_aborted");
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
+    await eventually(() => held.every((entry) => entry.abandoned));
+  });
+
+  it("the admission's deadline bounds its calls: a silent engine ends in engine_timeout and the slots are free", async () => {
+    const { stub } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 1, maxQueue: 0, maxQueueWaitMs: 5_000 },
+    });
+    const started = Date.now();
+    const error = await engineError(() =>
+      engine.withAdmission(1, { timeoutMs: 200 }, (admission) =>
+        engine.multiSearch(body("a"), 5_000, { admission }),
+      ),
+    );
+    expect(error.code).toBe("engine_timeout");
+    expect(Date.now() - started).toBeLessThan(1_000);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
+  });
+
+  it("a call the work left running when it returned is aborted before the slots are released", async () => {
+    const { stub, held } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 1, maxQueue: 0, maxQueueWaitMs: 5_000 },
+    });
+    const left: Promise<SearchEngineError>[] = [];
+    const value = await engine.withAdmission(1, { timeoutMs: 5_000 }, async (admission) => {
+      left.push(engineError(() => engine.multiSearch(body("a"), 5_000, { admission })));
+      await eventually(() => held.length === 1);
+      return "done";
+    });
+    expect(value).toBe("done");
+    expect(engine.interactiveLane().inFlight).toBe(0);
+    expect(left).toHaveLength(1);
+    expect((await Promise.all(left)).map((error) => error.code)).toEqual(["engine_aborted"]);
+    await eventually(() => held[0]?.abandoned === true);
+  });
+
+  it("close() refuses waiting passes and ends running ones; no slot stays held", async () => {
+    const { stub, held } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 1, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const running = engineError(() =>
+      engine.withAdmission(1, { timeoutMs: 5_000 }, (admission) =>
+        engine.multiSearch(body("a"), 5_000, { admission }),
+      ),
+    );
+    await eventually(() => held.length === 1);
+    const waiting = engineError(() =>
+      engine.withAdmission(1, { timeoutMs: 5_000 }, (admission) =>
+        engine.multiSearch(body("b"), 5_000, { admission }),
+      ),
+    );
+    await pause(20);
+    engine.close();
+    expect((await waiting).code).toBe("engine_busy");
+    expect((await running).code).toBe("engine_unreachable");
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 0, queued: 0 });
+    expect(held).toHaveLength(1);
+  });
+
+  it("keeps FIFO across passes: a one-call pass behind a waiting larger pass does not overtake it", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
+    });
+    const holder = engine.multiSearch(body("h"), 5_000);
+    await eventually(() => held.length === 1);
+    const large = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["l1", "l2"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await pause(20);
+    const small = engine.multiSearch(body("s"), 5_000);
+    await pause(50);
+    // One slot is free, but the larger pass came first.
+    expect(held.map((entry) => entry.query)).toEqual(["h"]);
+    answer(0);
+    await eventually(() => held.length === 3);
+    expect(held.map((entry) => entry.query)).toEqual(["h", "l1", "l2"]);
+    answer(1);
+    answer(2);
+    await eventually(() => held.length === 4);
+    answer(3);
+    await Promise.all([holder, large, small]);
+    expect(held.map((entry) => entry.query)).toEqual(["h", "l1", "l2", "s"]);
+  });
+
+  it("interactiveLane() reports the limits, the gauges, the high-water marks, admissions, calls and refusals", async () => {
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 3, maxQueue: 2, maxQueueWaitMs: 5_000 },
+    });
+    const since = engine.interactiveLane().since;
+    expect(Date.parse(since)).not.toBeNaN();
+    const first = engine.withAdmission(3, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["a", "b", "c"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await eventually(() => held.length === 3);
+    const second = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["d", "e"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await pause(20);
+    expect((await engineError(() => engine.multiSearch(body("x"), 5_000))).code).toBe(
+      "engine_busy",
+    );
+    expect(engine.interactiveLane()).toEqual({
+      maxConcurrency: 3,
+      maxQueue: 2,
+      inFlight: 3,
+      queued: 2,
+      inFlightHighWater: 3,
+      queuedHighWater: 2,
+      admitted: 1,
+      calls: 3,
+      refused: { queueFull: 1, waitExceeded: 0 },
+      since,
+    });
+    answer(0);
+    answer(1);
+    answer(2);
+    await first;
+    await eventually(() => held.length === 5);
+    answer(3);
+    answer(4);
+    await second;
+    expect(engine.interactiveLane()).toEqual({
+      maxConcurrency: 3,
+      maxQueue: 2,
+      inFlight: 0,
+      queued: 0,
+      inFlightHighWater: 3,
+      queuedHighWater: 2,
+      admitted: 2,
+      calls: 5,
+      refused: { queueFull: 1, waitExceeded: 0 },
+      since,
+    });
+  });
+
+  it("refuses an admission of no calls", async () => {
+    const engine = engineFor("http://127.0.0.1:9");
+    await expect(engine.withAdmission(0, {}, () => Promise.resolve(1))).rejects.toThrow(RangeError);
+  });
+});

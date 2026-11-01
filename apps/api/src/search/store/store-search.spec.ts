@@ -17,6 +17,7 @@ import { SearchWorld, UNLIMITED_BUDGET } from "../../test/search-world.js";
 import { StockWorld } from "../../test/stock-world.js";
 import { SearchEngine } from "../engine/index.js";
 import { SearchIndexer } from "../indexer/index.js";
+import { SEARCH_ENGINE } from "../search.module.js";
 
 interface Item {
   id: string;
@@ -724,38 +725,54 @@ describe("store search routes (real Postgres, real Meilisearch)", () => {
     }
   });
 
-  it("answers 503 search_unavailable at once when the engine client's interactive lane is full (engine_busy, ADR 0041)", async () => {
+  it("answers 503 search_unavailable at once when the engine client's interactive lane is full (engine_busy, ADR 0041 and 0042), and logs the refusals sampled", async () => {
     const warn = vi.spyOn(Logger.prototype, "warn");
-    // One slot and no time to wait for it: the two settings reads of a fresh process run in parallel, so the second is
-    // refused at once. (Concurrency 1 without a queue is refused by the configuration; a zero wait is a test tuning.)
+    // One slot, no queue: while something else holds the slot, every search is refused at once.
     const saturated = await startApp({
-      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 1 },
-      searchTuning: { engineQueueWaitMs: 0 },
+      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 0 },
+      adminAuthenticator: ownerAuthenticator(adminId),
     });
-    // The same with a queue of one: the second read waits for the first and the search answers.
-    const queued = await startApp({
-      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 1 },
+    // The same limits on an idle lane: the search's own parallel calls share one admission, so it answers.
+    const idle = await startApp({
+      search: { ...search.env, engineMaxConcurrency: 1, engineMaxQueue: 0 },
     });
+    const engine = saturated.app.get<SearchEngine>(SEARCH_ENGINE);
+    let letGo!: () => void;
+    const holding = engine.withAdmission(
+      1,
+      { timeoutMs: 10_000 },
+      () => new Promise<void>((resolve) => (letGo = resolve)),
+    );
     try {
-      const refused = await get<{ code: string }>(
-        `/store/search?q=${encodeURIComponent("секретний запит")}`,
-        saturated.baseUrl,
-      );
-      expect(refused.status, JSON.stringify(refused.body)).toBe(503);
-      expect(refused.body.code).toBe("search_unavailable");
-      expect(refused.headers.get("retry-after")).toBe("30");
-      const logged = warn.mock.calls.map((args) => String(args[0])).join("\n");
-      expect(logged).toContain("engine_busy");
-      expect(logged).not.toContain("секретний");
-      const answered = await get(
-        `/store/search?q=${encodeURIComponent("сорочка")}`,
-        queued.baseUrl,
-      );
+      for (const words of ["секретний запит", "секретна сорочка", "третій"]) {
+        const refused = await get<{ code: string }>(
+          `/store/search?q=${encodeURIComponent(words)}`,
+          saturated.baseUrl,
+        );
+        expect(refused.status, JSON.stringify(refused.body)).toBe(503);
+        expect(refused.body.code).toBe("search_unavailable");
+        expect(refused.headers.get("retry-after")).toBe("30");
+      }
+      const lines = warn.mock.calls.map((args) => String(args[0]));
+      // Three refusals, one line: the rest are summed into one line per 30 s (BusyRefusalLog).
+      expect(lines.filter((line) => line.includes("engine_busy"))).toHaveLength(1);
+      expect(lines.join("\n")).not.toContain("секрет");
+      const status = await http<{
+        engine: { interactiveLane: { refused: { queueFull: number }; inFlight: number } };
+      }>(saturated.baseUrl, "GET", "/admin/search/status");
+      expect(status.status).toBe(200);
+      expect(status.body.engine.interactiveLane).toMatchObject({
+        inFlight: 1,
+        refused: { queueFull: 3 },
+      });
+      const answered = await get(`/store/search?q=${encodeURIComponent("сорочка")}`, idle.baseUrl);
       expect(answered.status, JSON.stringify(answered.body)).toBe(200);
     } finally {
+      letGo();
+      await holding;
       warn.mockRestore();
       await saturated.app.close();
-      await queued.app.close();
+      await idle.app.close();
     }
   });
 
