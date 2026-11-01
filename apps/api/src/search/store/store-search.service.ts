@@ -32,6 +32,7 @@ import { SearchEngineError, type SearchEngine } from "../engine/index.js";
 import { readSearchDefinitions, type SearchDefinitions } from "../indexer/index.js";
 import type { SearchConfig } from "../search-config.js";
 import type { SearchRejections } from "../search-rejections.js";
+import { BusyRefusalLog } from "./busy-log.js";
 import type {
   StoreSearchFacet,
   StoreSearchQuery,
@@ -84,6 +85,8 @@ export class StoreSearchService {
   /** The `filterableAttributes` and `sortableAttributes` each live index has applied, by index uid (review F1). */
   private readonly liveFields = new Map<string, { at: number } & LiveFields>();
 
+  private readonly busyLog: BusyRefusalLog;
+
   constructor(
     private readonly database: Database,
     private readonly engine: SearchEngine,
@@ -91,9 +94,15 @@ export class StoreSearchService {
     private readonly store: StoreService,
     private readonly port: SearchPort,
     private readonly rejections: SearchRejections,
-  ) {}
+  ) {
+    this.busyLog = new BusyRefusalLog(this.logger, () => engine.interactiveLane().refused);
+  }
 
-  async search(query: StoreSearchQuery): Promise<StoreSearchResponse> {
+  /**
+   * `signal` fires when the shopper's connection closes before the answer: a pass still waiting for engine slots leaves
+   * the queue and running engine calls are destroyed (ADR 0042).
+   */
+  async search(query: StoreSearchQuery, signal?: AbortSignal): Promise<StoreSearchResponse> {
     const locale = this.store.resolveLocale(query.locale);
     const parsed = parseSearchQuery(query.q ?? "");
     if (!parsed.ok) {
@@ -116,7 +125,7 @@ export class StoreSearchService {
     const uid = searchLiveIndexUid(this.config.indexPrefix, locale.locale);
     const { definitions, specs: derived } = await this.definitions();
     // Only facets the live index can already filter: a definition change waits for job 13 without taking search down.
-    const live = await this.liveFieldsOf(uid, text);
+    const live = await this.liveFieldsOf(uid, text, signal);
     const specs = liveFacetSpecs(derived, live.filterable);
     const f = query.f === undefined ? [] : Array.isArray(query.f) ? query.f : [query.f];
     const selected = parseSelectionParams(
@@ -140,7 +149,7 @@ export class StoreSearchService {
     const textQueries = planTextQueries(text, locale.locale, "results");
 
     const rules = engineSort(sort, live.sortable);
-    let results = await this.run(uid, textQueries, plan.queries, rules, "all", text);
+    let results = await this.run(uid, textQueries, plan.queries, rules, "all", text, signal);
     let relaxed = false;
     const hits = results.find((entry) => entry.planned.purpose === "hits")?.result;
     if ((hits?.totalHits ?? 0) === 0 && text.words.length >= 1) {
@@ -148,7 +157,7 @@ export class StoreSearchService {
       // may also drop words from the end. Complete words that found something never reach this pass.
       const relaxedQueries = planTextQueries(text, locale.locale, "relaxed");
       const strategy: Strategy = text.words.length >= 2 ? "last" : "all";
-      results = await this.run(uid, relaxedQueries, plan.queries, rules, strategy, text);
+      results = await this.run(uid, relaxedQueries, plan.queries, rules, strategy, text, signal);
       relaxed = true;
     }
     const main = results.find((entry) => entry.planned.purpose === "hits")?.result ?? {};
@@ -180,7 +189,7 @@ export class StoreSearchService {
     };
   }
 
-  async suggest(query: StoreSuggestQuery): Promise<StoreSuggestResponse> {
+  async suggest(query: StoreSuggestQuery, signal?: AbortSignal): Promise<StoreSuggestResponse> {
     const locale = this.store.resolveLocale(query.locale);
     const parsed = parseSearchQuery(query.q);
     if (!parsed.ok) {
@@ -209,6 +218,7 @@ export class StoreSearchService {
         ],
       },
       parsed.query,
+      signal,
     );
     const productIds = uniqueProductIds(answer.results?.[0] ?? {});
     // Titles and slugs come from Postgres too: a product that stopped being for sale is never suggested.
@@ -236,7 +246,9 @@ export class StoreSearchService {
    * One pass of the planned queries (ADR 0036). With at most one text query (browsing, or words whose stems and
    * prefixes read like the words) every planned query goes in ONE non-federated `POST /multi-search`. With several text
    * queries each planned query is a federation of them (the federation merges their matches, so counts and pages are
-   * exact for the union), and the engine carries one federation per request: one request per planned query, in parallel.
+   * exact for the union), and the engine carries one federation per request: one request per planned query, in parallel,
+   * under ONE admission of the engine client's interactive lane (ADR 0042), so the pass is admitted or refused as a whole
+   * and a failing request aborts its siblings.
    */
   private async run(
     uid: string,
@@ -245,6 +257,7 @@ export class StoreSearchService {
     rules: string[] | undefined,
     strategy: Strategy,
     text: NormalizedSearchQuery,
+    signal: AbortSignal | undefined,
   ): Promise<{ planned: PlannedQuery; result: EngineSearchResult }[]> {
     const [single, ...others] = textQueries;
     if (others.length === 0) {
@@ -271,6 +284,7 @@ export class StoreSearchService {
           const answer = await this.engine.multiSearch<{ results?: unknown }>(
             { queries },
             this.config.tuning.searchTimeoutMs,
+            { signal },
           );
           if (!Array.isArray(answer.results) || answer.results.length !== planned.length) {
             throw new SearchEngineError("engine_bad_response", { operation: "search" });
@@ -278,44 +292,64 @@ export class StoreSearchService {
           return answer.results as EngineSearchResult[];
         },
         text,
+        signal,
       );
       return planned.map((entry, index) => ({ planned: entry, result: results[index] ?? {} }));
     }
     const texts = textQueries;
-    return Promise.all(
-      planned.map(async (entry) => {
-        const body = {
-          federation: {
-            ...(entry.distinct ? { distinct: "productId" } : {}),
-            ...(entry.pagination.kind === "page"
-              ? { page: entry.pagination.page, hitsPerPage: entry.pagination.hitsPerPage }
-              : { limit: 0 }),
-            ...(entry.facets.length > 0
-              ? { facetsByIndex: { [uid]: [...entry.facets] }, mergeFacets: {} }
-              : {}),
-          },
-          queries: texts.map((textQuery) => ({
-            indexUid: uid,
-            q: textQuery.q,
-            ...(textQuery.attributesToSearchOn === undefined
-              ? {}
-              : { attributesToSearchOn: [...textQuery.attributesToSearchOn] }),
-            ...(entry.filter === null ? {} : { filter: entry.filter }),
-            ...(entry.purpose === "hits" && rules !== undefined ? { sort: rules } : {}),
-            matchingStrategy: strategy,
-            attributesToRetrieve: ["productId"],
-          })),
-        };
-        return { planned: entry, result: await this.call<EngineSearchResult>(uid, body, text) };
-      }),
+    const timeoutMs = this.config.tuning.searchTimeoutMs;
+    const bodies = planned.map((entry) => ({
+      entry,
+      body: {
+        federation: {
+          ...(entry.distinct ? { distinct: "productId" } : {}),
+          ...(entry.pagination.kind === "page"
+            ? { page: entry.pagination.page, hitsPerPage: entry.pagination.hitsPerPage }
+            : { limit: 0 }),
+          ...(entry.facets.length > 0
+            ? { facetsByIndex: { [uid]: [...entry.facets] }, mergeFacets: {} }
+            : {}),
+        },
+        queries: texts.map((textQuery) => ({
+          indexUid: uid,
+          q: textQuery.q,
+          ...(textQuery.attributesToSearchOn === undefined
+            ? {}
+            : { attributesToSearchOn: [...textQuery.attributesToSearchOn] }),
+          ...(entry.filter === null ? {} : { filter: entry.filter }),
+          ...(entry.purpose === "hits" && rules !== undefined ? { sort: rules } : {}),
+          matchingStrategy: strategy,
+          attributesToRetrieve: ["productId"],
+        })),
+      },
+    }));
+    return this.guard(
+      uid,
+      () =>
+        this.engine.withAdmission(bodies.length, { timeoutMs, signal }, (admission) =>
+          Promise.all(
+            bodies.map(async ({ entry, body }) => ({
+              planned: entry,
+              result: await this.engine.multiSearch<EngineSearchResult>(body, timeoutMs, {
+                admission,
+              }),
+            })),
+          ),
+        ),
+      text,
+      signal,
     );
   }
 
   /**
    * The fields the live index can filter and sort by, read once per `DEFINITIONS_TTL_MS` (two cheap `settings.get`, in
-   * parallel).
+   * parallel under one admission).
    */
-  private async liveFieldsOf(uid: string, text: NormalizedSearchQuery): Promise<LiveFields> {
+  private async liveFieldsOf(
+    uid: string,
+    text: NormalizedSearchQuery,
+    signal: AbortSignal | undefined,
+  ): Promise<LiveFields> {
     const now = Date.now();
     const known = this.liveFields.get(uid);
     if (known !== undefined && now - known.at <= DEFINITIONS_TTL_MS) {
@@ -325,21 +359,30 @@ export class StoreSearchService {
     const [filterable, sortable] = await this.guard(
       uid,
       () =>
-        Promise.all([
-          this.engine.filterableAttributes(uid, timeout),
-          this.engine.sortableAttributes(uid, timeout),
-        ]),
+        this.engine.withAdmission(2, { timeoutMs: timeout, signal }, (admission) =>
+          Promise.all([
+            this.engine.filterableAttributes(uid, timeout, { admission }),
+            this.engine.sortableAttributes(uid, timeout, { admission }),
+          ]),
+        ),
       text,
+      signal,
     );
     this.liveFields.set(uid, { at: now, filterable, sortable });
     return { filterable, sortable };
   }
 
-  private call<T>(uid: string, body: object, text: NormalizedSearchQuery): Promise<T> {
+  private call<T>(
+    uid: string,
+    body: object,
+    text: NormalizedSearchQuery,
+    signal: AbortSignal | undefined,
+  ): Promise<T> {
     return this.guard(
       uid,
-      () => this.engine.multiSearch<T>(body, this.config.tuning.searchTimeoutMs),
+      () => this.engine.multiSearch<T>(body, this.config.tuning.searchTimeoutMs, { signal }),
       text,
+      signal,
     );
   }
 
@@ -347,12 +390,15 @@ export class StoreSearchService {
    * Engine failures: unreachable, slow, unauthorized or no index is `503 search_unavailable` (the storefront falls back).
    * An HTTP 400 (`engine_rejected`) is not an outage but a bug or a drift between the API and the live settings: it is
    * logged as an error, counted for the admin status and answered `500`; the cached live fields are dropped so the next
-   * request reads them again (review F1).
+   * request reads them again (review F1). A refusal of the interactive lane (`engine_busy`) goes to the sampled
+   * `BusyRefusalLog` (the counters are in the admin status); a pass given up because the shopper left (`engine_aborted`,
+   * or the signal fired) is not logged at all: nobody is waiting for the answer.
    */
   private async guard<T>(
     uid: string,
     run: () => Promise<T>,
     text: NormalizedSearchQuery,
+    signal: AbortSignal | undefined,
   ): Promise<T> {
     const started = Date.now();
     try {
@@ -360,6 +406,9 @@ export class StoreSearchService {
     } catch (error) {
       if (!(error instanceof SearchEngineError)) {
         throw error;
+      }
+      if (error.code === "engine_aborted" || signal?.aborted === true) {
+        throw searchUnavailable();
       }
       // Never the query text: its length and the code only.
       const what = `${error.code}${error.engineCode === undefined ? "" : ` [${error.engineCode}]`} after ${String(Date.now() - started)} ms (query of ${String(text.words.length)} words)`;
@@ -372,7 +421,11 @@ export class StoreSearchService {
           detail: "An unexpected error occurred. Please try again later.",
         });
       }
-      this.logger.warn(`Search failed: ${what}`);
+      if (error.code === "engine_busy") {
+        this.busyLog.refused(what);
+      } else {
+        this.logger.warn(`Search failed: ${what}`);
+      }
       throw searchUnavailable();
     }
   }

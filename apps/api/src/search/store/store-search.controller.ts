@@ -18,6 +18,21 @@ import {
 import { StoreSearchService } from "./store-search.service.js";
 
 /**
+ * Fires when the shopper's connection closes before the answer was sent (a closed tab, a client timeout), so the search
+ * stops spending engine work on it: its waiting pass leaves the queue and its running engine calls are destroyed
+ * (ADR 0042).
+ */
+function abandonedSignal(response: Response): AbortSignal {
+  const controller = new AbortController();
+  response.once("close", () => {
+    if (!response.writableFinished) {
+      controller.abort();
+    }
+  });
+  return controller.signal;
+}
+
+/**
  * Catalog search of the store (ADR 0034 decision 10, `docs/api/search.md`). Mounted only with `SEARCH_ENABLED=true`;
  * otherwise both routes answer 404. Public, rate limited per client address (windows `search` and `searchSuggest`).
  */
@@ -65,7 +80,7 @@ export class StoreSearchController {
     @Query(new ZodValidationPipe(storeSearchQuerySchema)) query: StoreSearchQuery,
     @Res({ passthrough: true }) response: Response,
   ): Promise<StoreSearchResponse> {
-    const result = await this.search.search(query);
+    const result = await this.search.search(query, abandonedSignal(response));
     // No personal data in the answer; prices and availability are current to the second they were read.
     response.setHeader("Cache-Control", "public, max-age=30");
     return result;
@@ -85,7 +100,7 @@ export class StoreSearchController {
     @Query(new ZodValidationPipe(storeSuggestQuerySchema)) query: StoreSuggestQuery,
     @Res({ passthrough: true }) response: Response,
   ): Promise<StoreSuggestResponse> {
-    const result = await this.search.suggest(query);
+    const result = await this.search.suggest(query, abandonedSignal(response));
     response.setHeader("Cache-Control", "no-store");
     return result;
   }
