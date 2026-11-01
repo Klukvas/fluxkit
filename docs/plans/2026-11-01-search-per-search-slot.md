@@ -51,3 +51,20 @@ Source: the deferred review findings F2 and F4 of `docs/plans/2026-10-31-search-
 - TDD, failing first: limiter (weights, FIFO without overtaking, queue by weight, abort removes a waiter and lets the next in, a timed-out head lets smaller ones in, counters, high-water marks); transport against loopback servers (an admission refused sends nothing and leaves no waiter; a sibling failure aborts waiting and running siblings; abort while waiting and in flight; no slot leak after success, failure, abort, timeout and `close()`; FIFO across admissions; counters); store against a loopback engine counting requests (a refused federated search starts no engine call afterwards; a disconnect leaves no waiting call and destroys the running ones); busy log with fake timers; admin status and screen.
 - `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `check:docs`; the search tests, the full API suite and the admin tests against real services; `pnpm openapi:export` and the freshness test.
 - If disk allows: the reduced overload run (3 000 products, concurrency 192) before/after: engine requests per refused search, the `503` rate and successful searches a second; indicative only.
+
+## Results (2026-11-01, indicative: one shared 4-vCPU sandbox runs the engine, Postgres, the API and the load loop)
+- Failing first: limiter 8 new specs red (weights ignored, no `counters`), transport 12 red (`withAdmission` missing), store 4 red against the old store code with the new engine (a refused search sent 1 more engine call later; a shopper who left while queued: 4 engine calls still ran; one who left while running: requests kept until the deadline; one slot without a queue: `503` on an idle lane), busy log red (module missing), config 3 red, admin view 3 red, admin screen 1 red; all green after.
+- Reduced load run: 3 000 products (19 644 documents), the load loop of the PR 204 run (closed loop, 2 000 forwarded addresses, on a `503` the loop reads the SQL listing), 15 s per run, two rounds of before/after alternated; engine requests counted by Meilisearch's request metrics. "before" = `origin/main` (one slot per call), "after" = this branch, both 8-512.
+
+| Mix, concurrency | Client | search `503` | successful searches/s | engine requests per refused search (est.) | page p95 |
+|---|---|---|---|---|---|
+| catalog through search, 32 | before / after | 0 % / 0 % | 101 to 104 / 94 to 103 | - | 466 to 478 / 471 to 538 ms |
+| catalog through search, 192 | before | 47 to 49 % | 85 to 88 | 0.00 | 1 319 to 1 436 ms |
+| catalog through search, 192 | after | 47 to 50 % | 85 to 90 | 0.00 | 1 329 to 1 414 ms |
+| full search mix, 32 | before / after | 0 % / 0 % | 175 to 181 / 171 to 179 | - | 275 to 286 / 282 to 290 ms |
+| full search mix, 192 | before | 2.6 to 7.5 % | 164 to 180 | -0.4 to 0.0 | 1 162 to 1 334 ms |
+| full search mix, 192 | after | 4.3 to 12.2 % | 156 to 173 | -1.4 to -0.7 | 1 152 to 1 361 ms |
+
+- Estimate: (engine requests of the run - successful searches x engine requests per search at concurrency 32) / refused searches. Reading: in these mixes the waste F2 describes is not measurable: the catalog mix sends one engine call per pass (no siblings), the live settings are cached, and in the full mix the fan-out passes (Ukrainian words, several text queries) are a minority; the estimate is noise around 0 for both clients (negative values: the mix of successful searches differs from the concurrency-32 run). The `503` rate and throughput are within the run-to-run noise of each other; head-of-line blocking showed no measurable cost here. The difference the design makes is pinned by the deterministic specs above, not by this run.
+- Log volume: the `before` API wrote 2 942 to 3 290 `engine_busy` warn lines per round (about 5.5 minutes, api.log 531 to 588 KB); the `after` API wrote 3 (one first line and summaries; api.log 46 KB).
+- Not measured: the 20 000-product catalog (disk), a real storefront in the loop, client disconnects under load, several API instances.
