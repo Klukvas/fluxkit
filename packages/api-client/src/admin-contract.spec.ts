@@ -828,6 +828,7 @@ const searchStatus: Shape<Admin.AdminSearchStatus> = {
             admitted: "integer",
             calls: "integer",
             refused: { object: { queueFull: "integer", waitExceeded: "integer" } },
+            abandoned: "integer",
             since: "string",
           },
         },

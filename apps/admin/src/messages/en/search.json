@@ -47,6 +47,7 @@
   "search.lane.admitted": "Searches let through",
   "search.lane.calls": "Engine calls sent",
   "search.lane.refusedQueueFull": "Turned away: waiting line full",
+  "search.lane.abandoned": "Left while waiting (the shopper's connection closed first)",
   "search.lane.refusedWaitExceeded": "Turned away: waited longer than 1 second",
   "search.indexes.title": "Indexes",
   "search.indexes.intro": "One index per language, built from the published catalog. Changes reach it through the sync queue; a rebuild builds a new index and swaps it in.",

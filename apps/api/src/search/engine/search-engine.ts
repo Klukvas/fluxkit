@@ -144,6 +144,8 @@ export interface InteractiveLaneSnapshot {
   readonly calls: number;
   /** Admissions refused with `engine_busy`, by reason. */
   readonly refused: { readonly queueFull: number; readonly waitExceeded: number };
+  /** Admissions given up while waiting for slots (the shopper left: `engine_aborted`); not refusals. */
+  readonly abandoned: number;
   /** When counting started (the client was created with the process). */
   readonly since: string;
 }
@@ -378,6 +380,7 @@ export class SearchEngine {
         queueFull: counters.refusedQueueFull,
         waitExceeded: counters.refusedWaitExceeded,
       },
+      abandoned: counters.abandoned,
       since: this.since.toISOString(),
     };
   }

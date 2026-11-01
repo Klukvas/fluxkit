@@ -729,9 +729,11 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     await holder;
     await pause(100);
     expect(held).toHaveLength(1);
+    // Both left while queued: counted as abandoned, not as refused.
     expect(engine.interactiveLane()).toMatchObject({
       inFlight: 0,
       refused: { queueFull: 0, waitExceeded: 0 },
+      abandoned: 2,
     });
   });
 
@@ -915,6 +917,7 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
       admitted: 1,
       calls: 3,
       refused: { queueFull: 1, waitExceeded: 0 },
+      abandoned: 0,
       since,
     });
     answer(0);
@@ -935,6 +938,7 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
       admitted: 2,
       calls: 5,
       refused: { queueFull: 1, waitExceeded: 0 },
+      abandoned: 0,
       since,
     });
   });

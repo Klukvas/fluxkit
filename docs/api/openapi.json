@@ -1654,6 +1654,12 @@
                               "additionalProperties": false,
                               "description": "Admissions refused (`engine_busy`; the store answered 503 and the storefront fell back), by reason: the queue had no room, or no slots came within 1 s."
                             },
+                            "abandoned": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Admissions given up while they waited for slots because the shopper left (connection closed); not refusals. Added 2026-11-01."
+                            },
                             "since": {
                               "type": "string",
                               "format": "date-time",
@@ -1670,6 +1676,7 @@
                             "admitted",
                             "calls",
                             "refused",
+                            "abandoned",
                             "since"
                           ],
                           "additionalProperties": false,

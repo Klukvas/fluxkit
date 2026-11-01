@@ -1345,6 +1345,8 @@ export interface AdminSearchStatus {
       admitted: number;
       calls: number;
       refused: { queueFull: number; waitExceeded: number };
+      /** Admissions given up while waiting for slots because the shopper left; not refusals. */
+      abandoned: number;
       since: string;
     };
   };

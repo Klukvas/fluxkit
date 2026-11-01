@@ -59,6 +59,7 @@ const IDLE_LANE: Lane = {
   admitted: 0,
   calls: 0,
   refused: { queueFull: 0, waitExceeded: 0 },
+  abandoned: 0,
   since: "2026-10-29T08:00:00.000Z",
 };
 
@@ -72,6 +73,7 @@ const REFUSING_LANE: Lane = {
   admitted: 300,
   calls: 900,
   refused: { queueFull: 60, waitExceeded: 40 },
+  abandoned: 12,
 };
 
 function status(overrides: Partial<AdminSearchStatus> = {}): AdminSearchStatus {
@@ -273,6 +275,7 @@ describe("the status screen", () => {
       "calls",
       "refusedQueueFull",
       "refusedWaitExceeded",
+      "abandoned",
     ]) {
       expect(quiet, key).toContain(`§search.lane.${key}`);
     }

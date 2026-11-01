@@ -55,6 +55,10 @@ export const adminSearchStatusSchema = z.object({
             description:
               "Admissions refused (`engine_busy`; the store answered 503 and the storefront fell back), by reason: the queue had no room, or no slots came within 1 s.",
           }),
+        abandoned: z.number().int().min(0).meta({
+          description:
+            "Admissions given up while they waited for slots because the shopper left (connection closed); not refusals. Added 2026-11-01.",
+        }),
         since: timestamp.meta({ description: "When counting started (with the process)." }),
       })
       .meta({

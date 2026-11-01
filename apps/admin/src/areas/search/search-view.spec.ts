@@ -235,6 +235,7 @@ describe("laneView", () => {
     admitted: 0,
     calls: 0,
     refused: { queueFull: 0, waitExceeded: 0 },
+    abandoned: 0,
     since: "2026-10-29T08:00:00.000Z",
     ...overrides,
   });
@@ -260,6 +261,7 @@ describe("laneView", () => {
           admitted: 300,
           calls: 900,
           refused: { queueFull: 60, waitExceeded: 40 },
+          abandoned: 7,
         }),
       ),
     ).toEqual({
@@ -276,6 +278,7 @@ describe("laneView", () => {
       queueFull: 60,
       waitExceeded: 40,
       refusedShare: 0.25,
+      abandoned: 7,
       since: "2026-10-29T08:00:00.000Z",
     });
   });

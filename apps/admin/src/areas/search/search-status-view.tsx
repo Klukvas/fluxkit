@@ -145,6 +145,7 @@ function LaneBlock({ t, uiLocale, lane }: { t: Translator; uiLocale: string; lan
       term: t("search.lane.refusedWaitExceeded"),
       description: number.format(lane.waitExceeded),
     },
+    { id: "abandoned", term: t("search.lane.abandoned"), description: number.format(lane.abandoned) },
   ];
   return (
     <section aria-labelledby="search-lane" className="flex flex-col gap-3">
