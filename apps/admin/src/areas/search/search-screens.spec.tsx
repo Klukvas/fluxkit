@@ -46,12 +46,41 @@ function locale(
   };
 }
 
+type Lane = AdminSearchStatus["engine"]["interactiveLane"];
+
+/** A fresh process's interactive lane: nothing admitted, refused or held. */
+const IDLE_LANE: Lane = {
+  maxConcurrency: 8,
+  maxQueue: 512,
+  inFlight: 0,
+  queued: 0,
+  inFlightHighWater: 0,
+  queuedHighWater: 0,
+  admitted: 0,
+  calls: 0,
+  refused: { queueFull: 0, waitExceeded: 0 },
+  since: "2026-10-29T08:00:00.000Z",
+};
+
+/** A lane under overload: full now, and a quarter of the searches refused since the start. */
+const REFUSING_LANE: Lane = {
+  ...IDLE_LANE,
+  inFlight: 8,
+  queued: 30,
+  inFlightHighWater: 8,
+  queuedHighWater: 512,
+  admitted: 300,
+  calls: 900,
+  refused: { queueFull: 60, waitExceeded: 40 },
+};
+
 function status(overrides: Partial<AdminSearchStatus> = {}): AdminSearchStatus {
   return {
     engine: {
       reachable: true,
       code: null,
       rejectedSearches: { count: 0, lastCode: null, lastAt: null },
+      interactiveLane: IDLE_LANE,
     },
     locales: [locale(), locale({ locale: "en", liveIndex: "fluxkit_catalog_en_1" })],
     queue: {
@@ -163,6 +192,7 @@ describe("the status screen", () => {
             lastCode: "invalid_search_facets",
             lastAt: "2026-10-29T11:00:00.000Z",
           },
+          interactiveLane: REFUSING_LANE,
         },
         locales: [
           locale({
@@ -199,6 +229,7 @@ describe("the status screen", () => {
           reachable: false,
           code: "engine_timeout",
           rejectedSearches: { count: 0, lastCode: null, lastAt: null },
+          interactiveLane: IDLE_LANE,
         },
       }),
     );
@@ -218,12 +249,42 @@ describe("the status screen", () => {
             lastCode: "invalid_search_facets",
             lastAt: "2026-10-29T11:00:00.000Z",
           },
+          interactiveLane: IDLE_LANE,
         },
       }),
     );
     expect(rejected).toContain("§search.rejected.title");
     expect(rejected).toContain("invalid_search_facets");
     expect(statusHtml(status())).toContain("§search.rejected.none");
+  });
+
+  it("shows the interactive lane's numbers as per process, and a warning with the advice once it refused searches", () => {
+    const quiet = statusHtml(status());
+    expect(quiet).toContain('aria-labelledby="search-lane"');
+    expect(quiet).toContain("§search.lane.title");
+    expect(quiet).toContain("§search.lane.intro");
+    expect(quiet).toContain("§search.lane.noneRefused");
+    expect(quiet).not.toContain("§search.lane.refusedTitle");
+    for (const key of [
+      "inFlight",
+      "queued",
+      "peaks",
+      "admitted",
+      "calls",
+      "refusedQueueFull",
+      "refusedWaitExceeded",
+    ]) {
+      expect(quiet, key).toContain(`§search.lane.${key}`);
+    }
+    const refusing = statusHtml(
+      status({
+        engine: { ...status().engine, interactiveLane: REFUSING_LANE },
+      }),
+    );
+    expect(refusing).toContain("§search.lane.refusedTitle");
+    expect(refusing).toContain("§search.lane.refusedBody");
+    expect(refusing).toContain("§search.lane.advice");
+    expect(refusing).not.toContain("§search.lane.noneRefused");
   });
 
   it("shows the queue numbers and the empty states, and the failing products as attention", () => {
@@ -540,6 +601,7 @@ describe("the area with its real messages", () => {
             lastCode: "invalid_search_facets",
             lastAt: "2026-10-29T11:00:00.000Z",
           },
+          interactiveLane: REFUSING_LANE,
         },
         locales: [
           locale({

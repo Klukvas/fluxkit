@@ -5,6 +5,7 @@ import {
   ageText,
   describeEngineCode,
   engineView,
+  laneView,
   localeView,
   queueView,
   rejectedView,
@@ -217,6 +218,65 @@ describe("rejectedView", () => {
       count: 3,
       lastCode: "invalid_search_facets",
       lastAt: "2026-10-29T11:00:00.000Z",
+    });
+  });
+});
+
+describe("laneView", () => {
+  const lane = (
+    overrides: Partial<AdminSearchStatus["engine"]["interactiveLane"]> = {},
+  ): AdminSearchStatus["engine"]["interactiveLane"] => ({
+    maxConcurrency: 8,
+    maxQueue: 512,
+    inFlight: 0,
+    queued: 0,
+    inFlightHighWater: 0,
+    queuedHighWater: 0,
+    admitted: 0,
+    calls: 0,
+    refused: { queueFull: 0, waitExceeded: 0 },
+    since: "2026-10-29T08:00:00.000Z",
+    ...overrides,
+  });
+
+  it("is clear with no share before anything was admitted or refused", () => {
+    expect(laneView(lane())).toMatchObject({ state: "clear", refused: 0, refusedShare: null });
+  });
+
+  it("is clear while nothing was refused, whatever the load", () => {
+    expect(
+      laneView(lane({ inFlight: 8, queued: 40, admitted: 1_000, calls: 2_400 })),
+    ).toMatchObject({ state: "clear", refused: 0, refusedShare: 0 });
+  });
+
+  it("sums the refusals by reason and gives their share of all admissions asked for", () => {
+    expect(
+      laneView(
+        lane({
+          inFlight: 8,
+          queued: 12,
+          inFlightHighWater: 8,
+          queuedHighWater: 512,
+          admitted: 300,
+          calls: 900,
+          refused: { queueFull: 60, waitExceeded: 40 },
+        }),
+      ),
+    ).toEqual({
+      state: "refused",
+      maxConcurrency: 8,
+      maxQueue: 512,
+      inFlight: 8,
+      queued: 12,
+      inFlightHighWater: 8,
+      queuedHighWater: 512,
+      admitted: 300,
+      calls: 900,
+      refused: 100,
+      queueFull: 60,
+      waitExceeded: 40,
+      refusedShare: 0.25,
+      since: "2026-10-29T08:00:00.000Z",
     });
   });
 });

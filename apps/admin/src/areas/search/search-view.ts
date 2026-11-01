@@ -10,7 +10,8 @@ import type { MessageDescriptor } from "../../lib/problem-messages";
 
 /**
  * The error codes of the engine client that the status and the queue store and return: `SearchEngineErrorCode` without
- * `engine_busy` (store search calls only, never stored; ADR 0041).
+ * `engine_busy` and `engine_aborted` (store search calls only, never stored; ADR 0041 and 0042). Refusals of the
+ * interactive lane are counted in `engine.interactiveLane` instead (`laneView`).
  */
 export const ENGINE_CODES = [
   "engine_unreachable",
@@ -171,6 +172,52 @@ export function rejectedView(
     count: rejected.count,
     lastCode: rejected.lastCode,
     lastAt: rejected.lastAt,
+  };
+}
+
+export interface LaneView {
+  /** `refused` when the lane refused any search since the API started (the screen then shows the advice). */
+  state: "clear" | "refused";
+  maxConcurrency: number;
+  maxQueue: number;
+  inFlight: number;
+  queued: number;
+  inFlightHighWater: number;
+  queuedHighWater: number;
+  admitted: number;
+  calls: number;
+  /** Refusals of both reasons. */
+  refused: number;
+  queueFull: number;
+  waitExceeded: number;
+  /** refused / (admitted + refused), 0 to 1; null before anything was asked for. */
+  refusedShare: number | null;
+  since: string;
+}
+
+/**
+ * The engine client's interactive lane (store search and suggest; ADR 0041 and 0042), counted per API process since it
+ * started: how full it is now, how full it got, and how many searches it refused (each answered 503 and fell back to the
+ * catalog listing).
+ */
+export function laneView(lane: AdminSearchStatus["engine"]["interactiveLane"]): LaneView {
+  const refused = lane.refused.queueFull + lane.refused.waitExceeded;
+  const asked = lane.admitted + refused;
+  return {
+    state: refused > 0 ? "refused" : "clear",
+    maxConcurrency: lane.maxConcurrency,
+    maxQueue: lane.maxQueue,
+    inFlight: lane.inFlight,
+    queued: lane.queued,
+    inFlightHighWater: lane.inFlightHighWater,
+    queuedHighWater: lane.queuedHighWater,
+    admitted: lane.admitted,
+    calls: lane.calls,
+    refused,
+    queueFull: lane.refused.queueFull,
+    waitExceeded: lane.refused.waitExceeded,
+    refusedShare: asked === 0 ? null : refused / asked,
+    since: lane.since,
   };
 }
 
