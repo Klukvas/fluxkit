@@ -65,6 +65,30 @@ export class MediaUploadService {
     admin: AdminPrincipal,
     connection: UploadResponseControl,
   ): Promise<MediaUploadResponse> {
+    return this.store(request, admin.userId, connection);
+  }
+
+  /**
+   * An image added by the system, not by an admin: the demo seed (`pnpm seed`). The SAME flow as `upload` from the length
+   * rules on (gate, decode, re-encode, random key, row, log line), with no admin (`created_by` null, logged as
+   * `admin=system`). Switched off like the route (`uploads_disabled` with the `none` driver). It is never reachable over
+   * HTTP: the route's guards (authentication, permission, CSRF, rate limit) have no caller to check here.
+   */
+  async storeSystemImage(bytes: Uint8Array): Promise<MediaUploadResponse> {
+    const request: UploadRequest = {
+      headers: { "content-length": String(bytes.length) },
+      async *[Symbol.asyncIterator]() {
+        yield bytes;
+      },
+    };
+    return this.store(request, null, { closeConnection: () => undefined });
+  }
+
+  private async store(
+    request: UploadRequest,
+    actorId: string | null,
+    connection: UploadResponseControl,
+  ): Promise<MediaUploadResponse> {
     const startedAt = Date.now();
     if (this.config.driver === "none") {
       connection.closeConnection();
@@ -132,11 +156,11 @@ export class MediaUploadService {
         width: image.width,
         height: image.height,
         sha256: createHash("sha256").update(image.data).digest("hex"),
-        createdBy: admin.userId,
+        createdBy: actorId,
       });
       // Ids and numbers only: never bytes, a file name or a client-supplied header value.
       this.logger.log(
-        `Stored upload id=${row.id} admin=${admin.userId} type=${image.type} bytesIn=${input.bytes} bytesOut=${image.data.length} width=${image.width} height=${image.height} durationMs=${Date.now() - startedAt}`,
+        `Stored upload id=${row.id} admin=${actorId ?? "system"} type=${image.type} bytesIn=${input.bytes} bytesOut=${image.data.length} width=${image.width} height=${image.height} durationMs=${Date.now() - startedAt}`,
       );
       return {
         id: row.id,
