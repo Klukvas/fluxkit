@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0044, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-01, `origin/main` at `e364acc` (PR 207, ADR 0043, merged); PR 208 (`fix/search-admission-tails`: PR 207 review tails, ADR 0044, re-measurement at 20 000 products) open, independently reviewed, its review findings F1 to F6 fixed on the branch.
+Last updated: 2026-11-01, `origin/main` at `6f0db22` (PR 208 merged); branch `feature/demo-images-and-local-run` (demo images, `pnpm demo:up`, plan `docs/plans/2026-11-01-demo-images-local-run.md`) pushed, no PR yet.
 
 ## 1. Current state
 
@@ -20,13 +20,14 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 - **Tooling and CI:** root scripts: `build typecheck lint format format:check check:boundaries check:env test test:e2e db:migrate seed admin:create admin:unlock jobs:run-once search:reindex openapi:export check:licenses check:docs notices feature-matrix audit:prod`. CI jobs (`.github/workflows/ci.yml`): `verify`, `feature-matrix`, `e2e`, `policy`, `docs`, `compose`, `deploy-smoke`. Matrix modes: `on off deleted providers-*` (nova-post, email, payment variants) `search-on search-off` (`scripts/feature-matrix.sh`).
 - **Test stability:** the admin e2e flakes were root-caused and fixed in #193 (refund dialog focus race, audit filter key bug, spec isolation); all rAF focus sites use the shared `useFocusAfterCommit` hook (`apps/admin/src/lib/use-focus-after-commit.ts`, guard `apps/admin/src/focus-guards.spec.ts`, #194); the engine task timeout test is deterministic (#190).
 - **Dependencies:** Dependabot bumps merged (swc, bullmq, dependency-cruiser, next 16.4.3, `@nestjs/swagger` 12.0.4). PSF-2.0 for `argparse` approved 2026-10-30 (#192).
-- **Open PRs:** PR 208 (`fix/search-admission-tails`, ADR 0044), independently reviewed, review findings fixed on the branch; to merge when CI is green.
+- **Local demo (branch, not merged):** drawn demo images in `seeds/assets/` uploaded by `pnpm seed` through the media service; `pnpm demo:up|demo:down|demo:pay` and README "Try it locally". Verified natively in the sandbox (no Docker there); the Docker path is unverified. Open owner question in the plan: the storefront shows placeholders for uploaded images on a developer machine (https-only rule, ADR 0028).
+- **Open PRs:** none (PR 208 merged as `6f0db22`).
 - **Not built:** live provider verification (all three plugins ran against stubs only), LiqPay/WayForPay, returns, admin email flows, two-factor, rate limits on the plain catalog routes of `/store/*`, search numbers on production hardware.
 
 ## 2. Next steps (in order)
 
 1. Owner-only items of section 3 (the AGENTS.md sync was merged in #196 and the owner decisions of 2026-10-30 are recorded): live provider checks; legal review. Migrations `0009_privacy` and `0010_search` and the vendored Snowball code were confirmed by the owner on 2026-10-31 (first approved by the orchestrator on 2026-10-29 under the standing autonomy grant); migration `0011` was approved by the owner personally on 2026-10-30. Nothing below replaces these.
-2. Search: PR 208 (ADR 0044) is open and reviewed; merge when CI is green. Re-measured at 20 000 products (plan `docs/plans/2026-10-29-search.md`, "Re-measurement at 20 000 products (2026-11-01)"): targets missed at concurrency 32 and for deep pages; F3 to F5 open. Still to do: test the engine-down fallback in a real browser (unit level only).
+2. Local demo branch: open a PR, independent review, a run of `pnpm demo:up` on a machine with Docker; owner answer on dev-time storefront images (plan, "Open question"). Search: PR 208 (ADR 0044) is merged. Re-measured at 20 000 products (plan `docs/plans/2026-10-29-search.md`, "Re-measurement at 20 000 products (2026-11-01)"): targets missed at concurrency 32 and for deep pages; F3 to F5 open. Still to do: test the engine-down fallback in a real browser (unit level only).
 3. Production deployment: owner approval of the plan, an independent review of the images and proxy, a first green `deploy-smoke` run on GitHub (it passed locally only, per `docs/deployment.md`), then a dry run on a real host.
 4. Live provider checks once the owner supplies keys (section 3).
 5. Launch blockers: rate limits on the plain catalog routes of `/store/*` (needs a dependency, red zone; `apps/api/src/rate-limit/rate-limiter.ts` has windows for search but none for catalog reads); Swagger UI and `/docs-json` decision; `TRUST_PROXY` set to the exact hop count (ADR 0026). Behind a proxy the search results page counts every shopper in one window unless `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (ADR 0038, default false); check per-address limits from two networks after deployment.

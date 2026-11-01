@@ -37,6 +37,23 @@ Shipping (`docs/plans/2026-10-24-shipping.md`, ADR 0029): steps 1 to 6, 8, 10 an
 
 Open decisions and next steps are listed at the end.
 
+## Try it locally
+
+One command prepares a demo shop on a machine with Node 22, pnpm 10.28 (`corepack enable`) and Docker with Compose (plan `docs/plans/2026-11-01-demo-images-local-run.md`).
+
+```bash
+pnpm install
+pnpm demo:up        # .env (if missing), Postgres + Redis + Meilisearch, build, migrate, seed, search index, admin owner
+```
+
+- Without `.env` it writes one from `.env.example` with random secrets of this machine (mode 0600, git-ignored, never commit it): database `fluxkit_dev`, search on, local image uploads (`var/media`), plain-HTTP cookies, and the TEST-ONLY providers `fake` for shipping and payment (`FAKE_PAYMENT_ADOPT_WEBHOOKS=true`; both are refused under `NODE_ENV=production`, never use this file for a real shop). An existing `.env` is used as it is; only a placeholder `MEILI_API_KEY` is replaced by a key scoped to the index prefix. `--skip-docker` uses services that already run.
+- It creates the owner `owner@example.com` (`--admin-email` for another address) with a random password that it prints ONCE and stores nowhere. Run again, it changes nothing (the seed is idempotent) and leaves the existing admin alone; a lost password: `ADMIN_PASSWORD='<12+ characters>' pnpm admin:create --email other@example.com`.
+- Then start the three servers, each in its own terminal: `pnpm --filter @fluxkit/api start` (API on http://127.0.0.1:3000), `pnpm --filter @fluxkit/storefront dev -p 3001` (shop: http://localhost:3001/uk), `pnpm --filter @fluxkit/admin dev` (admin: http://localhost:5173/admin-ui/, sign in with the printed password).
+- Delivery: the seed creates the demo delivery methods INACTIVE. In the admin, Shipping, open `demo_courier` (or another one), tick "Active (offered at checkout)" and save to see the delivery step; without an active method the checkout has none.
+- Payment: the `fake` provider charges nothing and has no payment page, so "Pay now" lands on `https://pay.fake.invalid/...`, which does not load. Then run `pnpm demo:pay` (`--order <number>` for a specific order, `--fail` for a declined payment): it sends the provider's signed webhook to the local API, the order becomes paid, and it prints the payment result page to open.
+- Images: the demo products carry drawn illustrations uploaded through the media service. The admin shows them; the shop shows its placeholder on a developer machine, because it renders only `https` images of `STOREFRONT_IMAGE_HOSTS` that resolve to a public address (ADR 0028, "Uploaded images" below).
+- `pnpm demo:down` stops the services and keeps their data. To start over from nothing: `docker compose --env-file .env -f infra/docker-compose.yml down -v`, delete `.env` and `var/media`, run `pnpm demo:up` (the Postgres volume keeps the password it was created with, so a new `.env` needs new volumes).
+
 ## Quick start
 
 Prerequisites: Node 22 (`.nvmrc`), pnpm 10.28 (`corepack enable`), Docker with Compose.
@@ -479,6 +496,7 @@ Notes:
 | `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
 | `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm admin:unlock --email <address>` | builds, then clears the failed-login counter and the lock of one admin user (nothing else changes); see Admin sign-in |
+| `pnpm demo:up` / `pnpm demo:down` / `pnpm demo:pay` | local demo only: prepare and start everything, stop the services (data kept), pay the newest unpaid order of the test-only `fake` payment provider; see Try it locally |
 | `pnpm jobs:run-once` | builds, then runs every scheduler job once under the scheduler lock (exit 0 ran, 1 failed, 2 lock held); see Scheduler and jobs |
 | `pnpm openapi:export` | regenerates `docs/api/openapi.json` (a test fails when it is stale) |
 | `pnpm check:licenses` / `pnpm audit:prod` / `pnpm notices` | license policy, production audit, third-party notices file |
