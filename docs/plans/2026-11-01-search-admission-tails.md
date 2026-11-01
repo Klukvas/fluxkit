@@ -1,6 +1,6 @@
 # Search admission: tails of the PR 207 review and a re-measurement at 20 000 products (2026-11-01)
 
-Status: the owner asked (through the orchestrator, 2026-11-01) for the open tails of the independent review of PR 207 (ADR 0043) and a re-measurement at 20 000 products. Branch `fix/search-admission-tails`. Results at the end.
+Status: the owner asked (through the orchestrator, 2026-11-01) for the open tails of the independent review of PR 207 (ADR 0043) and a re-measurement at 20 000 products. Implemented on branch `fix/search-admission-tails` (results at the end); no PR and no independent review yet.
 Source: the review findings F1 to F3 of PR 207 (recorded in the orchestrator's review notes; summarised here), `docs/plans/2026-11-01-search-admission-followups.md`, ADR 0042 and ADR 0043, `docs/plans/2026-10-29-search.md` "Measurements at scale (2026-10-31)".
 
 ## What exists (checked before building)
@@ -31,3 +31,19 @@ Source: the review findings F1 to F3 of PR 207 (recorded in the orchestrator's r
 ## Verification
 - Failing first per tail; mutation checks (revert the implementation line, the new specs fail).
 - `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `check:docs`; search tests, full API suite, admin, api-client and config tests against real services; openapi freshness.
+
+## Results (2026-11-01)
+- **Failing first** (specs written before the code, run against `origin/main`'s code): 8 red: T2 (`abandoned` 1 instead of 0 for an aborted arrival), `takeSpare`/`watchSpare` missing (2), and every admission spec (the moderate-load probe ended `engine_timeout` for some passes; the idle-slots pass ran on 1 slot; FIFO, release and abort specs: the pass never grew). T3 passed against the existing code (it pins behaviour), so it was mutation-checked instead. All green after the change.
+- **Mutation check** (one mutant at a time, limiter + admission + transport specs, file restored after each): killed: `takeSpare` ignores the queue (FIFO), ignores `maxInFlight` (bound), counts as `granted`; `drain()` offers no spares; no round robin among watchers; no growth at call entry; no shrink after a call; shrink gives a lane slot back without taking its private slot (more calls than slots); shrink before the call's private release; settle does not stop watching (watcher leak); growth beyond the waiting calls (hangs); T2 counting an aborted arrival again; **T3 "`drain()` grants the head then returns" (the PR 207 survivor) now killed**. Growth disabled while keeping the rest (a temporary switch, removed): 5 of the 6 admission specs red (only the saturation spec, which pins that nothing grows, passes).
+- **Two dead branches removed instead of tested:** releasing spares in `settle()` (every spare is already given back by `#shrink` when its call ends while no call of the pass waits) and the `open`/`aborted` guards of `#grow` (an aborted call is removed from the private queue at once, so nothing waits). Mutants of them survived because they are unreachable.
+- **T1 evidence: policy comparison** (scratch fake-timer harness, the real engine client with tasks that only wait, N = 8, 2 s deadline; heavy outcome counts, browse = one-call passes):
+
+| Load shape | ADR 0043 | growth (ADR 0044) | minimum grant `ceil(w/2)` | both |
+|---|---|---|---|---|
+| S1 saturation: 8 browsers renewing 100 ms pages, 20 heavy passes 5 x 250 ms | heavy p50 1 550 ms, browse p95 400 ms | same (nothing grows: the queue is never empty) | heavy p50 950 ms, browse p95 750 ms | as minimum grant |
+| S2 overload: 6 browsers, 15 heavy passes 10 x 250 ms every 300 ms | 14 of 15 heavy `engine_timeout` | 13 `engine_timeout` | 11 ok, 4 heavy and 18 browse `engine_busy` | as minimum grant |
+| S3 intermittent: 8 browsers with 50 ms think time, 16 heavy 8 x 250 ms | 10 of 16 heavy `engine_timeout` | **2** `engine_timeout`, browse p95 550 ms (was 500) | 0 timeouts, browse p95 800 ms | 0 timeouts, browse p95 650 ms |
+| S4 light: 4 browsers, 10 heavy 10 x 200 ms | heavy p50 2 100 ms | **500 ms**, browse p95 200 ms (was 100) | 700 ms, browse p95 300 ms | 500 ms |
+
+  Decision: growth (ADR 0044). It never adds a refusal or a timeout and never idles a slot; the minimum grant removes timeouts under saturation but idles freed slots at the head again and refuses one-call passes (catalog pages) under overload. Limit stated in ADR 0044: under sustained saturation a heavy pass does not grow (FIFO wins), pinned by a spec.
+- **Re-measurement at 20 000 products:** plan `docs/plans/2026-10-29-search.md`, "Re-measurement at 20 000 products (2026-11-01)". No `engine_timeout` of a multi-call pass with either code; ADR 0043 and ADR 0044 within the noise on that load loop; sustained 50 edits a second and the flag flip now meet their targets.

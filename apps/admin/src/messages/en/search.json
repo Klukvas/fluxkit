@@ -34,7 +34,7 @@
   "search.rejected.last": "The last one: {time}.",
   "search.rejected.none": "The engine has refused no search since the API started.",
   "search.lane.title": "Store search capacity",
-  "search.lane.intro": "Store searches and suggestions share a limited number of engine slots per API process; each step of a search is let through once (an admission) and runs its parallel engine calls on the slots that are free when its turn comes. Counted by this API process since {time}; the numbers start again when the API restarts.",
+  "search.lane.intro": "Store searches and suggestions share a limited number of engine slots per API process; each step of a search is let through once (an admission) and runs its parallel engine calls on the slots that are free when its turn comes, plus slots that free up later while no other search waits. Counted by this API process since {time}; the numbers start again when the API restarts.",
   "search.lane.noneRefused": "No search was turned away for lack of capacity.",
   "search.lane.refusedTitle": "Searches turned away for lack of capacity",
   "search.lane.refusedBody": "Turned away: {count} ({share} of the admissions asked for; a search asks for up to 3 admissions and a suggestion for 1, so the share of searches turned away can be up to 3 times higher). Those shoppers saw the catalog listing instead of search results.",

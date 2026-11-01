@@ -1,0 +1,21 @@
+# 0044. Search engine client: a granted pass grows on spare slots while nobody waits
+
+Status: accepted 2026-11-01 (the owner asked for the open tails of the independent review of PR 207, through the orchestrator; plan `docs/plans/2026-11-01-search-admission-tails.md`). Supersedes in part ADR 0043 decision 1 ("a granted pass does not grow later"). Keeps every other decision of ADR 0043 and ADR 0042, their limits, defaults and variables.
+
+## Context
+
+- Under ADR 0043 a pass is granted `min(weight, free)` slots at its turn and keeps exactly that grant for its life. At a busy lane slots free one at a time, so a heavy pass (a multi-word search with several active facet groups: one federated call per planned query, up to `SEARCH_ENGINE_MAX_CONCURRENCY` at once) is often granted one slot and runs its calls in series while slots free up around it (review F1 of PR 207). When the calls do not fit in the 2 s deadline the pass ends in `engine_timeout` (`503`, one `warn` line), after spending engine work.
+- Reproduced with fake timers (`apps/api/src/search/engine/interactive-admission.spec.ts`): four shoppers browsing and ten passes of 10 calls of 200 ms, 400 ms apart, on N = 8: under ADR 0043 every pass got one slot and some ended `engine_timeout`; review scenario 2 (seven one-call passes end 10 ms after a 10-call pass was granted the last slot): the seven freed slots idled while the pass ran 10 calls in series.
+- Two remedies were compared on the same fake-timer harness (four policies x five load shapes, indicative; plan "Results"): growth while the queue is empty, and a minimum grant of `ceil(weight / 2)`. Growth added no timeout and no refusal in any shape, removed most timeouts under intermittent load (10 to 2 timeouts of 16 heavy passes), cut heavy passes under light load from 2 100 to 500 ms (p50), cost one-call passes at most one call duration of p95 (100 to 200 ms under light load), and changed nothing under sustained saturation. The minimum grant also removed the timeouts under saturation, but the head of the queue idles freed slots again until half its weight is free (the defect ADR 0043 removed): one-call p95 rose from 400 to 750 ms and, under overload, one-call passes (catalog pages) were refused (`engine_busy`, 18 against 0).
+
+## Decision
+
+1. **Growth on spare slots.** A call of an admitted pass that finds none of the pass's slots free takes one spare lane slot when a slot is free AND nobody waits in the lane's queue (`ConcurrencyLimiter.takeSpare`), at once or as soon as a slot frees while nobody waits (`watchSpare`; passes that wait for spares take turns). A pass never holds more slots than it asked for (`min(calls, SEARCH_ENGINE_MAX_CONCURRENCY)`), never runs more calls than it holds, and gives a spare back as soon as one of its calls ends while no call of the pass waits; so a spare is held for one call at a time, and none is left when the last call settled.
+2. **Kept:** strict FIFO for waiters (a spare is never a slot a queued pass is waiting for: under sustained saturation, where a one-call pass always waits, a heavy pass does not grow); at most `SEARCH_ENGINE_MAX_CONCURRENCY` engine calls in flight per process; one admission per pass, admitted or refused as a whole; the queue accounting and every counter (`admitted` counts admissions, a spare is not one; `inFlight` counts the slots held, spares included).
+3. A minimum grant of `ceil(weight / 2)` is not adopted (it trades heavy-pass timeouts for idle slots and refused one-call passes under overload).
+
+## Consequences
+
+- Heavy passes use slots that would otherwise idle; one-call passes arriving while a heavy pass grows may wait up to one call duration for a slot it holds (they arrived later; FIFO by arrival).
+- Under sustained saturation nothing changes against ADR 0043: a heavy pass granted one slot runs in series and may end in `engine_timeout`. The log line `Search failed: engine_timeout` remains the signal to watch; the 20 000-product re-measurement (plan `docs/plans/2026-10-29-search.md`, "Re-measurement at 20 000 products (2026-11-01)") counts it.
+- No variable, route, response or schema change.
