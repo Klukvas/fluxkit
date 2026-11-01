@@ -88,6 +88,9 @@ function writeDemoEnv() {
     PAYMENT_PROVIDERS_ENABLED: "fake",
     FAKE_PAYMENT_ADOPT_WEBHOOKS: "true",
     MEDIA_STORAGE_DRIVER: "local",
+    // The prefix of every uploaded image's URL. `next dev` renders URLs under exactly this prefix as `/media/<key>` and
+    // rewrites them to the API (development only), so the shop shows the demo images; the admin loads them from the API.
+    MEDIA_PUBLIC_BASE_URL: `http://127.0.0.1:${base.PORT ?? "3000"}/media`,
   };
   const lines = example.split("\n");
   for (const [key, value] of Object.entries(values)) {
