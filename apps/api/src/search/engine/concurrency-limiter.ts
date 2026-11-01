@@ -1,9 +1,11 @@
 /**
  * A FIFO concurrency limiter for the engine client's interactive lane (ADR 0041, ADR 0042): at most `maxInFlight` slots
  * held at once, at most `maxQueue` slots waited for, each caller waiting at most the time it was given. A caller takes
- * one slot or several at once (`weight`: one search pass is admitted as a whole) and is refused with a
- * `LimiterRejection` instead of piling more work on a saturated engine. Strict FIFO: a caller never overtakes one that
- * came first, whatever their weights, so a large pass is never starved by small ones. Per process, in memory.
+ * one slot or several (`weight`) and is refused with a `LimiterRejection` instead of piling more work on a saturated
+ * engine. `acquire` grants the whole weight at once; `acquireUpTo` (one search pass, ADR 0043) grants `min(weight, free)`
+ * slots as soon as at least one is free, so the head of the queue never leaves a free slot idle while it waits for more.
+ * Strict FIFO: only the head of the queue is ever granted, so a caller never overtakes one that came first, whatever
+ * their weights. Per process, in memory.
  */
 
 export type LimiterRejectionReason = "queue_full" | "wait_exceeded" | "closed" | "aborted";
@@ -18,12 +20,15 @@ export class LimiterRejection extends Error {
 export interface ConcurrencyLimiterOptions {
   /** Slots: at least 1. */
   readonly maxInFlight: number;
-  /** Slots that may be waited for; 0 refuses whenever the slots asked for are not free. */
+  /**
+   * Slots that may be waited for (a waiter counts the slots it asked for); 0 never queues: `acquire` is refused whenever
+   * its whole weight is not free, `acquireUpTo` whenever no slot is free.
+   */
   readonly maxQueue: number;
 }
 
 export interface AcquireOptions {
-  /** Slots taken at once: 1 (the default) to `maxInFlight`. */
+  /** Slots asked for: 1 (the default) to `maxInFlight`. */
   readonly weight?: number;
   /** Aborting it removes the caller from the queue (`aborted`); it has no effect once the slots are granted. */
   readonly signal?: AbortSignal | undefined;
@@ -46,9 +51,18 @@ export interface LimiterCounters {
 /** Gives the slots back; calling it again does nothing. */
 export type Release = () => void;
 
+/** What `acquireUpTo` granted: `slots` from 1 to the weight asked for, given back together by `release`. */
+export interface Grant {
+  readonly slots: number;
+  readonly release: Release;
+}
+
 interface Waiter {
+  /** Slots asked for (what the queue counts). */
   readonly weight: number;
-  readonly grant: (release: Release) => void;
+  /** Fewest slots it accepts: the weight for `acquire`, 1 for `acquireUpTo`. */
+  readonly minimum: number;
+  readonly grant: (grant: Grant) => void;
   readonly refuse: (rejection: LimiterRejection) => void;
   timer: ReturnType<typeof setTimeout> | undefined;
   detach: (() => void) | undefined;
@@ -103,6 +117,24 @@ export class ConcurrencyLimiter {
    * it could never grant.
    */
   acquire(maxWaitMs: number, { weight = 1, signal }: AcquireOptions = {}): Promise<Release> {
+    return this.enqueue(maxWaitMs, weight, weight, signal).then((grant) => grant.release);
+  }
+
+  /**
+   * Up to `weight` slots (ADR 0043): as soon as the caller is at the head of the queue (at once when nobody waits) and at
+   * least one slot is free, it is granted `min(weight, free)` slots; it does not wait for the rest. Refusals as `acquire`;
+   * the queue counts the `weight` asked for.
+   */
+  acquireUpTo(maxWaitMs: number, { weight = 1, signal }: AcquireOptions = {}): Promise<Grant> {
+    return this.enqueue(maxWaitMs, weight, 1, signal);
+  }
+
+  private enqueue(
+    maxWaitMs: number,
+    weight: number,
+    minimum: number,
+    signal: AbortSignal | undefined,
+  ): Promise<Grant> {
     if (!Number.isInteger(weight) || weight < 1 || weight > this.options.maxInFlight) {
       throw new RangeError(
         `weight must be an integer from 1 to ${String(this.options.maxInFlight)}`,
@@ -115,8 +147,8 @@ export class ConcurrencyLimiter {
       this.abandoned += 1;
       return Promise.reject(new LimiterRejection("aborted"));
     }
-    if (this.queue.length === 0 && this.active + weight <= this.options.maxInFlight) {
-      return Promise.resolve(this.take(weight));
+    if (this.queue.length === 0 && this.active + minimum <= this.options.maxInFlight) {
+      return Promise.resolve(this.take(Math.min(weight, this.options.maxInFlight - this.active)));
     }
     if (this.queued + weight > this.options.maxQueue) {
       this.refusedQueueFull += 1;
@@ -126,9 +158,10 @@ export class ConcurrencyLimiter {
       this.refusedWaitExceeded += 1;
       return Promise.reject(new LimiterRejection("wait_exceeded"));
     }
-    return new Promise<Release>((resolve, reject) => {
+    return new Promise<Grant>((resolve, reject) => {
       const waiter: Waiter = {
         weight,
+        minimum,
         grant: resolve,
         refuse: reject,
         timer: undefined,
@@ -178,32 +211,36 @@ export class ConcurrencyLimiter {
     this.queued = 0;
   }
 
-  private take(weight: number): Release {
-    this.active += weight;
+  private take(slots: number): Grant {
+    this.active += slots;
     this.granted += 1;
     this.inFlightHighWater = Math.max(this.inFlightHighWater, this.active);
     let released = false;
-    return () => {
+    const release = (): void => {
       if (released) {
         return;
       }
       released = true;
-      this.active -= weight;
+      this.active -= slots;
       this.drain();
     };
+    return { slots, release };
   }
 
-  /** Grants the oldest waiters while their slots fit; stops at the first that does not (nobody overtakes it). */
+  /**
+   * Grants the oldest waiters while their minimum fits (each gets as many of the free slots as it asked for, up to its
+   * weight); stops at the first that does not fit (nobody overtakes it).
+   */
   private drain(): void {
     for (;;) {
       const next = this.queue[0];
-      if (next === undefined || this.active + next.weight > this.options.maxInFlight) {
+      if (next === undefined || this.active + next.minimum > this.options.maxInFlight) {
         return;
       }
       this.queue.shift();
       this.queued -= next.weight;
       this.forget(next);
-      next.grant(this.take(next.weight));
+      next.grant(this.take(Math.min(next.weight, this.options.maxInFlight - this.active)));
     }
   }
 

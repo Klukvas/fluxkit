@@ -815,25 +815,75 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     const engine = engineFor(stub.url, {
       interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 5_000 },
     });
-    const holder = engine.multiSearch(body("h"), 5_000);
-    await eventually(() => held.length === 1);
+    // One pass holds both slots and gives them back together when it ends.
+    const holder = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["h1", "h2"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await eventually(() => held.length === 2);
     const large = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
       Promise.all(["l1", "l2"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
     );
     await pause(20);
     const small = engine.multiSearch(body("s"), 5_000);
     await pause(50);
-    // One slot is free, but the larger pass came first.
-    expect(held.map((entry) => entry.query)).toEqual(["h"]);
+    expect(held.map((entry) => entry.query)).toEqual(["h1", "h2"]);
     answer(0);
-    await eventually(() => held.length === 3);
-    expect(held.map((entry) => entry.query)).toEqual(["h", "l1", "l2"]);
     answer(1);
+    // Both slots free at once: the larger pass came first and takes both.
+    await eventually(() => held.length === 4);
+    await pause(20);
+    expect(held.map((entry) => entry.query)).toEqual(["h1", "h2", "l1", "l2"]);
+    answer(2);
+    answer(3);
+    await eventually(() => held.length === 5);
+    answer(4);
+    await Promise.all([holder, large, small]);
+    expect(held.map((entry) => entry.query)).toEqual(["h1", "h2", "l1", "l2", "s"]);
+  });
+
+  it("admits a waiting pass on the first free slot (ADR 0043): no slot idles while it waits, its calls run in series on it, and nobody overtakes it", async () => {
+    // The review's scenario: N = 2, two one-call passes hold the slots; a two-call pass waits with a 1 s limit. The first
+    // holder ends, the second does not: the old rule (all of the pass's slots at once) idled the freed slot and refused
+    // the pass after 1 s.
+    const { stub, held, answer } = await controlledEngine();
+    const engine = engineFor(stub.url, {
+      interactive: { maxConcurrency: 2, maxQueue: 10, maxQueueWaitMs: 1_000 },
+    });
+    const holders = [engine.multiSearch(body("h1"), 5_000), engine.multiSearch(body("h2"), 5_000)];
+    await eventually(() => held.length === 2);
+    const large = engine.withAdmission(2, { timeoutMs: 5_000 }, (admission) =>
+      Promise.all(["l1", "l2"].map((q) => engine.multiSearch(body(q), 5_000, { admission }))),
+    );
+    await pause(20);
+    const small = engine.multiSearch(body("s"), 5_000);
+    await pause(20);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 2, queued: 3 });
+    answer(0);
+    // The freed slot goes to the pass at once, well within its 1 s wait.
+    await eventually(() => held.length === 3, 500);
+    await pause(20);
+    expect(held.map((entry) => entry.query)).toEqual(["h1", "h2", "l1"]);
+    expect(engine.interactiveLane()).toMatchObject({ inFlight: 2, queued: 1 });
+    // Its second call runs on the same slot after the first, not on a slot of the queue.
     answer(2);
     await eventually(() => held.length === 4);
+    expect(held[3]?.query).toBe("l2");
     answer(3);
-    await Promise.all([holder, large, small]);
-    expect(held.map((entry) => entry.query)).toEqual(["h", "l1", "l2", "s"]);
+    expect(await large).toEqual([{ results: [] }, { results: [] }]);
+    // The one-call pass behind it gets the next slot only now.
+    await eventually(() => held.length === 5);
+    expect(held[4]?.query).toBe("s");
+    answer(1);
+    answer(4);
+    await Promise.all([...holders, small]);
+    expect(engine.interactiveLane()).toMatchObject({
+      inFlight: 0,
+      queued: 0,
+      inFlightHighWater: 2,
+      refused: { queueFull: 0, waitExceeded: 0 },
+      admitted: 4,
+      calls: 5,
+    });
   });
 
   it("interactiveLane() reports the limits, the gauges, the high-water marks, admissions, calls and refusals", async () => {

@@ -4,7 +4,12 @@ import {
   DEFAULT_SEARCH_ENGINE_MAX_CONCURRENCY,
   DEFAULT_SEARCH_ENGINE_MAX_QUEUE,
 } from "@fluxkit/config";
-import { ConcurrencyLimiter, LimiterRejection, type Release } from "./concurrency-limiter.js";
+import {
+  ConcurrencyLimiter,
+  LimiterRejection,
+  type Grant,
+  type Release,
+} from "./concurrency-limiter.js";
 
 /**
  * A small REST client of Meilisearch (ADR 0034): the calls the indexer and the search routes need, with one deadline per
@@ -309,10 +314,11 @@ export class SearchEngine {
   }
 
   /**
-   * One admission to the interactive lane for a pass of `calls` parallel calls (ADR 0042): `min(calls, maxConcurrency)`
-   * slots taken at once, FIFO, before `work` runs, so the pass is admitted or refused as a whole (`engine_busy`: queue
-   * full, no slots within the wait or the deadline, or after `close`; `engine_aborted` when the signal fired while it
-   * waited). `work` must pass the admission to its calls (`{admission}`): they then run on its slots only, never on the
+   * One admission to the interactive lane for a pass of `calls` parallel calls (ADR 0042, ADR 0043): it asks for
+   * `min(calls, maxConcurrency)` slots, FIFO, and is granted as many of them as are free (at least one) once it is at the
+   * head of the queue, before `work` runs; the pass is admitted or refused as a whole (`engine_busy`: queue full, no slot
+   * within the wait or the deadline, or after `close`; `engine_aborted` when the signal fired while it waited). With
+   * fewer slots than calls its calls run in series on its slots, inside its one deadline. `work` must pass the admission to its calls (`{admission}`): they then run on its slots only, never on the
    * shared queue (admissions never nest, so they cannot deadlock). The first failing call aborts the others; whatever
    * `work` left running when it ended is aborted too, and the slots are released only once every call has settled.
    */
@@ -325,11 +331,10 @@ export class SearchEngine {
       throw new RangeError("an admission is for at least one call");
     }
     const deadline = Date.now() + timeoutMs;
-    const slots = Math.min(calls, this.limits.maxConcurrency);
-    let release: Release;
+    let grant: Grant;
     try {
-      release = await this.limiter.acquire(Math.min(this.limits.maxQueueWaitMs, timeoutMs), {
-        weight: slots,
+      grant = await this.limiter.acquireUpTo(Math.min(this.limits.maxQueueWaitMs, timeoutMs), {
+        weight: Math.min(calls, this.limits.maxConcurrency),
         signal,
       });
     } catch (error) {
@@ -340,7 +345,8 @@ export class SearchEngine {
       }
       throw error;
     }
-    const admission = new InteractiveAdmission(this, slots, deadline);
+    // Sized by the grant: with fewer slots than calls, the pass runs its calls in series on them inside its deadline.
+    const admission = new InteractiveAdmission(this, grant.slots, deadline);
     const onAbort = (): void => admission.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
     if (signal?.aborted === true) {
@@ -351,7 +357,7 @@ export class SearchEngine {
     } finally {
       signal?.removeEventListener("abort", onAbort);
       await admission.settle();
-      release();
+      grant.release();
     }
   }
 
