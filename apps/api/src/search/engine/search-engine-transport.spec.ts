@@ -773,15 +773,16 @@ describe("SearchEngine admissions: one per search pass (ADR 0042, loopback serve
     const engine = engineFor(stub.url, {
       interactive: { maxConcurrency: 1, maxQueue: 0, maxQueueWaitMs: 5_000 },
     });
-    let left: Promise<SearchEngineError> | undefined;
+    const left: Promise<SearchEngineError>[] = [];
     const value = await engine.withAdmission(1, { timeoutMs: 5_000 }, async (admission) => {
-      left = engineError(() => engine.multiSearch(body("a"), 5_000, { admission }));
+      left.push(engineError(() => engine.multiSearch(body("a"), 5_000, { admission })));
       await eventually(() => held.length === 1);
       return "done";
     });
     expect(value).toBe("done");
     expect(engine.interactiveLane().inFlight).toBe(0);
-    expect((await left!).code).toBe("engine_aborted");
+    expect(left).toHaveLength(1);
+    expect((await Promise.all(left)).map((error) => error.code)).toEqual(["engine_aborted"]);
     await eventually(() => held[0]?.abandoned === true);
   });
 
