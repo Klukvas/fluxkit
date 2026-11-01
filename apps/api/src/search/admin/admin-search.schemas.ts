@@ -43,7 +43,7 @@ export const adminSearchStatusSchema = z.object({
         }),
         admitted: z.number().int().min(0).meta({
           description:
-            "Admissions granted: one per search pass, suggestion or settings read (a pass takes the slots of all its parallel calls at once).",
+            "Admissions granted: one per search pass, suggestion or settings read (a pass runs its parallel calls on the slots it was granted).",
         }),
         calls: z.number().int().min(0).meta({ description: "Engine calls sent on the lane." }),
         refused: z
@@ -55,11 +55,15 @@ export const adminSearchStatusSchema = z.object({
             description:
               "Admissions refused (`engine_busy`; the store answered 503 and the storefront fell back), by reason: the queue had no room, or no slots came within 1 s.",
           }),
+        abandoned: z.number().int().min(0).meta({
+          description:
+            "Admissions given up while they waited for slots because the shopper left (connection closed); not refusals. Added 2026-11-01.",
+        }),
         since: timestamp.meta({ description: "When counting started (with the process)." }),
       })
       .meta({
         description:
-          "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused).",
+          "The engine client's interactive lane (store search and suggest, ADR 0041 and 0042): limits, gauges and counters since this API process started. Per process. Refused share = refused / (admitted + refused): a share of admissions (a store search asks for up to 3, a suggestion for 1); each refusal ends one search.",
       }),
   }),
   locales: z.array(

@@ -20,6 +20,7 @@ interface Status {
       admitted: number;
       calls: number;
       refused: { queueFull: number; waitExceeded: number };
+      abandoned: number;
       since: string;
     };
   };
@@ -55,6 +56,7 @@ const IDLE_LANE = {
   admitted: 0,
   calls: 0,
   refused: { queueFull: 0, waitExceeded: 0 },
+  abandoned: 0,
   since: expect.any(String) as unknown as string,
 };
 describe("admin search routes (real Postgres, real Meilisearch)", () => {
@@ -127,6 +129,7 @@ describe("admin search routes (real Postgres, real Meilisearch)", () => {
       admitted: 2,
       calls: 3,
       refused: { queueFull: 0, waitExceeded: 0 },
+      abandoned: 0,
     });
     await pool.query(
       `insert into search_sync_queue (product_id, reason, attempts, last_error_code)

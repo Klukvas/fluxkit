@@ -190,8 +190,13 @@ export interface LaneView {
   refused: number;
   queueFull: number;
   waitExceeded: number;
-  /** refused / (admitted + refused), 0 to 1; null before anything was asked for. */
+  /**
+   * refused / (admitted + refused), 0 to 1: a share of ADMISSIONS (a search asks for up to 3, a suggestion for 1), while
+   * each refusal is one search turned away; null before anything was asked for.
+   */
   refusedShare: number | null;
+  /** Given up while waiting because the shopper left: not refused, not in the share. */
+  abandoned: number;
   since: string;
 }
 
@@ -217,6 +222,7 @@ export function laneView(lane: AdminSearchStatus["engine"]["interactiveLane"]): 
     queueFull: lane.refused.queueFull,
     waitExceeded: lane.refused.waitExceeded,
     refusedShare: asked === 0 ? null : refused / asked,
+    abandoned: lane.abandoned,
     since: lane.since,
   };
 }

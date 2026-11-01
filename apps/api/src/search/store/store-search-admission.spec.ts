@@ -1,11 +1,17 @@
 import { createServer, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { DEFAULT_SEARCH_ENGINE_MAX_QUEUE } from "@fluxkit/config";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { Logger } from "@nestjs/common";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { startApp, type RunningApp } from "../../test/app.js";
 import { http } from "../../test/http.js";
 import { ensureMigrated } from "../../test/migrate.js";
-import type { SearchEngine } from "../engine/index.js";
+import {
+  SearchEngineError,
+  type InteractiveCallOptions,
+  type SearchEngine,
+} from "../engine/index.js";
+import { SearchRejections } from "../search-rejections.js";
 import { SEARCH_ENGINE } from "../search.module.js";
 
 /**
@@ -135,6 +141,10 @@ describe("store search: one admission per pass (loopback engine)", () => {
     held.clear();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   async function appWith(limits: {
     engineMaxConcurrency: number;
     engineMaxQueue: number;
@@ -226,6 +236,47 @@ describe("store search: one admission per pass (loopback engine)", () => {
     );
     await eventually(() => engine.interactiveLane().inFlight === 0, 1_000);
     expect(engine.interactiveLane().queued).toBe(0);
+  });
+
+  it("an engine 400 that coincides with the shopper leaving is still logged, counted and drops the cached live settings (review F6)", async () => {
+    const { app, engine } = await appWith({ engineMaxConcurrency: 8, engineMaxQueue: 512 });
+    const errors = vi.spyOn(Logger.prototype, "error");
+    const settingsReads = vi.spyOn(engine, "filterableAttributes");
+    const shopper = new AbortController();
+    // The engine refuses the search (HTTP 400) only once the route's signal has fired: the shopper left first.
+    const searches = vi
+      .spyOn(engine, "multiSearch")
+      .mockImplementation(
+        async (_body: object, _timeout?: number, options?: InteractiveCallOptions) => {
+          shopper.abort();
+          await options?.admission?.call(
+            "probe",
+            (_deadline, signal) =>
+              new Promise<void>((resolve) => {
+                if (signal.aborted) resolve();
+                signal.addEventListener("abort", () => resolve(), { once: true });
+              }),
+          );
+          throw new SearchEngineError("engine_rejected", {
+            status: 400,
+            engineCode: "invalid_search_facets",
+            operation: "search",
+          });
+        },
+      );
+    const leaving = fetch(`${app.baseUrl}${FEDERATED_SEARCH}`, { signal: shopper.signal }).catch(
+      (error: unknown) => error,
+    );
+    await leaving;
+    await eventually(() => app.app.get(SearchRejections).snapshot().count === 1);
+    expect(app.app.get(SearchRejections).snapshot().lastCode).toBe("invalid_search_facets");
+    const logged = errors.mock.calls.map((call) => String(call[0]));
+    expect(logged.some((line) => line.includes("engine_rejected"))).toBe(true);
+    searches.mockRestore();
+    // The cached live settings were dropped: the next search reads them again.
+    const readsBefore = settingsReads.mock.calls.length;
+    expect((await http(app.baseUrl, "GET", "/store/search")).status).toBe(200);
+    expect(settingsReads.mock.calls.length).toBe(readsBefore + 1);
   });
 
   it("a search on an idle lane is never refused by its own calls, even with one slot and no queue", async () => {

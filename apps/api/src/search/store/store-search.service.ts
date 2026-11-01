@@ -292,7 +292,6 @@ export class StoreSearchService {
           return answer.results as EngineSearchResult[];
         },
         text,
-        signal,
       );
       return planned.map((entry, index) => ({ planned: entry, result: results[index] ?? {} }));
     }
@@ -337,7 +336,6 @@ export class StoreSearchService {
           ),
         ),
       text,
-      signal,
     );
   }
 
@@ -366,7 +364,6 @@ export class StoreSearchService {
           ]),
         ),
       text,
-      signal,
     );
     this.liveFields.set(uid, { at: now, filterable, sortable });
     return { filterable, sortable };
@@ -382,7 +379,6 @@ export class StoreSearchService {
       uid,
       () => this.engine.multiSearch<T>(body, this.config.tuning.searchTimeoutMs, { signal }),
       text,
-      signal,
     );
   }
 
@@ -391,14 +387,13 @@ export class StoreSearchService {
    * An HTTP 400 (`engine_rejected`) is not an outage but a bug or a drift between the API and the live settings: it is
    * logged as an error, counted for the admin status and answered `500`; the cached live fields are dropped so the next
    * request reads them again (review F1). A refusal of the interactive lane (`engine_busy`) goes to the sampled
-   * `BusyRefusalLog` (the counters are in the admin status); a pass given up because the shopper left (`engine_aborted`,
-   * or the signal fired) is not logged at all: nobody is waiting for the answer.
+   * `BusyRefusalLog` (the counters are in the admin status); a pass given up because the shopper left (`engine_aborted`)
+   * is not logged at all: nobody is waiting for the answer.
    */
   private async guard<T>(
     uid: string,
     run: () => Promise<T>,
     text: NormalizedSearchQuery,
-    signal: AbortSignal | undefined,
   ): Promise<T> {
     const started = Date.now();
     try {
@@ -407,7 +402,9 @@ export class StoreSearchService {
       if (!(error instanceof SearchEngineError)) {
         throw error;
       }
-      if (error.code === "engine_aborted" || signal?.aborted === true) {
+      // Only a pass given up because the shopper left or a sibling failed is silent: a real failure that happens to
+      // coincide with a disconnect (an engine_rejected above all) is still logged and counted (review F6 of PR 206).
+      if (error.code === "engine_aborted") {
         throw searchUnavailable();
       }
       // Never the query text: its length and the code only.

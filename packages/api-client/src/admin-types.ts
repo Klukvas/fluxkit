@@ -1333,7 +1333,7 @@ export interface AdminSearchStatus {
     rejectedSearches: { count: number; lastCode: string | null; lastAt: string | null };
     /**
      * The engine client's interactive lane (store search and suggest) since this API process started; per process.
-     * `inFlight`/`queued` are slots held/waited for now; one admission per search pass takes the slots of all its calls.
+     * `inFlight`/`queued` are slots held/waited for now; one admission per search pass runs its calls on the slots it was granted.
      */
     interactiveLane: {
       maxConcurrency: number;
@@ -1345,6 +1345,8 @@ export interface AdminSearchStatus {
       admitted: number;
       calls: number;
       refused: { queueFull: number; waitExceeded: number };
+      /** Admissions given up while waiting for slots because the shopper left; not refusals. */
+      abandoned: number;
       since: string;
     };
   };

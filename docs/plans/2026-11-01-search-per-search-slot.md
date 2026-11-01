@@ -1,6 +1,6 @@
 # Search: one admission per search pass, and refusal counters (2026-11-01)
 
-Status: approved by the owner (both items, through the orchestrator, 2026-11-01); implemented on branch `fix/search-per-search-slot-and-refusals`, no independent review yet.
+Status: approved by the owner (both items, through the orchestrator, 2026-11-01); implemented, independently reviewed (verdict: safe to merge, findings F1 to F7) and merged in #206. The review findings are fixed (see "Review follow-ups").
 Source: the deferred review findings F2 and F4 of `docs/plans/2026-10-31-search-engine-client.md` (PR 204, ADR 0041).
 
 ## Goal
@@ -68,3 +68,13 @@ Source: the deferred review findings F2 and F4 of `docs/plans/2026-10-31-search-
 - Estimate: (engine requests of the run - successful searches x engine requests per search at concurrency 32) / refused searches. Reading: in these mixes the waste F2 describes is not measurable: the catalog mix sends one engine call per pass (no siblings), the live settings are cached, and in the full mix the fan-out passes (Ukrainian words, several text queries) are a minority; the estimate is noise around 0 for both clients (negative values: the mix of successful searches differs from the concurrency-32 run). The `503` rate and throughput are within the run-to-run noise of each other; head-of-line blocking showed no measurable cost here. The difference the design makes is pinned by the deterministic specs above, not by this run.
 - Log volume: the `before` API wrote 2 942 to 3 290 `engine_busy` warn lines per round (about 5.5 minutes, api.log 531 to 588 KB); the `after` API wrote 3 (one first line and summaries; api.log 46 KB).
 - Not measured: the 20 000-product catalog (disk), a real storefront in the loop, client disconnects under load, several API instances.
+
+## Review follow-ups (independent review of PR 206, 2026-11-01)
+All done on branch `fix/search-admission-review-followups` (plan `docs/plans/2026-11-01-search-admission-followups.md`, ADR 0043):
+- F1 (strict FIFO over weights idled slots and refused heavy passes): **done**, a waiting pass is admitted on the free slots (ADR 0043 supersedes decisions 1 and 3 of ADR 0042 in part); the "large passes are never starved" claim above held for waiting only.
+- F2 (release after every call settled, sibling abort, listener removal not pinned): **done**, specs added and mutation-checked.
+- F3 (`engine_busy` after the pass's deadline): **done**, `engine_timeout`.
+- F4 (`abandoned` counted but not shown): **done**, `engine.interactiveLane.abandoned`.
+- F5 (refused share of admissions shown as of searches): **done**, copy and docs reworded.
+- F6 (a 400 during a disconnect silenced): **done**, only `engine_aborted` is silent.
+- F7 (`MAX_QUEUE=0` wording): **done**; with F1 it means "refuse whenever no slot is free" everywhere. The "Design chosen" section above ("`0` ... means only refuse whenever no slot is free") was looser than the code of that time; it is exact since ADR 0043.
