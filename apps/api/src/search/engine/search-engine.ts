@@ -14,8 +14,9 @@ import { ConcurrencyLimiter, LimiterRejection, type Release } from "./concurrenc
  * (search plan, "Measurements at scale", F1).
  *
  * Two lanes, each with its own connection pool: `interactive` (store search, suggest and their settings reads) goes
- * through a FIFO concurrency limit and fails fast with `engine_busy` when it cannot start in time; `background` (indexer
- * writes, task polling, stats, the admin health check) is never queued behind shoppers.
+ * through a FIFO concurrency limit, one admission per search pass (ADR 0042), and fails fast with `engine_busy` when it
+ * cannot start in time; `background` (indexer writes, task polling, stats, the admin health check) is never queued
+ * behind shoppers.
  *
  * Errors carry a CODE, the HTTP status and the engine's own error code (a snake_case identifier such as
  * `index_not_found`), never the engine's message, the URL with a query or the key: they are stored in the database and
