@@ -5,7 +5,8 @@
  * engine. `acquire` grants the whole weight at once; `acquireUpTo` (one search pass, ADR 0043) grants `min(weight, free)`
  * slots as soon as at least one is free, so the head of the queue never leaves a free slot idle while it waits for more.
  * Strict FIFO: only the head of the queue is ever granted, so a caller never overtakes one that came first, whatever
- * their weights. Per process, in memory.
+ * their weights. A holder may add one spare slot at a time (`takeSpare`, ADR 0044) only while nobody waits, so a spare is
+ * never a slot a waiter is waiting for. Per process, in memory.
  */
 
 export type LimiterRejectionReason = "queue_full" | "wait_exceeded" | "closed" | "aborted";
@@ -40,7 +41,7 @@ export interface LimiterCounters {
   readonly granted: number;
   readonly refusedQueueFull: number;
   readonly refusedWaitExceeded: number;
-  /** Waiters whose signal aborted (the caller gave up): not a refusal. */
+  /** Waiters whose signal aborted while they waited (the caller gave up): not a refusal. */
   readonly abandoned: number;
   /** Most slots held at once. */
   readonly inFlightHighWater: number;
@@ -72,6 +73,8 @@ export class ConcurrencyLimiter {
   private active = 0;
   private queued = 0;
   private readonly queue: Waiter[] = [];
+  /** Holders that could use a spare slot, offered one in turn when a slot frees while nobody waits (ADR 0044). */
+  private readonly spareWatchers = new Set<() => void>();
   private closed = false;
   private granted = 0;
   private refusedQueueFull = 0;
@@ -144,7 +147,7 @@ export class ConcurrencyLimiter {
       return Promise.reject(new LimiterRejection("closed"));
     }
     if (signal?.aborted === true) {
-      this.abandoned += 1;
+      // Never waited: not an abandoned waiter, and no refusal of load either (review F2 of PR 207).
       return Promise.reject(new LimiterRejection("aborted"));
     }
     if (this.queue.length === 0 && this.active + minimum <= this.options.maxInFlight) {
@@ -191,6 +194,29 @@ export class ConcurrencyLimiter {
     });
   }
 
+  /**
+   * One more slot for a caller that already holds some (ADR 0044): taken only when a slot is free AND nobody waits in the
+   * queue, so it is never a slot a waiter is waiting for and never above `maxInFlight`. Never waits or queues and is not
+   * an acquisition (`granted` does not count it); it counts in `inFlight` until its release. `undefined` when none.
+   */
+  takeSpare(): Release | undefined {
+    if (this.closed || this.queue.length > 0 || this.active >= this.options.maxInFlight) {
+      return undefined;
+    }
+    return this.hold(1);
+  }
+
+  /**
+   * Calls `listener` whenever a slot frees while nobody waits, so it can take it with `takeSpare` at once (watchers take
+   * turns: one that took a slot goes to the back). Returns the function that stops watching.
+   */
+  watchSpare(listener: () => void): () => void {
+    this.spareWatchers.add(listener);
+    return () => {
+      this.spareWatchers.delete(listener);
+    };
+  }
+
   /** `task` inside a slot; the slot is given back however the task ends (value, error, timeout or abort). */
   async run<T>(maxWaitMs: number, task: () => Promise<T>): Promise<T> {
     const release = await this.acquire(maxWaitMs);
@@ -212,8 +238,12 @@ export class ConcurrencyLimiter {
   }
 
   private take(slots: number): Grant {
-    this.active += slots;
     this.granted += 1;
+    return { slots, release: this.hold(slots) };
+  }
+
+  private hold(slots: number): Release {
+    this.active += slots;
     this.inFlightHighWater = Math.max(this.inFlightHighWater, this.active);
     let released = false;
     const release = (): void => {
@@ -224,23 +254,45 @@ export class ConcurrencyLimiter {
       this.active -= slots;
       this.drain();
     };
-    return { slots, release };
+    return release;
   }
 
   /**
    * Grants the oldest waiters while their minimum fits (each gets as many of the free slots as it asked for, up to its
-   * weight); stops at the first that does not fit (nobody overtakes it).
+   * weight); stops at the first that does not fit (nobody overtakes it). With nobody left waiting, offers the free slots
+   * to the spare watchers.
    */
   private drain(): void {
     for (;;) {
       const next = this.queue[0];
-      if (next === undefined || this.active + next.minimum > this.options.maxInFlight) {
+      if (next === undefined) {
+        this.offerSpares();
+        return;
+      }
+      if (this.active + next.minimum > this.options.maxInFlight) {
         return;
       }
       this.queue.shift();
       this.queued -= next.weight;
       this.forget(next);
       next.grant(this.take(Math.min(next.weight, this.options.maxInFlight - this.active)));
+    }
+  }
+
+  /** Each watcher in turn while a slot is free and nobody waits; one that took a slot goes to the back of the turn. */
+  private offerSpares(): void {
+    for (const watcher of [...this.spareWatchers]) {
+      if (this.closed || this.queue.length > 0 || this.active >= this.options.maxInFlight) {
+        return;
+      }
+      if (!this.spareWatchers.has(watcher)) {
+        continue;
+      }
+      const before = this.active;
+      watcher();
+      if (this.active > before && this.spareWatchers.delete(watcher)) {
+        this.spareWatchers.add(watcher);
+      }
     }
   }
 
