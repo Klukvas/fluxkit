@@ -1,4 +1,8 @@
-/* Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, text-success, text-warning, ring-ring, outline-ring, rounded-md, ... */
+/*
+ * Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, text-success, text-warning,
+ * ring-ring, outline-ring, rounded-md, shadow-raised, ... The type scale (text-xs to text-4xl) and the spacing unit (p-4, gap-2, ...) also
+ * come from tokens, so the stock utilities follow a rebrand; steps outside the scale are refused by design-guard.spec.ts.
+ */
 @theme inline {
   --color-background: var(--fk-color-background);
   --color-foreground: var(--fk-color-foreground);
@@ -19,4 +23,23 @@
   --font-sans: var(--fk-font-sans);
   --font-mono: var(--fk-font-mono);
   --shadow-card: var(--fk-shadow-card);
+  --shadow-raised: var(--fk-shadow-raised);
+  --shadow-overlay: var(--fk-shadow-overlay);
+  --spacing: var(--fk-space-unit);
+  --text-xs: var(--fk-font-size-xs);
+  --text-xs--line-height: var(--fk-line-height-xs);
+  --text-sm: var(--fk-font-size-sm);
+  --text-sm--line-height: var(--fk-line-height-sm);
+  --text-base: var(--fk-font-size-base);
+  --text-base--line-height: var(--fk-line-height-base);
+  --text-lg: var(--fk-font-size-lg);
+  --text-lg--line-height: var(--fk-line-height-lg);
+  --text-xl: var(--fk-font-size-xl);
+  --text-xl--line-height: var(--fk-line-height-xl);
+  --text-2xl: var(--fk-font-size-2xl);
+  --text-2xl--line-height: var(--fk-line-height-2xl);
+  --text-3xl: var(--fk-font-size-3xl);
+  --text-3xl--line-height: var(--fk-line-height-3xl);
+  --text-4xl: var(--fk-font-size-4xl);
+  --text-4xl--line-height: var(--fk-line-height-4xl);
 }
