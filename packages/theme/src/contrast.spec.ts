@@ -2,19 +2,22 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { darkSchemeMedia, parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
 
 // WCAG 2.x contrast (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), pure code, no dependency.
 // tokens.css uses 6-digit hex colors only; any other format fails loudly instead of being skipped.
 const tokensCss = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
-const [lightBlock, darkBlock] = tokensCss.split('[data-theme="dark"]') as [string, string];
+const blocks = parseTokenBlocks(tokensCss);
+const lightTokens = tokenBlock(blocks, themeSelectors.light).tokens;
+const darkTokens = tokenBlock(blocks, themeSelectors.dark).tokens;
+// The system mode on a dark OS: the light values (`:root`) overridden by the system block inside the dark media query.
+const systemDarkTokens = new Map([
+  ...lightTokens,
+  ...tokenBlock(blocks, themeSelectors.system, darkSchemeMedia).tokens,
+]);
 
-function tokenValues(block: string): Map<string, string> {
-  return new Map(
-    [...block.matchAll(/(--fk-color-[a-z-]+)\s*:\s*([^;]+);/g)].map((match) => [
-      match[1] as string,
-      (match[2] as string).trim(),
-    ]),
-  );
+function colorValues(tokens: Map<string, string>): Map<string, string> {
+  return new Map([...tokens].filter(([name]) => name.startsWith("--fk-color-")));
 }
 
 function channel(value: number): number {
@@ -93,11 +96,12 @@ describe("contrast helper", () => {
 });
 
 describe("token contrast (WCAG 2.x)", () => {
-  for (const [theme, block] of [
-    ["light", lightBlock],
-    ["dark", darkBlock],
+  for (const [theme, tokens] of [
+    ["light", lightTokens],
+    ["dark", darkTokens],
+    ["system on a dark OS", systemDarkTokens],
   ] as const) {
-    const values = tokenValues(block);
+    const values = colorValues(tokens);
     for (const [foreground, background, minimum] of pairs) {
       it(`${theme}: ${foreground} on ${background} is at least ${minimum}:1`, () => {
         const foregroundValue = values.get(`--fk-color-${foreground}`);
@@ -117,7 +121,7 @@ describe("token contrast (WCAG 2.x)", () => {
 // primary border on a primary fill) has no contrast to measure.
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const scannedRoots = ["packages/ui/src", "apps/storefront/src", "apps/admin/src"];
-const colorTokens = [...tokenValues(lightBlock).keys()].map((name) =>
+const colorTokens = [...colorValues(lightTokens).keys()].map((name) =>
   name.replace("--fk-color-", ""),
 );
 

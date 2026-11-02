@@ -27,6 +27,7 @@ import { StepIndicator } from "./step-indicator";
 import { Tabs } from "./tabs";
 import { TrustBar } from "./trust-bar";
 import { Disclosure } from "./disclosure";
+import { Hero } from "./hero";
 import { render, text } from "./test-helpers";
 
 // Every user-facing string must come from props (AGENTS.md section 2.2). Each component is rendered with sentinel
@@ -283,6 +284,18 @@ const cases: [string, ReactElement][] = [
       key="y3"
       label={s("trust")}
       items={[{ key: "a", icon: <svg aria-hidden="true" />, text: s("delivery") }]}
+    />,
+  ],
+  [
+    "Hero",
+    <Hero
+      key="y5"
+      headingId="h"
+      headingLevel="h1"
+      title={s("title")}
+      subline={s("subline")}
+      action={<a href="/x">{s("cta")}</a>}
+      media={<img src="/a.svg" alt="" width={4} height={3} />}
     />,
   ],
   [

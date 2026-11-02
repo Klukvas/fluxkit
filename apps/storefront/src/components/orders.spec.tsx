@@ -316,6 +316,7 @@ describe("the guest order page on the server", () => {
     const messages = Object.fromEntries(Object.keys(uk).map((key) => [key, `§${key}`]));
     const html = renderToStaticMarkup(
       <SiteShell
+        themeMode="light"
         locale="uk"
         messages={messages}
         t={t}

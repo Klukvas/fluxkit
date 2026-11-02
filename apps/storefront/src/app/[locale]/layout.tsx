@@ -1,10 +1,13 @@
 import { createTranslator, isLocale, locales } from "@fluxkit/ui";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SiteShell } from "../../components/site-shell";
+import { themeConfig } from "../../config/theme";
 import { headerSearchEnabled } from "../../lib/search-data.server";
 import { navigationCategories } from "../../lib/store-data.server";
+import { resolveThemeMode, THEME_COOKIE } from "../../lib/theme-mode";
 import { messagesByLocale } from "../../messages";
 import "../globals.css";
 
@@ -41,9 +44,12 @@ export default async function LocaleLayout({
   const t = createTranslator(messages, locale);
   const categories = await navigationCategories(locale);
   const searchEnabled = await headerSearchEnabled();
+  // The theme is decided here, on the server, so the first paint already has it: no script, no flash of the other theme.
+  // `system` leaves the choice to the CSS media query (`tokens.css`), which also works without a script.
+  const themeMode = resolveThemeMode((await cookies()).get(THEME_COOKIE)?.value, themeConfig);
 
   return (
-    <html lang={locale} data-theme="light">
+    <html lang={locale} data-theme={themeMode}>
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <SiteShell
           locale={locale}
@@ -52,6 +58,7 @@ export default async function LocaleLayout({
           categories={categories}
           searchEnabled={searchEnabled}
           year={new Date().getFullYear()}
+          themeMode={themeMode}
         >
           {children}
         </SiteShell>

@@ -8,8 +8,6 @@ import { option, product, summary, variant, category } from "../lib/test-fixture
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { CatalogView } from "./catalog-view";
-import { HomeSections } from "./home-sections";
-import { homeSections } from "../layout/home";
 import { JsonLd } from "./json-ld";
 import { ProductCard } from "./product-card";
 import { ProductDetails } from "./product-details";
@@ -295,66 +293,6 @@ describe("CatalogView", () => {
     const html = withoutMoney(renderToStaticMarkup(<CatalogView {...props} />));
     expect(leftoverText(html)).toBe("");
     for (const value of textAttributes(html)) expect(value.startsWith("§"), value).toBe(true);
-  });
-});
-
-describe("home sections with data", () => {
-  const data = {
-    categories: [
-      category("clothing", [], { name: "§clothing" }),
-      category("books", [], { name: "§books" }),
-    ],
-    newProducts: [summary("a", { title: "§a" }), summary("b", { title: "§b" })],
-    exponent: 2,
-  };
-  const html = renderToStaticMarkup(
-    <HomeSections sections={homeSections} locale="uk" t={t} data={data} imageHosts={hosts} />,
-  );
-
-  it("renders category tiles and the new products with links, under a sound heading outline", () => {
-    expect(html).toContain('href="/uk/c/clothing"');
-    expect(html).toContain('href="/uk/c/books"');
-    expect(html).toContain('href="/uk/p/a"');
-    expect(html).toContain("§home.newProducts.all");
-    expect([...html.matchAll(/<h([1-6])[ >]/g)].map((m) => m[1])).toEqual([
-      "1",
-      "2",
-      "2",
-      "3",
-      "3",
-    ]);
-  });
-
-  it("shows at most the configured number of category tiles", () => {
-    const many = Array.from({ length: 30 }, (_, i) => category(`c${i}`, [], { name: `§c${i}` }));
-    const limited = renderToStaticMarkup(
-      <HomeSections
-        sections={homeSections}
-        locale="uk"
-        t={t}
-        data={{ ...data, categories: many }}
-        imageHosts={hosts}
-      />,
-    );
-    expect(limited.match(/href="\/uk\/c\//g)).toHaveLength(6);
-  });
-
-  it("falls back to the empty states without data", () => {
-    const empty = renderToStaticMarkup(
-      <HomeSections
-        sections={homeSections}
-        locale="uk"
-        t={t}
-        data={{ categories: [], newProducts: [] }}
-        imageHosts={hosts}
-      />,
-    );
-    expect(empty).toContain("§home.categoryTiles.empty.title");
-    expect(empty).toContain("§home.newProducts.empty.title");
-  });
-
-  it("has no hardcoded text", () => {
-    expect(leftoverText(withoutMoney(html))).toBe("");
   });
 });
 

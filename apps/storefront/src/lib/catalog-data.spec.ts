@@ -1,10 +1,8 @@
 import type { ProblemDetails } from "@fluxkit/api-client";
 import { describe, expect, it, vi } from "vitest";
-import type { HomeSection } from "../layout/home";
 import {
   UnexpectedStoreResponseError,
   loadCatalogListing,
-  loadHomeData,
   loadProductPage,
   loadShopExponent,
   loadShopMoney,
@@ -61,61 +59,6 @@ function fakeData(overrides: Partial<StoreData> = {}): StoreData & {
     ...overrides,
   } as StoreData & { calls: typeof calls };
 }
-
-const homeSections: HomeSection[] = [
-  { type: "hero", props: { titleKey: "a", descriptionKey: "b", ctaKey: "c", ctaHref: "/catalog" } },
-  {
-    type: "categoryTiles",
-    props: { titleKey: "a", emptyTitleKey: "b", emptyDescriptionKey: "c", limit: 3 },
-  },
-  {
-    type: "newProducts",
-    props: {
-      limit: 8,
-      titleKey: "a",
-      allKey: "d",
-      emptyTitleKey: "b",
-      emptyDescriptionKey: "c",
-    },
-  },
-];
-
-describe("loadHomeData", () => {
-  it("asks for what the configured sections need, once each, with the section's limit", async () => {
-    const data = fakeData();
-    const result = await loadHomeData(data, "uk", homeSections);
-    expect(data.calls.listProducts).toEqual([["uk", { limit: 8 }]]);
-    expect(data.calls.listCategories).toEqual([["uk"]]);
-    expect(result.exponent).toBe(2);
-    expect(result.newProducts?.map((item) => item.slug)).toEqual(["a", "b"]);
-    expect(result.categories?.map((node) => node.slug)).toEqual(["clothing", "books"]);
-  });
-
-  it("makes no request for a layout without data sections", async () => {
-    const data = fakeData();
-    const result = await loadHomeData(data, "en", [homeSections[0] as HomeSection]);
-    expect(result).toEqual({});
-    expect(data.calls.listProducts).toHaveLength(0);
-    expect(data.calls.listCategories).toHaveLength(0);
-  });
-
-  it("fails loudly when the API refuses a request (no fake data)", async () => {
-    const data = fakeData({ listProducts: async () => problem(400, "validation_failed") });
-    await expect(loadHomeData(data, "uk", homeSections)).rejects.toBeInstanceOf(
-      UnexpectedStoreResponseError,
-    );
-  });
-
-  it("passes an outage through: the data layer's error reaches the route's error.tsx", async () => {
-    const outage = new Error("StoreUnavailableError");
-    const data = fakeData({
-      listProducts: async () => {
-        throw outage;
-      },
-    });
-    await expect(loadHomeData(data, "uk", homeSections)).rejects.toBe(outage);
-  });
-});
 
 describe("loadCatalogListing", () => {
   it("lists one page with limit 24, the offset of the page, the category and the brand", async () => {

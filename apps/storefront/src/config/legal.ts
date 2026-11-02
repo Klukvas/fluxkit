@@ -9,6 +9,7 @@
  * tasks O1 to O8).
  */
 
+import { THEME_COOKIE } from "../lib/theme-mode";
 import legalIdentityFile from "./legal-identity.json";
 
 /**
@@ -41,19 +42,22 @@ export const privacyPageSlug: LegalPageSlug = "privacy";
 export const termsPageSlug: LegalPageSlug = "terms";
 
 /**
- * The cookies a shopper can receive, for the cookie statement (one table, texts in `legal.cookies.row.<id>.*`). They are set
- * by the API, not by the storefront (which sets none), under `/store`, `HttpOnly` and first-party. A guard in the API
- * (`apps/api/src/privacy/inventory`) fails when it sets another cookie; a spec here compares these names with the API's.
+ * The cookies a shopper can receive, for the cookie statement (one table, texts in `legal.cookies.row.<id>.*`). The cart and
+ * session cookies are set by the API under `/store`, `HttpOnly` and first-party; a guard in the API
+ * (`apps/api/src/privacy/inventory`) fails when it sets another cookie, and a spec here compares these names with the API's.
+ * The theme cookie is the storefront's only one (`lib/theme-mode.ts`, design batch B): a preference set only when the shopper
+ * picks a theme, holding one of three words; `source-guards.spec.ts` allows exactly two files to write it.
  * A client fork that adds a cookie adds a row here and its message keys.
  */
 export interface CookieRow {
-  id: "cart" | "session";
+  id: "cart" | "session" | "theme";
   name: string;
 }
 
 export const cookieTable: readonly CookieRow[] = [
   { id: "cart", name: "fluxkit_cart" },
   { id: "session", name: "fluxkit_customer_session" },
+  { id: "theme", name: THEME_COOKIE },
 ];
 
 export interface LegalIdentity {

@@ -29,6 +29,7 @@ export {
   type TranslationValues,
   type Translator,
 } from "./i18n";
+export { Hero, type HeroProps } from "./hero";
 export { Input, type InputProps } from "./input";
 export { LiveRegion, type LiveRegionProps } from "./live-region";
 export {
