@@ -263,8 +263,10 @@ describe("cardMatch: what a card may claim under variant-level filters (review S
   });
 
   it("knows the matching options' stock from the availability filter alone (one document per variant)", () => {
+    // PR 213 review M1: the index's `inStock` is "not out of stock" (core document.ts), so matching variants may all be
+    // low stock: inStock:true fixes no badge; only inStock:false does (every matching variant is out of stock).
     expect(cardMatch({ facets: ["inStock:true"], price: null }, [])).toEqual({
-      availability: "in_stock",
+      availability: null,
       linkQuery: "",
     });
     expect(cardMatch({ facets: ["inStock:false", "opt.size:l"], price: null }, [])).toEqual({

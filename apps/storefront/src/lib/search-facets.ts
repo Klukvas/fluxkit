@@ -1,5 +1,5 @@
 import type { SearchFacet, SearchFacetValue, SearchSort } from "@fluxkit/api-client";
-import type { Translator } from "@fluxkit/ui";
+import type { Locale, Translator } from "@fluxkit/ui";
 import { minorUnitsToInput } from "./search-money";
 import {
   facetEntry,
@@ -150,17 +150,34 @@ export function describeFormFailure(reason: string): FormFailureText {
  * item is the PRODUCT: `GET /store/search` returns its lowest price and its best availability, and nothing about which
  * variants matched (`docs/api/search.md`, "response"; a field for that is a contract change, not made). So:
  * - `null`: no variant-level filter; the card shows the product's own price and availability.
- * - `availability`: what the availability filter says about EVERY matching variant (`inStock:true` alone: in stock;
- *   `inStock:false` alone: out of stock), else `null` and the card says that price and stock depend on the option.
+ * - `availability`: `out_of_stock` when the availability filter alone (`inStock:false`) says that EVERY matching variant
+ *   is out of stock; else `null` and the card says that the stock (and, with several prices, the price) depends on the
+ *   option. `inStock:true` fixes no badge: the index's flag is "not out of stock" (core `search/document.ts`), so the
+ *   matching variants may all be low stock, and a green "In stock" would over-claim (PR 213 review M1).
  * - `linkQuery`: the options the filters pin to exactly one value, as the product page's `?opt.<code>=<value>`
  *   (`lib/variant-matcher.ts`), so the card opens on a matching variant.
  */
 export interface CardMatch {
-  availability: "in_stock" | "out_of_stock" | null;
+  availability: "out_of_stock" | null;
   linkQuery: string;
 }
 
 const OPTION_FACET_PREFIX = "opt.";
+
+/** The script a locale's product texts are written in (a new locale fails the type check until it has one). */
+const LOCALE_SCRIPTS: Readonly<Record<Locale, RegExp>> = {
+  uk: /\p{Script=Cyrillic}/u,
+  en: /\p{Script=Latin}/u,
+};
+
+/**
+ * Whether the words have letters and none of them in the page's script (`молоток` on the English page, typically after a
+ * language switch): only then does an empty result say which language the page searches (PR 213 review m11).
+ */
+export function wordsInOtherScript(q: string, locale: Locale): boolean {
+  const letters = [...q].filter((character) => /\p{L}/u.test(character));
+  return letters.length > 0 && !letters.some((letter) => LOCALE_SCRIPTS[locale].test(letter));
+}
 
 export function cardMatch(
   query: Pick<SearchQuery, "facets" | "price">,
@@ -183,7 +200,7 @@ export function cardMatch(
   if (!variantFiltered) return null;
   const stock = byKey.get("inStock") ?? [];
   const only = stock.length === 1 ? stock[0] : undefined;
-  const availability = only === "true" ? "in_stock" : only === "false" ? "out_of_stock" : null;
+  const availability = only === "false" ? "out_of_stock" : null;
   const link = new URLSearchParams();
   for (const [key, values] of byKey) {
     if (key.startsWith(OPTION_FACET_PREFIX) && values.length === 1) {

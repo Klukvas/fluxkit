@@ -124,8 +124,9 @@ describe("formatMoney", () => {
   it("formats EUR and USD", () => {
     expect(plain(formatMoney({ amount: 999, currency: "EUR" }, 2, "en"))).toBe("€9.99");
     expect(plain(formatMoney({ amount: 999, currency: "USD" }, 2, "en"))).toBe("$9.99");
-    expect(plain(formatMoney({ amount: 999, currency: "EUR" }, 2, "uk"))).toBe("9,99 €");
-    expect(plain(formatMoney({ amount: 999, currency: "USD" }, 2, "uk"))).toBe("9,99 $");
+    // PR 213 review m9: `uk` follows CLDR (ISO codes for foreign currencies; the admin's Intl output in Node agrees).
+    expect(plain(formatMoney({ amount: 999, currency: "EUR" }, 2, "uk"))).toBe("9,99 EUR");
+    expect(plain(formatMoney({ amount: 999, currency: "USD" }, 2, "uk"))).toBe("9,99 USD");
   });
 
   it("formats exponent 0 (JPY) without fraction digits and exponent 3 with three", () => {
@@ -149,6 +150,21 @@ describe("formatMoney", () => {
       new Intl.NumberFormat("uk", { style: "currency", currency: "UAH" }).format(1234.56),
     );
   });
+
+  // PR 213 review m9: the table is CLDR's text (as Node 22's ICU prints it) for every currency the API accepts, written
+  // down so the browser's ICU cannot change it.
+  it.each(locales.flatMap((locale) => SUPPORTED_SHOP_CURRENCIES.map((code) => [locale, code])))(
+    "prints CLDR's text in %s for %s",
+    (locale, currency) => {
+      const exponent = currencyExponent(currency);
+      const amount = 123456789;
+      expect(formatMoney({ amount, currency }, exponent, locale)).toBe(
+        new Intl.NumberFormat(locale, { style: "currency", currency }).format(
+          minorUnitsToDecimalString(amount, exponent) as `${number}`,
+        ),
+      );
+    },
+  );
 
   it.each(locales.flatMap((locale) => SUPPORTED_SHOP_CURRENCIES.map((code) => [locale, code])))(
     "formats every currency the API accepts in %s (%s): digits, separators and a sign",

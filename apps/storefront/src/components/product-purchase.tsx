@@ -12,12 +12,13 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import {
   MAX_LINE_QUANTITY,
   MIN_LINE_QUANTITY,
   addQuantityRefusal,
   lineRoom,
+  quantityLimitRefusal,
 } from "../lib/add-to-cart";
 import { quantitiesByVariant } from "../lib/cart-model";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
@@ -71,10 +72,14 @@ export interface ProductPurchaseViewProps {
   /** Quantity per variant id in the cart (`quantitiesByVariant`); `null` or absent while the cart is not known. */
   cartQuantities?: ReadonlyMap<string, number> | null;
   /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
-  onAddToCart: (input: {
-    variantId: string;
-    quantity: number;
-  }) => Promise<{ status: "added" } | { status: "failed"; messageKey: string }>;
+  onAddToCart: (input: { variantId: string; quantity: number }) => Promise<
+    | { status: "added" }
+    /**
+     * `cartQuantity`: the variant's quantity in the cart as the island READ IT AGAIN after a `quantity_limit` answer
+     * (another tab may have changed it); absent when it was not re-read.
+     */
+    | { status: "failed"; messageKey: string; cartQuantity?: number }
+  >;
 }
 
 /**
@@ -102,6 +107,16 @@ export function ProductPurchaseView({
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
+  // An address that asked for option values (a card link, a language switch) is rewritten once to the selection the page
+  // actually starts from, so a value that matches nothing (`?opt.color=nope`) does not stay in it (PR 213 review m7).
+  const addressReported = useRef(false);
+  useEffect(() => {
+    if (addressReported.current) return;
+    addressReported.current = true;
+    if (preferredSelection !== undefined && Object.keys(preferredSelection).length > 0) {
+      onSelectionChange?.(selection);
+    }
+  }, [preferredSelection, onSelectionChange, selection]);
 
   const variant = findVariant(product, selection);
   const images = galleryFor(gallery, selectedValueIds(product, selection));
@@ -127,10 +142,11 @@ export function ProductPurchaseView({
     setStatus({ state: "pending" });
     try {
       const outcome = await onAddToCart({ variantId: variant.id, quantity: shownQuantity });
-      // The API's `quantity_limit` does not know what the shopper sees: name the cart's quantity when there is one.
+      // The API's `quantity_limit` does not know what the shopper sees: name the cart's quantity, but only the one read
+      // again after the refusal (the tab's own may be stale, PR 213 review m1); otherwise the API's text stays.
       const limit =
-        outcome.status === "failed" && outcome.messageKey === QUANTITY_LIMIT_KEY && inCart > 0
-          ? addQuantityRefusal(lineRoom(inCart) + 1, inCart)
+        outcome.status === "failed" && outcome.messageKey === QUANTITY_LIMIT_KEY
+          ? quantityLimitRefusal(shownQuantity, outcome.cartQuantity)
           : null;
       setStatus(
         outcome.status === "added"
@@ -353,9 +369,15 @@ export function ProductPurchase(
       }}
       onAddToCart={async ({ variantId, quantity }) => {
         const outcome = await store.add(variantId, quantity);
-        return outcome.status === "ok"
-          ? { status: "added" }
-          : { status: "failed", messageKey: outcome.failure.messageKey };
+        if (outcome.status === "ok") return { status: "added" };
+        const { messageKey } = outcome.failure;
+        if (messageKey !== QUANTITY_LIMIT_KEY) return { status: "failed", messageKey };
+        // Another tab may have changed the line: read the cart again before naming its quantity.
+        const fresh = await store.refresh();
+        if (fresh.status !== "ok") return { status: "failed", messageKey };
+        const cartQuantity =
+          fresh.cart.lines.find((line) => line.variantId === variantId)?.quantity ?? 0;
+        return { status: "failed", messageKey, cartQuantity };
       }}
     />
   );

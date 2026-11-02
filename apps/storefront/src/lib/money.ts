@@ -73,14 +73,16 @@ const MONEY_FORMATS: Readonly<Record<Locale, LocaleMoneyFormat>> = {
     decimal: ",",
     position: "suffix",
     symbols: {
+      // CLDR's Ukrainian data (PR 213 review m9): the hryvnia and yen signs, ISO codes for the others (`$` alone would be
+      // ambiguous to a Ukrainian shopper).
       UAH: "₴",
-      USD: "$",
-      EUR: "€",
-      GBP: "£",
-      PLN: "zł",
-      CZK: "Kč",
+      USD: "USD",
+      EUR: "EUR",
+      GBP: "GBP",
+      PLN: "PLN",
+      CZK: "CZK",
       CHF: "CHF",
-      CAD: "CA$",
+      CAD: "CAD",
       JPY: "¥",
       KWD: "KWD",
     },

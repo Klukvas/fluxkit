@@ -60,12 +60,13 @@ export function ProductCard({
   const availability = shown === null ? null : availabilityDisplay(shown);
   const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);
   const href = match === null || match.linkQuery === "" ? path : `${path}?${match.linkQuery}`;
+  const onePrice = product.price.from === product.price.to;
   const note =
     match === null
       ? null
       : match.availability === null
-        ? t("search.card.dependsOnOption")
-        : product.price.from === product.price.to
+        ? t(onePrice ? "search.card.stockDependsOnOption" : "search.card.dependsOnOption")
+        : onePrice
           ? null
           : t("search.card.priceDependsOnOption");
   return (

@@ -65,3 +65,21 @@ Status: items 1 to 5 built on the branch; no PR opened by the implementing agent
 **Verification** (each separately, exit code 0): `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries` (2298 modules, 0 violations), `pnpm check:env`, `pnpm check:licenses`, `pnpm check:docs`; unit tests `@fluxkit/storefront` (96 files, 1675 tests), `@fluxkit/ui`, `@fluxkit/theme`; storefront e2e against this agent's own Postgres 16, Redis and Meilisearch: 91 passed, 4 skipped (as on main), including the new `ux-review-a.e2e.ts` (7 tests; no hydration error in the console on catalog, product, cart and checkout in `uk` and `en`).
 
 **Not verified:** the admin e2e suite (no admin code touched); the API integration tests (no API code touched); a real screen reader; browsers other than Chromium (the format no longer depends on the browser's ICU data, so Firefox and Safari should match, not checked); `next dev` on `localhost` (the e2e runs `next start`).
+
+## Review fixes (PR 213, independent review 2026-11-02)
+
+Each with a spec that failed first (logs in the agent's scratchpad `uxa/fail-first-r1.log` and the runs below):
+- **M1** `inStock:true` no longer gives a green "In stock" badge (the index flag is "not out of stock", core `search/document.ts`, so the matching variants may all be low stock); the card shows the "depends on the option" note. `inStock:false` still shows "Out of stock".
+- **m4** with one price for every option the note reads "Stock depends on the option".
+- **m5** `stockWarnings`: a spec with an out-of-range low-stock line and an unavailable line; the review's surviving mutant (skip rule weakened) now fails it.
+- **m1** on `quantity_limit` the island reads the cart again and words the refusal with that fresh quantity (`quantityLimitRefusal`), else keeps the API's text; the "already N" note itself still follows this tab's last read (no cross-tab sync, known limit).
+- **m2** the draft is cleared whenever a signed-in session ends (`clearDraftWhenSessionEnds`, wired once in the session provider: sign-out, expiry, a 401 anywhere, account deletion); docs no longer say it "closes with the tab" (a restored tab may restore it; the hour bounds it).
+- **m3** unit spec: a restored draft wins over the account prefill (the prefill fills empty fields only; the effect order is gated by `draftRestored`).
+- **m7** a product address whose option values match nothing is rewritten once to the selection the page starts from.
+- **m9** the `uk` symbols follow CLDR (as Node 22 prints it): `₴` and `¥`, ISO codes for the others; a spec compares every accepted currency in both locales with Node's Intl text.
+- **m11** the "searches in <language>" sentence shows only for words in another script than the page's.
+
+Not changed, with reasons:
+- **m6** (308 for static clean-ups): the clean-ups and the existing canonical redirects (a script-less form submit, `page=1`) share one code path, and a 308 is cached by browsers without end, so a later change of a rule (for example a new sort value) would keep sending visitors away from a now-valid address. 307 stays, as documented.
+- **m8** (other `Intl` output on server pages: the 10 000 cap number, numeric attributes, dates, country names): not part of this batch; no mismatch was seen in the e2e console check; a follow-up.
+- **m10** (`formatMoney` throws for a locale outside the table): intended, every caller passes the typed `Locale`.

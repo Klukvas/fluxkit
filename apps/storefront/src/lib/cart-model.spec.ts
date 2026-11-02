@@ -172,6 +172,22 @@ describe("stockWarnings (review SQ-02: say it before the form is filled in)", ()
     });
     expect(stockWarnings(cartOf([cartLine("c")]))).toEqual({ outOfStock: [], lowStock: [] });
   });
+
+  // PR 213 review m5: a line with its own block (unavailable, out of the money range) is never repeated as a stock warning,
+  // whatever its availability says (an out-of-range line keeps its stock status).
+  it("skips unavailable and out-of-range lines even when their status is low or out of stock", () => {
+    const cart = cartOf([
+      cartLine("range", {
+        availability: "low_stock",
+        notices: [{ code: "line_total_out_of_range" }],
+      }),
+      cartLine("gone", {
+        availability: "out_of_stock",
+        notices: [{ code: "unavailable" }, { code: "out_of_stock" }],
+      }),
+    ]);
+    expect(stockWarnings(cart)).toEqual({ outOfStock: [], lowStock: [] });
+  });
 });
 
 describe("quantitiesByVariant", () => {

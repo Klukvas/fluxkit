@@ -52,6 +52,26 @@ export function browserCheckoutDraftStorage(): DraftStorage | null {
   return typeof window === "undefined" ? null : sessionDraftStorage(() => window.sessionStorage);
 }
 
+/**
+ * Calls `clear` each time a signed-in session ends, whatever ended it: the sign-out, an expiry or a 401 seen by any call
+ * (`sessionEnded`), the account's deletion (PR 213 review m2). The session provider wires it to the page's account store
+ * once, so no sign-out path can forget the draft. Returns the unsubscribe function.
+ */
+export function clearDraftWhenSessionEnds(
+  account: {
+    getState(): { session: { status: string } };
+    subscribe(listener: () => void): () => void;
+  },
+  clear: () => void,
+): () => void {
+  let signedIn = account.getState().session.status === "signedIn";
+  return account.subscribe(() => {
+    const now = account.getState().session.status === "signedIn";
+    if (signedIn && !now) clear();
+    signedIn = now;
+  });
+}
+
 function cleanValues(values: unknown): Record<string, string> | null {
   if (values === null || typeof values !== "object" || Array.isArray(values)) return null;
   const entries = Object.entries(values as Record<string, unknown>).filter(

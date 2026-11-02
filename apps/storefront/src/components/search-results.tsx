@@ -12,7 +12,13 @@ import {
 import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
-import { cardMatch, describeFormFailure, selectedFilters, sortChoices } from "../lib/search-facets";
+import {
+  cardMatch,
+  describeFormFailure,
+  selectedFilters,
+  sortChoices,
+  wordsInOtherScript,
+} from "../lib/search-facets";
 import { SEARCH_RESULTS_HEADING_ID } from "../lib/search-ids";
 import {
   MAX_SEARCH_PAGE,
@@ -125,10 +131,15 @@ function EmptyResults({
   query,
 }: Pick<SearchResultsViewProps, "locale" | "t" | "query">) {
   const filtered = query.facets.length > 0 || query.price !== null;
+  const description = t(filtered ? "search.empty.filtered" : "search.empty.description");
   return (
     <EmptyState
       title={t("search.empty.title")}
-      description={t(filtered ? "search.empty.filtered" : "search.empty.description")}
+      description={
+        wordsInOtherScript(query.q, locale)
+          ? `${description} ${t("search.empty.otherLanguage")}`
+          : description
+      }
       action={
         <a
           href={

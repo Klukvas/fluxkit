@@ -3,11 +3,13 @@ import {
   CHECKOUT_DRAFT_KEY,
   CHECKOUT_DRAFT_TTL_MS,
   clearCheckoutDraft,
+  clearDraftWhenSessionEnds,
   loadCheckoutDraft,
   saveCheckoutDraft,
   sessionDraftStorage,
   type DraftStorage,
 } from "./checkout-draft";
+import { prefillFromCustomer } from "./checkout-form";
 
 function memoryStorage(): DraftStorage & { entries: Map<string, string> } {
   const entries = new Map<string, string>();
@@ -82,6 +84,65 @@ describe("checkout draft (review SQ-05: the language switch must not wipe the fo
       JSON.stringify({ savedAt: 10, values: {}, methodCode: "" }),
     );
     expect(loadCheckoutDraft(storage, 0)).toBeNull();
+  });
+
+  // PR 213 review m2: every way a session ends (sign-out, expiry or a 401 anywhere, account deletion) clears the draft.
+  it("clears the draft whenever a signed-in session ends, and not for a guest", () => {
+    let status = "loading";
+    const listeners = new Set<() => void>();
+    const account = {
+      getState: () => ({ session: { status } }),
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    };
+    const set = (next: string) => {
+      status = next;
+      for (const listener of [...listeners]) listener();
+    };
+    let cleared = 0;
+    const stop = clearDraftWhenSessionEnds(account, () => (cleared += 1));
+    set("guest");
+    expect(cleared).toBe(0);
+    set("signedIn");
+    set("signedIn");
+    expect(cleared).toBe(0);
+    set("guest");
+    expect(cleared).toBe(1);
+    set("guest");
+    expect(cleared).toBe(1);
+    stop();
+    set("signedIn");
+    set("guest");
+    expect(cleared).toBe(1);
+  });
+
+  // PR 213 review m3: the checkout restores the draft first, then the account prefill fills only what is still empty.
+  it("keeps the restored draft over the account's values (the prefill fills empty fields only)", () => {
+    const storage = memoryStorage();
+    saveCheckoutDraft(
+      storage,
+      { values: { email: "typed@example.com", phone: "" }, methodCode: "" },
+      0,
+    );
+    const restored = { email: "", phone: "", ...loadCheckoutDraft(storage, 1)?.values };
+    const prefilled = prefillFromCustomer(
+      restored,
+      {
+        id: "c1",
+        email: "account@example.com",
+        firstName: "Olena",
+        lastName: "Shevchenko",
+        phone: "+380501234567",
+        emailVerified: true,
+        createdAt: "2026-10-01T10:00:00.000Z",
+      },
+      "UA",
+    );
+    expect(prefilled["email"]).toBe("typed@example.com");
+    expect(prefilled["firstName"]).toBe("Olena");
+    expect(prefilled["phone"]).not.toBe("");
   });
 
   it("works without storage and when every access throws (blocked site data)", () => {

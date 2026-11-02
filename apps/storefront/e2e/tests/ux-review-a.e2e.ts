@@ -75,6 +75,16 @@ test("a card under option filters does not claim the product's stock and opens t
     page.getByRole("group", { name: "Size", exact: true }).getByRole("radio", { name: "L" }),
   ).toBeChecked();
   await expect(page.locator("#product-availability")).toHaveText("Out of stock");
+
+  // PR 213 review M1: "Has options in stock" includes low-stock options, so the card claims no green "In stock".
+  await page.goto("/en/catalog?f=inStock%3Atrue");
+  const inCard = page.getByRole("article").filter({ hasText: "Demo T-shirt" });
+  await expect(inCard.getByText("Price and stock depend on the option")).toBeVisible();
+  await expect(inCard.getByText("In stock", { exact: true })).toHaveCount(0);
+
+  // PR 213 review m7: values that match nothing leave the address for the selection the page starts from.
+  await page.goto("/en/p/demo-t-shirt?opt.color=nope");
+  await expect(page).toHaveURL(/\/en\/p\/demo-t-shirt\?opt\.color=black&opt\.size=s$/);
 });
 
 test("the product page names the cart's quantity, caps the stepper and explains the limit (SQ-02)", async ({

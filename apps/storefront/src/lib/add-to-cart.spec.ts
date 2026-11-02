@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_LINE_QUANTITY, addQuantityRefusal, lineRoom } from "./add-to-cart";
+import {
+  MAX_LINE_QUANTITY,
+  addQuantityRefusal,
+  lineRoom,
+  quantityLimitRefusal,
+} from "./add-to-cart";
 
 describe("lineRoom", () => {
   it("is what one more add may still put on the line", () => {
@@ -29,5 +34,22 @@ describe("addQuantityRefusal (review SQ-02: the limit message names what is alre
       messageKey: "product.quantity.overLimit",
       values: { count: 990, max: MAX_LINE_QUANTITY, room: 9 },
     });
+  });
+});
+
+describe("quantityLimitRefusal (PR 213 review m1: never word a stale cart quantity as fact)", () => {
+  it("keeps the API's text when the cart was not read again", () => {
+    expect(quantityLimitRefusal(1, undefined)).toBeNull();
+  });
+
+  it("names the quantity read again after the refusal (another tab raised the line to 999)", () => {
+    expect(quantityLimitRefusal(1, 999)).toEqual({
+      messageKey: "product.quantity.atLimit",
+      values: { count: 999, max: MAX_LINE_QUANTITY, room: 0 },
+    });
+  });
+
+  it("says nothing the fresh cart contradicts (the add would fit now)", () => {
+    expect(quantityLimitRefusal(1, 5)).toBeNull();
   });
 });
