@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Select, Spinner, type Locale } from "@fluxkit/ui";
+import { Alert, Select, Spinner, VisuallyHidden, type Locale } from "@fluxkit/ui";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -11,7 +11,9 @@ import {
   useTransition,
   type FormEvent,
   type ReactNode,
+  type Ref,
 } from "react";
+import { floatingTop, isFormChanged } from "../lib/filter-draft";
 import { describeFormFailure } from "../lib/search-facets";
 import { localizedHref } from "../lib/locale-path";
 import {
@@ -99,6 +101,45 @@ export function SearchResultsRegion({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * The floating "Apply filters" button (owner request 2026-11-02): it appears next to the row of the control the shopper
+ * changed (to the right of the panel from `lg`, at the row's end below it) and stays while the form differs from the
+ * rendered page. It is a pointer shortcut: the bottom "Apply" button stays the one in the tab order, and a polite status
+ * tells assistive technology that changes wait to be applied, so the floating copy is `aria-hidden` and not focusable.
+ * Without a script it never appears (the form is a plain GET form).
+ */
+export function FloatingApplyView({
+  visible,
+  label,
+  pendingText,
+  buttonRef,
+}: {
+  visible: boolean;
+  label: string;
+  pendingText: string;
+  buttonRef: Ref<HTMLButtonElement>;
+}) {
+  return (
+    <>
+      <VisuallyHidden>
+        <span role="status" aria-live="polite">
+          {visible ? pendingText : ""}
+        </span>
+      </VisuallyHidden>
+      <button
+        ref={buttonRef}
+        type="submit"
+        tabIndex={-1}
+        aria-hidden="true"
+        hidden={!visible}
+        className="absolute end-2 z-20 inline-flex min-h-11 items-center whitespace-nowrap rounded-md bg-primary px-4 font-medium text-primary-foreground shadow-card lg:end-auto lg:start-full lg:ms-3"
+      >
+        {label}
+      </button>
+    </>
+  );
+}
+
 export function SearchFilterForm({
   exponent,
   initialError = null,
@@ -109,9 +150,54 @@ export function SearchFilterForm({
   initialError?: string | null;
   children: ReactNode;
 }) {
-  const { navigate } = usePending();
+  const { navigate, pending } = usePending();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(initialError);
+  const formRef = useRef<HTMLFormElement>(null);
+  const floatingRef = useRef<HTMLButtonElement>(null);
+  /** The row of the last changed control while the form differs from the page, else `null`. */
+  const [changedRow, setChangedRow] = useState<HTMLElement | null>(null);
+
+  function onDraftChange(event: FormEvent<HTMLFormElement>): void {
+    const form = event.currentTarget;
+    const target = event.target;
+    // The sort select submits by itself; a change elsewhere is a draft until it is applied.
+    if (!(target instanceof HTMLElement) || target.getAttribute("name") === "sort") return;
+    const controls = Array.from(form.elements).filter(
+      (element): element is HTMLInputElement | HTMLSelectElement =>
+        (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) &&
+        element.name !== "sort",
+    );
+    setChangedRow(
+      isFormChanged(controls)
+        ? (target.closest("li, label, fieldset") as HTMLElement | null)
+        : null,
+    );
+  }
+
+  // Place the floating button on the changed row, and keep it there when a facet list scrolls or the window resizes.
+  useEffect(() => {
+    const form = formRef.current;
+    const button = floatingRef.current;
+    if (changedRow === null || form === null || button === null) return;
+    const place = () => {
+      const formBox = form.getBoundingClientRect();
+      const rowBox = changedRow.getBoundingClientRect();
+      button.style.top = `${String(floatingTop(rowBox, formBox, button.offsetHeight))}px`;
+    };
+    place();
+    form.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => {
+      form.removeEventListener("scroll", place, true);
+      window.removeEventListener("resize", place);
+    };
+  }, [changedRow]);
+
+  // A new page (the filters were applied) renders new defaults: nothing is pending any more.
+  useEffect(() => {
+    if (pending) setChangedRow(null);
+  }, [pending]);
   // Before the script runs the browser's own pattern check on the price boxes applies; once it runs, the form's own check
   // does (it says which box and in the shop's words), so the native one must not stop the submit first.
   const [scripted, setScripted] = useState(false);
@@ -148,12 +234,22 @@ export function SearchFilterForm({
     // GET: without a script the browser submits the same fields to the same page, which turns them into the short address
     // (`isCanonicalSearch`). The source guard allows exactly the search forms.
     <form
+      ref={formRef}
       id={SEARCH_FORM_ID}
       method="get"
       noValidate={scripted}
       onSubmit={onSubmit}
-      className="flex flex-col gap-4"
+      onChange={onDraftChange}
+      onInput={onDraftChange}
+      aria-busy={pending}
+      className="relative flex flex-col gap-4"
     >
+      <FloatingApplyView
+        visible={changedRow !== null && !pending}
+        label={t("searchForm.applyChanged")}
+        pendingText={t("searchForm.changesPending")}
+        buttonRef={floatingRef}
+      />
       {error === null ? null : (
         <Alert variant="danger" title={t("searchForm.error.title")}>
           <p>{error}</p>

@@ -23,6 +23,7 @@ import {
   type SearchQuery,
 } from "../lib/search-query";
 import type { SearchOutcome } from "../lib/search-data";
+import { outOfStockOptionsNote } from "../lib/search-facets";
 import { ProductGrid } from "./product-grid";
 import { SearchFilters } from "./search-filters";
 import {
@@ -283,6 +284,7 @@ export function FacetedResults({
                   headingLevel="h3"
                   brandPathFor={brandPathFor}
                   label={listLabel}
+                  noteFor={outOfStockOptionsNote(query, t)}
                 />
               )}
 

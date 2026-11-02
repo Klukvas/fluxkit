@@ -1,4 +1,9 @@
-import type { SearchFacet, SearchFacetValue, SearchSort } from "@fluxkit/api-client";
+import type {
+  ProductSummary,
+  SearchFacet,
+  SearchFacetValue,
+  SearchSort,
+} from "@fluxkit/api-client";
 import type { Translator } from "@fluxkit/ui";
 import { minorUnitsToInput } from "./search-money";
 import {
@@ -142,4 +147,19 @@ export function describeFormFailure(reason: string): FormFailureText {
       }
       return { messageKey: "searchForm.error.title", field: null };
   }
+}
+
+/**
+ * The availability facet is VARIANT-level (docs/api/search.md, ADR 0034 decision 4; AGENTS.md 2.3: filters operate on
+ * variants and group results by product): `inStock:false` finds every product with at least one out-of-stock variant, so
+ * a product whose other variants are in stock is listed with an "In stock" badge. With that filter on, such a card says
+ * that some of its options are out of stock (owner question 2026-11-02; the API and its contract are unchanged).
+ */
+export function outOfStockOptionsNote(
+  query: Pick<SearchQuery, "facets">,
+  t: Translator,
+): ((product: Pick<ProductSummary, "availability">) => string | null) | null {
+  if (!query.facets.includes("inStock:false")) return null;
+  return (product) =>
+    product.availability === "out_of_stock" ? null : t("search.facet.inStock.someOut");
 }

@@ -32,6 +32,8 @@ export interface ProductCardProps {
   headingLevel: "h2" | "h3";
   /** First row of a list: its image is not lazy. */
   eager?: boolean;
+  /** A line under the availability badge (the availability filter's "some options are out of stock"). */
+  note?: string | null;
 }
 
 /**
@@ -47,6 +49,7 @@ export function ProductCard({
   brandPath,
   headingLevel: Heading,
   eager = false,
+  note = null,
 }: ProductCardProps) {
   const availability = availabilityDisplay(product.availability);
   return (
@@ -84,6 +87,7 @@ export function ProductCard({
       <Badge variant={availability.variant} className="w-fit">
         {t(availability.messageKey)}
       </Badge>
+      {note === null ? null : <p className="text-sm text-muted-foreground">{note}</p>}
     </article>
   );
 }
