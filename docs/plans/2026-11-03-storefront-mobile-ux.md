@@ -119,3 +119,22 @@ Deviations from the design above:
 Verification: lint, format:check, typecheck, check:boundaries, check:env, check:licenses, check:docs exit 0; storefront 1736, ui 181, theme 68 unit tests pass; storefront e2e 110 passed, 4 skipped (the search-off cases, as on `main`) on throwaway Postgres 16, Redis and Meilisearch.
 Failing first: `lib/mobile-ux.spec.ts` failed before `lib/mobile-ux.ts` existed; `e2e/tests/mobile-ux.e2e.ts` run against the build of `main`: 9 of 12 failed (header 113 > 64, no search icon, no buy bar, no Filters link, checkout link not in view, no summary toggle, order heading 72 px, breadcrumb 20 px), the 3 overflow/hydration guards passed (no regression to catch there).
 Not verified: iOS Safari (safe-area insets, sticky bars with the dynamic toolbar), Firefox, a real screen reader, a real phone.
+
+## Review fixes (PR 216, 2026-11-03)
+
+Independent review: B1, M1, M2, m1 to m7 (scratchpad `pr216-review-findings.md`). Failing test first for each behaviour:
+- B1 (search icon visible from 1024 px: the unlayered `.fk-header-button { @apply inline-flex }` beat `lg:hidden` in `@layer utilities`): every
+  `.fk-*` rule of `app/globals.css` moved into `@layer components`. Audit: the other `.fk-*` classes are combined only with utilities that do
+  not touch the same property (`fk-bottom-bar` + `pt-3`, `fk-icon` + `rotate-180`, `fk-facet-summary` + focus ring), so nothing else changes.
+  Tests: `app/globals-css.spec.ts` (failed before: 2 of 2) and e2e at 1024 and 1280 (icon not displayed, header one 61 px row: logo, box,
+  cart; failed before: the icon link was found).
+- M1: the cart's sticky bar keeps only "Change N items to continue" and a link to the first flagged line; the list moved into the summary.
+  Test: `cart-page.spec.tsx` (failed before). `scroll-padding-bottom` 8rem -> 9rem.
+- M2: `SearchBoxFallback` as the header box's `Suspense` fallback, so the no-script search works on the streamed pages; e2e covers `/en`,
+  catalog, product and results at 390 and the catalog at 1024/1280 without a script (failed before on the catalog).
+- m1: `.fk-toast` is hidden while the search row is open (e2e; failed before: still visible after 2 s). m2: the summary toggle closes after a
+  refusal (`summaryOpen` undefined until the shopper toggles; a new refusal opens it again; unit test failed before). m4: `popstate` closes the
+  filter sheet. m5: the copy button is under the field below `sm` (e2e, failed before: field 97 px). m6: `order.payment.awaiting` uses the pay
+  step's sentence again; en "(the deadline is on the next page)"; uk "акаунт" for every "обліковий запис" (34 strings; the one spec that
+  matched the old word updated). m3 and m7: documented in the storefront README (desktop Tab order; no-script focus start point).
+- Skipped: none of the listed items. Not done: a history entry for the sheet (Back closes it but also navigates, as before).
