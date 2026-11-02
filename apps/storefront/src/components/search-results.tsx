@@ -12,7 +12,13 @@ import {
 import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
-import { describeFormFailure, selectedFilters, sortChoices } from "../lib/search-facets";
+import {
+  cardMatch,
+  describeFormFailure,
+  selectedFilters,
+  sortChoices,
+  wordsInOtherScript,
+} from "../lib/search-facets";
 import { SEARCH_RESULTS_HEADING_ID } from "../lib/search-ids";
 import {
   MAX_SEARCH_PAGE,
@@ -23,7 +29,6 @@ import {
   type SearchQuery,
 } from "../lib/search-query";
 import type { SearchOutcome } from "../lib/search-data";
-import { outOfStockOptionsNote } from "../lib/search-facets";
 import { ProductGrid } from "./product-grid";
 import { SearchFilters } from "./search-filters";
 import {
@@ -126,10 +131,15 @@ function EmptyResults({
   query,
 }: Pick<SearchResultsViewProps, "locale" | "t" | "query">) {
   const filtered = query.facets.length > 0 || query.price !== null;
+  const description = t(filtered ? "search.empty.filtered" : "search.empty.description");
   return (
     <EmptyState
       title={t("search.empty.title")}
-      description={t(filtered ? "search.empty.filtered" : "search.empty.description")}
+      description={
+        wordsInOtherScript(query.q, locale)
+          ? `${description} ${t("search.empty.otherLanguage")}`
+          : description
+      }
       action={
         <a
           href={
@@ -284,7 +294,7 @@ export function FacetedResults({
                   headingLevel="h3"
                   brandPathFor={brandPathFor}
                   label={listLabel}
-                  noteFor={outOfStockOptionsNote(query, t)}
+                  match={cardMatch(query, result.facets)}
                 />
               )}
 

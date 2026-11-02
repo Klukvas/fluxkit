@@ -392,6 +392,38 @@ describe("ProductPurchaseView", () => {
       />,
     );
 
+  // Review SQ-02 (2026-11-02): "add 1 more" to a line of 999 said "exceeds the allowed quantity" with no word of the 999.
+  it("says how many of the chosen variant are already in the cart and caps the stepper at the room left", () => {
+    const html = view({ cartQuantities: new Map([["mint-six", 990]]) });
+    expect(html).toContain("§product.quantity.inCart");
+    expect(html).toMatch(
+      /<input[^>]*id="product-quantity"[^>]*max="9"|max="9"[^>]*id="product-quantity"/,
+    );
+    expect(view()).not.toContain("§product.quantity.inCart");
+  });
+
+  it("names the cart's quantity and disables the button when the line is already at the limit", () => {
+    const html = view({ cartQuantities: new Map([["mint-six", 999]]) });
+    expect(html).toContain("§product.quantity.atLimit");
+    expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+  });
+
+  it("starts from the option values the address asks for", () => {
+    const html = view({ preferredSelection: { flavor: "lemon" } });
+    expect(html).toMatch(/<input[^>]*checked=""[^>]*value="lemon"/);
+  });
+
+  it("warns on a low-stock variant that the quantity is confirmed when the order is placed", () => {
+    const low = product({
+      ...multi,
+      variants: [
+        variant("mint-six", { flavor: "mint", pack: "six" }, { availability: "low_stock" }),
+      ],
+    });
+    expect(view({ product: low })).toContain("§product.quantity.lowStock");
+    expect(view()).not.toContain("§product.quantity.lowStock");
+  });
+
   it("renders one radio group per option from the API's names, with the first available variant selected", () => {
     const html = view();
     expect(html.match(/<fieldset/g)).toHaveLength(2);

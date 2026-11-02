@@ -199,19 +199,23 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   // Step 7: the checkout attempt and the guest order token (plan, "Guest order token", "Checkout idempotency").
   const code = (text: string) => text.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, "");
 
-  it("uses browser storage only for the checkout attempt, the payment attempt and the payment hand-off (sessionStorage), never localStorage or cookies", () => {
+  it("uses browser storage only for the checkout attempt, the payment attempt, the payment hand-off and the checkout draft (sessionStorage), never localStorage or cookies", () => {
     const storage = sources.filter((file) => /\bsessionStorage\b/.test(code(file.text)));
-    // Each of these three islands makes its storage once, through the probing helper, in the browser.
+    // Each of these three islands makes its storage once, through the probing helper, in the browser; the checkout draft
+    // (review SQ-05) is reached only through `browserCheckoutDraftStorage` of `lib/checkout-draft.ts`.
     expect(storage.map((file) => file.path).sort()).toEqual(
       [
         join("components", "checkout-page.tsx"),
         join("components", "order-payment.tsx"),
         join("components", "payment-return-page.tsx"),
+        join("lib", "checkout-draft.ts"),
       ].sort(),
     );
     for (const file of storage) {
       expect(code(file.text), file.path).toMatch(
-        /sessionAttemptStorage\(\(\) => window\.sessionStorage\)/,
+        file.path === join("lib", "checkout-draft.ts")
+          ? /sessionDraftStorage\(\(\) => window\.sessionStorage\)/
+          : /sessionAttemptStorage\(\(\) => window\.sessionStorage\)/,
       );
     }
     for (const file of sources) {

@@ -13,12 +13,14 @@ import {
  * Decisions, each with a test:
  * - The URL state is the results page's (`search-query.ts`): `f`, `price`, `sort` and `page`, the same names, values and
  *   canonical form, so a filter link means the same on `/search`, `/catalog` and `/c/<slug>`. Words are not: a `q` with text
- *   is a 404 here (words belong to `/search`); an empty `q` (the script-less form) redirects away like any non-canonical form.
+ *   redirects to `/search` with the words and filters (words belong there; review SQ-04 replaced the 404); an empty `q` (the
+ *   script-less form) redirects away like any non-canonical form.
  * - `?brand=<slug>` stays an accepted alias of `f=brand:<slug>` without a redirect: product pages and shared links of the
- *   SQL listing use it, and the address keeps working when search is switched off again. A brand that is not a slug is a 404
- *   (as on the SQL listing).
+ *   SQL listing use it, and the address keeps working when search is switched off again. A brand that is not a slug is
+ *   dropped by a redirect (review SQ-04; it was a 404).
  * - On a category page the path is the category: a `category:` facet in the address would be OR-ed with it by the API
- *   (values of one key are OR) and widen the page, so it is a 404. The page filters by the path's category id itself.
+ *   (values of one key are OR) and widen the page, so it is dropped by a redirect (review SQ-04; it was a 404). The page
+ *   filters by the path's category id itself.
  * - Only the unfiltered list may enter the Next data cache (category, page and sort are bounded; a facet value or a price
  *   is free text the visitor chooses, the reason `GET /store/products?brand=` is not cached either).
  * - The SQL fallback keeps what `GET /store/products` can apply (category, one brand, the page) and reports whether
@@ -44,29 +46,33 @@ function withBrand(query: SearchQuery, brand: string | null): SearchQuery {
   return query.facets.includes(entry) ? query : { ...query, facets: [...query.facets, entry] };
 }
 
-/** What a catalog or category route does with an address while search is on: list, redirect, explain a box, or 404. */
+/**
+ * What a catalog or category route does with an address while search is on: list, redirect (also the cleaned form of a bad
+ * address, review SQ-04), explain a box, or send words to the results page (`words`: the route redirects to `/search` with
+ * them and the filters).
+ */
 export function resolveCatalogAddress(
   raw: RawSearchParams,
   exponent: number,
   options: { categoryPage: boolean },
-): SearchAddress {
+): SearchAddress | { kind: "words"; query: SearchQuery } {
   const rawBrand = first(raw["brand"]);
   let brand: string | null = null;
-  if (rawBrand !== undefined && rawBrand !== "") {
-    if (!isSlug(rawBrand)) return { kind: "malformed" };
-    brand = rawBrand;
-  }
+  // A brand alias that is not a slug is dropped (the redirect shows the list without it).
+  const brandDropped = rawBrand !== undefined && rawBrand !== "" && !isSlug(rawBrand);
+  if (rawBrand !== undefined && rawBrand !== "" && !brandDropped) brand = rawBrand;
   const rest = Object.fromEntries(Object.entries(raw).filter(([name]) => name !== "brand"));
   const address = resolveSearchAddress(rest, exponent);
   if (address.kind === "malformed") return address;
-  if (address.query.q !== "") return { kind: "malformed" };
-  if (
-    options.categoryPage &&
-    address.query.facets.some((entry) => entry.startsWith(CATEGORY_PREFIX))
-  ) {
-    return { kind: "malformed" };
-  }
-  return { ...address, query: withBrand(address.query, brand) };
+  if (address.query.q !== "") return { kind: "words", query: withBrand(address.query, brand) };
+  // On a category page the path is the category: a `category:` facet would widen the list, so it is dropped.
+  const facets = options.categoryPage
+    ? address.query.facets.filter((entry) => !entry.startsWith(CATEGORY_PREFIX))
+    : address.query.facets;
+  const query = withBrand({ ...address.query, facets }, brand);
+  if (address.kind === "form_error") return { ...address, query };
+  const dropped = brandDropped || facets.length !== address.query.facets.length;
+  return { kind: "query", query, canonical: address.canonical && !dropped };
 }
 
 /** The query sent to `GET /store/search`: a category page adds its category, by id. */

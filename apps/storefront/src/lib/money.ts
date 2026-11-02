@@ -1,8 +1,14 @@
+import type { Locale } from "@fluxkit/ui";
+
 /**
  * Display formatting of money. The storefront never adds, multiplies or rounds money (every total comes from the API,
  * ADR 0011), so this file only turns an integer count of minor units into text. No floating point value ever holds an
- * amount here: the digits are cut out of the integer's decimal text and handed to `Intl.NumberFormat` as a decimal
- * STRING, which Intl formats exactly (ES2023 NumberFormat v3, Node 22 and every current browser).
+ * amount here: the digits are cut out of the integer's decimal text with BigInt.
+ *
+ * The text is built by this file alone, never by `Intl.NumberFormat` (review SQ-06/D-01, 2026-11-02): the currency symbol
+ * and the spaces Intl prints come from the runtime's ICU data, which differs between Node and the browser (Node prints
+ * `599,00 ₴`, Chromium `599,00 грн`), so a price rendered on the server and again in the browser did not match and React
+ * re-rendered every page with a price. The separators and symbols below are fixed per locale, so both sides print the same.
  */
 
 export interface MoneyValue {
@@ -11,6 +17,8 @@ export interface MoneyValue {
 }
 
 const MAX_EXPONENT = 20;
+/** U+00A0: a price never wraps between its digits and its symbol. */
+const NO_BREAK_SPACE = "\u00a0";
 
 /**
  * Decimal text of `amount` minor units with `exponent` fraction digits: `(123456, 2)` is `"1234.56"`. Integer arithmetic
@@ -32,7 +40,8 @@ export function minorUnitsToDecimalString(amount: number, exponent: number): str
 
 /**
  * The number of minor-unit digits Intl knows for an ISO 4217 code (UAH, EUR, USD: 2; JPY: 0; KWD: 3). Used only when the
- * caller has no exponent; the shop's own exponent comes from `GET /store/config` and wins. An unknown code throws.
+ * caller has no exponent; the shop's own exponent comes from `GET /store/config` and wins. An unknown code throws. (This is
+ * ISO 4217 data, the same in every runtime; nothing of Intl's output is displayed.)
  */
 export function currencyExponent(currency: string): number {
   const digits = new Intl.NumberFormat("en", { style: "currency", currency }).resolvedOptions()
@@ -43,22 +52,74 @@ export function currencyExponent(currency: string): number {
   return digits;
 }
 
-const formatters = new Map<string, Intl.NumberFormat>();
+interface LocaleMoneyFormat {
+  /** Between groups of three digits. */
+  group: string;
+  decimal: string;
+  /** `prefix`: `$1,234.56`; `suffix`: `1 234,56 ₴` (always with a no-break space). */
+  position: "prefix" | "suffix";
+  /** Symbol per ISO code; a code without an entry is shown as the code itself. */
+  symbols: Readonly<Record<string, string>>;
+}
 
-function formatterFor(locale: string, currency: string, exponent: number): Intl.NumberFormat {
-  const key = `${locale}|${currency}|${exponent}`;
-  let formatter = formatters.get(key);
-  if (formatter === undefined) {
-    // Minimum and maximum are both the exponent, so Intl neither rounds an exact amount nor drops a trailing zero.
-    formatter = new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency,
-      minimumFractionDigits: exponent,
-      maximumFractionDigits: exponent,
-    });
-    formatters.set(key, formatter);
+/**
+ * One row per storefront locale (a new locale fails the type check until it has one). The symbols cover every currency the
+ * API accepts as `SHOP_CURRENCY` (`SUPPORTED_SHOP_CURRENCIES` of `@fluxkit/config`, checked by `money.spec.ts`). English
+ * keeps the ISO code for UAH (`UAH 599.00`): an English-speaking shopper may not know the hryvnia sign.
+ */
+const MONEY_FORMATS: Readonly<Record<Locale, LocaleMoneyFormat>> = {
+  uk: {
+    group: NO_BREAK_SPACE,
+    decimal: ",",
+    position: "suffix",
+    symbols: {
+      // CLDR's Ukrainian data (PR 213 review m9): the hryvnia and yen signs, ISO codes for the others (`$` alone would be
+      // ambiguous to a Ukrainian shopper).
+      UAH: "₴",
+      USD: "USD",
+      EUR: "EUR",
+      GBP: "GBP",
+      PLN: "PLN",
+      CZK: "CZK",
+      CHF: "CHF",
+      CAD: "CAD",
+      JPY: "¥",
+      KWD: "KWD",
+    },
+  },
+  en: {
+    group: ",",
+    decimal: ".",
+    position: "prefix",
+    symbols: {
+      UAH: "UAH",
+      USD: "$",
+      EUR: "€",
+      GBP: "£",
+      PLN: "PLN",
+      CZK: "CZK",
+      CHF: "CHF",
+      CAD: "CA$",
+      JPY: "¥",
+      KWD: "KWD",
+    },
+  },
+};
+
+function moneyFormat(locale: string): LocaleMoneyFormat {
+  const format = (MONEY_FORMATS as Readonly<Record<string, LocaleMoneyFormat>>)[locale];
+  if (format === undefined) throw new RangeError(`No money format for locale "${locale}".`);
+  return format;
+}
+
+function groupDigits(whole: string, separator: string): string {
+  let grouped = "";
+  for (let end = whole.length; end > 0; end -= 3) {
+    const start = Math.max(0, end - 3);
+    grouped =
+      grouped === "" ? whole.slice(start, end) : `${whole.slice(start, end)}${separator}${grouped}`;
   }
-  return formatter;
+  return grouped;
 }
 
 /** `exponent` is the shop's `currencyExponent` from `GET /store/config`; without it the currency's Intl default is used. */
@@ -67,8 +128,20 @@ export function formatMoney(
   exponent: number | undefined,
   locale: string,
 ): string {
-  const digits = exponent ?? currencyExponent(money.currency);
-  const decimal = minorUnitsToDecimalString(money.amount, digits);
-  // Digits and at most one dot by construction, which is what the string-numeric type states.
-  return formatterFor(locale, money.currency, digits).format(decimal as `${number}`);
+  const format = moneyFormat(locale);
+  const decimal = minorUnitsToDecimalString(
+    money.amount,
+    exponent ?? currencyExponent(money.currency),
+  );
+  const negative = decimal.startsWith("-");
+  const [whole, fraction] = (negative ? decimal.slice(1) : decimal).split(".") as [string, string?];
+  const number =
+    groupDigits(whole, format.group) +
+    (fraction === undefined ? "" : `${format.decimal}${fraction}`);
+  const symbol = format.symbols[money.currency] ?? money.currency;
+  const sign = negative ? "-" : "";
+  if (format.position === "suffix") return `${sign}${number}${NO_BREAK_SPACE}${symbol}`;
+  // A letter code is set apart (`UAH 599.00`); a sign is not (`$9.99`).
+  const gap = /\p{L}$/u.test(symbol) ? NO_BREAK_SPACE : "";
+  return `${sign}${symbol}${gap}${number}`;
 }

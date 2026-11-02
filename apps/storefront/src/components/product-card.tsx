@@ -5,6 +5,7 @@ import { availabilityDisplay } from "../lib/availability";
 import { allowedImageUrl } from "../lib/image-source";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
+import type { CardMatch } from "../lib/search-facets";
 import { StoreImage } from "./store-image";
 import { focusRing } from "./styles";
 
@@ -32,8 +33,12 @@ export interface ProductCardProps {
   headingLevel: "h2" | "h3";
   /** First row of a list: its image is not lazy. */
   eager?: boolean;
-  /** A line under the availability badge (the availability filter's "some options are out of stock"). */
-  note?: string | null;
+  /**
+   * Variant-level filters are on (`cardMatch` of `lib/search-facets.ts`, review SQ-03): the badge shows the matching
+   * options' stock only when the filters say it, a note says that price and stock depend on the option, and the link opens
+   * the product page on the pinned option values. `null`: the product's own price and availability.
+   */
+  match?: CardMatch | null;
 }
 
 /**
@@ -49,9 +54,21 @@ export function ProductCard({
   brandPath,
   headingLevel: Heading,
   eager = false,
-  note = null,
+  match = null,
 }: ProductCardProps) {
-  const availability = availabilityDisplay(product.availability);
+  const shown = match === null ? product.availability : match.availability;
+  const availability = shown === null ? null : availabilityDisplay(shown);
+  const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);
+  const href = match === null || match.linkQuery === "" ? path : `${path}?${match.linkQuery}`;
+  const onePrice = product.price.from === product.price.to;
+  const note =
+    match === null
+      ? null
+      : match.availability === null
+        ? t(onePrice ? "search.card.stockDependsOnOption" : "search.card.dependsOnOption")
+        : onePrice
+          ? null
+          : t("search.card.priceDependsOnOption");
   return (
     <article className="relative flex h-full flex-col gap-2 rounded-lg border border-border bg-background p-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
       <StoreImage
@@ -63,10 +80,7 @@ export function ProductCard({
         eager={eager}
       />
       <Heading className="font-medium text-foreground">
-        <Link
-          href={localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`)}
-          className="after:absolute after:inset-0 focus-visible:outline-none"
-        >
+        <Link href={href} className="after:absolute after:inset-0 focus-visible:outline-none">
           {product.title}
         </Link>
       </Heading>
@@ -84,9 +98,11 @@ export function ProductCard({
         price={listPriceLabel(product.price, exponent, locale, t)}
         priceLabel={t("product.price.label")}
       />
-      <Badge variant={availability.variant} className="w-fit">
-        {t(availability.messageKey)}
-      </Badge>
+      {availability === null ? null : (
+        <Badge variant={availability.variant} className="w-fit">
+          {t(availability.messageKey)}
+        </Badge>
+      )}
       {note === null ? null : <p className="text-sm text-muted-foreground">{note}</p>}
     </article>
   );

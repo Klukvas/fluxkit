@@ -125,6 +125,8 @@ export type ListingResult =
       /** `currencyExponent` of the shop, for formatting the listed prices. */
       exponent: number;
     }
+  /** A page past the last one (review SQ-04): the route redirects to `lastPage` (1 for an empty list). */
+  | { kind: "beyond_last_page"; lastPage: number }
   | { kind: "not_found" };
 
 export async function loadCatalogListing(
@@ -134,7 +136,9 @@ export async function loadCatalogListing(
 ): Promise<ListingResult> {
   const { query } = options;
   // The API refuses an offset above 10 000 with a 400: a page that deep is simply not found, without asking.
-  if (query.page > maxPage(CATALOG_PAGE_SIZE)) return { kind: "not_found" };
+  if (query.page > maxPage(CATALOG_PAGE_SIZE)) {
+    return { kind: "beyond_last_page", lastPage: maxPage(CATALOG_PAGE_SIZE) };
+  }
 
   let trail: CategoryNode[] = [];
   if (options.categorySlug !== undefined) {
@@ -155,7 +159,12 @@ export async function loadCatalogListing(
   ]);
   const products = unwrap("GET /store/products", productsOutcome);
   const { currencyExponent } = unwrap("GET /store/config", configOutcome);
-  if (!isPageInRange(query.page, products.total, CATALOG_PAGE_SIZE)) return { kind: "not_found" };
+  if (!isPageInRange(query.page, products.total, CATALOG_PAGE_SIZE)) {
+    return {
+      kind: "beyond_last_page",
+      lastPage: Math.max(pageCountFor(products.total, CATALOG_PAGE_SIZE), 1),
+    };
+  }
 
   const brandName =
     query.brand === null

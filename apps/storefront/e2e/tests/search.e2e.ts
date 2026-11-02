@@ -310,7 +310,7 @@ test.describe("the results page", () => {
     await context.close();
   });
 
-  test("redirects a hand-made form address to the short one and refuses malformed parameters with a real 404", async ({
+  test("redirects a hand-made form address to the short one, and a malformed parameter to the cleaned address", async ({
     page,
   }) => {
     await page.goto("/en/search?q=demo&priceMin=1000&sort=");
@@ -323,9 +323,12 @@ test.describe("the results page", () => {
       "f=nocolon",
       "price=500..100",
     ]) {
+      // Review SQ-04 (2026-11-02): these were 404s; the bad parameter is dropped (page 418 is clamped to 417, past the
+      // last page of the result, so the last page).
       const response = await page.goto(`/en/search?q=demo&${bad}`);
-      expect(response?.status(), bad).toBe(404);
-      await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toBeVisible();
+      expect(response?.status(), bad).toBe(200);
+      await expect(page, bad).toHaveURL(/\/en\/search\?q=demo$/);
+      await expect(page.getByRole("heading", { level: 1, name: "Page not found" })).toHaveCount(0);
     }
   });
 

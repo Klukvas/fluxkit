@@ -160,12 +160,20 @@ describe("loadCatalogListing", () => {
     expect(data.calls.listProducts).toHaveLength(0);
   });
 
-  it("is not found for a page past the last one (not the last page, not an empty list)", async () => {
+  it("names the last page for a page past it (review SQ-04: the route redirects there)", async () => {
     const data = fakeData({
       listProducts: async () => ok({ items: [], total: 30, limit: 24, offset: 48 }),
     });
     expect(await loadCatalogListing(data, "uk", { query: { page: 3, brand: null } })).toEqual({
-      kind: "not_found",
+      kind: "beyond_last_page",
+      lastPage: 2,
+    });
+    const empty = fakeData({
+      listProducts: async () => ok({ items: [], total: 0, limit: 24, offset: 24 }),
+    });
+    expect(await loadCatalogListing(empty, "uk", { query: { page: 2, brand: null } })).toEqual({
+      kind: "beyond_last_page",
+      lastPage: 1,
     });
   });
 
@@ -184,7 +192,8 @@ describe("loadCatalogListing", () => {
   it("never calls the API with an offset above its limit", async () => {
     const data = fakeData();
     expect(await loadCatalogListing(data, "uk", { query: { page: 418, brand: null } })).toEqual({
-      kind: "not_found",
+      kind: "beyond_last_page",
+      lastPage: 417,
     });
     expect(data.calls.listProducts).toHaveLength(0);
   });
