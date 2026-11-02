@@ -149,6 +149,7 @@ describe("prefillFromCustomer", () => {
     const values = prefillFromCustomer(
       { ...initialCheckoutValues(checkoutConfig), firstName: "Typed" },
       customer({ phone: "+380501112233" }),
+      checkoutConfig.phoneDefaultCountry,
     );
     expect(values).toMatchObject({
       email: "shopper@example.test",
@@ -164,7 +165,13 @@ describe("prefillFromCustomer", () => {
         "UA",
       ).phone,
     ).toBe("+48 512 345 678");
-    expect(prefillFromCustomer(initialCheckoutValues(checkoutConfig), customer()).phone).toBe("");
+    expect(
+      prefillFromCustomer(
+        initialCheckoutValues(checkoutConfig),
+        customer(),
+        checkoutConfig.phoneDefaultCountry,
+      ).phone,
+    ).toBe("");
   });
 });
 

@@ -373,6 +373,12 @@ describe("phone field while typing (national format, caret never fights the shop
     );
   });
 
+  it("formats a paste that replaced the whole text (review m2 of PR 211)", () => {
+    expect(phoneTypingValue("050 999", { value: "0501234567", selectionStart: 10 })).toBe(
+      "050 123 4567",
+    );
+  });
+
   it("keeps the text as typed while deleting (a space can be removed) or editing in the middle", () => {
     expect(phoneTypingValue("050 123 4567", { value: "050 123 456", selectionStart: 11 })).toBe(
       "050 123 456",

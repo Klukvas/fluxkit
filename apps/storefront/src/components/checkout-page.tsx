@@ -127,8 +127,9 @@ export function checkoutLabels(t: Translator, config: CheckoutConfig): Record<st
 }
 
 /**
- * The phone field's next value: formatted (`formatPhoneTyping`) only when the shopper added characters at the end, so
- * deleting a space or editing in the middle never fights them or moves the caret; anything else is kept as typed.
+ * The phone field's next value: formatted (`formatPhoneTyping`) only when the caret is at the end and the change is not a
+ * deletion there (typing at the end, or a paste that replaced the text), so deleting a space or editing in the middle never
+ * fights the shopper or moves the caret; anything else is kept as typed.
  */
 export function phoneTypingValue(
   previous: string,
@@ -136,7 +137,8 @@ export function phoneTypingValue(
 ): string {
   const next = input.value;
   const atEnd = input.selectionStart === null || input.selectionStart === next.length;
-  return atEnd && next.length > previous.length && next.startsWith(previous.slice(0, -1))
+  const deletedAtEnd = next.length < previous.length && previous.startsWith(next);
+  return atEnd && next !== previous && !deletedAtEnd
     ? formatPhoneTyping(next, checkoutConfig.phoneDefaultCountry)
     : next;
 }

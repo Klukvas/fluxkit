@@ -96,7 +96,7 @@ export function AccountOverview({ emailDelivery }: { emailDelivery: boolean }) {
           locale={locale}
           pending={pending}
           failure={failure}
-          onLogout={logout}
+          onLogout={() => void logout()}
           emailDelivery={emailDelivery}
           emailNotice={<VerifyEmailNotice customer={customer} emailDelivery={emailDelivery} />}
         />

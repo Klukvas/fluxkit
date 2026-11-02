@@ -133,7 +133,8 @@ export function initialCheckoutValues(config: CheckoutConfig): CheckoutValues {
 export function prefillFromCustomer(
   values: CheckoutValues,
   customer: Customer,
-  phoneCountry: CountryCode = "UA",
+  /** `checkoutConfig.phoneDefaultCountry`: the shop's config decides, never a default here. */
+  phoneCountry: CountryCode,
 ): CheckoutValues {
   const fromAccount: CheckoutValues = {
     email: customer.email,

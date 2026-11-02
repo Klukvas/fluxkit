@@ -12,6 +12,11 @@ import type { Failure } from "./failure";
  *   total and the stock are always the server's; the draft is dropped once the server's quantity equals it or a save ends.
  * - A failed save restores the server's quantity (the draft is dropped) and keeps the failure for the line, unless the
  *   shopper changed the quantity again meanwhile (then the newer choice is saved and the failure is not shown).
+ * - Leaving the page (`dispose`, review M1 of PR 211) loses nothing: a change waiting for its delay is sent at once, a change
+ *   made while a request ran is still sent after it, and every save made after leaving is `final`, so the island reports
+ *   its failure to the shared cart (the line that would show it is gone). Every page shows the server's cart anyway.
+ * - `settled()` saves a waiting change now and resolves when nothing waits or runs, with the last outcome: the checkout
+ *   link waits for it, so the checkout never starts from a quantity the shopper did not choose.
  */
 
 export const QUANTITY_SAVE_DELAY_MS = 500;
@@ -28,8 +33,11 @@ export interface AutosaveState {
 export type SaveOutcome = { status: "ok" } | { status: "failed"; failure: Failure };
 
 export interface QuantityAutosaveOptions {
-  /** Sends the quantity; resolves when the cart store has applied the answer. Must not throw for an expected failure. */
-  save(quantity: number): Promise<SaveOutcome>;
+  /**
+   * Sends the quantity; resolves when the cart store has applied the answer. Must not throw for an expected failure.
+   * `final` is true for a save made after the page was left (`dispose`): its failure has no line to show it.
+   */
+  save(quantity: number, final: boolean): Promise<SaveOutcome>;
   /** The quantity of the line in the cart store right now (the server's). */
   serverQuantity(): number;
   delayMs?: number;
@@ -42,9 +50,14 @@ export interface QuantityAutosave {
   subscribe(listener: () => void): () => void;
   /** The shopper chose `quantity` (a step button or a typed number). */
   change(quantity: number): void;
-  /** Saves a waiting change now (no delay); the island calls it when the page is left. */
+  /** Saves a waiting change now (no delay). */
   flush(): void;
-  /** Stops the timer; an answer that arrives later is still applied by the store, but this line's state stays as is. */
+  /** Saves a waiting change now and resolves when nothing waits or runs, with the last outcome. */
+  settled(): Promise<SaveOutcome>;
+  /**
+   * The page is left: no more state for the view, but the work is finished (a waiting change is sent now, a newer change
+   * after the request in flight), every later save `final`.
+   */
   dispose(): void;
 }
 
@@ -53,6 +66,36 @@ export const idleAutosave: AutosaveState = Object.freeze({
   pending: false,
   failure: null,
 });
+
+const OK: SaveOutcome = Object.freeze({ status: "ok" });
+
+/**
+ * The autosaves of the cart page's lines, so the checkout link can wait for them (review M1 of PR 211): `pending()` says
+ * whether a change waits or runs, `settled()` saves the waiting ones now and resolves `true` when every line's last save
+ * succeeded.
+ */
+export interface AutosaveRegistry {
+  register(key: string, autosave: QuantityAutosave): () => void;
+  pending(): boolean;
+  settled(): Promise<boolean>;
+}
+
+export function createAutosaveRegistry(): AutosaveRegistry {
+  const lines = new Map<string, QuantityAutosave>();
+  return {
+    register(key, autosave) {
+      lines.set(key, autosave);
+      return () => {
+        if (lines.get(key) === autosave) lines.delete(key);
+      };
+    },
+    pending: () => [...lines.values()].some((autosave) => autosave.getState().pending),
+    async settled() {
+      const outcomes = await Promise.all([...lines.values()].map((autosave) => autosave.settled()));
+      return outcomes.every((outcome) => outcome.status === "ok");
+    },
+  };
+}
 
 export function createQuantityAutosave(options: QuantityAutosaveOptions): QuantityAutosave {
   const delayMs = options.delayMs ?? QUANTITY_SAVE_DELAY_MS;
@@ -66,10 +109,18 @@ export function createQuantityAutosave(options: QuantityAutosaveOptions): Quanti
   /** Bumped by every change, so a save can tell whether the shopper changed the quantity while it ran. */
   let version = 0;
   const listeners = new Set<() => void>();
+  let waiters: ((outcome: SaveOutcome) => void)[] = [];
 
   function set(next: AutosaveState): void {
-    if (disposed) return;
     state = next;
+    if (!next.pending && waiters.length > 0) {
+      const outcome: SaveOutcome =
+        next.failure === null ? OK : { status: "failed", failure: next.failure };
+      const resolve = waiters;
+      waiters = [];
+      for (const waiter of resolve) waiter(outcome);
+    }
+    if (disposed) return;
     for (const listener of [...listeners]) listener();
   }
 
@@ -82,7 +133,8 @@ export function createQuantityAutosave(options: QuantityAutosaveOptions): Quanti
 
   function send(): void {
     stopTimer();
-    if (inFlight || disposed) return;
+    // A request runs: `finished` sends the newer version after it (the timer is cleared, so it does not wait).
+    if (inFlight) return;
     const quantity = state.draft;
     if (quantity === null) return;
     if (quantity === options.serverQuantity()) {
@@ -91,7 +143,7 @@ export function createQuantityAutosave(options: QuantityAutosaveOptions): Quanti
     }
     inFlight = true;
     const sentVersion = version;
-    void options.save(quantity).then(
+    void options.save(quantity, disposed).then(
       (outcome) => finished(outcome, sentVersion),
       (error: unknown) => {
         // A throw is a bug, not a refused save: free the line and stay loud.
@@ -135,10 +187,21 @@ export function createQuantityAutosave(options: QuantityAutosaveOptions): Quanti
     flush() {
       if (timer !== null) send();
     },
+    settled() {
+      if (!state.pending) {
+        return Promise.resolve(
+          state.failure === null ? OK : { status: "failed", failure: state.failure },
+        );
+      }
+      const promise = new Promise<SaveOutcome>((resolve) => waiters.push(resolve));
+      if (timer !== null) send();
+      return promise;
+    },
     dispose() {
-      stopTimer();
       disposed = true;
       listeners.clear();
+      // A change still waiting for its delay goes now; one made during a request goes after it (`finished`).
+      if (timer !== null) send();
     },
   };
 }

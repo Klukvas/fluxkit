@@ -417,6 +417,38 @@ describe("CartPageView: banner, acknowledge, checkout", () => {
   });
 });
 
+describe("CartPageView while quantities still save (review M1 of PR 211)", () => {
+  it("lets the checkout link wait with a visible 'saving' state, and shows a change refused after leaving", () => {
+    const onCheckout = vi.fn();
+    const waiting = renderToStaticMarkup(
+      <CartPageView {...props(ready(cartOf([cartLine("a")])))} onCheckout={onCheckout} leaving />,
+    );
+    expect(waiting).toMatch(
+      /<a [^>]*aria-busy="true"[^>]*aria-disabled="true"[^>]*>§cart\.checkout\.saving<\/a>/,
+    );
+    const element = CartPageView({ ...props(ready(cartOf([cartLine("a")]))), onCheckout });
+    const [link] = findElements(
+      element,
+      (candidate) => textOf(candidate.props.children as never) === "§cart.checkout",
+    );
+    (link?.props.onClick as (event: unknown) => void)({ preventDefault() {} });
+    expect(onCheckout).toHaveBeenCalledTimes(1);
+    const left = renderToStaticMarkup(
+      <CartPageView
+        {...props(ready(cartOf([cartLine("a")])))}
+        leftFailure={{
+          messageKey: "errors.rule.quantity_limit",
+          status: 409,
+          code: "rule_violation",
+          retryAfterSeconds: null,
+          fieldErrors: [],
+        }}
+      />,
+    );
+    expect(left).toContain("§cart.leftFailure");
+  });
+});
+
 describe("LineQuantityView", () => {
   const base = {
     title: "§a",

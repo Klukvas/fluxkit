@@ -164,3 +164,94 @@ test("the account pages have a side menu that marks the current section; 'Your d
   await openAccountMenu(page, "Account: Api");
   await expect(page.getByRole("banner").getByRole("button", { name: "Sign out" })).toBeVisible();
 });
+
+test("a quantity still saving when Checkout is pressed is not lost: the link waits for it (review M1 of PR 211)", async ({
+  page,
+  shopper,
+}) => {
+  const screwdriver = await shopper.variantBySku("demo-screwdriver", "DEMO-SCREWDRIVER");
+  await shopper.addToCart(screwdriver.id, 1);
+  // Every quantity write answers slowly, so the second click happens while the first request runs.
+  await page.route("**/store/cart/items/**", async (route) => {
+    if (route.request().method() !== "PATCH") return route.fallback();
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return route.fallback();
+  });
+  await page.goto("/en/cart");
+  await waitForHydration(page);
+  const increase = page.getByRole("button", { name: "Increase quantity of Demo Screwdriver" });
+  const firstWrite = page.waitForRequest(
+    (request) => request.method() === "PATCH" && request.url().includes("/store/cart/items/"),
+  );
+  await increase.click();
+  await firstWrite; // the request for 2 is in flight
+  await increase.click(); // 3, while it runs
+  const checkout = page.getByRole("link", { name: /^(Checkout|Saving your changes)/ });
+  await checkout.click();
+  await expect(checkout).toHaveText("Saving your changes…");
+  await expect(page.getByRole("heading", { level: 1, name: "Checkout" })).toBeVisible({
+    timeout: 15_000,
+  });
+  const cart = (await (await page.request.get("/store/cart")).json()) as {
+    lines: { quantity: number }[];
+  };
+  expect(cart.lines[0]?.quantity).toBe(3);
+});
+
+test("the header is one row of controls at 1280 in uk and en, and at 390 the controls stay in one row too", async ({
+  page,
+}) => {
+  for (const [width, locale] of [
+    [1280, "uk"],
+    [1280, "en"],
+    [390, "uk"],
+    [390, "en"],
+  ] as const) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.goto(`/${locale}`);
+    await waitForHydration(page).catch(() => undefined);
+    const tops = await page.locator("header > div > *").evaluateAll((items) =>
+      items
+        .filter((item) => item.getBoundingClientRect().width > 0)
+        .filter((item) => item.querySelector('[role="search"]') === null)
+        .map((item) => Math.round(item.getBoundingClientRect().top)),
+    );
+    expect(new Set(tops).size, `${String(width)} ${locale}: ${JSON.stringify(tops)}`).toBe(1);
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    );
+    expect(overflow, `${String(width)} ${locale}: no horizontal scroll`).toBe(false);
+  }
+});
+
+test("the header in Ukrainian: one dropdown open at a time, panels inside a 390 px screen, sign-out from the account menu", async ({
+  page,
+  shopper,
+}, testInfo) => {
+  await shopper.register(uniqueEmail(testInfo, "header-uk"), "a-Long-Password-123");
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.goto("/uk");
+  await expect(page.getByRole("banner").getByRole("link", { name: /^Кошик/ })).toHaveAccessibleName(
+    /товарів у кошику/,
+  );
+  const language = page.getByRole("button", { name: "Мова сайту: Українська" });
+  const account = page.getByRole("banner").getByRole("button", { name: "Акаунт: Api" });
+  await language.click();
+  await expect(page.getByRole("link", { name: "English" })).toBeVisible();
+  for (const panel of await page.locator("header details[open] > div").all()) {
+    const box = await panel.boundingBox();
+    expect(box !== null && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  }
+  await account.click();
+  await expect(language).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("link", { name: "English" })).toBeHidden();
+  await expect(page.getByRole("link", { name: "Мої замовлення" })).toBeVisible();
+  const box = await page.locator("header details[open] > div").boundingBox();
+  expect(box !== null && box.x >= 0 && box.x + box.width <= 390).toBe(true);
+  // Sign out on the home page: the menu closes and the header shows a guest.
+  await page.getByRole("banner").getByRole("button", { name: "Вийти" }).click();
+  await expect(
+    page.getByRole("banner").getByRole("button", { name: "Меню акаунта" }),
+  ).toBeVisible();
+  await expect(page.locator("header details[open]")).toHaveCount(0);
+});

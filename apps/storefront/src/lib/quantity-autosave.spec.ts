@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clientFailure } from "./failure";
-import { createQuantityAutosave, type SaveOutcome } from "./quantity-autosave";
+import {
+  createAutosaveRegistry,
+  createQuantityAutosave,
+  type SaveOutcome,
+} from "./quantity-autosave";
 
 /** A save whose answer the test releases by hand, and a server quantity that follows a successful save (like the store). */
 function harness(initial = 1) {
@@ -123,7 +127,7 @@ describe("cart line quantity autosave", () => {
     expect(line.autosave.getState()).toEqual({ draft: null, pending: false, failure: null });
   });
 
-  it("flush saves a waiting change at once; dispose stops the timer", async () => {
+  it("flush saves a waiting change at once; dispose sends a waiting change at once too and takes no new one", async () => {
     const line = harness(1);
     line.autosave.change(2);
     line.autosave.flush();
@@ -131,8 +135,90 @@ describe("cart line quantity autosave", () => {
     await line.answer();
     line.autosave.change(5);
     line.autosave.dispose();
+    expect(line.sent).toEqual([2, 5]);
+    line.autosave.change(7);
     await vi.advanceTimersByTimeAsync(1000);
+    expect(line.sent).toEqual([2, 5]);
+  });
+
+  it("loses no change when the page is left while a request runs (review M1 of PR 211)", async () => {
+    const line = harness(1);
+    line.autosave.change(2);
+    await vi.advanceTimersByTimeAsync(500); // the request for 2 is in flight
+    line.autosave.change(3); // a newer choice while it runs
+    // The island unmounts (the shopper clicked a link): flush, then dispose.
+    line.autosave.flush();
+    line.autosave.dispose();
+    await line.answer(); // the request for 2 answers after the navigation
+    expect(line.sent).toEqual([2, 3]);
+    await line.answer();
+    expect(line.shown()).toBe(3);
+  });
+
+  it("sends the saves made after the page was left as final, so their failure is reported to the shared cart", async () => {
+    const finals: boolean[] = [];
+    let server = 1;
+    const autosave = createQuantityAutosave({
+      serverQuantity: () => server,
+      save: (quantity, final) => {
+        finals.push(final);
+        if (quantity === 2) server = 2;
+        return Promise.resolve<SaveOutcome>(
+          quantity === 2 ? { status: "ok" } : { status: "failed", failure: refused },
+        );
+      },
+    });
+    autosave.change(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(finals).toEqual([false]);
+    autosave.change(9);
+    autosave.dispose(); // left with a change still waiting for its delay: it is sent at once, as final
+    await vi.advanceTimersByTimeAsync(0);
+    expect(finals).toEqual([false, true]);
+  });
+
+  it("settles: resolves once nothing waits or runs, with the last failure (the checkout link waits for it)", async () => {
+    const line = harness(1);
+    line.autosave.change(2);
+    let result: SaveOutcome | null = null;
+    void line.autosave.settled().then((outcome) => {
+      result = outcome;
+    });
+    // settled() saves a waiting change at once, without waiting for the delay.
+    await vi.advanceTimersByTimeAsync(0);
     expect(line.sent).toEqual([2]);
+    expect(result).toBeNull();
+    await line.answer({ status: "failed", failure: refused });
+    expect(result).toEqual({ status: "failed", failure: refused });
+    // Settled again: the last outcome at once (no request).
+    expect(await line.autosave.settled()).toEqual({ status: "failed", failure: refused });
+    expect(line.sent).toEqual([2]);
+    expect(await harness(1).autosave.settled()).toEqual({ status: "ok" });
+  });
+
+  it("lets the checkout link wait for every line: pending while one waits, settled true only when all saved", async () => {
+    const registry = createAutosaveRegistry();
+    const a = harness(1);
+    const b = harness(1);
+    const unregisterA = registry.register("a", a.autosave);
+    registry.register("b", b.autosave);
+    expect(registry.pending()).toBe(false);
+    expect(await registry.settled()).toBe(true);
+    a.autosave.change(2);
+    b.autosave.change(3);
+    expect(registry.pending()).toBe(true);
+    let ok: boolean | null = null;
+    void registry.settled().then((value) => {
+      ok = value;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect([a.sent, b.sent]).toEqual([[2], [3]]); // sent at once, no delay
+    await a.answer();
+    expect(ok).toBeNull();
+    await b.answer({ status: "failed", failure: refused });
+    expect(ok).toBe(false);
+    unregisterA();
+    expect(registry.pending()).toBe(false);
   });
 
   it("returns the same state object while nothing changed (useSyncExternalStore)", () => {

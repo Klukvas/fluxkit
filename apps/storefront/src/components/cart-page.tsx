@@ -16,7 +16,8 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
 import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
 import { cartPageHandlers } from "../lib/cart-handlers";
 import {
@@ -28,11 +29,12 @@ import {
   noticeMoney,
 } from "../lib/cart-model";
 import { LOAD_BUSY_KEY, type CartAnnouncement, type CartState } from "../lib/cart-store";
-import { failureText } from "../lib/failure";
+import { failureText, type Failure } from "../lib/failure";
 import { allowedImageUrl } from "../lib/image-source";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import {
+  createAutosaveRegistry,
   createQuantityAutosave,
   idleAutosave,
   type AutosaveState,
@@ -54,10 +56,18 @@ export interface CartPageViewProps {
   imageHosts: readonly string[];
   onRetry: () => void;
   /** Resolves when the cart store applied the answer; a failure is returned to the line (not shown in the page alert). */
-  onSetQuantity: (variantId: string, quantity: number) => Promise<SaveOutcome>;
+  onSetQuantity: (variantId: string, quantity: number, final: boolean) => Promise<SaveOutcome>;
   onRemove: (variantId: string) => void;
   onAcknowledge: () => void;
   onDismissFailure: () => void;
+  /** Each line's autosave registers here, so the checkout link can wait for them (review M1 of PR 211). */
+  registerLine?: (variantId: string, autosave: QuantityAutosave) => () => void;
+  /** Checkout pressed while a quantity still saves: the link waits, shows it, and goes on once every line is saved. */
+  onCheckout?: (event: MouseEvent<HTMLAnchorElement>) => void;
+  leaving?: boolean;
+  /** A quantity change sent after the shopper left the cart page was refused (shown when they come back). */
+  leftFailure?: Failure | null;
+  onDismissLeftFailure?: () => void;
 }
 
 const ANNOUNCEMENT_KEYS: Record<CartAnnouncement, string> = {
@@ -127,11 +137,13 @@ function LineQuantity({
   disabled,
   t,
   onSetQuantity,
+  registerLine,
 }: {
   line: CartLine;
   disabled: boolean;
   t: Translator;
-  onSetQuantity: (variantId: string, quantity: number) => Promise<SaveOutcome>;
+  registerLine: ((variantId: string, autosave: QuantityAutosave) => () => void) | undefined;
+  onSetQuantity: (variantId: string, quantity: number, final: boolean) => Promise<SaveOutcome>;
 }) {
   const serverQuantity = useRef(line.quantity);
   useEffect(() => {
@@ -147,16 +159,18 @@ function LineQuantity({
   useEffect(() => {
     // Made in the effect (not in render), so React's strict double mount gets a fresh one after the first is disposed.
     const created = createQuantityAutosave({
-      save: (quantity) => onSetQuantity(variantId, quantity),
+      save: (quantity, final) => onSetQuantity(variantId, quantity, final),
       serverQuantity: () => serverQuantity.current,
     });
     setAutosave(created);
+    const unregister = registerLine?.(variantId, created);
     return () => {
-      // Leaving the page with a change still waiting for its delay: send it now (the store applies the answer).
-      created.flush();
+      unregister?.();
+      // Leaving the page: nothing is lost. A waiting change is sent now, one made during a request after it; their
+      // failure goes to the shared cart (`final`), since this line is gone.
       created.dispose();
     };
-  }, [variantId, onSetQuantity]);
+  }, [variantId, onSetQuantity, registerLine]);
   return (
     <LineQuantityView
       title={line.title}
@@ -181,6 +195,7 @@ export function CartLineView({
   imageHosts,
   onSetQuantity,
   onRemove,
+  registerLine,
 }: {
   line: CartLine;
   currency: string;
@@ -191,8 +206,9 @@ export function CartLineView({
   locale: Locale;
   exponent: number;
   imageHosts: readonly string[];
-  onSetQuantity: (variantId: string, quantity: number) => Promise<SaveOutcome>;
+  onSetQuantity: (variantId: string, quantity: number, final: boolean) => Promise<SaveOutcome>;
   onRemove: (variantId: string) => void;
+  registerLine?: (variantId: string, autosave: QuantityAutosave) => () => void;
 }) {
   const flags = lineFlags(line);
   const image = allowedImageUrl(line.image?.url, imageHosts);
@@ -270,7 +286,13 @@ export function CartLineView({
 
           <div className="flex flex-wrap items-center gap-3">
             {flags.canEditQuantity ? (
-              <LineQuantity line={line} disabled={cartBusy} t={t} onSetQuantity={onSetQuantity} />
+              <LineQuantity
+                line={line}
+                disabled={cartBusy}
+                t={t}
+                onSetQuantity={onSetQuantity}
+                registerLine={registerLine}
+              />
             ) : (
               <p className="text-foreground">
                 {t("cart.line.quantityFixed", { count: line.quantity })}
@@ -313,6 +335,11 @@ export function CartPageView({
   onRemove,
   onAcknowledge,
   onDismissFailure,
+  registerLine,
+  onCheckout,
+  leaving = false,
+  leftFailure = null,
+  onDismissLeftFailure = () => {},
 }: CartPageViewProps) {
   const { cart, failure } = state;
   const announcement =
@@ -334,6 +361,15 @@ export function CartPageView({
       >
         {announcement}
       </div>
+
+      {leftFailure === null ? null : (
+        <Alert variant="danger">
+          <p>{t("cart.leftFailure", { reason: failureText(t, leftFailure) })}</p>
+          <Button variant="secondary" className="mt-3" onClick={onDismissLeftFailure}>
+            {t("cart.failure.dismiss")}
+          </Button>
+        </Alert>
+      )}
 
       {cart !== null && failure !== null ? (
         <Alert variant="danger">
@@ -408,6 +444,7 @@ export function CartPageView({
                 imageHosts={imageHosts}
                 onSetQuantity={onSetQuantity}
                 onRemove={onRemove}
+                registerLine={registerLine}
               />
             ))}
           </ul>
@@ -434,8 +471,11 @@ export function CartPageView({
               <Link
                 href={localizedHref(locale, "/checkout")}
                 className={`${linkButton} self-start`}
+                onClick={onCheckout}
+                aria-busy={leaving}
+                {...(leaving ? { "aria-disabled": true } : {})}
               >
-                {t("cart.checkout")}
+                {leaving ? t("cart.checkout.saving") : t("cart.checkout")}
               </Link>
             ) : (
               <>
@@ -464,15 +504,31 @@ export function CartPage({
 }) {
   const { locale, t } = useI18n();
   const { state, store } = useCart();
+  const router = useRouter();
   // Stable callbacks: each line's autosave is made once per line, not on every render.
   const handlers = useMemo(() => cartPageHandlers(store), [store]);
+  const registry = useMemo(() => createAutosaveRegistry(), []);
+  const [leaving, setLeaving] = useState(false);
+  // A refusal of a quantity sent after the shopper left (review M1 of PR 211) lands in the shared cart's failure; the
+  // read below would clear it, so it is kept here and shown until dismissed.
+  const [leftFailure, setLeftFailure] = useState<Failure | null>(null);
 
   useEffect(() => {
+    const before = store.getState();
+    if (before.status !== "loading" && before.failure !== null) setLeftFailure(before.failure);
     // Arriving by navigation, the cart may be older than the shopper expects: read it again. On a direct page load the
     // first read is still in flight (`loading`), and a second one would be the double fetch the shared store avoids.
-    if (store.getState().status !== "loading") void store.refresh();
+    if (before.status !== "loading") void store.refresh();
     return () => store.dismissFailure();
   }, [store]);
+
+  async function checkoutWhenSaved(): Promise<void> {
+    setLeaving(true);
+    const saved = await registry.settled();
+    setLeaving(false);
+    // A refused quantity stays on this page with its reason on the line; the shopper decides again.
+    if (saved) router.push(localizedHref(locale, "/checkout"));
+  }
 
   return (
     <CartPageView
@@ -482,6 +538,16 @@ export function CartPage({
       exponent={exponent}
       imageHosts={imageHosts}
       {...handlers}
+      registerLine={registry.register}
+      leaving={leaving}
+      leftFailure={leftFailure}
+      onDismissLeftFailure={() => setLeftFailure(null)}
+      onCheckout={(event) => {
+        // Nothing waits: an ordinary link. A quantity still saving: wait for it, so the checkout starts from it.
+        if (!registry.pending() && !leaving) return;
+        event.preventDefault();
+        if (!leaving) void checkoutWhenSaved();
+      }}
     />
   );
 }

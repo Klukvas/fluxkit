@@ -18,8 +18,9 @@ export function useLogout() {
   const [pending, setPending] = useState(false);
   const [failure, setFailure] = useState<Failure | null>(null);
 
-  async function logout(): Promise<void> {
-    if (pending) return;
+  /** Resolves `true` after a successful sign-out (the caller may close its menu), `false` otherwise. */
+  async function logout(): Promise<boolean> {
+    if (pending) return false;
     setPending(true);
     setFailure(null);
     try {
@@ -27,14 +28,15 @@ export function useLogout() {
       if (outcome.status === "failed") {
         setFailure(outcome.failure);
         setPending(false);
-        return;
+        return false;
       }
       router.replace(localizedHref(locale, "/"));
+      return true;
     } catch (error) {
       setPending(false);
       throw error;
     }
   }
 
-  return { pending, failure, logout: () => void logout() };
+  return { pending, failure, logout };
 }

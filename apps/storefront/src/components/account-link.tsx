@@ -2,7 +2,7 @@
 
 import { Skeleton, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { accountLinks, guestLinks, sessionLinks } from "../layout/navigation";
 import { failureText, type Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
@@ -120,7 +120,23 @@ export function SignOutItemView({
 function SignOutItem() {
   const { t } = useI18n();
   const { pending, failure, logout } = useLogout();
-  return <SignOutItemView t={t} pending={pending} failure={failure} onLogout={logout} />;
+  const ref = useRef<HTMLSpanElement>(null);
+  return (
+    <span ref={ref} className="contents">
+      <SignOutItemView
+        t={t}
+        pending={pending}
+        failure={failure}
+        onLogout={() => {
+          // On the home page the path does not change after signing out, so close the menu here (review m5 of PR 211).
+          const menu = ref.current?.closest("details") ?? null;
+          void logout().then((done) => {
+            if (done && menu !== null) menu.open = false;
+          });
+        }}
+      />
+    </span>
+  );
 }
 
 /** The session comes from the shared account store (`SessionProvider`): one `GET /store/account/me` per page load; 401 means guest. */

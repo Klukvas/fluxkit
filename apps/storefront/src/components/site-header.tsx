@@ -78,7 +78,8 @@ export function SiteHeader({
         </HeaderDisclosure>
         <Link
           href={localizedHref(locale, "/")}
-          className="inline-flex min-h-11 shrink-0 items-center whitespace-nowrap text-lg font-bold text-foreground"
+          title={t("site.name")}
+          className="min-h-11 min-w-0 truncate text-lg leading-11 font-bold text-foreground max-lg:grow max-lg:basis-0 lg:shrink-0"
         >
           {t("site.name")}
         </Link>

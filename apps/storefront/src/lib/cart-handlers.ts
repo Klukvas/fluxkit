@@ -10,9 +10,16 @@ export function cartPageHandlers(store: CartStore) {
     onRetry: (): void => {
       void store.refresh();
     },
-    /** The line shows a failure itself (next to its quantity), so it is not reported in the page's alert as well. */
-    onSetQuantity: async (variantId: string, quantity: number): Promise<SaveOutcome> => {
-      const outcome = await store.setQuantity(variantId, quantity, { reportFailure: false });
+    /**
+     * The line shows a failure itself (next to its quantity), so it is not reported in the page's alert as well; a `final`
+     * save (sent after the shopper left the page, review M1 of PR 211) has no line any more, so its failure is reported.
+     */
+    onSetQuantity: async (
+      variantId: string,
+      quantity: number,
+      final = false,
+    ): Promise<SaveOutcome> => {
+      const outcome = await store.setQuantity(variantId, quantity, { reportFailure: final });
       return outcome.status === "ok" ? { status: "ok" } : outcome;
     },
     onRemove: (variantId: string): void => {
