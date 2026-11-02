@@ -8,6 +8,8 @@ import {
   isLineBusy,
   lineFlags,
   noticeMoney,
+  quantitiesByVariant,
+  stockWarnings,
 } from "./cart-model";
 import { CART_BUSY_KEY, initialCartState, type CartState } from "./cart-store";
 import { cartLine, cartOf } from "./test-fixtures";
@@ -153,5 +155,28 @@ describe("cartNoticeMessageKey", () => {
     expect(cartNoticeMessageKey("quantity_capped")).toBe("account.cartNotice.quantity_capped");
     expect(cartNoticeMessageKey("lines_dropped")).toBe("account.cartNotice.lines_dropped");
     expect(cartNoticeMessageKey("something_new")).toBe("account.cartNotice.generic");
+  });
+});
+
+describe("stockWarnings (review SQ-02: say it before the form is filled in)", () => {
+  it("lists out-of-stock lines (the checkout refuses them) and low-stock lines, never unavailable ones", () => {
+    const cart = cartOf([
+      cartLine("a", { availability: "out_of_stock", notices: [{ code: "out_of_stock" }] }),
+      cartLine("b", { availability: "low_stock" }),
+      cartLine("c"),
+      cartLine("d", { availability: "out_of_stock", notices: [{ code: "unavailable" }] }),
+    ]);
+    expect(stockWarnings(cart)).toEqual({
+      outOfStock: [cart.lines[0]],
+      lowStock: [cart.lines[1]],
+    });
+    expect(stockWarnings(cartOf([cartLine("c")]))).toEqual({ outOfStock: [], lowStock: [] });
+  });
+});
+
+describe("quantitiesByVariant", () => {
+  it("maps each line's variant to its quantity, or null while there is no cart", () => {
+    expect(quantitiesByVariant(ready().cart)).toEqual(new Map([["v1", 3]]));
+    expect(quantitiesByVariant(initialCartState.cart)).toBeNull();
   });
 });
