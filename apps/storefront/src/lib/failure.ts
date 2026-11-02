@@ -133,6 +133,20 @@ export function missingRequired(
   return fieldErrors.length === 0 ? null : clientFailure("errors.validation_failed", fieldErrors);
 }
 
+/**
+ * Two client-side field failures as one (the blank required fields and a format check), so the form reports every field at
+ * once; a field already reported as blank keeps that one message.
+ */
+export function mergeFieldFailures(first: Failure | null, second: Failure | null): Failure | null {
+  if (first === null) return second;
+  if (second === null) return first;
+  const seen = new Set(first.fieldErrors.map((error) => error.path));
+  return clientFailure(first.messageKey, [
+    ...first.fieldErrors,
+    ...second.fieldErrors.filter((error) => !seen.has(error.path)),
+  ]);
+}
+
 /** The message of a failure, with the wait of a 429 when the API gave one (`errors.retryAfter`, plural seconds). */
 export function failureText(t: Translator, failure: Failure): string {
   const message = t(failure.messageKey);

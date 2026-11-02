@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { clientFailure, focusAfterFailure, missingRequired, type Failure } from "../lib/failure";
+import {
+  clientFailure,
+  focusAfterFailure,
+  mergeFieldFailures,
+  missingRequired,
+  type Failure,
+} from "../lib/failure";
 
 /**
  * State of one form that submits to the store API: the values, the last failure, a pending flag, and where focus goes after
@@ -42,11 +48,16 @@ export function useForm<V extends Record<string, string>>(options: {
       required: readonly (keyof V & string)[];
       leaves: boolean;
       run: (values: V) => Promise<Failure | null>;
+      /** Field checks made in the browser too (the phone's format), reported together with the blank required fields. */
+      check?: (values: V) => Failure | null;
     },
   ): Promise<void> {
     event.preventDefault();
     if (submitting.current) return;
-    const missing = missingRequired(values, config.required);
+    const missing = mergeFieldFailures(
+      missingRequired(values, config.required),
+      config.check?.(values) ?? null,
+    );
     if (missing !== null) {
       setFailure(missing);
       return;

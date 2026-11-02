@@ -790,6 +790,12 @@ export function CheckoutPage({
             checkoutConfig,
           ),
           leaves: true,
+          check: (submitted) => {
+            const text = submitted["phone"] ?? "";
+            if (text.trim() === "") return null; // reported as a blank required field
+            const phone = checkPhone(text, checkoutConfig.phoneDefaultCountry);
+            return phone.ok ? null : phoneFailure("phone", phone.problem);
+          },
           run: async (submitted) => {
             setOrdersHref(null);
             // The phone is checked here (friendly per-field texts) and sent as E.164; the API still judges it.

@@ -5,11 +5,13 @@ import { vi } from "vitest";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import {
+  clientFailure,
   failureFromResult,
   failureFromThrown,
   failureText,
   focusAfterFailure,
   focusTarget,
+  mergeFieldFailures,
   missingRequired,
   retryAfterSeconds,
 } from "./failure";
@@ -169,6 +171,25 @@ describe("focusTarget", () => {
       failed(400, "validation_failed", { errors: [{ path: "somethingElse", code: "invalid" }] }),
     );
     expect(focusTarget(unknownField, order)).toEqual({ kind: "summary" });
+  });
+});
+
+describe("mergeFieldFailures (blank fields and a format check reported together)", () => {
+  it("keeps every field once, the blank one's message first", () => {
+    const blank = missingRequired({ city: "", phone: "" }, ["city", "phone"]);
+    const format = clientFailure("errors.validation_failed", [
+      { path: "phone", code: "too_short", messageKey: "checkout.field.phone.error.too_short" },
+      { path: "email", code: "invalid", messageKey: "errors.field.invalid_format" },
+    ]);
+    expect(mergeFieldFailures(blank, format)?.fieldErrors.map((error) => error.path)).toEqual([
+      "city",
+      "phone",
+      "email",
+    ]);
+    expect(mergeFieldFailures(blank, format)?.fieldErrors[1]?.code).toBe("required");
+    expect(mergeFieldFailures(null, format)).toBe(format);
+    expect(mergeFieldFailures(blank, null)).toBe(blank);
+    expect(mergeFieldFailures(null, null)).toBeNull();
   });
 });
 
