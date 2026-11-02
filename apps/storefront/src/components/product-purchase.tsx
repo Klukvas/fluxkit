@@ -258,7 +258,7 @@ export function ProductPurchaseView({
 
         <div
           data-product-summary=""
-          className="flex flex-col gap-4 lg:sticky lg:top-6 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1 lg:self-start"
+          className="fk-product-summary flex flex-col gap-4 lg:sticky lg:top-6 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1 lg:self-start"
         >
           <h1 className={textStyles.pageTitle}>{product.title}</h1>
           {brand === null ? null : (
@@ -470,7 +470,13 @@ export function ProductPurchaseView({
           min={MIN_LINE_QUANTITY}
           max={Math.max(MIN_LINE_QUANTITY, room)}
           canAdd={purchasable && !pending}
-          addLabel={pending ? t("product.adding") : t("product.addToCart")}
+          addLabel={
+            pending
+              ? t("product.adding")
+              : soldOut
+                ? t("availability.out_of_stock")
+                : t("product.addToCart")
+          }
           decreaseLabel={t("product.quantity.decrease")}
           increaseLabel={t("product.quantity.increase")}
           onQuantity={(next) => {

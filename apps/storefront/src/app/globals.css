@@ -117,6 +117,19 @@
   .fk-bottom-bar {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0));
   }
+  /*
+   * The product page's sticky summary (`product-purchase.tsx`, from `lg`): never taller than the viewport, so its button and
+   * the trust bar cannot stay below the fold while the left column scrolls (review m4 of PR 217); a long summary scrolls on its
+   * own. The inline padding (with the same negative margin) keeps the controls' focus rings inside the scroll box.
+   */
+  @media (width >= 64rem) {
+    .fk-product-summary {
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      @apply -mx-2 px-2 py-1;
+    }
+  }
   /* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
   .fk-icon {
     @apply fill-none stroke-current stroke-2;

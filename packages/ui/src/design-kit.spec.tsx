@@ -134,6 +134,12 @@ describe("StepIndicator", () => {
     expect(markup).toContain('<span class="sr-only"> completed</span>');
   });
 
+  // Review m2 of PR 217: below `md` the list is visually hidden, so its link must not be a focus stop there.
+  it("hides the link below md and shows the same step as plain text instead", () => {
+    expect(String(first(markup, "a").attributes.class).split(" ")).toContain("max-md:hidden");
+    expect(markup).toMatch(/<\/a><span class="inline-flex items-center gap-2 md:hidden">/);
+  });
+
   it("shows the compact line below md only, hidden from assistive technology", () => {
     const compact = first(markup, "p");
     expect(compact.attributes["aria-hidden"]).toBe("true");

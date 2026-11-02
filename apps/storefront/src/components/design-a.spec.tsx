@@ -102,6 +102,14 @@ describe("ProductCard (review D-07, D-15)", () => {
       />,
     );
 
+  // Review m5 of PR 217: a title cut at two lines can still be read in full by a mouse user (a tooltip on the heading, not on
+  // the link, so the link's accessible name and description stay the title once).
+  it("gives the clamped title heading the full title as a tooltip, not the link", () => {
+    const html = card("in_stock");
+    expect(html).toMatch(/<h2 class="[^"]*line-clamp-2[^"]*" title="§lamp">/);
+    expect(html).not.toMatch(/<a [^>]*title=/);
+  });
+
   it("shows no stock badge for in stock, but keeps the words for assistive technology", () => {
     const html = card("in_stock");
     expect(html).toContain('<span class="sr-only">§availability.in_stock</span>');

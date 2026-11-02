@@ -298,3 +298,106 @@ test("account pages have breadcrumbs: Home / My account / section", async ({
   );
   await expect(crumbs.locator('[aria-current="page"]')).toHaveText("My orders");
 });
+
+// Review of PR 217 (minors m1 to m4).
+
+/** A CSS colour as the browser computes it, for comparing a computed style with a token. */
+async function resolvedColor(page: Page, token: string): Promise<string> {
+  return page.evaluate((name) => {
+    const probe = document.createElement("span");
+    probe.style.color = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    document.body.append(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  }, token);
+}
+
+test("the chosen option keeps its primary border under the mouse (review m1)", async ({ page }) => {
+  await page.goto("/en/p/demo-t-shirt?opt.color=black&opt.size=m");
+  await waitForHydration(page);
+  const chosen = page
+    .getByRole("group", { name: "Size", exact: true })
+    .getByText("M", { exact: true });
+  const other = page
+    .getByRole("group", { name: "Size", exact: true })
+    .getByText("S", { exact: true });
+  const border = (locator: Locator) =>
+    locator.evaluate((element) => getComputedStyle(element).borderTopColor);
+  const primary = await resolvedColor(page, "--fk-color-primary");
+  const input = await resolvedColor(page, "--fk-color-border-input");
+  await chosen.hover();
+  expect(await border(chosen)).toBe(primary);
+  // An unchosen value still answers the mouse.
+  await other.hover();
+  expect(await border(other)).toBe(input);
+});
+
+test("on a phone the hidden step list has no focus stop of its own (review m2, WCAG 2.4.7)", async ({
+  page,
+  shopper,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const screwdriver = await shopper.variantBySku("demo-screwdriver", "DEMO-SCREWDRIVER");
+  await shopper.addToCart(screwdriver.id, 1);
+  await page.goto("/en/checkout");
+  await expect(page.getByRole("heading", { level: 1, name: "Checkout" })).toBeVisible();
+  await expect(page.getByText("Step 2 of 3: Checkout")).toBeVisible();
+  const email = page.getByRole("textbox", { name: "Email" });
+  const stops: { inSteps: boolean; width: number; height: number }[] = [];
+  for (let step = 0; step < 60; step += 1) {
+    if (await email.evaluate((element) => element === document.activeElement)) break;
+    await page.keyboard.press("Tab");
+    stops.push(
+      await page.evaluate(() => {
+        const element = document.activeElement as HTMLElement;
+        const box = element.getBoundingClientRect();
+        return {
+          inSteps: element.closest('nav[aria-label="Checkout progress"]') !== null,
+          width: box.width,
+          height: box.height,
+        };
+      }),
+    );
+  }
+  expect(await email.evaluate((element) => element === document.activeElement)).toBe(true);
+  expect(stops.filter((stop) => stop.inSteps)).toEqual([]);
+  expect(stops.filter((stop) => stop.width <= 1 || stop.height <= 1)).toEqual([]);
+  // Screen readers still get the steps with the current one.
+  await expect(
+    page.getByRole("navigation", { name: "Checkout progress" }).locator('[aria-current="step"]'),
+  ).toHaveText(/Checkout/);
+});
+
+test("on a phone the buy bar says 'Out of stock' for a sold-out variant, like the button (review m3)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/en/p/demo-t-shirt?opt.color=red&opt.size=l");
+  await waitForHydration(page);
+  await expect(page.getByRole("button", { name: "Out of stock" })).toBeDisabled();
+  const bar = page.locator(".fk-bottom-bar.fixed");
+  await expect(bar.locator("button").last()).toHaveText("Out of stock");
+  await expect(bar.locator("button").last()).toBeDisabled();
+});
+
+test("the sticky summary never runs past a short viewport: it scrolls on its own (review m4)", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.goto("/en/p/demo-t-shirt?opt.color=black&opt.size=m");
+  await waitForHydration(page);
+  const summary = page.locator("[data-product-summary]");
+  await page.mouse.wheel(0, 300);
+  await expect
+    .poll(async () => Math.round((await summary.boundingBox())?.y ?? -1))
+    .toBeLessThanOrEqual(32);
+  const box = await summary.boundingBox();
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(480);
+  // The button and the trust bar are reachable inside it.
+  const add = summary.getByRole("button", { name: "Add to cart" });
+  await add.scrollIntoViewIfNeeded();
+  await expect(add).toBeInViewport();
+  await summary.getByRole("list", { name: "About your purchase" }).scrollIntoViewIfNeeded();
+  await expect(summary.getByRole("list", { name: "About your purchase" })).toBeInViewport();
+});

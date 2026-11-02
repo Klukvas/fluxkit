@@ -103,7 +103,9 @@ export function ProductCard({
           {product.brand.name}
         </Link>
       )}
-      <Heading className="line-clamp-2 font-medium text-foreground">
+      {/* The full title as a tooltip where two lines cut it (review m5 of PR 217); on the heading, not the link, so the
+          link's name is not repeated as its description. */}
+      <Heading className="line-clamp-2 font-medium text-foreground" title={product.title}>
         <Link
           href={href}
           className="after:absolute after:inset-0 group-hover:underline group-hover:underline-offset-4 focus-visible:outline-none"

@@ -140,3 +140,21 @@ bottoms 573/573/597/573). Pre-existing flake found, not caused here: `mobile-ux.
 fails about 1 in 6 on main's code too (5 of 30 runs; 1 of 20 on this branch): the search box swaps from its Suspense fallback while measured.
 Not verified: Safari and Firefox, a real screen reader, the dark theme (batch B), admin e2e (admin unit tests only; `packages/ui` changes are additive
 apart from the `Button` hover and the type/space mapping, whose values are unchanged).
+
+## Review fixes (PR 217, independent review: no blocker, no major, m1 to m8)
+
+| Finding | Fix | Test (failed first on `e5c425a`, passes now) |
+|---|---|---|
+| m1 hovering the chosen option turned its border grey | `OptionPicker` hover scoped to an unchecked value (`peer-not-checked:hover:border-border-input`) | e2e computed border of the chosen chip on hover = primary (was `rgb(100,116,139)`), an unchosen chip still = border-input |
+| m2 below `md` the visually hidden step list kept a focusable "Cart" link (WCAG 2.4.7) | `StepIndicator`: the link is `max-md:hidden`, the same step is plain text `md:hidden` | e2e Tab walk at 390 to the email field: no stop inside the steps nav, none 1 px (was the 60x24 link); ui spec |
+| m3 phone buy bar said "Add to cart" for a sold-out variant | the bar gets the inline button's label | e2e at 390 on red L: bar button "Out of stock", disabled |
+| m4 sticky summary had no height guard | `.fk-product-summary` (`app/globals.css`, from `lg`): `max-height: calc(100vh - 3rem)`, own scroll, inline padding for focus rings | e2e at 1280x480: summary bottom <= 480 (was 548), button and trust bar reachable |
+| m5 clamped titles had no full text for mouse users | `title` on the card heading (not the link: its name is not repeated as a description) | unit `design-a.spec.tsx` |
+| m6 the tightened guard can break a fork's merge | migration note in `docs/contracts/theme-tokens.md` and the CHANGELOG line | docs |
+| m7 stale docs | HANDOFF (PR 217 open), `docs/files/theme.md` email-spec line | docs |
+| m8 trust bar demo copy outside the release placeholder check | not added to the check (it covers `legal.*` placeholder markers; extending it is more than one line and would show a marker to shoppers); owner action in `docs/HANDOFF.md` section 3 | docs |
+
+Pre-existing flake of PR 216 (`mobile-ux.e2e.ts`, "the header has no search icon and keeps its one row"): fixed in the TEST, which now reads
+each box only once it is stable (`stableBox`: two equal reads 100 ms apart); 40 of 40 runs passed (`--repeat-each=20`, both widths), it failed
+5 of 30 on `d37bb4d`. Re-verified: lint, format:check, typecheck, check:boundaries, check:docs, check:env, check:licenses all exit 0; unit theme 71,
+ui 200, storefront 1774, admin 1662 passed; full storefront e2e 130 passed, 4 skipped (`search-off`, by design).

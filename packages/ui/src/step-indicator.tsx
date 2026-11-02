@@ -75,17 +75,26 @@ export function StepIndicator({
               {...(state === "current" ? { "aria-current": "step" as const } : {})}
             >
               {state === "done" && step.href ? (
-                <a
-                  href={step.href}
-                  className={cn(
-                    "inline-flex min-h-6 items-center gap-2 rounded-md underline-offset-4 hover:underline",
-                    focusRing,
-                  )}
-                >
-                  {number}
-                  {text}
-                  {done}
-                </a>
+                <>
+                  {/* Below `md` the list is only for assistive technology: a link there would be a focus stop nobody sees
+                      (review m2 of PR 217, WCAG 2.4.7), so the step is plain text there and a link from `md`. */}
+                  <a
+                    href={step.href}
+                    className={cn(
+                      "inline-flex min-h-6 items-center gap-2 rounded-md underline-offset-4 hover:underline max-md:hidden",
+                      focusRing,
+                    )}
+                  >
+                    {number}
+                    {text}
+                    {done}
+                  </a>
+                  <span className="inline-flex items-center gap-2 md:hidden">
+                    {number}
+                    {text}
+                    {done}
+                  </span>
+                </>
               ) : (
                 <span className="inline-flex items-center gap-2">
                   {number}

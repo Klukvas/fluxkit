@@ -30,6 +30,11 @@ step outside a scale (`text-5xl`, `rounded-xl`, `shadow-md`) would use a Tailwin
 (page title, section title, subsection title, meta) are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
 so a dark theme only sets values. Controls have no colour transition: it would also animate `outline-color`, so the focus ring would fade in.
 
+**Migration note for client forks (2026-11-03, not a SemVer break: the tokens are additive):** after merging this upstream change, `pnpm test`
+fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a size, radius or shadow outside the scales (`text-5xl`,
+`rounded-xl`, `shadow-md`, a bare `rounded` or `shadow`). Fix: replace the class with a scale step, or extend the scale in all three places:
+a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
+
 Themes: `light` (default) and `dark`, selected with `data-theme` on `<html>`. Both define exactly the same token names (enforced by a test).
 Rebranding a client = changing values in `tokens.css` (or adding a preset block); no component edits.
 
