@@ -1,13 +1,14 @@
 export { Alert, type AlertProps, type AlertVariant } from "./alert";
 export { Badge, type BadgeProps, type BadgeVariant } from "./badge";
 export { Breadcrumbs, type BreadcrumbItem, type BreadcrumbsProps } from "./breadcrumbs";
-export { Button, type ButtonProps, type ButtonVariant } from "./button";
+export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";
 export { Checkbox, type CheckboxProps } from "./checkbox";
 export { cn } from "./cn";
 export { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 export { Container } from "./container";
 export { DataTable, type DataTableColumn, type DataTableProps } from "./data-table";
+export { Disclosure, type DisclosureProps } from "./disclosure";
 export {
   DescriptionList,
   type DescriptionListItem,
@@ -37,7 +38,7 @@ export {
 } from "./locale-text-field";
 export { OptionPicker, type OptionPickerProps, type OptionPickerValue } from "./option-picker";
 export { Pagination, pageItems, type PaginationProps } from "./pagination";
-export { PriceText, type PriceTextProps } from "./price-text";
+export { PriceText, type PriceDiscount, type PriceTextProps } from "./price-text";
 export { ProductImage, type ProductImageProps } from "./product-image";
 export { clampQuantity, QuantityInput, type QuantityInputProps } from "./quantity-input";
 export { Select, type SelectProps } from "./select";
@@ -51,8 +52,11 @@ export {
 export { Skeleton } from "./skeleton";
 export { SkipLink, type SkipLinkProps } from "./skip-link";
 export { Spinner, type SpinnerProps } from "./spinner";
+export { StepIndicator, type Step, type StepIndicatorProps } from "./step-indicator";
 export { StatusBadge, type StatusBadgeProps, type StatusTone } from "./status-badge";
 export { nextTabIndex } from "./tab-navigation";
 export { Tabs, type TabItem, type TabsProps } from "./tabs";
 export { Textarea, type TextareaProps } from "./textarea";
+export { textStyles } from "./styles";
+export { TrustBar, type TrustBarItem, type TrustBarProps } from "./trust-bar";
 export { VisuallyHidden } from "./visually-hidden";

@@ -23,7 +23,10 @@ import { SideNav } from "./side-nav";
 import { SkipLink } from "./skip-link";
 import { Spinner } from "./spinner";
 import { StatusBadge } from "./status-badge";
+import { StepIndicator } from "./step-indicator";
 import { Tabs } from "./tabs";
+import { TrustBar } from "./trust-bar";
+import { Disclosure } from "./disclosure";
 import { render, text } from "./test-helpers";
 
 // Every user-facing string must come from props (AGENTS.md section 2.2). Each component is rendered with sentinel
@@ -252,6 +255,53 @@ const cases: [string, ReactElement][] = [
   ],
   ["StatusBadge", <StatusBadge key="w" tone="success" label={s("status")} />],
   ["LiveRegion", <LiveRegion key="x">{s("saved")}</LiveRegion>],
+  [
+    "PriceText with a discount",
+    <PriceText
+      key="y1"
+      price={s("p")}
+      compareAt={s("c")}
+      compareAtLabel={s("was")}
+      discount={{ text: s("off"), label: s("save") }}
+    />,
+  ],
+  [
+    "OptionPicker with a sold-out value",
+    <OptionPicker
+      key="y2"
+      name="o2"
+      legend={s("legend")}
+      values={[{ value: "v", label: s("v"), soldOut: true }]}
+      selected={null}
+      onChange={() => undefined}
+      soldOutLabel={s("soldOut")}
+    />,
+  ],
+  [
+    "TrustBar",
+    <TrustBar
+      key="y3"
+      label={s("trust")}
+      items={[{ key: "a", icon: <svg aria-hidden="true" />, text: s("delivery") }]}
+    />,
+  ],
+  [
+    "StepIndicator",
+    <StepIndicator
+      key="y4"
+      label={s("steps")}
+      steps={[{ label: s("cart"), href: "/cart" }, { label: s("checkout") }, { label: s("order") }]}
+      current={1}
+      completedLabel={s("done")}
+      compactText={s("compact")}
+    />,
+  ],
+  [
+    "Disclosure",
+    <Disclosure key="y5" title={s("title")} headingId="d">
+      {s("body")}
+    </Disclosure>,
+  ],
 ];
 
 describe("no hardcoded user-facing text in ui components", () => {
