@@ -11,7 +11,6 @@ import { HeaderDisclosure, menuItem } from "./header-menu";
 import { useI18n } from "./i18n-provider";
 import { UserIcon } from "./icons";
 import { useAccount } from "./session-provider";
-import { focusRing } from "./styles";
 import { useLogout } from "./use-logout";
 
 /**
@@ -46,7 +45,7 @@ export function AccountLinkView({
       <Link
         href={localizedHref(locale, sessionLinks.account)}
         aria-label={t("nav.account.account")}
-        className={`${slot} rounded-md text-foreground hover:bg-muted ${focusRing}`}
+        className="fk-header-button"
       >
         <UserIcon />
       </Link>

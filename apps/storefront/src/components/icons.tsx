@@ -4,20 +4,17 @@ import type { SVGProps } from "react";
  * Decorative line icons of the header (24 x 24, stroke `currentColor`, so they take the text colour token). Always hidden from
  * assistive technology: the control around an icon carries the translated name. Replace them here to restyle the shop.
  */
-function Icon({ children, ...props }: SVGProps<SVGSVGElement>) {
+function Icon({ children, className = "", ...props }: SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"
       width="24"
       height="24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      // Stroke and fill come from `.fk-icon` (app/globals.css): fewer bytes in every page's header.
       aria-hidden="true"
       focusable="false"
       {...props}
+      className={className === "" ? "fk-icon" : `fk-icon ${className}`}
     >
       {children}
     </svg>

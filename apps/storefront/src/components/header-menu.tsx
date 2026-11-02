@@ -2,7 +2,6 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { focusRing } from "./styles";
 
 /**
  * A header dropdown (the menu, the language and the account): a native `<details>` with its `<summary>` as the button, so it
@@ -44,18 +43,13 @@ export function HeaderDisclosure({
       className={`group relative ${className}`}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary
-        role="button"
-        aria-expanded={open}
-        aria-label={label}
-        className={`inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted [&::-webkit-details-marker]:hidden ${focusRing}`}
-      >
+      <summary role="button" aria-expanded={open} aria-label={label} className="fk-header-button">
         {summary}
       </summary>
       <div
-        className={`absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-card ${
-          align === "end" ? "end-0" : "start-0"
-        } ${panelClassName}`}
+        className={`fk-menu-panel ${align === "end" ? "end-0" : "start-0"}${
+          panelClassName === "" ? "" : ` ${panelClassName}`
+        }`}
       >
         {children}
       </div>
@@ -63,8 +57,11 @@ export function HeaderDisclosure({
   );
 }
 
-/** Classes of one entry of a dropdown panel (a link or a button), tokens only. */
-export const menuItem = `flex min-h-11 w-full items-center gap-2 whitespace-nowrap rounded-md px-3 text-start text-foreground hover:bg-muted ${focusRing}`;
+/**
+ * Class of one entry of a dropdown panel (a link or a button): `.fk-menu-item` in `app/globals.css` (tokens only, through
+ * `@apply`), one short class because the header is in every page's first HTML (see the note there).
+ */
+export const menuItem = "fk-menu-item";
 
 /** Closes an open `<details>` on Escape (focus back to its summary), on a pointer or focus outside, and after a navigation. */
 export function useDismiss(ref: { current: HTMLDetailsElement | null }): void {

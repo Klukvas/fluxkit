@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { homeSections } from "../layout/home";
-import { MAIN_CONTENT_ID } from "../layout/navigation";
+import { HEADER_CATEGORY_LIMIT, MAIN_CONTENT_ID } from "../layout/navigation";
 import { AccountLinkView, SignOutItemView } from "./account-link";
 import { CartBadgeView } from "./cart-badge";
 import { homeSectionRegistry, HomeSections } from "./home-sections";
@@ -114,6 +114,32 @@ describe("SiteShell landmarks and accessibility", () => {
   });
 });
 
+describe("header size (it is in every page's first HTML)", () => {
+  it("stays small, so the sign-in and registration forms still render before their script runs", () => {
+    // React 19.3 moves a finished page section out of place (to be put back by a script) once the HTML before it plus the
+    // section pass 12 800 bytes (`progressiveChunkSize`); the e2e `pre-hydration-forms` test then sees only the loading
+    // view. Measured 2026-11-02 with the real build: header 4.7 KB, `/uk/account/register` inline; at 5.3 KB it was not.
+    const longNames = Array.from({ length: HEADER_CATEGORY_LIMIT }, (_, index) => ({
+      slug: `category-${String(index)}`,
+      name: `§Category name ${String(index)}`,
+    }));
+    const html = renderToStaticMarkup(
+      <SiteShell
+        locale="uk"
+        messages={sentinelMessages}
+        t={t}
+        categories={longNames}
+        searchEnabled={false}
+        year={2026}
+      >
+        §child
+      </SiteShell>,
+    );
+    const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
+    expect(new TextEncoder().encode(header).length).toBeLessThan(4300); // 3 802 bytes on 2026-11-02 (six categories, no search box)
+  });
+});
+
 describe("header islands", () => {
   it("shows the cart as an icon with a count badge only above 0, a spoken count, and a fixed slot (no layout shift)", () => {
     const slot = (state: Parameters<typeof CartBadgeView>[0]["state"]) =>
@@ -124,7 +150,8 @@ describe("header islands", () => {
     const many = slot({ status: "ready", count: 150 });
     const failed = slot({ status: "error" });
     for (const html of [loading, ready, zero, failed, many]) {
-      expect(html).toContain("min-h-11 min-w-11");
+      // The 44 px slot (`.fk-header-button`: min-h-11 min-w-11 in app/globals.css) in every state.
+      expect(html).toContain(`class="fk-header-button"`);
       expect(html).toContain('href="/uk/cart"');
       expect(html).toContain("§nav.cart");
       expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
@@ -182,7 +209,8 @@ describe("header islands", () => {
     expect(loading).toContain("§nav.account.loading");
     expect(loading).not.toContain("<a ");
     expect(loading).not.toContain("<details");
-    for (const html of [guest, signedIn, loading]) expect(html).toContain("min-h-11 min-w-11");
+    for (const html of [guest, signedIn]) expect(html).toContain(`class="fk-header-button"`);
+    expect(loading).toContain("min-h-11 min-w-11");
   });
 
   it("signs out from the account menu with a busy state and shows a failed sign-out as an alert", () => {
@@ -238,8 +266,8 @@ describe("header islands", () => {
       /<details[^>]*><summary role="button" aria-expanded="false" aria-label="§locale\.switcher\.current"/,
     );
     expect(html).toContain("§locale.short.uk");
-    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-ua rounded-sm ring-1 ring-border"><\/span>/);
-    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-gb rounded-sm ring-1 ring-border"><\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-ua"><\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-gb"><\/span>/);
     expect(html).toMatch(/<span lang="uk" aria-current="true"/);
     expect(html).toContain('href="/en/catalog?page=2"');
     expect(html).toContain('hrefLang="en"');

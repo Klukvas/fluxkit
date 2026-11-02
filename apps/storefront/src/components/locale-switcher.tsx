@@ -2,7 +2,7 @@
 
 import { locales, type Locale, type Translator } from "@fluxkit/ui";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { switchLocalePath } from "../lib/locale-path";
 import { flagClass } from "../config/locale-flags";
 import { HeaderDisclosure, menuItem } from "./header-menu";
@@ -31,6 +31,27 @@ export function LocaleSwitcherView({
   hash?: string;
 }) {
   return (
+    <LocaleMenuFrame locale={locale} t={t}>
+      <LocaleListView locale={locale} t={t} pathname={pathname} search={search} hash={hash} />
+    </LocaleMenuFrame>
+  );
+}
+
+/**
+ * The nav and the dropdown around the list. Kept OUTSIDE the list's Suspense boundary: the server renders the list without
+ * the query (its fallback) and the browser swaps the list in, so a dropdown opened before hydration stays open (found by the
+ * e2e language-switch scenario: a dropdown inside the boundary was replaced, closed, by the swap).
+ */
+function LocaleMenuFrame({
+  locale,
+  t,
+  children,
+}: {
+  locale: Locale;
+  t: Translator;
+  children: ReactNode;
+}) {
+  return (
     <nav aria-label={t("locale.switcher.label")}>
       <HeaderDisclosure
         label={t("locale.switcher.current", { name: t(`locale.name.${locale}`) })}
@@ -44,30 +65,48 @@ export function LocaleSwitcherView({
           </>
         }
       >
-        <ul className="flex flex-col">
-          {locales.map((target) => (
-            <li key={target}>
-              {target === locale ? (
-                <span lang={target} aria-current="true" className={`${menuItem} font-semibold`}>
-                  <span aria-hidden="true" className={flagClass(target)} />
-                  {t(`locale.name.${target}`)}
-                </span>
-              ) : (
-                <a
-                  lang={target}
-                  hrefLang={target}
-                  href={switchLocalePath(pathname, target, search, hash)}
-                  className={menuItem}
-                >
-                  <span aria-hidden="true" className={flagClass(target)} />
-                  {t(`locale.name.${target}`)}
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
+        {children}
       </HeaderDisclosure>
     </nav>
+  );
+}
+
+function LocaleListView({
+  locale,
+  t,
+  pathname,
+  search,
+  hash,
+}: {
+  locale: Locale;
+  t: Translator;
+  pathname: string;
+  search: string;
+  hash: string;
+}) {
+  return (
+    <ul className="flex flex-col">
+      {locales.map((target) => (
+        <li key={target}>
+          {target === locale ? (
+            <span lang={target} aria-current="true" className={`${menuItem} font-semibold`}>
+              <span aria-hidden="true" className={flagClass(target)} />
+              {t(`locale.name.${target}`)}
+            </span>
+          ) : (
+            <a
+              lang={target}
+              hrefLang={target}
+              href={switchLocalePath(pathname, target, search, hash)}
+              className={menuItem}
+            >
+              <span aria-hidden="true" className={flagClass(target)} />
+              {t(`locale.name.${target}`)}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -93,7 +132,7 @@ function WithSearch({ pathname }: { pathname: string }) {
   const query = useSearchParams().toString();
   const hash = useLocationHash(pathname, query);
   return (
-    <LocaleSwitcherView
+    <LocaleListView
       locale={locale}
       t={t}
       pathname={pathname}
@@ -111,8 +150,12 @@ export function LocaleSwitcher() {
   const { locale, t } = useI18n();
   const pathname = usePathname() ?? `/${locale}`;
   return (
-    <Suspense fallback={<LocaleSwitcherView locale={locale} t={t} pathname={pathname} search="" />}>
-      <WithSearch pathname={pathname} />
-    </Suspense>
+    <LocaleMenuFrame locale={locale} t={t}>
+      <Suspense
+        fallback={<LocaleListView locale={locale} t={t} pathname={pathname} search="" hash="" />}
+      >
+        <WithSearch pathname={pathname} />
+      </Suspense>
+    </LocaleMenuFrame>
   );
 }

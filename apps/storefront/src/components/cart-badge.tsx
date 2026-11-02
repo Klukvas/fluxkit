@@ -8,7 +8,6 @@ import { cartBadgeState, type CartBadgeState } from "../lib/cart-model";
 import { useI18n } from "./i18n-provider";
 import { CartIcon } from "./icons";
 import { useCart } from "./session-provider";
-import { focusRing } from "./styles";
 
 /**
  * The cart as an icon (owner request 2026-11-02). The count sits in a round badge on the icon (`danger` fill, its own
@@ -26,10 +25,7 @@ export function CartBadgeView({
   locale: Locale;
 }) {
   return (
-    <Link
-      href={localizedHref(locale, sessionLinks.cart)}
-      className={`relative inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-foreground hover:bg-muted ${focusRing}`}
-    >
+    <Link href={localizedHref(locale, sessionLinks.cart)} className="fk-header-button">
       <CartIcon />
       <VisuallyHidden>{t("nav.cart")}</VisuallyHidden>
       <span aria-live="polite">

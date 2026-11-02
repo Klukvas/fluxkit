@@ -9,7 +9,6 @@ import { HeaderDisclosure, menuItem } from "./header-menu";
 import { MenuIcon } from "./icons";
 import { LocaleSwitcher } from "./locale-switcher";
 import { SearchBox } from "./search-box";
-import { navLink } from "./styles";
 
 export interface NavigationCategory {
   slug: string;
@@ -84,10 +83,10 @@ export function SiteHeader({
           {t("site.name")}
         </Link>
         <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">
-          <ul className="flex flex-nowrap items-center gap-x-1 overflow-x-auto">
+          <ul className="flex flex-nowrap items-center gap-x-1 overflow-x-auto *:shrink-0">
             {links.map((link) => (
-              <li key={link.key} className="shrink-0">
-                <Link href={link.href} className={`${navLink} whitespace-nowrap`}>
+              <li key={link.key}>
+                <Link href={link.href} className="fk-nav-link">
                   {link.label}
                 </Link>
               </li>
