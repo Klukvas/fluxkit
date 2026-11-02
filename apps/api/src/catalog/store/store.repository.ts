@@ -8,6 +8,7 @@ import {
   brand,
   category,
   inventoryLevel,
+  location,
   media,
   option,
   optionValue,
@@ -87,6 +88,11 @@ export interface StockLevelRow {
   variantId: string;
   onHand: number;
   reserved: number;
+}
+
+/** A `StockLevelRow` of the cart, which also needs to know the level the checkout reserves from. */
+export interface CartStockLevelRow extends StockLevelRow {
+  isDefaultLocation: boolean;
 }
 
 /**
@@ -454,11 +460,15 @@ export class StoreRepository {
       .where(inArray(variant.id, [...variantIds]));
   }
 
-  /** The inventory levels (all locations) of the given variants, in one query (the cart shows an availability, never a quantity). */
+  /**
+   * The inventory levels (all locations) of the given variants, in one query, each marked when it is the default
+   * location's (where the checkout reserves). The cart shows an availability and a stock hint, never a quantity above
+   * the low-stock threshold.
+   */
   listStockLevelsForVariants(
     variantIds: readonly string[],
     executor: DbExecutor = this.db,
-  ): Promise<StockLevelRow[]> {
+  ): Promise<CartStockLevelRow[]> {
     if (variantIds.length === 0) {
       return Promise.resolve([]);
     }
@@ -467,8 +477,10 @@ export class StoreRepository {
         variantId: inventoryLevel.variantId,
         onHand: inventoryLevel.onHand,
         reserved: inventoryLevel.reserved,
+        isDefaultLocation: location.isDefault,
       })
       .from(inventoryLevel)
+      .innerJoin(location, eq(location.id, inventoryLevel.locationId))
       .where(inArray(inventoryLevel.variantId, [...variantIds]));
   }
 

@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import {
   deriveFacetSpecs,
   engineSort,
+  hasVariantLevelSelection,
   liveFacetSpecs,
   parseSearchQuery,
   parseSearchSort,
@@ -23,18 +24,25 @@ import {
 } from "@fluxkit/core";
 import { inArray } from "drizzle-orm";
 import type { StoreService } from "../../catalog/store/store.service.js";
+import type { PricingConfig } from "../../common/pricing-config.js";
 import { validationFailed, ProblemException } from "../../common/problem.js";
 import type { SearchPort } from "../../common/search-port.js";
 import { withTransaction } from "../../common/transaction.js";
 import type { Database } from "../../database/database.module.js";
 import { brand } from "../../database/schema/index.js";
 import { SearchEngineError, type SearchEngine } from "../engine/index.js";
-import { readSearchDefinitions, type SearchDefinitions } from "../indexer/index.js";
+import {
+  readSearchDefinitions,
+  readSearchProducts,
+  type SearchDefinitions,
+} from "../indexer/index.js";
 import type { SearchConfig } from "../search-config.js";
 import type { SearchRejections } from "../search-rejections.js";
 import { BusyRefusalLog } from "./busy-log.js";
+import { matchOfProduct } from "./search-match.js";
 import type {
   StoreSearchFacet,
+  StoreSearchItem,
   StoreSearchQuery,
   StoreSearchResponse,
   StoreSuggestQuery,
@@ -94,6 +102,7 @@ export class StoreSearchService {
     private readonly store: StoreService,
     private readonly port: SearchPort,
     private readonly rejections: SearchRejections,
+    private readonly pricing: Pick<PricingConfig, "shopCurrency" | "lowStockThreshold">,
   ) {
     this.busyLog = new BusyRefusalLog(this.logger, () => engine.interactiveLane().refused);
   }
@@ -163,17 +172,22 @@ export class StoreSearchService {
     const main = results.find((entry) => entry.planned.purpose === "hits")?.result ?? {};
     const productIds = uniqueProductIds(main);
     const hydrated = await this.store.listItemsByIds(productIds, locale.locale);
-    if (hydrated.missing.length > 0) {
-      // The index is behind: the product is no longer for sale. Mark it so the next sync removes its documents.
+    const matched = hasVariantLevelSelection(selection, specs)
+      ? await this.withMatches(hydrated.items, selection, definitions)
+      : { items: hydrated.items, stale: [] };
+    const stale = [...hydrated.missing, ...matched.stale];
+    if (stale.length > 0) {
+      // The index is behind: the product is no longer for sale, or none of its variants fits the selection any more.
+      // Mark it so the next sync rewrites or removes its documents.
       await withTransaction(this.database, (tx) =>
-        this.port.productsChanged(tx, hydrated.missing, "stale_hit"),
+        this.port.productsChanged(tx, stale, "stale_hit"),
       );
     }
     const facets = await this.facets(results, specs, selection, definitions, locale);
     const priceStats = results.find((entry) => entry.planned.purpose === plan.priceRangeFrom)
       ?.result.facetStats?.["price"];
     return {
-      items: hydrated.items,
+      items: matched.items,
       total: main.totalHits ?? 0,
       page: page.page,
       pageCount: main.totalPages ?? 0,
@@ -224,6 +238,41 @@ export class StoreSearchService {
     // Titles and slugs come from Postgres too: a product that stopped being for sale is never suggested.
     const hydrated = await this.store.listItemsByIds(productIds, locale.locale);
     return { items: hydrated.items.map((item) => ({ slug: item.slug, title: item.title })) };
+  }
+
+  /**
+   * `match` of every item of the page (plan 2026-11-02-api-matched-variant-and-stock-hints): the current facts of the
+   * page's products in a fixed number of batched reads (`readSearchProducts`, no N+1), matched with core's filter
+   * semantics. `stale` names the products none of whose variants fits any more.
+   */
+  private async withMatches(
+    items: readonly StoreSearchItem[],
+    selection: SearchSelection,
+    definitions: SearchDefinitions,
+  ): Promise<{ items: StoreSearchItem[]; stale: string[] }> {
+    if (items.length === 0) {
+      return { items: [], stale: [] };
+    }
+    const records = await readSearchProducts(
+      this.database,
+      items.map((item) => item.id),
+      definitions,
+      this.pricing,
+    );
+    const byId = new Map(records.map((record) => [record.facts.id, record]));
+    const stale: string[] = [];
+    const matched = items.map((item) => {
+      const record = byId.get(item.id);
+      const match =
+        record === undefined
+          ? null
+          : matchOfProduct(record, selection, definitions, this.pricing.shopCurrency);
+      if (match === null) {
+        stale.push(item.id);
+      }
+      return { ...item, match };
+    });
+    return { items: matched, stale };
   }
 
   private async definitions(): Promise<{ definitions: SearchDefinitions; specs: FacetSpec[] }> {

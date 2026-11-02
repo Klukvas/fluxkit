@@ -550,6 +550,9 @@ describe("cart API: repricing, notices and amounts", () => {
         "compareAtAmount",
         "lineTotal",
         "availability",
+        // The stock hint (plan 2026-11-02): a boolean and a count only at most LOW_STOCK_THRESHOLD.
+        "insufficientStock",
+        "maxQuantity",
         "amount",
         "currency",
       ]);

@@ -98,6 +98,8 @@ const cartLine: Shape<CartLine> = {
     compareAtAmount: { nullable: "integer" },
     lineTotal: { nullable: money },
     availability,
+    insufficientStock: "boolean",
+    maxQuantity: { nullable: "integer" },
     notices: { array: lineNotice },
   },
 };
@@ -452,7 +454,28 @@ const productList: Shape<ProductList> = {
 
 const searchResult: Shape<SearchResult> = {
   object: {
-    items: productList.object.items,
+    items: {
+      array: {
+        object: {
+          ...productList.object.items.array.object,
+          match: {
+            optional: {
+              nullable: {
+                object: {
+                  variantId: "string",
+                  variantCount: "integer",
+                  price: priceRange,
+                  availability,
+                  optionValues: {
+                    array: { object: { optionCode: "string", valueCode: "string" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
     total: "integer",
     page: "integer",
     pageCount: "integer",

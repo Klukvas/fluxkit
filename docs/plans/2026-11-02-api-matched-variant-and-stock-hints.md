@@ -128,3 +128,21 @@ API integration (real Postgres, Redis, Meilisearch):
 ## Verification
 
 Each separately with its exit code: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries`, `pnpm check:docs`, `pnpm check:env`, the full API test suite and the core and api-client tests against this agent's own Postgres, Redis and Meilisearch (not the shared stack), `pnpm openapi:export` with the freshness spec, and the feature-matrix modes `search-on` and `search-off` if the sandbox allows.
+
+## Results (2026-11-02)
+
+Status: built on the branch as planned; no PR opened by the implementing agent. No migration, schema, index setting, document version, configuration variable or dependency change.
+
+- **Shapes as planned:** `items[].match?: {variantId, variantCount, price {from, to, currency}, availability, optionValues [{optionCode, valueCode}]} | null` on `GET /store/search`; `lines[].insufficientStock: boolean`, `lines[].maxQuantity: integer | null` on every cart response and the `cart` of `409 cart_changed`.
+- **Code:** core `buildSearchFilterDocuments` (the per-variant code of `buildSearchDocuments` extracted into `sellableVariantFields`, so the index and the matcher share it; the existing document specs are unchanged and pass), core `matchesSearchSelection` and `hasVariantLevelSelection` (`search/match.ts`), core `cartLineStockHint` (`inventory/stock-hint.ts`, built on `decideReserve`); API `search-match.ts` (`matchOfProduct`), `StoreSearchService.withMatches`, `CartPricingService.stockHint`, `listStockLevelsForVariants` with `isDefaultLocation`.
+- **Deviation:** `apps/storefront/src/lib/test-fixtures.ts` (`cartLine()`, a test fixture) got the two new required `CartLine` fields as defaults (`false`, `null`), because `pnpm typecheck` failed on it otherwise; no storefront component, page or message was changed, and PR 213 does not touch that file. The alternative (optional fields in the client types) would contradict the OpenAPI document and the contract test.
+- **Existing spec updated:** the allowed-key list of the cart leak test (`cart-pricing.spec.ts`) gained `insufficientStock` and `maxQuantity`; its stock values (424 243 on hand, 31 337 reserved) are still checked to be absent.
+
+**Failing-first evidence** (logs `mv-red-*.log` in the agent's scratchpad):
+- Core: `match.spec.ts` and `stock-hint.spec.ts` before the code: 16 failed of 16 (`buildSearchFilterDocuments is not a function`, `cartLineStockHint is not a function`); after: 2075 passed in 106 files.
+- API: `cart-stock-hints.spec.ts` 10 failed of 10 (`insufficientStock: undefined`); `store-search-match.spec.ts` 10 failed, 3 passed (the guards: no `match` without a variant selection, no item for a selection nothing fits, SQL listing parity); after: 23 of 23 passed.
+- Mutations (each run red, then restored): the hint read a non-default location's level: 7 of 10 cart hint tests failed; the matcher ignored `inStock: false`: the availability test and the engine parity test failed.
+
+**Verification** (each separately, exit code 0 unless noted): `pnpm lint` 0; `pnpm format:check` 0; `pnpm typecheck` 0 (22 tasks); `pnpm check:boundaries` 0 (2006 modules, 0 violations); `pnpm check:env` 0; `pnpm check:docs` (see the report); API suite against this agent's own Postgres 16, Redis and Meilisearch: 254 files, 4414 passed, 1 failed (the cart leak test's allowed-key list, expected, then updated and re-run: 29 of 29 passed); core 2075 passed; `@fluxkit/api-client` 1346 passed (contract test against the regenerated `openapi.json`); `pnpm openapi:export` (the freshness spec passed in the suite); `pnpm feature-matrix search-off` 0 and `search-on` 0 (on a fresh database; a first `search-on` run on the database `search-off` had already seeded failed with "expected the seed's catalog writes to mark products", because the idempotent seed wrote nothing; CI gives each mode a fresh database).
+
+**Not verified:** the storefront and admin e2e suites (no UI code changed); response time of variant-filtered searches at 20 000 products (6 extra batched reads per page, only measured on test data); the multi-location case beyond one extra location.

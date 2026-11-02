@@ -83,6 +83,14 @@ export const cartLineSchema = z.object({
   availability: availabilitySchema.meta({
     description: "`out_of_stock` on an unavailable line. Never a quantity.",
   }),
+  insufficientStock: z.boolean().meta({
+    description:
+      "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides.",
+  }),
+  maxQuantity: z.number().int().min(0).nullable().meta({
+    description:
+      "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+  }),
   notices: z.array(cartLineNoticeSchema),
 });
 

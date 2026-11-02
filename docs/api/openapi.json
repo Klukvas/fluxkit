@@ -1228,6 +1228,76 @@
                           "availability": {
                             "type": "string",
                             "enum": ["in_stock", "low_stock", "out_of_stock"]
+                          },
+                          "match": {
+                            "description": "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
+                            "nullable": true,
+                            "type": "object",
+                            "properties": {
+                              "variantId": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "The representative matching variant (best availability, then lowest price, then the product's variant order): link to it."
+                              },
+                              "variantCount": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991,
+                                "description": "How many sellable variants of the product match."
+                              },
+                              "price": {
+                                "type": "object",
+                                "properties": {
+                                  "from": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "to": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "currency": {
+                                    "type": "string",
+                                    "description": "Always the shop currency."
+                                  }
+                                },
+                                "required": ["from", "to", "currency"],
+                                "additionalProperties": false,
+                                "description": "Lowest and highest price of the matching variants, minor units of the shop currency."
+                              },
+                              "availability": {
+                                "type": "string",
+                                "enum": ["in_stock", "low_stock", "out_of_stock"],
+                                "description": "The best availability among the matching variants (the representative's)."
+                              },
+                              "optionValues": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "optionCode": {
+                                      "type": "string"
+                                    },
+                                    "valueCode": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": ["optionCode", "valueCode"],
+                                  "additionalProperties": false
+                                },
+                                "description": "The representative's option values as codes (as `GET /store/products/{slug}` `variants[].optionValues`), sorted by option code."
+                              }
+                            },
+                            "required": [
+                              "variantId",
+                              "variantCount",
+                              "price",
+                              "availability",
+                              "optionValues"
+                            ],
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -6202,6 +6272,17 @@
                             "enum": ["in_stock", "low_stock", "out_of_stock"],
                             "description": "`out_of_stock` on an unavailable line. Never a quantity."
                           },
+                          "insufficientStock": {
+                            "type": "boolean",
+                            "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                          },
+                          "maxQuantity": {
+                            "nullable": true,
+                            "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "notices": {
                             "type": "array",
                             "items": {
@@ -6285,6 +6366,8 @@
                           "compareAtAmount",
                           "lineTotal",
                           "availability",
+                          "insufficientStock",
+                          "maxQuantity",
                           "notices"
                         ],
                         "additionalProperties": false
@@ -6629,6 +6712,17 @@
                             "enum": ["in_stock", "low_stock", "out_of_stock"],
                             "description": "`out_of_stock` on an unavailable line. Never a quantity."
                           },
+                          "insufficientStock": {
+                            "type": "boolean",
+                            "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                          },
+                          "maxQuantity": {
+                            "nullable": true,
+                            "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "notices": {
                             "type": "array",
                             "items": {
@@ -6712,6 +6806,8 @@
                           "compareAtAmount",
                           "lineTotal",
                           "availability",
+                          "insufficientStock",
+                          "maxQuantity",
                           "notices"
                         ],
                         "additionalProperties": false
@@ -7025,6 +7121,17 @@
                             "enum": ["in_stock", "low_stock", "out_of_stock"],
                             "description": "`out_of_stock` on an unavailable line. Never a quantity."
                           },
+                          "insufficientStock": {
+                            "type": "boolean",
+                            "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                          },
+                          "maxQuantity": {
+                            "nullable": true,
+                            "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "notices": {
                             "type": "array",
                             "items": {
@@ -7108,6 +7215,8 @@
                           "compareAtAmount",
                           "lineTotal",
                           "availability",
+                          "insufficientStock",
+                          "maxQuantity",
                           "notices"
                         ],
                         "additionalProperties": false
@@ -7399,6 +7508,17 @@
                             "enum": ["in_stock", "low_stock", "out_of_stock"],
                             "description": "`out_of_stock` on an unavailable line. Never a quantity."
                           },
+                          "insufficientStock": {
+                            "type": "boolean",
+                            "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                          },
+                          "maxQuantity": {
+                            "nullable": true,
+                            "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "notices": {
                             "type": "array",
                             "items": {
@@ -7482,6 +7602,8 @@
                           "compareAtAmount",
                           "lineTotal",
                           "availability",
+                          "insufficientStock",
+                          "maxQuantity",
                           "notices"
                         ],
                         "additionalProperties": false
@@ -7767,6 +7889,17 @@
                             "enum": ["in_stock", "low_stock", "out_of_stock"],
                             "description": "`out_of_stock` on an unavailable line. Never a quantity."
                           },
+                          "insufficientStock": {
+                            "type": "boolean",
+                            "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                          },
+                          "maxQuantity": {
+                            "nullable": true,
+                            "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991
+                          },
                           "notices": {
                             "type": "array",
                             "items": {
@@ -7850,6 +7983,8 @@
                           "compareAtAmount",
                           "lineTotal",
                           "availability",
+                          "insufficientStock",
+                          "maxQuantity",
                           "notices"
                         ],
                         "additionalProperties": false
@@ -43605,6 +43740,17 @@
                       "enum": ["in_stock", "low_stock", "out_of_stock"],
                       "description": "`out_of_stock` on an unavailable line. Never a quantity."
                     },
+                    "insufficientStock": {
+                      "type": "boolean",
+                      "description": "True when the checkout, run now, would refuse this quantity with `insufficient_stock` (the stock the checkout reserves from: the default location). Always false for untracked and backorder variants and on an unavailable line. A hint computed on every read: nothing is reserved, and the checkout decides."
+                    },
+                    "maxQuantity": {
+                      "nullable": true,
+                      "description": "How many units can be reserved now, given ONLY when `insufficientStock` is true and that number is at most `LOW_STOCK_THRESHOLD`; otherwise null (no stock count above the threshold is ever shown).",
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
                     "notices": {
                       "type": "array",
                       "items": {
@@ -43688,6 +43834,8 @@
                     "compareAtAmount",
                     "lineTotal",
                     "availability",
+                    "insufficientStock",
+                    "maxQuantity",
                     "notices"
                   ],
                   "additionalProperties": false

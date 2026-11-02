@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0044, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-02, `origin/main` at `2b08704` (PR 210 merged); branch `feature/storefront-ui-polish` (plan `docs/plans/2026-11-02-storefront-ui-polish.md`) pushed, no PR yet.
+Last updated: 2026-11-02, `origin/main` at `472fb56` (PR 211 merged); branch `feature/api-matched-variant-and-stock-hints` (plan `docs/plans/2026-11-02-api-matched-variant-and-stock-hints.md`) pushed, no PR yet.
 
 ## 1. Current state
 
@@ -22,6 +22,7 @@ Fluxkit is a white-label e-commerce template: TypeScript monorepo, NestJS + Driz
 - **Dependencies:** Dependabot bumps merged (swc, bullmq, dependency-cruiser, next 16.4.3, `@nestjs/swagger` 12.0.4). PSF-2.0 for `argparse` approved 2026-10-30 (#192).
 - **Local demo (PR 209 and its review minors PR 210, merged):** drawn demo images in `seeds/assets/` uploaded by `pnpm seed` through the media service; `pnpm demo:up|demo:down|demo:pay` and README "Try it locally". Verified natively in the sandbox (no Docker there); the Docker path is unverified. The owner chose option (a) on 2026-11-01: under `next dev` only, the storefront renders local uploads through a same-origin `/media` rewrite; production keeps the https-only rule (ADR 0028).
 - **Storefront UI polish (branch, not merged):** owner request 2026-11-02: header icons and menus (one row in both languages), account menu and account side menu ("Your data" labelled "Privacy and data"), cart quantity autosave, centred stepper, floating "Apply filters", honest wording of the variant-level availability filter, checkout phone with `libphonenumber-js` (new runtime dependency, owner-approved, MIT), token `--fk-color-danger-foreground`, the "My orders" `getSnapshot` error fixed. Payment method choice (online vs cash on delivery) is a separate later plan (owner decision 3).
+- **API: matched variant and stock hints (branch `feature/api-matched-variant-and-stock-hints`, no PR yet):** plan `docs/plans/2026-11-02-api-matched-variant-and-stock-hints.md`; additive `match` on `GET /store/search` items (variant-level selections) and `insufficientStock`/`maxQuantity` on cart lines, for the storefront follow-up of PR 213 (consumption notes in the plan).
 - **Open PRs:** none (PR 210 merged as `2b08704`).
 - **Not built:** live provider verification (all three plugins ran against stubs only), LiqPay/WayForPay, returns, admin email flows, two-factor, rate limits on the plain catalog routes of `/store/*`, search numbers on production hardware.
 

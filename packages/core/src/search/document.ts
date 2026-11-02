@@ -196,35 +196,40 @@ function cut(text: string, length: number): string {
 }
 
 /**
- * The search documents of one product (ADR 0034 decision 2): one per sellable variant, none for a product that is not
- * `active`. The ONLY place that decides what reaches the index: attributes pass `isPublicAttribute` (visible on the
- * storefront and not internal); their searchable text follows `isSearchable`; a select, multiselect, boolean or number
- * value is always stored as its `attr_<code>` field (document version 3), and only the index settings decide whether it
- * can be filtered (`isFilterable`, `deriveIndexSettings`). Stored values that do not fit their definition are left out.
- * Pure: the caller supplies the facts and the definitions.
+ * The filter fields of a search document: what the engine filters on (`buildSearchFilter`), without any text.
  */
-export function buildSearchDocuments(
+export type SearchFilterDocument = Pick<
+  SearchDocumentFields,
+  "id" | "productId" | "brand" | "categories" | "price" | "inStock"
+> & {
+  readonly [field in OptionFieldName]?: string;
+} & {
+  readonly [field in AttributeFieldName]?: SearchAttributeFieldValue;
+};
+
+interface SellableVariantFields {
+  readonly variant: SearchVariantFacts;
+  readonly shopPrice: number;
+  readonly optionLabels: readonly string[];
+  readonly optionFields: Readonly<Record<OptionFieldName, string>>;
+  readonly attributeText: readonly string[];
+  readonly attributeFields: Readonly<Record<AttributeFieldName, SearchAttributeFieldValue>>;
+}
+
+/**
+ * The per-variant part of the documents, for every sellable variant in variant order: the ONE place that decides which
+ * variants have documents (`isVariantSellable`) and which attribute values reach them (`isPublicAttribute`).
+ * `buildSearchDocuments` and `buildSearchFilterDocuments` both build on it, so the index and the store's matcher read
+ * the same fields.
+ */
+function sellableVariantFields(
   product: SearchProductFacts,
   context: SearchBuildContext,
-): SearchDocument[] {
+): SellableVariantFields[] {
   const publicAssignments = context.attributes.filter(({ definition }) =>
     isPublicAttribute(definition),
   );
-  const language = stemLanguageOf(context.locale);
-  const brandName = product.brand === null ? undefined : textOf(product.brand.name, context);
-  const title = textOf(product.title, context);
-  const description = cut(textOf(product.description, context), SEARCH_LIMITS.maxDescriptionLength);
-  const categoryIds = unique(
-    product.categories.flatMap((category) => [category.id, ...category.ancestorIds]),
-  ).sort();
-  const categoryNames = unique(
-    product.categories
-      .map((category) => textOf(category.name, context))
-      .filter((name) => name !== ""),
-  );
-  const publishedAt = epochMilliseconds(product.publishedAt);
-
-  const documents: SearchDocument[] = [];
+  const result: SellableVariantFields[] = [];
   for (const variant of product.variants) {
     const sellable = isVariantSellable({
       productStatus: product.status,
@@ -270,7 +275,50 @@ export function buildSearchDocuments(
         }
       }
     }
+    result.push({
+      variant,
+      shopPrice: variant.shopPrice,
+      optionLabels,
+      optionFields,
+      attributeText,
+      attributeFields,
+    });
+  }
+  return result;
+}
 
+function categoryIdsOf(product: SearchProductFacts): string[] {
+  return unique(
+    product.categories.flatMap((category) => [category.id, ...category.ancestorIds]),
+  ).sort();
+}
+
+/**
+ * The search documents of one product (ADR 0034 decision 2): one per sellable variant, none for a product that is not
+ * `active`. The ONLY place that decides what reaches the index: attributes pass `isPublicAttribute` (visible on the
+ * storefront and not internal); their searchable text follows `isSearchable`; a select, multiselect, boolean or number
+ * value is always stored as its `attr_<code>` field (document version 3), and only the index settings decide whether it
+ * can be filtered (`isFilterable`, `deriveIndexSettings`). Stored values that do not fit their definition are left out.
+ * Pure: the caller supplies the facts and the definitions.
+ */
+export function buildSearchDocuments(
+  product: SearchProductFacts,
+  context: SearchBuildContext,
+): SearchDocument[] {
+  const language = stemLanguageOf(context.locale);
+  const brandName = product.brand === null ? undefined : textOf(product.brand.name, context);
+  const title = textOf(product.title, context);
+  const description = cut(textOf(product.description, context), SEARCH_LIMITS.maxDescriptionLength);
+  const categoryIds = categoryIdsOf(product);
+  const categoryNames = unique(
+    product.categories
+      .map((category) => textOf(category.name, context))
+      .filter((name) => name !== ""),
+  );
+  const publishedAt = epochMilliseconds(product.publishedAt);
+
+  return sellableVariantFields(product, context).map((fields) => {
+    const { variant, optionLabels, attributeText } = fields;
     const stemmedWords = unique(
       [title, brandName ?? "", ...optionLabels, ...categoryNames, ...attributeText].flatMap(
         normalizeSearchWords,
@@ -291,15 +339,36 @@ export function buildSearchDocuments(
       stems5: language === "uk" ? unique(stemmedWords.map(prefixToken)) : [],
       ...(product.brand !== null && { brand: product.brand.slug }),
       categories: categoryIds,
-      price: variant.shopPrice,
+      price: fields.shopPrice,
       inStock: variant.availability !== "out_of_stock",
       publishedAt,
-      ...optionFields,
-      ...attributeFields,
+      ...fields.optionFields,
+      ...fields.attributeFields,
     };
-    documents.push(document);
-  }
-  return documents;
+    return document;
+  });
+}
+
+/**
+ * The filter fields of the documents `buildSearchDocuments` writes for this product, field for field, without the text
+ * fields and stems (cheap enough to run per request for a page of products). The store uses them to say which variants
+ * of a hit match a selection (`matchesSearchSelection`). Pure.
+ */
+export function buildSearchFilterDocuments(
+  product: SearchProductFacts,
+  context: SearchBuildContext,
+): SearchFilterDocument[] {
+  const categoryIds = categoryIdsOf(product);
+  return sellableVariantFields(product, context).map((fields) => ({
+    id: fields.variant.id,
+    productId: product.id,
+    ...(product.brand !== null && { brand: product.brand.slug }),
+    categories: categoryIds,
+    price: fields.shopPrice,
+    inStock: fields.variant.availability !== "out_of_stock",
+    ...fields.optionFields,
+    ...fields.attributeFields,
+  }));
 }
 
 /**

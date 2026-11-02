@@ -119,6 +119,10 @@ export interface CartLine {
   /** `null` on an unavailable line. */
   lineTotal: Money | null;
   availability: Availability;
+  /** The checkout, run now, would refuse this quantity (`insufficient_stock`); false for untracked, backorder and unavailable lines. A hint: nothing is reserved. */
+  insufficientStock: boolean;
+  /** The units that can be bought now, only when `insufficientStock` and at most `LOW_STOCK_THRESHOLD`; otherwise null (no count above it). */
+  maxQuantity: number | null;
   notices: CartLineNotice[];
 }
 
@@ -623,9 +627,30 @@ export interface SearchFacet {
   range: { min: number; max: number } | null;
 }
 
+/** The variants of a search item that fit the variant-level selection (`inStock`, `price`, options, variant attributes). */
+export interface SearchMatch {
+  /** The representative matching variant: best availability, then lowest price, then the product's variant order. */
+  variantId: string;
+  variantCount: number;
+  /** Lowest and highest price of the matching variants. */
+  price: PriceRange;
+  /** The best availability among the matching variants. */
+  availability: Availability;
+  /** The representative's option values as codes, sorted by option code (`?opt.<optionCode>=<valueCode>`). */
+  optionValues: { optionCode: string; valueCode: string }[];
+}
+
+export interface SearchItem extends ProductSummary {
+  /**
+   * Only with a variant-level selection: the matching variants (facets and price, not the words), from current data;
+   * `null` when none fits any more (the index is catching up). Absent without such a selection.
+   */
+  match?: SearchMatch | null;
+}
+
 /** `GET /store/search`. Items are hydrated from the database, so prices and availability are current. */
 export interface SearchResult {
-  items: ProductSummary[];
+  items: SearchItem[];
   total: number;
   page: number;
   pageCount: number;

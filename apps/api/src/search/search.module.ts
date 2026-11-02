@@ -120,13 +120,14 @@ export class SearchModule {
         { provide: SearchRejections, useValue: new SearchRejections() },
         {
           provide: StoreSearchService,
-          inject: [DRIZZLE, StoreService, SEARCH_PORT, SearchRejections],
+          inject: [DRIZZLE, StoreService, SEARCH_PORT, SearchRejections, PRICING_CONFIG],
           useFactory: (
             database: Database,
             store: StoreService,
             port: SearchPort,
             rejections: SearchRejections,
-          ) => new StoreSearchService(database, engine, config, store, port, rejections),
+            pricing: PricingConfig,
+          ) => new StoreSearchService(database, engine, config, store, port, rejections, pricing),
         },
         {
           provide: AdminSearchService,
