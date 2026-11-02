@@ -7,5 +7,6 @@
   "shell.signOut": "Вийти",
   "shell.signingOut": "Вихід…",
   "shell.navigating": "Завантаження сторінки…",
-  "shell.sessionFailed": "Не вдалося перевірити вхід"
+  "shell.sessionFailed": "Не вдалося перевірити вхід",
+  "shell.contextHelp": "Довідка до цієї сторінки"
 }

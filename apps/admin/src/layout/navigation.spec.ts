@@ -26,6 +26,7 @@ describe("navigation configuration", () => {
       "privacy",
       "auditLog",
       "users",
+      "help",
     ]);
     for (const group of visibleNavigation([...ROLE_PERMISSIONS.owner])) {
       for (const item of group.items) {
@@ -44,7 +45,16 @@ describe("navigation configuration", () => {
       "brands",
       "categories",
       "search",
+      "help",
     ]);
+  });
+
+  it("shows Help to every signed-in admin, whatever the permissions, and to nobody signed out", () => {
+    for (const role of ["owner", "manager", "viewer"] as const) {
+      expect(ids([...ROLE_PERMISSIONS[role]]), role).toContain("help");
+    }
+    expect(visibleNavigation([]).map((group) => group.id)).toEqual(["help"]);
+    expect(visibleNavigation(null)).toEqual([]);
   });
 
   it("shows the manager everything but the users", () => {
@@ -57,8 +67,11 @@ describe("navigation configuration", () => {
   it("shows the Shipping area to a session with shipping.manage only: never to the viewer, never through orders.write", () => {
     expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("shipping");
     expect(ids(["orders.read", "orders.write", "customers.read"])).not.toContain("shipping");
-    expect(ids(["shipping.manage"])).toEqual(["shipping"]);
-    expect(visibleNavigation(["shipping.manage"]).map((group) => group.id)).toEqual(["settings"]);
+    expect(ids(["shipping.manage"])).toEqual(["shipping", "help"]);
+    expect(visibleNavigation(["shipping.manage"]).map((group) => group.id)).toEqual([
+      "settings",
+      "help",
+    ]);
   });
 
   it("shows the Email area to a session with email.manage only: owner and manager, never the viewer, never through shipping.manage or orders", () => {
@@ -68,8 +81,11 @@ describe("navigation configuration", () => {
     expect(ids(["shipping.manage", "orders.read", "orders.write", "users.manage"])).not.toContain(
       "email",
     );
-    expect(ids(["email.manage"])).toEqual(["email"]);
-    expect(visibleNavigation(["email.manage"]).map((group) => group.id)).toEqual(["settings"]);
+    expect(ids(["email.manage"])).toEqual(["email", "help"]);
+    expect(visibleNavigation(["email.manage"]).map((group) => group.id)).toEqual([
+      "settings",
+      "help",
+    ]);
   });
 
   it("shows the payment attention list to a session that reads orders: owner and manager, never the viewer, never through the refund permission alone", () => {
@@ -77,14 +93,15 @@ describe("navigation configuration", () => {
     expect(ids([...ROLE_PERMISSIONS.manager])).toContain("payments");
     expect(ids([...ROLE_PERMISSIONS.viewer])).not.toContain("payments");
     expect(ids(["payments.refund", "shipping.manage", "email.manage"])).not.toContain("payments");
-    expect(ids(["orders.read"])).toEqual(["orders", "payments"]);
-    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales"]);
+    expect(ids(["orders.read"])).toEqual(["orders", "payments", "help"]);
+    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales", "help"]);
   });
 
   it("shows the owner everything, and drops groups that end up empty", () => {
     expect(ids([...ROLE_PERMISSIONS.owner])).toContain("users");
     expect(ids([...ROLE_PERMISSIONS.owner])).toContain("shipping");
-    expect(visibleNavigation([]).length).toBe(0);
-    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales"]);
+    // Help is the only group of a session without permissions; every other group is dropped.
+    expect(visibleNavigation([]).map((group) => group.id)).toEqual(["help"]);
+    expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales", "help"]);
   });
 });
