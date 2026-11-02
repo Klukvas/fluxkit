@@ -85,7 +85,8 @@ export function TextField({
   failure: Failure | null;
   t: Translator;
   value: string;
-  onValueChange: (value: string) => void;
+  /** The new text; the input is passed too, for a field that formats as it is typed (its caret position). */
+  onValueChange: (value: string, input: HTMLInputElement) => void;
   required?: boolean;
 } & Omit<
   InputHTMLAttributes<HTMLInputElement>,
@@ -105,7 +106,7 @@ export function TextField({
           {...control}
           name={name}
           value={value}
-          onChange={(event) => onValueChange(event.currentTarget.value)}
+          onChange={(event) => onValueChange(event.currentTarget.value, event.currentTarget)}
           {...input}
         />
       )}

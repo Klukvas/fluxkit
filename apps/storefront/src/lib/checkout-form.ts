@@ -6,6 +6,8 @@ import type {
   ShippingMethodKind,
 } from "@fluxkit/api-client";
 import type { AddressFieldName, CheckoutConfig } from "../config/checkout";
+import type { CountryCode } from "libphonenumber-js/min";
+import { phoneForDisplay } from "./phone";
 import type { DeliveryMode } from "./shipping-model";
 
 /**
@@ -124,13 +126,20 @@ export function initialCheckoutValues(config: CheckoutConfig): CheckoutValues {
   return values;
 }
 
-/** Fills the contact fields the shopper has not typed in yet from the signed-in account; the shopper can still edit them. */
-export function prefillFromCustomer(values: CheckoutValues, customer: Customer): CheckoutValues {
+/**
+ * Fills the contact fields the shopper has not typed in yet from the signed-in account; the shopper can still edit them.
+ * The account's phone is shown formatted like a typed one (national for the shop's phone country).
+ */
+export function prefillFromCustomer(
+  values: CheckoutValues,
+  customer: Customer,
+  phoneCountry: CountryCode = "UA",
+): CheckoutValues {
   const fromAccount: CheckoutValues = {
     email: customer.email,
     firstName: customer.firstName,
     lastName: customer.lastName,
-    phone: customer.phone ?? "",
+    phone: customer.phone === null ? "" : phoneForDisplay(customer.phone, phoneCountry),
   };
   const next = { ...values };
   for (const [path, value] of Object.entries(fromAccount)) {

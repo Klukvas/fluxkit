@@ -63,6 +63,7 @@ import { clientFailure, failureText, type Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { LegalNotice, noticeLinks } from "./legal-notice";
 import { formatMoney } from "../lib/money";
+import { checkPhone, formatPhoneTyping, phoneFailure } from "../lib/phone";
 import { loginHref } from "../lib/safe-next";
 import {
   deliveryMode,
@@ -123,6 +124,21 @@ export function checkoutLabels(t: Translator, config: CheckoutConfig): Record<st
       : t("checkout.field.optional", { label });
   }
   return labels;
+}
+
+/**
+ * The phone field's next value: formatted (`formatPhoneTyping`) only when the shopper added characters at the end, so
+ * deleting a space or editing in the middle never fights them or moves the caret; anything else is kept as typed.
+ */
+export function phoneTypingValue(
+  previous: string,
+  input: { value: string; selectionStart: number | null },
+): string {
+  const next = input.value;
+  const atEnd = input.selectionStart === null || input.selectionStart === next.length;
+  return atEnd && next.length > previous.length && next.startsWith(previous.slice(0, -1))
+    ? formatPhoneTyping(next, checkoutConfig.phoneDefaultCountry)
+    : next;
 }
 
 function SummaryLine({
@@ -364,6 +380,15 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
               inputMode="tel"
               autoComplete="tel"
               hint={t("checkout.field.phone.hint")}
+              onValueChange={(value, input) =>
+                props.onValueChange(
+                  "phone",
+                  phoneTypingValue(values["phone"] ?? "", {
+                    value,
+                    selectionStart: input.selectionStart,
+                  }),
+                )
+              }
             />
             <TextField {...field("firstName")} autoComplete="given-name" maxLength={100} />
             <TextField {...field("lastName")} autoComplete="family-name" maxLength={100} />
@@ -700,7 +725,9 @@ export function CheckoutPage({
     if (account.session.status !== "signedIn" || prefilled.current) return;
     prefilled.current = true;
     const { customer } = account.session;
-    setValues((current) => prefillFromCustomer(current, customer));
+    setValues((current) =>
+      prefillFromCustomer(current, customer, checkoutConfig.phoneDefaultCountry),
+    );
   }, [account.session, setValues]);
 
   const chosen = answer?.options.find((option) => option.methodCode === methodCode);
@@ -765,8 +792,11 @@ export function CheckoutPage({
           leaves: true,
           run: async (submitted) => {
             setOrdersHref(null);
+            // The phone is checked here (friendly per-field texts) and sent as E.164; the API still judges it.
+            const phone = checkPhone(submitted["phone"] ?? "", checkoutConfig.phoneDefaultCountry);
+            if (!phone.ok) return phoneFailure("phone", phone.problem);
             const result = await checkout.submit(
-              { ...submitted, [SHIPPING_METHOD_FIELD]: methodCode },
+              { ...submitted, phone: phone.e164, [SHIPPING_METHOD_FIELD]: methodCode },
               { signedIn },
             );
             if (result.kind === "placed" || result.kind === "cartEmpty") {

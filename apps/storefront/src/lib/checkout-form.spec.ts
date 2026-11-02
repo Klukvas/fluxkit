@@ -154,8 +154,16 @@ describe("prefillFromCustomer", () => {
       email: "shopper@example.test",
       firstName: "Typed",
       lastName: "Shopper",
-      phone: "+380501112233",
+      // Shown like a typed number: national format for the shop's phone country (2026-11-02); sent as E.164 again.
+      phone: "050 111 2233",
     });
+    expect(
+      prefillFromCustomer(
+        initialCheckoutValues(checkoutConfig),
+        customer({ phone: "+48512345678" }),
+        "UA",
+      ).phone,
+    ).toBe("+48 512 345 678");
     expect(prefillFromCustomer(initialCheckoutValues(checkoutConfig), customer()).phone).toBe("");
   });
 });
