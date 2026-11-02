@@ -1,6 +1,6 @@
 # Plan: storefront desktop design, batch A
 
-Status: proposed (first commit of the branch); branch `feature/storefront-design-a` from `origin/main` `d37bb4d` (PR 216 merged). Storefront, `packages/ui` and
+Status: implemented (see "Results"), not independently reviewed; branch `feature/storefront-design-a` from `origin/main` `d37bb4d` (PR 216 merged). Storefront, `packages/ui` and
 `packages/theme` only: no API, schema, dependency, environment variable or public config change. Batch B (next): home page (D-18) and the dark theme switch.
 Source: the designer review of 2026-11-02 (D-07, D-08, D-11, D-14, D-15, D-19 and recommendations 1, 3, 5), a11y nit A10; scratchpad `ux-review/`.
 
@@ -47,7 +47,8 @@ Screenshots: scratchpad `design-a-shots/before-*.jpg` (catalog, category, two PD
      (values = today's Tailwind values, so nothing moves).
    - Spacing unit `--fk-space-unit` (0.25rem) -> `--spacing` (every `p-*`, `gap-*`, `m-*`).
    - Elevation `--fk-shadow-raised` (hover of a card), `--fk-shadow-overlay` (menus, toast, sticky bars) beside `--fk-shadow-card`.
-   - Radius `--fk-radius-full` (pills: count badge, step numbers) beside sm/md/lg.
+   - Radius: no new token (deviation from this plan's first version): `rounded-full` is a shape, not a brand value, and Tailwind's
+     `rounded-full` is not read from a theme variable, so a `--fk-radius-full` would have done nothing. The guard allows it.
    - No new colour token: the discount badge is `danger-foreground` on `danger`, the current step `primary-foreground` on `primary`, the card
      hover border `border-input` (all pairs already tested). Names are role-based, so batch B's dark theme only sets values.
    - Guard (`design-guard.spec.ts`): font sizes, radii and shadows only from the token scale (`text-5xl`, `rounded-xl`, `shadow-md` and friends
@@ -112,3 +113,30 @@ Screenshots: scratchpad `design-a-shots/before-*.jpg` (catalog, category, two PD
   390, 0-result page without filters and with category links, account breadcrumbs, logo focus ring. Trust bar hidden when the config is empty:
   unit test (config is build-time data). Contrast: no new colour pair (existing pairs tested).
 - After screenshots: `design-a-shots/after-*.jpg`, same pages and sizes; 390 sanity.
+
+## Results (2026-11-03)
+
+After-state (same pages, sizes and tool as the before table; `next dev`, demo seed):
+
+| Item | 1280 uk/en | 1024 uk/en | 390 uk |
+|---|---|---|---|
+| Catalog first-row cards (height / price y) | 321 / 577 on all four | 297 / 553 on all four | 2 per row, aligned per row |
+| PDP | summary right (5/12), sticky; "−25 %" / "−25%" on the T-shirt, "−22 %" on the hammer; SKU in the specifications; trust bar under the button | same, page 1372 px (was 1187) | order unchanged: add button at y 1061 (T-shirt) and 817 (hammer), as before |
+| 0 results | no filter panel, "Browse categories" links | same | same |
+| Cart / checkout | funnel step 1 / 2, trust bar | same | "Крок 1 з 3: Кошик" |
+| Console errors (no 401) | 0 | 0 | 0 |
+
+Deviations: no `--fk-radius-full` (see decision 1); no colour transition on `Button` and `OptionPicker` (found by the e2e focus check: Tailwind's
+`transition-colors` also animates the outline colour, so the focus ring faded in from the text colour); the sold-out word is the radio's
+description, not part of its name (the value is still called "L"); menus and the "added" toast use `shadow-overlay`.
+Not possible without an API change (not done): card discount and swatch hint, suggestion thumbnail and price, "notify me" / similar products.
+"New" badge: not added (needs a merchandising rule, owner decision). uk account wording: already one term ("акаунт", PR 216).
+
+Verification (each exit code read separately): lint 0, format:check 0, typecheck 0, check:boundaries 0, check:docs 0, check:env 0,
+check:licenses 0; unit theme 71, ui 199, storefront 1773, admin 1662 passed. Full storefront e2e on throwaway Postgres 16 / Redis 8 / Meilisearch:
+126 passed, 4 skipped (`search-off`, by design). Failing first: `discount.spec.ts` (4 of 7 failed on a stub), `isValueSoldOut` (5 failed, not a
+function), the guard's mapping test against main's `tailwind.css` (failed), `design-a.e2e.ts` against main's source (11 of 11 failed, e.g. price
+bottoms 573/573/597/573). Pre-existing flake found, not caused here: `mobile-ux.e2e.ts` "the header has no search icon and keeps its one row"
+fails about 1 in 6 on main's code too (5 of 30 runs; 1 of 20 on this branch): the search box swaps from its Suspense fallback while measured.
+Not verified: Safari and Firefox, a real screen reader, the dark theme (batch B), admin e2e (admin unit tests only; `packages/ui` changes are additive
+apart from the `Button` hover and the type/space mapping, whose values are unchanged).
