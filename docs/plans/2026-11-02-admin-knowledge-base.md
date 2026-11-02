@@ -1,6 +1,6 @@
 # Plan: admin knowledge base ("Help")
 
-Status: in progress (branch `feature/admin-knowledge-base`). Owner request 2026-11-02: "the admin should have a knowledge base: how to do things". Scope decided by the orchestrator: admin app only; no API, DB, migration or new dependency (red zones: none).
+Status: built on branch `feature/admin-knowledge-base` (pushed, no PR); awaiting review. Owner request 2026-11-02: "the admin should have a knowledge base: how to do things". Scope decided by the orchestrator: admin app only; no API, DB, migration or new dependency (red zones: none).
 
 ## Goal
 
@@ -40,8 +40,10 @@ A shop manager finds, inside the admin, short and honest instructions for every 
 ## Results
 
 - Built as planned: decisions 1 to 6. 17 articles in 5 topics (`first-steps`, `glossary`, `product-types`, `create-product`, `images`, `categories-brands`, `publishing`, `search`, `prices`, `stock`, `orders`, `customers`, `payments`, `shipping`, `email`, `personal-data`, `users-roles`, `audit-log`); the block set gained `heading` (sections need anchors), and "Open this screen" takes its text from the route title (no extra text to translate).
-- Initial JavaScript: 426 392 -> 430 676 bytes raw, 127 791 -> 128 882 gzip (budget 440 000 / 135 000). Help chunk 110.6 KB raw, 33.8 KB gzip (both languages; lazy).
+- Initial JavaScript: 426 392 -> 430 980 bytes raw, 127 791 -> 128 950 gzip (budget 440 000 / 135 000). Help chunk 110.6 KB raw, 33.8 KB gzip (both languages; lazy).
 - `localStorage`: still one accessor (`browserStorage`); the source guard now names its three users (language at start, language switch, checklist).
+- The help area asks the shell (`router/screen-access.tsx`) for a screen's title and permission instead of importing the route table, which `check:boundaries` refused as an import cycle.
+- Verification (2026-11-02): `pnpm lint`, `typecheck`, `format:check`, `check:boundaries`, `check:env`, `check:docs` exit 0; admin unit tests 1661 passed; admin e2e suite 55 passed on throwaway native Postgres 16, Redis and Meilisearch. An earlier full run had one failure in `product.e2e.ts` ("The product is published." not shown after Publish, run under load, 14.7 s); not reproduced in 4 repeats nor in the final full run; the admin README lists a lost click while the product reloads as a known limit.
 - Mutation check: focusing the section directly in the article's effect (instead of `useFocusAfterCommit`) fails the e2e "Help for this page" scenario once the help chunk is already loaded (the route focus wins); restored.
 
 ### Claims in the articles NOT verified in a browser or against a live service (read from code and docs only)
