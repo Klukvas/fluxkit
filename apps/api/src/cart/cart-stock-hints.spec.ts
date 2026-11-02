@@ -161,6 +161,24 @@ describe("cart API: stock hints on lines", () => {
     expect(hintOf(line)).toEqual({ insufficientStock: false, maxQuantity: null });
   });
 
+  it("a line taken out for line_total_out_of_range carries no hint (the checkout refuses it for the total, not stock)", async () => {
+    const overflowing = await tracked(3);
+    const other = await tracked(10);
+    await add(overflowing.variantId, 4);
+    await add(other.variantId, 1);
+    await catalog.setPrice(overflowing.variantId, 900_000_000_000);
+    const response = await shopper.get<CartResult>("/store/cart");
+    expect(response.status, JSON.stringify(response.body)).toBe(200);
+    const line = lineOf(response.body, overflowing.variantId) as
+      (HintedLine & { notices?: unknown }) | undefined;
+    expect(line?.notices).toEqual([{ code: "line_total_out_of_range" }]);
+    expect(hintOf(line)).toEqual({ insufficientStock: false, maxQuantity: null });
+    expect(hintOf(lineOf(response.body, other.variantId))).toEqual({
+      insufficientStock: false,
+      maxQuantity: null,
+    });
+  });
+
   it("counts the default location only, where the checkout reserves", async () => {
     const product = await tracked(2);
     const code = `mv_extra_${randomUUID().slice(0, 8)}`;

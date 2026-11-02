@@ -71,6 +71,13 @@ describe("store search: the matched variant of an item (real Postgres, real Meil
   let digital: { productId: string; variantId: string };
   /** red priced in UAH, blue only in EUR (not sellable in the UAH shop). */
   let twoCurrencies: { id: string; red: string; blue: string };
+  /** Filterable attributes for the engine-parity spec (PR 214 review m5), and one category. */
+  const extraAttributeIds: string[] = [];
+  let tagsCode: string;
+  let organicCode: string;
+  let lengthCode: string;
+  let categoryId: string;
+  let childCategoryId: string;
 
   const get = (path: string) => http<SearchBody>(app.baseUrl, "GET", path);
   const itemOf = (body: SearchBody, id: string) => body.items.find((item) => item.id === id);
@@ -177,6 +184,90 @@ describe("store search: the matched variant of an item (real Postgres, real Meil
       expect((await call("PATCH", `/admin/products/${id}`, { brandId })).status).toBe(200);
     }
 
+    // Filterable attributes (review m5): a product-level multiselect, a variant-level boolean and number.
+    tagsCode = `tags_${fx.runId}`;
+    organicCode = `organic_${fx.runId}`;
+    lengthCode = `length_${fx.runId}`;
+    const attributes: { code: string; inputType: string; level: string }[] = [
+      { code: tagsCode, inputType: "multiselect", level: "product" },
+      { code: organicCode, inputType: "boolean", level: "variant" },
+      { code: lengthCode, inputType: "number", level: "variant" },
+    ];
+    for (const attribute of attributes) {
+      const created = await call<{ id: string }>("POST", "/admin/attributes", {
+        code: attribute.code,
+        name: { uk: attribute.code },
+        inputType: attribute.inputType,
+        isFilterable: true,
+      });
+      expect(created.status, JSON.stringify(created.body)).toBe(201);
+      extraAttributeIds.push(created.body.id);
+      if (attribute.inputType === "multiselect") {
+        for (const code of ["a", "b", "c"]) {
+          const value = await call("POST", `/admin/attributes/${created.body.id}/options`, {
+            code,
+            label: { uk: code },
+          });
+          expect(value.status, JSON.stringify(value.body)).toBe(201);
+        }
+      }
+      const assigned = await call(
+        "PUT",
+        `/admin/product-types/${fx.teeTypeId}/attributes/${created.body.id}`,
+        { level: attribute.level },
+      );
+      expect(assigned.status, JSON.stringify(assigned.body)).toBeLessThan(300);
+    }
+    for (const [id, tags] of [
+      [shirt.id, ["a", "b"]],
+      [backorder.productId, ["c"]],
+    ] as const) {
+      // `attributes` replaces the whole map: keep the values the product already has (a required one among them).
+      const current = await call<{ attributes: Record<string, unknown> }>(
+        "GET",
+        `/admin/products/${id}`,
+      );
+      const tagged = await call("PATCH", `/admin/products/${id}`, {
+        attributes: { ...current.body.attributes, [tagsCode]: tags },
+      });
+      expect(tagged.status, JSON.stringify(tagged.body)).toBe(200);
+    }
+    const variantValues: Record<string, { organic: boolean; length: number }> = {
+      "red-s": { organic: true, length: 70 },
+      "red-l": { organic: false, length: 74 },
+      "blue-s": { organic: true, length: 68 },
+      "blue-l": { organic: false, length: 75.5 },
+    };
+    for (const [key, values] of Object.entries(variantValues)) {
+      const changed = await call("PATCH", `/admin/products/${shirt.id}/variants/${variants[key]}`, {
+        attributes: { [organicCode]: values.organic, [lengthCode]: values.length },
+      });
+      expect(changed.status, JSON.stringify(changed.body)).toBe(200);
+    }
+    // A category with a child: the shirt sits in the child, the digital product in the parent.
+    const parent = await call<{ id: string }>("POST", "/admin/categories", {
+      name: { uk: "Матч", en: "Match" },
+      slug: `match-parent-${fx.runId}`,
+    });
+    expect(parent.status, JSON.stringify(parent.body)).toBe(201);
+    categoryId = parent.body.id;
+    const child = await call<{ id: string }>("POST", "/admin/categories", {
+      name: { uk: "Матч дочірня", en: "Match child" },
+      slug: `match-child-${fx.runId}`,
+      parentId: categoryId,
+    });
+    expect(child.status, JSON.stringify(child.body)).toBe(201);
+    childCategoryId = child.body.id;
+    for (const [id, category] of [
+      [shirt.id, childCategoryId],
+      [digital.productId, categoryId],
+    ] as const) {
+      const placed = await call("PUT", `/admin/products/${id}/categories`, {
+        categories: [{ categoryId: category }],
+      });
+      expect(placed.status, JSON.stringify(placed.body)).toBe(200);
+    }
+
     // red priced in UAH, blue only in EUR.
     const multi = await world.createProduct();
     await call("PATCH", `/admin/products/${multi.id}`, { brandId });
@@ -215,6 +306,10 @@ describe("store search: the matched variant of an item (real Postgres, real Meil
 
   afterAll(async () => {
     await fx.cleanup(pool);
+    await pool.query("delete from attribute where id = any($1::uuid[])", [extraAttributeIds]);
+    await pool.query("delete from category where id = any($1::uuid[])", [
+      [childCategoryId, categoryId].filter((id) => id !== undefined),
+    ]);
     await pool.query("delete from brand where slug = $1", [brandSlug]);
     await search.dispose(pool);
     await app.app.close();
@@ -418,6 +513,22 @@ describe("store search: the matched variant of an item (real Postgres, real Meil
       { price: { max: 549 } },
       { options: { [fx.color.code]: ["blue"] }, inStock: false, price: { min: 1 } },
       { brands: [brandSlug], inStock: true },
+      // Attributes and categories (review m5): multiselect (array field, any element), boolean, number range,
+      // a category with its descendants, and each combined with a variant-level facet.
+      { attributes: { [tagsCode]: { kind: "values", values: ["b"] } } },
+      { attributes: { [tagsCode]: { kind: "values", values: ["a", "c"] } }, inStock: true },
+      { attributes: { [organicCode]: { kind: "boolean", value: true } } },
+      { attributes: { [organicCode]: { kind: "boolean", value: false } }, inStock: true },
+      { attributes: { [lengthCode]: { kind: "range", min: 70, max: 74 } } },
+      { attributes: { [lengthCode]: { kind: "range", min: 75 } } },
+      { attributes: { [lengthCode]: { kind: "range", max: 69.9 } }, inStock: false },
+      { categories: [categoryId] },
+      { categories: [childCategoryId], options: { [fx.color.code]: ["blue"] } },
+      {
+        categories: [categoryId],
+        attributes: { [tagsCode]: { kind: "values", values: ["a"] } },
+        inStock: true,
+      },
     ];
     const productIds = [shirt.id, backorder.productId, digital.productId, twoCurrencies.id];
     const database = app.app.get<Database>(DRIZZLE);
@@ -461,6 +572,23 @@ describe("store search: the matched variant of an item (real Postgres, real Meil
     }
     // The comparison is not vacuous: most selections find variants.
     expect(nonEmpty).toBeGreaterThanOrEqual(selections.length - 1);
+  });
+
+  it("matches variant-level attributes over HTTP: a number range and a boolean name the right variant", async () => {
+    const long = itemOf(
+      (await get(`/store/search?f=attr.${lengthCode}:72..80&f=${colorKey}:blue`)).body,
+      shirt.id,
+    );
+    expect(long?.match).toMatchObject({
+      variantId: v("blue-l"),
+      variantCount: 1,
+      availability: "low_stock",
+    });
+    const organicInStock = itemOf(
+      (await get(`/store/search?f=attr.${organicCode}:true&f=inStock:true`)).body,
+      shirt.id,
+    );
+    expect(organicInStock?.match).toMatchObject({ variantId: v("red-s"), variantCount: 1 });
   });
 
   it("gives the SQL listing and search the same items for the same plain list (fallback parity)", async () => {

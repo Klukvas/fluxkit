@@ -305,7 +305,13 @@ export class CartPricingService {
           compareAtAmount: line.compareAtAmount,
           lineTotal: line.lineTotal,
           availability: line.availability,
-          ...this.stockHint(row, priced.has(line.variantId), line.quantity, levels),
+          ...this.stockHint(
+            row,
+            // A line taken out for its total is refused for that, never for stock (PR 214 review m4).
+            priced.has(line.variantId) && !overflowing.has(line.variantId),
+            line.quantity,
+            levels,
+          ),
           notices: overflowing.has(line.variantId)
             ? [{ code: "line_total_out_of_range" as const }]
             : line.notices.map((notice) =>

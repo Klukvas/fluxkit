@@ -24,12 +24,20 @@ function sortedIds(ids: Iterable<string>): string[] {
  *   and is due now (`least` keeps an earlier due time); `enqueued_at` keeps the oldest unsynced change, `attempts` and
  *   `last_error_code` stay so a failing product remains visible.
  * Rows are taken in product id order by one statement.
+ *
+ * `stale_hit` is not a data change, only "the index looked behind on a read" (a store search): it adds a row only when
+ * the product has none. A queued row already guarantees a sync that reads the current data, so a read never resets a
+ * failing product's backoff nor bumps the `change_seq` of a sync in flight (PR 214 review M1).
  */
 function upsertStatement(source: SQL, reason: SearchSyncReason): SQL {
-  return sql`
+  const insert = sql`
     insert into search_sync_queue (product_id, reason)
     select product_id, ${reason} from (${source}) as marked (product_id)
-    order by product_id
+    order by product_id`;
+  if (reason === "stale_hit") {
+    return sql`${insert} on conflict (product_id) do nothing`;
+  }
+  return sql`${insert}
     on conflict (product_id) do update set
       reason = excluded.reason,
       change_seq = nextval('search_sync_seq'),
