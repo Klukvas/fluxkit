@@ -250,7 +250,11 @@ describe("catalog seed (real app, real Postgres)", () => {
   });
 
   it("uploads every demo image through the media service and attaches it to its product", async () => {
-    expect(firstRun.images).toEqual({ uploadsEnabled: true, uploaded: mediaCount });
+    expect(firstRun.images).toEqual({
+      uploadsEnabled: true,
+      uploaded: mediaCount,
+      existingWithoutImages: [],
+    });
     expect(formatSummary(firstRun)).toContain(
       `images        uploaded ${String(mediaCount).padStart(3)}`,
     );
@@ -670,7 +674,11 @@ describe("catalog seed (real app, real Postgres)", () => {
       // `media_upload` included: no image is uploaded twice, and no file is added to the media directory.
       expect(after).toEqual(before);
       expect(await filesUnder(mediaDir)).toEqual(filesBefore);
-      expect(second.images).toEqual({ uploadsEnabled: true, uploaded: 0 });
+      expect(second.images).toEqual({
+        uploadsEnabled: true,
+        uploaded: 0,
+        existingWithoutImages: [],
+      });
       // Named explicitly: a second run adds no price, no level and no journal row for the demo variants.
       expect(rowsBefore.price).toBeGreaterThan(0);
       expect(rowsBefore.inventory_level).toBeGreaterThan(0);
@@ -716,6 +724,39 @@ describe("catalog seed (real app, real Postgres)", () => {
       expect(again.created.shippingMethods).toBe(0);
       expect(again.existing.shippingMethods).toBe(shippingMethods.length);
       expect(await tableCounts()).toEqual(before);
+    });
+
+    it("review F9 of PR 209: names an existing demo product without images (it is never repaired) and says how to fix it", async () => {
+      const [first] = products;
+      const slug = first?.slug ?? "";
+      const saved = await pool.query<Record<string, unknown>>(
+        "select m.* from media m join product p on p.id = m.product_id where p.slug = $1",
+        [slug],
+      );
+      await pool.query(
+        "delete from media where product_id in (select id from product where slug = $1)",
+        [slug],
+      );
+      try {
+        const run = await runSeedCommand([], env);
+        expect(run.images).toEqual({
+          uploadsEnabled: true,
+          uploaded: 0,
+          existingWithoutImages: [slug],
+        });
+        expect(formatSummary(run)).toContain(
+          `images missing on existing products (never repaired by the seed, seeds/README.md): ${slug}`,
+        );
+      } finally {
+        for (const row of saved.rows) {
+          const columns = Object.keys(row);
+          await pool.query(
+            `insert into media (${columns.map((column) => `"${column}"`).join(", ")})
+             values (${columns.map((_, index) => `$${index + 1}`).join(", ")})`,
+            columns.map((column) => row[column]),
+          );
+        }
+      }
     });
 
     it("leaves an entity that exists alone, even when its content differs from the seed", async () => {
@@ -983,7 +1024,11 @@ describe("catalog seed (real app, real Postgres)", () => {
         MEDIA_STORAGE_DRIVER: "none",
       });
       expect(summary.created.products).toBe(products.length);
-      expect(summary.images).toEqual({ uploadsEnabled: false, uploaded: 0 });
+      expect(summary.images).toEqual({
+        uploadsEnabled: false,
+        uploaded: 0,
+        existingWithoutImages: [],
+      });
       expect(formatSummary(summary)).toContain(
         "images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images)",
       );

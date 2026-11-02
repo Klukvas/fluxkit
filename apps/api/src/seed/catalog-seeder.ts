@@ -19,6 +19,7 @@ import {
   attribute,
   brand,
   category,
+  media as productMedia,
   option,
   product,
   productType,
@@ -125,6 +126,11 @@ export interface SeedSummary {
   images: {
     uploadsEnabled: boolean;
     uploaded: number;
+    /**
+     * Slugs of demo products that exist but have no image at all (a run that stopped after creating the product, or one made
+     * with `MEDIA_STORAGE_DRIVER=none`). The seed never repairs them (no overwrite); only checked while uploads are on.
+     */
+    existingWithoutImages: string[];
   };
 }
 
@@ -166,7 +172,7 @@ export class CatalogSeeder {
     variantsCreated: 0,
     skippedShippingMethods: [],
     synonymGroups: { searchEnabled: false, created: 0, existing: 0, skippedLocales: [] },
-    images: { uploadsEnabled: false, uploaded: 0 },
+    images: { uploadsEnabled: false, uploaded: 0, existingWithoutImages: [] },
   };
   private readonly attributeIds = new Map<string, string>();
   private readonly optionIds = new Map<string, string>();
@@ -379,6 +385,15 @@ export class CatalogSeeder {
     return row?.id;
   }
 
+  private async hasMedia(productId: string): Promise<boolean> {
+    const [row] = await this.database
+      .select({ id: productMedia.id })
+      .from(productMedia)
+      .where(eq(productMedia.productId, productId))
+      .limit(1);
+    return row !== undefined;
+  }
+
   private async ensureAttribute(definition: SeedAttribute): Promise<void> {
     const existingId = await this.findAttributeId(definition.code);
     if (existingId !== undefined) {
@@ -505,8 +520,16 @@ export class CatalogSeeder {
   }
 
   private async ensureProduct(definition: SeedProduct): Promise<void> {
-    if ((await this.findProductId(definition.slug)) !== undefined) {
+    const existingId = await this.findProductId(definition.slug);
+    if (existingId !== undefined) {
       this.summary.existing.products += 1;
+      if (
+        this.images !== null &&
+        definition.media.length > 0 &&
+        !(await this.hasMedia(existingId))
+      ) {
+        this.summary.images.existingWithoutImages.push(definition.slug);
+      }
       return;
     }
     // Read before anything is written, so a missing file stops the run without a half-built product.

@@ -133,9 +133,9 @@ export class Guard {
       const csrf = request.headers()["x-fluxkit-csrf"];
       this.requests.push({ method: request.method(), url: request.url(), csrf });
       if (url.origin !== ADMIN_E2E_ORIGIN) {
-        // The seed's media and logos are on example.com, which the admin's CSP does not allow (`img-src 'self' data:`): the
-        // SPA tries the preview, the CSP refuses it and the screen says so in text (apps/admin/README.md). Such an image is
-        // accepted only if the CSP refused exactly that address (checked in verify); anything else is a problem.
+        // An image of another origin is not allowed by the admin's CSP (`img-src 'self' data:`): the SPA tries the preview,
+        // the CSP refuses it and the screen says so in text (apps/admin/README.md). The seed's images are same-origin uploads
+        // (`/media/*`), so no scenario expects one; verify fails on any, refused or loaded.
         if (request.resourceType() === "image") this.foreignImages.add(request.url());
         else this.problems.push(`request to another origin: ${request.method()} ${request.url()}`);
         return;
@@ -246,11 +246,13 @@ export class Guard {
       this.texts.some((text) => text.includes(detail.trim()) && !SPA_MESSAGES.has(text)),
     );
     const loadedImages = [...this.foreignImages].filter((url) => !this.blockedImages.has(url));
-    const blockedNotRequested = [...this.blockedImages].filter(
-      (url) => !url.startsWith("https://example.com/"),
-    );
+    // Since the demo seed uploads its images (PR 209), no image of another host is expected at all (review F12).
+    const blockedImages = [...this.blockedImages];
     expect(loadedImages, "an image of another host that the CSP did NOT refuse").toEqual([]);
-    expect(blockedNotRequested, "only the seed's example.com images may be refused").toEqual([]);
+    expect(
+      blockedImages,
+      "an image refused by the CSP (the seed's images are same-origin)",
+    ).toEqual([]);
     expect(this.problems, "requests, CSRF and CSP").toEqual([]);
     expect(this.errors, "console and page errors").toEqual([]);
     expect(shown, "the API's problem detail must never be shown").toEqual([]);

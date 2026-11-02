@@ -129,9 +129,11 @@ export default function config(phase: string): NextConfig {
   return {
     reactStrictMode: true,
     // DEVELOPMENT ONLY (owner decision 2026-11-01, option a of docs/plans/2026-11-01-demo-images-local-run.md): the API's
-    // media prefix, inlined for `next dev` so pages render local uploads as `/media/<key>` (rewritten below). Never set for
-    // a production build or server; `lib/image-source.ts` also ignores it unless NODE_ENV is development.
-    ...(development ? developmentMediaEnv() : {}),
+    // media prefix, inlined for `next dev` so pages render local uploads as `/media/<key>` (rewritten below). Every other
+    // phase inlines an EMPTY prefix, so a production bundle (server code included) never reads the variable from its
+    // environment, even with NODE_ENV=development forced (review F1 of PR 209); `lib/image-source.ts` also ignores the
+    // prefix unless NODE_ENV is development.
+    ...(development ? developmentMediaEnv() : { env: { FLUXKIT_DEV_MEDIA_BASE_URL: "" } }),
     // `next start` evaluates this file again, so the optimizer allows the hosts of the variable as the server STARTS; the
     // pages read the same variable (`lib/image-hosts.server.ts`) and so agree with it. The CSP below keeps the build value.
     images: {

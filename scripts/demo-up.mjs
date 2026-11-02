@@ -19,6 +19,7 @@ import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
+  apiPort,
   assertDemoDatabase,
   childEnv,
   composeArgs,
@@ -114,7 +115,28 @@ function storeMeiliKey(key) {
 
 async function createSearchKey(values) {
   const prefix = values.MEILI_INDEX_PREFIX || "fluxkit_";
-  const response = await globalThis.fetch(`${values.MEILI_URL}/keys`, {
+  let response;
+  try {
+    response = await meiliKeyRequest(values, prefix);
+  } catch (error) {
+    // fetch wraps the socket error; a host with several addresses wraps them in an AggregateError.
+    const cause = error?.cause;
+    const code = cause?.code ?? cause?.errors?.[0]?.code ?? cause?.message ?? "no answer";
+    throw new Error(
+      `Meilisearch at ${values.MEILI_URL} did not answer (${code}) while creating the search key. Is it running? ` +
+        "With Docker: docker compose --env-file .env -f infra/docker-compose.yml ps",
+      { cause: error },
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`Meilisearch refused to create the search key (HTTP ${response.status}).`);
+  }
+  const { key } = await response.json();
+  return key;
+}
+
+function meiliKeyRequest(values, prefix) {
+  return globalThis.fetch(`${values.MEILI_URL}/keys`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${values.MEILI_MASTER_KEY}`,
@@ -139,11 +161,6 @@ async function createSearchKey(values) {
       ],
     }),
   });
-  if (!response.ok) {
-    throw new Error(`Meilisearch refused to create the search key (HTTP ${response.status}).`);
-  }
-  const { key } = await response.json();
-  return key;
 }
 
 async function adminExists(values, email) {
@@ -172,6 +189,7 @@ async function main() {
   }
   let values = parseEnv(readFileSync(envFile, "utf8"));
   const database = assertDemoDatabase(values);
+  apiPort(values);
   const searchOn = values.SEARCH_ENABLED === "true";
 
   if (options.skipDocker) {
@@ -210,7 +228,7 @@ async function main() {
     });
   }
 
-  const port = values.PORT || "3000";
+  const port = apiPort(values);
   const storefront = values.STOREFRONT_PUBLIC_URL || "http://localhost:3001";
   console.log(`
 Demo ready (database ${database}). Start the three servers, each in its own terminal:

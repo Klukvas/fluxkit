@@ -211,9 +211,12 @@ describe("next.config development media rule", () => {
     vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "http://127.0.0.1:3000/media");
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com");
+    // Review F1 of PR 209: even an exported prefix (with NODE_ENV=development forced) cannot switch the rule on in a
+    // build, because the build inlines an EMPTY prefix into every bundle, server code included.
+    vi.stubEnv("FLUXKIT_DEV_MEDIA_BASE_URL", "http://127.0.0.1:3000/media");
     for (const phase of productionPhases) {
       const resolved = config(phase);
-      expect(resolved.env ?? {}, phase).toEqual({});
+      expect(resolved.env, phase).toEqual({ FLUXKIT_DEV_MEDIA_BASE_URL: "" });
       expect(await rewritesFor(phase), phase).toEqual([]);
       // Exactly today's image policy: https on the listed hosts, nothing local or plain http.
       expect(resolved.images, phase).toEqual({

@@ -44,11 +44,44 @@ export function childEnv(fileValues, extra = {}) {
   return { ...env, ...extra };
 }
 
+const INSTALL_HINTS = {
+  docker:
+    "Docker with Compose, or pass --skip-docker when Postgres, Redis and Meilisearch already run",
+  pnpm: "corepack enable",
+};
+
+/**
+ * The API port of `.env` (`PORT`, default 3000) as a whole number 1 to 65535, so a URL built from it can only point at
+ * 127.0.0.1 (review F4 of PR 209: `PORT=3000@evil.example` would otherwise change the host).
+ */
+export function apiPort(values) {
+  const raw = values.PORT === undefined || values.PORT === "" ? "3000" : values.PORT;
+  const port = /^\d{1,5}$/.test(raw) ? Number(raw) : Number.NaN;
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error("PORT in .env must be a whole number from 1 to 65535.");
+  }
+  return port;
+}
+
+/** `http://127.0.0.1:<PORT>`; refuses anything that would not be this machine's loopback address. */
+export function localApiOrigin(values) {
+  const url = new URL(`http://127.0.0.1:${apiPort(values)}`);
+  if (url.hostname !== "127.0.0.1") {
+    throw new Error("Refusing: the demo scripts only talk to an API on 127.0.0.1.");
+  }
+  return url.origin;
+}
+
 /** Runs a command in the repository root with inherited output; throws with the command line on a non-zero exit. */
 export function run(command, args, options = {}) {
   console.log(`\n$ ${command} ${args.join(" ")}`);
   const result = spawnSync(command, args, { cwd: repoRoot, stdio: "inherit", ...options });
   if (result.error !== undefined) {
+    if (result.error.code === "ENOENT") {
+      throw new Error(
+        `\`${command}\` was not found on PATH. Install it (${INSTALL_HINTS[command] ?? "see README, Try it locally"}) and run the command again.`,
+      );
+    }
     throw result.error;
   }
   if (result.status !== 0) {
@@ -68,7 +101,17 @@ export function assertDemoDatabase(values) {
       "Refusing: NODE_ENV is production. The demo scripts are for a developer machine.",
     );
   }
-  const name = decodeURIComponent(new URL(values.DATABASE_URL ?? "").pathname.replace(/^\//, ""));
+  if (values.DATABASE_URL === undefined || values.DATABASE_URL === "") {
+    throw new Error("DATABASE_URL is missing in .env (see .env.example).");
+  }
+  let url;
+  try {
+    url = new URL(values.DATABASE_URL);
+  } catch {
+    // Never repeat the value: it holds the database password.
+    throw new Error("DATABASE_URL in .env is not a valid URL (see .env.example).");
+  }
+  const name = decodeURIComponent(url.pathname.replace(/^\//, ""));
   if (!DEMO_DATABASE_SUFFIXES.some((suffix) => name.toLowerCase().endsWith(suffix))) {
     throw new Error(
       `Refusing: the database "${name}" does not end in ${DEMO_DATABASE_SUFFIXES.join(", ")}.`,

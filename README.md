@@ -39,14 +39,14 @@ Open decisions and next steps are listed at the end.
 
 ## Try it locally
 
-One command prepares a demo shop on a machine with Node 22, pnpm 10.28 (`corepack enable`) and Docker with Compose (plan `docs/plans/2026-11-01-demo-images-local-run.md`).
+One command prepares a demo shop on a macOS or Linux machine with Node 22, pnpm 10.28 (`corepack enable`) and Docker with Compose (plan `docs/plans/2026-11-01-demo-images-local-run.md`). Windows is not verified: the scripts start `pnpm` and `docker` without a shell, which Node refuses for `pnpm.cmd`; use WSL2 (run everything inside the Linux distribution).
 
 ```bash
 pnpm install
 pnpm demo:up        # .env (if missing), Postgres + Redis + Meilisearch, build, migrate, seed, search index, admin owner
 ```
 
-- Without `.env` it writes one from `.env.example` with random secrets of this machine (mode 0600, git-ignored, never commit it): database `fluxkit_dev`, search on, local image uploads (`var/media`), plain-HTTP cookies, and the TEST-ONLY providers `fake` for shipping and payment (`FAKE_PAYMENT_ADOPT_WEBHOOKS=true`; both are refused under `NODE_ENV=production`, never use this file for a real shop). An existing `.env` is used as it is; only a placeholder `MEILI_API_KEY` is replaced by a key scoped to the index prefix. `--skip-docker` uses services that already run.
+- Without `.env` it writes one from `.env.example` with random secrets of this machine (mode 0600, git-ignored, never commit it): database `fluxkit_dev`, search on, local image uploads (`var/media`), plain-HTTP cookies, and the TEST-ONLY providers `fake` for shipping and payment (`FAKE_PAYMENT_ADOPT_WEBHOOKS=true`; both are refused under `NODE_ENV=production`, never use this file for a real shop). An existing `.env` is used as it is; only a placeholder `MEILI_API_KEY` is replaced by a key scoped to the index prefix. Its `DATABASE_URL` must name a database ending in `_dev`, `_demo`, `_local` or `_test` (an older quick-start `.env` with `.../fluxkit` is refused: rename the database in it or delete the file), and `PORT` must be a whole number from 1 to 65535. `--skip-docker` uses services that already run.
 - It creates the owner `owner@example.com` (`--admin-email` for another address) with a random password that it prints ONCE and stores nowhere. Run again, it changes nothing (the seed is idempotent) and leaves the existing admin alone; a lost password: `ADMIN_PASSWORD='<12+ characters>' pnpm admin:create --email other@example.com`.
 - Then start the three servers, each in its own terminal: `pnpm --filter @fluxkit/api start` (API on http://127.0.0.1:3000), `pnpm --filter @fluxkit/storefront dev -p 3001` (shop: http://localhost:3001/uk), `pnpm --filter @fluxkit/admin dev` (admin: http://localhost:5173/admin-ui/, sign in with the printed password).
 - Delivery: the seed creates the demo delivery methods INACTIVE. In the admin, Shipping, open `demo_courier` (or another one), tick "Active (offered at checkout)" and save to see the delivery step; without an active method the checkout has none.
