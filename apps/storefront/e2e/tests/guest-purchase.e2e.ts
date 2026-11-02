@@ -57,6 +57,10 @@ test("a guest buys a T-shirt from the home page and manages the order through it
   expect(
     await page.evaluate(() => window.sessionStorage.getItem("fluxkit.checkoutAttempt")),
   ).toBeNull();
+  // So is the form's draft (review SQ-05): the contact and address are not kept once the order exists.
+  expect(
+    await page.evaluate(() => window.sessionStorage.getItem("fluxkit.checkoutDraft")),
+  ).toBeNull();
 
   // "Save this link": the field holds the full private link and the button copies it.
   const field = page.getByLabel("Link to your order");

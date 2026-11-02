@@ -83,7 +83,7 @@ test("a category page filters by its category and offers no category facet; its 
   await expect(page.getByRole("heading", { level: 3, name: "Demo T-shirt" })).toHaveCount(0);
 });
 
-test("keeps ?brand= of the product pages working as the brand facet, and 404s words on a catalog page", async ({
+test("keeps ?brand= of the product pages working as the brand facet, and sends words on a catalog page to search", async ({
   page,
 }) => {
   const response = await page.goto("/en/catalog?brand=demo-brand");
@@ -92,8 +92,10 @@ test("keeps ?brand= of the product pages working as the brand facet, and 404s wo
   await expect(
     page.getByRole("group", { name: "Brand" }).getByRole("checkbox", { name: /Demo Brand/ }),
   ).toBeChecked();
+  // Review SQ-04 (2026-11-02): words belong to the results page; this was a 404.
   const words = await page.goto("/en/catalog?q=shirt");
-  expect(words?.status()).toBe(404);
+  expect(words?.status()).toBe(200);
+  await expect(page).toHaveURL(/\/en\/search\?q=shirt$/);
 });
 
 test("falls back to the SQL listing and says so when search cannot answer (the shopper's window is used up)", async ({
@@ -134,21 +136,31 @@ test("pages past the last one cost no engine read and no cache entry, on either 
   playwright,
 }) => {
   // Warm up: the config and the categories of a catalog view are cached reads of their own (fixed addresses).
-  expect((await page.request.get("/en/catalog?page=76")).status()).toBe(404);
+  // Review SQ-04 (2026-11-02): a page past the last one redirects to the last page (it was a 404); the redirect itself is
+  // what is counted here, so the requests do not follow it.
+  const pastLast = await page.request.get("/en/catalog?page=76", { maxRedirects: 0 });
+  expect(pastLast.status()).toBe(307);
+  expect(pastLast.headers()["location"]).toMatch(/\/en\/catalog(\?page=\d+)?$/);
   const direct = `http://127.0.0.1:${String(E2E_STOREFRONT_UNFORWARDED_PORT)}`;
   const client = await playwright.request.newContext();
   try {
-    expect((await client.get(`${direct}/uk/catalog?page=76`)).status()).toBe(404);
+    expect((await client.get(`${direct}/uk/catalog?page=76`, { maxRedirects: 0 })).status()).toBe(
+      307,
+    );
     const before = fetchCacheFiles();
     // The review's scenario: one client asks for 74 addresses that cannot have a page, in a few seconds.
     for (let number = 2; number <= 75; number += 1) {
-      const response = await page.request.get(`/en/catalog?page=${String(number)}`);
-      expect(response.status(), `page ${String(number)}`).toBe(404);
+      const response = await page.request.get(`/en/catalog?page=${String(number)}`, {
+        maxRedirects: 0,
+      });
+      expect(response.status(), `page ${String(number)}`).toBe(307);
     }
     // The same through the storefront without the forwarding, where every read is the Next server's own address.
     for (let number = 2; number <= 75; number += 1) {
-      const response = await client.get(`${direct}/uk/catalog?page=${String(number)}`);
-      expect(response.status(), `unforwarded page ${String(number)}`).toBe(404);
+      const response = await client.get(`${direct}/uk/catalog?page=${String(number)}`, {
+        maxRedirects: 0,
+      });
+      expect(response.status(), `unforwarded page ${String(number)}`).toBe(307);
     }
     // The Next server's address (this runner reaches the API from the same address, without a forwarded one) still has
     // its window: before the fix, the 148 bogus pages had used it up (429).

@@ -1,11 +1,6 @@
 import { expect, test } from "../support/fixtures.ts";
 
-for (const path of [
-  "/en/p/no-such-product",
-  "/en/c/no-such-category",
-  "/en/catalog?page=9999",
-  "/en/no-such-page",
-]) {
+for (const path of ["/en/p/no-such-product", "/en/c/no-such-category", "/en/no-such-page"]) {
   test(`${path} answers HTTP 404 and shows the not-found page`, async ({ page }) => {
     const response = await page.goto(path);
     expect(response?.status()).toBe(404);

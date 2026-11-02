@@ -1,6 +1,6 @@
 # Storefront UX review, batch A (2026-11-02)
 
-Status: in progress. Branch `fix/storefront-ux-review-a` from `origin/main` `472fb56` (PR 211 merged). No PR is opened by the implementing agent.
+Status: built (see "Results"). Branch `fix/storefront-ux-review-a` from `origin/main` `472fb56` (PR 211 merged). No PR is opened by the implementing agent.
 Source: the independent UX review of 2026-11-02 (shopper QA `SQ-xx`, designer `D-xx`, a11y `A-xx`); items 1 to 5 of the owner-approved order.
 Goal: fix the price format and its hydration error, make the filtered product card honest, tell the shopper about quantity limits and stock with the data the store API already gives, survive bad query parameters and a language switch, and validate the registration form before it is sent. Storefront only: no API, schema, contract or dependency change.
 
@@ -43,5 +43,25 @@ Goal: fix the price format and its hydration error, make the filtered product ca
 ## Verification
 Each separately with its exit code: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries`, `pnpm check:docs`, `pnpm check:env`, `pnpm check:licenses`, the unit tests of `@fluxkit/ui`, `@fluxkit/theme` and `@fluxkit/storefront`, and the storefront e2e suite against this agent's own throwaway Postgres, Redis and Meilisearch (not the shared stack).
 
-## Results
-(filled in when done)
+## Results (2026-11-02)
+
+Status: items 1 to 5 built on the branch; no PR opened by the implementing agent. Changes while building:
+- Item 2: the card shows a badge only when the availability filter alone fixes the matching variants' stock (`inStock:true`: "In stock", `inStock:false`: "Out of stock"); otherwise no badge and "Price and stock depend on the option". With a fixed stock and differing prices it says "Price depends on the option". The earlier `outOfStockOptionsNote` ("some options are out of stock") is replaced. A `category:` facet on a category page and an option filter with several values link no option.
+- Item 3: the checkout's warning names out-of-stock and low-stock lines (title and chosen values) above the form; the in-stock line of 999 (stock 22) is still only refused on submit, because the API gives no number. The `quantity_limit` answer of the API is replaced by the "already N in the cart" text when the cart holds the variant.
+- Item 4: words on a catalog or category page redirect to `/search` with the words and filters; a page past the last one redirects to the last page (catalog, category, results, SQL fallback), the redirect costs no extra engine read. The checkout draft is reached only through `browserCheckoutDraftStorage` (the storage guard lists it). The draft is also removed on account deletion. An empty result in the other language says which language the page searches.
+- Item 5: the checks also refuse the email as the password (the API's third rule) and passwords over 128 code points.
+
+**Needs an API field (red zone, not done):**
+1. Matched variants of a search hit: `GET /store/search` items have no `matchedVariants` (or `match: {variantId, priceFrom, priceTo, availability}`), so a card cannot show the matching variant's own price, nor link to the exact variant when a filter has several values or the filter is a price range or attribute.
+2. Stock against the cart's quantity: no cart line field says the quantity exceeds what can be reserved (for example a boolean `insufficientStock` per line, computed on each read, no number, so it does not open stock probing beyond what checkout already allows). Without it the 999-of-22 case is known only when the order is sent.
+
+**Failing-first evidence** (logs in the agent's scratchpad `uxa/`):
+- Money: `money.spec.ts` with a browser-like `Intl` (`грн`, narrow spaces) failed on the old code (`expected '1 234,56 грн' to be '1 234,56 ₴'`; `uk` EUR `'9,99 EUR'`), 2 failed of 72; passes after. In Chromium: the e2e `SQ-06` test against a storefront built with the OLD `money.ts` failed (`getByText(/599,00\s₴/)` not found: the browser re-rendered `грн`), passes with the new one.
+- Card: the two `search-results.spec.tsx` regressions failed on the old code (the card printed `§availability.in_stock` under `opt.color:red&opt.size:l`; no `Out of stock` under `inStock:false`).
+- Quantity and stock: 10 specs failed on the old code (`catalog.spec.tsx` in-cart text, capped stepper, at-limit text and disabled button, low-stock hint; `checkout.spec.tsx` warnings before the form; `add-to-cart.spec.ts`; `cart-model.spec.ts`).
+- Parameters: 27 route specs (`search-page.spec.tsx`, `catalog-page.spec.tsx`) failed on the old code with `NEXT_NOT_FOUND` instead of the redirect.
+- Checkout draft and registration: new modules (`checkout-draft.spec.ts`, `register-checks.spec.ts`); the browser regressions are the e2e tests `SQ-05` and `D-06` (not run against the old code).
+
+**Verification** (each separately, exit code 0): `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries` (2298 modules, 0 violations), `pnpm check:env`, `pnpm check:licenses`, `pnpm check:docs`; unit tests `@fluxkit/storefront` (96 files, 1675 tests), `@fluxkit/ui`, `@fluxkit/theme`; storefront e2e against this agent's own Postgres 16, Redis and Meilisearch: 91 passed, 4 skipped (as on main), including the new `ux-review-a.e2e.ts` (7 tests; no hydration error in the console on catalog, product, cart and checkout in `uk` and `en`).
+
+**Not verified:** the admin e2e suite (no admin code touched); the API integration tests (no API code touched); a real screen reader; browsers other than Chromium (the format no longer depends on the browser's ICU data, so Firefox and Safari should match, not checked); `next dev` on `localhost` (the e2e runs `next start`).
