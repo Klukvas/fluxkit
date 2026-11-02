@@ -67,12 +67,15 @@ test("a shopper downloads their data and deletes the account; the admin sees the
   await shopper.addToCart(variant.id, 1);
   const order = await shopper.checkout({ idempotencyKey: randomUUID(), shipping: false });
 
-  // The account page links to "Your data".
+  // The account menu beside the account page links to "Privacy and data" (formerly "Your data", 2026-11-02).
   await page.goto("/en/account");
   await waitForHydration(page);
-  await page.getByRole("link", { name: "Your data" }).click();
+  await page
+    .getByRole("navigation", { name: "Account sections" })
+    .getByRole("link", { name: "Privacy and data" })
+    .click();
   await expect(page).toHaveURL(/\/en\/account\/data$/);
-  await expect(page.getByRole("heading", { level: 1, name: "Your data" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Privacy and data" })).toBeVisible();
   await waitForHydration(page);
 
   // --- Download my data: a JSON file built from the response.
@@ -150,7 +153,10 @@ test("a shopper downloads their data and deletes the account; the admin sees the
     page.getByRole("heading", { level: 1, name: "Your account was deleted" }),
   ).toBeVisible();
   await expect(page.getByText("you are signed out")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+  // The header shows a guest: the account icon's menu is the guest's one.
+  await expect(
+    page.getByRole("banner").getByRole("button", { name: "Account menu" }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: /Cart.*0 items in the cart/ })).toBeVisible();
 
   // Signing in is refused afterwards, and the data page sends the shopper to sign in.

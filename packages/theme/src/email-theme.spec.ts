@@ -24,6 +24,7 @@ const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.to
 const notInMail: Record<string, string> = {
   "--fk-color-border-input": "mail has no form controls",
   "--fk-color-ring": "mail has no keyboard focus to show",
+  "--fk-color-danger-foreground": "mail has no count badge or other text on a danger fill",
   "--fk-shadow-card": "box-shadow is not supported by common mail clients",
 };
 

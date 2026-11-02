@@ -111,6 +111,22 @@ export async function waitForHydration(page: Page): Promise<void> {
   await expect(page.getByRole("link", { name: /Cart.*\d+ items? in the cart/ })).toBeVisible();
 }
 
+/**
+ * Opens the header's language menu (a `<details>` dropdown since 2026-11-02; its links are hidden until it is open). The
+ * summary is named "Site language: <name>" in English and "Мова сайту: <name>" in Ukrainian.
+ */
+export async function openLanguageMenu(page: Page): Promise<void> {
+  await page.getByRole("button", { name: /^(Site language|Мова сайту):/ }).click();
+}
+
+/** Opens the header's account menu: "Account menu" for a guest, "Account: <first name>" for a customer. */
+export async function openAccountMenu(
+  page: Page,
+  name: string | RegExp = "Account menu",
+): Promise<void> {
+  await page.getByRole("banner").getByRole("button", { name }).click();
+}
+
 /** The value of a row of the order summary or the totals (`<dt>` label, `<dd>` value next to it). */
 export function rowValue(region: Locator, label: string): Locator {
   return region

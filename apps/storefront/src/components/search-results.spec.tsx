@@ -110,6 +110,15 @@ const ok = (overrides: Partial<SearchResult> = {}): SearchPageOutcome => ({
   result: result(overrides),
 });
 
+describe("the availability filter's card note (variant-level facet, 2026-11-02)", () => {
+  it("says on an in-stock card that some options are out of stock, only while inStock:false is selected", () => {
+    const filtered = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
+    expect(filtered.match(/§search\.facet\.inStock\.someOut/g)).toHaveLength(2);
+    const plain = render(ok(), { query: { ...query, facets: ["inStock:true"] } });
+    expect(plain).not.toContain("§search.facet.inStock.someOut");
+  });
+});
+
 describe("results page markup", () => {
   const html = render(ok(), {
     query: { ...query, facets: ["brand:zeta"], price: { min: 1000, max: null } },

@@ -202,6 +202,18 @@ export type OrderListState =
   | { status: "error"; failure: Failure }
   | { status: "signedOut" };
 
+/**
+ * The list before its store exists (and the server render). ONE object: `useSyncExternalStore` compares snapshots with
+ * `Object.is`, so a fallback built per call is reported by React as an uncached snapshot (the 'My orders' error of
+ * 2026-11-02).
+ */
+export const initialOrderListState: OrderListState = Object.freeze({ status: "loading" });
+
+/** What the island shows: the store's state, or the shared loading state while there is no store yet. */
+export function orderListSnapshot(store: Pick<OrderListStore, "getState"> | null): OrderListState {
+  return store?.getState() ?? initialOrderListState;
+}
+
 export interface OrderListStore {
   getState(): OrderListState;
   subscribe(listener: () => void): () => void;
@@ -215,7 +227,7 @@ export function createOrderListStore(options: {
   onSignedOut?: () => void;
 }): OrderListStore {
   const { client, page, locale } = options;
-  let state: OrderListState = { status: "loading" };
+  let state: OrderListState = initialOrderListState;
   const listeners = new Set<() => void>();
 
   function set(next: OrderListState): void {

@@ -1,5 +1,10 @@
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { fillCheckoutForm, orderNumberOnPage, waitForHydration } from "../support/flows.ts";
+import {
+  fillCheckoutForm,
+  openAccountMenu,
+  orderNumberOnPage,
+  waitForHydration,
+} from "../support/flows.ts";
 
 const PASSWORD = "a long e2e password 123";
 
@@ -14,7 +19,9 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
   await page.getByRole("button", { name: "Add to cart" }).click();
   await expect(page.getByRole("link", { name: /Cart.*1 item in the cart/ })).toBeVisible();
 
-  await page.getByRole("link", { name: "Sign in" }).first().click();
+  // The account icon's menu (2026-11-02): a guest gets "Sign in" and "Register".
+  await openAccountMenu(page);
+  await page.getByRole("link", { name: "Sign in" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await page.getByRole("link", { name: "Create an account" }).click();
   // Wait for the new page: a field filled while the old page is still there would be filled on the wrong form.
@@ -27,7 +34,7 @@ test("a shopper registers with a guest cart, checks out as a customer and finds 
 
   // Signed in; the guest cart came along (an empty account cart needs no merge notice).
   await expect(page).toHaveURL(/\/en\/account$/);
-  await expect(page.getByRole("link", { name: "Account: Olena" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Account: Olena" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Cart.*1 item in the cart/ })).toBeVisible();
   await expect(page.getByText("Your carts were merged")).toHaveCount(0);
 

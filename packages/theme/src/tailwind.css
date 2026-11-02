@@ -9,6 +9,7 @@
   --color-primary: var(--fk-color-primary);
   --color-primary-foreground: var(--fk-color-primary-foreground);
   --color-danger: var(--fk-color-danger);
+  --color-danger-foreground: var(--fk-color-danger-foreground);
   --color-success: var(--fk-color-success);
   --color-warning: var(--fk-color-warning);
   --color-ring: var(--fk-color-ring);

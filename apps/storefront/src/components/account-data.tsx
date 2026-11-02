@@ -1,6 +1,5 @@
 "use client";
 
-import { Container } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -141,7 +140,7 @@ export function AccountDataPage() {
   return (
     <AccountGate titleKey="account.data.title">
       {() => (
-        <Container className="flex flex-col gap-10 py-8">
+        <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold text-foreground">{t("account.data.title")}</h1>
             <Link
@@ -169,7 +168,7 @@ export function AccountDataPage() {
           </div>
           <ExportPanel />
           <DeletePanel />
-        </Container>
+        </div>
       )}
     </AccountGate>
   );

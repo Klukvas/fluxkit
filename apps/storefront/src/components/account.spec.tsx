@@ -6,7 +6,9 @@ import { clientFailure, failureFromResult, missingRequired, type Failure } from 
 import { customer } from "../lib/test-fixtures";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
+import { currentAccountLink } from "../layout/navigation";
 import { AccountGateView } from "./account-gate";
+import { AccountNavView } from "./account-nav";
 import { AccountOverviewView } from "./account-overview";
 import { AlreadySignedInView, LoginFormView, type LoginFormViewProps } from "./login-form";
 import { PasswordFormView, ProfileFormView } from "./profile-forms";
@@ -343,8 +345,8 @@ describe("AccountOverviewView", () => {
     expect(onLogout).toHaveBeenCalledTimes(1);
     const html = renderToStaticMarkup(view);
     expect(html).toContain('href="/uk/account/profile"');
-    expect(html).toContain('href="/uk/account/orders"');
-    expect(html).toContain("§account.overview.orders");
+    // The orders and "Privacy and data" are in the account menu beside every account page (AccountNavView), not repeated here.
+    expect(html).not.toContain('href="/uk/account/orders"');
     expect(html.match(/<h1/g)).toHaveLength(1);
   });
 
@@ -464,5 +466,56 @@ describe("account views: language and text", () => {
         expect(() => renderToStaticMarkup(element)).not.toThrow();
       }
     }
+  });
+});
+
+describe("account menu of the account pages (side menu on desktop, tabs on a phone)", () => {
+  it("lists the account sections as links in a labelled nav and marks the current one", () => {
+    const html = renderToStaticMarkup(
+      <AccountNavView t={t} locale="uk" current={currentAccountLink("/account/orders/AB-12")} />,
+    );
+    expect(html).toMatch(/^<nav aria-label="§nav\.account\.sections">/);
+    const links = [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]*)<\/a>/g)].map((match) => [
+      match[1],
+      match[2],
+    ]);
+    expect(links).toEqual([
+      ["/uk/account", "§nav.account.overview"],
+      ["/uk/account/orders", "§nav.account.orders"],
+      ["/uk/account/profile", "§nav.account.profile"],
+      ["/uk/account/data", "§nav.account.privacy"],
+    ]);
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toMatch(
+      /aria-current="page"[^>]*href="\/uk\/account\/orders"|href="\/uk\/account\/orders"[^>]*aria-current="page"/,
+    );
+    // Tabs below `lg` (a row that scrolls), a column from `lg`.
+    expect(html).toContain("overflow-x-auto");
+    expect(html).toContain("lg:flex-col");
+    expect(leftoverText(html)).toBe("");
+  });
+
+  it("marks the overview only on /account itself and each section on its own pages", () => {
+    expect(currentAccountLink("/account")).toBe("/account");
+    expect(currentAccountLink("/account/profile")).toBe("/account/profile");
+    expect(currentAccountLink("/account/data")).toBe("/account/data");
+    expect(currentAccountLink("/account/orders")).toBe("/account/orders");
+    expect(currentAccountLink("/account/ordersx")).toBeNull();
+    expect(currentAccountLink("/account/login")).toBeNull();
+    expect(currentAccountLink("/cart")).toBeNull();
+  });
+
+  it("has real labels in both languages and calls 'Your data' Privacy and data", () => {
+    for (const [messages, locale] of [
+      [uk, "uk"],
+      [en, "en"],
+    ] as const) {
+      const real = createTranslator(messages, locale);
+      const html = renderToStaticMarkup(<AccountNavView t={real} locale={locale} current={null} />);
+      expect(html).not.toContain("§");
+    }
+    expect(en["nav.account.privacy"]).toBe("Privacy and data");
+    expect(en["account.data.title"]).toBe("Privacy and data");
+    expect(uk["nav.account.privacy"]).toBe("Конфіденційність і дані");
   });
 });

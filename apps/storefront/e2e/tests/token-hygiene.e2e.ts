@@ -5,6 +5,7 @@ import {
   orderNumberOnPage,
   tokenOf,
   waitForHydration,
+  openLanguageMenu,
 } from "../support/flows.ts";
 
 const pathOf = (url: string): string => new URL(url).pathname;
@@ -111,6 +112,7 @@ test("the guest order token never appears in a URL, a header, the page source, t
   expect(await page.title()).not.toContain(number);
 
   // A language switch is a full navigation that carries the fragment and nothing else.
+  await openLanguageMenu(page);
   await page.getByRole("link", { name: "Українська" }).click();
   await expect(page).toHaveURL(new RegExp(`/uk/order/${number}#t=${token}$`));
   await expect(page.getByRole("heading", { level: 1, name: new RegExp(number) })).toBeVisible();

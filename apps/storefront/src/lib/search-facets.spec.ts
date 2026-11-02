@@ -5,6 +5,7 @@ import {
   describeFormFailure,
   facetTitle,
   facetValueLabel,
+  outOfStockOptionsNote,
   priceBoxHints,
   selectedFilters,
   sortChoices,
@@ -235,5 +236,19 @@ describe("priceBoxHints", () => {
   it("gives the placeholders of the price boxes from the result's range", () => {
     expect(priceBoxHints({ min: 1250, max: 99000 }, 2)).toEqual({ min: "12.5", max: "990" });
     expect(priceBoxHints(null, 2)).toEqual({ min: "", max: "" });
+  });
+});
+
+describe("the availability filter is variant-level (ADR 0034 decision 4), and the cards say so", () => {
+  it("notes 'some options are out of stock' on a listed product that is not out of stock, only with inStock:false", () => {
+    const note = outOfStockOptionsNote({ facets: ["inStock:false"] }, t);
+    expect(note).not.toBeNull();
+    // The demo T-shirt: listed by inStock:false because its red L variant is out of stock, while the product is in stock.
+    expect(note?.({ availability: "in_stock" })).toBe("§search.facet.inStock.someOut");
+    expect(note?.({ availability: "low_stock" })).toBe("§search.facet.inStock.someOut");
+    expect(note?.({ availability: "out_of_stock" })).toBeNull();
+    expect(outOfStockOptionsNote({ facets: [] }, t)).toBeNull();
+    expect(outOfStockOptionsNote({ facets: ["inStock:true"] }, t)).toBeNull();
+    expect(outOfStockOptionsNote({ facets: ["brand:acme", "inStock:false"] }, t)).not.toBeNull();
   });
 });

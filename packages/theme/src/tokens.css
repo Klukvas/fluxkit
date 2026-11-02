@@ -14,6 +14,7 @@
   --fk-color-primary: #4f46e5;
   --fk-color-primary-foreground: #ffffff;
   --fk-color-danger: #b91c1c;
+  --fk-color-danger-foreground: #ffffff;
   --fk-color-success: #15803d;
   --fk-color-warning: #b45309;
   --fk-color-ring: #4f46e5;
@@ -35,6 +36,7 @@
   --fk-color-primary: #818cf8;
   --fk-color-primary-foreground: #0b1020;
   --fk-color-danger: #f87171;
+  --fk-color-danger-foreground: #0b1020;
   --fk-color-success: #4ade80;
   --fk-color-warning: #fbbf24;
   --fk-color-ring: #818cf8;

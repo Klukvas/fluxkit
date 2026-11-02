@@ -1,10 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
+import { openLanguageMenu } from "../support/flows.ts";
 
 test("the language switcher keeps the page and the query string", async ({ page }) => {
   await page.goto("/uk/catalog?brand=demo-brand");
   await expect(page.locator("html")).toHaveAttribute("lang", "uk");
   // The server renders the links without the query; the browser adds it after hydration, so wait for the finished link.
+  // The languages are in a dropdown (2026-11-02): open it first.
+  await openLanguageMenu(page);
   const english = page.getByRole("link", { name: "English" });
   await expect(english).toHaveAttribute("href", "/en/catalog?brand=demo-brand");
   await english.click();
@@ -13,6 +16,7 @@ test("the language switcher keeps the page and the query string", async ({ page 
   await expect(page.getByRole("heading", { level: 1, name: "Catalog" })).toBeVisible();
 
   await page.goto("/en/p/demo-hammer");
+  await openLanguageMenu(page);
   await page.getByRole("link", { name: "Українська" }).click();
   await expect(page).toHaveURL(/\/uk\/p\/demo-hammer$/);
   await expect(page.getByRole("heading", { level: 1, name: "Демо молоток" })).toBeVisible();
@@ -39,6 +43,7 @@ test("the language switcher keeps the order link's fragment, in both directions"
   ).toBeVisible();
 
   // The links are built in the browser after hydration: wait for the fragment to be in the link, then use it.
+  await openLanguageMenu(page);
   const english = page.getByRole("link", { name: "English" });
   await expect(english).toHaveAttribute("href", `/en/order/${order.number}#t=${token}`);
   await english.click();
@@ -48,6 +53,7 @@ test("the language switcher keeps the order link's fragment, in both directions"
   ).toBeVisible();
   await expect(page.getByText("Awaiting payment", { exact: true })).toBeVisible();
 
+  await openLanguageMenu(page);
   const ukrainian = page.getByRole("link", { name: "Українська" });
   await expect(ukrainian).toHaveAttribute("href", `/uk/order/${order.number}#t=${token}`);
   await ukrainian.click();

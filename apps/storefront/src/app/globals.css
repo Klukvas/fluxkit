@@ -4,6 +4,53 @@
 /* Tailwind must also scan the shared UI library for class names. */
 @source "../../../../packages/ui/src";
 
+/*
+ * Flags of the language menu (`src/config/locale-flags.ts`): decorative pictures from `public/flags`, drawn as a background
+ * so they stay out of the accessibility tree and out of the component markup. Flag colours are content, not theme tokens.
+ */
+.fk-flag {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1rem;
+  flex-shrink: 0;
+  background-position: center;
+  background-size: cover;
+  @apply rounded-sm ring-1 ring-border;
+}
+.fk-flag-ua {
+  background-image: url("/flags/ua.svg");
+}
+.fk-flag-gb {
+  background-image: url("/flags/gb.svg");
+}
+
+/*
+ * The header's repeated controls as ONE class each (tokens only, through @apply). The header is part of every page's first
+ * HTML, and React (19.3, `progressiveChunkSize` 12 800 bytes) moves a finished page section out of place, to be put back by
+ * a script, once the HTML before it plus the section pass that size: a page that must work before its script runs (the
+ * sign-in and registration forms, e2e `pre-hydration-forms`) then shows only its loading view. A long class list on every
+ * menu entry cost about 3 KB of that budget (2026-11-02). Keep the header markup small.
+ */
+.fk-menu-item {
+  @apply flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-start whitespace-nowrap text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+}
+.fk-nav-link {
+  @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+}
+.fk-header-button {
+  @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+}
+.fk-header-button::-webkit-details-marker {
+  display: none;
+}
+.fk-menu-panel {
+  @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-card;
+}
+/* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
+.fk-icon {
+  @apply fill-none stroke-current stroke-2;
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

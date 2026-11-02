@@ -2,15 +2,19 @@
 
 import { locales, type Locale, type Translator } from "@fluxkit/ui";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { switchLocalePath } from "../lib/locale-path";
+import { flagClass } from "../config/locale-flags";
+import { HeaderDisclosure, menuItem } from "./header-menu";
 import { useI18n } from "./i18n-provider";
-import { navLink } from "./styles";
+import { ChevronDownIcon } from "./icons";
 
 /**
- * Each locale named in its own language. The current one is plain text with `aria-current`; the others are ordinary links
- * (not `next/link`): a language change should be a full page load, so `<html lang>`, the messages and every island start
- * from the new locale.
+ * A dropdown of the languages (owner request 2026-11-02): the summary shows the current language's flag and short name, the
+ * panel each language with its flag and its name in its own language. The flags are decoration (`aria-hidden`, drawn by CSS);
+ * the accessible name of the summary says "Site language: <name>". The current one is plain text with `aria-current`; the
+ * others are ordinary links (not `next/link`): a language change should be a full page load, so `<html lang>`, the messages
+ * and every island start from the new locale.
  */
 export function LocaleSwitcherView({
   locale,
@@ -27,32 +31,82 @@ export function LocaleSwitcherView({
   hash?: string;
 }) {
   return (
+    <LocaleMenuFrame locale={locale} t={t}>
+      <LocaleListView locale={locale} t={t} pathname={pathname} search={search} hash={hash} />
+    </LocaleMenuFrame>
+  );
+}
+
+/**
+ * The nav and the dropdown around the list. Kept OUTSIDE the list's Suspense boundary: the server renders the list without
+ * the query (its fallback) and the browser swaps the list in, so a dropdown opened before hydration stays open (found by the
+ * e2e language-switch scenario: a dropdown inside the boundary was replaced, closed, by the swap).
+ */
+function LocaleMenuFrame({
+  locale,
+  t,
+  children,
+}: {
+  locale: Locale;
+  t: Translator;
+  children: ReactNode;
+}) {
+  return (
     <nav aria-label={t("locale.switcher.label")}>
-      <ul className="flex items-center gap-1">
-        {locales.map((target) => (
-          <li key={target}>
-            {target === locale ? (
-              <span
-                lang={target}
-                aria-current="true"
-                className="inline-flex min-h-11 items-center px-2 font-semibold text-foreground"
-              >
-                {t(`locale.name.${target}`)}
-              </span>
-            ) : (
-              <a
-                lang={target}
-                hrefLang={target}
-                href={switchLocalePath(pathname, target, search, hash)}
-                className={navLink}
-              >
-                {t(`locale.name.${target}`)}
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
+      <HeaderDisclosure
+        label={t("locale.switcher.current", { name: t(`locale.name.${locale}`) })}
+        summary={
+          <>
+            <span aria-hidden="true" className={flagClass(locale)} />
+            <span aria-hidden="true" className="text-sm font-semibold">
+              {t(`locale.short.${locale}`)}
+            </span>
+            <ChevronDownIcon className="transition-transform group-open:rotate-180 motion-reduce:transition-none" />
+          </>
+        }
+      >
+        {children}
+      </HeaderDisclosure>
     </nav>
+  );
+}
+
+function LocaleListView({
+  locale,
+  t,
+  pathname,
+  search,
+  hash,
+}: {
+  locale: Locale;
+  t: Translator;
+  pathname: string;
+  search: string;
+  hash: string;
+}) {
+  return (
+    <ul className="flex flex-col">
+      {locales.map((target) => (
+        <li key={target}>
+          {target === locale ? (
+            <span lang={target} aria-current="true" className={`${menuItem} font-semibold`}>
+              <span aria-hidden="true" className={flagClass(target)} />
+              {t(`locale.name.${target}`)}
+            </span>
+          ) : (
+            <a
+              lang={target}
+              hrefLang={target}
+              href={switchLocalePath(pathname, target, search, hash)}
+              className={menuItem}
+            >
+              <span aria-hidden="true" className={flagClass(target)} />
+              {t(`locale.name.${target}`)}
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -78,7 +132,7 @@ function WithSearch({ pathname }: { pathname: string }) {
   const query = useSearchParams().toString();
   const hash = useLocationHash(pathname, query);
   return (
-    <LocaleSwitcherView
+    <LocaleListView
       locale={locale}
       t={t}
       pathname={pathname}
@@ -96,8 +150,12 @@ export function LocaleSwitcher() {
   const { locale, t } = useI18n();
   const pathname = usePathname() ?? `/${locale}`;
   return (
-    <Suspense fallback={<LocaleSwitcherView locale={locale} t={t} pathname={pathname} search="" />}>
-      <WithSearch pathname={pathname} />
-    </Suspense>
+    <LocaleMenuFrame locale={locale} t={t}>
+      <Suspense
+        fallback={<LocaleListView locale={locale} t={t} pathname={pathname} search="" hash="" />}
+      >
+        <WithSearch pathname={pathname} />
+      </Suspense>
+    </LocaleMenuFrame>
   );
 }

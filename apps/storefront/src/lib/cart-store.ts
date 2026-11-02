@@ -135,7 +135,15 @@ export interface CartStore {
   refresh(): Promise<CartOutcome>;
   /** Failure of the call is returned, not kept in the shared state: the product page shows it itself. */
   add(variantId: string, quantity: number): Promise<CartOutcome>;
-  setQuantity(variantId: string, quantity: number): Promise<CartOutcome>;
+  /**
+   * `reportFailure: false` keeps a failure out of the shared state: the cart page's line shows it next to its quantity
+   * (autosave, 2026-11-02). A cart in a `409` answer is applied either way.
+   */
+  setQuantity(
+    variantId: string,
+    quantity: number,
+    options?: { reportFailure?: boolean },
+  ): Promise<CartOutcome>;
   remove(variantId: string): Promise<CartOutcome>;
   /** `DELETE /store/cart`, then a read: the empty cart (with its currency) is the server's, never built here. */
   clear(): Promise<CartOutcome>;
@@ -272,13 +280,14 @@ export function createCartStore(options: CartStoreOptions): CartStore {
         false,
       );
     },
-    setQuantity(variantId, quantity) {
-      if (!validQuantity(quantity)) return Promise.resolve(refuse(invalidQuantity(), true));
+    setQuantity(variantId, quantity, options) {
+      const report = options?.reportFailure ?? true;
+      if (!validQuantity(quantity)) return Promise.resolve(refuse(invalidQuantity(), report));
       return run(
         variantId,
         "updated",
         () => client.setCartItemQuantity(variantId, { quantity }, call),
-        true,
+        report,
       );
     },
     remove: (variantId) =>

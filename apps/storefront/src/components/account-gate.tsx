@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { SessionState } from "../lib/account-store";
 import { currentPath, loginHref } from "../lib/safe-next";
 import { useI18n } from "./i18n-provider";
+import { AccountLayoutView, AccountNav } from "./account-nav";
 import { useAccount } from "./session-provider";
 import { linkButton } from "./styles";
 
@@ -102,7 +103,10 @@ export function AccountGate({
       signInHref={signInHref}
       onRetry={() => void store.refresh()}
     >
-      {children}
+      {(customer) => (
+        // Every signed-in account page gets the account menu (side menu on desktop, tabs on a phone; 2026-11-02).
+        <AccountLayoutView nav={<AccountNav />}>{children(customer)}</AccountLayoutView>
+      )}
     </AccountGateView>
   );
 }

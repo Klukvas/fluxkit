@@ -79,7 +79,7 @@ test("forgot password, reset link, new password, sign in: the old password stops
   await repeat.fill(NEW_PASSWORD);
   await page.getByRole("button", { name: "Save the new password" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Password changed" })).toBeFocused();
-  await expect(page.getByRole("link", { name: /^Account:/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Account:/ })).toHaveCount(0);
   await page.getByRole("link", { name: "Go to sign in" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Sign in" })).toBeVisible();
   await waitForHydration(page);
@@ -92,7 +92,7 @@ test("forgot password, reset link, new password, sign in: the old password stops
   await page.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(page).toHaveURL(/\/en\/account$/);
-  await expect(page.getByRole("link", { name: "Account: Api" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Account: Api" })).toBeVisible();
 
   // The link is single use. The page cannot know that before the API says so: the form shows, the submit turns it into the
   // one "does not work" state (no sign-in link was followed, so the shopper is still signed in with the new password).

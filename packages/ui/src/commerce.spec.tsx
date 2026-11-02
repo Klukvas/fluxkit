@@ -52,6 +52,19 @@ describe("QuantityInput", () => {
     expect(text(markup)).not.toContain("Quantity");
   });
 
+  it("centres the number in a box as tall as the buttons, without native spin buttons", () => {
+    const markup = render(<QuantityInput {...props} />);
+    const inputClass = String(first(markup, "input").attributes.class);
+    expect(inputClass).toContain("text-center");
+    expect(inputClass).toContain("tabular-nums");
+    expect(inputClass).toContain("h-11");
+    expect(inputClass).toContain("[appearance:textfield]");
+    expect(inputClass).toContain("[&::-webkit-inner-spin-button]:appearance-none");
+    for (const button of tags(markup, "button")) {
+      expect(String(button.attributes.class)).toContain("h-11");
+    }
+  });
+
   it("disables decrease at the minimum and increase at the maximum", () => {
     const atMin = tags(render(<QuantityInput {...props} value={1} min={1} max={5} />), "button");
     expect(atMin[0]?.attributes.disabled).toBe(true);

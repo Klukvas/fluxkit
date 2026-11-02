@@ -6,7 +6,6 @@ import {
   Badge,
   Button,
   Card,
-  Container,
   EmptyState,
   Pagination,
   Skeleton,
@@ -28,7 +27,9 @@ import {
   accountOrderSource,
   createOrderListStore,
   createOrderStore,
+  initialOrderListState,
   initialOrderState,
+  orderListSnapshot,
   type OrderListState,
   type OrderListStore,
   type OrderStore,
@@ -100,12 +101,28 @@ export function AccountOrdersView({
   onRetry: () => void;
 }) {
   return (
-    <Container className="flex flex-col gap-6 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-foreground">{t("account.orders.title")}</h1>
       {state.status === "loading" || state.status === "signedOut" ? (
         <div className="flex flex-col gap-4" aria-busy="true">
           <Spinner label={t("account.orders.loading")} />
-          <Skeleton className="h-24 w-full" />
+          {/* Shaped like the order cards (number, date, items on the left; status and total on the right). */}
+          {[0, 1, 2].map((index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between gap-4 rounded-lg border border-border p-4"
+            >
+              <div className="flex flex-1 flex-col gap-2">
+                <Skeleton className="h-6 w-40" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <Skeleton className="h-6 w-24" />
+                <Skeleton className="h-5 w-20" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
       {state.status === "error" ? (
@@ -162,7 +179,7 @@ export function AccountOrdersView({
       <Link href={localizedHref(locale, "/account")} className={`self-start ${focusRing}`}>
         {t("nav.account.account")}
       </Link>
-    </Container>
+    </div>
   );
 }
 
@@ -175,8 +192,8 @@ function OrderList({ shop }: { shop: ShopMoney }) {
   const [store, setStore] = useState<OrderListStore | null>(null);
   const state = useSyncExternalStore<OrderListState>(
     (listener) => store?.subscribe(listener) ?? (() => {}),
-    () => store?.getState() ?? { status: "loading" },
-    () => ({ status: "loading" }),
+    () => orderListSnapshot(store),
+    () => initialOrderListState,
   );
 
   useEffect(() => {
@@ -256,7 +273,7 @@ function OrderDetail({
   }, [client, number, locale, account, malformed]);
 
   return (
-    <Container className="flex flex-col gap-6 py-8">
+    <div className="flex flex-col gap-6">
       {malformed ? (
         <OrderStatusView state={{ status: "notFound" }} t={t} locale={locale} onRetry={() => {}} />
       ) : state.load.status === "ready" && store !== null ? (
@@ -292,7 +309,7 @@ function OrderDetail({
       <Link href={accountOrdersHref(locale)} className={`self-start ${focusRing}`}>
         {t("account.orders.back")}
       </Link>
-    </Container>
+    </div>
   );
 }
 

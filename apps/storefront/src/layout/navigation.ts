@@ -35,4 +35,37 @@ export const sessionLinks = {
   cart: "/cart",
   account: "/account",
   signIn: "/account/login",
+  register: "/account/register",
 } as const;
+
+/**
+ * The signed-in customer's pages, in menu order: the header's account menu and the account pages' side menu (tabs on a
+ * phone) both list these (owner decision 2026-11-02). "Your data" (privacy, ADR 0033) is labelled "Privacy and data".
+ */
+export const accountLinks: readonly NavigationLink[] = [
+  { labelKey: "nav.account.overview", href: "/account" },
+  { labelKey: "nav.account.orders", href: "/account/orders" },
+  { labelKey: "nav.account.profile", href: "/account/profile" },
+  { labelKey: "nav.account.privacy", href: "/account/data" },
+];
+
+/** The guest's entries of the header's account menu. */
+export const guestLinks: readonly NavigationLink[] = [
+  { labelKey: "nav.account.signIn", href: sessionLinks.signIn },
+  { labelKey: "nav.account.register", href: sessionLinks.register },
+];
+
+/**
+ * The account link that is "current" for a path: the longest matching one, so `/account/orders/AB-12` marks "My orders"
+ * and only `/account` itself marks the overview. `pathname` is locale-less.
+ */
+export function currentAccountLink(pathname: string): string | null {
+  const matches = accountLinks
+    .map((link) => link.href)
+    .filter((href) =>
+      href === "/account"
+        ? pathname === href
+        : pathname === href || pathname.startsWith(`${href}/`),
+    );
+  return matches.sort((a, b) => b.length - a.length)[0] ?? null;
+}

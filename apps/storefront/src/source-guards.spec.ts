@@ -72,6 +72,25 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     ).toEqual([...searchForms].sort());
   });
 
+  it("never returns a fresh object from a useSyncExternalStore snapshot (the 'My orders' error, 2026-11-02)", () => {
+    // React compares two calls of getSnapshot with Object.is. A literal such as `store?.getState() ?? { status: "loading" }`
+    // is a new object on every call: React (development) reports "The result of getSnapshot should be cached" and `next
+    // dev` shows it as an error on the page. A fallback must be a module constant.
+    const calls = (text: string) =>
+      [...text.matchAll(/useSyncExternalStore(?:<[^>]*>)?\(([\s\S]*?)\);/g)].map(
+        (match) => match[1] as string,
+      );
+    const freshObject = /\?\?\s*\{|=>\s*\(\s*\{|=>\s*\[|\?\?\s*\[/;
+    expect(freshObject.test(`() => store?.getState() ?? { status: "loading" }`)).toBe(true);
+    expect(freshObject.test(`() => ({ status: "loading" })`)).toBe(true);
+    expect(freshObject.test(`() => store?.getState() ?? LOADING`)).toBe(false);
+    const checked = sources.flatMap((file) => calls(file.text).map((call) => ({ file, call })));
+    expect(checked.length).toBeGreaterThanOrEqual(8);
+    for (const { file, call } of checked) {
+      expect(freshObject.test(call), `${file.path}: ${call.trim()}`).toBe(false);
+    }
+  });
+
   it("mounts RouteFocus in the shell, so the focus follows a client-side navigation (review L9)", () => {
     const shell = sources.find((file) => file.path === join("components", "site-shell.tsx"));
     expect(shell?.text).toMatch(/<RouteFocus\s*\/>/);

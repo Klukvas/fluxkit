@@ -19,8 +19,12 @@ describe("cartPageHandlers", () => {
     const handlers = cartPageHandlers(store as unknown as CartStore);
     handlers.onRetry();
     expect(store.refresh).toHaveBeenCalledTimes(1);
-    handlers.onSetQuantity("v1", 4);
-    expect(store.setQuantity).toHaveBeenCalledWith("v1", 4);
+    void handlers.onSetQuantity("v1", 4);
+    // The line shows its own failure, so the shared page alert must not show it as well.
+    expect(store.setQuantity).toHaveBeenCalledWith("v1", 4, { reportFailure: false });
+    // A save sent after the shopper left the page has no line to show its failure: the shared cart reports it.
+    void handlers.onSetQuantity("v1", 5, true);
+    expect(store.setQuantity).toHaveBeenLastCalledWith("v1", 5, { reportFailure: true });
     handlers.onRemove("v2");
     expect(store.remove).toHaveBeenCalledWith("v2");
     handlers.onAcknowledge();
@@ -29,7 +33,7 @@ describe("cartPageHandlers", () => {
     expect(store.dismissFailure).toHaveBeenCalledTimes(1);
     // Nothing else was called by any of them.
     expect(store.refresh).toHaveBeenCalledTimes(1);
-    expect(store.setQuantity).toHaveBeenCalledTimes(1);
+    expect(store.setQuantity).toHaveBeenCalledTimes(2);
     expect(store.remove).toHaveBeenCalledTimes(1);
     expect(store.acknowledge).toHaveBeenCalledTimes(1);
   });

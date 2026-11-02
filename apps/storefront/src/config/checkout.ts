@@ -1,3 +1,5 @@
+import type { CountryCode } from "libphonenumber-js/min";
+
 /**
  * Shop-specific checkout settings (plan, "Theming and layout composition"; API gap 14: the API has no such settings). Read
  * by the checkout form in step 7, never hardcoded in a component. Internal to the storefront in v1.
@@ -25,11 +27,17 @@ export interface CheckoutConfig {
   defaultCountry: string;
   /** Address fields shown under the country, in order. */
   addressFields: readonly AddressFieldConfig[];
+  /**
+   * The country a phone number typed without `+` belongs to (formatting while typing and the check before submit,
+   * `lib/phone.ts`; 2026-11-02). ISO 3166-1 alpha-2.
+   */
+  phoneDefaultCountry: CountryCode;
 }
 
 export const checkoutConfig: CheckoutConfig = {
   allowedShippingCountries: ["UA"],
   defaultCountry: "UA",
+  phoneDefaultCountry: "UA",
   addressFields: [
     { name: "region", required: false },
     { name: "city", required: true },

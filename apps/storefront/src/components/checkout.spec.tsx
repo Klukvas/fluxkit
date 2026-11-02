@@ -12,7 +12,7 @@ import { initialCheckoutState, type CheckoutState } from "../lib/checkout-store"
 import { clientFailure, failureFromResult } from "../lib/failure";
 import { formatMoney } from "../lib/money";
 import { cartLine, cartOf } from "../lib/test-fixtures";
-import { CheckoutPageView, type CheckoutPageViewProps } from "./checkout-page";
+import { CheckoutPageView, phoneTypingValue, type CheckoutPageViewProps } from "./checkout-page";
 import {
   findElements,
   leftoverText,
@@ -360,5 +360,30 @@ describe("checkout page: money and text", () => {
       );
       expect(html).toContain(messages["checkout.submit"]);
     }
+  });
+});
+
+describe("phone field while typing (national format, caret never fights the shopper)", () => {
+  it("formats when a digit is added at the end", () => {
+    expect(phoneTypingValue("050123456", { value: "0501234567", selectionStart: 10 })).toBe(
+      "050 123 4567",
+    );
+    expect(phoneTypingValue("050 123 456", { value: "050 123 4567", selectionStart: 12 })).toBe(
+      "050 123 4567",
+    );
+  });
+
+  it("formats a paste that replaced the whole text (review m2 of PR 211)", () => {
+    expect(phoneTypingValue("050 999", { value: "0501234567", selectionStart: 10 })).toBe(
+      "050 123 4567",
+    );
+  });
+
+  it("keeps the text as typed while deleting (a space can be removed) or editing in the middle", () => {
+    expect(phoneTypingValue("050 123 4567", { value: "050 123 456", selectionStart: 11 })).toBe(
+      "050 123 456",
+    );
+    expect(phoneTypingValue("050 123", { value: "050123", selectionStart: 3 })).toBe("050123");
+    expect(phoneTypingValue("050 123", { value: "0590 123", selectionStart: 3 })).toBe("0590 123");
   });
 });
