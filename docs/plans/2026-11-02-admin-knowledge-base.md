@@ -39,4 +39,21 @@ A shop manager finds, inside the admin, short and honest instructions for every 
 
 ## Results
 
-(filled in at the end of the work)
+- Built as planned: decisions 1 to 6. 17 articles in 5 topics (`first-steps`, `glossary`, `product-types`, `create-product`, `images`, `categories-brands`, `publishing`, `search`, `prices`, `stock`, `orders`, `customers`, `payments`, `shipping`, `email`, `personal-data`, `users-roles`, `audit-log`); the block set gained `heading` (sections need anchors), and "Open this screen" takes its text from the route title (no extra text to translate).
+- Initial JavaScript: 426 392 -> 430 676 bytes raw, 127 791 -> 128 882 gzip (budget 440 000 / 135 000). Help chunk 110.6 KB raw, 33.8 KB gzip (both languages; lazy).
+- `localStorage`: still one accessor (`browserStorage`); the source guard now names its three users (language at start, language switch, checklist).
+- Mutation check: focusing the section directly in the article's effect (instead of `useFocusAfterCommit`) fails the e2e "Help for this page" scenario once the help chunk is already loaded (the route focus wins); restored.
+
+### Claims in the articles NOT verified in a browser or against a live service (read from code and docs only)
+
+- Storefront side: the compare-at price is shown "as the price before the discount" (component `product-purchase.tsx` uses it; the exact look not checked); an inactive category hides its subcategories in the storefront (from the admin hint text); the "Privacy and data" and "Forgot your password?" labels (from the storefront messages).
+- Timings depending on configuration: "within a minute or two" for search sync (scheduler interval 60 s by default and job 13), reservation = payment time (30 min default) + 10 min, low-stock threshold 5 by default, audit events purged after 365 days only when a retention period is set.
+- Providers: Monobank, Resend and Nova Post were only run against stubs (HANDOFF); the articles say so. Nova Post limits (pickup points only, no cash on delivery, one parcel) are taken from the plugin README.
+- A late payment gets a full refund queued automatically (from `docs/api/payments.md`, attention `late_payment`).
+- The shipment mail carries the tracking number (template `shipment.created`), the order mails are sent when email is set up and the scheduler relays events.
+- Legal: the personal-data article repeats `docs/privacy/README.md` and carries its "not legal advice" caveat; no legal outcome is promised.
+
+### Open questions
+
+- Should the checklist's payment step distinguish the test provider? It needs the provider codes in `GET /admin/config` (API change, red zone; not done).
+- Should the content be split per language to shrink the help chunk (about half of 110 KB)? Not needed for the entry budget; left as is.
