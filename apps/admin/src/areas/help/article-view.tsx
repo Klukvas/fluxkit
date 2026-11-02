@@ -1,7 +1,7 @@
 import { cn, type Locale, type Translator } from "@fluxkit/ui";
 import { Link } from "react-router";
 import { PATHS } from "../../router/paths";
-import { routeById } from "../../routes";
+import type { ScreenAccess } from "../../router/screen-access";
 import { PageHeading } from "../../views/status-views";
 import {
   helpArticlePath,
@@ -29,21 +29,21 @@ export interface BlockViewProps {
   t: Translator;
   locale: Locale;
   block: HelpBlock;
-  canOpen: (route: ScreenRouteId) => boolean;
+  access: ScreenAccess;
 }
 
 /** The link to a screen, named by its page title; a role that may not open the screen gets a line instead. */
 export function ScreenLink({
   t,
   route,
-  canOpen,
+  access,
 }: {
   t: Translator;
   route: ScreenRouteId;
-  canOpen: (route: ScreenRouteId) => boolean;
+  access: ScreenAccess;
 }) {
-  const screen = t(routeById(route).titleKey);
-  if (!canOpen(route)) {
+  const screen = t(access.titleKey(route));
+  if (!access.canOpen(route)) {
     return <p className="text-muted-foreground">{t("help.screen.notAllowed", { screen })}</p>;
   }
   return (
@@ -55,7 +55,7 @@ export function ScreenLink({
   );
 }
 
-export function BlockView({ t, locale, block, canOpen }: BlockViewProps) {
+export function BlockView({ t, locale, block, access }: BlockViewProps) {
   switch (block.kind) {
     case "heading":
       return (
@@ -88,7 +88,7 @@ export function BlockView({ t, locale, block, canOpen }: BlockViewProps) {
         </div>
       );
     case "screen":
-      return <ScreenLink t={t} route={block.route} canOpen={canOpen} />;
+      return <ScreenLink t={t} route={block.route} access={access} />;
     case "definitions":
       return (
         <dl className="flex max-w-prose flex-col gap-3">
@@ -110,7 +110,7 @@ export interface ArticleViewProps {
   topic: HelpTopic | null;
   previous: HelpArticle | null;
   next: HelpArticle | null;
-  canOpen: (route: ScreenRouteId) => boolean;
+  access: ScreenAccess;
 }
 
 export function ArticleView({
@@ -120,7 +120,7 @@ export function ArticleView({
   topic,
   previous,
   next,
-  canOpen,
+  access,
 }: ArticleViewProps) {
   const sections = sectionsOf(article);
   return (
@@ -154,7 +154,7 @@ export function ArticleView({
         </nav>
       )}
       {article.blocks.map((block, index) => (
-        <BlockView key={index} t={t} locale={locale} block={block} canOpen={canOpen} />
+        <BlockView key={index} t={t} locale={locale} block={block} access={access} />
       ))}
       {previous === null && next === null ? null : (
         <nav

@@ -34,7 +34,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Під полем видно, як ціну буде збережено. Натисніть «Зберегти ціни»: усі змінені ціни зберігаються разом.",
-            en: 'Under the field you see how the price will be stored. Press "Save the prices": all changed prices are saved together.',
+            en: "Under the field you see how the price will be stored. Press “Save the prices”: all changed prices are saved together.",
           },
         ],
       },
@@ -51,7 +51,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Магазин продає в одній валюті — валюті магазину з налаштувань сервера. «Показати іншу валюту» дозволяє зберегти ціни в інших валютах, але вони не продаються і не конвертуються.",
-          en: 'The shop sells in one currency, the shop currency of the server configuration. "Show another currency" lets you store prices in other currencies, but they are neither sold nor converted.',
+          en: "The shop sells in one currency, the shop currency of the server configuration. “Show another currency” lets you store prices in other currencies, but they are neither sold nor converted.",
         },
       },
       { kind: "heading", id: "remove", text: { uk: "Видалити ціну", en: "Removing a price" } },
@@ -59,7 +59,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
         kind: "warning",
         text: {
           uk: "«Видалити ціну» не можна скасувати. Без ціни у валюті магазину варіант не продається; ціну увімкненого варіанта опублікованого товару сервер видалити не дасть — спершу зніміть товар із публікації або вимкніть варіант.",
-          en: '"Remove the price" cannot be undone. Without a price in the shop currency the variant is not sold; the server refuses to remove it from an active variant of a published product: unpublish the product or switch the variant off first.',
+          en: "“Remove the price” cannot be undone. Without a price in the shop currency the variant is not sold; the server refuses to remove it from an active variant of a published product: unpublish the product or switch the variant off first.",
         },
       },
       { kind: "heading", id: "rules", text: { uk: "Що варто знати", en: "Good to know" } },
@@ -127,7 +127,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Виберіть вид: «Надходження» (товар прийшов, кількість додається), «Виправлення» (після підрахунку, пошкодження чи втрати: додати, відняти або ввести порахувану кількість) чи «Повернення» (покупець повернув, кількість додається).",
-            en: 'Choose the kind: "Receipt" (goods arrived, the quantity is added), "Correction" (after a count, damage or loss: add, remove or enter the counted quantity) or "Return" (a customer returned units, the quantity is added).',
+            en: "Choose the kind: “Receipt” (goods arrived, the quantity is added), “Correction” (after a count, damage or loss: add, remove or enter the counted quantity) or “Return” (a customer returned units, the quantity is added).",
           },
           {
             uk: "За бажанням вкажіть причину і номер документа. Зменшення і введення порахованої кількості потрібно підтвердити.",
@@ -155,7 +155,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Коли доступно стільки або менше одиниць, ніж поріг (налаштування сервера, за замовчуванням 5), варіант позначається «мало в наявності» в адмінці та у вітрині. Вітрина ніколи не показує точну кількість, лише стан: є, мало, немає.",
-          en: 'When the available quantity is at or below the threshold (a server setting, 5 by default), the variant is marked "low stock" in the admin and the storefront. The storefront never shows the exact quantity, only the state: in stock, low, out of stock.',
+          en: "When the available quantity is at or below the threshold (a server setting, 5 by default), the variant is marked “low stock” in the admin and the storefront. The storefront never shows the exact quantity, only the state: in stock, low, out of stock.",
         },
       },
       {
@@ -167,7 +167,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Позначка варіанта «Продавати понад наявний залишок» дозволяє замовляти більше, ніж є. Коли замовлення оплачене, продається те, що є, а решта чекає. «Позначити виконаним» буде відхилено, доки ви не оприбуткуєте товар, якого бракує.",
-          en: 'The variant flag "Sell beyond the stock on hand" lets shoppers order more than there is. When the order is paid, what is on hand is sold and the rest waits. "Mark fulfilled" is refused until you receive the missing units.',
+          en: "The variant flag “Sell beyond the stock on hand” lets shoppers order more than there is. When the order is paid, what is on hand is sold and the rest waits. “Mark fulfilled” is refused until you receive the missing units.",
         },
       },
       {
@@ -179,7 +179,7 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Якщо вимкнути «Рахувати залишки» (наприклад, для цифрових товарів), варіант завжди доступний і нічого не резервується.",
-          en: 'With "Count stock" off (for example for digital goods), the variant is always available and nothing is reserved.',
+          en: "With “Count stock” off (for example for digital goods), the variant is always available and nothing is reserved.",
         },
       },
       { kind: "screen", route: "products" },

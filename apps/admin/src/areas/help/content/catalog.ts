@@ -40,7 +40,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Позначка «Товари цього типу доставляються» вимкнена для цифрових товарів: варіанти таких товарів створюються без обліку залишків.",
-          en: '"Products of this type are shipped" is off for digital goods: the variants of such products are created without stock counting.',
+          en: "“Products of this type are shipped” is off for digital goods: the variants of such products are created without stock counting.",
         },
       },
       { kind: "screen", route: "productTypes" },
@@ -116,15 +116,15 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Створіть опції «Розмір» (S, M, L) і «Колір» (білий, чорний).",
-            en: 'Create the options "Size" (S, M, L) and "Colour" (white, black).',
+            en: "Create the options “Size” (S, M, L) and “Colour” (white, black).",
           },
           {
             uk: "Створіть атрибути «Матеріал» (один вибір) і «Догляд» (текст).",
-            en: 'Create the attributes "Material" (one choice) and "Care" (text).',
+            en: "Create the attributes “Material” (one choice) and “Care” (text).",
           },
           {
             uk: "Створіть тип «Футболка»: додайте обидві опції та обидва атрибути на рівні товару.",
-            en: 'Create the type "T-shirt": add both options and both attributes at product level.',
+            en: "Create the type “T-shirt”: add both options and both attributes at product level.",
           },
           {
             uk: "Створіть товар цього типу й виберіть розміри та кольори: вийде 6 варіантів (3 розміри × 2 кольори).",
@@ -160,7 +160,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Товари → «Новий товар».",
-            en: 'Products → "New product".',
+            en: "Products → “New product”.",
           },
           {
             uk: "Виберіть тип товару (потім його не змінити), введіть назву хоча б мовою за замовчуванням.",
@@ -234,15 +234,15 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "«Створити відсутні варіанти» створює поєднання, яких ще немає (повторне натискання нічого не дублює).",
-            en: '"Generate missing variants" creates the combinations that do not exist yet (pressing it again duplicates nothing).',
+            en: "“Generate missing variants” creates the combinations that do not exist yet (pressing it again duplicates nothing).",
           },
           {
             uk: "Кнопка редагування в рядку: артикул, штрихкод, увімкнений, «Рахувати залишки», «Продавати понад наявний залишок», атрибути варіанта.",
-            en: 'The edit button of a row: SKU, barcode, active, "Count stock", "Sell beyond the stock on hand", the variant attributes.',
+            en: "The edit button of a row: SKU, barcode, active, “Count stock”, “Sell beyond the stock on hand”, the variant attributes.",
           },
           {
             uk: "Основний варіант («Зробити основним») показується першим; його не можна видалити, а в опублікованому товарі — і вимкнути.",
-            en: 'The default variant ("Make default") is shown first; it cannot be deleted, and in a published product it cannot be switched off.',
+            en: "The default variant (“Make default”) is shown first; it cannot be deleted, and in a published product it cannot be switched off.",
           },
         ],
       },
@@ -285,7 +285,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "«Завантажити зображення» (кілька файлів, до 20 за раз) або вставте адресу https зображення.",
-            en: '"Upload images" (several files, up to 20 at a time) or paste the https address of an image.',
+            en: "“Upload images” (several files, up to 20 at a time) or paste the https address of an image.",
           },
           {
             uk: "Файли завантажуються по одному; дочекайтеся кінця черги.",
@@ -293,7 +293,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Натисніть «Зберегти зображення». Лише збереження додає зображення до товару.",
-            en: 'Press "Save the images". Only saving attaches the images to the product.',
+            en: "Press “Save the images”. Only saving attaches the images to the product.",
           },
         ],
       },
@@ -313,7 +313,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Кнопки «Вище» і «Нижче» задають порядок. Альтернативний текст описує зображення для людей, які його не бачать; якщо він є хоч однією мовою, потрібен і мовою за замовчуванням. Зображення можна повʼязати зі значенням опції (наприклад, з чорним кольором).",
-          en: '"Move up" and "Move down" set the order. The alternative text describes the image for people who cannot see it; once it is filled in one language, the default language is needed too. An image can be linked to an option value (for example the black colour).',
+          en: "“Move up” and “Move down” set the order. The alternative text describes the image for people who cannot see it; once it is filled in one language, the default language is needed too. An image can be linked to an option value (for example the black colour).",
         },
       },
       { kind: "heading", id: "limits", text: { uk: "Обмеження", en: "Limits" } },
@@ -349,11 +349,11 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "«Додати підкатегорію» створює дочірню категорію; найбільша глибина — 5 рівнів.",
-            en: '"Add subcategory" creates a child category; the deepest level is 5.',
+            en: "“Add subcategory” creates a child category; the deepest level is 5.",
           },
           {
             uk: "Щоб перенести категорію з підкатегоріями, відкрийте її та скористайтеся розділом «Переміщення».",
-            en: 'To move a category with its subcategories, open it and use the "Move" section.',
+            en: "To move a category with its subcategories, open it and use the “Move” section.",
           },
         ],
       },
@@ -370,7 +370,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Бренд має назву, адресу й логотип (адреса https або «Завантажити логотип»). Бренд для публікації товару не обовʼязковий.",
-          en: 'A brand has a name, an address and a logo (an https address or "Upload logo"). A brand is not required to publish a product.',
+          en: "A brand has a name, an address and a logo (an https address or “Upload logo”). A brand is not required to publish a product.",
         },
       },
       { kind: "screen", route: "brands" },
@@ -407,14 +407,14 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
             term: { uk: "Опубліковано", en: "Published" },
             definition: {
               uk: "Продається. «Зняти з публікації» повертає в чернетку.",
-              en: 'For sale. "Unpublish" turns it back into a draft.',
+              en: "For sale. “Unpublish” turns it back into a draft.",
             },
           },
           {
             term: { uk: "Архів", en: "Archived" },
             definition: {
               uk: "Прихований, але збережений (адреса лишається за ним). «Відновити як чернетку» повертає його.",
-              en: 'Hidden but kept (its address stays reserved). "Restore as draft" brings it back.',
+              en: "Hidden but kept (its address stays reserved). “Restore as draft” brings it back.",
             },
           },
         ],
@@ -453,7 +453,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "note",
         text: {
           uk: "Не потрібні: категорія, бренд, зображення, залишок. Товар без залишку публікується і показується як «немає в наявності».",
-          en: 'Not needed: a category, a brand, images, stock. A product without stock is published and shown as "out of stock".',
+          en: "Not needed: a category, a brand, images, stock. A product without stock is published and shown as “out of stock”.",
         },
       },
       { kind: "heading", id: "fix", text: { uk: "Як виправити", en: "How to fix it" } },
@@ -461,7 +461,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Коли публікацію відхилено, редактор перелічує всі проблеми одразу. Кнопка біля кожної відкриває потрібну вкладку й ставить курсор у поле. Виправте все і натисніть «Опублікувати» ще раз.",
-          en: 'When publishing is refused, the editor lists every problem at once. The button next to each opens the right tab and puts the cursor in the field. Fix them all and press "Publish" again.',
+          en: "When publishing is refused, the editor lists every problem at once. The button next to each opens the right tab and puts the cursor in the field. Fix them all and press “Publish” again.",
         },
       },
       {
@@ -502,7 +502,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Пошук → «Синоніми пошуку» → «Додати групу».",
-            en: 'Search → "Search synonyms" → "Add group".',
+            en: "Search → “Search synonyms” → “Add group”.",
           },
           {
             uk: "Виберіть мову і введіть слова через кому: 2–20 слів, кожне до 50 символів і до 3 слів.",
@@ -524,7 +524,7 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "«Перебудувати індекс» лише ставить запит. Фонова задача будує новий індекс і підміняє ним старий; до того вітрина шукає в старому. Перебудовуйте, коли екран стану радить це або на прохання розробника.",
-          en: '"Rebuild index" only places a request. A background job builds a new index and swaps it in; until then the storefront searches the old one. Rebuild when the status screen advises it or your developer asks.',
+          en: "“Rebuild index” only places a request. A background job builds a new index and swaps it in; until then the storefront searches the old one. Rebuild when the status screen advises it or your developer asks.",
         },
       },
       {

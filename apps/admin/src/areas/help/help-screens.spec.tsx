@@ -1,6 +1,7 @@
 import { createTranslator, type Locale, type Translator } from "@fluxkit/ui";
 import { beforeAll, describe, expect, it } from "vitest";
 import { ContextHelpLink } from "../../layout/shell";
+import { routeById } from "../../routes";
 import {
   leftoverText,
   messagesForArea,
@@ -72,7 +73,7 @@ function article(id: string, t: Translator = sentinel, locale: Locale = "en", ca
       topic={HELP_LIBRARY.topics.find((topic) => topic.id === found.topic) ?? null}
       previous={previous}
       next={next}
-      canOpen={canOpen}
+      access={{ canOpen, titleKey: (route) => routeById(route).titleKey }}
     />,
     helpArticlePath(id),
   );

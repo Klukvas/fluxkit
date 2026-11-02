@@ -43,7 +43,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Кожна зміна зберігається одним запитом. Якщо звʼязок обірвався, екран каже «результат невідомий», перечитує дані з сервера і нічого не надсилає вдруге сам: перевірте, що збережено, і лише тоді повторіть.",
-          en: 'Every change is saved with one request. If the connection drops, the screen says "result unknown", reads the data from the server again and never sends anything a second time by itself: check what was stored before you repeat.',
+          en: "Every change is saved with one request. If the connection drops, the screen says “result unknown”, reads the data from the server again and never sends anything a second time by itself: check what was stored before you repeat.",
         },
       },
       {
@@ -56,7 +56,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Створіть типи товарів з атрибутами та опціями (наприклад, «Футболка» з опціями «Розмір» і «Колір»).",
-            en: 'Create product types with their attributes and options (for example "T-shirt" with the options "Size" and "Colour").',
+            en: "Create product types with their attributes and options (for example “T-shirt” with the options “Size” and “Colour”).",
           },
           {
             uk: "Створіть категорії, а за потреби — бренди.",
@@ -84,7 +84,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Картка «Перші кроки» на стартовій сторінці сама позначає кроки, які видно з даних магазину. Її можна сховати; вона завжди є в Довідці.",
-          en: 'The "Getting started" card on the start page marks the steps the shop\'s data shows as done. You can hide it; it is always available under Help.',
+          en: "The “Getting started” card on the start page marks the steps the shop's data shows as done. You can hide it; it is always available under Help.",
         },
       },
       { kind: "screen", route: "help" },
@@ -93,7 +93,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
         kind: "warning",
         text: {
           uk: "Сторінки вітрини «Політика конфіденційності», «Умови» та «Файли cookie» постачаються як заглушки разом із даними про продавця. Їх замінює розробник у коді вітрини, не в адмінці. Перед запуском замініть їх текстами, які перевірив ваш юрист. Адмінка не може це перевірити, тому цей крок у картці «Перші кроки» ви позначаєте самі.",
-          en: 'The storefront pages "Privacy policy", "Terms" and "Cookies" ship as placeholders, together with the seller details. A developer replaces them in the storefront code, not in the admin. Before launch, replace them with texts your lawyer has checked. The admin cannot check this, so you tick this step of the "Getting started" card yourself.',
+          en: "The storefront pages “Privacy policy”, “Terms” and “Cookies” ship as placeholders, together with the seller details. A developer replaces them in the storefront code, not in the admin. Before launch, replace them with texts your lawyer has checked. The admin cannot check this, so you tick this step of the “Getting started” card yourself.",
         },
       },
       {
@@ -193,7 +193,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
             term: { uk: "Стара ціна", en: "Compare-at price" },
             definition: {
               uk: "Необовʼязкова «ціна до знижки»; має бути більшою за ціну.",
-              en: 'An optional "was" price; it must be higher than the price.',
+              en: "An optional “was” price; it must be higher than the price.",
             },
           },
           {
@@ -259,7 +259,7 @@ export const START_ARTICLES: readonly HelpArticle[] = [
             term: { uk: "Синонім", en: "Synonym" },
             definition: {
               uk: "Слова, які пошук вважає рівнозначними (наприклад, «футболка» і «тішка»).",
-              en: 'Words the search treats as the same (for example "t-shirt" and "tee").',
+              en: "Words the search treats as the same (for example “t-shirt” and “tee”).",
             },
           },
           {

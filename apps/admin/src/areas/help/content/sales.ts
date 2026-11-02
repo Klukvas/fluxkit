@@ -79,7 +79,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Для оплати поза магазином (банківський переказ, готівка) відкрийте замовлення → «Позначити оплаченим».",
-            en: 'For a payment outside the shop (bank transfer, cash) open the order → "Mark paid".',
+            en: "For a payment outside the shop (bank transfer, cash) open the order → “Mark paid”.",
           },
           {
             uk: "Сума — уся сума замовлення, змінити її не можна: часткова оплата не підтримується.",
@@ -87,7 +87,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Введіть номер платежу (переказу чи чека), поставте позначку «Я отримав цю суму» і підтвердьте.",
-            en: 'Type the payment reference (transfer or receipt number), tick "I received this amount" and confirm.',
+            en: "Type the payment reference (transfer or receipt number), tick “I received this amount” and confirm.",
           },
         ],
       },
@@ -103,7 +103,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Коли товар відправлено чи видано, натисніть «Позначити виконаним». Якщо в замовленні є товар під замовлення, якого ще немає на складі, дію буде відхилено: спершу оприбуткуйте його. Створення накладної статус не змінює.",
-          en: 'When the goods are shipped or handed over, press "Mark fulfilled". If the order has a backordered line that is not on hand yet, it is refused: receive the stock first. Creating a waybill does not change the status.',
+          en: "When the goods are shipped or handed over, press “Mark fulfilled”. If the order has a backordered line that is not on hand yet, it is refused: receive the stock first. Creating a waybill does not change the status.",
         },
       },
       {
@@ -115,14 +115,14 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "«Скасувати замовлення» потребує причини; вона зберігається в історії замовлення. Для неоплаченого замовлення резерв знімається.",
-          en: '"Cancel the order" needs a reason; it is kept in the order history. For an unpaid order the reservation is released.',
+          en: "“Cancel the order” needs a reason; it is kept in the order history. For an unpaid order the reservation is released.",
         },
       },
       {
         kind: "warning",
         text: {
           uk: "Скасування ОПЛАЧЕНОГО замовлення не повертає гроші і не повертає товар на склад. Гроші поверніть кнопкою «Повернути кошти» на панелі оплати (для онлайн-оплати) або поза магазином, а товар — видом «Повернення» на вкладці «Залишки».",
-          en: 'Cancelling a PAID order neither refunds the money nor puts the goods back in stock. Refund with "Refund" on the payment panel (for an online payment) or outside the shop, and book the goods back with the kind "Return" on the Stock tab.',
+          en: "Cancelling a PAID order neither refunds the money nor puts the goods back in stock. Refund with “Refund” on the payment panel (for an online payment) or outside the shop, and book the goods back with the kind “Return” on the Stock tab.",
         },
       },
       { kind: "heading", id: "contact", text: { uk: "Контактні дані", en: "Contact details" } },
@@ -130,7 +130,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Імʼя, email, телефон і адреси зберігаються такими, якими їх ввели під час оформлення; разом із назвами, артикулами й цінами на момент покупки. Змінити замовлення в адмінці не можна. Якщо контактні дані видалено (запит на видалення або строк зберігання), замість них написано «Видалено».",
-          en: 'The name, email, phone and addresses are kept as typed at checkout, together with the titles, SKUs and prices at the time of purchase. An order cannot be edited in the admin. When the contact data was erased (an erasure request or the retention period), the fields say "Erased".',
+          en: "The name, email, phone and addresses are kept as typed at checkout, together with the titles, SKUs and prices at the time of purchase. An order cannot be edited in the admin. When the contact data was erased (an erasure request or the retention period), the fields say “Erased”.",
         },
       },
       {
@@ -193,7 +193,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "В адмінці не можна створити чи видалити клієнта, змінити email або задати пароль. Пароль клієнт відновлює сам через «Забули пароль?» у вітрині (потрібна налаштована пошта). Видалити свій обліковий запис клієнт може сам у вітрині на сторінці «Конфіденційність і дані»; на прохання людини це робить власник у розділі «Персональні дані».",
-          en: 'The admin cannot create or delete a customer, change an email or set a password. The customer resets the password through "Forgot your password?" in the storefront (email must be set up). A customer can delete their own account in the storefront, on the "Privacy and data" page; on a person\'s request an owner does it in Personal data.',
+          en: "The admin cannot create or delete a customer, change an email or set a password. The customer resets the password through “Forgot your password?” in the storefront (email must be set up). A customer can delete their own account in the storefront, on the “Privacy and data” page; on a person's request an owner does it in Personal data.",
         },
       },
     ],
@@ -223,7 +223,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "warning",
         text: {
           uk: "Шаблон містить провайдер Monobank і тестовий провайдер «fake». «fake» лише для тестів: справжні гроші він не приймає. Monobank поки перевірено лише на імітаторі, не на справжньому рахунку; перед запуском попросіть розробника перевірити його з вашим договором. Адмінка не показує, який саме провайдер увімкнено.",
-          en: 'The template has the Monobank provider and the test provider "fake". "fake" is for tests only: it takes no real money. Monobank has so far been checked only against a simulator, not a real account; before launch, ask your developer to verify it with your merchant contract. The admin does not show which provider is on.',
+          en: "The template has the Monobank provider and the test provider “fake”. “fake” is for tests only: it takes no real money. Monobank has so far been checked only against a simulator, not a real account; before launch, ask your developer to verify it with your merchant contract. The admin does not show which provider is on.",
         },
       },
       { kind: "heading", id: "panel", text: { uk: "Панель оплати", en: "The payment panel" } },
@@ -231,7 +231,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "У замовленні панель показує кожну спробу оплати: статус, суму, повернення, картку (лише система і 4 останні цифри) і журнал. «Перевірити статус» питає провайдера зараз.",
-          en: 'On an order, the panel shows every payment attempt: status, amount, refunds, the card (only the scheme and the last 4 digits) and the journal. "Check status" asks the provider now.',
+          en: "On an order, the panel shows every payment attempt: status, amount, refunds, the card (only the scheme and the last 4 digits) and the journal. “Check status” asks the provider now.",
         },
       },
       { kind: "heading", id: "refund", text: { uk: "Повернути кошти", en: "Refund" } },
@@ -240,7 +240,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Замовлення → панель оплати → «Повернути кошти» (власник або менеджер).",
-            en: 'Order → payment panel → "Refund" (owner or manager).',
+            en: "Order → payment panel → “Refund” (owner or manager).",
           },
           {
             uk: "Сума — від залишку, який ще можна повернути (можна менше: часткове повернення, якщо провайдер його підтримує). Причина обовʼязкова.",
@@ -256,7 +256,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "warning",
         text: {
           uk: "Якщо результат «невідомий», НЕ повертайте ту саму суму вдруге: фонова задача зʼясує його в провайдера. Повернення коштів не скасовує замовлення і не повертає товар на склад.",
-          en: 'If the result is "unknown", do NOT refund the same amount again: a background job settles it with the provider. A refund neither cancels the order nor puts the goods back in stock.',
+          en: "If the result is “unknown”, do NOT refund the same amount again: a background job settles it with the provider. A refund neither cancels the order nor puts the goods back in stock.",
         },
       },
       {
@@ -268,7 +268,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Список платежів, які потребують людини, з поясненням, що робити. Наприклад, оплата, що прийшла після скасування чи прострочення замовлення: магазин сам ставить у чергу її повне повернення. «Закрити пункт уваги» лише прибирає пункт зі списку і нічого не змінює в провайдера.",
-          en: 'The payments that need a person, each with what to do. For example a payment that arrived after the order was cancelled or expired: the shop queues its full refund by itself. "Close attention item" only removes it from the list and changes nothing at the provider.',
+          en: "The payments that need a person, each with what to do. For example a payment that arrived after the order was cancelled or expired: the shop queues its full refund by itself. “Close attention item” only removes it from the list and changes nothing at the provider.",
         },
       },
       { kind: "screen", route: "payments" },
@@ -348,7 +348,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "warning",
         text: {
           uk: "Нова пошта підтримує лише пункти видачі (відділення й поштомати): немає доставки за адресою, накладеного платежу і кількох посилок. Підключення перевірено лише на імітаторі; створення накладної у справжньому сервісі ще не підтверджено. Тестовий перевізник «fake» — лише для тестів. Перед запуском перевірте все на реальному замовленні.",
-          en: 'Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. The connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet. The test carrier "fake" is for tests only. Check everything with a real order before launch.',
+          en: "Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. The connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet. The test carrier “fake” is for tests only. Check everything with a real order before launch.",
         },
       },
       {
@@ -361,15 +361,15 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Замовлення (лише оплачене) → «Доставка і відправлення» → «Створити накладну»: вага, розміри, оголошена цінність.",
-            en: 'Order (paid only) → "Delivery and shipments" → "Create a waybill": weight, dimensions, declared value.',
+            en: "Order (paid only) → “Delivery and shipments” → “Create a waybill”: weight, dimensions, declared value.",
           },
           {
             uk: "Результат: створено (номер для відстеження), не вдалося (причина) або «результат невідомий» — тоді НЕ створюйте ще одну, а натисніть «Перевірити в перевізника».",
-            en: 'The result: created (a tracking number), failed (the reason) or "result unknown": then do NOT create another, press "Check with the carrier".',
+            en: "The result: created (a tracking number), failed (the reason) or “result unknown”: then do NOT create another, press “Check with the carrier”.",
           },
           {
             uk: "«Друкувати етикетку» завантажує PDF. «Оновити відстеження» питає перевізника зараз; фонова задача оновлює статуси й сама.",
-            en: '"Print label" downloads a PDF. "Refresh tracking" asks the carrier now; a background job also updates the statuses by itself.',
+            en: "“Print label” downloads a PDF. “Refresh tracking” asks the carrier now; a background job also updates the statuses by itself.",
           },
           {
             uk: "Коли відправили, позначте замовлення виконаним: накладна статус замовлення не змінює.",
@@ -381,7 +381,7 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         kind: "note",
         text: {
           uk: "«Скасувати накладну» можна лише для щойно створеної. Коли налаштовано пошту, покупець отримує лист із номером для відстеження.",
-          en: '"Cancel the waybill" works only for a waybill just created. When email is set up, the shopper receives a mail with the tracking number.',
+          en: "“Cancel the waybill” works only for a waybill just created. When email is set up, the shopper receives a mail with the tracking number.",
         },
       },
     ],

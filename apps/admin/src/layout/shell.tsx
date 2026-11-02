@@ -1,6 +1,6 @@
 import type { AdminOperationPermission } from "@fluxkit/api-client";
 import { LiveRegion, SideNav, SkipLink, type SideNavGroup, type Translator } from "@fluxkit/ui";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
 import { useDocumentTitle } from "../i18n/use-document-title";
@@ -9,6 +9,8 @@ import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/u
 import { ReauthDialog } from "../session/reauth-dialog";
 import { useSession } from "../session/session-context";
 import { NotAllowedView } from "../views/status-views";
+import { routeById } from "../routes";
+import { ScreenAccessProvider, type ScreenAccess } from "../router/screen-access";
 import { contextHelpFor, helpArticlePath } from "./context-help";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
@@ -126,6 +128,14 @@ export function Shell() {
   const matches = useMatches();
   const navigation = useNavigation();
   const [unsaved] = useState(createUnsavedChangesRegistry);
+  const can = session.can;
+  const screenAccess = useMemo<ScreenAccess>(
+    () => ({
+      canOpen: (route) => can(routeById(route).permission),
+      titleKey: (route) => routeById(route).titleKey,
+    }),
+    [can],
+  );
 
   const handle = matches
     .map((match) => match.handle)
@@ -152,24 +162,26 @@ export function Shell() {
   );
 
   return (
-    <UnsavedChangesContext.Provider value={unsaved}>
-      <ShellFrame
-        t={t}
-        navigation={groups}
-        languageSwitch={<LanguageSwitch />}
-        userMenu={<UserMenu />}
-        navigating={navigation.state === "loading"}
-        contextHelp={
-          help === null ? null : (
-            <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
-          )
-        }
-      >
-        <Fragment key={session.state.generation}>
-          {allowed ? <Outlet /> : <NotAllowedView t={t} />}
-        </Fragment>
-      </ShellFrame>
-      {session.state.status === "expired" ? <ReauthDialog /> : null}
-    </UnsavedChangesContext.Provider>
+    <ScreenAccessProvider value={screenAccess}>
+      <UnsavedChangesContext.Provider value={unsaved}>
+        <ShellFrame
+          t={t}
+          navigation={groups}
+          languageSwitch={<LanguageSwitch />}
+          userMenu={<UserMenu />}
+          navigating={navigation.state === "loading"}
+          contextHelp={
+            help === null ? null : (
+              <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
+            )
+          }
+        >
+          <Fragment key={session.state.generation}>
+            {allowed ? <Outlet /> : <NotAllowedView t={t} />}
+          </Fragment>
+        </ShellFrame>
+        {session.state.status === "expired" ? <ReauthDialog /> : null}
+      </UnsavedChangesContext.Provider>
+    </ScreenAccessProvider>
   );
 }

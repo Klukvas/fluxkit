@@ -7,7 +7,7 @@ import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { useResource } from "../../lib/use-resource";
 import { canRun } from "../../permissions";
 import { PATHS } from "../../router/paths";
-import { routeById } from "../../routes";
+import { useScreenAccess } from "../../router/screen-access";
 import { useSession } from "../../session/session-context";
 import { PageHeading } from "../../views/status-views";
 import { ArticleView, helpLinkClass } from "./article-view";
@@ -28,15 +28,8 @@ import {
   sectionElementId,
   sectionFromHash,
   sectionsOf,
-  type ScreenRouteId,
 } from "./help-model";
 import { MAX_QUERY_LENGTH, buildSearchIndex, searchArticles } from "./help-search";
-
-/** Whether the signed-in admin may open a screen (the route's permission, from `GET /admin/auth/me`). */
-function useCanOpen(): (route: ScreenRouteId) => boolean {
-  const session = useSession();
-  return (route) => session.can(routeById(route).permission);
-}
 
 /**
  * The getting-started checklist with its data: the facts are read when it mounts (one read per fact, never repeated by
@@ -81,7 +74,7 @@ function ChecklistWithFacts({
 >) {
   const { t } = useI18n();
   const session = useSession();
-  const canOpen = useCanOpen();
+  const { canOpen } = useScreenAccess();
   const me = session.state.me;
   const permissions = me?.permissions ?? null;
   const facts = useResource(
@@ -146,7 +139,7 @@ export function HelpArticlePage() {
   const { t, locale } = useI18n();
   const { articleId = "" } = useParams();
   const location = useLocation();
-  const canOpen = useCanOpen();
+  const access = useScreenAccess();
   const focusAfterCommit = useFocusAfterCommit();
   const article = findArticle(HELP_LIBRARY, articleId);
 
@@ -183,7 +176,7 @@ export function HelpArticlePage() {
       topic={topic}
       previous={previous}
       next={next}
-      canOpen={canOpen}
+      access={access}
     />
   );
 }

@@ -25,14 +25,14 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Постачальника задають налаштування сервера. Без постачальника магазин не надсилає жодного листа (зокрема відновлення пароля). Шаблон містить постачальника Resend і тестового «fake».",
-          en: 'The provider is set in the server configuration. Without a provider the shop sends no mail at all (password resets included). The template has the Resend provider and the test provider "fake".',
+          en: "The provider is set in the server configuration. Without a provider the shop sends no mail at all (password resets included). The template has the Resend provider and the test provider “fake”.",
         },
       },
       {
         kind: "warning",
         text: {
           uk: "«fake» лише для тестів: він нічого не доставляє. Resend поки перевірено лише на імітаторі. Щоб листи не потрапляли в спам, для адреси відправника потрібен підтверджений домен (SPF, DKIM, DMARC) — це налаштовує власник домену разом із розробником.",
-          en: '"fake" is for tests only: it delivers nothing. Resend has so far been checked only against a simulator. For mail not to land in spam, the sender address needs a verified domain (SPF, DKIM, DMARC): the domain owner sets this up with the developer.',
+          en: "“fake” is for tests only: it delivers nothing. Resend has so far been checked only against a simulator. For mail not to land in spam, the sender address needs a verified domain (SPF, DKIM, DMARC): the domain owner sets this up with the developer.",
         },
       },
       {
@@ -44,7 +44,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Екран «Електронна пошта» показує постачальника, відправника, скільки листів надіслано за 24 години, що чекає в черзі і найчастіші помилки. «Надіслати тестовий лист» надсилає лист на вашу власну адресу (до 5 на годину).",
-          en: 'The Email screen shows the provider, the sender, how many mails were sent in 24 hours, what waits in the queue and the most common errors. "Send test email" sends a mail to your own address (up to 5 an hour).',
+          en: "The Email screen shows the provider, the sender, how many mails were sent in 24 hours, what waits in the queue and the most common errors. “Send test email” sends a mail to your own address (up to 5 an hour).",
         },
       },
       { kind: "screen", route: "email" },
@@ -65,11 +65,11 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "«Відправлено» означає, що постачальник прийняв лист: попросіть перевірити спам.",
-            en: '"Sent" means the provider accepted it: ask the shopper to check the spam folder.',
+            en: "“Sent” means the provider accepted it: ask the shopper to check the spam folder.",
           },
           {
             uk: "«Помилка»: відкрийте лист, прочитайте причину і за потреби «Надіслати повторно» (створює новий лист).",
-            en: '"Failed": open the mail, read the reason and, if needed, "Resend" (it creates a new mail).',
+            en: "“Failed”: open the mail, read the reason and, if needed, “Resend” (it creates a new mail).",
           },
         ],
       },
@@ -77,7 +77,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "note",
         text: {
           uk: "Листи облікового запису (відновлення пароля тощо) повторно не надсилаються: покупець просить новий. Лист, що чекає, можна «Скасувати відправлення».",
-          en: 'Account mails (password reset and the like) cannot be resent: the shopper asks for a new one. A waiting mail can be stopped with "Cancel sending".',
+          en: "Account mails (password reset and the like) cannot be resent: the shopper asks for a new one. A waiting mail can be stopped with “Cancel sending”.",
         },
       },
       { kind: "screen", route: "emailMessages" },
@@ -117,7 +117,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Покупець з обліковим записом робить усе сам у вітрині на сторінці «Конфіденційність і дані»: завантажує свої дані або видаляє обліковий запис. Запити гостей і листи від людей обробляє власник (лише роль «Власник»). Строк відповіді — 30 днів; екран показує дату і позначає прострочені запити.",
-          en: 'A shopper with an account does it all in the storefront on the "Privacy and data" page: downloads their data or deletes the account. Requests of guests and letters from people are handled by an owner (the Owner role only). The answer is due in 30 days; the screen shows the date and marks overdue requests.',
+          en: "A shopper with an account does it all in the storefront on the “Privacy and data” page: downloads their data or deletes the account. Requests of guests and letters from people are handled by an owner (the Owner role only). The answer is due in 30 days; the screen shows the date and marks overdue requests.",
         },
       },
       {
@@ -134,11 +134,11 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Персональні дані → «Пошук за email»: введіть адресу. Видно обліковий запис, гостьові замовлення, листи й відкриті запити; пошук записується в журнал дій.",
-            en: 'Personal data → "Look up by email": type the address. You see the account, guest orders, mails and open requests; the lookup is written to the audit log.',
+            en: "Personal data → “Look up by email”: type the address. You see the account, guest orders, mails and open requests; the lookup is written to the audit log.",
           },
           {
             uk: "«Записати запит» (експорт або стирання) і в примітці вкажіть, як перевірили особу, без персональних даних.",
-            en: '"Record the request" (export or erasure) and note how you checked the identity, without personal data.',
+            en: "“Record the request” (export or erasure) and note how you checked the identity, without personal data.",
           },
           {
             uk: "Відкрийте запит. Запит зберігає лише хеш адреси, тож введіть адресу ще раз.",
@@ -152,7 +152,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "«Завантажити персональні дані» зберігає файл JSON. У ньому персональні дані: передайте його лише цій людині надійним каналом і видаліть свою копію.",
-          en: '"Download the personal data" saves a JSON file. It holds personal data: send it only to that person over a channel you trust, and delete your copy.',
+          en: "“Download the personal data” saves a JSON file. It holds personal data: send it only to that person over a channel you trust, and delete your copy.",
         },
       },
       { kind: "heading", id: "erasure", text: { uk: "Стирання", en: "Erasure" } },
@@ -161,11 +161,11 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "«Переглянути, що буде стерто»: екран покаже, що заважає (неоплачене або оплачене й не виконане замовлення, платіж чи повернення в процесі, активне відправлення, лист, що надсилається). Завершіть це і перегляньте знову.",
-            en: '"Preview the erasure": the screen shows what is in the way (an order awaiting payment, or paid and not fulfilled, a payment or refund in progress, an active shipment, a mail being sent). Settle it and preview again.',
+            en: "“Preview the erasure”: the screen shows what is in the way (an order awaiting payment, or paid and not fulfilled, a payment or refund in progress, an active shipment, a mail being sent). Settle it and preview again.",
           },
           {
             uk: "«Стерти...» відкриває вікно з переліком, що буде видалено і що залишиться. Введіть показане слово і підтвердьте.",
-            en: '"Erase..." opens a dialog listing what is deleted and what stays. Type the shown word and confirm.',
+            en: "“Erase...” opens a dialog listing what is deleted and what stays. Type the shown word and confirm.",
           },
         ],
       },
@@ -180,7 +180,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "note",
         text: {
           uk: "Запит, на який не можна чи не слід відповідати (особу не підтверджено, дубль), «Відхилити запит» з причиною. Автоматичне стирання контактів старих замовлень вмикається налаштуванням сервера (строк зберігання); за замовчуванням вимкнене.",
-          en: 'A request you cannot or must not act on (identity not confirmed, a duplicate): "Reject the request" with a reason. Automatic erasure of old orders\' contact data is switched on by a server setting (the retention period); it is off by default.',
+          en: "A request you cannot or must not act on (identity not confirmed, a duplicate): “Reject the request” with a reason. Automatic erasure of old orders' contact data is switched on by a server setting (the retention period); it is off by default.",
         },
       },
       { kind: "screen", route: "privacy" },
@@ -232,7 +232,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         items: [
           {
             uk: "Адміністратори → «Створити адміністратора»: email, роль і початковий пароль (12–128 символів; кнопка генерує надійний).",
-            en: 'Admin users → "Create an admin user": email, role and an initial password (12 to 128 characters; a button generates a strong one).',
+            en: "Admin users → “Create an admin user”: email, role and an initial password (12 to 128 characters; a button generates a strong one).",
           },
           {
             uk: "Передайте пароль особисто: магазин не надсилає запрошень, і пароль більше ніде не показується.",
@@ -240,7 +240,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
           },
           {
             uk: "Людина входить і змінює пароль у «Мій обліковий запис».",
-            en: 'The person signs in and changes the password under "My account".',
+            en: "The person signs in and changes the password under “My account”.",
           },
         ],
       },
@@ -262,7 +262,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "У «Мій обліковий запис» ви змінюєте свій пароль; інші ваші сесії завершуються. Після 5 невдалих спроб входу обліковий запис блокується на 15 хвилин.",
-          en: 'Under "My account" you change your own password; your other sessions end. After 5 failed sign-ins the account is locked for 15 minutes.',
+          en: "Under “My account” you change your own password; your other sessions end. After 5 failed sign-ins the account is locked for 15 minutes.",
         },
       },
       { kind: "screen", route: "account" },
@@ -301,7 +301,7 @@ export const SETTINGS_ARTICLES: readonly HelpArticle[] = [
         kind: "paragraph",
         text: {
           uk: "Фільтри: дія, хто виконав, чого стосується, дати (за часовим поясом браузера). Новіші події вгорі; «Завантажити старіші події» додає наступну сторінку.",
-          en: 'Filters: action, who did it, what it concerns, dates (in the browser\'s time zone). Newest first; "Load older events" adds the next page.',
+          en: "Filters: action, who did it, what it concerns, dates (in the browser's time zone). Newest first; “Load older events” adds the next page.",
         },
       },
       { kind: "screen", route: "auditLog" },
