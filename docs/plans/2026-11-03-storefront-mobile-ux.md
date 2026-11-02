@@ -1,6 +1,6 @@
 # Plan: storefront mobile UX (review batch "mobile")
 
-Status: in progress, branch `feature/storefront-mobile-ux` (from `origin/main` `55f53ff`). Storefront only: no API, schema or dependency change.
+Status: implemented (see "Results"), not independently reviewed; branch `feature/storefront-mobile-ux` (from `origin/main` `55f53ff`). Storefront only: no API, schema or dependency change.
 Source: the independent UX reviews of 2026-11-02 (designer D-02 to D-05, D-09, D-10, D-12, D-13; a11y A-02; newbie N5, N8, N9). Desktop
 redesign (cards hover, PDP right column, home, type/space tokens, TrustBar, breadcrumbs/steps, dark theme) is the NEXT batch, not this one.
 
@@ -84,3 +84,38 @@ Failing-first unit tests for the pure parts (filter count, bar visibility, focus
 buy bar appears/disappears, toast, filter sheet open/apply/close/Escape and no-JS fallback, cart sticky summary, checkout summary toggle,
 no horizontal scroll, tap-target sizes; hydration-error console check; then lint, format:check, typecheck, check:boundaries, check:docs,
 check:env, check:licenses, storefront/ui/theme unit tests and the full storefront e2e suite on own throwaway services (exit codes read separately).
+
+## Results (2026-11-03)
+
+Measured the same way as the before-state (`next dev` on localhost, demo seed, touch emulation):
+
+| Item | Before (390 uk) | After (390 uk) | 360 uk after | 768 uk after |
+|---|---|---|---|---|
+| Header | 113 px, `static`, gone after scrolling | 61 px, `sticky` (top 0 after scrolling 800 px) | 61, sticky | 61, sticky |
+| PDP add button | y 931, 180x40, no bar | y 957, 358x48; bottom bar with price, values, stepper and a 358x48 "Add to cart" while it is out of view | 328x48 | 180x44 (two columns, no bar) |
+| Catalog filters | inline toggle; unusable without a script | "Filters (N)" next to the sort, full-screen sheet; `:target` without a script; groups collapsed after the first two | same | same (sheet below 1024) |
+| Cart | SKU 3 lines, Remove 42 px, checkout at y 1207 | SKU 1-2 lines (232 px column), Remove 44 px, total and checkout in a sticky bottom bar | SKU 2 lines (was 4) | unchanged layout, not sticky |
+| Checkout | summary y 1669, submit y 1597 (40 px), page 2394 | collapsed summary y 447 (below the sign-in prompt and the stock alert of this cart), sticky submit 358x48 with the total, page 2271 | summary y 471 | summary y 201, submit 736x48 |
+| Order page | "Save this link" 324 px above the heading; h1 wraps (72 px) | heading first, one line (32 px); callout 218 px (en 198) under the status | | callout 178 px |
+| Breadcrumb links | 20 px | 44 px (coarse pointer) | 44 | 44 |
+| Card brand link | 87x20, separate target | 87x24, `pointer-events: none` on a coarse pointer | | |
+| Horizontal scroll | 0 | 0 on home, catalog, PDP, cart, checkout, order, search | 0 | 0 |
+
+Screenshots: scratchpad `mobile-shots/after-*.jpg`.
+
+Copy changes (D-12; the same facts, shorter):
+- `order.saveLink.description` en: "This link is the only way to open your order again. Keep it private: anyone who has it can see and cancel the order." -> "Only this link opens your order again. Keep it private: anyone who has it can see and cancel the order." (uk likewise).
+- `checkout.payment.note` en: "...After you place the order, the shop will contact you to arrange payment. An unpaid order is held for a limited time; you will see until when on the next page." -> "No payment is taken on this site: after you order, the shop will contact you to arrange payment. An unpaid order is held for a limited time (until when is on the next page)."; `checkout.payment.noteOnline` likewise (keeps "does not take or store card details").
+- `order.payment.awaiting` en: "...If the order is not paid by {time}, it is cancelled automatically." -> "...An order not paid by {time} is cancelled automatically."
+- `payment.return.noEntry.body`: the example in parentheses, "sign in to your account" instead of "open the order in your account" (uk "особистий кабінет" -> "акаунт", review D-11).
+
+Deviations from the design above:
+- The buy bar's "Added" toast hides after 8 s on phones only (unless focus is inside); from `md` it stays in place as before.
+- Breadcrumb links are 44 px on a coarse pointer (not only 24 px): they are the main way up from a product on a phone.
+- The language summary shows only the flag below `sm` (the logo was cut otherwise); its accessible name is unchanged.
+- The order page's empty cancel status region takes no room (D-10 "uneven gaps").
+- Desktop side effects (kept small): facet groups are collapsible at every width (the first two open), the cart's line total sits in the controls row, the checkout summary is first in the page order (still in the right column), the order heading is `text-2xl` below `sm` only.
+
+Verification: lint, format:check, typecheck, check:boundaries, check:env, check:licenses, check:docs exit 0; storefront 1736, ui 181, theme 68 unit tests pass; storefront e2e 110 passed, 4 skipped (the search-off cases, as on `main`) on throwaway Postgres 16, Redis and Meilisearch.
+Failing first: `lib/mobile-ux.spec.ts` failed before `lib/mobile-ux.ts` existed; `e2e/tests/mobile-ux.e2e.ts` run against the build of `main`: 9 of 12 failed (header 113 > 64, no search icon, no buy bar, no Filters link, checkout link not in view, no summary toggle, order heading 72 px, breadcrumb 20 px), the 3 overflow/hydration guards passed (no regression to catch there).
+Not verified: iOS Safari (safe-area insets, sticky bars with the dynamic toolbar), Firefox, a real screen reader, a real phone.
