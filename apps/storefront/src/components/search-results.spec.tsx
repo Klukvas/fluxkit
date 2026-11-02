@@ -110,12 +110,27 @@ const ok = (overrides: Partial<SearchResult> = {}): SearchPageOutcome => ({
   result: result(overrides),
 });
 
-describe("the availability filter's card note (variant-level facet, 2026-11-02)", () => {
-  it("says on an in-stock card that some options are out of stock, only while inStock:false is selected", () => {
-    const filtered = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
-    expect(filtered.match(/§search\.facet\.inStock\.someOut/g)).toHaveLength(2);
-    const plain = render(ok(), { query: { ...query, facets: ["inStock:true"] } });
-    expect(plain).not.toContain("§search.facet.inStock.someOut");
+describe("cards under variant-level filters (review SQ-03, 2026-11-02)", () => {
+  it("does not claim the product's 'In stock' under option filters, notes that price and stock depend on the option, and links the chosen option", () => {
+    const html = render(ok(), { query: { ...query, facets: ["opt.color:red", "opt.size:l"] } });
+    expect(html).not.toContain("§availability.in_stock");
+    expect(html.match(/§search\.card\.dependsOnOption/g)).toHaveLength(2);
+    expect(html).toContain('href="/uk/p/lamp?opt.color=red&amp;opt.size=l"');
+  });
+
+  it("shows the matching options' stock when the availability filter says it", () => {
+    const out = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
+    expect(out.match(/§availability\.out_of_stock/g)).toHaveLength(2);
+    expect(out).not.toContain("§availability.in_stock");
+    const inStockOnly = render(ok(), { query: { ...query, facets: ["inStock:true"] } });
+    expect(inStockOnly.match(/§availability\.in_stock/g)).toHaveLength(2);
+  });
+
+  it("keeps the product's own price, stock and plain link without variant filters", () => {
+    const html = render(ok(), { query: { ...query, facets: ["brand:zeta"] } });
+    expect(html.match(/§availability\.in_stock/g)).toHaveLength(2);
+    expect(html).not.toContain("§search.card.");
+    expect(html).toContain('href="/uk/p/lamp"');
   });
 });
 

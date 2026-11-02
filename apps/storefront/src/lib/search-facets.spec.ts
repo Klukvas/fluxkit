@@ -5,7 +5,7 @@ import {
   describeFormFailure,
   facetTitle,
   facetValueLabel,
-  outOfStockOptionsNote,
+  cardMatch,
   priceBoxHints,
   selectedFilters,
   sortChoices,
@@ -239,16 +239,59 @@ describe("priceBoxHints", () => {
   });
 });
 
-describe("the availability filter is variant-level (ADR 0034 decision 4), and the cards say so", () => {
-  it("notes 'some options are out of stock' on a listed product that is not out of stock, only with inStock:false", () => {
-    const note = outOfStockOptionsNote({ facets: ["inStock:false"] }, t);
-    expect(note).not.toBeNull();
-    // The demo T-shirt: listed by inStock:false because its red L variant is out of stock, while the product is in stock.
-    expect(note?.({ availability: "in_stock" })).toBe("§search.facet.inStock.someOut");
-    expect(note?.({ availability: "low_stock" })).toBe("§search.facet.inStock.someOut");
-    expect(note?.({ availability: "out_of_stock" })).toBeNull();
-    expect(outOfStockOptionsNote({ facets: [] }, t)).toBeNull();
-    expect(outOfStockOptionsNote({ facets: ["inStock:true"] }, t)).toBeNull();
-    expect(outOfStockOptionsNote({ facets: ["brand:acme", "inStock:false"] }, t)).not.toBeNull();
+describe("cardMatch: what a card may claim under variant-level filters (review SQ-03, 2026-11-02)", () => {
+  const variantFacet = (key: string, selected: string[] = []): SearchFacet => ({
+    key,
+    kind: "code",
+    level: "variant",
+    label: null,
+    counted: false,
+    values: selected.map((code) => ({ code, label: null, count: null, selected: true })),
+    range: null,
+  });
+
+  it("is null without a variant-level filter: the card shows the product's own price and stock", () => {
+    expect(cardMatch({ facets: [], price: null }, [])).toBeNull();
+    expect(cardMatch({ facets: ["brand:acme", "category:x"], price: null }, [])).toBeNull();
+  });
+
+  it("does not repeat the product's stock under option filters (the matching option may be out of stock)", () => {
+    expect(cardMatch({ facets: ["opt.color:red", "opt.size:l"], price: null }, [])).toEqual({
+      availability: null,
+      linkQuery: "opt.color=red&opt.size=l",
+    });
+  });
+
+  it("knows the matching options' stock from the availability filter alone (one document per variant)", () => {
+    expect(cardMatch({ facets: ["inStock:true"], price: null }, [])).toEqual({
+      availability: "in_stock",
+      linkQuery: "",
+    });
+    expect(cardMatch({ facets: ["inStock:false", "opt.size:l"], price: null }, [])).toEqual({
+      availability: "out_of_stock",
+      linkQuery: "opt.size=l",
+    });
+    expect(
+      cardMatch({ facets: ["inStock:true", "inStock:false"], price: null }, [])?.availability,
+    ).toBeNull();
+  });
+
+  it("links only options pinned to ONE value (OR of several values names no single option)", () => {
+    expect(
+      cardMatch({ facets: ["opt.color:red", "opt.color:blue", "opt.size:l"], price: null }, [])
+        ?.linkQuery,
+    ).toBe("opt.size=l");
+  });
+
+  it("treats a price range and a selected variant-level attribute as variant filters", () => {
+    expect(cardMatch({ facets: [], price: { min: 100, max: null } }, [])).toEqual({
+      availability: null,
+      linkQuery: "",
+    });
+    expect(
+      cardMatch({ facets: ["attr.fit:slim"], price: null }, [variantFacet("attr.fit", ["slim"])]),
+    ).toEqual({ availability: null, linkQuery: "" });
+    const productLevel = { ...variantFacet("attr.fit", ["slim"]), level: "product" as const };
+    expect(cardMatch({ facets: ["attr.fit:slim"], price: null }, [productLevel])).toBeNull();
   });
 });

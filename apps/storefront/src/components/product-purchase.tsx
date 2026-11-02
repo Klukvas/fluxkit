@@ -26,6 +26,7 @@ import {
   isValueAvailable,
   selectValue,
   selectedValueIds,
+  selectionQuery,
   type Selection,
 } from "../lib/variant-matcher";
 import { useI18n } from "./i18n-provider";
@@ -54,6 +55,10 @@ export interface ProductPurchaseViewProps {
   brand: { name: string; path: string } | null;
   /** Server-rendered content below the purchase block (description, specifications). */
   children?: ReactNode;
+  /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
+  preferredSelection?: Selection;
+  /** Called with every selection the shopper makes (the island keeps it in the address). */
+  onSelectionChange?: (selection: Selection) => void;
   /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
   onAddToCart: (input: {
     variantId: string;
@@ -76,8 +81,12 @@ export function ProductPurchaseView({
   brand,
   children,
   onAddToCart,
+  preferredSelection,
+  onSelectionChange,
 }: ProductPurchaseViewProps) {
-  const [selection, setSelection] = useState<Selection>(() => initialSelection(product));
+  const [selection, setSelection] = useState<Selection>(() =>
+    initialSelection(product, preferredSelection),
+  );
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
@@ -212,7 +221,9 @@ export function ProductPurchaseView({
                     }))}
                     selected={chosenValue(selection, option.code) ?? null}
                     onChange={(valueCode) => {
-                      setSelection(selectValue(product, selection, option.code, valueCode));
+                      const next = selectValue(product, selection, option.code, valueCode);
+                      setSelection(next);
+                      onSelectionChange?.(next);
                       setActiveImage(0);
                       setStatus({ state: "idle" });
                     }}
@@ -269,15 +280,23 @@ export function ProductPurchaseView({
 
 /** The island: takes the translator from the page's provider and adds through the shared cart store. */
 export function ProductPurchase(
-  props: Omit<ProductPurchaseViewProps, "locale" | "t" | "onAddToCart">,
+  props: Omit<ProductPurchaseViewProps, "locale" | "t" | "onAddToCart" | "onSelectionChange">,
 ) {
   const { locale, t } = useI18n();
   const { store } = useCart();
+  const { product } = props;
   return (
     <ProductPurchaseView
       {...props}
       locale={locale}
       t={t}
+      onSelectionChange={(selection) => {
+        // The choice lives in the address (review SQ-05): a reload, a shared link and the language switch keep it. Next's
+        // router follows `history.replaceState`, so the language links pick up the new query.
+        const query = selectionQuery(product, selection);
+        const url = `${window.location.pathname}${query === "" ? "" : `?${query}`}`;
+        window.history.replaceState(null, "", url);
+      }}
       onAddToCart={async ({ variantId, quantity }) => {
         const outcome = await store.add(variantId, quantity);
         return outcome.status === "ok"

@@ -7,6 +7,8 @@ import {
   isValueAvailable,
   selectValue,
   selectedValueIds,
+  selectionFromParams,
+  selectionQuery,
 } from "./variant-matcher";
 
 // A grid with a hole: (red, l) is not sellable, so it is not in the variant list.
@@ -113,6 +115,77 @@ describe("initialSelection", () => {
     expect(initialSelection(product())).toEqual({});
     expect(findVariant(shirt, initialSelection(shirt))).not.toBeNull();
     expect(findVariant(sparse, initialSelection(sparse))).not.toBeNull();
+  });
+
+  // Review SQ-03/SQ-05 (2026-11-02): a filtered card and a language switch open the page with values from the address.
+  it("starts from the preferred values: the first matching variant that is not out of stock", () => {
+    expect(initialSelection(shirt, { color: "red", size: "m" })).toEqual({
+      color: "red",
+      size: "m",
+    });
+    expect(initialSelection(shirt, { color: "red" })).toEqual({ color: "red", size: "s" });
+    const partly = product({
+      options: shirt.options,
+      variants: [
+        variant("red-s", { color: "red", size: "s" }, { availability: "out_of_stock" }),
+        variant("red-m", { color: "red", size: "m" }),
+      ],
+    });
+    expect(initialSelection(partly, { color: "red" })).toEqual({ color: "red", size: "m" });
+    expect(initialSelection(partly, { size: "s" })).toEqual({ color: "red", size: "s" });
+  });
+
+  it("ignores preferred values that name no variant (the default start), and unknown options", () => {
+    expect(initialSelection(shirt, { color: "red", size: "l" })).toEqual(initialSelection(shirt));
+    expect(initialSelection(shirt, { color: "green" })).toEqual(initialSelection(shirt));
+    expect(initialSelection(shirt, { fabric: "silk", color: "red" })).toEqual({
+      color: "red",
+      size: "s",
+    });
+    expect(initialSelection(product(), { color: "red" })).toEqual({});
+  });
+});
+
+describe("selection in the address", () => {
+  it("reads opt.<code>=<value> entries and nothing else", () => {
+    expect(selectionFromParams({ "opt.color": "red", "opt.size": "l", page: "2", q: "x" })).toEqual(
+      { color: "red", size: "l" },
+    );
+    expect(selectionFromParams({})).toEqual({});
+  });
+
+  it("drops repeated, empty, overlong or malformed entries instead of failing the page", () => {
+    expect(
+      selectionFromParams({
+        "opt.color": ["red", "black"],
+        "opt.size": "",
+        "opt.": "x",
+        "opt.fit": "a".repeat(81),
+        "opt.bad code": "x",
+        "opt.ok": "bad value",
+      }),
+    ).toEqual({});
+  });
+
+  it("keeps an option code that is a member name of Object.prototype as data", () => {
+    const parsed = selectionFromParams({ "opt.__proto__": "x", "opt.constructor": "y" });
+    expect(Object.hasOwn(parsed, "__proto__")).toBe(true);
+    expect(parsed).toEqual(
+      Object.fromEntries([
+        ["__proto__", "x"],
+        ["constructor", "y"],
+      ]),
+    );
+  });
+
+  it("writes the selection in option order and round-trips it", () => {
+    const query = selectionQuery(shirt, { size: "m", color: "red" });
+    expect(query).toBe("opt.color=red&opt.size=m");
+    expect(selectionFromParams(Object.fromEntries(new URLSearchParams(query)))).toEqual({
+      color: "red",
+      size: "m",
+    });
+    expect(selectionQuery(product(), {})).toBe("");
   });
 });
 

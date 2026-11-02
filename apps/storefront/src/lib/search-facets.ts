@@ -1,9 +1,4 @@
-import type {
-  ProductSummary,
-  SearchFacet,
-  SearchFacetValue,
-  SearchSort,
-} from "@fluxkit/api-client";
+import type { SearchFacet, SearchFacetValue, SearchSort } from "@fluxkit/api-client";
 import type { Translator } from "@fluxkit/ui";
 import { minorUnitsToInput } from "./search-money";
 import {
@@ -150,16 +145,50 @@ export function describeFormFailure(reason: string): FormFailureText {
 }
 
 /**
- * The availability facet is VARIANT-level (docs/api/search.md, ADR 0034 decision 4; AGENTS.md 2.3: filters operate on
- * variants and group results by product): `inStock:false` finds every product with at least one out-of-stock variant, so
- * a product whose other variants are in stock is listed with an "In stock" badge. With that filter on, such a card says
- * that some of its options are out of stock (owner question 2026-11-02; the API and its contract are unchanged).
+ * What a product card may claim while variant-level filters are on (review SQ-03, 2026-11-02). Filters operate on
+ * variants and group results by product (AGENTS.md 2.3; the index holds one document per variant, ADR 0034), but a list
+ * item is the PRODUCT: `GET /store/search` returns its lowest price and its best availability, and nothing about which
+ * variants matched (`docs/api/search.md`, "response"; a field for that is a contract change, not made). So:
+ * - `null`: no variant-level filter; the card shows the product's own price and availability.
+ * - `availability`: what the availability filter says about EVERY matching variant (`inStock:true` alone: in stock;
+ *   `inStock:false` alone: out of stock), else `null` and the card says that price and stock depend on the option.
+ * - `linkQuery`: the options the filters pin to exactly one value, as the product page's `?opt.<code>=<value>`
+ *   (`lib/variant-matcher.ts`), so the card opens on a matching variant.
  */
-export function outOfStockOptionsNote(
-  query: Pick<SearchQuery, "facets">,
-  t: Translator,
-): ((product: Pick<ProductSummary, "availability">) => string | null) | null {
-  if (!query.facets.includes("inStock:false")) return null;
-  return (product) =>
-    product.availability === "out_of_stock" ? null : t("search.facet.inStock.someOut");
+export interface CardMatch {
+  availability: "in_stock" | "out_of_stock" | null;
+  linkQuery: string;
+}
+
+const OPTION_FACET_PREFIX = "opt.";
+
+export function cardMatch(
+  query: Pick<SearchQuery, "facets" | "price">,
+  facets: readonly Pick<SearchFacet, "key" | "level">[],
+): CardMatch | null {
+  const variantKeys = new Set(
+    facets.filter((facet) => facet.level === "variant").map((facet) => facet.key),
+  );
+  const byKey = new Map<string, string[]>();
+  for (const entry of query.facets) {
+    const colon = entry.indexOf(":");
+    const key = entry.slice(0, colon);
+    byKey.set(key, [...(byKey.get(key) ?? []), entry.slice(colon + 1)]);
+  }
+  const variantFiltered =
+    query.price !== null ||
+    [...byKey.keys()].some(
+      (key) => key === "inStock" || key.startsWith(OPTION_FACET_PREFIX) || variantKeys.has(key),
+    );
+  if (!variantFiltered) return null;
+  const stock = byKey.get("inStock") ?? [];
+  const only = stock.length === 1 ? stock[0] : undefined;
+  const availability = only === "true" ? "in_stock" : only === "false" ? "out_of_stock" : null;
+  const link = new URLSearchParams();
+  for (const [key, values] of byKey) {
+    if (key.startsWith(OPTION_FACET_PREFIX) && values.length === 1) {
+      link.append(key, values[0] as string);
+    }
+  }
+  return { availability, linkQuery: link.toString() };
 }

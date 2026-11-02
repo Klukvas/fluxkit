@@ -83,12 +83,24 @@ export function isValueAvailable(
   return existsWithPrefix(product, selection, index, valueCode);
 }
 
-/** The first variant that is not out of stock (else the first one), as a selection. Empty without options. */
-export function initialSelection(product: MatcherProduct): Selection {
+/**
+ * The first variant that is not out of stock (else the first one), as a selection. Empty without options. With `preferred`
+ * values (from the address: a filtered product card or a language switch), only variants that have every preferred value
+ * of the product's options count; when none has them, the default start is used (an option the product does not have is
+ * ignored).
+ */
+export function initialSelection(product: MatcherProduct, preferred: Selection = {}): Selection {
   if (product.options.length === 0) return {};
+  const wanted = product.options.flatMap((option) => {
+    const value = chosenValue(preferred, option.code);
+    return value === undefined ? [] : [[option.code, value] as const];
+  });
+  const matching = product.variants.filter((variant) =>
+    wanted.every(([code, value]) => valueOf(variant, code) === value),
+  );
+  const candidates = matching.length > 0 ? matching : product.variants;
   const chosen =
-    product.variants.find((variant) => variant.availability !== "out_of_stock") ??
-    product.variants[0];
+    candidates.find((variant) => variant.availability !== "out_of_stock") ?? candidates[0];
   if (chosen === undefined) return {};
   // `fromEntries` defines own properties; `selection[code] = value` with the code `__proto__` would set the prototype instead.
   return Object.fromEntries(
@@ -131,6 +143,37 @@ export function selectValue(
 /** A selection with the entries of `map` as own properties (also for the code `__proto__`). */
 function asSelection(map: ReadonlyMap<string, string>): Selection {
   return Object.fromEntries(map);
+}
+
+/** Prefix of an option in the product page's address: `?opt.<optionCode>=<valueCode>` (the codes of the search facet). */
+export const SELECTION_PARAM_PREFIX = "opt.";
+/** Codes are data; this only keeps junk out (core codes are narrower: lower case, digits, `_`, at most 64). */
+const SELECTION_CODE = /^[A-Za-z0-9_][A-Za-z0-9_-]{0,79}$/;
+
+/**
+ * The selection a product page address asks for (`?opt.color=red&opt.size=l`). A malformed, empty or repeated entry is
+ * dropped, never an error: the page still shows the product, starting from the default variant.
+ */
+export function selectionFromParams(
+  params: Readonly<Record<string, string | string[] | undefined>>,
+): Selection {
+  const entries: [string, string][] = [];
+  for (const [key, value] of Object.entries(params)) {
+    if (!key.startsWith(SELECTION_PARAM_PREFIX) || typeof value !== "string") continue;
+    const code = key.slice(SELECTION_PARAM_PREFIX.length);
+    if (SELECTION_CODE.test(code) && SELECTION_CODE.test(value)) entries.push([code, value]);
+  }
+  return Object.fromEntries(entries);
+}
+
+/** The query (without `?`) that names `selection`, in the product's option order; empty for a product without options. */
+export function selectionQuery(product: MatcherProduct, selection: Selection): string {
+  const params = new URLSearchParams();
+  for (const option of product.options) {
+    const value = chosenValue(selection, option.code);
+    if (value !== undefined) params.append(`${SELECTION_PARAM_PREFIX}${option.code}`, value);
+  }
+  return params.toString();
 }
 
 /** Ids of the selected option values, in option order (media can belong to one: `ProductMedia.optionValueId`). */
