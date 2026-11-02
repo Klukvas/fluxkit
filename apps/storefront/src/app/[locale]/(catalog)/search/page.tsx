@@ -1,7 +1,8 @@
 import { createTranslator, isLocale } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { SearchResultsView } from "../../../../components/search-results";
+import { isBareNoResults, SearchResultsView } from "../../../../components/search-results";
+import { navigationCategories } from "../../../../lib/store-data.server";
 import { getShopMoney } from "../../../../lib/catalog-pages.server";
 import { imageHosts } from "../../../../lib/image-hosts.server";
 import { localizedHref } from "../../../../lib/locale-path";
@@ -59,6 +60,8 @@ export default async function SearchPage(props: SearchProps) {
     const last = Math.min(Math.max(outcome.result.pageCount, 1), MAX_SEARCH_PAGE);
     redirect(localizedHref(locale, searchPath(setPage(query, last))));
   }
+  // Nothing found for the words alone: the top-level categories as a way on (review D-14); read only then.
+  const categories = isBareNoResults(query, outcome) ? await navigationCategories(locale) : null;
   return (
     <SearchResultsView
       locale={locale}
@@ -69,6 +72,7 @@ export default async function SearchPage(props: SearchProps) {
       currency={shop.currency}
       exponent={shop.exponent}
       imageHosts={imageHosts()}
+      categories={categories}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Button, Container, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { sessionAttemptStorage } from "../lib/checkout-attempt";
@@ -94,7 +94,7 @@ export function PaymentReturnView({
   const failure = state !== "noEntry" && state.phase === "error" ? state.failure : null;
   return (
     <Container className="flex flex-col gap-6 py-8">
-      <h1 className="text-3xl font-bold text-foreground">{t("payment.return.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("payment.return.title")}</h1>
       <div
         id={RETURN_RESULT_ID}
         role="status"

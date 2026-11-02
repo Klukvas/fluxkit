@@ -1,5 +1,5 @@
 import type { ProductSummary } from "@fluxkit/api-client";
-import { Badge, PriceText, type Locale, type Translator } from "@fluxkit/ui";
+import { Badge, PriceText, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { availabilityDisplay } from "../lib/availability";
 import { allowedImageUrl } from "../lib/image-source";
@@ -45,7 +45,9 @@ const PRODUCT_OFFER: CardOffer = { kind: "product" };
 
 /**
  * One product in a list. The whole card is one click target (the title link stretches over it); the brand link sits above
- * that layer so it stays separately clickable. Everything shown comes from the list item: price, availability, brand.
+ * that layer so it stays separately clickable. Everything shown comes from the list item: price, availability, brand. The
+ * list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (no API change in
+ * design batch A).
  */
 export function ProductCard({
   product,
@@ -75,8 +77,11 @@ export function ProductCard({
       : offer.kind === "matched" && offer.variantCount > 1
         ? t.plural("search.card.matchingOptions", offer.variantCount)
         : null;
+  // Only an exception earns a visible badge (review D-15): "In stock" on every card was noise. The in-stock state stays in the
+  // card's text for assistive technology.
+  const badgeShown = availability !== null && shown !== "in_stock";
   return (
-    <article className="relative flex h-full flex-col gap-2 rounded-lg border border-border bg-background p-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
+    <article className="group relative flex h-full flex-col gap-2 rounded-lg border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       <StoreImage
         src={allowedImageUrl(product.image?.url, imageHosts)}
         alt={product.image?.alt ?? product.title}
@@ -85,34 +90,47 @@ export function ProductCard({
         sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
         eager={eager}
       />
-      <Heading className="font-medium text-foreground">
-        <Link href={href} className="after:absolute after:inset-0 focus-visible:outline-none">
-          {product.title}
-        </Link>
-      </Heading>
       {product.brand === null ? null : brandPath === null ? (
         <p className="text-sm text-muted-foreground">{product.brand.name}</p>
       ) : (
-        // A 24 px target with a mouse; on a touch screen not a target of its own (review N5): a tap there opens the product
-        // (the card's link lies under it), so a finger never lands on the filter by mistake. Keyboards and screen readers
+        // A small meta line, not a second button (review D-07). A 24 px target with a mouse; on a touch screen not a target of
+        // its own (review N5): a tap there opens the product (the card's link lies under it). Keyboards and screen readers
         // still reach the brand link.
         <Link
           href={localizedHref(locale, brandPath)}
-          className={`relative z-10 inline-flex min-h-6 w-fit items-center text-sm text-muted-foreground underline underline-offset-4 pointer-coarse:pointer-events-none pointer-coarse:no-underline ${focusRing}`}
+          className={`relative z-10 inline-flex min-h-6 w-fit items-center rounded-sm text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline pointer-coarse:pointer-events-none ${focusRing}`}
         >
           {product.brand.name}
         </Link>
       )}
-      <PriceText
-        price={listPriceLabel(price, exponent, locale, t)}
-        priceLabel={t("product.price.label")}
-      />
-      {availability === null ? null : (
-        <Badge variant={availability.variant} className="w-fit">
+      <Heading className="line-clamp-2 font-medium text-foreground">
+        <Link
+          href={href}
+          className="after:absolute after:inset-0 group-hover:underline group-hover:underline-offset-4 focus-visible:outline-none"
+        >
+          {product.title}
+        </Link>
+      </Heading>
+      {/* Pushed to the bottom: in a row of equal-height cards the prices share one line whatever the titles' length. */}
+      <div className="mt-auto flex flex-col gap-1 pt-1">
+        {note === null ? null : <p className="text-sm text-muted-foreground">{note}</p>}
+        <PriceText
+          price={listPriceLabel(price, exponent, locale, t)}
+          priceLabel={t("product.price.label")}
+        />
+        {availability !== null && !badgeShown ? (
+          <VisuallyHidden>{t(availability.messageKey)}</VisuallyHidden>
+        ) : null}
+      </div>
+      {availability !== null && badgeShown ? (
+        // Over the image's corner (after the title in reading order): the text column keeps one shape on every card.
+        <Badge
+          variant={availability.variant}
+          className="pointer-events-none absolute top-5 left-5 w-fit shadow-card"
+        >
           {t(availability.messageKey)}
         </Badge>
-      )}
-      {note === null ? null : <p className="text-sm text-muted-foreground">{note}</p>}
+      ) : null}
     </article>
   );
 }

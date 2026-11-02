@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, type Translator } from "@fluxkit/ui";
+import { Button, textStyles, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, Ref } from "react";
@@ -79,7 +79,7 @@ export function RegisterFormView({
       aria-busy={pending}
       className="flex flex-col gap-4"
     >
-      <h1 className="text-3xl font-bold text-foreground">{t("account.register.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.register.title")}</h1>
       <FormErrorSummary
         failure={failure}
         t={t}

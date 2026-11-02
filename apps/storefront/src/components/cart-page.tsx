@@ -12,6 +12,7 @@ import {
   QuantityInput,
   Skeleton,
   Spinner,
+  textStyles,
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
@@ -20,6 +21,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from "react";
 import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
 import { cartPageHandlers } from "../lib/cart-handlers";
+import { CheckoutSteps } from "./checkout-steps";
+import { StoreTrustBar } from "./trust-bar";
 import {
   cartLineAnchor,
   checkoutBlock,
@@ -393,7 +396,11 @@ export function CartPageView({
   const block = cart === null ? null : checkoutBlock(cart);
   return (
     <Container className="flex flex-col gap-6 py-8">
-      <h1 className="text-3xl font-bold text-foreground">{t("cart.title")}</h1>
+      {/* The funnel (review recommendation 3) once there is something to buy; an empty cart is not a step yet. */}
+      {cart !== null && cart.lines.length > 0 ? (
+        <CheckoutSteps t={t} locale={locale} current="cart" />
+      ) : null}
+      <h1 className={textStyles.pageTitle}>{t("cart.title")}</h1>
       <div
         role="status"
         aria-live="polite"
@@ -491,7 +498,7 @@ export function CartPageView({
           </ul>
 
           <section aria-labelledby="cart-summary-heading" className="flex flex-col gap-3">
-            <h2 id="cart-summary-heading" className="text-xl font-semibold text-foreground">
+            <h2 id="cart-summary-heading" className={textStyles.sectionTitle}>
               {t("cart.summary.title")}
             </h2>
             <dl className="flex max-w-sm flex-col gap-1 text-foreground">
@@ -586,6 +593,7 @@ export function CartPageView({
               </>
             )}
           </div>
+          <StoreTrustBar t={t} className="max-w-sm max-md:max-w-none" />
         </>
       ) : null}
     </Container>

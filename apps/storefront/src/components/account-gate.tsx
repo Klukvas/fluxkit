@@ -1,14 +1,22 @@
 "use client";
 
 import type { Customer } from "@fluxkit/api-client";
-import { Alert, Button, Container, Skeleton, Spinner, type Translator } from "@fluxkit/ui";
+import {
+  Alert,
+  Button,
+  Container,
+  Skeleton,
+  Spinner,
+  textStyles,
+  type Translator,
+} from "@fluxkit/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { SessionState } from "../lib/account-store";
 import { currentPath, loginHref } from "../lib/safe-next";
 import { useI18n } from "./i18n-provider";
-import { AccountLayoutView, AccountNav } from "./account-nav";
+import { AccountBreadcrumbs, AccountLayoutView, AccountNav } from "./account-nav";
 import { useAccount } from "./session-provider";
 import { linkButton } from "./styles";
 
@@ -37,7 +45,7 @@ export function AccountGateView({
   if (state.status === "guest") {
     return (
       <Container className="flex flex-col items-start gap-4 py-8">
-        <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+        <h1 className={textStyles.pageTitle}>{title}</h1>
         <p role="status" className="text-muted-foreground">
           {t("account.gate.redirecting")}
         </p>
@@ -50,7 +58,7 @@ export function AccountGateView({
   if (state.status === "error") {
     return (
       <Container className="flex flex-col items-start gap-4 py-8">
-        <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+        <h1 className={textStyles.pageTitle}>{title}</h1>
         <Alert variant="danger">{t("account.gate.error")}</Alert>
         <Button onClick={onRetry}>{t("account.gate.retry")}</Button>
       </Container>
@@ -58,7 +66,7 @@ export function AccountGateView({
   }
   return (
     <Container className="flex flex-col gap-4 py-8" aria-busy="true">
-      <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+      <h1 className={textStyles.pageTitle}>{title}</h1>
       <Spinner label={t("account.loading")} />
       <Skeleton className="h-24 w-full" />
     </Container>
@@ -105,7 +113,9 @@ export function AccountGate({
     >
       {(customer) => (
         // Every signed-in account page gets the account menu (side menu on desktop, tabs on a phone; 2026-11-02).
-        <AccountLayoutView nav={<AccountNav />}>{children(customer)}</AccountLayoutView>
+        <AccountLayoutView nav={<AccountNav />} breadcrumbs={<AccountBreadcrumbs />}>
+          {children(customer)}
+        </AccountLayoutView>
       )}
     </AccountGateView>
   );

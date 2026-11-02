@@ -1,4 +1,12 @@
-import { Alert, Badge, Button, type BadgeVariant, type Locale, type Translator } from "@fluxkit/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  textStyles,
+  type BadgeVariant,
+  type Locale,
+  type Translator,
+} from "@fluxkit/ui";
 import { formatDateTime } from "../lib/date";
 import { failureText } from "../lib/failure";
 import {
@@ -119,7 +127,7 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
       aria-busy={busy}
       className="flex flex-col gap-3"
     >
-      <h2 id="order-payment-heading" className="text-xl font-semibold text-foreground">
+      <h2 id="order-payment-heading" className={textStyles.sectionTitle}>
         {t("payment.title")}
       </h2>
 

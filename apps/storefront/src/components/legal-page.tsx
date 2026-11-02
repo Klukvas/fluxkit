@@ -1,4 +1,4 @@
-import { Alert, Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Container, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import {
   LEGAL_PLACEHOLDER_MARKER,
@@ -29,7 +29,7 @@ function Identity({ t }: { t: Translator }) {
   ];
   return (
     <section aria-labelledby="legal-identity" className="flex flex-col gap-3">
-      <h2 id="legal-identity" className="text-xl font-semibold text-foreground">
+      <h2 id="legal-identity" className={textStyles.sectionTitle}>
         {t("legal.identity.title")}
       </h2>
       <dl className="flex max-w-xl flex-col gap-2 text-foreground">
@@ -47,7 +47,7 @@ function Identity({ t }: { t: Translator }) {
 function CookieTable({ t }: { t: Translator }) {
   return (
     <section aria-labelledby="legal-cookie-table" className="flex flex-col gap-3">
-      <h2 id="legal-cookie-table" className="text-xl font-semibold text-foreground">
+      <h2 id="legal-cookie-table" className={textStyles.sectionTitle}>
         {t("legal.cookies.tableTitle")}
       </h2>
       <div className="overflow-x-auto">
@@ -92,7 +92,7 @@ function PrivacyPointers({ t, locale }: { t: Translator; locale: Locale }) {
   const parts = splitMessage(t("legal.privacy.selfService", slotValues(["account"])), ["account"]);
   return (
     <section aria-labelledby="legal-rights" className="flex flex-col gap-2">
-      <h2 id="legal-rights" className="text-xl font-semibold text-foreground">
+      <h2 id="legal-rights" className={textStyles.sectionTitle}>
         {t("legal.privacy.rightsTitle")}
       </h2>
       <p className="text-foreground">
@@ -127,7 +127,7 @@ export function LegalPage({
   const intro = t(`legal.${slug}.intro`);
   return (
     <Container className="flex flex-col gap-6 py-8">
-      <h1 className="text-3xl font-bold text-foreground">{t(`legal.${slug}.title`)}</h1>
+      <h1 className={textStyles.pageTitle}>{t(`legal.${slug}.title`)}</h1>
       {/* The box follows the text, not a message of its own: it goes away only when the shop replaced the text. */}
       {intro.includes(LEGAL_PLACEHOLDER_MARKER) ? (
         <Alert variant="warning" title={t("legal.placeholder.title")}>

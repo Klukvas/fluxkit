@@ -43,6 +43,10 @@
   .fk-nav-link {
     @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
+  /* The logo link, with the same focus ring as every other control (review A10: it showed the browser's default ring). */
+  .fk-logo {
+    @apply min-h-11 min-w-0 truncate rounded-md text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
+  }
   .fk-header-button {
     @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
@@ -50,7 +54,7 @@
     display: none;
   }
   .fk-menu-panel {
-    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-card;
+    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-overlay;
   }
   /*
    * Mobile batch (plan 2026-11-03-storefront-mobile-ux.md). Below `lg` the header is one sticky row; its search row opens behind

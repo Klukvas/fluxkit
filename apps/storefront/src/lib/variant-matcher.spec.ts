@@ -5,6 +5,7 @@ import {
   hasOptionPicker,
   initialSelection,
   isValueAvailable,
+  isValueSoldOut,
   selectValue,
   selectedValueIds,
   selectionFromParams,
@@ -205,6 +206,46 @@ describe("isValueAvailable", () => {
   it("answers false for an option or value the product does not have", () => {
     expect(isValueAvailable(shirt, { color: "red", size: "s" }, "weight", "heavy")).toBe(false);
     expect(isValueAvailable(shirt, { color: "red", size: "s" }, "size", "xxl")).toBe(false);
+  });
+});
+
+describe("isValueSoldOut (review D-15: the value leads to a variant that is out of stock)", () => {
+  const stocked = product({
+    options: [option("color", ["black", "red"]), option("size", ["s", "m", "l"])],
+    variants: [
+      variant("black-s", { color: "black", size: "s" }),
+      variant("black-m", { color: "black", size: "m" }, { availability: "out_of_stock" }),
+      variant("black-l", { color: "black", size: "l" }, { availability: "low_stock" }),
+      variant("red-s", { color: "red", size: "s" }, { availability: "out_of_stock" }),
+      variant("red-m", { color: "red", size: "m" }, { availability: "out_of_stock" }),
+    ],
+  });
+
+  it("is true for a value whose variant with the other chosen values is out of stock", () => {
+    expect(isValueSoldOut(stocked, { color: "black", size: "s" }, "size", "m")).toBe(true);
+    expect(isValueSoldOut(stocked, { color: "black", size: "m" }, "size", "m")).toBe(true);
+  });
+
+  it("is false for a value whose variant can be bought (low stock included)", () => {
+    expect(isValueSoldOut(stocked, { color: "black", size: "s" }, "size", "s")).toBe(false);
+    expect(isValueSoldOut(stocked, { color: "black", size: "s" }, "size", "l")).toBe(false);
+  });
+
+  it("follows the repair of later options: red keeps size s, and red s is out of stock", () => {
+    expect(isValueSoldOut(stocked, { color: "black", size: "s" }, "color", "red")).toBe(true);
+    // black l exists and is low stock; red l does not exist, so choosing red repairs the size to s (out of stock).
+    expect(isValueSoldOut(stocked, { color: "black", size: "l" }, "color", "red")).toBe(true);
+  });
+
+  it("is false for a value that is not available at all (that is the disabled state, not sold out)", () => {
+    expect(isValueSoldOut(stocked, { color: "red", size: "s" }, "size", "l")).toBe(false);
+    expect(isValueSoldOut(stocked, { color: "red", size: "s" }, "size", "xxl")).toBe(false);
+    expect(isValueSoldOut(stocked, { color: "red", size: "s" }, "weight", "heavy")).toBe(false);
+  });
+
+  it("is false for a product without options (nothing to choose)", () => {
+    const single = product({ variants: [variant("v1", {}, { availability: "out_of_stock" })] });
+    expect(isValueSoldOut(single, {}, "size", "s")).toBe(false);
   });
 });
 

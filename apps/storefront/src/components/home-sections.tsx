@@ -1,4 +1,4 @@
-import { Card, EmptyState, type Locale, type Translator } from "@fluxkit/ui";
+import { Card, EmptyState, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { HomeSection, HomeSectionType } from "../layout/home";
@@ -33,7 +33,7 @@ function Hero({
   const { t, locale } = context;
   return (
     <section aria-labelledby="home-hero-title" className="py-12">
-      <h1 id="home-hero-title" className="text-3xl font-bold text-foreground">
+      <h1 id="home-hero-title" className={textStyles.pageTitle}>
         {t(props.titleKey)}
       </h1>
       <p className="mt-2 text-muted-foreground">{t(props.descriptionKey)}</p>
@@ -59,7 +59,7 @@ function EmptySection({
 }) {
   return (
     <section aria-labelledby={id} className="py-8">
-      <h2 id={id} className="text-xl font-semibold text-foreground">
+      <h2 id={id} className={textStyles.sectionTitle}>
         {t(titleKey)}
       </h2>
       <EmptyState
@@ -86,7 +86,7 @@ function CategoryTiles({
   }
   return (
     <section aria-labelledby="home-categories-title" className="py-8">
-      <h2 id="home-categories-title" className="text-xl font-semibold text-foreground">
+      <h2 id="home-categories-title" className={textStyles.sectionTitle}>
         {t(props.titleKey)}
       </h2>
       <ul className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
@@ -121,7 +121,7 @@ function NewProducts({
   }
   return (
     <section aria-labelledby="home-new-products-title" className="py-8">
-      <h2 id="home-new-products-title" className="text-xl font-semibold text-foreground">
+      <h2 id="home-new-products-title" className={textStyles.sectionTitle}>
         {t(props.titleKey)}
       </h2>
       <div className="mt-4">

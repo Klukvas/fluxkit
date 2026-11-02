@@ -140,6 +140,22 @@ export function selectValue(
   return asSelection(next);
 }
 
+/**
+ * Whether choosing `valueCode` would land on a variant that is out of stock (review D-15): the picker shows such a value
+ * struck through but keeps it selectable, so the shopper still sees its price and the "out of stock" state. It follows
+ * `selectValue`, repairs of later options included. A value that is not available at all is NOT sold out (it is disabled).
+ */
+export function isValueSoldOut(
+  product: MatcherProduct,
+  selection: Selection,
+  optionCode: string,
+  valueCode: string,
+): boolean {
+  if (!isValueAvailable(product, selection, optionCode, valueCode)) return false;
+  const landing = findVariant(product, selectValue(product, selection, optionCode, valueCode));
+  return landing !== null && landing.availability === "out_of_stock";
+}
+
 /** A selection with the entries of `map` as own properties (also for the code `__proto__`). */
 function asSelection(map: ReadonlyMap<string, string>): Selection {
   return Object.fromEntries(map);

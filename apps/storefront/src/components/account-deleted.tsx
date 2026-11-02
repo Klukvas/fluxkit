@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Container, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useEffect } from "react";
 import { localizedHref } from "../lib/locale-path";
@@ -12,7 +12,7 @@ import { linkButton } from "./styles";
 export function AccountDeletedView({ t, locale }: { t: Translator; locale: Locale }) {
   return (
     <Container className="flex max-w-xl flex-col gap-4 py-8">
-      <h1 className="text-3xl font-bold text-foreground">{t("account.data.deleted.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.data.deleted.title")}</h1>
       <Alert variant="success">
         <p>{t("account.data.deleted.body")}</p>
       </Alert>

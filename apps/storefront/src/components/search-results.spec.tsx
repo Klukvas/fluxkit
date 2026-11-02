@@ -344,6 +344,43 @@ describe("results page states", () => {
     expect(filtered).toContain("§search.empty.clear");
   });
 
+  // Review D-14: nothing found for the words alone is not a filter page.
+  it("drops the filter panel and the sort when nothing is found without filters, and offers the categories", () => {
+    const categories = [
+      { slug: "tools", name: "§tools" },
+      { slug: "a b", name: "§spaced" },
+    ];
+    const plain = renderToStaticMarkup(
+      <I18nProvider locale="uk" messages={sentinelMessages}>
+        <SearchResultsView
+          locale="uk"
+          t={t}
+          query={query}
+          outcome={ok({ items: [], total: 0 })}
+          currency="UAH"
+          exponent={2}
+          imageHosts={[]}
+          categories={categories}
+        />
+      </I18nProvider>,
+    );
+    expect(plain).not.toContain('id="search-filters-panel"');
+    expect(plain).not.toContain("§search.sort.label");
+    expect(plain).toMatch(/§search\.count/);
+    expect(plain).toContain("§search.empty.categories");
+    expect(plain).toContain('href="/uk/c/tools"');
+    expect(plain).toContain('href="/uk/c/a%20b"');
+    // Without categories (an outage of the category read) the empty state stays, without the list.
+    const without = render(ok({ items: [], total: 0 }));
+    expect(without).toContain("§search.empty.title");
+    expect(without).not.toContain("§search.empty.categories");
+    // With a selected filter the panel stays: the shopper widens the search there.
+    const filtered = render(ok({ items: [], total: 0 }), {
+      query: { ...query, facets: ["brand:zeta"] },
+    });
+    expect(filtered).toContain('id="search-filters-panel"');
+  });
+
   // PR 213 review m11: the "searches in <language>" sentence only when the words are in another script than the page's
   // (the case of a language switch on a results page), not on every empty result.
   it("names the page's search language only for words written in another script", () => {
@@ -427,7 +464,8 @@ describe("results page states", () => {
 describe("what the shopper typed", () => {
   const hostile = "<script>alert(1)</script><img src=x onerror=alert(1)>\"'&";
   const real = createTranslator(en, "en");
-  const html = render(ok({ items: [], total: 0 }), {
+  // With a result, so the filter form (its hidden field) and the page links are rendered too.
+  const html = render(ok(), {
     locale: "en",
     translate: real,
     messages: en,

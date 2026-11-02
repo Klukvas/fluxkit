@@ -45,6 +45,10 @@ vi.mock("../lib/catalog-pages.server", () => ({
   getShopMoney: () => Promise.resolve({ currency: "UAH", exponent: 2 }),
 }));
 vi.mock("../lib/image-hosts.server", () => ({ imageHosts: () => [] }));
+// The header's categories, read by the route only when nothing is found (review D-14).
+vi.mock("../lib/store-data.server", () => ({
+  navigationCategories: () => Promise.resolve([{ slug: "lamps", name: "§Lamps category" }]),
+}));
 vi.mock("../lib/public-url.server", () => ({
   publicOrigin: () => Promise.resolve("https://shop.example"),
 }));
@@ -158,7 +162,11 @@ describe("the results route", () => {
       "NEXT_REDIRECT /en/search?q=lamp",
     );
     reads.outcome = results({ items: [], total: 0, pageCount: 0 });
-    expect(await visit({ q: "lamp" })).toContain(en["search.empty.title"]);
+    const nothing = await visit({ q: "lamp" });
+    expect(nothing).toContain(en["search.empty.title"]);
+    // Nothing found: the categories as a way on, no filter panel (review D-14).
+    expect(nothing).toContain('href="/en/c/lamps"');
+    expect(nothing).not.toContain('id="search-filters-panel"');
     reads.outcome = results({ page: 2, pageCount: 2 });
     expect(await visit({ q: "lamp", page: "2" })).toContain("Lamp");
   });

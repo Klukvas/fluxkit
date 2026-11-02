@@ -78,11 +78,7 @@ export function SiteHeader({
             </ul>
           </nav>
         </HeaderDisclosure>
-        <Link
-          href={localizedHref(locale, "/")}
-          title={t("site.name")}
-          className="min-h-11 min-w-0 truncate text-lg leading-11 font-bold text-foreground max-lg:grow max-lg:basis-0 lg:shrink-0"
-        >
+        <Link href={localizedHref(locale, "/")} title={t("site.name")} className="fk-logo">
           {t("site.name")}
         </Link>
         <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">

@@ -606,8 +606,9 @@ describe("checkout page with shipping methods", () => {
         })}
       />,
     );
-    expect(html).not.toContain(uk["checkout.shipping.title"]);
-    expect(html).not.toContain(uk["checkout.summary.shipping"]);
+    // As a heading or a summary row (the trust bar's demo line "Доставка по всій країні" starts with the same word).
+    expect(html).not.toContain(`>${uk["checkout.shipping.title"]}<`);
+    expect(html).not.toContain(`>${uk["checkout.summary.shipping"]}<`);
     expect(html).toContain('name="shippingAddress.city"');
     expect(html).toContain(formatMoney(UAH(1999), 2, "uk"));
     expect(submit(html)).not.toContain("disabled");

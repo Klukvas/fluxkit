@@ -74,3 +74,40 @@ export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/** Trust bar icons (`config/trust-bar.ts`): a delivery van, a lock, a chat bubble, a return arrow; 20 px beside a line of text. */
+export function DeliveryIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M3 6h11v10H3zM14 9h4l3 3v4h-7" />
+      <circle cx="7" cy="18" r="1.5" />
+      <circle cx="17" cy="18" r="1.5" />
+    </Icon>
+  );
+}
+
+export function LockIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <rect x="5" y="11" width="14" height="9" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+    </Icon>
+  );
+}
+
+export function ChatIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M4 5h16v11H9l-5 4z" />
+    </Icon>
+  );
+}
+
+export function ReturnIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon width="20" height="20" {...props}>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+    </Icon>
+  );
+}
