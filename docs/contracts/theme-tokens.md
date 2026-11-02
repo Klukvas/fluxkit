@@ -35,12 +35,38 @@ fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a siz
 `rounded-xl`, `shadow-md`, a bare `rounded` or `shadow`). Fix: replace the class with a scale step, or extend the scale in all three places:
 a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
 
-Themes: `light` (default) and `dark`, selected with `data-theme` on `<html>`. Both define exactly the same token names (enforced by a test).
-Rebranding a client = changing values in `tokens.css` (or adding a preset block); no component edits.
+## Themes and modes (design batch B, 2026-11-03)
+
+`data-theme` on `<html>` selects the theme; `tokens.css` has exactly three blocks (a test refuses any other rule):
+
+| `data-theme` | Block | `color-scheme` | Who sets it |
+|---|---|---|---|
+| none or `light` | `:root, [data-theme="light"]` (every token) | `light` | the admin (`index.html`, fixed); the storefront when the shopper or the config chose light |
+| `dark` | `[data-theme="dark"]` (every token, same names) | `dark` | the storefront |
+| `system` | light, plus `@media (prefers-color-scheme: dark) { [data-theme="system"] { ... } }` on a dark device | `dark` there | the storefront (default) |
+
+- The `system` block holds the dark value of every token whose dark value differs from light (today: all colours and the three shadows) and
+  nothing else; a test keeps it equal to the dark block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
+  `data-theme="system"` (the admin) never follows the device (`apps/admin/src/theme-isolation.spec.ts` checks the admin's built CSS).
+- `color-scheme` makes native controls, scrollbars and select popups follow the theme.
+- Mail stays light (`emailTheme` reads the light block; mail templates set `color-scheme: light`).
+- `@fluxkit/theme` exports `themeModes` (`light`, `dark`, `system`) and the type `ThemeMode` (additive).
+- The storefront's choice of mode: `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) and the `fluxkit_theme` cookie
+  (ADR 0045); the server renders `data-theme`, so the first paint is right without a script.
+
+**How a fork rebrands both themes:** set the light values in the `:root` block and the dark values in the `[data-theme="dark"]` block (same names;
+the contrast pairs below must pass in both), then copy every dark value that differs from light into the `system` block: `pnpm --filter
+@fluxkit/theme test` names each token that is missing or different there. A shop without a dark theme sets `defaultMode: "light"` and
+`showToggle: false` in the storefront config (the dark blocks then never apply). No component edits.
+
+**Migration note for client forks (2026-11-03, additive: no token renamed or removed):** a fork that changed dark values in `tokens.css` must
+copy them into the new `system` block (the test above fails until it does). The storefront now renders `data-theme="system"` by default
+instead of `light`: a fork whose components assumed the light theme only (for example a picture without its own background) checks them in
+dark, or sets `defaultMode: "light"`.
 
 ## Contrast (enforced by `packages/theme/src/contrast.spec.ts`)
 
-The test parses `tokens.css` (6-digit hex values only; another color format fails the test) and computes the WCAG 2.x contrast ratio in both themes. A rebrand must keep these pairs passing:
+The test parses `tokens.css` into its blocks (`packages/theme/src/token-blocks.ts`; 6-digit hex values only; another color format fails the test) and computes the WCAG 2.x contrast ratio in the light theme, the dark theme and the system mode on a dark device (light values overridden by the system block). A rebrand must keep these pairs passing:
 
 | Foreground on background | Minimum |
 |---|---|
@@ -59,6 +85,11 @@ The test parses `tokens.css` (6-digit hex values only; another color format fail
 | `border-input` on `background` and on `muted` | 3:1 (non-text, WCAG 1.4.11: the border that identifies a text control; `muted` is the alert surface) |
 
 The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
+
+Design batch B (2026-11-03) added no colour token and no new pair either: the hero and the category tiles are `foreground` and
+`muted-foreground` on `muted`, the theme switch `primary-foreground` on `primary` (pressed) and `foreground` on `background`/`muted`. The storefront
+e2e (`e2e/tests/design-b.e2e.ts`) also measures the computed colours of every visible text and text-field border of the home, product, category,
+cart and checkout pages in dark (4.5:1 text, 3:1 field border).
 
 Design batch A (2026-11-03) added no colour token and no new pair: the discount badge is `danger-foreground` on `danger`, the current funnel step
 `primary-foreground` on `primary`, the hovered card border `border-input` on `background`, the trust bar `foreground` and `muted-foreground` on

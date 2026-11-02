@@ -139,6 +139,27 @@ describe("header size (it is in every page's first HTML)", () => {
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
     expect(new TextEncoder().encode(header).length).toBeLessThan(4300); // 3 802 bytes on 2026-11-02 (six categories, no search box)
   });
+
+  it("keeps the footer small too: it is flushed with the shell, before a page section that streams later", () => {
+    // Design batch B: the theme switch made the footer 2.3 KB and `/{locale}/account/register` was outlined again (e2e
+    // `pre-hydration-forms`); with one class per link and button it is about 1.6 KB, and the forms render inline.
+    const html = renderToStaticMarkup(
+      <SiteShell
+        themeMode="system"
+        locale="uk"
+        messages={sentinelMessages}
+        t={t}
+        categories={null}
+        searchEnabled={false}
+        year={2026}
+      >
+        §child
+      </SiteShell>,
+    );
+    const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
+    expect(footer).toContain('class="fk-theme-option"');
+    expect(new TextEncoder().encode(footer).length).toBeLessThan(1900);
+  });
 });
 
 describe("header islands", () => {

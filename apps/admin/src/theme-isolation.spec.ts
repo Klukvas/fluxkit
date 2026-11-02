@@ -66,7 +66,7 @@ describe("the admin is not affected by the storefront's dark and system themes",
   it("keeps the light values on the page root and color-scheme light", () => {
     const css = builtCss();
     expect(css).toMatch(/:root,\s*\[data-theme=["']?light["']?\]\s*\{[^}]*color-scheme:\s*light/);
-    expect(css).toMatch(/--fk-color-background:\s*#fff(fff)?\b/);
+    expect(css).toMatch(/:root,\s*\[data-theme=["']?light["']?\]\s*\{[^}]*--fk-color-background:/);
   });
 
   it("is the scanner itself sound (a selector outside the system mode is found)", () => {

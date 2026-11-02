@@ -8,7 +8,8 @@ Status: steps 1 to 10 of the plan are merged (PRs #66 to #79; #78 is the step 9 
 
 | Route | Rendering | Data (all through the 60 s data cache) | Indexing |
 |---|---|---|---|
-| `/{locale}` | server, per request | `GET /store/products?limit=8`, `GET /store/categories`, `GET /store/config` | index, canonical, hreflang |
+| `/{locale}` | server, per request; the hero at once, each data section of `config/home.ts` streamed into its own boundary | per data section: `GET /store/categories` (tiles), `GET /store/products?limit=8` (+ `category`/`brand` of the row) and `GET /store/config` (rows) | index, canonical, hreflang |
+| `/theme` (POST only) | route handler, no page | none; sets `fluxkit_theme` and answers `303` to a checked storefront path (the theme switch without a script, ADR 0045) | not a page |
 | `/{locale}/catalog` (`?page`, `?brand`) | server, per request | `GET /store/products?limit=24&offset=` (+ `brand`), `GET /store/config` | page 1 index; `noindex, follow` on a brand filter and on page 2 and later; canonical never has `brand` |
 | `/{locale}/c/{slug}` (`?page`, `?brand`) | server, per request | categories tree (breadcrumbs, children), products with `category=` (descendants included by the API) | same rules as the catalog |
 | `/{locale}/p/{slug}` | server, per request; `ProductPurchase` is a client island | `GET /store/products/{slug}`, config, categories | index, Product and BreadcrumbList JSON-LD |
@@ -56,7 +57,7 @@ pnpm test:e2e                                    # (repository root) Playwright 
 
 ## Rendering and caching (verified against Next 16.4.1)
 
-- **Every page under `[locale]` renders per request** (`ƒ` in the `next build` table), because the shell reads the API (categories, config). `generateStaticParams` returns the locales but prerenders nothing. HTML is sent with `Cache-Control: private, no-cache, no-store`.
+- **Every page under `[locale]` renders per request** (`ƒ` in the `next build` table), because the shell reads the API (categories, config) and, since design batch B, the root layout reads the `fluxkit_theme` cookie (`cookies()`) to render `<html data-theme>`. `generateStaticParams` returns the locales but prerenders nothing. HTML is sent with `Cache-Control: private, no-cache, no-store`.
 - **How it is made dynamic:** `lib/store-data.server.ts` awaits `connection()` (`next/server`) before any API read, so a catalog read can never run while Next prerenders. `next build` therefore never calls the API and passes without `API_INTERNAL_URL` (checked: `env -u API_INTERNAL_URL pnpm build`). Nothing in a layout or page needs `export const dynamic`.
 - **API responses are cached, not pages:** `fetch(..., { next: { revalidate: 60, tags } })` (`CATALOG_REVALIDATE_SECONDS`, an internal constant in `lib/store-data.ts`). Measured: five page requests produce one `GET /store/config` and one `GET /store/categories`.
   - The Next 16 docs say `dynamic = "force-dynamic"` is equivalent to `fetchCache = 'force-no-store'`. Measured on 16.4.1: with `force-dynamic` on the layout the explicit `revalidate` was still honored (one call each for five requests). `connection()` is used anyway because it is structural (it sits in the data layer, not in each file) and leaves routes that never read the API free to be static.
@@ -127,12 +128,14 @@ See `docs/files/storefront.md` for one line per file. In short:
 
 ### Layout composition is configuration
 
-- Home page: `src/layout/home.ts` lists the sections in order with props (message keys, a `limit`); `components/home-sections.tsx` has the registry (one renderer per section type). `categoryTiles` and `newProducts` get their data from `loadHomeData` (`lib/catalog-data.ts`, called by the page) and render an empty state when there is none. The registry renderers are synchronous and receive the loaded data in their context, so they stay testable with `renderToStaticMarkup`.
+- Home page: `src/config/home.ts` lists the sections in order (`hero`, `categories`, `productRow`, `trust`, `richText`; see "Desktop design, batch B"); `components/home-sections.tsx` renders each `kind` (a `switch` with a `never` check). The page starts one load per data section (`getHomeSection`, `lib/home-data.ts`) and streams each into its own `Suspense` boundary; the renderers are synchronous and receive the loaded result, so they stay testable with `renderToStaticMarkup` (`HomeSectionsView`).
+- Category page header: `src/config/category-page.ts` (`banner`: the category's name and description in the `Hero` component, optional picture per slug; `plain`).
+- Theme: `src/config/theme.ts` (`defaultMode`, `showToggle`).
 - Header and footer links: `src/layout/navigation.ts` (message keys and locale-less paths; `localizedHref` adds the locale and refuses anything that is not a plain path).
 - Checkout settings (the country list of the checkout WITHOUT shipping methods, default country `UA`, which address fields are shown): `src/config/checkout.ts`, consumed by step 7. With shipping methods the country list comes from the methods (see "Delivery and shipping").
 - Trust bar (the reassurance lines next to the buy button, the cart summary and the checkout summary): `src/config/trust-bar.ts` (see "Desktop design, batch A"); an empty list hides it.
 
-**Add a home section:** add a member to the `HomeSection` union and an entry to `homeSections` in `layout/home.ts`, and a renderer in `homeSectionRegistry` (TypeScript fails until both exist). **Add a header or footer link:** add `{ labelKey, href }` to `navigation.ts` and the message key to both JSON files.
+**Add a home section:** reorder, remove or add entries of `homeSections` in `config/home.ts` (each with a unique `id`; texts are message keys in both JSON files). A new `kind`: add a member to the `HomeSection` union and a `case` in `home-sections.tsx` (TypeScript fails until both exist), and, for a data kind, a loader in `lib/home-data.ts`. **Add a header or footer link:** add `{ labelKey, href }` to `navigation.ts` and the message key to both JSON files.
 
 ### i18n
 
@@ -400,7 +403,7 @@ Plan `docs/plans/2026-11-02-storefront-ui-polish.md` (owner decisions there).
 - **Availability filter:** `inStock` is variant-level (`docs/api/search.md`, ADR 0034 decision 4): `inStock:false` lists every product with an out-of-stock variant (the demo T-shirt's red L). The values read "Has options in stock" / "Has options out of stock"; a card under either shows the availability of its matched variants (`match`, `cardOffer`, see "Variant picker").
 - **Phone** (`lib/phone.ts`, `libphonenumber-js/min`): national format while typing (only when the text grew at its end), length and country checked with the blank fields (`mergeFieldFailures`), E.164 sent; default country `checkoutConfig.phoneDefaultCountry` (`UA`). The API's own rule is unchanged.
 - **Skeletons:** the audit table is in the plan; the cart lines and the order list have skeletons shaped like their content. The `(catalog)` routes still have no `loading.tsx` (real 404s, see "Rendering and caching").
-- **Keep the header small (found by e2e `pre-hydration-forms`).** React 19.3 (`progressiveChunkSize` 12 800 bytes) moves a finished page section out of place, to be put back by a script, once the HTML before it plus the section pass that size; the forms that must work before their script runs then show only the `(site)` loading view. The first version of this header (7.8 KB) did that to `/en/account/login` and `/uk/account/register` (main: 4.0 KB, inline). The repeated header classes are now single token classes (`.fk-menu-item`, `.fk-nav-link`, `.fk-header-button`, `.fk-menu-panel`, `.fk-icon`, `.fk-flag` in `app/globals.css`, through `@apply`): 4.7 KB, and login, register (uk and en), cart, checkout and a legal page are inline again (checked on `next start`). `shell.spec.tsx` pins the header size. The home page is outlined (needs the script for its content); it has no form, and it was not compared with main.
+- **Keep the header small (found by e2e `pre-hydration-forms`).** React 19.3 (`progressiveChunkSize` 12 800 bytes) moves a finished page section out of place, to be put back by a script, once the HTML before it plus the section pass that size; the forms that must work before their script runs then show only the `(site)` loading view. The first version of this header (7.8 KB) did that to `/en/account/login` and `/uk/account/register` (main: 4.0 KB, inline). The repeated header classes are now single token classes (`.fk-menu-item`, `.fk-nav-link`, `.fk-header-button`, `.fk-menu-panel`, `.fk-icon`, `.fk-flag` in `app/globals.css`, through `@apply`): 4.7 KB, and login, register (uk and en), cart, checkout and a legal page are inline again (checked on `next start`). `shell.spec.tsx` pins the header size. The home page was outlined (needed the script for its content); since design batch B it lives in `(catalog)` without the loading view, so its hero and section skeletons are in the first HTML and only the data sections stream. **Design batch B:** the footer is in the same budget (it is flushed with the shell before a late page section): the theme switch first made it 2.3 KB and `/en/account/register` was outlined; with `.fk-nav-link` and `.fk-theme-option` it is 1.25 KB (en) / 1.41 KB (uk), smaller than before (1.70 / 1.82 KB), pinned by `shell.spec.tsx`. Found, not fixed (pre-existing on `34c98e6`, same with main's footer): `/uk/account/register` is outlined (header 5.4 KB in uk); the e2e test covers the en pages only.
 - **Language list and Suspense:** the server renders the language list without the query (the `useSearchParams` boundary's fallback) and the browser swaps it in; the dropdown sits outside that boundary, so a dropdown opened before hydration stays open.
 - **Bundle (`next build`, `.next/diagnostics/route-bundle-stats.json`):** the phone code is one chunk on `/[locale]/checkout` only: 183,451 bytes uncompressed (43.5 KB gzip; mostly the "min" metadata). Checkout first-load JS 711,950 bytes (201.0 KB gzip); other routes do not load it (`/[locale]` 531,575, 158.5 KB gzip; `/[locale]/cart` 545,275, 162.3 KB gzip). A smaller build is possible with custom metadata for the shop's countries (`libphonenumber-js` metadata generation), not done.
 - **Not verified:** a screen reader; Safari and Firefox (details/summary with `role="button"`); reflow at 320 px.
@@ -423,7 +426,7 @@ Plan `docs/plans/2026-11-03-storefront-mobile-ux.md` (before/after numbers there
 
 ## Desktop design, batch A (2026-11-03)
 
-Plan `docs/plans/2026-11-03-storefront-design-a.md` (before/after measurements and screenshots there). Batch B (next): the home page and the dark theme switch.
+Plan `docs/plans/2026-11-03-storefront-design-a.md` (before/after measurements and screenshots there). Batch B: the next section.
 
 - **Design kit** (`@fluxkit/theme`, `@fluxkit/ui`): the type scale, the spacing unit and the elevations are tokens (`docs/contracts/theme-tokens.md`), mapped to the stock utilities, so `text-sm` or `p-4` follow a rebrand; sizes, radii and shadows outside the scales fail `design-guard.spec.ts`. Repeated headings use `textStyles` (`pageTitle`, `sectionTitle`, ...). No colour transitions on controls (they animate the focus ring's colour too).
 - **Product card** (`product-card.tsx`): `shadow-raised` and the `border-input` border on hover (no transition with reduced motion); brand as a muted meta line above the title (still its own link for keyboards); title clamped to two lines; the note and the price in a bottom group (`mt-auto`), so a row's prices share one line; a badge only for `low_stock` and `out_of_stock`, over the image corner (in stock is visually hidden text). The list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (an API change, not done).
@@ -432,6 +435,35 @@ Plan `docs/plans/2026-11-03-storefront-design-a.md` (before/after measurements a
 - **Funnel and breadcrumbs** (`checkout-steps.tsx`, `@fluxkit/ui` `StepIndicator`, `lib/account-trail.ts`): cart (step 1, once it has lines), checkout (step 2, links back to the cart), order page (step 3 while the order awaits payment, guest and account pages); `aria-current="step"`; below `md` "Step 2 of 3: Checkout" with the list kept for assistive technology. Account pages have breadcrumbs (Home / My account / section / order number; no JSON-LD, the pages are `noindex`).
 - **Search** (`search-results.tsx` `NoResults`, search route): nothing found for words without filters shows the empty state (spelling and other-language hints kept) and the header's top-level categories ("Browse categories"; there is no popularity data), with no filter panel or sort. With filters the faceted layout stays. Suggestions still show titles only: `GET /store/search/suggest` answers `{slug, title}` (thumbnail and price need an API change).
 - **Tests:** `components/design-a.spec.tsx`, additions to `catalog.spec.tsx`, `search-results.spec.tsx`, `search-page.spec.tsx`, `lib/discount.spec.ts`, `lib/account-trail.spec.ts`, `lib/variant-matcher.spec.ts`; e2e `e2e/tests/design-a.e2e.ts` (1280 and 1024, one test at 390).
+
+## Desktop design, batch B (2026-11-03)
+
+Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements and screenshots there).
+
+- **Home (review D-18):** `config/home.ts` (internal config; demo composition and copy marked `TODO(fluxkit)`): a hero with headline, subline,
+  CTA and a local picture (`public/home/hero.svg`, a neutral generated illustration with its own background, `width`/`height`, loaded eagerly
+  with high priority as the largest paint), category tiles (top-level categories in the API's order; a config picture per slug or the name on
+  the `muted` surface with an icon; "N subcategories" from the tree; no product count: that would be one request per tile), a product row
+  (`GET /store/products` is newest first; optional category or brand; "All products" beside the heading; images lazy), the trust bar and a
+  short text. One `h1` (the first hero, else a visually hidden one); sections are labelled by their `h2`, products `h3`. Data sections stream
+  with skeletons of the final size (CLS under 0.05 measured), are left out when empty, and show "This section could not be loaded" (logged)
+  when the store cannot answer; the hero and the other sections still render. No JSON-LD on the home (no correct, useful type without the
+  client's identity).
+- **Category banner:** `config/category-page.ts` (`banner` by default, no pictures): the same `Hero` with the category's name (`h1`) and
+  description; `plain` keeps the old header.
+- **Dark theme (ADR 0045, proposed):** `config/theme.ts` (`defaultMode: "system"`, `showToggle: true`). The root layout renders
+  `<html data-theme>` from the `fluxkit_theme` cookie (or the default), so the first paint has the right theme with no script; `system`
+  follows the device through the CSS media query (works without a script). The footer's switch (`theme-switch.tsx`): Light / Dark / System
+  buttons with `aria-pressed` in a group named "Theme"; with a script it writes the cookie and the attribute in place, without one it posts
+  to `/theme` (`303` back to the same path). `showToggle: false` hides it, ignores the cookie and makes `/theme` a 404. Colours come from the
+  tokens only, so every page, form control, badge, skeleton, toast, the filter sheet and the buy bar follow; product pictures keep their own
+  background on the `muted` surface; `color-scheme` follows the theme (native controls and scrollbars). Mail stays light. The admin is not
+  affected (it sets `data-theme="light"`; spec on its built CSS).
+- **Tests:** `components/home-sections.spec.tsx`, `config/home.spec.ts`, `lib/home-data.spec.ts`, `lib/theme-mode.spec.ts`,
+  `lib/theme-route.spec.ts`, the cookie guards in `source-guards.spec.ts` and `security-headers.spec.ts`, `legal-pages.spec.tsx` (the cookie
+  row); e2e `e2e/tests/design-b.e2e.ts` (section order, h1, hero picture, CLS, 1280/1024/768/390 without sideways scroll, the banner, the
+  server HTML per cookie, the system mode under an emulated scheme, the switch by keyboard and without a script, computed-colour contrast of
+  the home, product, category, cart and checkout pages in dark).
 
 ## Accessibility baseline (what was checked)
 

@@ -76,7 +76,8 @@ function SectionShell({
       data-home-section-id={section.id}
       className="flex flex-col gap-4"
     >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      {/* `min-h-11`: the same height with or without the link beside the heading, so a skeleton matches its section. */}
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1">
         <h2 id={headingId(section)} className={textStyles.sectionTitle}>
           {title}
         </h2>
@@ -333,7 +334,8 @@ export function HomeSectionSkeleton({
   context: HomeContext;
 }) {
   const { t } = context;
-  const count = Math.min(section.limit, section.kind === "categories" ? 6 : 8);
+  // One row of tiles (most shops show a few top-level categories), two rows of four product cards.
+  const count = Math.min(section.limit, section.kind === "categories" ? 3 : 8);
   return (
     <SectionShell section={section} title={t(section.titleKey)} busy>
       <VisuallyHidden>{t("loading.page")}</VisuallyHidden>
@@ -347,6 +349,7 @@ export function HomeSectionSkeleton({
               <Skeleton className="aspect-video" />
               <div className="flex flex-col gap-1 p-3">
                 <Skeleton className="h-6 w-2/3" />
+                <Skeleton className="h-5 w-1/3" />
               </div>
             </div>
           ))}
@@ -358,7 +361,9 @@ export function HomeSectionSkeleton({
               <Skeleton className="aspect-square w-full" />
               <Skeleton className="h-5 w-1/3" />
               <Skeleton className="h-6 w-3/4" />
-              <Skeleton className="h-6 w-1/2" />
+              <div className="pt-1">
+                <Skeleton className="h-6 w-1/2" />
+              </div>
             </div>
           ))}
         </div>

@@ -200,6 +200,8 @@ describe("home data sections: empty, error and loading", () => {
     expect(html).toContain("§loading.page");
     // The tiles: as many boxes as the section's limit; the row: up to two rows of four.
     expect(html.match(/aspect-video/g)).toHaveLength(2);
+    // A config limit above a row still shows one row of tile skeletons.
+    expect(render([{ ...tiles, limit: 6 }], {}).match(/aspect-video/g)).toHaveLength(3);
     expect(html.match(/aspect-square/g)).toHaveLength(8);
   });
 });

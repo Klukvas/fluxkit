@@ -33,13 +33,23 @@ test("the home page shows the configured sections in order, one h1, the hero pic
   page,
 }) => {
   await page.addInitScript(() => {
-    (window as unknown as { shift: number }).shift = 0;
+    const record = window as unknown as { shift: number; shiftSources: string[] };
+    record.shift = 0;
+    record.shiftSources = [];
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as unknown as {
         value: number;
         hadRecentInput: boolean;
+        sources?: { node: Node | null }[];
       }[]) {
-        if (!entry.hadRecentInput) (window as unknown as { shift: number }).shift += entry.value;
+        if (entry.hadRecentInput) continue;
+        record.shift += entry.value;
+        for (const source of entry.sources ?? []) {
+          const node = source.node;
+          record.shiftSources.push(
+            `${entry.value.toFixed(3)} ${node instanceof Element ? `${node.tagName} ${node.className}`.slice(0, 80) : String(node?.nodeName)}`,
+          );
+        }
       }
     }).observe({ type: "layout-shift", buffered: true });
   });
@@ -52,6 +62,14 @@ test("the home page shows the configured sections in order, one h1, the hero pic
   await expect(hero).toHaveAttribute("width", "640");
   await expect(hero).toHaveAttribute("height", "480");
   await expect(hero).toHaveAttribute("fetchpriority", "high");
+  await expect(main.getByRole("link", { name: /^Clothing/ })).toHaveAttribute(
+    "href",
+    "/en/c/demo-clothing",
+  );
+  await expect(main.getByRole("link", { name: /^Clothing/ })).toContainText("2 subcategories");
+  const products = main.getByRole("list", { name: "New arrivals" });
+  await expect(products.getByRole("listitem")).toHaveCount(8);
+  // Read once the streamed sections are in (a skeleton has the section's h2 but no product h3 yet).
   expect(await sectionIds(page)).toEqual([
     "home-categories",
     "home-new-products",
@@ -62,14 +80,6 @@ test("the home page shows the configured sections in order, one h1, the hero pic
     .locator("h1, h2, h3")
     .evaluateAll((elements) => elements.map((element) => element.tagName));
   expect(headings.slice(0, 4)).toEqual(["H1", "H2", "H2", "H3"]);
-
-  await expect(main.getByRole("link", { name: /^Clothing/ })).toHaveAttribute(
-    "href",
-    "/en/c/demo-clothing",
-  );
-  await expect(main.getByRole("link", { name: /^Clothing/ })).toContainText("2 subcategories");
-  const products = main.getByRole("list", { name: "New arrivals" });
-  await expect(products.getByRole("listitem")).toHaveCount(8);
   // Below the hero: no product image of the home row is fetched eagerly.
   expect(
     await products
@@ -85,8 +95,11 @@ test("the home page shows the configured sections in order, one h1, the hero pic
 
   await page.mouse.wheel(0, 3000);
   await page.waitForTimeout(500);
-  const shift = await page.evaluate(() => (window as unknown as { shift: number }).shift);
-  expect(shift, "cumulative layout shift").toBeLessThan(0.05);
+  const { shift, shiftSources } = await page.evaluate(() => {
+    const record = window as unknown as { shift: number; shiftSources: string[] };
+    return { shift: record.shift, shiftSources: record.shiftSources };
+  });
+  expect(shift, `cumulative layout shift: ${shiftSources.join(" | ")}`).toBeLessThan(0.05);
 });
 
 for (const width of [1280, 1024, 768, 390]) {

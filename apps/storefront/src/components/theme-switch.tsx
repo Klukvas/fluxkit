@@ -2,10 +2,8 @@
 
 import type { ThemeMode } from "@fluxkit/theme";
 import { usePathname } from "next/navigation";
-import { useId, useState, type MouseEvent, type ReactNode } from "react";
+import { useId, useState, type MouseEvent } from "react";
 import { storefrontThemeModes, themeCookie } from "../lib/theme-mode";
-import { DeviceIcon, MoonIcon, SunIcon } from "./icons";
-import { focusRing } from "./styles";
 
 export interface ThemeSwitchLabels {
   /** Name of the group ("Theme"). */
@@ -15,18 +13,13 @@ export interface ThemeSwitchLabels {
   system: string;
 }
 
-const icons: Record<ThemeMode, () => ReactNode> = {
-  light: () => <SunIcon />,
-  dark: () => <MoonIcon />,
-  system: () => <DeviceIcon />,
-};
-
 /**
  * The footer's Light / Dark / System switch (plan 2026-11-03-storefront-design-b.md, decision 5): three buttons with
  * `aria-pressed` in a labelled group. Without a script it is a plain form: the browser posts the choice to `/theme`
  * (`app/theme/route.ts`), which stores it and sends the shopper back to this path. With a script the choice applies in
- * place: the cookie is written here (the one place in the storefront that writes a cookie, guarded by a spec) and
- * `<html data-theme>` changes at once, so the next page the server renders matches.
+ * place: the cookie is written here (one of the two places in the storefront that write a cookie, guarded by a spec) and
+ * `<html data-theme>` changes at once, so the next page the server renders matches. Text buttons and one class
+ * (`.fk-theme-option`): the footer is part of every page's first HTML, which has a size budget (README, "Keep the header small").
  */
 export function ThemeSwitch({
   initialMode,
@@ -50,33 +43,22 @@ export function ThemeSwitch({
   return (
     <form method="post" action="/theme" className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="return" value={pathname} />
-      <span id={labelId} className="text-sm">
-        {labels.group}
+      <span id={labelId}>{labels.group}</span>
+      <span role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1">
+        {storefrontThemeModes.map((option) => (
+          <button
+            key={option}
+            type="submit"
+            name="mode"
+            value={option}
+            aria-pressed={option === mode}
+            onClick={(event) => choose(event, option)}
+            className="fk-theme-option"
+          >
+            {labels[option]}
+          </button>
+        ))}
       </span>
-      <div role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1">
-        {storefrontThemeModes.map((option) => {
-          const pressed = option === mode;
-          return (
-            <button
-              key={option}
-              type="submit"
-              name="mode"
-              value={option}
-              aria-pressed={pressed}
-              data-theme-option={option}
-              onClick={(event) => choose(event, option)}
-              className={`inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-sm ${focusRing} ${
-                pressed
-                  ? "border-primary bg-primary font-semibold text-primary-foreground"
-                  : "border-border bg-background text-foreground hover:bg-muted"
-              }`}
-            >
-              {icons[option]()}
-              <span>{labels[option]}</span>
-            </button>
-          );
-        })}
-      </div>
     </form>
   );
 }
