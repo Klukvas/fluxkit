@@ -34,6 +34,10 @@ export function HeaderDisclosure({
   // a name by every engine (Playwright's role tree shows it nameless), so it gets `role="button"` and the state.
   const [open, setOpen] = useState(false);
   useDismiss(ref);
+  // A menu opened before hydration: show its real state.
+  useEffect(() => {
+    if (ref.current?.open === true) setOpen(true);
+  }, []);
   return (
     <details
       ref={ref}
@@ -65,7 +69,12 @@ export const menuItem = `flex min-h-11 w-full items-center gap-2 whitespace-nowr
 /** Closes an open `<details>` on Escape (focus back to its summary), on a pointer or focus outside, and after a navigation. */
 export function useDismiss(ref: { current: HTMLDetailsElement | null }): void {
   const pathname = usePathname();
+  // Only a CHANGE of path closes it: on the first run (hydration) a menu the shopper opened before the script ran stays
+  // open (found by the e2e language-switch scenario).
+  const shownPath = useRef(pathname);
   useEffect(() => {
+    if (shownPath.current === pathname) return;
+    shownPath.current = pathname;
     const details = ref.current;
     if (details !== null) details.open = false;
   }, [ref, pathname]);

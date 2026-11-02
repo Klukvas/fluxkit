@@ -12,5 +12,5 @@ export const localeFlagCountry: Record<Locale, string> = {
 
 /** The CSS classes that draw the flag of a locale. */
 export function flagClass(locale: Locale): string {
-  return `fk-flag fk-flag-${localeFlagCountry[locale]}`;
+  return `fk-flag fk-flag-${localeFlagCountry[locale]} rounded-sm ring-1 ring-border`;
 }

@@ -14,7 +14,7 @@ test("the header: an account menu by keyboard, Escape closes it, and the cart ba
 }) => {
   await page.goto("/en");
   await waitForHydration(page);
-  const cart = page.getByRole("link", { name: /^Cart/ });
+  const cart = page.getByRole("banner").getByRole("link", { name: /^Cart/ });
   await expect(cart).toHaveAccessibleName(/0 items in the cart/);
   await expect(cart.locator(".bg-danger")).toHaveCount(0);
 

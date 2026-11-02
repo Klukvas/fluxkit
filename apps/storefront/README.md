@@ -147,7 +147,7 @@ All personalized pages follow ADR 0026: a server-rendered shell plus client comp
 
 ### Cart store rules (each has a test; `lib/cart-store.spec.ts`)
 
-- Server values only. No optimistic update of a quantity or an amount: the cart changes when an answer arrives (mutation checked: an optimistic quantity fails three tests). Busy lines are disabled instead.
+- Server values only. No optimistic update of a quantity or an amount in the store: the cart changes when an answer arrives (mutation checked: an optimistic quantity fails three tests). The cart page shows the shopper's chosen quantity at once as a per-line DRAFT (display only, `lib/quantity-autosave.ts`, 2026-11-02); prices, totals and stock stay the server's. `setQuantity(..., { reportFailure: false })` keeps a refused quantity out of the shared `failure` (the line shows it).
 - Every answer that holds a cart replaces the state and publishes `fluxkit:cart-changed`: a `200`, and the `cart` inside a `409 cart_changed` (the reason is still shown, in `failure`).
 - Requests are numbered when they START; an answer replaces the state only when its number is higher than the last applied one. A slow older answer (a write whose reply arrives after a newer write's, or a read that started before a write) is dropped and not published; the failure of an older request is not shown either. Tested both with out-of-order and in-order answers.
 - A failed write (`429` with its `Retry-After` wait, network, `5xx`, a refused rule) keeps the previous cart and shows a translated message (`failureText`: the message, plus "Try again in N seconds" for a 429). A failed FIRST read leaves `status: "error"` with a retry. An unexpected exception (a bug) releases the busy mark and is rethrown.
@@ -156,7 +156,8 @@ All personalized pages follow ADR 0026: a server-rendered shell plus client comp
 
 ### Cart page (`/{locale}/cart`, `components/cart-page.tsx`)
 
-- Lines: image (`StoreImage`, the host allow-list comes from the server shell as a prop; any other host shows the placeholder), title linked to the product, option text from the API's `optionValues`, SKU, unit price, line total, quantity form, remove. The quantity is a draft until the shopper presses "Update" (one request per submit, not one per keystroke); a new server quantity resets the draft.
+- Lines: image (`StoreImage`, the host allow-list comes from the server shell as a prop; any other host shows the placeholder), title linked to the product, option text from the API's `optionValues`, SKU, unit price, line total, quantity stepper, remove.
+- **Quantity saves itself (2026-11-02, no "Update" button; `lib/quantity-autosave.ts`, `LineQuantityView`):** a change shows at once and is sent 500 ms after the last change (rapid clicks are one request); one request per line at a time, a change made while it runs is sent after it (no lost update); "Saving..." and `aria-busy` while pending; a refused change restores the server's quantity and shows "The quantity was not changed: <reason>" as an alert on the line; leaving the page sends a waiting change at once. The stepper is disabled only while a whole-cart write runs (the price-change OK). Without a script the stepper does nothing (it was a POST form to the page itself before, which changed nothing either).
 - Notices exactly as the plan says: `price_changed` "was X, now Y" (a price seen in ANOTHER currency is formatted with that currency's own digits, not the shop's), `unavailable` (no price, no quantity box, remove), `out_of_stock` (badge plus a hint that the order may be refused), `line_total_out_of_range` ("lower the quantity"; the quantity box stays because lowering it is the repair).
 - Cart-level banner "prices changed" with OK = `POST /store/cart/acknowledge` (disabled while a whole-cart write runs).
 - Summary: item count, subtotal and total through `formatMoney` from the API values; nothing is added or multiplied (mutation checked: a subtotal summed from lines fails two tests). `lineTotal` is shown as the API gives it.
@@ -376,11 +377,28 @@ Plan: `docs/plans/2026-10-29-search.md` (section 9, step 10a), ADR 0034, 0036 an
 - **Found while testing (fixed since by ADR 0037).** `GET /store/search?q=screw` used to return nothing for the seeded "Demo Screwdriver" while the suggestions offered it; the second pass now matches the last word as a prefix.
 - **Not verified (catalog pages).** The engine-down (`503`) fallback in a browser: the e2e reaches the same fallback through a used-up window (`429`); `503` and an unreachable API are covered by `catalog-search-data.spec.ts` and `catalog-page.spec.tsx`. More than 24 products per category (paging through search is tested on the markup).
 
+## Header, account menu and UI polish (2026-11-02)
+
+Plan `docs/plans/2026-11-02-storefront-ui-polish.md` (owner decisions there).
+
+- **Header** (`components/site-header.tsx`): one row of controls in both languages at 1280, 1024 and 390 px (checked in a browser): the Menu dropdown (below `xl`), the logo, the category links (from `xl`; a row that scrolls instead of wrapping), the search box (in the row from `lg`, `min-w-72`; a full-width row below `lg`, so its placeholder is never cut), then the language, cart and account controls.
+- **Dropdowns** (`components/header-menu.tsx`, `HeaderDisclosure`): a native `<details>`; the `summary` has `role="button"`, `aria-expanded` and a translated name, so they open and close before hydration too; `useDismiss` closes them on Escape (focus back to the summary), on a pointer or focus outside, and after a navigation. Panels hold plain links and buttons in DOM order.
+- **Language** (`locale-switcher.tsx`): flag, short name and a chevron; the panel lists each language with its flag and its own name. Flags are decorative CSS backgrounds (`public/flags/*.svg`, `.fk-flag-*` in `app/globals.css`, chosen per locale in `src/config/locale-flags.ts`): flag colours are content, not theme tokens, and stay out of component class strings (`<img>` is reserved for `StoreImage`).
+- **Cart** (`cart-badge.tsx`): an icon (`components/icons.tsx`, stroke `currentColor`); the count badge (`bg-danger text-danger-foreground`, "99+" above 99) only above 0; the link's name is "Cart" plus the count in words in a polite live region.
+- **Account** (`account-link.tsx`): an icon with a menu; guest: Sign in, Register; customer: `accountLinks` (`layout/navigation.ts`) and Sign out (`use-logout.ts`, shared with the overview; the item that needs the router is rendered only for a signed-in customer).
+- **Account pages** (`account-nav.tsx`): `AccountGate` puts `AccountNav` beside every signed-in page: a vertical side menu from `lg`, a scrolling tab row below it, links with `aria-current="page"` (`currentAccountLink`); "Your data" is labelled "Privacy and data" (route and behaviour unchanged). The overview keeps "Edit profile" and "Sign out"; the orders and data links live in the menu.
+- **Filters** (`search-island.tsx`, `lib/filter-draft.ts`): changing a control shows a floating "Apply filters" button next to its row (to the right of the panel from `lg`) while the form differs from the rendered page (the browser's `defaultChecked`/`defaultValue`); a polite status says changes wait; the bottom button stays the keyboard path (the floating copy is `aria-hidden`, `tabindex=-1`); the form is `aria-busy` while results load.
+- **Availability filter:** `inStock` is variant-level (`docs/api/search.md`, ADR 0034 decision 4): `inStock:false` lists every product with an out-of-stock variant (the demo T-shirt's red L). The values read "Has options in stock" / "Has options out of stock", and with `inStock:false` a card that is not out of stock says "Some options are out of stock" (`outOfStockOptionsNote`).
+- **Phone** (`lib/phone.ts`, `libphonenumber-js/min`): national format while typing (only when the text grew at its end), length and country checked with the blank fields (`mergeFieldFailures`), E.164 sent; default country `checkoutConfig.phoneDefaultCountry` (`UA`). The API's own rule is unchanged.
+- **Skeletons:** the audit table is in the plan; the cart lines and the order list have skeletons shaped like their content. The `(catalog)` routes still have no `loading.tsx` (real 404s, see "Rendering and caching").
+- **Bundle (`next build`, `.next/diagnostics/route-bundle-stats.json`):** the phone code is one chunk on `/[locale]/checkout` only: 183,451 bytes uncompressed (43.5 KB gzip; mostly the "min" metadata). Checkout first-load JS 711,950 bytes (201.0 KB gzip); other routes do not load it (`/[locale]` 531,575, 158.5 KB gzip; `/[locale]/cart` 545,275, 162.3 KB gzip). A smaller build is possible with custom metadata for the shop's countries (`libphonenumber-js` metadata generation), not done.
+- **Not verified:** a screen reader; Safari and Firefox (details/summary with `role="button"`); reflow at 320 px.
+
 ## Accessibility baseline (what was checked)
 
 By tests (`components/shell.spec.tsx`, markup assertions) and by `curl` of the running app:
 
-- Landmarks: one `header`, `main` and `footer`; three `nav`s (main, locale switcher, footer), each with a translated `aria-label`. `<html lang>` is the route's locale; the locale links carry `lang` and `hrefLang`; the current locale has `aria-current`.
+- Landmarks: one `header`, `main` and `footer`; `nav`s for main (twice in the markup: inside the Menu dropdown below `xl` and inline from `xl`; one is always `display: none`), the locale switcher and the footer, each with a translated `aria-label`; the account pages add "Account sections". `<html lang>` is the route's locale; the locale links carry `lang` and `hrefLang`; the current locale has `aria-current`.
 - Skip link: the first element in `<body>`, `href="#main-content"`; `<main id="main-content" tabindex="-1">` receives the focus when the link is followed. It is visible only while focused (classes of the `@fluxkit/ui` component).
 - Focus: visible keyboard focus comes from the `ring` token (`focus-visible:outline-ring` on every link and button class in `components/styles.ts` and `@fluxkit/ui`). Contrast of the documented token pairs is a theme test (step 4a).
 - Headings: one `h1` per page; the home outline is h1, h2, h3 without skips (tested). The error and not-found views have their own `h1`.
@@ -418,7 +436,6 @@ NOT checked (no browser or screen reader here): a real keyboard walk, focus orde
 ## Known limits and TODOs
 
 - `TODO(fluxkit)` the product page shows the product-level attributes only; the attributes of the selected variant (`variant.attributes`) are not shown.
-- `TODO(fluxkit)` the header has no link to the order history; it is reached from the account overview (the header's account link is one slot; a menu is a later design decision).
 - `TODO(fluxkit)` the delivery step has no recipient name for a pickup point other than the order's contact, and the pickers have no map; a shop that needs either adds them to `components/delivery-section.tsx`.
 - `TODO(fluxkit)` no billing address and no recipient fields at checkout (decision below); a shop that needs them adds them to `lib/checkout-form.ts` and `config/checkout.ts`.
 - `TODO(fluxkit)` the checkout form is not kept across a reload (on purpose: no personal data in browser storage); only the attempt (key, salt and hash) survives a reload of the tab.

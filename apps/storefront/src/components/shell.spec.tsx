@@ -238,8 +238,8 @@ describe("header islands", () => {
       /<details[^>]*><summary role="button" aria-expanded="false" aria-label="§locale\.switcher\.current"/,
     );
     expect(html).toContain("§locale.short.uk");
-    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-ua"><\/span>/);
-    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-gb"><\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-ua rounded-sm ring-1 ring-border"><\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-gb rounded-sm ring-1 ring-border"><\/span>/);
     expect(html).toMatch(/<span lang="uk" aria-current="true"/);
     expect(html).toContain('href="/en/catalog?page=2"');
     expect(html).toContain('hrefLang="en"');
