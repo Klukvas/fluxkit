@@ -106,7 +106,7 @@ describe("catalog seed data", () => {
       expectBothLocales(product.title, product.slug);
       expectBothLocales(product.description, product.slug);
       for (const item of product.media) {
-        expectBothLocales(item.alt, `${product.slug} ${item.url}`);
+        expectBothLocales(item.alt, `${product.slug} ${item.file}`);
       }
     }
   });
@@ -149,12 +149,13 @@ describe("catalog seed data", () => {
         }
       }
       for (const item of product.media) {
-        expect(item.url).toMatch(/^https:\/\/example\.com\/placeholder\/[a-z0-9-]+\.jpg$/);
+        // A file of seeds/assets (drawn by scripts/generate-demo-images.mjs); the runner uploads it through the media service.
+        expect(item.file).toMatch(/^[a-z0-9-]+\.webp$/);
         if (item.optionValue !== undefined) {
           const chosen = product.options.find(
             (selection) => selection.optionCode === item.optionValue?.optionCode,
           );
-          expect(chosen?.valueCodes, `${product.slug} ${item.url}`).toContain(
+          expect(chosen?.valueCodes, `${product.slug} ${item.file}`).toContain(
             item.optionValue.valueCode,
           );
         }
@@ -345,7 +346,14 @@ describe("catalog seed data", () => {
 
   it("does not look like client data", () => {
     const text = JSON.stringify(catalogSeed);
-    const hosts = text.match(/https?:\/\/[^/"]+/g) ?? [];
-    expect(new Set(hosts)).toEqual(new Set(["https://example.com"]));
+    // No URL at all: images are local files (seeds/assets), so no host can leak into the template.
+    expect(text.match(/https?:\/\/[^/"]+/g) ?? []).toEqual([]);
+  });
+
+  it("names each image file once per product, so every media entry gets its own upload", () => {
+    for (const product of products) {
+      const files = product.media.map((item) => item.file);
+      expect(new Set(files).size, product.slug).toBe(files.length);
+    }
   });
 });

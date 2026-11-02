@@ -125,8 +125,13 @@ export default function config(phase: string): NextConfig {
     API_INTERNAL_URL: "http://127.0.0.1",
     STOREFRONT_IMAGE_HOSTS: process.env.STOREFRONT_IMAGE_HOSTS,
   });
+  const development = phase === PHASE_DEVELOPMENT_SERVER;
   return {
     reactStrictMode: true,
+    // DEVELOPMENT ONLY (owner decision 2026-11-01, option a of docs/plans/2026-11-01-demo-images-local-run.md): the API's
+    // media prefix, inlined for `next dev` so pages render local uploads as `/media/<key>` (rewritten below). Never set for
+    // a production build or server; `lib/image-source.ts` also ignores it unless NODE_ENV is development.
+    ...(development ? developmentMediaEnv() : {}),
     // `next start` evaluates this file again, so the optimizer allows the hosts of the variable as the server STARTS; the
     // pages read the same variable (`lib/image-hosts.server.ts`) and so agree with it. The CSP below keeps the build value.
     images: {
@@ -142,9 +147,44 @@ export default function config(phase: string): NextConfig {
       if (phase !== PHASE_DEVELOPMENT_SERVER) return [];
       // Throws (no fallback) when API_INTERNAL_URL is missing or malformed, so `next dev` stops instead of proxying nowhere.
       const { apiInternalUrl } = loadStorefrontEnv(process.env);
-      return [{ source: "/store/:path*", destination: `${apiInternalUrl}/store/:path*` }];
+      return [
+        { source: "/store/:path*", destination: `${apiInternalUrl}/store/:path*` },
+        // Uploaded images of the local API (development only, see `env` above).
+        { source: "/media/:path*", destination: `${apiInternalUrl}/media/:path*` },
+      ];
     },
   };
+}
+
+/**
+ * The API's media prefix for `next dev`: `MEDIA_PUBLIC_BASE_URL` (the same root `.env` as the API) or, unset, the API's
+ * own development default `API_INTERNAL_URL` + `/media`. A malformed `MEDIA_PUBLIC_BASE_URL` stops the dev server without
+ * repeating it. Without a valid `API_INTERNAL_URL` there is no prefix here: the `/store` rewrite stops the dev server
+ * with that variable's own error.
+ */
+function developmentMediaEnv(): { env?: Record<string, string> } {
+  const base = developmentMediaBaseUrl();
+  return base === undefined ? {} : { env: { FLUXKIT_DEV_MEDIA_BASE_URL: base } };
+}
+
+function developmentMediaBaseUrl(): string | undefined {
+  const configured = process.env.MEDIA_PUBLIC_BASE_URL;
+  if (configured !== undefined && configured !== "") {
+    let url: URL | undefined;
+    try {
+      url = new URL(configured);
+    } catch {
+      url = undefined;
+    }
+    if (url === undefined || (url.protocol !== "http:" && url.protocol !== "https:")) {
+      throw new Error("MEDIA_PUBLIC_BASE_URL must be an absolute http(s) URL (see .env.example).");
+    }
+    return configured.replace(/\/+$/, "");
+  }
+  const internal = process.env.API_INTERNAL_URL;
+  if (internal === undefined || internal === "") return undefined;
+  const { apiInternalUrl } = loadStorefrontEnv(process.env);
+  return `${apiInternalUrl}/media`;
 }
 
 /**

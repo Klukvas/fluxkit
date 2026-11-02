@@ -140,7 +140,7 @@ export interface CreateAppOptions {
  * The media configuration of an environment. A caller without `MEDIA_STORAGE_DRIVER` (tests, the OpenAPI export, the
  * commands) gets uploads switched off and needs no directory; the API passes the values of `loadEnv`.
  */
-function mediaConfigOf(env: CreateAppEnv, tuning: Partial<MediaTuning> = {}): MediaConfig {
+export function mediaConfigOf(env: CreateAppEnv, tuning: Partial<MediaTuning> = {}): MediaConfig {
   if (env.mediaStorageDriver === undefined) {
     return DISABLED_MEDIA_CONFIG;
   }

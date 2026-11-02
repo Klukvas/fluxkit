@@ -28,6 +28,10 @@ export const NOT_IN_ENV_EXAMPLE = new Map([
   ],
   ["CI", "set by the CI runner; switches tooling behaviour only"],
   [
+    "FLUXKIT_DEV_MEDIA_BASE_URL",
+    "set only by apps/storefront/next.config.ts for `next dev` (from MEDIA_PUBLIC_BASE_URL or API_INTERNAL_URL), never by the shop's .env; docs/contracts/config.md",
+  ],
+  [
     "DRIZZLE_KIT_OUT",
     "set only by scripts/check-schema-drift.sh for a temporary drizzle-kit output directory",
   ],

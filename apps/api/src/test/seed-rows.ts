@@ -11,6 +11,12 @@ export async function removeSeedRows(pool: pg.Pool): Promise<void> {
   const demoSynonymTerms = catalogSeed.synonymGroups.flatMap((group) => [...group.terms]);
   const productSlugs = products.map((product) => product.slug);
   const where = "product_id in (select id from product where slug = any($1))";
+  // The seed's own uploads (no admin) that the demo products name; the files stay in the spec's temp media directory.
+  await pool.query(
+    `delete from media_upload where created_by is null and storage_key in
+       (select substring(url from '[0-9a-f]{32}\\.(?:jpg|png|webp)$') from media where ${where})`,
+    [productSlugs],
+  );
   await pool.query(`delete from media where ${where}`, [productSlugs]);
   await pool.query(`delete from variant where ${where}`, [productSlugs]);
   await pool.query("delete from product where slug = any($1)", [productSlugs]);

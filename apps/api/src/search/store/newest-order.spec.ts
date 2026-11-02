@@ -84,7 +84,11 @@ describe("newest first through search equals the SQL listing (real Postgres, rea
   beforeAll(async () => {
     await ensureMigrated();
     await removeSeedRows(pool);
-    await runSeedCommand([], { DATABASE_URL: requireTestDatabaseUrl() });
+    // No images: this spec reads the order of the list only, and uploads would write into the default MEDIA_DIR.
+    await runSeedCommand([], {
+      DATABASE_URL: requireTestDatabaseUrl(),
+      MEDIA_STORAGE_DRIVER: "none",
+    });
     world = await SearchWorld.create("neworder");
     await pool.query("delete from search_index_state");
     app = await startApp({
