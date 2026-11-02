@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -15,6 +19,7 @@ import { http } from "../test/http.js";
 import { ensureMigrated } from "../test/migrate.js";
 import { removeSeedRows as removeSeedRowsOf } from "../test/seed-rows.js";
 import { testShippingProviders } from "../test/test-shipping-provider.js";
+import { filesUnder, TEST_MEDIA_BASE_URL } from "../test/media-app.js";
 import type { ProductDetailResponse } from "../catalog/admin/products/products.schemas.js";
 import type { InventoryResponse, MovementResponse } from "../inventory/admin/inventory.schemas.js";
 import type {
@@ -23,7 +28,7 @@ import type {
   StoreProductDetail,
   StoreProductListItem,
 } from "../catalog/store/store.schemas.js";
-import { SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
+import { DEFAULT_SEED_ASSETS_DIR, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
 import {
   ALLOW_PRODUCTION_FLAG,
   assertSeedAllowed,
@@ -130,9 +135,28 @@ function expectedCounts(): Record<(typeof SEED_ENTITY_KINDS)[number], number> {
   };
 }
 
+/** Every media entry of the demo seed: one upload each. */
+const mediaCount = products.reduce((sum, product) => sum + product.media.length, 0);
+
+/** The storage key at the end of an uploaded image's URL (`<base>/<32 hex>.<ext>`), or `undefined`. */
+function keyOf(url: string): string | undefined {
+  const prefix = `${TEST_MEDIA_BASE_URL}/`;
+  if (!url.startsWith(prefix)) {
+    return undefined;
+  }
+  const key = url.slice(prefix.length);
+  return /^[0-9a-f]{32}\.(jpg|png|webp)$/.test(key) ? key : undefined;
+}
+
 describe("catalog seed (real app, real Postgres)", () => {
   const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
-  const env = { DATABASE_URL: requireTestDatabaseUrl() };
+  // The local media driver in a fresh temp directory (set in beforeAll): the seed uploads its images there.
+  const env: Record<string, string> = {
+    DATABASE_URL: requireTestDatabaseUrl(),
+    MEDIA_STORAGE_DRIVER: "local",
+    MEDIA_PUBLIC_BASE_URL: TEST_MEDIA_BASE_URL,
+  };
+  let mediaDir: string;
   let running: RunningApp;
   let firstRun: SeedSummary;
 
@@ -174,18 +198,87 @@ describe("catalog seed (real app, real Postgres)", () => {
     return result.rows;
   }
 
+  /** The demo products' media rows: url and the upload row it names (left join: `null` for a foreign URL). */
+  async function demoMediaRows(): Promise<
+    {
+      url: string;
+      storage_key: string | null;
+      first_attached_at: Date | null;
+      created_by: string | null;
+      content_type: string | null;
+    }[]
+  > {
+    const result = await pool.query(
+      `select m.url, u.storage_key, u.first_attached_at, u.created_by, u.content_type
+         from media m join product p on p.id = m.product_id
+         left join media_upload u on m.url = $2 || '/' || u.storage_key
+        where p.slug = any($1)`,
+      [products.map((product) => product.slug), TEST_MEDIA_BASE_URL],
+    );
+    return result.rows;
+  }
+
   beforeAll(async () => {
     await ensureMigrated();
+    mediaDir = await mkdtemp(join(tmpdir(), "fluxkit-seed-spec-"));
+    env["MEDIA_DIR"] = mediaDir;
     // A crashed earlier run must not leave rows that make the "created" counts lie.
     await removeSeedRows();
     firstRun = await runSeedCommand([], env);
-    running = await startApp();
+    running = await startApp({
+      mediaStorageDriver: "local",
+      mediaDir,
+      mediaPublicBaseUrl: TEST_MEDIA_BASE_URL,
+    });
   });
 
   afterAll(async () => {
     await running?.app.close();
     await removeSeedRows();
     await pool.end();
+    if (mediaDir !== undefined) {
+      await rm(mediaDir, { recursive: true, force: true });
+    }
+  });
+
+  it("every image file the demo seed names exists in seeds/assets", () => {
+    for (const product of products) {
+      for (const item of product.media) {
+        expect(existsSync(join(DEFAULT_SEED_ASSETS_DIR, item.file)), item.file).toBe(true);
+      }
+    }
+  });
+
+  it("uploads every demo image through the media service and attaches it to its product", async () => {
+    expect(firstRun.images).toEqual({ uploadsEnabled: true, uploaded: mediaCount });
+    expect(formatSummary(firstRun)).toContain(
+      `images        uploaded ${String(mediaCount).padStart(3)}`,
+    );
+    const rows = await demoMediaRows();
+    expect(rows).toHaveLength(mediaCount);
+    for (const row of rows) {
+      // Our own prefix and a key the service chose (random, re-encoded WebP), never the seed's file name.
+      expect(keyOf(row.url), row.url).toBe(row.storage_key);
+      expect(row.content_type).toBe("image/webp");
+      // Marked like a save of PUT /admin/products/{id}/media; a system upload has no admin.
+      expect(row.first_attached_at).not.toBeNull();
+      expect(row.created_by).toBeNull();
+    }
+    expect(new Set(rows.map((row) => row.storage_key)).size).toBe(mediaCount);
+    expect(await filesUnder(mediaDir)).toHaveLength(mediaCount);
+    // The read route serves them.
+    const [first] = rows;
+    const served = await fetch(`${running.baseUrl}/media/${first?.storage_key ?? ""}`);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-type")).toBe("image/webp");
+    // The colour ties of the seed survive (the T-shirt has gallery and colour images).
+    const tShirt = await http<StoreProductDetail>(
+      running.baseUrl,
+      "GET",
+      "/store/products/demo-t-shirt",
+    );
+    expect(tShirt.body.media).toHaveLength(3);
+    expect(tShirt.body.media.filter((item) => item.optionValueId !== null)).toHaveLength(2);
   });
 
   it("creates the whole demo catalog on an empty database", () => {
@@ -271,9 +364,9 @@ describe("catalog seed (real app, real Postgres)", () => {
         expect(
           result.body.items.every((item) => item.brand?.name === brands[0]?.name[locale]),
         ).toBe(true);
-        expect(
-          result.body.items.every((item) => item.image?.url.startsWith("https://example.com/")),
-        ).toBe(true);
+        expect(result.body.items.every((item) => keyOf(item.image?.url ?? "") !== undefined)).toBe(
+          true,
+        );
       }
     });
 
@@ -570,10 +663,14 @@ describe("catalog seed (real app, real Postgres)", () => {
         stock_movement: await seedRowCount("stock_movement"),
       });
       const rowsBefore = await demoRows();
+      const filesBefore = await filesUnder(mediaDir);
       const second = await runSeedCommand([], env);
       const after = await tableCounts();
 
+      // `media_upload` included: no image is uploaded twice, and no file is added to the media directory.
       expect(after).toEqual(before);
+      expect(await filesUnder(mediaDir)).toEqual(filesBefore);
+      expect(second.images).toEqual({ uploadsEnabled: true, uploaded: 0 });
       // Named explicitly: a second run adds no price, no level and no journal row for the demo variants.
       expect(rowsBefore.price).toBeGreaterThan(0);
       expect(rowsBefore.inventory_level).toBeGreaterThan(0);
@@ -779,6 +876,28 @@ describe("catalog seed (real app, real Postgres)", () => {
       );
     });
 
+    it("fails on an image file that does not exist before it creates anything", async () => {
+      const [template] = products;
+      if (template === undefined) {
+        throw new Error("The demo seed has no products.");
+      }
+      const before = await tableCounts();
+      const broken = {
+        ...catalogSeed,
+        products: [
+          {
+            ...template,
+            slug: "demo-missing-image",
+            media: [{ file: "no-such-image.webp", alt: { uk: "Немає", en: "Missing" } }],
+          },
+        ],
+      };
+      await expect(runSeedCommand([], env, { seed: broken })).rejects.toThrow(
+        /no-such-image\.webp/,
+      );
+      expect(await tableCounts()).toEqual(before);
+    });
+
     it("does not invent a default for a missing DATABASE_URL", async () => {
       await expect(runSeedCommand([], {})).rejects.toThrow(/DATABASE_URL/);
     });
@@ -848,6 +967,32 @@ describe("catalog seed (real app, real Postgres)", () => {
         /Refusing to seed/,
       );
       expect(await tableCounts()).toEqual(before);
+    });
+  });
+
+  // Last: it removes the demo catalog the tests above read and seeds it again without images.
+  describe("uploads switched off (MEDIA_STORAGE_DRIVER=none)", () => {
+    it("creates the products without images, uploads nothing and says why", async () => {
+      await removeSeedRows();
+      const uploadsBefore = await pool.query<{ count: number }>(
+        "select count(*)::int as count from media_upload",
+      );
+      const filesBefore = await filesUnder(mediaDir);
+      const summary = await runSeedCommand([], {
+        DATABASE_URL: requireTestDatabaseUrl(),
+        MEDIA_STORAGE_DRIVER: "none",
+      });
+      expect(summary.created.products).toBe(products.length);
+      expect(summary.images).toEqual({ uploadsEnabled: false, uploaded: 0 });
+      expect(formatSummary(summary)).toContain(
+        "images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images)",
+      );
+      expect(await demoMediaRows()).toEqual([]);
+      const uploadsAfter = await pool.query<{ count: number }>(
+        "select count(*)::int as count from media_upload",
+      );
+      expect(uploadsAfter.rows).toEqual(uploadsBefore.rows);
+      expect(await filesUnder(mediaDir)).toEqual(filesBefore);
     });
   });
 });

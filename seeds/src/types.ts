@@ -67,8 +67,11 @@ export interface SeedProductOption {
 }
 
 export interface SeedMedia {
-  /** Always `https://example.com/placeholder/<name>.jpg`. */
-  url: string;
+  /**
+   * A file name in `seeds/assets/` (`<name>.webp`, drawn by `scripts/generate-demo-images.mjs`). The runner uploads it
+   * through the media service (re-encoded, random key) and saves the URL the upload answered; the data names no URL.
+   */
+  file: string;
   alt: I18nText;
   /** Ties the image to one option value (for example one color); omit for a gallery image. */
   optionValue?: { optionCode: string; valueCode: string };

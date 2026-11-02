@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { INestApplicationContext } from "@nestjs/common";
 import { eq } from "drizzle-orm";
 import type {
@@ -42,6 +45,8 @@ import { PricesService } from "../catalog/admin/prices/prices.service.js";
 import { putProductPricesSchema } from "../catalog/admin/prices/prices.schemas.js";
 import { adjustmentSchema } from "../inventory/admin/inventory.schemas.js";
 import { PRICING_CONFIG, type PricingConfig } from "../common/pricing-config.js";
+import { MEDIA_CONFIG, type MediaConfig } from "../media/media-config.js";
+import { MediaUploadService } from "../media/media-upload.service.js";
 import {
   SEARCH_PORT,
   SEARCH_SYNONYM_SEEDER,
@@ -66,6 +71,19 @@ import {
 import { createShippingMethodSchema } from "../shipping/admin/shipping-methods.schemas.js";
 import { ShippingMethodsService } from "../shipping/admin/shipping-methods.service.js";
 import { ShippingProviderRegistry } from "../shipping/registry/index.js";
+
+/**
+ * Where the image files of the seed data live: `<repo>/seeds/assets` (committed; drawn by
+ * `scripts/generate-demo-images.mjs`). Resolved from this file, which sits at the same depth in `src/` and `dist/`.
+ */
+export const DEFAULT_SEED_ASSETS_DIR = fileURLToPath(
+  new URL("../../../../seeds/assets", import.meta.url),
+);
+
+/** Uploads one image file of the seed and answers the URL the media service stored it under. */
+export interface SeedImageUploader {
+  upload(bytes: Uint8Array): Promise<string>;
+}
 
 /** The demo stock is received at the default location (the `main` location of the migration). */
 const STOCK_REASON = "Demo seed";
@@ -99,6 +117,14 @@ export interface SeedSummary {
     existing: number;
     /** Locales of demo groups the shop does not serve (`LOCALES`), each once. */
     skippedLocales: string[];
+  };
+  /**
+   * Product images, uploaded through the media service (ADR 0028) for the products this run created. With
+   * `MEDIA_STORAGE_DRIVER=none` nothing is uploaded and those products get no images.
+   */
+  images: {
+    uploadsEnabled: boolean;
+    uploaded: number;
   };
 }
 
@@ -140,6 +166,7 @@ export class CatalogSeeder {
     variantsCreated: 0,
     skippedShippingMethods: [],
     synonymGroups: { searchEnabled: false, created: 0, existing: 0, skippedLocales: [] },
+    images: { uploadsEnabled: false, uploaded: 0 },
   };
   private readonly attributeIds = new Map<string, string>();
   private readonly optionIds = new Map<string, string>();
@@ -166,9 +193,17 @@ export class CatalogSeeder {
     private readonly shippingProviders: ShippingProviderRegistry,
     /** `null` with search off: the demo synonym groups are then not written at all. */
     private readonly synonyms: SearchSynonymSeeder | null,
-  ) {}
+    /** `null` with `MEDIA_STORAGE_DRIVER=none`: products are then created without images. */
+    private readonly images: SeedImageUploader | null,
+    private readonly assetsDir: string,
+  ) {
+    this.summary.images.uploadsEnabled = images !== null;
+  }
 
-  static fromContext(app: INestApplicationContext): CatalogSeeder {
+  static fromContext(
+    app: INestApplicationContext,
+    assetsDir: string = DEFAULT_SEED_ASSETS_DIR,
+  ): CatalogSeeder {
     // The services are not exported by their modules; `strict: false` finds them anywhere in the container.
     const get = <T>(token: new (...args: never[]) => T): T => app.get(token, { strict: false });
     // The search module provides the synonym writer only with search on; the port says which (no import of src/search/).
@@ -176,6 +211,13 @@ export class CatalogSeeder {
     const synonyms = search.enabled
       ? app.get<SearchSynonymSeeder>(SEARCH_SYNONYM_SEEDER, { strict: false })
       : null;
+    // The same upload service as POST /admin/media/uploads (gate, re-encode, random key, `media_upload` row).
+    const media = app.get<MediaConfig>(MEDIA_CONFIG, { strict: false });
+    const uploads = get(MediaUploadService);
+    const images: SeedImageUploader | null =
+      media.driver === "none"
+        ? null
+        : { upload: async (bytes) => (await uploads.storeSystemImage(bytes)).url };
     return new CatalogSeeder(
       app.get<Database>(DRIZZLE, { strict: false }),
       get(AttributesService),
@@ -192,6 +234,8 @@ export class CatalogSeeder {
       get(ShippingMethodsService),
       get(ShippingProviderRegistry),
       synonyms,
+      images,
+      assetsDir,
     );
   }
 
@@ -465,6 +509,11 @@ export class CatalogSeeder {
       this.summary.existing.products += 1;
       return;
     }
+    // Read before anything is written, so a missing file stops the run without a half-built product.
+    const imageBytes =
+      this.images === null
+        ? []
+        : await Promise.all(definition.media.map((item) => this.readImage(item.file)));
     const created = await this.products.create(
       parse(createProductSchema, {
         productTypeId: this.lookup(this.productTypeIds, definition.productTypeCode, "product type"),
@@ -510,11 +559,17 @@ export class CatalogSeeder {
       }),
     );
 
+    // Uploaded after the product exists (invalid product data fails first and uploads nothing). Saved through the rules
+    // of PUT /admin/products/{id}/media, which marks each upload attached (ADR 0028 decision 5).
+    const media =
+      this.images === null
+        ? []
+        : await this.uploadImages(definition.media, imageBytes, this.images);
     await this.products.putMedia(
       productId,
       parse(putProductMediaSchema, {
-        media: definition.media.map((item) => ({
-          url: item.url,
+        media: media.map(({ item, url }) => ({
+          url,
           alt: item.alt,
           ...(item.optionValue === undefined
             ? {}
@@ -587,6 +642,35 @@ export class CatalogSeeder {
     const published = await this.products.transition(productId, "publish");
     this.summary.variantsCreated += published.variants.length;
     this.summary.created.products += 1;
+  }
+
+  private async readImage(file: string): Promise<Uint8Array> {
+    try {
+      return await readFile(join(this.assetsDir, file));
+    } catch (error) {
+      throw new Error(
+        `Seed image "${file}" could not be read from ${this.assetsDir} (run node scripts/generate-demo-images.mjs).`,
+        { cause: error },
+      );
+    }
+  }
+
+  /** One upload per media entry, in order (the media service processes at most two at once anyway). */
+  private async uploadImages(
+    items: SeedProduct["media"],
+    bytes: readonly Uint8Array[],
+    uploader: SeedImageUploader,
+  ): Promise<{ item: SeedProduct["media"][number]; url: string }[]> {
+    const uploaded: { item: SeedProduct["media"][number]; url: string }[] = [];
+    for (const [index, item] of items.entries()) {
+      const data = bytes[index];
+      if (data === undefined) {
+        throw new Error(`Seed image "${item.file}" was not read.`);
+      }
+      uploaded.push({ item, url: await uploader.upload(data) });
+      this.summary.images.uploaded += 1;
+    }
+    return uploaded;
   }
 
   private lookupCommerce(

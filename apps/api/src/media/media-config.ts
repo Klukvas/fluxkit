@@ -38,9 +38,10 @@ export const DEFAULT_MEDIA_TUNING: Readonly<MediaTuning> = Object.freeze({
 });
 
 /**
- * Uploads off for a caller that builds the application without an environment (tests, the OpenAPI export, the seed and
- * admin commands): none of them may need or touch a media directory. The API process passes the `MEDIA_*` values, whose
- * default outside production is the local driver.
+ * Uploads off for a caller that builds the application without an environment (tests, the OpenAPI export, the admin
+ * commands): none of them may need or touch a media directory. The API process, `pnpm seed` (it uploads the demo images),
+ * `pnpm jobs:run-once` and `pnpm search:reindex` pass the `MEDIA_*` values, whose default outside production is the local
+ * driver.
  */
 export const DISABLED_MEDIA_CONFIG: Readonly<MediaConfig> = Object.freeze({
   driver: "none",

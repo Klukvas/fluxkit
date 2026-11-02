@@ -28,10 +28,11 @@ async function rewritesFor(phase: string) {
 }
 
 describe("next.config store rewrite", () => {
-  it("proxies /store/* to the API in the development server only", async () => {
+  it("proxies /store/* and /media/* to the API in the development server only", async () => {
     vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000/");
     expect(await rewritesFor(PHASE_DEVELOPMENT_SERVER)).toEqual([
       { source: "/store/:path*", destination: "http://127.0.0.1:3000/store/:path*" },
+      { source: "/media/:path*", destination: "http://127.0.0.1:3000/media/:path*" },
     ]);
   });
 
@@ -178,6 +179,47 @@ describe("next.config images", () => {
     expect(resolved.images?.remotePatterns).toEqual([
       { protocol: "https", hostname: "cdn.example.com" },
     ]);
+  });
+});
+
+// Owner decision 2026-11-01 (plan docs/plans/2026-11-01-demo-images-local-run.md, option a): local product images in
+// `next dev` only. A production build or server must keep the policy of ADR 0028 / owner answer 7 exactly.
+describe("next.config development media rule", () => {
+  const productionPhases = [PHASE_PRODUCTION_BUILD, PHASE_PRODUCTION_SERVER];
+
+  it("gives the dev server the API's media prefix: MEDIA_PUBLIC_BASE_URL, else API_INTERNAL_URL + /media", () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
+    vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "");
+    expect(config(PHASE_DEVELOPMENT_SERVER).env).toEqual({
+      FLUXKIT_DEV_MEDIA_BASE_URL: "http://127.0.0.1:3000/media",
+    });
+    vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "http://127.0.0.1:4000/media");
+    expect(config(PHASE_DEVELOPMENT_SERVER).env).toEqual({
+      FLUXKIT_DEV_MEDIA_BASE_URL: "http://127.0.0.1:4000/media",
+    });
+  });
+
+  it("fails loudly in development on a malformed MEDIA_PUBLIC_BASE_URL, without echoing it", () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
+    vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "not a url secret-value");
+    expect(() => config(PHASE_DEVELOPMENT_SERVER)).toThrow(/MEDIA_PUBLIC_BASE_URL/);
+    expect(() => config(PHASE_DEVELOPMENT_SERVER)).not.toThrow(/secret-value/);
+  });
+
+  it("is absent from a production build and a production server, whatever the environment says", async () => {
+    vi.stubEnv("API_INTERNAL_URL", "http://127.0.0.1:3000");
+    vi.stubEnv("MEDIA_PUBLIC_BASE_URL", "http://127.0.0.1:3000/media");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("STOREFRONT_IMAGE_HOSTS", "cdn.example.com");
+    for (const phase of productionPhases) {
+      const resolved = config(phase);
+      expect(resolved.env ?? {}, phase).toEqual({});
+      expect(await rewritesFor(phase), phase).toEqual([]);
+      // Exactly today's image policy: https on the listed hosts, nothing local or plain http.
+      expect(resolved.images, phase).toEqual({
+        remotePatterns: [{ protocol: "https", hostname: "cdn.example.com" }],
+      });
+    }
   });
 });
 

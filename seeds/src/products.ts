@@ -1,7 +1,8 @@
 import type { I18nText } from "@fluxkit/core";
 import type { SeedMedia, SeedProduct, SeedVariantCommerce } from "./types.js";
 
-// Demo products. Every title, text and image is a placeholder; there are no real products, brands or domains.
+// Demo products. Every title, text and image is a placeholder; there are no real products, brands or domains. Images are
+// drawn illustrations in `seeds/assets/` (scripts/generate-demo-images.mjs).
 
 /** Marker that tests and docs use to find the internal demo values: it must never appear in a public response. */
 export const INTERNAL_SUPPLIER_MARKER = "DEMO-INTERNAL-SUPPLIER";
@@ -10,7 +11,7 @@ const BRAND_SLUG = "demo-brand";
 
 function image(name: string, alt: I18nText, color?: string): SeedMedia {
   return {
-    url: `https://example.com/placeholder/${name}.jpg`,
+    file: `${name}.webp`,
     alt,
     ...(color === undefined ? {} : { optionValue: { optionCode: "color", valueCode: color } }),
   };

@@ -2,6 +2,8 @@ import { NestFactory } from "@nestjs/core";
 import { loadEnv } from "@fluxkit/config";
 import { catalogSeed, type CatalogSeed } from "@fluxkit/seeds";
 import { AppModule } from "../app.module.js";
+import { mediaConfigOf } from "../app.factory.js";
+import { prepareDefaultMediaDirectory } from "../media/media-directory.js";
 import { toPricingConfig } from "../common/pricing-config.js";
 import { ProblemException } from "../common/problem.js";
 import {
@@ -75,7 +77,15 @@ export function formatSummary(summary: SeedSummary): string {
           `  skipped (provider not loaded, SHIPPING_PROVIDERS_ENABLED): ${summary.skippedShippingMethods.join(", ")}`,
         ]),
     ...synonymLines(summary.synonymGroups),
+    imageLine(summary.images),
   ].join("\n");
+}
+
+function imageLine(images: SeedSummary["images"]): string {
+  if (!images.uploadsEnabled) {
+    return "  images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images)";
+  }
+  return `  images        uploaded ${String(images.uploaded).padStart(3)} (through the media service, into MEDIA_DIR)`;
 }
 
 function synonymLines(groups: SeedSummary["synonymGroups"]): string[] {
@@ -103,6 +113,8 @@ export interface RunSeedCommandOptions {
   seed?: CatalogSeed;
   /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
   extraShippingProviders?: LoadedShippingProvider[];
+  /** Tests only: another directory of the seed's image files (default `<repo>/seeds/assets`). */
+  assetsDir?: string;
 }
 
 /**
@@ -121,6 +133,8 @@ export async function runSeedCommand(
     enabled: config.enabledShippingProviders,
     providersDir: DEFAULT_SHIPPING_PROVIDERS_DIR,
   });
+  // The media settings of the API (`MEDIA_*`): the demo images are uploaded where the API serves them from.
+  await prepareDefaultMediaDirectory(config, env);
   const app = await NestFactory.createApplicationContext(
     AppModule.register({
       databaseUrl: config.databaseUrl,
@@ -131,11 +145,12 @@ export async function runSeedCommand(
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
       // With SEARCH_ENABLED=true the seeded products are queued for the index like any admin write (`pnpm search:reindex`).
       search: config.search,
+      media: mediaConfigOf(config),
     }),
     { logger: ["error", "warn"] },
   );
   try {
-    return await CatalogSeeder.fromContext(app).run(options.seed ?? catalogSeed);
+    return await CatalogSeeder.fromContext(app, options.assetsDir).run(options.seed ?? catalogSeed);
   } finally {
     await app.close();
   }
