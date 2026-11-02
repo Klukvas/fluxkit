@@ -12,7 +12,8 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
 - `src/badge.tsx`, `src/spinner.tsx` (name from `label`), `src/skeleton.tsx` (decorative, `aria-hidden`), `src/empty-state.tsx`.
 - `src/price-text.tsx` - preformatted price plus optional struck-through compare-at with spoken text from props. Must NOT format money.
 - `src/quantity-input.tsx` - number input with labelled minus/plus buttons, `min`/`max`, optional `stepMax` (where the buttons stop, e.g. a stock hint; a typed number is clamped to `max` only), `clampQuantity`.
-- `src/pagination.tsx` (`aria-current`, disabled previous/next, `pageItems`), `src/breadcrumbs.tsx` (last item is `aria-current="page"`).
+- `src/pagination.tsx` (`aria-current`, disabled previous/next, `pageItems`), `src/breadcrumbs.tsx` (last item is `aria-current="page"`; links at least 24 px high, 44 px on `pointer: coarse`).
+- `src/checkbox.tsx` `fullWidth` (2026-11-03): the label, the hit area, takes the whole row; `src/button.tsx` takes `ref` as a prop (React 19, `ComponentPropsWithRef<"button">`).
 - `src/product-image.tsx` - lazy image with a token-styled placeholder when `src` is missing or fails. A client component (`"use client"`): the failing-image fallback needs state and `onError`. `Dialog` and `Tabs` are the other two.
 - `src/option-picker.tsx` - radio group per product option in a `fieldset`/`legend`; disabled values are struck through, not only dimmed.
 - `src/skip-link.tsx`, `src/visually-hidden.tsx` - accessibility helpers.

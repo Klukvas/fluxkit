@@ -1,10 +1,11 @@
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { cn } from "./cn";
 import { focusRing } from "./styles";
 
 export type ButtonVariant = "primary" | "secondary" | "danger";
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+/** `ref` is a plain prop in React 19: it reaches the `<button>` (the product page observes its add button). */
+export interface ButtonProps extends ComponentPropsWithRef<"button"> {
   variant?: ButtonVariant;
 }
 
