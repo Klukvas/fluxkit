@@ -1,6 +1,6 @@
 # Plan: storefront desktop design, batch B (home page and dark theme)
 
-Status: proposed; branch `feature/storefront-design-b` from `origin/main` `34c98e6` (PR 217 merged). Storefront, `packages/ui`, `packages/theme`
+Status: implemented (see "Results"), not independently reviewed; ADR 0045 proposed (owner and legal confirmation); branch `feature/storefront-design-b` from `origin/main` `34c98e6` (PR 217 merged). Storefront, `packages/ui`, `packages/theme`
 and one admin spec only: no API, schema, dependency, environment variable or public config change.
 Source: designer review of 2026-11-02 (scratchpad `ux-review/findings-designer.md`): D-18 (wireframe home), recommendation 4 (image-led,
 configurable home and category composition) and the dark-theme part of recommendation 5 ("make the existing dark theme reachable").
@@ -111,3 +111,60 @@ subcategory count from the tree (real data); a product count per category would 
   carries `data-theme` from the cookie (no flash), system mode follows the emulated scheme, toggle by keyboard with `aria-pressed`, the
   no-JS form round trip, computed-colour contrast of key components in dark, layout at 1280/1024/768/390.
 - After screenshots: `design-b-shots/after-*` (home 1280/1024/390 uk/en light and dark; product, cart, checkout in dark).
+
+## Results (2026-11-03)
+
+After-state (same tool and sizes as the before table; `next dev` on localhost, demo seed; screenshots scratchpad `design-b-shots/after-*`:
+home 1280/1024/390 uk/en light and dark, product, cart and checkout in dark at 1280 uk):
+
+| Item | 1280 uk/en | 1024 uk/en | 768 uk/en | 390 uk / en |
+|---|---|---|---|---|
+| Home sections (height px) | hero 461 (picture right), categories 337, new arrivals 812, trust 54, about 168 | 413 / 313 / 748 / 54 / 168 | 317 / 265 / 1096 / 54 / 168 | 477 (picture under the text) / 414 / 1264 (1240 en) / 102 / 216 |
+| Page height | 2406 | 2270 | 2518 / 2474 | 3135 / 3067 |
+| Images | hero `eager` + `fetchpriority=high` at y 133; product images all `lazy` (first at y 1060) | same (988) | same (844) | hero at y 313 |
+| Headings | h1 (hero), h2 per section, h3 per product | same | same | same |
+| Theme | `<html data-theme="system">` (default), `color-scheme: light`; with the cookie `dark`: `data-theme="dark"`, `color-scheme: dark`, body `rgb(11,16,32)` | same | same | same |
+| Emulated `prefers-color-scheme: dark`, no cookie | body `rgb(11,16,32)` (was white) | | | |
+| Console errors (no 401) | 0 | 0 | 0 | 0 |
+
+Deviations from the plan:
+- **Theme switch**: text buttons without icons and one class (`.fk-theme-option`): the footer is flushed with the shell before a late page
+  section and counts against the pre-hydration budget (README, "Keep the header small"). With icons and utility classes the footer was 2.3 KB
+  and `/en/account/register` was outlined (e2e `pre-hydration-forms` failed 2 of 2); with `.fk-nav-link` for the footer links (the header's
+  class) it is 1.25 KB en / 1.41 KB uk, smaller than on main (1.70 / 1.82), pinned by `shell.spec.tsx`.
+- **`LoadingView` is at least a screen tall** (not planned): when the page replaced the `(site)` loading view, the footer moved (CLS 0.261 in
+  3 of 6 cold e2e runs, source `FOOTER`); now the footer starts below the fold (4 of 4 runs pass). Tried first and reverted: moving the home
+  page out of `(site)` removed the shift but made the header search box lose typed text in 5 of 40 runs of the `search.e2e.ts` header tests
+  (0 of 40 under `(site)`; also 5 of 40 with the sections awaited instead of streamed): text typed before the box hydrates is lost when the
+  page hydrates with the shell. NOT measured on the catalog, category and product pages, which hydrate with the shell too (their header-search
+  timing is the same race; the e2e tests type on the home page only).
+- **Category tiles**: one row of skeletons (most shops show a few top-level categories); a "N subcategories" line (plural) from the tree.
+- **Privacy**: the storefront's first cookie needed ADR 0045 (supersedes in part ADR 0033 decision 11), the cookie statement row and intro,
+  `docs/privacy/README.md` and allow-list guards (`source-guards.spec.ts`, `security-headers.spec.ts`) instead of the "no cookie" guards.
+- **Home page code location**: `src/config/home.ts` replaces `src/layout/home.ts` (`kind` instead of `type`); `loadHomeData` is replaced by
+  per-section loaders in `lib/home-data.ts`; a second image path `LocalPicture` (files under `public/` named in the config only, guarded).
+
+Found, not fixed (pre-existing, reported):
+- `/uk/account/register` is outlined behind the loading view without a script (header 5.4 KB in uk): same with main's footer (measured by
+  swapping main's `site-footer.tsx` in); the e2e test covers the en pages only.
+- A 404 rendered before the first byte (`<html id="__next_error__">`) carries no `data-theme`; with a script it becomes dark after hydration,
+  without one the page is empty (as before).
+- The header search box loses text typed before it hydrates (see above).
+
+Verification (each exit code read separately, final code `92e1f8c`): lint 0, format:check 0, typecheck 0, check:boundaries 0, check:docs 0,
+check:env 0, check:licenses 0; unit theme 96, ui 204, storefront 1799, admin 1666 passed (admin includes `theme-isolation.spec.ts` on the
+built CSS: the only `prefers-color-scheme` rule is `[data-theme=system]`, `index.html` keeps `data-theme="light"`). Full storefront e2e on
+throwaway Postgres 16 / Redis 8 / Meilisearch: 142 passed, 4 skipped (`search-off`, by design). Failing first: theme specs against main's
+`tokens.css` (2 files failed: no system block); `theme-isolation.spec.ts` against main's admin build (2 of 4 failed); `design-b.e2e.ts`
+against main's build (11 of 12 failed; the light-contrast check passes on main, as it should); the footer budget (pre-hydration e2e 2 failed)
+and the loading-view shift (3 of 6 runs) before their fixes. Mail stays light: `email-theme.spec.ts` reads the light block, the mail layout
+sets `<meta name="color-scheme" content="light">` (unchanged).
+Not verified: Safari and Firefox, a real screen reader, iOS Safari's `color-scheme`, admin e2e (admin unit tests and the built-CSS spec only),
+the no-script theme switch on the guest order page (its `no-referrer` policy does not matter: the form sends the path), a production host
+with https (`Secure` cookie flag tested in unit tests only).
+
+Owner decisions: the token additions (`color-scheme`, the `system` block, `themeModes`; no new colour token); the default theme mode (`system`,
+switch shown in the footer, not the header); the default home composition and copy (hero headline/subline/CTA kept from before, the hero
+picture, the "About the shop" demo text with a visible `TODO(fluxkit)` marker, the trust bar on the home page); the category banner as the
+default header; ADR 0045 and its legal reading (or `showToggle: false`).
+
