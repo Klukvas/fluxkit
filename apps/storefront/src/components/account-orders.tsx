@@ -28,7 +28,9 @@ import {
   accountOrderSource,
   createOrderListStore,
   createOrderStore,
+  initialOrderListState,
   initialOrderState,
+  orderListSnapshot,
   type OrderListState,
   type OrderListStore,
   type OrderStore,
@@ -175,8 +177,8 @@ function OrderList({ shop }: { shop: ShopMoney }) {
   const [store, setStore] = useState<OrderListStore | null>(null);
   const state = useSyncExternalStore<OrderListState>(
     (listener) => store?.subscribe(listener) ?? (() => {}),
-    () => store?.getState() ?? { status: "loading" },
-    () => ({ status: "loading" }),
+    () => orderListSnapshot(store),
+    () => initialOrderListState,
   );
 
   useEffect(() => {

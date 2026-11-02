@@ -20,6 +20,8 @@ import {
   createOrderListStore,
   createOrderStore,
   guestOrderSource,
+  initialOrderListState,
+  orderListSnapshot,
 } from "./order-store";
 import { formatMoney } from "./money";
 import { immediateClient, json, problem, settle, stagedClient } from "./test-fetch";
@@ -282,6 +284,17 @@ describe("account order list store", () => {
     total,
     limit: ACCOUNT_ORDERS_PAGE_SIZE,
     offset: 0,
+  });
+
+  it("gives useSyncExternalStore the same snapshot while nothing changed, also before the store exists ('My orders' error)", () => {
+    expect(orderListSnapshot(null)).toBe(orderListSnapshot(null));
+    expect(orderListSnapshot(null)).toBe(initialOrderListState);
+    const store = createOrderListStore({
+      client: immediateClient(() => json(list(1))).client,
+      page: 1,
+      locale: "uk",
+    });
+    expect(orderListSnapshot(store)).toBe(orderListSnapshot(store));
   });
 
   it("asks for the page's offset and limit and keeps the answer", async () => {
