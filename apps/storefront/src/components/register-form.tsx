@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, Ref } from "react";
 import type { Failure } from "../lib/failure";
+import { registerFieldChecks } from "../lib/register-checks";
 import { authHref, safeNextPath } from "../lib/safe-next";
 import { FormErrorSummary, TextField } from "./form-parts";
 import { useI18n } from "./i18n-provider";
@@ -40,7 +41,8 @@ export interface RegisterFormViewProps {
 
 /**
  * Markup of the registration form. The password rules come from the API (12 to 128 characters, not the email) and are
- * stated as a hint; the API stays the judge, and its answer for each field is shown through `errors.field.*`.
+ * stated as a hint and checked before sending together with the email's shape (`lib/register-checks.ts`, review D-06);
+ * the API stays the judge, and its answer for each field is shown through `errors.field.*`.
  */
 export function RegisterFormView({
   t,
@@ -145,6 +147,8 @@ export function RegisterForm({ next }: { next: string | undefined }) {
         form.submit(event, {
           required: REQUIRED,
           leaves: true,
+          // The email shape and the password rules are checked with the blank fields (review D-06).
+          check: (values) => registerFieldChecks(values),
           run: async (values) => {
             const phone = values.phone.trim();
             const outcome = await store.register({
