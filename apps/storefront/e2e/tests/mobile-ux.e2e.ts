@@ -72,18 +72,40 @@ test("the header is one sticky row; the search opens behind its icon and Escape 
   expect(errors.filter((line) => HYDRATION.test(line))).toEqual([]);
 });
 
-test("without a script the search icon shows the search row (:target), and the box still searches", async ({
+test("without a script the search icon shows the search row (:target), and the box searches on every page, streamed ones too (review M2 of PR 216)", async ({
   browser,
   baseURL,
 }) => {
   const context = await browser.newContext({ ...PHONE, javaScriptEnabled: false, baseURL });
   const page = await context.newPage();
-  await page.goto("/en");
-  await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
-  await page.getByRole("combobox", { name: "Search products" }).fill("screwdriver");
-  await page.getByRole("button", { name: "Search", exact: true }).click();
-  await expect(page).toHaveURL(/\/en\/search\?q=screwdriver$/);
+  // The catalog, product and results pages stream the header's box: without a script the fallback form must be there.
+  for (const path of ["/en", "/en/catalog", "/en/p/demo-hoodie", "/en/search?q=demo"]) {
+    await page.goto(path);
+    await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
+    await page.getByRole("combobox", { name: "Search products" }).fill("screwdriver");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(page, path).toHaveURL(/\/en\/search\?q=screwdriver$/);
+  }
   await context.close();
+});
+
+test("the 'added' toast steps aside while the search row is open (review m1 of PR 216)", async ({
+  page,
+}) => {
+  await page.goto("/en/p/demo-hoodie");
+  await hydrated(page);
+  await page.getByTestId("buy-bar").getByText("Add to cart", { exact: true }).click();
+  await expect(page.getByText("Added to the cart.")).toBeVisible();
+  await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
+  const searchBox = page.getByRole("combobox", { name: "Search products" });
+  // Well inside the toast's own 8 s on screen: it must step aside at once, not time out.
+  await expect(searchBox).toBeFocused({ timeout: 2000 });
+  await expect(page.getByText("Added to the cart.")).toBeHidden({ timeout: 2000 });
+  const hit = await searchBox.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === element;
+  });
+  expect(hit).toBe(true);
 });
 
 test("the product page's buy bar shows while the add button is out of view, adds, and a toast links to the cart (D-02)", async ({
@@ -277,8 +299,9 @@ test("the order page keeps the number on one line and shows the link as a compac
   expect((await box(heading)).height).toBeLessThan(lineHeight * 1.5);
   const field = page.getByLabel("Посилання на ваше замовлення");
   const copy = page.getByRole("button", { name: "Скопіювати посилання" });
-  // One row: the field and the button side by side, the callout short, under the heading.
-  expect(Math.abs((await box(field)).y - (await box(copy)).y)).toBeLessThan(8);
+  // On a phone the button sits under a full-width field (review m5 of PR 216: beside it the field was 97 px).
+  expect((await box(field)).width).toBeGreaterThan(300);
+  expect((await box(copy)).y).toBeGreaterThan((await box(field)).y);
   expect((await box(copy)).height).toBeGreaterThanOrEqual(44);
   expect((await box(field)).y).toBeGreaterThan((await box(heading)).y);
   expect(await horizontalOverflow(page)).toBe(0);
@@ -317,5 +340,49 @@ for (const width of [360, 390, 768]) {
       expect(await horizontalOverflow(page), path).toBe(0);
     }
     expect(errors.filter((line) => HYDRATION.test(line))).toEqual([]);
+  });
+}
+
+// Review B1 of PR 216: the search icon is for phones and tablets only. An unlayered component class beat `lg:hidden`, so the
+// icon showed between the category links and the search box on desktop; no test noticed.
+for (const width of [1024, 1280]) {
+  test.describe(`desktop ${String(width)} px`, () => {
+    test.use({ viewport: { width, height: 800 }, hasTouch: false, isMobile: false });
+
+    test("the header has no search icon and keeps its one row: logo, search box, cart (review B1 of PR 216)", async ({
+      page,
+    }) => {
+      await page.goto("/en/catalog");
+      await hydrated(page);
+      const header = page.getByRole("banner");
+      await expect(header.locator('a[href="#site-search"]')).toBeHidden();
+      await expect(header.getByRole("link", { name: "Search", exact: true })).toHaveCount(0);
+      expect((await box(header)).height).toBeLessThanOrEqual(64);
+      const logo = await box(header.getByRole("link", { name: "Fluxkit", exact: true }));
+      const search = await box(header.getByRole("combobox", { name: "Search products" }));
+      const cart = await box(header.getByRole("link", { name: /Cart/ }));
+      const middle = (item: { y: number; height: number }) => item.y + item.height / 2;
+      expect(Math.abs(middle(logo) - middle(search))).toBeLessThan(8);
+      expect(Math.abs(middle(search) - middle(cart))).toBeLessThan(8);
+      expect(logo.x).toBeLessThan(search.x);
+      expect(search.x).toBeLessThan(cart.x);
+    });
+
+    test("without a script the header still has a working search box on a streamed page (review M2 of PR 216)", async ({
+      browser,
+      baseURL,
+    }) => {
+      const context = await browser.newContext({
+        viewport: { width, height: 800 },
+        javaScriptEnabled: false,
+        baseURL,
+      });
+      const page = await context.newPage();
+      await page.goto("/en/catalog");
+      await page.getByRole("combobox", { name: "Search products" }).fill("screwdriver");
+      await page.getByRole("button", { name: "Search", exact: true }).click();
+      await expect(page).toHaveURL(/\/en\/search\?q=screwdriver$/);
+      await context.close();
+    });
   });
 }

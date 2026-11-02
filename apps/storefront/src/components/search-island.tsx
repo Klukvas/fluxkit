@@ -387,7 +387,11 @@ export function FilterSheet({
       if (wide.matches) setSheetOpen(false);
     };
     wide.addEventListener("change", onWide);
+    // Back (or Forward) while the sheet is open goes to the other results with the sheet closed (review m4 of PR 216).
+    const onHistory = () => setSheetOpen(false);
+    window.addEventListener("popstate", onHistory);
     return () => {
+      window.removeEventListener("popstate", onHistory);
       wide.removeEventListener("change", onWide);
       document.documentElement.classList.remove("overflow-hidden");
     };

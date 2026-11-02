@@ -86,7 +86,8 @@ export type CopyState = "idle" | "copied" | "failed";
  * "Save this link": the private link is the only way back to a guest order (until the email plan). The link is shown in a
  * read-only field (a visible fallback: it can always be selected and copied by hand) with a copy button for the Clipboard
  * API. It is rendered only in the browser, after the fragment was read; the server never has it. A compact callout under the
- * order's heading (review D-10): one sentence, then the field and the copy button in one row.
+ * order's heading (review D-10): one sentence, then the field and the copy button (in one row from `sm`, the button under
+ * a full-width field on a phone, review m5 of PR 216).
  */
 export function SaveLinkView({
   link,
@@ -106,7 +107,7 @@ export function SaveLinkView({
         <label htmlFor="order-link">
           <VisuallyHidden>{t("order.saveLink.label")}</VisuallyHidden>
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <Input
             id="order-link"
             readOnly
@@ -115,7 +116,7 @@ export function SaveLinkView({
             aria-describedby="order-link-copy-state"
             onFocus={(event) => event.currentTarget.select()}
           />
-          <Button variant="secondary" className="min-h-11 shrink-0" onClick={onCopy}>
+          <Button variant="secondary" className="min-h-11 sm:shrink-0" onClick={onCopy}>
             {t("order.saveLink.copy")}
           </Button>
         </div>

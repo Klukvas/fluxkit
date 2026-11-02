@@ -413,6 +413,17 @@ describe("checkout page: blocks and confirmations", () => {
     ];
     const refused = render({ checkout: { ...initialCheckoutState, lineErrors: { cart, errors } } });
     expect(refused).toContain('id="checkout-summary-details" class="flex flex-col gap-4"');
+    // The shopper can still close it after a refusal, and the toggle says so (review m2 of PR 216).
+    const closedAfterRefusal = render({
+      checkout: { ...initialCheckoutState, lineErrors: { cart, errors } },
+      summaryOpen: false,
+    });
+    expect(closedAfterRefusal).toMatch(
+      /aria-expanded="false" aria-controls="checkout-summary-details"/,
+    );
+    expect(closedAfterRefusal).toContain(
+      'id="checkout-summary-details" class="flex flex-col gap-4 max-lg:hidden"',
+    );
     // The submit row sticks to the bottom below lg, with the total.
     expect(closed).toMatch(
       /class="fk-sticky-bottom fk-bottom-bar[^"]*max-lg:sticky max-lg:bottom-0/,

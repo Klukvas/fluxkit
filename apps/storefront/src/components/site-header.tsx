@@ -9,7 +9,7 @@ import { HeaderDisclosure, menuItem } from "./header-menu";
 import { HeaderSearchToggle } from "./header-search-toggle";
 import { MenuIcon } from "./icons";
 import { LocaleSwitcher } from "./locale-switcher";
-import { SearchBox } from "./search-box";
+import { SearchBox, SearchBoxFallback } from "./search-box";
 
 export interface NavigationCategory {
   slug: string;
@@ -98,8 +98,9 @@ export function SiteHeader({
         </nav>
         {searchEnabled ? (
           <HeaderSearchToggle label={t("nav.search")}>
-            {/* `useSearchParams` in the box needs a boundary; the page is rendered per request, so it is never the fallback. */}
-            <Suspense fallback={null}>
+            {/* `useSearchParams` in the box needs a boundary. On dynamic pages (catalog, product, results) the box streams in
+                after the shell, so the fallback is the same GET form: without a script it is the search (review M2). */}
+            <Suspense fallback={<SearchBoxFallback />}>
               <SearchBox locale={locale} />
             </Suspense>
           </HeaderSearchToggle>

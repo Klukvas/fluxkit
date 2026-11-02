@@ -391,7 +391,7 @@ export function ProductPurchaseView({
                   <div
                     ref={toastRef}
                     hidden={!toastOpen}
-                    className="z-40 flex items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-card max-md:fixed max-md:inset-x-4 max-md:top-20"
+                    className="fk-toast z-40 items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-card max-md:fixed max-md:inset-x-4 max-md:top-20"
                   >
                     <span className="flex-1">{t("product.added")}</span>
                     <Link

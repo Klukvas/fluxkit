@@ -300,8 +300,12 @@ export interface CheckoutPageViewProps {
   onRetryCart: () => void;
   /** The city and pickup point pickers of a pickup point method (they own the carrier lookups). */
   pickup: ReactNode;
-  /** Below `lg` the summary sits above the form, collapsed to one line until opened (mobile batch, review D-03). */
-  summaryOpen?: boolean;
+  /**
+   * Below `lg` the summary sits above the form, collapsed to one line until opened (mobile batch, review D-03). Absent: the
+   * page decides (open while the server refused a line); a choice of the shopper wins, also after a refusal (review m2 of
+   * PR 216).
+   */
+  summaryOpen?: boolean | undefined;
   onSummaryOpenChange?: (open: boolean) => void;
 }
 
@@ -381,7 +385,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
       ? t("checkout.summary.total.pending")
       : money(shown.total);
   // A line the server refused is shown open, right under the alerts at the top.
-  const summaryShown = props.summaryOpen === true || refusals.length > 0;
+  const summaryShown = props.summaryOpen ?? refusals.length > 0;
   const field = (path: string) => ({
     id: ids[path] as string,
     name: path,
@@ -753,7 +757,8 @@ export function CheckoutPage({
   const { state: account } = useAccount();
   const router = useRouter();
   const [shipping] = useState(() => createShippingStore({ client, cart: cartStore, locale }));
-  const [summaryOpen, setSummaryOpen] = useState(false);
+  // `undefined` until the shopper toggles it: then the page decides (open for a refused line).
+  const [summaryOpen, setSummaryOpen] = useState<boolean | undefined>(undefined);
   const shippingState = useSyncExternalStore(
     shipping.subscribe,
     shipping.getState,
@@ -780,6 +785,11 @@ export function CheckoutPage({
   );
   const [ordersHref, setOrdersHref] = useState<string | null>(null);
   const signedIn = account.session.status === "signedIn";
+  // A new refusal opens the summary again, even after the shopper closed it for an earlier one.
+  const lineErrors = checkoutState.lineErrors;
+  useEffect(() => {
+    if (lineErrors !== null) setSummaryOpen(undefined);
+  }, [lineErrors]);
   const cart = cartState.cart;
   const requiresShipping = cart?.requiresShipping ?? true;
   const fieldIds = useMemo(() => checkoutFieldIds(checkoutConfig), []);

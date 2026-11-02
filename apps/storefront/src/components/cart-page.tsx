@@ -504,11 +504,30 @@ export function CartPageView({
                 <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
               </div>
             </dl>
+            {/* The full list of the lines that block the checkout stays in the page; the sticky bar below only counts them
+                and links to the first, so it stays short on a phone (review M1 of PR 216). */}
+            {block === "stock" ? (
+              <div className="flex flex-col gap-1 text-sm">
+                <p className="text-foreground">{t("cart.checkout.stockBlocked")}</p>
+                <ul className="flex flex-col gap-1">
+                  {stockProblemLines(cart).map((line) => (
+                    <li key={line.variantId}>
+                      <a
+                        href={`#${cartLineAnchor(line.variantId)}`}
+                        className={`inline-flex min-h-6 items-center text-foreground underline underline-offset-4 ${focusRing}`}
+                      >
+                        {lineName(line)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </section>
 
           {/* The total and the checkout control stick to the bottom of a phone screen while the lines scroll (review D-09):
               CSS only, the same elements (a direct child of the page container, so `sticky` has the whole page to stick in). */}
-          <div className="fk-sticky-bottom fk-bottom-bar flex flex-col gap-3 bg-background max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:border-t max-md:border-border max-md:px-4 max-md:pt-3 max-md:shadow-card">
+          <div className="fk-sticky-bottom fk-bottom-bar flex flex-col gap-2 bg-background max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:border-t max-md:border-border max-md:px-4 max-md:pt-3 max-md:shadow-card">
             <dl className="flex max-w-sm flex-col text-foreground max-md:max-w-none">
               <div className="flex justify-between gap-6 font-semibold">
                 <dt>{t("cart.summary.total")}</dt>
@@ -535,25 +554,26 @@ export function CartPageView({
                   {t("cart.checkout")}
                 </Button>
                 {block === "stock" ? (
-                  <div
+                  <p
                     id={CHECKOUT_REASON_ID}
                     tabIndex={-1}
-                    className={`flex flex-col gap-1 text-sm ${focusRing}`}
+                    className={`flex flex-wrap items-center gap-x-2 text-sm text-foreground ${focusRing}`}
                   >
-                    <p className="text-foreground">{t("cart.checkout.stockBlocked")}</p>
-                    <ul className="flex flex-col gap-1">
-                      {stockProblemLines(cart).map((line) => (
-                        <li key={line.variantId}>
-                          <a
-                            href={`#${cartLineAnchor(line.variantId)}`}
-                            className={`inline-flex min-h-6 items-center text-foreground underline underline-offset-4 ${focusRing}`}
-                          >
-                            {lineName(line)}
-                          </a>
-                        </li>
+                    <span>
+                      {t.plural("cart.checkout.stockBlockedShort", stockProblemLines(cart).length)}
+                    </span>
+                    {stockProblemLines(cart)
+                      .slice(0, 1)
+                      .map((line) => (
+                        <a
+                          key={line.variantId}
+                          href={`#${cartLineAnchor(line.variantId)}`}
+                          className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
+                        >
+                          {t("cart.checkout.firstLine")}
+                        </a>
                       ))}
-                    </ul>
-                  </div>
+                  </p>
                 ) : (
                   <p
                     id={CHECKOUT_REASON_ID}
