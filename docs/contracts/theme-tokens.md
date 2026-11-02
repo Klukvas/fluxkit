@@ -12,6 +12,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-border-input` | `border-border-input` | the border of inputs, textareas, selects and checkboxes (WCAG 1.4.11, at least 3:1; added after the storefront step 10 review) |
 | `--fk-color-primary` / `-primary-foreground` | `bg-primary` / `text-primary-foreground` | primary actions |
 | `--fk-color-danger` | `text-danger`, `bg-danger`, `border-danger` | destructive and error states |
+| `--fk-color-danger-foreground` | `text-danger-foreground` | text on a `danger` fill, such as the header's cart count badge (added 2026-11-02) |
 | `--fk-color-success` | `text-success`, `border-success` | success and availability (added in storefront plan step 4a) |
 | `--fk-color-warning` | `text-warning`, `border-warning` | notices such as changed prices (added in step 4a) |
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
@@ -30,6 +31,7 @@ The test parses `tokens.css` (6-digit hex values only; another color format fail
 |---|---|
 | `foreground` on `background` | 4.5:1 |
 | `primary-foreground` on `primary` | 4.5:1 |
+| `danger-foreground` on `danger` | 4.5:1 (the cart count badge) |
 | `muted-foreground` on `muted` | 4.5:1 |
 | `danger` on `background` | 4.5:1 |
 | `success` on `background` | 4.5:1 |
@@ -61,5 +63,5 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | `lineHeight` | mail only | `1.5` |
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
-Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card` (box-shadow is poorly supported). Dark mode is not attempted in mail.
+Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card` (box-shadow is poorly supported). Dark mode is not attempted in mail.
 `packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.

@@ -165,6 +165,25 @@ describe("cart store: writes", () => {
     },
   );
 
+  it("keeps a quantity failure out of the shared state when the caller shows it itself (cart line autosave)", async () => {
+    let answer = () => json(cartOne);
+    const { client } = immediateClient(() => answer());
+    const { store } = storeWith(client);
+    await store.refresh();
+    answer = () => problem(409, "rule_violation", { rule: "quantity_limit" });
+    const outcome = await store.setQuantity("v1", 5, { reportFailure: false });
+    expect(outcome).toMatchObject({ status: "failed" });
+    expect(store.getState().failure).toBeNull();
+    expect(store.getState().busy).toEqual([]);
+    expect(store.getState().cart).toEqual(cartOne);
+    const invalid = await store.setQuantity("v1", 0, { reportFailure: false });
+    expect(invalid).toMatchObject({ status: "failed" });
+    expect(store.getState().failure).toBeNull();
+    // The default still reports it.
+    await store.setQuantity("v1", 5);
+    expect(store.getState().failure).not.toBeNull();
+  });
+
   it("allows exactly 1 to 999", async () => {
     expect(MIN_LINE_QUANTITY).toBe(1);
     expect(MAX_LINE_QUANTITY).toBe(999);

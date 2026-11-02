@@ -1,5 +1,5 @@
 import type { Cart, CartLine } from "@fluxkit/api-client";
-import { Button, createTranslator } from "@fluxkit/ui";
+import { Button, createTranslator, QuantityInput } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { initialCartState, type CartState } from "../lib/cart-store";
@@ -7,7 +7,8 @@ import { formatMoney } from "../lib/money";
 import { cartLine, cartOf } from "../lib/test-fixtures";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
-import { CartLineView, CartPageView, QuantityFormView, type CartPageViewProps } from "./cart-page";
+import { CartLineView, CartPageView, LineQuantityView, type CartPageViewProps } from "./cart-page";
+import { idleAutosave } from "../lib/quantity-autosave";
 import {
   findElements,
   leftoverText,
@@ -260,7 +261,9 @@ describe("CartPageView: lines and notices", () => {
       />,
     );
     expect(line).toContain('type="number"');
-    expect(line).toContain("§cart.line.update");
+    // No "Update" button any more: the quantity saves itself (2026-11-02).
+    expect(line).not.toContain("§cart.line.update");
+    expect(line).not.toContain('type="submit"');
     expect(line).toContain("§cart.line.remove");
   });
 
@@ -414,41 +417,73 @@ describe("CartPageView: banner, acknowledge, checkout", () => {
   });
 });
 
-describe("QuantityFormView", () => {
-  it("is a labelled form whose submit sends the draft, and whose button waits for a change", () => {
-    const onSubmit = vi.fn();
-    const element = QuantityFormView({
-      title: "§a",
-      draft: 4,
-      serverQuantity: 2,
-      busy: false,
-      t,
-      onDraftChange: vi.fn(),
-      onSubmit,
-    });
-    const [form] = findElements(element, (candidate) => candidate.type === "form");
-    (form?.props.onSubmit as (event: unknown) => void)({ preventDefault() {} });
-    expect(onSubmit).toHaveBeenCalledTimes(1);
-    const html = renderToStaticMarkup(element);
+describe("LineQuantityView", () => {
+  const base = {
+    title: "§a",
+    variantId: "v1",
+    quantity: 4,
+    autosave: idleAutosave,
+    disabled: false,
+    t,
+    onChange: vi.fn(),
+  };
+
+  it("is a labelled stepper with the line's limits, no form and no submit button", () => {
+    const html = renderToStaticMarkup(LineQuantityView(base));
     expect(html).toContain('aria-label="§cart.line.quantity"');
+    expect(html).toContain('aria-label="§cart.line.decrease"');
+    expect(html).toContain('aria-label="§cart.line.increase"');
     expect(html).toContain('value="4"');
     expect(html).toContain('min="1"');
     expect(html).toContain('max="999"');
-    expect(html).not.toMatch(/<button type="submit"[^>]*disabled=""/);
-    const unchanged = renderToStaticMarkup(
-      QuantityFormView({
-        title: "§a",
-        draft: 2,
-        serverQuantity: 2,
-        busy: false,
-        t,
-        onDraftChange: vi.fn(),
-        onSubmit,
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain('type="submit"');
+    expect(html).toContain('aria-busy="false"');
+    expect(html).not.toContain("§cart.line.saving");
+  });
+
+  it("says it is saving while a change waits, and shows a refused change with its reason as an alert", () => {
+    const saving = renderToStaticMarkup(
+      LineQuantityView({ ...base, autosave: { draft: 5, pending: true, failure: null } }),
+    );
+    expect(saving).toContain("§cart.line.saving");
+    expect(saving).toContain('aria-busy="true"');
+    const failed = renderToStaticMarkup(
+      LineQuantityView({
+        ...base,
+        quantity: 2,
+        autosave: {
+          draft: null,
+          pending: false,
+          failure: {
+            messageKey: "errors.rule.quantity_limit",
+            status: 409,
+            code: "rule_violation",
+            retryAfterSeconds: null,
+            fieldErrors: [],
+          },
+        },
       }),
     );
-    expect(unchanged).toMatch(
-      /<button[^>]*disabled=""[^>]*type="submit"|<button[^>]*type="submit"[^>]*disabled=""/,
+    expect(failed).toMatch(/role="alert"[^>]*>§cart\.line\.saveFailed/);
+    expect(failed).toContain('value="2"');
+  });
+
+  it("disables the stepper only when told to (a whole-cart write), not for its own save", () => {
+    const html = renderToStaticMarkup(
+      LineQuantityView({ ...base, autosave: { draft: 5, pending: true, failure: null } }),
     );
+    expect(html).not.toMatch(/<input[^>]*disabled=""/);
+    const locked = renderToStaticMarkup(LineQuantityView({ ...base, disabled: true }));
+    expect(locked).toMatch(/<input[^>]*disabled=""/);
+  });
+
+  it("hands the stepper's change to onChange (the autosave), with no request of its own", () => {
+    const onChange = vi.fn();
+    const element = LineQuantityView({ ...base, onChange });
+    const [stepper] = findElements(element, (candidate) => candidate.type === QuantityInput);
+    (stepper?.props.onChange as (quantity: number) => void)(5);
+    expect(onChange).toHaveBeenCalledWith(5);
   });
 });
 

@@ -19,8 +19,9 @@ describe("cartPageHandlers", () => {
     const handlers = cartPageHandlers(store as unknown as CartStore);
     handlers.onRetry();
     expect(store.refresh).toHaveBeenCalledTimes(1);
-    handlers.onSetQuantity("v1", 4);
-    expect(store.setQuantity).toHaveBeenCalledWith("v1", 4);
+    void handlers.onSetQuantity("v1", 4);
+    // The line shows its own failure, so the shared page alert must not show it as well.
+    expect(store.setQuantity).toHaveBeenCalledWith("v1", 4, { reportFailure: false });
     handlers.onRemove("v2");
     expect(store.remove).toHaveBeenCalledWith("v2");
     handlers.onAcknowledge();

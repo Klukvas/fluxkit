@@ -48,6 +48,8 @@ const nonTextMinimum = 3;
 const pairs: [string, string, number][] = [
   ["foreground", "background", textMinimum],
   ["primary-foreground", "primary", textMinimum],
+  // Text on a danger fill (the cart count badge of the storefront header, 2026-11-02).
+  ["danger-foreground", "danger", textMinimum],
   ["muted-foreground", "muted", textMinimum],
   ["danger", "background", textMinimum],
   ["success", "background", textMinimum],

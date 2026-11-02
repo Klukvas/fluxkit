@@ -1,4 +1,5 @@
 import type { CartStore } from "./cart-store";
+import type { SaveOutcome } from "./quantity-autosave";
 
 /**
  * The cart page's actions as the callbacks its view takes, one per control, each doing exactly one thing to the cart store.
@@ -9,8 +10,10 @@ export function cartPageHandlers(store: CartStore) {
     onRetry: (): void => {
       void store.refresh();
     },
-    onSetQuantity: (variantId: string, quantity: number): void => {
-      void store.setQuantity(variantId, quantity);
+    /** The line shows a failure itself (next to its quantity), so it is not reported in the page's alert as well. */
+    onSetQuantity: async (variantId: string, quantity: number): Promise<SaveOutcome> => {
+      const outcome = await store.setQuantity(variantId, quantity, { reportFailure: false });
+      return outcome.status === "ok" ? { status: "ok" } : outcome;
     },
     onRemove: (variantId: string): void => {
       void store.remove(variantId);
