@@ -99,6 +99,7 @@ import { FormErrorSummary, TextField, fieldMessage } from "./form-parts";
 import { useI18n } from "./i18n-provider";
 import { useAccount, useCart, useStoreClient } from "./session-provider";
 import { focusRing, linkButton } from "./styles";
+import { ChevronDownIcon } from "./icons";
 import { useForm } from "./use-form";
 
 /** `autocomplete` token of each address field (HTML autofill), so browsers and password managers fill the right box. */
@@ -159,6 +160,9 @@ export function phoneTypingValue(
     : next;
 }
 
+/** The part of the order summary that collapses below `lg` (lines, totals, "Change the cart"). */
+const SUMMARY_DETAILS_ID = "checkout-summary-details";
+
 /** The stock warning's sentence: the submit button names it as its description while the warning is shown. */
 const STOCK_WARNING_ID = "checkout-stock-warning";
 
@@ -187,7 +191,7 @@ export function StockWarningsView({
           <li key={line.variantId} className="flex flex-wrap gap-x-2">
             <Link
               href={localizedHref(locale, `/cart#${cartLineAnchor(line.variantId)}`)}
-              className={`underline underline-offset-4 ${focusRing}`}
+              className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
             >
               {lineName(line)}
             </Link>
@@ -296,6 +300,9 @@ export interface CheckoutPageViewProps {
   onRetryCart: () => void;
   /** The city and pickup point pickers of a pickup point method (they own the carrier lookups). */
   pickup: ReactNode;
+  /** Below `lg` the summary sits above the form, collapsed to one line until opened (mobile batch, review D-03). */
+  summaryOpen?: boolean;
+  onSummaryOpenChange?: (open: boolean) => void;
 }
 
 /**
@@ -368,6 +375,13 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
       ? checkout.lineErrors.errors
       : [];
   const submitDisabled = props.pending || block !== null || checkout.insecure;
+  const totalText = !deliveryActive
+    ? money(cart.total)
+    : shown === null
+      ? t("checkout.summary.total.pending")
+      : money(shown.total);
+  // A line the server refused is shown open, right under the alerts at the top.
+  const summaryShown = props.summaryOpen === true || refusals.length > 0;
   const field = (path: string) => ({
     id: ids[path] as string,
     name: path,
@@ -393,7 +407,10 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
       {signedIn ? null : (
         <p className="text-foreground">
           {t("checkout.signInPrompt")}{" "}
-          <Link href={props.signInHref} className={`underline underline-offset-4 ${focusRing}`}>
+          <Link
+            href={props.signInHref}
+            className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
+          >
             {t("checkout.signIn")}
           </Link>
         </p>
@@ -401,12 +418,160 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
       <StockWarningsView cart={cart} t={t} locale={locale} />
 
       <div className="grid gap-8 lg:grid-cols-3">
+        {/* First in the page order: above the form on phones; from `lg` placed in the right column as before. */}
+        <section
+          aria-labelledby="checkout-summary-heading"
+          className="flex flex-col gap-4 lg:col-start-3 lg:row-start-1"
+        >
+          <h2
+            id="checkout-summary-heading"
+            className="text-xl font-semibold text-foreground max-lg:hidden"
+          >
+            {t("checkout.summary.title")}
+          </h2>
+          <h2 className="lg:hidden">
+            <button
+              type="button"
+              aria-expanded={summaryShown}
+              aria-controls={SUMMARY_DETAILS_ID}
+              onClick={() => props.onSummaryOpenChange?.(!summaryShown)}
+              className={`flex min-h-11 w-full items-center gap-3 rounded-md border border-border bg-muted px-4 py-2 text-start text-foreground ${focusRing}`}
+            >
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="font-semibold">{t("checkout.summary.title")}</span>
+                <span className="text-sm text-muted-foreground">
+                  {t("checkout.summary.toggleDetail", {
+                    items: t.plural("cart.count", cart.itemCount),
+                    total: totalText,
+                  })}
+                </span>
+              </span>
+              <ChevronDownIcon
+                className={`shrink-0 motion-safe:transition-transform ${summaryShown ? "rotate-180" : ""}`}
+              />
+            </button>
+          </h2>
+          {hasPriceChange(cart) ? (
+            <Alert variant="warning" title={t("cart.banner.title")}>
+              <p>{t("cart.banner.description")}</p>
+              <Button className="mt-3" onClick={props.onAcknowledge}>
+                {t("cart.banner.ok")}
+              </Button>
+            </Alert>
+          ) : null}
+          {block === "confirmTotal" ? (
+            <Alert variant="warning" title={t("checkout.confirm.title")}>
+              <p>
+                {t("checkout.confirm.total", {
+                  total: money(plan.kind === "ship" ? plan.total : itemsTotal),
+                })}
+              </p>
+              <Button className="mt-3" onClick={props.onConfirmTotal}>
+                {t("checkout.confirm.button")}
+              </Button>
+            </Alert>
+          ) : null}
+          {block === "confirmShipping" &&
+          plan.kind === "ship" &&
+          checkout.shippingConsent !== null ? (
+            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
+              <p>
+                {t("checkout.shippingChanged.body", {
+                  method: plan.option.title,
+                  price: shippingPriceText(t, plan.option, money),
+                  total: money(plan.total),
+                  previousTotal: money(checkout.shippingConsent.previousTotal),
+                })}
+              </p>
+              <Button className="mt-3" onClick={props.onConfirmShipping}>
+                {t("checkout.shippingChanged.button")}
+              </Button>
+            </Alert>
+          ) : null}
+          {checkout.shippingConsent !== null &&
+          plan.kind === "blocked" &&
+          plan.reason === "unavailable" ? (
+            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
+              <p>
+                {t("checkout.shippingChanged.unavailable", {
+                  method:
+                    deliveryOptions.find(
+                      (option) => option.methodCode === checkout.shippingConsent?.methodCode,
+                    )?.title ?? checkout.shippingConsent.methodCode,
+                })}
+              </p>
+            </Alert>
+          ) : null}
+          {block === "notPurchasable" ? (
+            <Alert variant="danger">
+              <p>{t("checkout.blocked.notPurchasable")}</p>
+            </Alert>
+          ) : null}
+          <div
+            id={SUMMARY_DETAILS_ID}
+            className={`flex flex-col gap-4${summaryShown ? "" : " max-lg:hidden"}`}
+          >
+            <ul aria-label={t("checkout.summary.lines.label")} className="flex flex-col gap-2">
+              {cart.lines.map((line, index) => {
+                const refusal = refusals.find((error) => error.index === index);
+                return (
+                  <SummaryLine
+                    key={line.variantId}
+                    line={line}
+                    index={index}
+                    cart={cart}
+                    refusal={refusal === undefined ? null : t(refusal.messageKey)}
+                    t={t}
+                    locale={locale}
+                    exponent={exponent}
+                  />
+                );
+              })}
+            </ul>
+            <dl className="flex flex-col gap-1 text-foreground">
+              <div className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
+                <dd>{t.plural("cart.count", cart.itemCount)}</dd>
+              </div>
+              <div className="flex justify-between gap-6">
+                <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
+                <dd>
+                  {money(
+                    deliveryActive && shipping.answer !== null
+                      ? shipping.answer.subtotal
+                      : cart.subtotal,
+                  )}
+                </dd>
+              </div>
+              {deliveryActive ? (
+                <div className="flex justify-between gap-6">
+                  <dt className="text-muted-foreground">{t("checkout.summary.shipping")}</dt>
+                  <dd className="text-end">
+                    {shown === null
+                      ? t("checkout.summary.shipping.notChosen")
+                      : shippingPriceText(t, shown, money)}
+                  </dd>
+                </div>
+              ) : null}
+              <div className="flex justify-between gap-6 font-semibold">
+                <dt>{t("cart.summary.total")}</dt>
+                <dd className="text-end">{totalText}</dd>
+              </div>
+            </dl>
+            <Link
+              href={localizedHref(locale, "/cart")}
+              className={`self-start underline underline-offset-4 ${focusRing}`}
+            >
+              {t("checkout.summary.editCart")}
+            </Link>
+          </div>
+        </section>
         <form
           method="post"
           onSubmit={props.onSubmit}
           noValidate
           aria-busy={props.pending}
-          className="flex flex-col gap-6 lg:col-span-2"
+          className="flex flex-col gap-6 lg:col-span-2 lg:col-start-1 lg:row-start-1"
         >
           <FormErrorSummary
             failure={failure}
@@ -537,11 +702,17 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             </p>
           </section>
 
-          <div className="flex flex-col gap-2">
-            <LegalNotice t={t} kind="checkout" links={noticeLinks(locale)} />
+          <LegalNotice t={t} kind="checkout" links={noticeLinks(locale)} />
+          {/* "Place order" with the total sticks to the bottom of a phone screen (review D-03): a direct child of the form,
+              so it stays while any field is in view; the scroll padding keeps a focused field above it. */}
+          <div className="fk-sticky-bottom fk-bottom-bar flex flex-col gap-2 bg-background max-lg:sticky max-lg:bottom-0 max-lg:z-20 max-lg:-mx-4 max-lg:border-t max-lg:border-border max-lg:px-4 max-lg:pt-3 max-lg:shadow-card">
+            <p className="flex justify-between gap-6 font-semibold text-foreground lg:hidden">
+              <span>{t("cart.summary.total")}</span>
+              <span className="text-end">{totalText}</span>
+            </p>
             <Button
               type="submit"
-              className="self-start"
+              className="min-h-11 self-start max-lg:min-h-12 max-lg:self-stretch"
               disabled={submitDisabled}
               aria-busy={props.pending}
               {...(block !== null
@@ -559,127 +730,6 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             )}
           </div>
         </form>
-
-        <section aria-labelledby="checkout-summary-heading" className="flex flex-col gap-4">
-          <h2 id="checkout-summary-heading" className="text-xl font-semibold text-foreground">
-            {t("checkout.summary.title")}
-          </h2>
-          {hasPriceChange(cart) ? (
-            <Alert variant="warning" title={t("cart.banner.title")}>
-              <p>{t("cart.banner.description")}</p>
-              <Button className="mt-3" onClick={props.onAcknowledge}>
-                {t("cart.banner.ok")}
-              </Button>
-            </Alert>
-          ) : null}
-          {block === "confirmTotal" ? (
-            <Alert variant="warning" title={t("checkout.confirm.title")}>
-              <p>
-                {t("checkout.confirm.total", {
-                  total: money(plan.kind === "ship" ? plan.total : itemsTotal),
-                })}
-              </p>
-              <Button className="mt-3" onClick={props.onConfirmTotal}>
-                {t("checkout.confirm.button")}
-              </Button>
-            </Alert>
-          ) : null}
-          {block === "confirmShipping" &&
-          plan.kind === "ship" &&
-          checkout.shippingConsent !== null ? (
-            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
-              <p>
-                {t("checkout.shippingChanged.body", {
-                  method: plan.option.title,
-                  price: shippingPriceText(t, plan.option, money),
-                  total: money(plan.total),
-                  previousTotal: money(checkout.shippingConsent.previousTotal),
-                })}
-              </p>
-              <Button className="mt-3" onClick={props.onConfirmShipping}>
-                {t("checkout.shippingChanged.button")}
-              </Button>
-            </Alert>
-          ) : null}
-          {checkout.shippingConsent !== null &&
-          plan.kind === "blocked" &&
-          plan.reason === "unavailable" ? (
-            <Alert variant="warning" title={t("checkout.shippingChanged.title")}>
-              <p>
-                {t("checkout.shippingChanged.unavailable", {
-                  method:
-                    deliveryOptions.find(
-                      (option) => option.methodCode === checkout.shippingConsent?.methodCode,
-                    )?.title ?? checkout.shippingConsent.methodCode,
-                })}
-              </p>
-            </Alert>
-          ) : null}
-          {block === "notPurchasable" ? (
-            <Alert variant="danger">
-              <p>{t("checkout.blocked.notPurchasable")}</p>
-            </Alert>
-          ) : null}
-          <ul aria-label={t("checkout.summary.lines.label")} className="flex flex-col gap-2">
-            {cart.lines.map((line, index) => {
-              const refusal = refusals.find((error) => error.index === index);
-              return (
-                <SummaryLine
-                  key={line.variantId}
-                  line={line}
-                  index={index}
-                  cart={cart}
-                  refusal={refusal === undefined ? null : t(refusal.messageKey)}
-                  t={t}
-                  locale={locale}
-                  exponent={exponent}
-                />
-              );
-            })}
-          </ul>
-          <dl className="flex flex-col gap-1 text-foreground">
-            <div className="flex justify-between gap-6">
-              <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
-              <dd>{t.plural("cart.count", cart.itemCount)}</dd>
-            </div>
-            <div className="flex justify-between gap-6">
-              <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
-              <dd>
-                {money(
-                  deliveryActive && shipping.answer !== null
-                    ? shipping.answer.subtotal
-                    : cart.subtotal,
-                )}
-              </dd>
-            </div>
-            {deliveryActive ? (
-              <div className="flex justify-between gap-6">
-                <dt className="text-muted-foreground">{t("checkout.summary.shipping")}</dt>
-                <dd className="text-end">
-                  {shown === null
-                    ? t("checkout.summary.shipping.notChosen")
-                    : shippingPriceText(t, shown, money)}
-                </dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between gap-6 font-semibold">
-              <dt>{t("cart.summary.total")}</dt>
-              <dd className="text-end">
-                {!deliveryActive
-                  ? money(cart.total)
-                  : shown === null
-                    ? t("checkout.summary.total.pending")
-                    : money(shown.total)}
-              </dd>
-            </div>
-          </dl>
-          <Link
-            href={localizedHref(locale, "/cart")}
-            className={`self-start underline underline-offset-4 ${focusRing}`}
-          >
-            {t("checkout.summary.editCart")}
-          </Link>
-        </section>
       </div>
     </Container>
   );
@@ -703,6 +753,7 @@ export function CheckoutPage({
   const { state: account } = useAccount();
   const router = useRouter();
   const [shipping] = useState(() => createShippingStore({ client, cart: cartStore, locale }));
+  const [summaryOpen, setSummaryOpen] = useState(false);
   const shippingState = useSyncExternalStore(
     shipping.subscribe,
     shipping.getState,
@@ -815,6 +866,8 @@ export function CheckoutPage({
 
   return (
     <CheckoutPageView
+      summaryOpen={summaryOpen}
+      onSummaryOpenChange={setSummaryOpen}
       t={t}
       locale={locale}
       exponent={exponent}

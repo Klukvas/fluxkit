@@ -246,7 +246,8 @@ describe("results page markup", () => {
     const form = html.match(/<form [^>]*>/)?.[0] ?? "";
     expect(form).toContain('id="search-filters"');
     expect(form).toContain('method="get"');
-    expect(form).not.toContain("action=");
+    // The page's own path, without the `#search-filters-panel` fragment that opens the panel on a phone without a script.
+    expect(form).toContain('action="/uk/search"');
     expect(html).toContain('<input type="hidden" name="q" value="lamp"/>');
     expect(html).toContain("§search.filters.apply");
     expect(html).toMatch(/<button type="submit"[^>]*>§search\.filters\.apply<\/button>/);
@@ -299,11 +300,14 @@ describe("results page markup", () => {
     expect(html.match(/<h3[ >]/g)).toHaveLength(2);
   });
 
-  it("starts the filter panel closed below the lg width, behind a toggle that says what it controls", () => {
+  it("starts the filter panel closed below the lg width, behind a 'Filters (N)' link that opens it (a sheet with a script, in place by :target without one)", () => {
     expect(html).toMatch(
-      /<button type="button" aria-expanded="false" aria-controls="search-filters-panel"/,
+      /<a href="#search-filters-panel" id="search-filters-button" aria-controls="search-filters-panel" aria-haspopup="dialog" aria-expanded="false"/,
     );
-    expect(html).toContain('id="search-filters-panel" class="hidden lg:block"');
+    // Two chosen filters on this address (a brand and a price).
+    expect(html).toContain(">§search.filters.withCount</a>");
+    expect(html).toContain('id="search-filters-panel" class="fk-filter-panel"');
+    expect(html).not.toContain('role="dialog"');
   });
 
   it("keeps the results in a region that is not busy until a change is pending", () => {

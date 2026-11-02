@@ -24,6 +24,7 @@ import { cartLineFacts, type CartLineFacts } from "../lib/cart-model";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
+import { buyBarShown, selectionSummary } from "../lib/mobile-ux";
 import { galleryFor, type GalleryItem } from "../lib/product-media";
 import {
   chosenValue,
@@ -39,6 +40,8 @@ import {
 import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
 import { StoreImage } from "./store-image";
+import { CloseIcon } from "./icons";
+import { PHONE_QUERY, StickyBuyBar, useInView, useMediaQuery } from "./sticky-buy-bar";
 import { focusRing } from "./styles";
 
 type AddStatus =
@@ -107,6 +110,15 @@ export function ProductPurchaseView({
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
+  // The "Added" toast is shown until it is dismissed, the choice changes or it times out (the cart badge keeps the count).
+  const [toastOpen, setToastOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const toastRef = useRef<HTMLDivElement>(null);
+  // The bar exists on phones only: no second, hidden copy of the price and the button on wider screens.
+  const phone = useMediaQuery(PHONE_QUERY);
+  const ctaInView = useInView(addButtonRef, phone);
+  const footerInView = useInView("footer", phone) ?? false;
   // An address that asked for option values (a card link, a language switch) is rewritten once to the selection the page
   // actually starts from, so a value that matches nothing (`?opt.color=nope`) does not stay in it (PR 213 review m7).
   const addressReported = useRef(false);
@@ -132,6 +144,29 @@ export function ProductPurchaseView({
   const atLimit = room === 0;
   const purchasable = variant !== null && canAddToCart(variant.availability) && !atLimit;
   const pending = status.state === "pending";
+  const shownPrice =
+    variant === null
+      ? null
+      : formatMoney(
+          { amount: variant.price.amount, currency: variant.price.currency },
+          exponent,
+          locale,
+        );
+  const barNote = !purchasable
+    ? atLimit
+      ? t("product.bar.atLimit", { count: inCart })
+      : t(availability.messageKey)
+    : selectionSummary(product, selection, t("product.bar.separator"));
+
+  useEffect(() => {
+    // On a phone the toast covers the page: hidden after a while unless the shopper is in it (the cart badge keeps the
+    // count). From `md` it is a line in place, as before, and stays.
+    if (!toastOpen || !phone) return;
+    const id = window.setTimeout(() => {
+      if (!toastRef.current?.contains(document.activeElement)) setToastOpen(false);
+    }, 8000);
+    return () => window.clearTimeout(id);
+  }, [toastOpen, phone]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -142,6 +177,7 @@ export function ProductPurchaseView({
       return;
     }
     setStatus({ state: "pending" });
+    setToastOpen(false);
     try {
       const outcome = await onAddToCart({ variantId: variant.id, quantity: shownQuantity });
       // The API's `quantity_limit` does not know what the shopper sees: name the cart's quantity, but only the one read
@@ -150,6 +186,7 @@ export function ProductPurchaseView({
         outcome.status === "failed" && outcome.messageKey === QUANTITY_LIMIT_KEY
           ? quantityLimitRefusal(shownQuantity, outcome.cartQuantity)
           : null;
+      if (outcome.status === "added") setToastOpen(true);
       setStatus(
         outcome.status === "added"
           ? { state: "added" }
@@ -206,7 +243,7 @@ export function ProductPurchaseView({
               {t("product.brand")}{" "}
               <Link
                 href={localizedHref(locale, brand.path)}
-                className={`underline underline-offset-4 ${focusRing}`}
+                className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
               >
                 {brand.name}
               </Link>
@@ -254,7 +291,13 @@ export function ProductPurchaseView({
             )}
           </div>
 
-          <form method="post" onSubmit={submit} noValidate className="flex flex-col gap-4">
+          <form
+            ref={formRef}
+            method="post"
+            onSubmit={submit}
+            noValidate
+            className="flex flex-col gap-4"
+          >
             {hasOptionPicker(product)
               ? product.options.map((option) => (
                   <OptionPicker
@@ -273,6 +316,7 @@ export function ProductPurchaseView({
                       onSelectionChange?.(next);
                       setActiveImage(0);
                       setStatus({ state: "idle" });
+                      setToastOpen(false);
                     }}
                   />
                 ))
@@ -294,9 +338,14 @@ export function ProductPurchaseView({
                   }}
                   disabled={pending || atLimit}
                 />
+                {/* Full width and 48 px on phones (review N8). While adding it stays enabled for the focus (`aria-disabled`,
+                    review A1): a disabled button drops the keyboard focus to the page body; `submit` ignores a repeat. */}
                 <Button
+                  ref={addButtonRef}
                   type="submit"
-                  disabled={!purchasable || pending}
+                  disabled={!purchasable}
+                  aria-disabled={pending}
+                  className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto"
                   aria-describedby={
                     atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
                   }
@@ -316,7 +365,7 @@ export function ProductPurchaseView({
                   </span>
                   <Link
                     href={localizedHref(locale, "/cart")}
-                    className={`underline underline-offset-4 ${focusRing}`}
+                    className={`inline-flex min-h-6 items-center underline underline-offset-4 ${focusRing}`}
                   >
                     {t("product.viewCart")}
                   </Link>
@@ -337,15 +386,29 @@ export function ProductPurchaseView({
               <div role="status" className="flex flex-col gap-2">
                 {status.state === "pending" ? <p>{t("product.adding")}</p> : null}
                 {status.state === "added" ? (
-                  <p className="flex flex-wrap items-center gap-3 text-foreground">
-                    <span>{t("product.added")}</span>
+                  // The confirmation as a toast (review D-02): on phones fixed under the sticky header, from `md` in place.
+                  // It stays in this always mounted status region, so it is announced, and next in the tab order.
+                  <div
+                    ref={toastRef}
+                    hidden={!toastOpen}
+                    className="z-40 flex items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-card max-md:fixed max-md:inset-x-4 max-md:top-20"
+                  >
+                    <span className="flex-1">{t("product.added")}</span>
                     <Link
                       href={localizedHref(locale, "/cart")}
-                      className={`underline underline-offset-4 ${focusRing}`}
+                      className={`inline-flex min-h-11 items-center font-medium underline underline-offset-4 ${focusRing}`}
                     >
                       {t("product.viewCart")}
                     </Link>
-                  </p>
+                    <button
+                      type="button"
+                      aria-label={t("product.added.dismiss")}
+                      onClick={() => setToastOpen(false)}
+                      className={`inline-flex size-11 items-center justify-center rounded-md hover:bg-muted ${focusRing}`}
+                    >
+                      <CloseIcon />
+                    </button>
+                  </div>
                 ) : null}
               </div>
               {status.state === "failed" ? (
@@ -356,6 +419,25 @@ export function ProductPurchaseView({
         </div>
       </div>
       {children}
+      {phone ? (
+        <StickyBuyBar
+          visible={buyBarShown({ ctaInView, footerInView })}
+          price={shownPrice}
+          note={barNote}
+          quantity={shownQuantity}
+          min={MIN_LINE_QUANTITY}
+          max={Math.max(MIN_LINE_QUANTITY, room)}
+          canAdd={purchasable && !pending}
+          addLabel={pending ? t("product.adding") : t("product.addToCart")}
+          decreaseLabel={t("product.quantity.decrease")}
+          increaseLabel={t("product.quantity.increase")}
+          onQuantity={(next) => {
+            setQuantity(next);
+            if (status.state === "failed") setStatus({ state: "idle" });
+          }}
+          onAdd={() => formRef.current?.requestSubmit()}
+        />
+      ) : null}
     </>
   );
 }

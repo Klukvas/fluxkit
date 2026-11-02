@@ -330,6 +330,19 @@ describe("CartPageView: lines and notices", () => {
   });
 });
 
+describe("CartPageView on a phone (mobile batch, review D-09)", () => {
+  it("keeps the total and the checkout control in one bar that sticks to the bottom below md", () => {
+    const html = view(ready(cartOf([cartLine("a", { title: "§a" })])));
+    const bar =
+      /<div class="fk-sticky-bottom fk-bottom-bar[^"]*max-md:sticky max-md:bottom-0[^"]*">(.*?)<\/div><\/div>/.exec(
+        html,
+      );
+    expect(bar).not.toBeNull();
+    expect(bar?.[1]).toContain("§cart.summary.total");
+    expect(bar?.[1]).toContain('href="/uk/checkout"');
+  });
+});
+
 describe("CartPageView: banner, acknowledge, checkout", () => {
   it("shows the prices-changed banner only when a line has a price_changed notice", () => {
     expect(view(ready(mixedCart))).toContain("§cart.banner.title");

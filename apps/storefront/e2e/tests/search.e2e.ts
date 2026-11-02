@@ -250,6 +250,11 @@ test.describe("the results page", () => {
     await page.goto("/en/search?q=demo");
     await waitForHydration(page);
     const total = Number(((await resultCount(page).textContent()) ?? "").match(/\d+/)?.[0]);
+    // The Color group starts closed (only the first two groups and chosen ones are open, mobile batch): open it.
+    await page
+      .locator("details > summary")
+      .filter({ hasText: /^Color$/ })
+      .click();
     const color = page.getByRole("group", { name: "Color" });
     // Option values are variant-level: listed without counts (ADR 0034 decision 4), never with a made-up number.
     await expect(color.getByRole("checkbox", { name: "Black", exact: true })).toBeVisible();

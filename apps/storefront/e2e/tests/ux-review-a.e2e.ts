@@ -39,14 +39,25 @@ test("prices render the same on the server and in the browser: no hydration erro
   expect(html).toContain("599,00 ₴");
   for (const path of ["/uk/catalog", "/uk/p/demo-t-shirt", "/uk/cart", "/uk/checkout"]) {
     await page.goto(path);
-    // Hydrated and the cart read: a mismatch would have re-rendered the price by now.
+    // Hydrated and the cart read: a mismatch would have re-rendered the price by now. `visible`: the checkout's summary
+    // toggle for phones repeats the total and is hidden at this width (mobile batch).
     await page.waitForLoadState("networkidle");
-    await expect(page.getByText(/599,00\s₴/).first()).toBeVisible();
+    await expect(
+      page
+        .getByText(/599,00\s₴/)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
     await expect(page.getByText(/грн/)).toHaveCount(0);
   }
   for (const path of ["/en/catalog", "/en/p/demo-t-shirt", "/en/cart", "/en/checkout"]) {
     await page.goto(path);
-    await expect(page.getByText(/UAH\s599\.00/).first()).toBeVisible();
+    await expect(
+      page
+        .getByText(/UAH\s599\.00/)
+        .filter({ visible: true })
+        .first(),
+    ).toBeVisible();
   }
   expect(errors.filter((line) => HYDRATION.test(line))).toEqual([]);
 });

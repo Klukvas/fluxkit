@@ -119,7 +119,7 @@ export function LineQuantityView({
 }) {
   return (
     <div className="flex flex-col gap-1" aria-busy={autosave.pending}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-1">
         <QuantityInput
           label={t("cart.line.quantity", { title })}
           decreaseLabel={t("cart.line.decrease", { title })}
@@ -131,8 +131,8 @@ export function LineQuantityView({
           onChange={onChange}
           disabled={disabled}
         />
-        {/* Reserved width, so the row does not move when the text appears. */}
-        <span className="min-w-24 text-sm text-muted-foreground">
+        {/* A reserved line, so the row does not move when the text appears. */}
+        <span className="min-h-5 text-sm text-muted-foreground">
           {autosave.pending ? t("cart.line.saving") : ""}
         </span>
       </div>
@@ -233,91 +233,98 @@ export function CartLineView({
   const image = allowedImageUrl(line.image?.url, imageHosts);
   return (
     <li id={cartLineAnchor(line.variantId)} aria-busy={busy}>
-      <Card className="flex gap-4 p-4">
-        <div className="w-24 shrink-0">
-          <StoreImage
-            src={image}
-            alt={line.image?.alt ?? line.title}
-            width={96}
-            height={96}
-            sizes="96px"
-          />
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <h2 className="text-lg font-semibold text-foreground">
-            <Link
-              href={localizedHref(locale, `/p/${encodeURIComponent(line.productSlug)}`)}
-              className={`underline-offset-4 hover:underline ${focusRing}`}
-            >
-              {line.title}
-            </Link>
-          </h2>
-          {line.variantTitle === null ? null : (
-            <p className="text-sm text-muted-foreground">{line.variantTitle}</p>
-          )}
-          {line.optionValues.length === 0 ? null : (
-            <ul className="flex flex-wrap gap-x-4 text-sm text-muted-foreground">
-              {line.optionValues.map((choice) => (
-                <li key={choice.option}>
-                  {t("cart.line.option", { option: choice.option, value: choice.value })}
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="text-sm text-muted-foreground">{t("product.sku", { sku: line.sku })}</p>
+      {/* A stacked card (review D-09): picture and text, then one row of controls with the line total at its end. */}
+      <Card className="flex flex-col gap-3 p-4">
+        <div className="flex gap-3 sm:gap-4">
+          <div className="w-20 shrink-0 sm:w-24">
+            <StoreImage
+              src={image}
+              alt={line.image?.alt ?? line.title}
+              width={96}
+              height={96}
+              sizes="96px"
+            />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <h2 className="text-lg font-semibold text-foreground">
+              <Link
+                href={localizedHref(locale, `/p/${encodeURIComponent(line.productSlug)}`)}
+                className={`inline-flex min-h-6 items-center underline-offset-4 hover:underline ${focusRing}`}
+              >
+                {line.title}
+              </Link>
+            </h2>
+            {line.variantTitle === null ? null : (
+              <p className="text-sm text-muted-foreground">{line.variantTitle}</p>
+            )}
+            {line.optionValues.length === 0 ? null : (
+              <ul className="flex flex-wrap gap-x-4 text-sm text-muted-foreground">
+                {line.optionValues.map((choice) => (
+                  <li key={choice.option}>
+                    {t("cart.line.option", { option: choice.option, value: choice.value })}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-sm break-words text-muted-foreground">
+              {t("product.sku", { sku: line.sku })}
+            </p>
 
-          {flags.priceChanged !== null && line.unitPrice !== null ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="warning">{t("cart.notice.priceChanged")}</Badge>
-              <span>
-                {t("cart.notice.priceChanged.detail", {
-                  previous: noticeMoney(flags.priceChanged, currency, exponent, locale),
-                  current: formatMoney(line.unitPrice, exponent, locale),
-                })}
-              </span>
-            </p>
-          ) : null}
-          {flags.unavailable ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="danger">{t("cart.notice.unavailable")}</Badge>
-              <span>{t("cart.notice.unavailable.hint")}</span>
-            </p>
-          ) : null}
-          {/* Always mounted, so a hint an autosave answer brings or clears is announced (review m5 of PR 215). */}
-          <div aria-live="polite" aria-atomic="true" className="empty:-mt-2">
-            {flags.outOfStock ? (
+            {flags.priceChanged !== null && line.unitPrice !== null ? (
               <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-                <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
+                <Badge variant="warning">{t("cart.notice.priceChanged")}</Badge>
                 <span>
-                  {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
+                  {t("cart.notice.priceChanged.detail", {
+                    previous: noticeMoney(flags.priceChanged, currency, exponent, locale),
+                    current: formatMoney(line.unitPrice, exponent, locale),
+                  })}
                 </span>
               </p>
-            ) : stock !== null ? (
+            ) : null}
+            {flags.unavailable ? (
               <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-                <Badge variant="warning">{t("cart.stock.badge")}</Badge>
-                <span>{stockHintText(t, stock)}</span>
-              </p>
-            ) : !flags.unavailable && line.availability === "low_stock" ? (
-              <p className="text-sm text-foreground">
-                <Badge variant="warning">{t("availability.low_stock")}</Badge>
+                <Badge variant="danger">{t("cart.notice.unavailable")}</Badge>
+                <span>{t("cart.notice.unavailable.hint")}</span>
               </p>
             ) : null}
+            {/* Always mounted, so a hint an autosave answer brings or clears is announced (review m5 of PR 215). */}
+            <div aria-live="polite" aria-atomic="true" className="empty:-mt-2">
+              {flags.outOfStock ? (
+                <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                  <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
+                  <span>
+                    {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
+                  </span>
+                </p>
+              ) : stock !== null ? (
+                <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                  <Badge variant="warning">{t("cart.stock.badge")}</Badge>
+                  <span>{stockHintText(t, stock)}</span>
+                </p>
+              ) : !flags.unavailable && line.availability === "low_stock" ? (
+                <p className="text-sm text-foreground">
+                  <Badge variant="warning">{t("availability.low_stock")}</Badge>
+                </p>
+              ) : null}
+            </div>
+            {flags.outOfRange ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <Badge variant="danger">{t("cart.notice.outOfRange")}</Badge>
+                <span>{t("cart.notice.outOfRange.hint")}</span>
+              </p>
+            ) : null}
+
+            {line.unitPrice === null ? null : (
+              <p className="text-foreground">
+                <span className="text-sm text-muted-foreground">{t("cart.line.unitPrice")} </span>
+                <PriceText price={formatMoney(line.unitPrice, exponent, locale)} />
+              </p>
+            )}
           </div>
-          {flags.outOfRange ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="danger">{t("cart.notice.outOfRange")}</Badge>
-              <span>{t("cart.notice.outOfRange.hint")}</span>
-            </p>
-          ) : null}
+        </div>
 
-          {line.unitPrice === null ? null : (
-            <p className="text-foreground">
-              <span className="text-sm text-muted-foreground">{t("cart.line.unitPrice")} </span>
-              <PriceText price={formatMoney(line.unitPrice, exponent, locale)} />
-            </p>
-          )}
-
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start gap-3">
             {flags.canEditQuantity ? (
               <LineQuantity
                 line={line}
@@ -333,6 +340,7 @@ export function CartLineView({
             )}
             <Button
               variant="secondary"
+              className="min-h-11"
               aria-label={t("cart.line.remove", { title: line.title })}
               disabled={busy}
               onClick={() => onRemove(line.variantId)}
@@ -340,13 +348,13 @@ export function CartLineView({
               {t("cart.line.removeText")}
             </Button>
           </div>
+          {line.lineTotal === null ? null : (
+            <p className="ms-auto shrink-0 text-end text-foreground">
+              <span className="block text-sm text-muted-foreground">{t("cart.line.total")}</span>
+              <PriceText price={formatMoney(line.lineTotal, exponent, locale)} />
+            </p>
+          )}
         </div>
-        {line.lineTotal === null ? null : (
-          <p className="shrink-0 text-end text-foreground">
-            <span className="block text-sm text-muted-foreground">{t("cart.line.total")}</span>
-            <PriceText price={formatMoney(line.lineTotal, exponent, locale)} />
-          </p>
-        )}
       </Card>
     </li>
   );
@@ -495,6 +503,13 @@ export function CartPageView({
                 <dt className="text-muted-foreground">{t("cart.summary.subtotal")}</dt>
                 <dd>{formatMoney(cart.subtotal, exponent, locale)}</dd>
               </div>
+            </dl>
+          </section>
+
+          {/* The total and the checkout control stick to the bottom of a phone screen while the lines scroll (review D-09):
+              CSS only, the same elements (a direct child of the page container, so `sticky` has the whole page to stick in). */}
+          <div className="fk-sticky-bottom fk-bottom-bar flex flex-col gap-3 bg-background max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:border-t max-md:border-border max-md:px-4 max-md:pt-3 max-md:shadow-card">
+            <dl className="flex max-w-sm flex-col text-foreground max-md:max-w-none">
               <div className="flex justify-between gap-6 font-semibold">
                 <dt>{t("cart.summary.total")}</dt>
                 <dd>{formatMoney(cart.total, exponent, locale)}</dd>
@@ -503,7 +518,7 @@ export function CartPageView({
             {block === null ? (
               <Link
                 href={localizedHref(locale, "/checkout")}
-                className={`${linkButton} self-start`}
+                className={`${linkButton} self-start max-md:self-stretch`}
                 onClick={onCheckout}
                 aria-busy={leaving}
                 {...(leaving ? { "aria-disabled": true } : {})}
@@ -512,7 +527,11 @@ export function CartPageView({
               </Link>
             ) : (
               <>
-                <Button className="self-start" disabled aria-describedby={CHECKOUT_REASON_ID}>
+                <Button
+                  className="min-h-11 self-start max-md:self-stretch"
+                  disabled
+                  aria-describedby={CHECKOUT_REASON_ID}
+                >
                   {t("cart.checkout")}
                 </Button>
                 {block === "stock" ? (
@@ -527,7 +546,7 @@ export function CartPageView({
                         <li key={line.variantId}>
                           <a
                             href={`#${cartLineAnchor(line.variantId)}`}
-                            className={`text-foreground underline underline-offset-4 ${focusRing}`}
+                            className={`inline-flex min-h-6 items-center text-foreground underline underline-offset-4 ${focusRing}`}
                           >
                             {lineName(line)}
                           </a>
@@ -546,7 +565,7 @@ export function CartPageView({
                 )}
               </>
             )}
-          </section>
+          </div>
         </>
       ) : null}
     </Container>

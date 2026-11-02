@@ -76,6 +76,29 @@ export interface OrderDetailsViewProps {
    * has something to show. It replaces the neutral "the shop will contact you" wording, which would be wrong beside a pay button.
    */
   payment?: ReactNode;
+  /** Shown right under the heading and the status (the guest page's "Save this link" callout): the confirmation comes first. */
+  afterHeading?: ReactNode;
+}
+
+/**
+ * The heading's text with the order number kept on one line (review D-10: "GCAD-" and "8X10" must not part at the hyphen).
+ * The translated sentence is split around the number, so any locale's word order works; the text stays a plain hyphen.
+ */
+export function headingParts(text: string, number: string): [string, string, string] {
+  const at = text.indexOf(number);
+  if (at === -1) return [text, "", ""];
+  return [text.slice(0, at), number, text.slice(at + number.length)];
+}
+
+function OrderHeading({ text, number }: { text: string; number: string }) {
+  const [before, kept, after] = headingParts(text, number);
+  return (
+    <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+      {before}
+      {kept === "" ? null : <span className="whitespace-nowrap">{kept}</span>}
+      {after}
+    </h1>
+  );
 }
 
 export function OrderDetailsView({
@@ -88,6 +111,7 @@ export function OrderDetailsView({
   onKeepOrder,
   onConfirmCancel,
   payment = null,
+  afterHeading = null,
 }: OrderDetailsViewProps) {
   const money = (value: Order["total"]) => orderMoney(value, shop, locale);
   const status = t(orderStatusKey(order.status));
@@ -117,16 +141,15 @@ export function OrderDetailsView({
   const contactErased = order.contact.email === null;
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold text-foreground">
-        {t("order.heading", { number: order.number })}
-      </h1>
+      <OrderHeading text={t("order.heading", { number: order.number })} number={order.number} />
+      {/* Always mounted (a live region); while empty it takes no room, not even the gap above it (review D-10). */}
       <div
         role="status"
         aria-live="polite"
         aria-atomic="true"
         id={CANCEL_FOCUS_IDS.status}
         tabIndex={-1}
-        className="min-h-6 rounded-md text-muted-foreground outline-offset-2 focus:outline-2 focus:outline-ring"
+        className="min-h-6 rounded-md empty:-mt-6 empty:min-h-0 text-muted-foreground outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         {cancel.done ? t("order.cancel.done") : ""}
       </div>
@@ -142,6 +165,7 @@ export function OrderDetailsView({
           <dd>{formatDateTime(order.placedAt, locale)}</dd>
         </div>
       </dl>
+      {afterHeading}
 
       {payment !== null ? (
         payment

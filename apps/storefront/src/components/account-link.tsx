@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
+import { VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRef, type ReactNode } from "react";
 import { accountLinks, guestLinks, sessionLinks } from "../layout/navigation";
@@ -34,8 +34,9 @@ export function AccountLinkView({
   const slot = "inline-flex min-h-11 min-w-11 items-center justify-center";
   if (state.status === "loading") {
     return (
-      <div className={slot} aria-live="polite">
-        <Skeleton className="h-6 w-6 rounded-full" />
+      <div className={`${slot} text-muted-foreground`} aria-live="polite">
+        {/* The icon, muted and not a control yet: a grey placeholder pill read as broken (review N9). */}
+        <UserIcon />
         <VisuallyHidden>{t("nav.account.loading")}</VisuallyHidden>
       </div>
     );

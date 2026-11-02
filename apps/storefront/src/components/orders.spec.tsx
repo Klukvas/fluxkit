@@ -11,7 +11,7 @@ import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { AccountOrdersView } from "./account-orders";
 import { GuestOrderPage, OrderStatusView, SaveLinkView, copyLink } from "./guest-order-page";
-import { OrderDetailsView, addressLines } from "./order-details";
+import { OrderDetailsView, addressLines, headingParts } from "./order-details";
 import { SiteShell } from "./site-shell";
 import {
   findElements,
@@ -233,6 +233,20 @@ describe("OrderDetailsView", () => {
       for (const attribute of textAttributes(html)) expect(leftoverText(attribute)).toBe("");
       expect(html.match(/<h1/g)).toHaveLength(1);
     }
+  });
+});
+
+describe("the order heading (review D-10)", () => {
+  it("keeps the number in one unbreakable piece, in any word order", () => {
+    expect(headingParts("Замовлення GCAD-8X10", "GCAD-8X10")).toEqual([
+      "Замовлення ",
+      "GCAD-8X10",
+      "",
+    ]);
+    expect(headingParts("GCAD-8X10 order", "GCAD-8X10")).toEqual(["", "GCAD-8X10", " order"]);
+    expect(headingParts("Order", "GCAD-8X10")).toEqual(["Order", "", ""]);
+    // The test translator leaves the number out: nothing to keep together, no empty span.
+    expect(renderToStaticMarkup(details(anOrder()))).not.toContain("whitespace-nowrap");
   });
 });
 

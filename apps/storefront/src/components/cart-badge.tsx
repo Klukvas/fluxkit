@@ -1,6 +1,6 @@
 "use client";
 
-import { Skeleton, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
+import { VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { sessionLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
@@ -12,8 +12,8 @@ import { useCart } from "./session-provider";
 /**
  * The cart as an icon (owner request 2026-11-02). The count sits in a round badge on the icon (`danger` fill, its own
  * `danger-foreground` text token) ONLY when the cart holds something; at 0 there is no badge. The link's accessible name is
- * "Cart" plus the count in words (plural forms), in a polite live region so a change is announced. The slot keeps its size in
- * every state (a small skeleton while loading), so the header does not shift when the answer arrives.
+ * "Cart" plus the count in words (plural forms), in a polite live region so a change is announced. While the cart loads the
+ * icon shows alone (no grey placeholder pill: it read as broken, review N9); the badge sits on the icon, so nothing shifts.
  */
 export function CartBadgeView({
   state,
@@ -30,10 +30,7 @@ export function CartBadgeView({
       <VisuallyHidden>{t("nav.cart")}</VisuallyHidden>
       <span aria-live="polite">
         {state.status === "loading" ? (
-          <>
-            <Skeleton className="absolute end-0 top-0 h-5 w-5 rounded-full" />
-            <VisuallyHidden>{t("nav.cart.loading")}</VisuallyHidden>
-          </>
+          <VisuallyHidden>{t("nav.cart.loading")}</VisuallyHidden>
         ) : null}
         {state.status === "ready" ? (
           <VisuallyHidden>{t.plural("nav.cart.items", state.count)}</VisuallyHidden>

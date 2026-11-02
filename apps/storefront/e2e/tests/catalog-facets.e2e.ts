@@ -42,6 +42,11 @@ test("the catalog lists through search: facets, sort and chips on its own addres
   const total = await countOf(page);
   expect(total).toBeGreaterThan(3);
 
+  // The Color group starts closed (only the first two groups and chosen ones are open, mobile batch): open it.
+  await page
+    .locator("details > summary")
+    .filter({ hasText: /^Color$/ })
+    .click();
   await page
     .getByRole("group", { name: "Color" })
     .getByRole("checkbox", { name: "Black", exact: true })
