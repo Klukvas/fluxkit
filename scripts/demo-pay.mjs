@@ -9,7 +9,7 @@
 // Development only: refuses NODE_ENV=production, a database whose name does not end in _dev, _demo, _local or _test, and
 // every provider but `fake`. Changes nothing itself: it reads one row and sends one request.
 import { createHmac } from "node:crypto";
-import { assertDemoDatabase, loadPg, readEnvFile } from "./demo-lib.mjs";
+import { assertDemoDatabase, loadPg, localApiOrigin, readEnvFile } from "./demo-lib.mjs";
 
 /** The fake's fixed, public test key (never a secret; packages/providers/_fake-payment/README.md). */
 const FAKE_WEBHOOK_KEY = "fluxkit-fake-payment-webhook-test-key";
@@ -56,6 +56,8 @@ async function main() {
   if (!(values.PAYMENT_PROVIDERS_ENABLED ?? "").split(",").includes("fake")) {
     throw new Error("PAYMENT_PROVIDERS_ENABLED in .env does not contain fake.");
   }
+  // Checked before anything else, so a bad PORT never reaches the database or the network.
+  const api = localApiOrigin(values);
   const attempt = await findAttempt(values, options.order);
   if (attempt === undefined) {
     throw new Error(
@@ -79,7 +81,6 @@ async function main() {
     card: paid ? { system: "visa", last4: "4242" } : null,
   });
   const signature = createHmac("sha256", FAKE_WEBHOOK_KEY).update(body, "utf8").digest("hex");
-  const api = `http://127.0.0.1:${values.PORT || "3000"}`;
   let response;
   try {
     response = await globalThis.fetch(`${api}/webhooks/payments/fake`, {

@@ -78,6 +78,11 @@ export function formatSummary(summary: SeedSummary): string {
         ]),
     ...synonymLines(summary.synonymGroups),
     imageLine(summary.images),
+    ...(summary.images.existingWithoutImages.length === 0
+      ? []
+      : [
+          `  images missing on existing products (never repaired by the seed, seeds/README.md): ${summary.images.existingWithoutImages.join(", ")}`,
+        ]),
   ].join("\n");
 }
 
