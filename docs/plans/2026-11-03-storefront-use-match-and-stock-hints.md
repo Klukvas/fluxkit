@@ -1,6 +1,6 @@
 # Storefront: use the matched variant and the cart stock hints (2026-11-03)
 
-Status: built (see "Results"); not independently reviewed. Branch `feature/storefront-use-match-and-stock-hints` from `origin/main` `9dbdac0` (PR 214 merged). No PR is opened by the implementing agent.
+Status: built (see "Results"); PR 215, independently reviewed (no blocker, no major; minors fixed, see "Review fixes"). The file name carries the date the task gave it; the work was written, built and reviewed on 2026-11-02 (the dates below). Branch `feature/storefront-use-match-and-stock-hints` from `origin/main` `9dbdac0` (PR 214 merged). No PR is opened by the implementing agent.
 Goal: consume the two additive API fields of PR 214 (plan `2026-11-02-api-matched-variant-and-stock-hints.md`, "Consumption notes") and remove the stop-gap wording PR 213 added while they did not exist. Storefront only: no API, schema, contract, token or dependency change.
 
 ## Existing functionality found
@@ -41,3 +41,14 @@ Goal: consume the two additive API fields of PR 214 (plan `2026-11-02-api-matche
 - **Failing first:** unit specs written before the code failed (11 card specs: `search-facets.spec.ts`, `search-results.spec.tsx`; 26 stock specs across `cart-model`, `add-to-cart`, `checkout-store`, `cart-page`, `checkout`, `catalog`), then passed. The new e2e file `match-and-stock-hints.e2e.ts` failed 6 of 6 against a storefront built from `origin/main`'s source, then passed 6 of 6.
 - **Verified (exit 0 each):** `pnpm lint`, `format:check`, `typecheck`, `check:boundaries` (2331 modules, 0 violations), `check:env`, `check:licenses`, `check:docs`; unit tests storefront 1723, ui 180, theme 68; storefront e2e full suite with search on (97 passed, 4 `search-off` skipped by design) and `match-and-stock-hints` plus `search-off` with `E2E_SEARCH=off` (6 passed, 4 skipped).
 - **Not verified:** a `match: null` card in a browser (the index would have to lag Postgres; unit-tested only); a manual screen-reader pass; the admin e2e suite (no admin change); a multi-location shop (the hint counts the default location, `docs/api/cart.md`).
+
+## Review fixes (PR 215, independent review 2026-11-02)
+
+- **m1 (typed quantity clamped to a stale hint):** chosen: the server decides above the hint. `QuantityInput` (`packages/ui`) gains an optional `stepMax`: the step buttons stop there, a typed number is clamped to `max` (999) only. The cart passes `quantityStepperMax(line)` as `stepMax`, so "+" stops at "Only N available" while a typed 10 is sent as 10 and the server's answer sets the hint again (or clears it after a restock). One "-" from above the hint still lands on it.
+- **m2 (grammar):** `product.quantity.stockLimit` is a plural group by the available count (`{inCart}`, `{count}`; en "is"/"are", uk all forms); a count of 0 uses `product.quantity.stockShort` ("more than the shop has in stock").
+- **m3 (stale line error):** after an `insufficient_stock` refusal the cart re-read drops the stock errors of lines the fresh cart no longer flags; other codes stay; a newer submit's errors are never touched.
+- **m4 (count beside the badge):** "N matching options; the best availability among them is shown" (uk the same meaning).
+- **m5 (a11y):** each cart line's stock hint sits in an always-mounted polite live region; when the checkout link turns into the blocked button and the focus was lost with it, the focus moves to the reason (`focusCheckoutReason`, `tabindex="-1"` on the reason).
+- **m6:** the `409 cart_changed` path is driven through the checkout store (cart without hints before, the 409's cart with hints applied after); the view spec's name says what it checks.
+- **m7:** handoff names PR 215; this date note; the dead `hint === null` branch of `StockWarningsView` is gone (`stockProblems` yields line and hint).
+- **Failing first:** the new and changed specs failed before the fixes (storefront 7, ui 1; the m6 store spec passed at once: it covers existing behaviour), then passed.
