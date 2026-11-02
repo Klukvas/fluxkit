@@ -9,6 +9,7 @@ import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/u
 import { ReauthDialog } from "../session/reauth-dialog";
 import { useSession } from "../session/session-context";
 import { NotAllowedView } from "../views/status-views";
+import { contextHelpFor, helpArticlePath } from "./context-help";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
 import { mayOpenRoute } from "./route-gate";
@@ -38,7 +39,27 @@ export interface ShellFrameProps {
   userMenu: ReactNode;
   /** Announced while a route chunk loads. */
   navigating: boolean;
+  /** The link to the help of the current page (`ContextHelpLink`), above the page; none on screens without one. */
+  contextHelp?: ReactNode;
   children: ReactNode;
+}
+
+/** "Help for this page": the article (and section) of the screen, from `context-help.ts`. */
+export function ContextHelpLink({ t, href }: { t: Translator; href: string }) {
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-foreground underline underline-offset-4"
+    >
+      <span
+        aria-hidden="true"
+        className="inline-flex size-6 items-center justify-center rounded-full border border-border no-underline"
+      >
+        ?
+      </span>
+      {t("shell.contextHelp")}
+    </Link>
+  );
 }
 
 /**
@@ -51,6 +72,7 @@ export function ShellFrame({
   languageSwitch,
   userMenu,
   navigating,
+  contextHelp,
   children,
 }: ShellFrameProps) {
   return (
@@ -81,6 +103,9 @@ export function ShellFrame({
         </aside>
         <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-6">
           <LiveRegion visuallyHidden>{navigating ? t("shell.navigating") : null}</LiveRegion>
+          {contextHelp === undefined || contextHelp === null ? null : (
+            <div className="mb-2 flex justify-end">{contextHelp}</div>
+          )}
           {children}
         </main>
       </div>
@@ -109,6 +134,10 @@ export function Shell() {
   useDocumentTitle(handle?.titleKey ?? "notFound.title");
 
   const allowed = mayOpenRoute(handle, (permission) => session.can(permission));
+  const help =
+    allowed && handle !== undefined
+      ? contextHelpFor(handle.routeId, new URLSearchParams(location.search).get("tab"))
+      : null;
   const groups: SideNavGroup[] = visibleNavigation(session.state.me?.permissions ?? null).map(
     (group) => ({
       id: group.id,
@@ -130,6 +159,11 @@ export function Shell() {
         languageSwitch={<LanguageSwitch />}
         userMenu={<UserMenu />}
         navigating={navigation.state === "loading"}
+        contextHelp={
+          help === null ? null : (
+            <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
+          )
+        }
       >
         <Fragment key={session.state.generation}>
           {allowed ? <Outlet /> : <NotAllowedView t={t} />}

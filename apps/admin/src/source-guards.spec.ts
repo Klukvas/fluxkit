@@ -187,11 +187,21 @@ describe("source guards (AGENTS.md sections 2.2, 2.3 and 11; plan, Security (adm
     }
   });
 
-  it("keeps only the UI language in browser storage, read in one place; no cookie, sessionStorage or IndexedDB", () => {
+  it("keeps browser storage behind one accessor, used for the UI language and the help checklist only; no cookie, sessionStorage or IndexedDB", () => {
     const storage = sources.filter((file) => /\blocalStorage\b/.test(code(file.text)));
     expect(storage.map((file) => file.path)).toEqual([join("i18n", "i18n-context.tsx")]);
     expect(code(storage[0]?.text ?? "")).toMatch(
       /browserStorage = \(\): StorageLike => window\.localStorage;/,
+    );
+    // The users of the accessor: the language (start-up and switch) and the getting-started checklist, whose key holds the
+    // opaque admin id and whose value holds step ids and a flag only (knowledge base plan, decision 5).
+    const users = sources.filter((file) => /\bbrowserStorage\b/.test(code(file.text)));
+    expect(users.map((file) => file.path).sort()).toEqual(
+      [
+        join("areas", "help", "checklist-storage.ts"),
+        join("i18n", "i18n-context.tsx"),
+        "main.tsx",
+      ].sort(),
     );
     for (const file of sources) {
       expect(code(file.text), file.path).not.toMatch(

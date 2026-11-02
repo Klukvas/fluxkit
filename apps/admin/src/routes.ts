@@ -452,6 +452,25 @@ export const ROUTES: readonly AppRoute[] = [
       (module) => module.UserDetailPage,
     ),
   ),
+  // The knowledge base: every signed-in role may read it, so it is guarded by the session operation like the start page.
+  route(
+    "help",
+    "getMe",
+    "page.help.title",
+    areaPage(
+      () => import("./areas/help"),
+      (module) => module.HelpIndexPage,
+    ),
+  ),
+  route(
+    "helpArticle",
+    "getMe",
+    "page.helpArticle.title",
+    areaPage(
+      () => import("./areas/help"),
+      (module) => module.HelpArticlePage,
+    ),
+  ),
 ];
 
 export function routeById(id: RouteId): AppRoute {
