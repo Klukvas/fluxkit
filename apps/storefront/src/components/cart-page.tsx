@@ -21,12 +21,18 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseE
 import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
 import { cartPageHandlers } from "../lib/cart-handlers";
 import {
+  cartLineAnchor,
   checkoutBlock,
   hasPriceChange,
   isCartBusy,
   isLineBusy,
   lineFlags,
+  lineName,
+  lineStockHint,
   noticeMoney,
+  quantityStepperMax,
+  stockHintText,
+  stockProblemLines,
 } from "../lib/cart-model";
 import { LOAD_BUSY_KEY, type CartAnnouncement, type CartState } from "../lib/cart-store";
 import { failureText, type Failure } from "../lib/failure";
@@ -90,6 +96,7 @@ export function LineQuantityView({
   disabled,
   t,
   onChange,
+  max = MAX_LINE_QUANTITY,
 }: {
   title: string;
   variantId: string;
@@ -100,6 +107,8 @@ export function LineQuantityView({
   disabled: boolean;
   t: Translator;
   onChange: (quantity: number) => void;
+  /** The highest quantity offered (`quantityStepperMax`: the API's stock count when it gave one, else the line limit). */
+  max?: number;
 }) {
   return (
     <div className="flex flex-col gap-1" aria-busy={autosave.pending}>
@@ -109,7 +118,7 @@ export function LineQuantityView({
           decreaseLabel={t("cart.line.decrease", { title })}
           increaseLabel={t("cart.line.increase", { title })}
           min={MIN_LINE_QUANTITY}
-          max={MAX_LINE_QUANTITY}
+          max={max}
           value={quantity}
           onChange={onChange}
           disabled={disabled}
@@ -180,6 +189,7 @@ function LineQuantity({
       disabled={disabled || autosave === null}
       t={t}
       onChange={(quantity) => autosave?.change(quantity)}
+      max={quantityStepperMax(line)}
     />
   );
 }
@@ -211,9 +221,10 @@ export function CartLineView({
   registerLine?: (variantId: string, autosave: QuantityAutosave) => () => void;
 }) {
   const flags = lineFlags(line);
+  const stock = lineStockHint(line);
   const image = allowedImageUrl(line.image?.url, imageHosts);
   return (
-    <li aria-busy={busy}>
+    <li id={cartLineAnchor(line.variantId)} aria-busy={busy}>
       <Card className="flex gap-4 p-4">
         <div className="w-24 shrink-0">
           <StoreImage
@@ -267,13 +278,18 @@ export function CartLineView({
           {flags.outOfStock ? (
             <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
               <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
-              <span>{t("cart.notice.outOfStock.hint")}</span>
+              <span>
+                {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
+              </span>
             </p>
-          ) : null}
-          {!flags.outOfStock && !flags.unavailable && line.availability === "low_stock" ? (
+          ) : stock !== null ? (
             <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+              <Badge variant="warning">{t("cart.stock.badge")}</Badge>
+              <span>{stockHintText(t, stock)}</span>
+            </p>
+          ) : !flags.unavailable && line.availability === "low_stock" ? (
+            <p className="text-sm text-foreground">
               <Badge variant="warning">{t("availability.low_stock")}</Badge>
-              <span>{t("cart.notice.lowStock.hint")}</span>
             </p>
           ) : null}
           {flags.outOfRange ? (
@@ -488,9 +504,27 @@ export function CartPageView({
                 <Button className="self-start" disabled aria-describedby="cart-checkout-reason">
                   {t("cart.checkout")}
                 </Button>
-                <p id="cart-checkout-reason" className="text-sm text-muted-foreground">
-                  {t("cart.checkout.blocked")}
-                </p>
+                {block === "stock" ? (
+                  <div id="cart-checkout-reason" className="flex flex-col gap-1 text-sm">
+                    <p className="text-foreground">{t("cart.checkout.stockBlocked")}</p>
+                    <ul className="flex flex-col gap-1">
+                      {stockProblemLines(cart).map((line) => (
+                        <li key={line.variantId}>
+                          <a
+                            href={`#${cartLineAnchor(line.variantId)}`}
+                            className={`text-foreground underline underline-offset-4 ${focusRing}`}
+                          >
+                            {lineName(line)}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p id="cart-checkout-reason" className="text-sm text-muted-foreground">
+                    {t("cart.checkout.blocked")}
+                  </p>
+                )}
               </>
             )}
           </section>
@@ -532,8 +566,12 @@ export function CartPage({
     setLeaving(true);
     const saved = await registry.settled();
     setLeaving(false);
-    // A refused quantity stays on this page with its reason on the line; the shopper decides again.
-    if (saved) router.push(localizedHref(locale, "/checkout"));
+    // A refused quantity stays on this page with its reason on the line; the shopper decides again. So does a saved one
+    // the server's answer flags for stock: the page now shows the reason and the checkout button is blocked.
+    const cart = store.getState().cart;
+    if (saved && cart !== null && checkoutBlock(cart) === null) {
+      router.push(localizedHref(locale, "/checkout"));
+    }
   }
 
   return (

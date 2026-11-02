@@ -32,6 +32,26 @@ const cart = cartOf(
   { subtotal: { amount: 4321, currency: "UAH" }, total: { amount: 4321, currency: "UAH" } },
 );
 
+/** One line the checkout would refuse for stock (with a count) and one without a count (999 of 22). */
+const stockCart = cartOf(
+  [
+    cartLine("a", {
+      title: "§title-a",
+      lineTotal: { amount: 1000, currency: "UAH" },
+      quantity: 5,
+      insufficientStock: true,
+      maxQuantity: 3,
+    }),
+    cartLine("b", {
+      title: "§title-b",
+      lineTotal: { amount: 2000, currency: "UAH" },
+      quantity: 999,
+      insufficientStock: true,
+    }),
+  ],
+  { subtotal: { amount: 4321, currency: "UAH" }, total: { amount: 4321, currency: "UAH" } },
+);
+
 function ready(value = cart): CartState {
   return { ...initialCartState, status: "ready", cart: value };
 }
@@ -296,8 +316,9 @@ describe("checkout page: blocks and confirmations", () => {
     expect(submitButton(volatile)).not.toContain("disabled");
   });
 
-  // Review SQ-02 (2026-11-02): the stock refusal came only after the whole form was filled in.
-  it("names the out-of-stock and low-stock lines above the form as soon as the page loads", () => {
+  // Review SQ-02 (2026-11-02), plan 2026-11-03: the stock refusal came only after the whole form was filled in; the cart's
+  // `insufficientStock` now says which lines the checkout would refuse.
+  it("lists the lines the checkout would refuse for stock above the form, links each to the cart and flags the submit", () => {
     const html = render({
       cartState: ready(
         cartOf([
@@ -305,20 +326,46 @@ describe("checkout page: blocks and confirmations", () => {
             title: "§title-a",
             availability: "out_of_stock",
             notices: [{ code: "out_of_stock" }],
+            insufficientStock: true,
+            maxQuantity: 0,
           }),
           cartLine("b", { title: "§title-b", availability: "low_stock", quantity: 3 }),
-          cartLine("c", { title: "§title-c" }),
+          cartLine("c", { title: "§title-c", quantity: 999, insufficientStock: true }),
         ]),
       ),
     });
     const form = html.indexOf("<form");
-    const out = html.indexOf("§checkout.stock.outOfStock");
-    const low = html.indexOf("§checkout.stock.lowStock");
-    expect(out).toBeGreaterThan(-1);
-    expect(low).toBeGreaterThan(-1);
-    expect(out).toBeLessThan(form);
-    expect(low).toBeLessThan(form);
+    const alert = html.indexOf("§checkout.stock.title");
+    expect(alert).toBeGreaterThan(-1);
+    expect(alert).toBeLessThan(form);
+    expect(html.indexOf('href="/uk/cart#cart-line-a"')).toBeLessThan(form);
+    expect(html).toContain('href="/uk/cart#cart-line-c"');
+    expect(html).not.toContain("#cart-line-b");
+    expect(html).toContain("§cart.stock.none");
+    expect(html).toContain("§cart.stock.short");
+    // Flagged, not blocked: the server judges the order, and a hint can be older than the stock.
+    expect(submitButton(html)).not.toContain("disabled");
+    expect(submitButton(html)).toContain('aria-describedby="checkout-stock-warning"');
+    expect(html).toContain('id="checkout-stock-warning"');
+    // A low-stock line that fits says nothing here (the PR 213 "confirmed at checkout" note is gone).
+    const low = render({
+      cartState: ready(cartOf([cartLine("b", { availability: "low_stock", quantity: 3 })])),
+    });
+    expect(low).not.toContain("§checkout.stock.");
+    expect(submitButton(low)).not.toContain("aria-describedby");
     expect(render()).not.toContain("§checkout.stock.");
+  });
+
+  it("shows the stock hints of the cart a 409 cart_changed handed over (the store applies that cart)", () => {
+    const changed = cartOf([
+      cartLine("a", { title: "§title-a", quantity: 4, insufficientStock: true, maxQuantity: 2 }),
+    ]);
+    const html = render({
+      cartState: ready(changed),
+      checkout: { ...initialCheckoutState, needsConfirmation: true },
+    });
+    expect(html).toContain("§checkout.stock.title");
+    expect(html).toContain("§cart.stock.only");
   });
 
   it("marks the refused lines of checkout_refused, only for the cart they were refused in", () => {
@@ -333,6 +380,17 @@ describe("checkout page: blocks and confirmations", () => {
       checkout: { ...initialCheckoutState, lineErrors: { cart: cartOf([cartLine("a")]), errors } },
     });
     expect(other).not.toContain("refusal");
+    // The cart is read again after an insufficient_stock refusal: the same lines in a new answer keep their errors.
+    const reread = render({
+      cartState: ready(cartOf(cart.lines.map((line) => ({ ...line })))),
+      checkout: { ...initialCheckoutState, lineErrors: { cart, errors } },
+    });
+    expect(reread).toContain('id="checkout-line-1-refusal"');
+    const changedQuantity = render({
+      cartState: ready(cartOf(cart.lines.map((line) => ({ ...line, quantity: 1 })))),
+      checkout: { ...initialCheckoutState, lineErrors: { cart, errors } },
+    });
+    expect(changedQuantity).not.toContain("refusal");
   });
 
   it("links a customer at the open-order limit to the order history", () => {
@@ -362,6 +420,7 @@ describe("checkout page: money and text", () => {
         },
       },
       { cartState: ready(cartOf([])) },
+      { cartState: ready(stockCart) },
     ] satisfies Partial<CheckoutPageViewProps>[]) {
       const html = render(overrides);
       expect(leftoverText(withoutData(html))).toBe("");
@@ -384,6 +443,13 @@ describe("checkout page: money and text", () => {
         <CheckoutPageView {...props({ t: createTranslator(messages, locale), locale })} />,
       );
       expect(html).toContain(messages["checkout.submit"]);
+      const stock = renderToStaticMarkup(
+        <CheckoutPageView
+          {...props({ t: createTranslator(messages, locale), locale, cartState: ready(stockCart) })}
+        />,
+      );
+      expect(stock).toContain(messages["checkout.stock.title"]);
+      expect(stock).toContain(messages["checkout.stock.description"]);
     }
   });
 });

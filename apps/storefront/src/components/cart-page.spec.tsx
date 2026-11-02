@@ -417,6 +417,84 @@ describe("CartPageView: banner, acknowledge, checkout", () => {
   });
 });
 
+describe("CartPageView: stock hints of the API (insufficientStock, maxQuantity; plan 2026-11-03)", () => {
+  const short = cartLine("big", {
+    title: "§big",
+    quantity: 999,
+    insufficientStock: true,
+    maxQuantity: null,
+  });
+  const few = cartLine("few", {
+    title: "§few",
+    quantity: 8,
+    insufficientStock: true,
+    maxQuantity: 3,
+  });
+  const none = cartLine("none", {
+    title: "§none",
+    availability: "out_of_stock",
+    notices: [{ code: "out_of_stock" }],
+    insufficientStock: true,
+    maxQuantity: 0,
+  });
+  const fine = cartLine("fine", { title: "§fine", availability: "low_stock", quantity: 2 });
+  const lineHtml = (line: CartLine) =>
+    renderToStaticMarkup(
+      <CartLineView
+        line={line}
+        currency="UAH"
+        busy={false}
+        t={t}
+        locale="uk"
+        exponent={2}
+        imageHosts={hosts}
+        onSetQuantity={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+  it("says 'not enough stock, reduce or remove' without a count (999 of 22)", () => {
+    const html = lineHtml(short);
+    expect(html).toContain("§cart.stock.badge");
+    expect(html).toContain("§cart.stock.short");
+    expect(html).not.toContain("§cart.stock.only");
+  });
+
+  it("names the count when the API gives one and caps the stepper at it", () => {
+    const html = lineHtml(few);
+    expect(html).toContain("§cart.stock.only");
+    expect(html).toMatch(/<input[^>]*type="number"[^>]*max="3"/);
+    expect(lineHtml(short)).toMatch(/<input[^>]*type="number"[^>]*max="999"/);
+  });
+
+  it("tells an out-of-stock line to be removed instead of 'may be refused'", () => {
+    const html = lineHtml(none);
+    expect(html).toContain("§availability.out_of_stock");
+    expect(html).toContain("§cart.stock.none");
+    expect(html).not.toContain("§cart.notice.outOfStock.hint");
+  });
+
+  it("shows a low-stock line that fits with its badge only (no PR 213 stop-gap note)", () => {
+    const html = lineHtml(fine);
+    expect(html).toContain("§availability.low_stock");
+    expect(html).not.toContain("§cart.stock.");
+    expect(html).not.toContain("§cart.notice.lowStock.hint");
+  });
+
+  it("gives every line an anchor and blocks the checkout with a link to each offending line", () => {
+    const html = view(ready(cartOf([fine, short, few])));
+    expect(html).toContain('id="cart-line-big"');
+    expect(html).not.toContain('href="/uk/checkout"');
+    expect(html).toMatch(
+      /<button[^>]*disabled=""[^>]*aria-describedby="cart-checkout-reason"|<button[^>]*aria-describedby="cart-checkout-reason"[^>]*disabled=""/,
+    );
+    expect(html).toContain("§cart.checkout.stockBlocked");
+    expect(html).toContain('href="#cart-line-big"');
+    expect(html).toContain('href="#cart-line-few"');
+    expect(html).not.toContain('href="#cart-line-fine"');
+  });
+});
+
 describe("CartPageView while quantities still save (review M1 of PR 211)", () => {
   it("lets the checkout link wait with a visible 'saving' state, and shows a change refused after leaving", () => {
     const onCheckout = vi.fn();
@@ -535,6 +613,12 @@ describe("CartPageView: language, headings, accessibility", () => {
     },
     empty: ready(cartOf([], { itemCount: 0 })),
     mixed: ready(mixedCart, { announcement: "removed" }),
+    stock: ready(
+      cartOf([
+        cartLine("s", { title: "§s", quantity: 999, insufficientStock: true, maxQuantity: null }),
+        cartLine("f", { title: "§f", quantity: 8, insufficientStock: true, maxQuantity: 3 }),
+      ]),
+    ),
   };
 
   it("has no hardcoded text in any state", () => {

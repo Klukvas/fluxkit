@@ -28,7 +28,16 @@ import {
   type Ref,
 } from "react";
 import { checkoutConfig, type AddressFieldName, type CheckoutConfig } from "../config/checkout";
-import { hasPriceChange, lineFlags, noticeMoney, stockWarnings } from "../lib/cart-model";
+import {
+  cartLineAnchor,
+  hasPriceChange,
+  lineFlags,
+  lineName,
+  lineStockHint,
+  noticeMoney,
+  stockHintText,
+  stockProblemLines,
+} from "../lib/cart-model";
 import type { CartState } from "../lib/cart-store";
 import {
   createAttemptManager,
@@ -56,6 +65,7 @@ import {
   checkoutBlock,
   createCheckoutStore,
   initialCheckoutState,
+  sameLines,
   type CheckoutBlock,
   type CheckoutState,
 } from "../lib/checkout-store";
@@ -149,17 +159,14 @@ export function phoneTypingValue(
     : next;
 }
 
-/** A line's name in a warning: the title, with the variant's own title or chosen values when it has them. */
-function lineName(line: CartLine): string {
-  if (line.variantTitle !== null) return `${line.title} (${line.variantTitle})`;
-  if (line.optionValues.length === 0) return line.title;
-  return `${line.title} (${line.optionValues.map((choice) => choice.value).join(", ")})`;
-}
+/** The stock warning's sentence: the submit button names it as its description while the warning is shown. */
+const STOCK_WARNING_ID = "checkout-stock-warning";
 
 /**
- * Stock warnings shown as soon as the checkout loads (review SQ-02), above the form: the API refuses an `out_of_stock` line
- * only when the order is sent, after the whole form was filled in. The store API gives no stock quantity, so the text names
- * the lines and what to do, never a number.
+ * The lines the checkout would refuse for stock (the cart's `insufficientStock`, plan 2026-11-03; review SQ-02), shown as
+ * soon as the page loads, above the form, so the shopper learns it before filling the form in: each line links to itself
+ * in the cart with what to do (the count only when the API gives one). The submit stays enabled: the server judges the
+ * order (a refusal names the lines and reads the cart again), and a hint can be older than the stock.
  */
 export function StockWarningsView({
   cart,
@@ -170,27 +177,28 @@ export function StockWarningsView({
   t: Translator;
   locale: Locale;
 }) {
-  const { outOfStock, lowStock } = stockWarnings(cart);
-  if (outOfStock.length === 0 && lowStock.length === 0) return null;
+  const lines = stockProblemLines(cart);
+  if (lines.length === 0) return null;
   return (
-    <div className="flex flex-col gap-3">
-      {outOfStock.length === 0 ? null : (
-        <Alert variant="warning">
-          <p>{t("checkout.stock.outOfStock", { items: outOfStock.map(lineName).join("; ") })}</p>
-          <Link
-            href={localizedHref(locale, "/cart")}
-            className={`underline underline-offset-4 ${focusRing}`}
-          >
-            {t("checkout.stock.toCart")}
-          </Link>
-        </Alert>
-      )}
-      {lowStock.length === 0 ? null : (
-        <Alert variant="info">
-          <p>{t("checkout.stock.lowStock", { items: lowStock.map(lineName).join("; ") })}</p>
-        </Alert>
-      )}
-    </div>
+    <Alert variant="warning" title={t("checkout.stock.title")}>
+      <p id={STOCK_WARNING_ID}>{t("checkout.stock.description")}</p>
+      <ul className="mt-2 flex flex-col gap-1">
+        {lines.map((line) => {
+          const hint = lineStockHint(line);
+          return (
+            <li key={line.variantId} className="flex flex-wrap gap-x-2">
+              <Link
+                href={localizedHref(locale, `/cart#${cartLineAnchor(line.variantId)}`)}
+                className={`underline underline-offset-4 ${focusRing}`}
+              >
+                {lineName(line)}
+              </Link>
+              {hint === null ? null : <span>{stockHintText(t, hint)}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </Alert>
   );
 }
 
@@ -359,7 +367,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
   const labels = checkoutLabels(t, config);
   const ids = checkoutFieldIds(config);
   const refusals =
-    checkout.lineErrors !== null && checkout.lineErrors.cart === cart
+    checkout.lineErrors !== null && sameLines(checkout.lineErrors.cart, cart)
       ? checkout.lineErrors.errors
       : [];
   const submitDisabled = props.pending || block !== null || checkout.insecure;
@@ -539,7 +547,11 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
               className="self-start"
               disabled={submitDisabled}
               aria-busy={props.pending}
-              {...(block === null ? {} : { "aria-describedby": "checkout-blocked-reason" })}
+              {...(block !== null
+                ? { "aria-describedby": "checkout-blocked-reason" }
+                : stockProblemLines(cart).length > 0
+                  ? { "aria-describedby": STOCK_WARNING_ID }
+                  : {})}
             >
               {props.pending ? t("checkout.submitting") : t("checkout.submit")}
             </Button>
