@@ -296,6 +296,31 @@ describe("checkout page: blocks and confirmations", () => {
     expect(submitButton(volatile)).not.toContain("disabled");
   });
 
+  // Review SQ-02 (2026-11-02): the stock refusal came only after the whole form was filled in.
+  it("names the out-of-stock and low-stock lines above the form as soon as the page loads", () => {
+    const html = render({
+      cartState: ready(
+        cartOf([
+          cartLine("a", {
+            title: "§title-a",
+            availability: "out_of_stock",
+            notices: [{ code: "out_of_stock" }],
+          }),
+          cartLine("b", { title: "§title-b", availability: "low_stock", quantity: 3 }),
+          cartLine("c", { title: "§title-c" }),
+        ]),
+      ),
+    });
+    const form = html.indexOf("<form");
+    const out = html.indexOf("§checkout.stock.outOfStock");
+    const low = html.indexOf("§checkout.stock.lowStock");
+    expect(out).toBeGreaterThan(-1);
+    expect(low).toBeGreaterThan(-1);
+    expect(out).toBeLessThan(form);
+    expect(low).toBeLessThan(form);
+    expect(render()).not.toContain("§checkout.stock.");
+  });
+
   it("marks the refused lines of checkout_refused, only for the cart they were refused in", () => {
     const errors = [
       { index: 1, code: "insufficient_stock", messageKey: "errors.field.insufficient_stock" },

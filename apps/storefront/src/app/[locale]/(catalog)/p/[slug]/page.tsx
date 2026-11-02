@@ -19,10 +19,13 @@ import {
   socialImageUrl,
   trimDescription,
 } from "../../../../../lib/seo";
+import { selectionFromParams } from "../../../../../lib/variant-matcher";
 import { messagesByLocale } from "../../../../../messages";
 
 interface ProductProps {
   params: Promise<{ locale: string; slug: string }>;
+  /** Only `opt.<code>=<value>` is read (the variant to start from); anything else is ignored. */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /**
@@ -50,6 +53,7 @@ export async function generateMetadata(props: ProductProps): Promise<Metadata> {
 export default async function ProductPage(props: ProductProps) {
   const { locale, page } = await resolve(props);
   const { product, exponent, trail } = page;
+  const preferredSelection = selectionFromParams(await props.searchParams);
   const t = createTranslator(messagesByLocale[locale], locale);
   const origin = await publicOrigin();
   const url = absoluteUrl(origin, localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`));
@@ -80,6 +84,7 @@ export default async function ProductPage(props: ProductProps) {
           availability: product.availability,
         }}
         gallery={prepareMedia(product.media, imageHosts())}
+        preferredSelection={preferredSelection}
         exponent={exponent}
         brand={
           product.brand === null

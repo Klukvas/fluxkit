@@ -1,5 +1,46 @@
-import { describe, expect, it } from "vitest";
+import { SUPPORTED_SHOP_CURRENCIES } from "@fluxkit/config";
+import { locales } from "@fluxkit/ui";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { currencyExponent, formatMoney, minorUnitsToDecimalString } from "./money";
+
+/**
+ * An `Intl.NumberFormat` that answers like Chromium's ICU data does (review SQ-06/D-01, 2026-11-02): `грн` instead of `₴`
+ * for UAH in `uk`, the narrow no-break space as the group separator. The server (Node) and the browser must still print the
+ * same text, or React reports a hydration mismatch on every page with a price.
+ */
+class BrowserLikeNumberFormat extends Intl.NumberFormat {
+  override format(value: number | bigint | `${number}`): string {
+    return super
+      .format(value as number)
+      .replace("₴", "грн")
+      .replace(/\u00a0/g, "\u202f");
+  }
+}
+
+describe("formatMoney does not depend on the runtime's ICU data (hydration, SQ-06)", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("prints the same text when Intl answers like the browser", async () => {
+    const server = {
+      uk: formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk"),
+      en: formatMoney({ amount: 123456, currency: "UAH" }, 2, "en"),
+      ukEur: formatMoney({ amount: 999, currency: "EUR" }, 2, "uk"),
+      enUsd: formatMoney({ amount: -250, currency: "USD" }, 2, "en"),
+    };
+    vi.stubGlobal("Intl", { ...Intl, NumberFormat: BrowserLikeNumberFormat });
+    vi.resetModules();
+    // A fresh module, so no formatter made with the real Intl is reused.
+    const browser = await import("./money");
+    expect(browser.formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk")).toBe(server.uk);
+    expect(browser.formatMoney({ amount: 123456, currency: "UAH" }, 2, "en")).toBe(server.en);
+    expect(browser.formatMoney({ amount: 999, currency: "EUR" }, 2, "uk")).toBe(server.ukEur);
+    expect(browser.formatMoney({ amount: -250, currency: "USD" }, 2, "en")).toBe(server.enUsd);
+    expect(server.uk).toBe("1\u00a0234,56\u00a0₴");
+  });
+});
 
 describe("minorUnitsToDecimalString", () => {
   it.each([
@@ -83,12 +124,67 @@ describe("formatMoney", () => {
   it("formats EUR and USD", () => {
     expect(plain(formatMoney({ amount: 999, currency: "EUR" }, 2, "en"))).toBe("€9.99");
     expect(plain(formatMoney({ amount: 999, currency: "USD" }, 2, "en"))).toBe("$9.99");
+    // PR 213 review m9: `uk` follows CLDR (ISO codes for foreign currencies; the admin's Intl output in Node agrees).
     expect(plain(formatMoney({ amount: 999, currency: "EUR" }, 2, "uk"))).toBe("9,99 EUR");
+    expect(plain(formatMoney({ amount: 999, currency: "USD" }, 2, "uk"))).toBe("9,99 USD");
   });
 
   it("formats exponent 0 (JPY) without fraction digits and exponent 3 with three", () => {
     expect(plain(formatMoney({ amount: 1500, currency: "JPY" }, 0, "en"))).toBe("¥1,500");
     expect(plain(formatMoney({ amount: 1234567, currency: "KWD" }, 3, "en"))).toBe("KWD 1,234.567");
+    expect(plain(formatMoney({ amount: 1234567, currency: "KWD" }, 3, "uk"))).toBe("1 234,567 KWD");
+  });
+
+  it("uses no-break spaces, so a price never wraps inside itself", () => {
+    expect(formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk")).toBe("1\u00a0234,56\u00a0₴");
+    expect(formatMoney({ amount: 59900, currency: "UAH" }, 2, "en")).toBe("UAH\u00a0599.00");
+  });
+
+  it("matches Node's Intl text where the storefront keeps that format (the e2e helpers rely on it)", () => {
+    for (const currency of ["UAH", "EUR", "USD"]) {
+      expect(formatMoney({ amount: 123456, currency }, 2, "en")).toBe(
+        new Intl.NumberFormat("en", { style: "currency", currency }).format(1234.56),
+      );
+    }
+    expect(formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk")).toBe(
+      new Intl.NumberFormat("uk", { style: "currency", currency: "UAH" }).format(1234.56),
+    );
+  });
+
+  // PR 213 review m9: the table is CLDR's text (as Node 22's ICU prints it) for every currency the API accepts, written
+  // down so the browser's ICU cannot change it.
+  it.each(locales.flatMap((locale) => SUPPORTED_SHOP_CURRENCIES.map((code) => [locale, code])))(
+    "prints CLDR's text in %s for %s",
+    (locale, currency) => {
+      const exponent = currencyExponent(currency);
+      const amount = 123456789;
+      expect(formatMoney({ amount, currency }, exponent, locale)).toBe(
+        new Intl.NumberFormat(locale, { style: "currency", currency }).format(
+          minorUnitsToDecimalString(amount, exponent) as `${number}`,
+        ),
+      );
+    },
+  );
+
+  it.each(locales.flatMap((locale) => SUPPORTED_SHOP_CURRENCIES.map((code) => [locale, code])))(
+    "formats every currency the API accepts in %s (%s): digits, separators and a sign",
+    (locale, currency) => {
+      const text = plain(formatMoney({ amount: 123456789, currency }, 2, locale));
+      expect(text).toContain(locale === "uk" ? "1 234 567,89" : "1,234,567.89");
+      expect(text.replace(/[\d., ]/g, "")).not.toBe("");
+    },
+  );
+
+  it("shows the ISO code of a currency it has no symbol for", () => {
+    expect(plain(formatMoney({ amount: 100, currency: "SEK" }, 2, "en"))).toBe("SEK 1.00");
+    expect(plain(formatMoney({ amount: 100, currency: "SEK" }, 2, "uk"))).toBe("1,00 SEK");
+  });
+
+  it("groups thousands in both locales and keeps small amounts ungrouped", () => {
+    expect(plain(formatMoney({ amount: 99999, currency: "UAH" }, 2, "uk"))).toBe("999,99 ₴");
+    expect(plain(formatMoney({ amount: 100000, currency: "UAH" }, 2, "uk"))).toBe("1 000,00 ₴");
+    expect(plain(formatMoney({ amount: 100000, currency: "USD" }, 2, "en"))).toBe("$1,000.00");
+    expect(plain(formatMoney({ amount: -5, currency: "UAH" }, 2, "uk"))).toBe("-0,05 ₴");
   });
 
   it("derives the exponent from the currency when none is given", () => {

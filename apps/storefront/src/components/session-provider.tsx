@@ -11,6 +11,11 @@ import {
 } from "react";
 import { initialAccountState, type AccountState, type AccountStore } from "../lib/account-store";
 import { initialCartState, type CartState, type CartStore } from "../lib/cart-store";
+import {
+  browserCheckoutDraftStorage,
+  clearCheckoutDraft,
+  clearDraftWhenSessionEnds,
+} from "../lib/checkout-draft";
 import { withTimeout } from "../lib/request-timeout";
 import { createSessionStores, type SessionStores } from "../lib/session-stores";
 
@@ -41,7 +46,14 @@ export function SessionProvider({ locale, children }: { locale: string; children
     // Both are idempotent, so a strict-mode remount does not read twice.
     stores.cart.start();
     stores.account.start();
-    return () => stores.cart.stop();
+    // Any end of a signed-in session removes the checkout draft of this tab (review SQ-05, PR 213 review m2).
+    const stopDraftWatch = clearDraftWhenSessionEnds(stores.account, () =>
+      clearCheckoutDraft(browserCheckoutDraftStorage()),
+    );
+    return () => {
+      stores.cart.stop();
+      stopDraftWatch();
+    };
   }, [stores]);
 
   return (

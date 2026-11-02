@@ -12,8 +12,15 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { useState, type FormEvent, type ReactNode } from "react";
-import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  MAX_LINE_QUANTITY,
+  MIN_LINE_QUANTITY,
+  addQuantityRefusal,
+  lineRoom,
+  quantityLimitRefusal,
+} from "../lib/add-to-cart";
+import { quantitiesByVariant } from "../lib/cart-model";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
@@ -26,6 +33,7 @@ import {
   isValueAvailable,
   selectValue,
   selectedValueIds,
+  selectionQuery,
   type Selection,
 } from "../lib/variant-matcher";
 import { useI18n } from "./i18n-provider";
@@ -37,7 +45,10 @@ type AddStatus =
   | { state: "idle" }
   | { state: "pending" }
   | { state: "added" }
-  | { state: "failed"; messageKey: string };
+  | { state: "failed"; messageKey: string; values?: Readonly<Record<string, number>> };
+
+const QUANTITY_LIMIT_KEY = "errors.rule.quantity_limit";
+const LIMIT_NOTE_ID = "product-quantity-limit";
 
 type PurchaseProduct = Pick<
   ProductDetail,
@@ -54,11 +65,21 @@ export interface ProductPurchaseViewProps {
   brand: { name: string; path: string } | null;
   /** Server-rendered content below the purchase block (description, specifications). */
   children?: ReactNode;
+  /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
+  preferredSelection?: Selection;
+  /** Called with every selection the shopper makes (the island keeps it in the address). */
+  onSelectionChange?: (selection: Selection) => void;
+  /** Quantity per variant id in the cart (`quantitiesByVariant`); `null` or absent while the cart is not known. */
+  cartQuantities?: ReadonlyMap<string, number> | null;
   /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
-  onAddToCart: (input: {
-    variantId: string;
-    quantity: number;
-  }) => Promise<{ status: "added" } | { status: "failed"; messageKey: string }>;
+  onAddToCart: (input: { variantId: string; quantity: number }) => Promise<
+    | { status: "added" }
+    /**
+     * `cartQuantity`: the variant's quantity in the cart as the island READ IT AGAIN after a `quantity_limit` answer
+     * (another tab may have changed it); absent when it was not re-read.
+     */
+    | { status: "failed"; messageKey: string; cartQuantity?: number }
+  >;
 }
 
 /**
@@ -76,30 +97,63 @@ export function ProductPurchaseView({
   brand,
   children,
   onAddToCart,
+  preferredSelection,
+  onSelectionChange,
+  cartQuantities = null,
 }: ProductPurchaseViewProps) {
-  const [selection, setSelection] = useState<Selection>(() => initialSelection(product));
+  const [selection, setSelection] = useState<Selection>(() =>
+    initialSelection(product, preferredSelection),
+  );
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
+  // An address that asked for option values (a card link, a language switch) is rewritten once to the selection the page
+  // actually starts from, so a value that matches nothing (`?opt.color=nope`) does not stay in it (PR 213 review m7).
+  const addressReported = useRef(false);
+  useEffect(() => {
+    if (addressReported.current) return;
+    addressReported.current = true;
+    if (preferredSelection !== undefined && Object.keys(preferredSelection).length > 0) {
+      onSelectionChange?.(selection);
+    }
+  }, [preferredSelection, onSelectionChange, selection]);
 
   const variant = findVariant(product, selection);
   const images = galleryFor(gallery, selectedValueIds(product, selection));
   const current = images[Math.min(activeImage, images.length - 1)] as GalleryItem;
   const shownAvailability = variant?.availability ?? product.availability;
   const availability = availabilityDisplay(shownAvailability);
-  const purchasable = variant !== null && canAddToCart(variant.availability);
+  // What the cart already holds of this variant (review SQ-02): the stepper offers only the room left on the line.
+  const inCart = variant === null ? 0 : (cartQuantities?.get(variant.id) ?? 0);
+  const room = lineRoom(inCart);
+  const shownQuantity = Math.min(quantity, Math.max(MIN_LINE_QUANTITY, room));
+  const atLimit = room === 0;
+  const purchasable = variant !== null && canAddToCart(variant.availability) && !atLimit;
   const pending = status.state === "pending";
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
     if (variant === null || !purchasable || pending) return;
+    const refusal = addQuantityRefusal(shownQuantity, inCart);
+    if (refusal !== null) {
+      setStatus({ state: "failed", messageKey: refusal.messageKey, values: refusal.values });
+      return;
+    }
     setStatus({ state: "pending" });
     try {
-      const outcome = await onAddToCart({ variantId: variant.id, quantity });
+      const outcome = await onAddToCart({ variantId: variant.id, quantity: shownQuantity });
+      // The API's `quantity_limit` does not know what the shopper sees: name the cart's quantity, but only the one read
+      // again after the refusal (the tab's own may be stale, PR 213 review m1); otherwise the API's text stays.
+      const limit =
+        outcome.status === "failed" && outcome.messageKey === QUANTITY_LIMIT_KEY
+          ? quantityLimitRefusal(shownQuantity, outcome.cartQuantity)
+          : null;
       setStatus(
         outcome.status === "added"
           ? { state: "added" }
-          : { state: "failed", messageKey: outcome.messageKey },
+          : limit !== null
+            ? { state: "failed", messageKey: limit.messageKey, values: limit.values }
+            : { state: "failed", messageKey: outcome.messageKey },
       );
     } catch (error) {
       // The store reports every failure the shopper can act on as an outcome; a throw is a bug. Free the button, stay loud.
@@ -212,7 +266,9 @@ export function ProductPurchaseView({
                     }))}
                     selected={chosenValue(selection, option.code) ?? null}
                     onChange={(valueCode) => {
-                      setSelection(selectValue(product, selection, option.code, valueCode));
+                      const next = selectValue(product, selection, option.code, valueCode);
+                      setSelection(next);
+                      onSelectionChange?.(next);
                       setActiveImage(0);
                       setStatus({ state: "idle" });
                     }}
@@ -228,19 +284,40 @@ export function ProductPurchaseView({
                   decreaseLabel={t("product.quantity.decrease")}
                   increaseLabel={t("product.quantity.increase")}
                   min={MIN_LINE_QUANTITY}
-                  max={MAX_LINE_QUANTITY}
-                  value={quantity}
-                  onChange={setQuantity}
-                  disabled={pending}
+                  max={Math.max(MIN_LINE_QUANTITY, room)}
+                  value={shownQuantity}
+                  onChange={(next) => {
+                    setQuantity(next);
+                    if (status.state === "failed") setStatus({ state: "idle" });
+                  }}
+                  disabled={pending || atLimit}
                 />
                 <Button
                   type="submit"
                   disabled={!purchasable || pending}
-                  aria-describedby="product-availability"
+                  aria-describedby={
+                    atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
+                  }
                 >
                   {pending ? t("product.adding") : t("product.addToCart")}
                 </Button>
               </div>
+              {atLimit ? (
+                <p id={LIMIT_NOTE_ID} className="text-sm text-foreground">
+                  {t("product.quantity.atLimit", {
+                    count: inCart,
+                    max: MAX_LINE_QUANTITY,
+                    room: 0,
+                  })}
+                </p>
+              ) : inCart > 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {t("product.quantity.inCart", { count: inCart })}
+                </p>
+              ) : null}
+              {variant?.availability === "low_stock" ? (
+                <p className="text-sm text-muted-foreground">{t("product.quantity.lowStock")}</p>
+              ) : null}
               <div role="status" className="flex flex-col gap-2">
                 {status.state === "pending" ? <p>{t("product.adding")}</p> : null}
                 {status.state === "added" ? (
@@ -256,7 +333,7 @@ export function ProductPurchaseView({
                 ) : null}
               </div>
               {status.state === "failed" ? (
-                <Alert variant="danger">{t(status.messageKey)}</Alert>
+                <Alert variant="danger">{t(status.messageKey, status.values)}</Alert>
               ) : null}
             </div>
           </form>
@@ -269,20 +346,38 @@ export function ProductPurchaseView({
 
 /** The island: takes the translator from the page's provider and adds through the shared cart store. */
 export function ProductPurchase(
-  props: Omit<ProductPurchaseViewProps, "locale" | "t" | "onAddToCart">,
+  props: Omit<ProductPurchaseViewProps, "locale" | "t" | "onAddToCart" | "onSelectionChange">,
 ) {
   const { locale, t } = useI18n();
-  const { store } = useCart();
+  const { state, store } = useCart();
+  const { product } = props;
+  // Only a new cart answer changes the quantities; busy marks and announcements do not.
+  const cart = state.cart;
+  const cartQuantities = useMemo(() => quantitiesByVariant(cart), [cart]);
   return (
     <ProductPurchaseView
       {...props}
       locale={locale}
       t={t}
+      cartQuantities={cartQuantities}
+      onSelectionChange={(selection) => {
+        // The choice lives in the address (review SQ-05): a reload, a shared link and the language switch keep it. Next's
+        // router follows `history.replaceState`, so the language links pick up the new query.
+        const query = selectionQuery(product, selection);
+        const url = `${window.location.pathname}${query === "" ? "" : `?${query}`}`;
+        window.history.replaceState(null, "", url);
+      }}
       onAddToCart={async ({ variantId, quantity }) => {
         const outcome = await store.add(variantId, quantity);
-        return outcome.status === "ok"
-          ? { status: "added" }
-          : { status: "failed", messageKey: outcome.failure.messageKey };
+        if (outcome.status === "ok") return { status: "added" };
+        const { messageKey } = outcome.failure;
+        if (messageKey !== QUANTITY_LIMIT_KEY) return { status: "failed", messageKey };
+        // Another tab may have changed the line: read the cart again before naming its quantity.
+        const fresh = await store.refresh();
+        if (fresh.status !== "ok") return { status: "failed", messageKey };
+        const cartQuantity =
+          fresh.cart.lines.find((line) => line.variantId === variantId)?.quantity ?? 0;
+        return { status: "failed", messageKey, cartQuantity };
       }}
     />
   );

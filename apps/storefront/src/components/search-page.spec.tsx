@@ -99,9 +99,20 @@ describe("the results route", () => {
     expect(reads.searched).toEqual([]);
   });
 
-  it("is a real 404 for a malformed shared address, and searches nothing", async () => {
-    await expect(visit({ q: "lamp", price: "abc" })).rejects.toThrow("NEXT_NOT_FOUND");
-    await expect(visit({ q: "lamp", f: "brand:a b" })).rejects.toThrow("NEXT_NOT_FOUND");
+  // Review SQ-04 (2026-11-02): a bad parameter answered "page not found". It now redirects to the cleaned address.
+  it.each([
+    [{ q: "lamp", price: "abc" }, "/en/search?q=lamp"],
+    [{ q: "lamp", f: "brand:a b" }, "/en/search?q=lamp"],
+    [{ q: "lamp", f: ["garbage", "brand:acme"] }, "/en/search?q=lamp&f=brand%3Aacme"],
+    [{ q: "lamp", sort: "zzz" }, "/en/search?q=lamp"],
+    [{ q: "lamp", page: "-1" }, "/en/search?q=lamp"],
+    [{ q: "lamp", page: "abc" }, "/en/search?q=lamp"],
+    [{ q: "lamp", page: "0" }, "/en/search?q=lamp"],
+    [{ q: "lamp", page: "99999999" }, "/en/search?q=lamp&page=417"],
+    [{ q: "\u0000x" }, "/en/search?q=x"],
+    [{ q: "a".repeat(600) }, `/en/search?q=${"a".repeat(200)}`],
+  ])("redirects the bad address %j to %s and searches nothing first", async (raw, target) => {
+    await expect(visit(raw)).rejects.toThrow(`NEXT_REDIRECT ${target}`);
     expect(reads.searched).toEqual([]);
   });
 
@@ -133,9 +144,19 @@ describe("the results route", () => {
     expect(html).toContain(en["search.rateLimited.title"]);
   });
 
-  it("is a real 404 for a page past the last one, and not for page 1 of nothing", async () => {
+  it("redirects a page past the last one to the last page (review SQ-04), and not page 1 of nothing", async () => {
     reads.outcome = results({ page: 2, pageCount: 1 });
-    await expect(visit({ q: "lamp", page: "2" })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(visit({ q: "lamp", page: "2" })).rejects.toThrow(
+      "NEXT_REDIRECT /en/search?q=lamp",
+    );
+    reads.outcome = results({ page: 9, pageCount: 3 });
+    await expect(visit({ q: "lamp", page: "9" })).rejects.toThrow(
+      "NEXT_REDIRECT /en/search?q=lamp&page=3",
+    );
+    reads.outcome = results({ items: [], total: 0, pageCount: 0, page: 5 });
+    await expect(visit({ q: "lamp", page: "5" })).rejects.toThrow(
+      "NEXT_REDIRECT /en/search?q=lamp",
+    );
     reads.outcome = results({ items: [], total: 0, pageCount: 0 });
     expect(await visit({ q: "lamp" })).toContain(en["search.empty.title"]);
     reads.outcome = results({ page: 2, pageCount: 2 });

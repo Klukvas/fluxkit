@@ -361,16 +361,38 @@ describe("resolveSearchAddress (what the results route does with an address, rev
     });
   });
 
+  // Review SQ-04 (2026-11-02): these were 404s; the bad part is dropped or clamped and the route redirects.
   it.each([
-    { q: "demo", price: "abc" },
-    { q: "demo", page: "0" },
-    { f: "no-colon" },
-    { f: "brand:a b" },
-    // A form field does not excuse a malformed shared parameter next to it.
-    { q: "demo", f: "no-colon", priceMin: "12.505" },
-    { q: "demo", page: "418", priceMin: "x" },
-  ])("is a real 404 for the malformed address %j", (raw) => {
-    expect(resolveSearchAddress(raw, 2)).toEqual({ kind: "malformed" });
+    [
+      { q: "demo", price: "abc" },
+      { ...empty, q: "demo" },
+    ],
+    [
+      { q: "demo", page: "0" },
+      { ...empty, q: "demo" },
+    ],
+    [
+      { q: "demo", page: "418" },
+      { ...empty, q: "demo", page: 417 },
+    ],
+    [{ f: "no-colon" }, empty],
+    [{ f: ["brand:a b", "brand:acme", "brand:acme"] }, { ...empty, facets: ["brand:acme"] }],
+    [
+      { sort: "zzz", q: "demo" },
+      { ...empty, q: "demo" },
+    ],
+    [{ q: " de\u0007mo " }, { ...empty, q: "demo" }],
+    [{ q: "x".repeat(250) }, { ...empty, q: "x".repeat(200) }],
+  ])("cleans the bad address %j and asks for a redirect", (raw, query) => {
+    expect(resolveSearchAddress(raw, 2)).toEqual({ kind: "query", query, canonical: false });
+  });
+
+  it("keeps the form's own failure next to a cleaned shared parameter", () => {
+    expect(resolveSearchAddress({ q: "demo", f: "no-colon", priceMin: "12.505" }, 2)).toEqual({
+      kind: "form_error",
+      query: { ...empty, q: "demo" },
+      reason: "price_min",
+    });
   });
 });
 

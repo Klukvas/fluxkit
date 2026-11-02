@@ -51,6 +51,8 @@ export type CatalogSearchPage =
       /** The address asked for a facet, price or sort the SQL listing cannot apply. */
       dropped: boolean;
     }
+  /** A page past the last one (review SQ-04): the route redirects to `lastPage` (1 when nothing matches). */
+  | { kind: "beyond_last_page"; lastPage: number }
   | { kind: "not_found" };
 
 export async function loadCatalogSearchPage(
@@ -83,7 +85,7 @@ export async function loadCatalogSearchPage(
     // never read (review F1: bogus page numbers would each be a read and an entry).
     const first = await search.search(locale, { ...request, page: 1 }, SHARED);
     if (first.kind === "results" && query.page > Math.max(first.result.pageCount, 1)) {
-      return { kind: "not_found" };
+      return { kind: "beyond_last_page", lastPage: Math.max(first.result.pageCount, 1) };
     }
     outcome =
       query.page === 1 || first.kind !== "results"
@@ -92,7 +94,9 @@ export async function loadCatalogSearchPage(
   }
   switch (outcome.kind) {
     case "results":
-      if (query.page > 1 && query.page > outcome.result.pageCount) return { kind: "not_found" };
+      if (query.page > 1 && query.page > outcome.result.pageCount) {
+        return { kind: "beyond_last_page", lastPage: Math.max(outcome.result.pageCount, 1) };
+      }
       return { kind: "search", result: outcome.result, category, trail };
     case "invalid":
       return { kind: "invalid", reason: outcome.reason, category, trail };
@@ -104,7 +108,7 @@ export async function loadCatalogSearchPage(
         ...(options.categorySlug === undefined ? {} : { categorySlug: options.categorySlug }),
         query: fallback.query,
       });
-      if (listing.kind === "not_found") return listing;
+      if (listing.kind !== "ok") return listing;
       return { kind: "fallback", listing, dropped: fallback.dropped };
     }
   }

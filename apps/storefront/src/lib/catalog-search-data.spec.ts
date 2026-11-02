@@ -91,11 +91,11 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     expect(searches).toEqual([]);
   });
 
-  it("is not found past the last page of the result, like the SQL listing", async () => {
+  it("names the last page for a page past it, like the SQL listing (review SQ-04)", async () => {
     const { store, search } = fakes({ kind: "results", result });
     expect(
       await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 3 } }),
-    ).toEqual({ kind: "not_found" });
+    ).toEqual({ kind: "beyond_last_page", lastPage: 2 });
     expect(
       (await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 2 } })).kind,
     ).toBe("search");
@@ -109,7 +109,7 @@ describe("catalog and category pages with search on (plan section 9, question 3)
           categorySlug: "tops",
           query: { ...empty, sort: "price_asc", page },
         }),
-      ).toEqual({ kind: "not_found" });
+      ).toEqual({ kind: "beyond_last_page", lastPage: 2 });
     }
     // Only page 1 of the same list (same locale, category and sort) was asked for, through the shared cache, so bogus page
     // numbers add neither engine reads nor cache entries.
@@ -188,11 +188,11 @@ describe("catalog and category pages with search on (plan section 9, question 3)
     expect(page).toMatchObject({ kind: "fallback", dropped: false });
   });
 
-  it("is not found when the fallback page is past the SQL listing's last page", async () => {
+  it("names the last page when the fallback page is past the SQL listing's last page", async () => {
     const { store, search } = fakes({ kind: "unavailable", retryAfterSeconds: null });
     expect(
       await loadCatalogSearchPage(store, search, "en", { query: { ...empty, page: 5 } }),
-    ).toEqual({ kind: "not_found" });
+    ).toEqual({ kind: "beyond_last_page", lastPage: 1 });
   });
 
   it("explains a selection the API refuses (a 400) instead of silently dropping it", async () => {

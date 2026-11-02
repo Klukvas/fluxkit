@@ -28,7 +28,7 @@ import {
   type Ref,
 } from "react";
 import { checkoutConfig, type AddressFieldName, type CheckoutConfig } from "../config/checkout";
-import { hasPriceChange, lineFlags, noticeMoney } from "../lib/cart-model";
+import { hasPriceChange, lineFlags, noticeMoney, stockWarnings } from "../lib/cart-model";
 import type { CartState } from "../lib/cart-store";
 import {
   createAttemptManager,
@@ -59,6 +59,12 @@ import {
   type CheckoutBlock,
   type CheckoutState,
 } from "../lib/checkout-store";
+import {
+  clearCheckoutDraft,
+  loadCheckoutDraft,
+  saveCheckoutDraft,
+  browserCheckoutDraftStorage,
+} from "../lib/checkout-draft";
 import { clientFailure, failureText, type Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { LegalNotice, noticeLinks } from "./legal-notice";
@@ -141,6 +147,51 @@ export function phoneTypingValue(
   return atEnd && next !== previous && !deletedAtEnd
     ? formatPhoneTyping(next, checkoutConfig.phoneDefaultCountry)
     : next;
+}
+
+/** A line's name in a warning: the title, with the variant's own title or chosen values when it has them. */
+function lineName(line: CartLine): string {
+  if (line.variantTitle !== null) return `${line.title} (${line.variantTitle})`;
+  if (line.optionValues.length === 0) return line.title;
+  return `${line.title} (${line.optionValues.map((choice) => choice.value).join(", ")})`;
+}
+
+/**
+ * Stock warnings shown as soon as the checkout loads (review SQ-02), above the form: the API refuses an `out_of_stock` line
+ * only when the order is sent, after the whole form was filled in. The store API gives no stock quantity, so the text names
+ * the lines and what to do, never a number.
+ */
+export function StockWarningsView({
+  cart,
+  t,
+  locale,
+}: {
+  cart: Cart;
+  t: Translator;
+  locale: Locale;
+}) {
+  const { outOfStock, lowStock } = stockWarnings(cart);
+  if (outOfStock.length === 0 && lowStock.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-3">
+      {outOfStock.length === 0 ? null : (
+        <Alert variant="warning">
+          <p>{t("checkout.stock.outOfStock", { items: outOfStock.map(lineName).join("; ") })}</p>
+          <Link
+            href={localizedHref(locale, "/cart")}
+            className={`underline underline-offset-4 ${focusRing}`}
+          >
+            {t("checkout.stock.toCart")}
+          </Link>
+        </Alert>
+      )}
+      {lowStock.length === 0 ? null : (
+        <Alert variant="info">
+          <p>{t("checkout.stock.lowStock", { items: lowStock.map(lineName).join("; ") })}</p>
+        </Alert>
+      )}
+    </div>
+  );
 }
 
 function SummaryLine({
@@ -342,6 +393,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           </Link>
         </p>
       )}
+      <StockWarningsView cart={cart} t={t} locale={locale} />
 
       <div className="grid gap-8 lg:grid-cols-3">
         <form
@@ -626,8 +678,8 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
 
 /**
  * The island of `/{locale}/checkout`. The cart is the page's shared cart store; the checkout store sends the order. The
- * form values live in component state only (never a URL, browser storage or a log); the attempt in `sessionStorage` is a
- * key and a hash.
+ * form values live in component state and, as a draft of this tab, in `sessionStorage` (`lib/checkout-draft.ts`: one hour,
+ * removed when the order is placed and on sign-out; never a URL or a log); the attempt in `sessionStorage` is a key and a hash.
  */
 export function CheckoutPage({
   exponent,
@@ -690,6 +742,24 @@ export function CheckoutPage({
   const prefilled = useRef(false);
   const { setValues } = form;
 
+  // The draft of this tab (review SQ-05): restored once after hydration (the server never sees it), then kept up to date,
+  // so the language switch (a full page load) and a reload do not wipe what the shopper typed. Restored BEFORE the
+  // account prefill, which fills only the fields that are still empty.
+  const [draftStorage] = useState(() => browserCheckoutDraftStorage());
+  const [draftRestored, setDraftRestored] = useState(false);
+  useEffect(() => {
+    const draft = loadCheckoutDraft(draftStorage, Date.now());
+    if (draft !== null) {
+      setValues((current) => ({ ...current, ...draft.values }));
+      setMethodCode(draft.methodCode);
+    }
+    setDraftRestored(true);
+  }, [draftStorage, setValues]);
+  useEffect(() => {
+    if (!draftRestored) return;
+    saveCheckoutDraft(draftStorage, { values: form.values, methodCode }, Date.now());
+  }, [draftRestored, draftStorage, form.values, methodCode]);
+
   useEffect(() => {
     checkout.prepare();
     // Opened by navigation, the cart may be old: read it again (a direct load's first read is still in flight).
@@ -724,13 +794,13 @@ export function CheckoutPage({
   }, [answer, setValues]);
 
   useEffect(() => {
-    if (account.session.status !== "signedIn" || prefilled.current) return;
+    if (!draftRestored || account.session.status !== "signedIn" || prefilled.current) return;
     prefilled.current = true;
     const { customer } = account.session;
     setValues((current) =>
       prefillFromCustomer(current, customer, checkoutConfig.phoneDefaultCountry),
     );
-  }, [account.session, setValues]);
+  }, [draftRestored, account.session, setValues]);
 
   const chosen = answer?.options.find((option) => option.methodCode === methodCode);
 
@@ -808,6 +878,8 @@ export function CheckoutPage({
               { signedIn },
             );
             if (result.kind === "placed" || result.kind === "cartEmpty") {
+              // The order exists (or there is nothing to order): the typed contact and address are not kept any longer.
+              clearCheckoutDraft(draftStorage);
               router.replace(result.href);
               return null;
             }

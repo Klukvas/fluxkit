@@ -86,7 +86,7 @@ test("the last unit sold to another session refuses the checkout on its line, an
     page.getByText("Not every item in the cart can be ordered. Check the marked items."),
   ).toBeVisible();
   const line = page.getByRole("list", { name: "Items in the order" }).getByRole("listitem");
-  await expect(line).toContainText("Cannot be ordered: Not enough stock available.");
+  await expect(line).toContainText("Cannot be ordered: Not enough in stock for this quantity.");
   await expect(page).toHaveURL(/\/en\/checkout$/);
   await expect(page.getByRole("button", { name: "Place the order" })).toBeEnabled();
   expect(keys).toHaveLength(1);
@@ -103,10 +103,11 @@ test("the last unit sold to another session refuses the checkout on its line, an
   await page.reload();
   expect(await storedAttempt(page)).toBe(attempt);
 
-  // The same request again (the form is not kept across a reload, on purpose) reuses the same key ...
+  // The same request again (the form's draft survives the reload since review SQ-05; filling it again changes nothing)
+  // reuses the same key ...
   await fillCheckoutForm(page, { email });
   await page.getByRole("button", { name: "Place the order" }).click();
-  await expect(line).toContainText("Cannot be ordered: Not enough stock available.");
+  await expect(line).toContainText("Cannot be ordered: Not enough in stock for this quantity.");
   expect(keys).toHaveLength(2);
   expect(keys[1]).toBe(keys[0]);
 

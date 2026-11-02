@@ -270,6 +270,12 @@ export function CartLineView({
               <span>{t("cart.notice.outOfStock.hint")}</span>
             </p>
           ) : null}
+          {!flags.outOfStock && !flags.unavailable && line.availability === "low_stock" ? (
+            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+              <Badge variant="warning">{t("availability.low_stock")}</Badge>
+              <span>{t("cart.notice.lowStock.hint")}</span>
+            </p>
+          ) : null}
           {flags.outOfRange ? (
             <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
               <Badge variant="danger">{t("cart.notice.outOfRange")}</Badge>

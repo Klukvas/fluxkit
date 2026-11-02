@@ -110,12 +110,44 @@ const ok = (overrides: Partial<SearchResult> = {}): SearchPageOutcome => ({
   result: result(overrides),
 });
 
-describe("the availability filter's card note (variant-level facet, 2026-11-02)", () => {
-  it("says on an in-stock card that some options are out of stock, only while inStock:false is selected", () => {
-    const filtered = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
-    expect(filtered.match(/§search\.facet\.inStock\.someOut/g)).toHaveLength(2);
-    const plain = render(ok(), { query: { ...query, facets: ["inStock:true"] } });
-    expect(plain).not.toContain("§search.facet.inStock.someOut");
+describe("cards under variant-level filters (review SQ-03, 2026-11-02)", () => {
+  it("does not claim the product's 'In stock' under option filters, notes that price and stock depend on the option, and links the chosen option", () => {
+    const ranged = ok({
+      items: [
+        summary("lamp", { title: "§lamp", price: { from: 1999, to: 2999, currency: "UAH" } }),
+        summary("desk-lamp", { title: "§desk" }),
+      ],
+    });
+    const html = render(ranged, { query: { ...query, facets: ["opt.color:red", "opt.size:l"] } });
+    expect(html).not.toContain("§availability.in_stock");
+    expect(html.match(/§search\.card\.dependsOnOption/g)).toHaveLength(1);
+    // PR 213 review m4: one price for every option: only the stock depends on the option.
+    expect(html.match(/§search\.card\.stockDependsOnOption/g)).toHaveLength(1);
+    expect(html).toContain('href="/uk/p/lamp?opt.color=red&amp;opt.size=l"');
+  });
+
+  it("shows the matching options' stock when the availability filter says it", () => {
+    const out = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
+    expect(out.match(/§availability\.out_of_stock/g)).toHaveLength(2);
+    expect(out).not.toContain("§availability.in_stock");
+    // PR 213 review M1: "has options in stock" includes low-stock options, so no green "In stock" badge is claimed; a
+    // low-stock product must never read "In stock" under the filter.
+    const low = ok({
+      items: [
+        summary("lamp", { title: "§lamp" }, "low_stock"),
+        summary("desk-lamp", { title: "§desk" }),
+      ],
+    });
+    const inStockOnly = render(low, { query: { ...query, facets: ["inStock:true"] } });
+    expect(inStockOnly).not.toContain("§availability.in_stock");
+    expect(inStockOnly.match(/§search\.card\.stockDependsOnOption/g)).toHaveLength(2);
+  });
+
+  it("keeps the product's own price, stock and plain link without variant filters", () => {
+    const html = render(ok(), { query: { ...query, facets: ["brand:zeta"] } });
+    expect(html.match(/§availability\.in_stock/g)).toHaveLength(2);
+    expect(html).not.toContain("§search.card.");
+    expect(html).toContain('href="/uk/p/lamp"');
   });
 });
 
@@ -234,6 +266,24 @@ describe("results page states", () => {
     expect(filtered).toContain("§search.empty.filtered");
     expect(filtered).toContain('href="/uk/search?q=lamp"');
     expect(filtered).toContain("§search.empty.clear");
+  });
+
+  // PR 213 review m11: the "searches in <language>" sentence only when the words are in another script than the page's
+  // (the case of a language switch on a results page), not on every empty result.
+  it("names the page's search language only for words written in another script", () => {
+    const empty = ok({ items: [], total: 0, facets: [] });
+    expect(render(empty, { query: emptyQuery })).not.toContain("§search.empty.otherLanguage");
+    expect(render(empty, { query: { ...query, q: "молоток" } })).not.toContain(
+      "§search.empty.otherLanguage",
+    );
+    const english = render(empty, { locale: "en", query: { ...query, q: "молоток" } });
+    expect(english).toContain("§search.empty.otherLanguage");
+    expect(render(empty, { locale: "en", query: { ...query, q: "hammer 2" } })).not.toContain(
+      "§search.empty.otherLanguage",
+    );
+    expect(render(empty, { query: { ...query, q: "hammer" } })).toContain(
+      "§search.empty.otherLanguage",
+    );
   });
 
   it("pages with real links, never past the API's limit, and says at the end that only the first 10 000 can be shown", () => {

@@ -57,15 +57,18 @@ describe("catalog page address with search on (the /search URL state without wor
     expect(query({ brand: "" })).toEqual({ query: empty, canonical: true });
   });
 
-  it("refuses a brand alias that is not a slug (a 404, as on the SQL listing)", () => {
+  it("drops a brand alias that is not a slug and asks for a redirect (review SQ-04; it was a 404)", () => {
     expect(resolveCatalogAddress({ brand: "Not A Slug" }, 2, { categoryPage: false })).toEqual({
-      kind: "malformed",
+      kind: "query",
+      query: empty,
+      canonical: false,
     });
   });
 
-  it("refuses words: a catalog page is a list, words belong to /search", () => {
+  it("sends words to /search: a catalog page is a list (review SQ-04; it was a 404)", () => {
     expect(resolveCatalogAddress({ q: "shirt" }, 2, { categoryPage: false })).toEqual({
-      kind: "malformed",
+      kind: "words",
+      query: { ...empty, q: "shirt" },
     });
   });
 
@@ -75,24 +78,31 @@ describe("catalog page address with search on (the /search URL state without wor
     expect(query({ sort: "newest" }).canonical).toBe(false);
   });
 
-  it("refuses a category facet on a category page (the path is the category; a second one would widen the list)", () => {
+  it("drops a category facet on a category page (the path is the category; a second one would widen the list)", () => {
     expect(
       resolveCatalogAddress({ f: "category:7d5b4c1e-1111-4222-8333-944455556666" }, 2, {
         categoryPage: true,
       }),
-    ).toEqual({ kind: "malformed" });
+    ).toEqual({ kind: "query", query: empty, canonical: false });
     // On the whole catalog the category is an ordinary facet.
     expect(query({ f: "category:7d5b4c1e-1111-4222-8333-944455556666" }).query.facets).toEqual([
       "category:7d5b4c1e-1111-4222-8333-944455556666",
     ]);
   });
 
-  it("refuses what the results page refuses: a malformed facet, page or price", () => {
-    for (const raw of [{ f: "nocolon" }, { page: "418" }, { page: "0" }, { price: "9..1" }]) {
+  it("cleans what the results page cleans: a malformed facet, page or price (review SQ-04)", () => {
+    for (const raw of [{ f: "nocolon" }, { page: "0" }, { price: "9..1" }]) {
       expect(resolveCatalogAddress(raw, 2, { categoryPage: false })).toEqual({
-        kind: "malformed",
+        kind: "query",
+        query: empty,
+        canonical: false,
       });
     }
+    expect(resolveCatalogAddress({ page: "418" }, 2, { categoryPage: false })).toEqual({
+      kind: "query",
+      query: { ...empty, page: 417 },
+      canonical: false,
+    });
   });
 
   it("turns a script-less filter submit into the canonical address, and names a refused box", () => {

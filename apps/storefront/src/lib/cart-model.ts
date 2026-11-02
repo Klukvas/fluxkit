@@ -40,6 +40,29 @@ export function lineFlags(line: CartLine): LineFlags {
   return { priceChanged, unavailable, outOfStock, outOfRange, canEditQuantity: !unavailable };
 }
 
+/**
+ * Lines to warn about before the checkout form is filled in (review SQ-02). The store API never gives a stock quantity
+ * (`docs/api/cart.md`), only a status: an `out_of_stock` line will be refused by the checkout (`insufficient_stock`), a
+ * `low_stock` line may be. An unavailable line has its own notice and block, so it is not repeated here.
+ */
+export function stockWarnings(cart: Cart): { outOfStock: CartLine[]; lowStock: CartLine[] } {
+  const outOfStock: CartLine[] = [];
+  const lowStock: CartLine[] = [];
+  for (const line of cart.lines) {
+    const flags = lineFlags(line);
+    if (flags.unavailable || flags.outOfRange) continue;
+    if (flags.outOfStock) outOfStock.push(line);
+    else if (line.availability === "low_stock") lowStock.push(line);
+  }
+  return { outOfStock, lowStock };
+}
+
+/** Quantity per variant id in the cart the browser last read; `null` while there is none (still loading or failed). */
+export function quantitiesByVariant(cart: Cart | null): ReadonlyMap<string, number> | null {
+  if (cart === null) return null;
+  return new Map(cart.lines.map((line) => [line.variantId, line.quantity]));
+}
+
 export function hasPriceChange(cart: Cart): boolean {
   return cart.lines.some((line) => lineFlags(line).priceChanged !== null);
 }
