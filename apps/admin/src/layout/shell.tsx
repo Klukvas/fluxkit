@@ -1,14 +1,18 @@
 import type { AdminOperationPermission } from "@fluxkit/api-client";
 import { LiveRegion, SideNav, SkipLink, type SideNavGroup, type Translator } from "@fluxkit/ui";
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
+import { PageTitleProvider, type PageTitleOverride } from "../i18n/page-title";
 import { useDocumentTitle } from "../i18n/use-document-title";
 import { PATHS } from "../router/paths";
 import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/unsaved-changes";
 import { ReauthDialog } from "../session/reauth-dialog";
 import { useSession } from "../session/session-context";
 import { NotAllowedView } from "../views/status-views";
+import { routeById } from "../routes";
+import { ScreenAccessProvider, type ScreenAccess } from "../router/screen-access";
+import { contextHelpFor, helpArticlePath } from "./context-help";
 import { LanguageSwitch } from "./language-switch";
 import { isCurrentPath, visibleNavigation } from "./navigation";
 import { mayOpenRoute } from "./route-gate";
@@ -38,7 +42,27 @@ export interface ShellFrameProps {
   userMenu: ReactNode;
   /** Announced while a route chunk loads. */
   navigating: boolean;
+  /** The link to the help of the current page (`ContextHelpLink`), above the page; none on screens without one. */
+  contextHelp?: ReactNode;
   children: ReactNode;
+}
+
+/** "Help for this page": the article (and section) of the screen, from `context-help.ts`. */
+export function ContextHelpLink({ t, href }: { t: Translator; href: string }) {
+  return (
+    <Link
+      to={href}
+      className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-foreground underline underline-offset-4"
+    >
+      <span
+        aria-hidden="true"
+        className="inline-flex size-6 items-center justify-center rounded-full border border-border no-underline"
+      >
+        ?
+      </span>
+      {t("shell.contextHelp")}
+    </Link>
+  );
 }
 
 /**
@@ -51,6 +75,7 @@ export function ShellFrame({
   languageSwitch,
   userMenu,
   navigating,
+  contextHelp,
   children,
 }: ShellFrameProps) {
   return (
@@ -81,6 +106,9 @@ export function ShellFrame({
         </aside>
         <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-6">
           <LiveRegion visuallyHidden>{navigating ? t("shell.navigating") : null}</LiveRegion>
+          {contextHelp === undefined || contextHelp === null ? null : (
+            <div className="mb-2 flex justify-end">{contextHelp}</div>
+          )}
           {children}
         </main>
       </div>
@@ -101,14 +129,31 @@ export function Shell() {
   const matches = useMatches();
   const navigation = useNavigation();
   const [unsaved] = useState(createUnsavedChangesRegistry);
+  const can = session.can;
+  const screenAccess = useMemo<ScreenAccess>(
+    () => ({
+      canOpen: (route) => can(routeById(route).permission),
+      titleKey: (route) => routeById(route).titleKey,
+    }),
+    [can],
+  );
 
   const handle = matches
     .map((match) => match.handle)
     .filter(isRouteHandle)
     .pop();
-  useDocumentTitle(handle?.titleKey ?? "notFound.title");
+  // A page may name itself (a help article); the name counts only while its own path is shown.
+  const [pageTitle, setPageTitle] = useState<PageTitleOverride | null>(null);
+  useDocumentTitle(
+    handle?.titleKey ?? "notFound.title",
+    pageTitle !== null && pageTitle.pathname === location.pathname ? pageTitle.text : null,
+  );
 
   const allowed = mayOpenRoute(handle, (permission) => session.can(permission));
+  const help =
+    allowed && handle !== undefined
+      ? contextHelpFor(handle.routeId, new URLSearchParams(location.search).get("tab"))
+      : null;
   const groups: SideNavGroup[] = visibleNavigation(session.state.me?.permissions ?? null).map(
     (group) => ({
       id: group.id,
@@ -123,19 +168,28 @@ export function Shell() {
   );
 
   return (
-    <UnsavedChangesContext.Provider value={unsaved}>
-      <ShellFrame
-        t={t}
-        navigation={groups}
-        languageSwitch={<LanguageSwitch />}
-        userMenu={<UserMenu />}
-        navigating={navigation.state === "loading"}
-      >
-        <Fragment key={session.state.generation}>
-          {allowed ? <Outlet /> : <NotAllowedView t={t} />}
-        </Fragment>
-      </ShellFrame>
-      {session.state.status === "expired" ? <ReauthDialog /> : null}
-    </UnsavedChangesContext.Provider>
+    <PageTitleProvider value={setPageTitle}>
+      <ScreenAccessProvider value={screenAccess}>
+        <UnsavedChangesContext.Provider value={unsaved}>
+          <ShellFrame
+            t={t}
+            navigation={groups}
+            languageSwitch={<LanguageSwitch />}
+            userMenu={<UserMenu />}
+            navigating={navigation.state === "loading"}
+            contextHelp={
+              help === null ? null : (
+                <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
+              )
+            }
+          >
+            <Fragment key={session.state.generation}>
+              {allowed ? <Outlet /> : <NotAllowedView t={t} />}
+            </Fragment>
+          </ShellFrame>
+          {session.state.status === "expired" ? <ReauthDialog /> : null}
+        </UnsavedChangesContext.Provider>
+      </ScreenAccessProvider>
+    </PageTitleProvider>
   );
 }

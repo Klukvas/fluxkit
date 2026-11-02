@@ -59,6 +59,7 @@ export const LAZY_FILES = [
   "privacy",
   "audit",
   "search",
+  "help",
 ] as const;
 export type LazyFile = (typeof LAZY_FILES)[number];
 
@@ -112,6 +113,10 @@ export const LAZY_FILE_LOADERS: Record<LazyFile, Record<Locale, FileLoader>> = {
   search: {
     uk: () => import("./uk/search.json").then((module) => module.default),
     en: () => import("./en/search.json").then((module) => module.default),
+  },
+  help: {
+    uk: () => import("./uk/help.json").then((module) => module.default),
+    en: () => import("./en/help.json").then((module) => module.default),
   },
 };
 
