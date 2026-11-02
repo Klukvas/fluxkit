@@ -251,8 +251,8 @@ export const START_ARTICLES: readonly HelpArticle[] = [
           {
             term: { uk: "Черга листів", en: "Outbox" },
             definition: {
-              uk: "Список усіх листів магазину з їхнім станом: чекає, надсилається, надіслано, помилка.",
-              en: "The list of every mail of the shop with its state: waiting, sending, sent, failed.",
+              uk: "Список усіх листів магазину з їхнім станом: чекає, надсилається, надіслано, помилка, невідомо (могло бути надіслано), скасовано.",
+              en: "The list of every mail of the shop with its state: waiting, sending, sent, failed, unknown (may have been sent), cancelled.",
             },
           },
           {

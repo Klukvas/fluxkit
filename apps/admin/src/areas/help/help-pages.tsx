@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams, useSearchParams } from "react-router";
 import { AreaMessages } from "../../i18n/area-messages";
 import { useI18n } from "../../i18n/i18n-context";
+import { usePageTitle } from "../../i18n/page-title";
 import { adminClient } from "../../lib/api";
 import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { useResource } from "../../lib/use-resource";
@@ -36,9 +37,16 @@ import { MAX_QUERY_LENGTH, buildSearchIndex, searchArticles } from "./help-searc
  * itself; "Check again" reads them again), the admin's ticks and the hidden flag come from this browser.
  */
 export function ChecklistPanel({ place }: { place: ChecklistPlace }) {
-  const { t } = useI18n();
   const session = useSession();
-  const adminUserId = session.state.me?.user.id ?? "";
+  const adminUserId = session.state.me?.user.id ?? null;
+  // The shell renders pages only with a session; without a known user there is no storage key, so no checklist at all
+  // (never a key shared by everybody).
+  if (adminUserId === null) return null;
+  return <ChecklistForUser key={adminUserId} place={place} adminUserId={adminUserId} />;
+}
+
+function ChecklistForUser({ place, adminUserId }: { place: ChecklistPlace; adminUserId: string }) {
+  const { t } = useI18n();
   const { preferences, storageFailed, update } = useChecklistPreferences(adminUserId);
   const [justHidden, setJustHidden] = useState(false);
   const noticeRef = useRef<HTMLParagraphElement>(null);
@@ -115,7 +123,16 @@ export function HelpIndexPage() {
   const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   // The box keeps its own state (no caret jump while the URL catches up); the URL only remembers it for back and reload.
-  const [query, setQuery] = useState(() => (params.get("q") ?? "").slice(0, MAX_QUERY_LENGTH));
+  const urlQuery = (params.get("q") ?? "").slice(0, MAX_QUERY_LENGTH);
+  const [query, setQuery] = useState(urlQuery);
+  // The URL changed without the box (the Help link of the navigation drops `?q`, Back and Forward): the box follows it.
+  // What the box itself wrote is remembered, so typing never resets the box.
+  const written = useRef(urlQuery);
+  useEffect(() => {
+    if (urlQuery === written.current) return;
+    written.current = urlQuery;
+    setQuery(urlQuery);
+  }, [urlQuery]);
   const index = useMemo(() => buildSearchIndex(HELP_LIBRARY), []);
   const results = useMemo(() => searchArticles(index, query), [index, query]);
   return (
@@ -127,6 +144,7 @@ export function HelpIndexPage() {
       results={results}
       onQuery={(next) => {
         setQuery(next);
+        written.current = next.trim() === "" ? "" : next;
         setParams(next.trim() === "" ? {} : { q: next }, { replace: true });
       }}
       checklist={<ChecklistPanel place="help" />}
@@ -142,6 +160,8 @@ export function HelpArticlePage() {
   const access = useScreenAccess();
   const focusAfterCommit = useFocusAfterCommit();
   const article = findArticle(HELP_LIBRARY, articleId);
+  // The document title names the article, or says it does not exist (not the generic "Help article").
+  usePageTitle(article === null ? t("help.article.notFoundTitle") : article.title[locale]);
 
   // A section anchor moves the focus (and so the scroll) to its heading. It is requested from an effect, so it lands in
   // the NEXT commit: after the route focus, which runs in the parent's effect of the navigation's commit and would

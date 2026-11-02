@@ -33,6 +33,16 @@ test("Help: open it from the navigation, search in English and Ukrainian, read a
   // The count is announced politely (a status region that was in the page before the search).
   await expect(page.getByRole("status").filter({ hasText: /articles? found\./ })).toHaveCount(1);
   await expect(page).toHaveURL(/[?&]q=refund/);
+  // The navigation's Help link drops `?q`: the box and the results follow the URL (review of PR 212).
+  await page
+    .getByRole("navigation", { name: "Admin sections" })
+    .getByRole("link", { name: "Help" })
+    .click();
+  await expect(page).toHaveURL(new RegExp(`${SPA}/help$`));
+  await expect(box).toHaveValue("");
+  await expect(results).toHaveCount(0);
+  await box.fill("refund");
+  await expect(results.getByRole("link").first()).toHaveText("Online payments and refunds");
 
   await box.fill("unicorn rocket");
   await expect(
@@ -55,12 +65,22 @@ test("Help: open it from the navigation, search in English and Ukrainian, read a
   await ukResults.getByRole("link", { name: "Пошук у вітрині" }).click();
 
   await expect(page).toHaveURL(new RegExp(`${SPA}/help/search$`));
+  // The document title names the article; an unknown article says it does not exist.
+  await expect(page).toHaveTitle(/^Пошук у вітрині/);
   await expect(page.getByRole("heading", { level: 1, name: "Пошук у вітрині" })).toBeFocused();
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { level: 2, name: "Синоніми" })).toBeVisible();
   await expect(main.getByRole("navigation", { name: "Інші статті" })).toBeVisible();
   await main.getByRole("link", { name: "Відкрити екран: Синоніми пошуку" }).click();
   await expect(page).toHaveURL(new RegExp(`${SPA}/catalog/search/synonyms$`));
+  // The title of the next page is its own again (the article's name does not leak).
+  await expect(page).toHaveTitle(/^Синоніми пошуку · /);
+
+  await page.goto(`${SPA}/help/no-such-article`);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Такої статті довідки немає" }),
+  ).toBeVisible();
+  await expect(page).toHaveTitle(/^Такої статті довідки немає · /);
 });
 
 test("Help for this page: the contextual link opens the article at the section of the screen", async ({

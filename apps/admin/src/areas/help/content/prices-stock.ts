@@ -154,8 +154,8 @@ export const PRICES_STOCK_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Коли доступно стільки або менше одиниць, ніж поріг (налаштування сервера, за замовчуванням 5), варіант позначається «мало в наявності» в адмінці та у вітрині. Вітрина ніколи не показує точну кількість, лише стан: є, мало, немає.",
-          en: "When the available quantity is at or below the threshold (a server setting, 5 by default), the variant is marked “low stock” in the admin and the storefront. The storefront never shows the exact quantity, only the state: in stock, low, out of stock.",
+          uk: "Коли доступно від 1 одиниці до порога включно (налаштування сервера, за замовчуванням 5), варіант позначається «мало в наявності» в адмінці та у вітрині; 0 — «немає в наявності». Вітрина ніколи не показує точну кількість, лише стан: є, мало, немає.",
+          en: "When 1 unit up to the threshold is available (a server setting, 5 by default), the variant is marked “low stock” in the admin and the storefront; 0 is “out of stock”. The storefront never shows the exact quantity, only the state: in stock, low, out of stock.",
         },
       },
       {

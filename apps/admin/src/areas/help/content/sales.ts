@@ -121,8 +121,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Скасування ОПЛАЧЕНОГО замовлення не повертає гроші і не повертає товар на склад. Гроші поверніть кнопкою «Повернути кошти» на панелі оплати (для онлайн-оплати) або поза магазином, а товар — видом «Повернення» на вкладці «Залишки».",
-          en: "Cancelling a PAID order neither refunds the money nor puts the goods back in stock. Refund with “Refund” on the payment panel (for an online payment) or outside the shop, and book the goods back with the kind “Return” on the Stock tab.",
+          uk: "Скасування ОПЛАЧЕНОГО замовлення не повертає гроші і не повертає проданий товар на склад (звільняються лише одиниці, що ще чекали надходження за позицією понад залишок). Гроші поверніть кнопкою «Повернути кошти» на панелі оплати (для онлайн-оплати) або поза магазином, а товар — видом «Повернення» на вкладці «Залишки».",
+          en: "Cancelling a PAID order neither refunds the money nor puts the sold goods back in stock (only units still waiting for stock on a backordered line are released). Refund with “Refund” on the payment panel (for an online payment) or outside the shop, and book the goods back with the kind “Return” on the Stock tab.",
         },
       },
       { kind: "heading", id: "contact", text: { uk: "Контактні дані", en: "Contact details" } },
@@ -222,16 +222,16 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Шаблон містить провайдер Monobank і тестовий провайдер «fake». «fake» лише для тестів: справжні гроші він не приймає. Monobank поки перевірено лише на імітаторі, не на справжньому рахунку; перед запуском попросіть розробника перевірити його з вашим договором. Адмінка не показує, який саме провайдер увімкнено.",
-          en: "The template has the Monobank provider and the test provider “fake”. “fake” is for tests only: it takes no real money. Monobank has so far been checked only against a simulator, not a real account; before launch, ask your developer to verify it with your merchant contract. The admin does not show which provider is on.",
+          uk: "Шаблон містить провайдер Monobank і тестовий провайдер «fake». «fake» лише для тестів: справжні гроші він не приймає. Monobank поки перевірено лише на імітаторі, не на справжньому рахунку; перед запуском попросіть розробника перевірити його з вашим договором. Екрани налаштувань не показують, який саме провайдер увімкнено; кожна спроба оплати в замовленні називає свого провайдера.",
+          en: "The template has the Monobank provider and the test provider “fake”. “fake” is for tests only: it takes no real money. Monobank has so far been checked only against a simulator, not a real account; before launch, ask your developer to verify it with your merchant contract. The settings screens do not show which provider is on; each payment attempt on an order names its provider.",
         },
       },
       { kind: "heading", id: "panel", text: { uk: "Панель оплати", en: "The payment panel" } },
       {
         kind: "paragraph",
         text: {
-          uk: "У замовленні панель показує кожну спробу оплати: статус, суму, повернення, картку (лише система і 4 останні цифри) і журнал. «Перевірити статус» питає провайдера зараз.",
-          en: "On an order, the panel shows every payment attempt: status, amount, refunds, the card (only the scheme and the last 4 digits) and the journal. “Check status” asks the provider now.",
+          uk: "У замовленні панель показує кожну спробу оплати: статус, суму, повернення, провайдера, картку (лише система і 4 останні цифри) і журнал. «Перевірити статус» питає провайдера зараз.",
+          en: "On an order, the panel shows every payment attempt: status, amount, refunds, the provider, the card (only the scheme and the last 4 digits) and the journal. “Check status” asks the provider now.",
         },
       },
       { kind: "heading", id: "refund", text: { uk: "Повернути кошти", en: "Refund" } },
@@ -298,8 +298,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Поки увімкнений хоча б один спосіб, кожне оформлення замовлення з фізичним товаром мусить вибрати спосіб доставки. Без жодного увімкненого способу оформлення йде без вибору доставки.",
-          en: "While any method is on, every checkout of physical goods must choose a delivery method. With no method on, checkout runs without a delivery choice.",
+          uk: "Поки магазин пропонує хоча б один спосіб (увімкнений, з ціною у валюті магазину, а для пункту видачі — з перевізником, увімкненим на сервері), кожне оформлення замовлення з фізичним товаром мусить вибрати спосіб доставки. Без жодного такого способу оформлення йде без вибору доставки.",
+          en: "While the shop offers at least one method (switched on, priced in the shop currency and, for a pickup point, with its carrier enabled on the server), every checkout of physical goods must choose a delivery method. With no such method, checkout runs without a delivery choice.",
         },
       },
       { kind: "heading", id: "pricing", text: { uk: "Ціна доставки", en: "Delivery price" } },
@@ -347,8 +347,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Нова пошта підтримує лише пункти видачі (відділення й поштомати): немає доставки за адресою, накладеного платежу і кількох посилок. Підключення перевірено лише на імітаторі; створення накладної у справжньому сервісі ще не підтверджено. Тестовий перевізник «fake» — лише для тестів. Перед запуском перевірте все на реальному замовленні.",
-          en: "Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. The connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet. The test carrier “fake” is for tests only. Check everything with a real order before launch.",
+          uk: "Нова пошта підтримує лише пункти видачі (відділення й поштомати): немає доставки за адресою, накладеного платежу і кількох посилок. Підключення перевірено лише на імітаторі; створення накладної у справжньому сервісі ще не підтверджено. Справжній сервіс відповів на запит етикетки помилкою 422, тож «Друкувати етикетку» може не спрацювати (екран скаже, що сервіс недоступний). Тестовий перевізник «fake» — лише для тестів. Перед запуском перевірте все на реальному замовленні.",
+          en: "Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. The connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet. The real service answered the label request with error 422, so “Print label” may fail (the screen says the service is unavailable). The test carrier “fake” is for tests only. Check everything with a real order before launch.",
         },
       },
       {
@@ -372,16 +372,16 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
             en: "“Print label” downloads a PDF. “Refresh tracking” asks the carrier now; a background job also updates the statuses by itself.",
           },
           {
-            uk: "Коли відправили, позначте замовлення виконаним: накладна статус замовлення не змінює.",
-            en: "Once shipped, mark the order fulfilled: a waybill does not change the order status.",
+            uk: "Створіть накладну до того, як позначите замовлення виконаним: для виконаного замовлення накладну створити не можна. Коли відправили, позначте його виконаним: накладна статус замовлення не змінює.",
+            en: "Create the waybill before you mark the order fulfilled: a fulfilled order cannot get one. Once shipped, mark it fulfilled: a waybill does not change the order status.",
           },
         ],
       },
       {
         kind: "note",
         text: {
-          uk: "«Скасувати накладну» можна лише для щойно створеної. Коли налаштовано пошту, покупець отримує лист із номером для відстеження.",
-          en: "“Cancel the waybill” works only for a waybill just created. When email is set up, the shopper receives a mail with the tracking number.",
+          uk: "«Скасувати накладну» можна, лише поки накладна в стані «Створено» (ще не в дорозі). Коли налаштовано пошту, покупець отримує лист із номером для відстеження.",
+          en: "“Cancel the waybill” works only while the waybill is in the state “Created” (not yet in transit). When email is set up, the shopper receives a mail with the tracking number.",
         },
       },
     ],

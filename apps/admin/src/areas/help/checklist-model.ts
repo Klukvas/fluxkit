@@ -74,7 +74,10 @@ export const CHECKLIST_STEPS: readonly ChecklistStep[] = [
 export type FactState = "done" | "todo" | "testOnly" | "noAccess" | "failed";
 export type ChecklistFacts = Readonly<Record<ComputedStepId, FactState>>;
 
-/** How many of the newest published products the stock step looks at (one inventory read each). */
+/**
+ * How many published products the stock step looks at (one inventory read each): the FIRST ones of `GET /admin/products`,
+ * which is ordered by slug (not by date; there is no sort parameter), so this is a sample, not the newest products.
+ */
 export const STOCK_SAMPLE = 5;
 
 /** The reads the facts need: the admin client's methods of the same names (a fake in the specs). */
@@ -163,16 +166,28 @@ export async function loadChecklistFacts(
     // proves that prices are set; a draft with prices does not count (it is not for sale).
     prices: total(published),
     stock,
+    // A method is offered at checkout when it is active AND priced in the shop currency (and, for a pickup point, its carrier
+    // is loaded on the server, which no admin read tells: the step's text says so). Without the config the currency is
+    // unknown, so the step is not guessed.
     shipping:
       shipping === null
         ? "noAccess"
-        : fromResult(shipping, (data) => data.items.some((method) => method.isActive)),
+        : !config.ok
+          ? "failed"
+          : fromResult(shipping, (data) =>
+              data.items.some(
+                (method) => method.isActive && method.currency === config.data.shopCurrency,
+              ),
+            ),
     payments,
     email,
   };
 }
 
-/** Done when one of the newest published products has a variant with stock available, or one that does not count stock. */
+/**
+ * Done when one of the first published products of the admin product list (ordered by slug: the API has no sort option)
+ * has a variant with stock available, or one that does not count stock.
+ */
 async function stockFact(
   client: ChecklistClient,
   can: (operation: AdminOperationName) => boolean,

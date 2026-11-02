@@ -300,8 +300,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Завантажене, але не збережене зображення лишається на сервері невикористаним і видаляється через 24 години. Чи дозволене завантаження, які типи файлів і який найбільший розмір — залежить від налаштувань сервера; коли завантаження вимкнене, додавайте зображення за адресою.",
-          en: "An uploaded image that is not saved stays on the server unused and is deleted after 24 hours. Whether uploads are allowed, which file types and the largest size depend on the server configuration; when uploads are off, add images by address.",
+          uk: "Завантажене, але не збережене зображення лишається на сервері невикористаним і видаляється через 24 години. Приймаються JPEG, PNG і WebP. Чи дозволене завантаження і який найбільший розмір — залежить від налаштувань сервера; коли завантаження вимкнене, додавайте зображення за адресою.",
+          en: "An uploaded image that is not saved stays on the server unused and is deleted after 24 hours. Uploads accept JPEG, PNG and WebP. Whether uploads are allowed and the largest size depend on the server configuration; when uploads are off, add images by address.",
         },
       },
       {

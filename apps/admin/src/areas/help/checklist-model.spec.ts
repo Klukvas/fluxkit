@@ -30,7 +30,7 @@ const problem = (status: number): AdminResult<never> => ({
 const page = (total: number, items: unknown[] = []) => ok({ items, total, limit: 1, offset: 0 });
 
 const config = (overrides: Partial<AdminConfig> = {}): AdminConfig =>
-  ({ emailDelivery: true, onlinePayment: true, ...overrides }) as AdminConfig;
+  ({ emailDelivery: true, onlinePayment: true, shopCurrency: "UAH", ...overrides }) as AdminConfig;
 
 interface Calls {
   names: string[];
@@ -50,7 +50,7 @@ function fakeClient(
       string,
       AdminResult<{ items: { trackInventory: boolean; totalAvailable: number }[] }>
     >;
-    methods?: boolean[];
+    methods?: (boolean | { isActive: boolean; currency: string })[];
     email?: AdminResult<AdminEmailStatus>;
   } = {},
 ): ChecklistClient {
@@ -83,7 +83,9 @@ function fakeClient(
         "listShippingMethods",
         page(
           (answers.methods ?? [true]).length,
-          (answers.methods ?? [true]).map((isActive) => ({ isActive })),
+          (answers.methods ?? [true]).map((method) =>
+            typeof method === "boolean" ? { isActive: method, currency: "UAH" } : method,
+          ),
         ),
       ),
     getEmailStatus: () =>
@@ -209,6 +211,21 @@ describe("loadChecklistFacts", () => {
     expect(none.productTypes).toBe("noAccess");
     expect(none.stock).toBe("noAccess");
     expect(nothing.names).toEqual(["getConfig"]);
+  });
+
+  it("counts only an active method priced in the shop currency, and does not guess without the config", async () => {
+    const otherCurrency = await loadChecklistFacts(
+      fakeClient({ names: [] }, { methods: [{ isActive: true, currency: "EUR" }, false] }),
+      everything,
+      signal,
+    );
+    expect(otherCurrency.shipping).toBe("todo");
+    const noConfig = await loadChecklistFacts(
+      fakeClient({ names: [] }, { config: problem(500) }),
+      everything,
+      signal,
+    );
+    expect(noConfig.shipping).toBe("failed");
   });
 
   it("marks the test mail provider as test only, not done", async () => {

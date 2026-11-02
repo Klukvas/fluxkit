@@ -3,6 +3,7 @@ import { LiveRegion, SideNav, SkipLink, type SideNavGroup, type Translator } fro
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
+import { PageTitleProvider, type PageTitleOverride } from "../i18n/page-title";
 import { useDocumentTitle } from "../i18n/use-document-title";
 import { PATHS } from "../router/paths";
 import { createUnsavedChangesRegistry, UnsavedChangesContext } from "../router/unsaved-changes";
@@ -141,7 +142,12 @@ export function Shell() {
     .map((match) => match.handle)
     .filter(isRouteHandle)
     .pop();
-  useDocumentTitle(handle?.titleKey ?? "notFound.title");
+  // A page may name itself (a help article); the name counts only while its own path is shown.
+  const [pageTitle, setPageTitle] = useState<PageTitleOverride | null>(null);
+  useDocumentTitle(
+    handle?.titleKey ?? "notFound.title",
+    pageTitle !== null && pageTitle.pathname === location.pathname ? pageTitle.text : null,
+  );
 
   const allowed = mayOpenRoute(handle, (permission) => session.can(permission));
   const help =
@@ -162,26 +168,28 @@ export function Shell() {
   );
 
   return (
-    <ScreenAccessProvider value={screenAccess}>
-      <UnsavedChangesContext.Provider value={unsaved}>
-        <ShellFrame
-          t={t}
-          navigation={groups}
-          languageSwitch={<LanguageSwitch />}
-          userMenu={<UserMenu />}
-          navigating={navigation.state === "loading"}
-          contextHelp={
-            help === null ? null : (
-              <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
-            )
-          }
-        >
-          <Fragment key={session.state.generation}>
-            {allowed ? <Outlet /> : <NotAllowedView t={t} />}
-          </Fragment>
-        </ShellFrame>
-        {session.state.status === "expired" ? <ReauthDialog /> : null}
-      </UnsavedChangesContext.Provider>
-    </ScreenAccessProvider>
+    <PageTitleProvider value={setPageTitle}>
+      <ScreenAccessProvider value={screenAccess}>
+        <UnsavedChangesContext.Provider value={unsaved}>
+          <ShellFrame
+            t={t}
+            navigation={groups}
+            languageSwitch={<LanguageSwitch />}
+            userMenu={<UserMenu />}
+            navigating={navigation.state === "loading"}
+            contextHelp={
+              help === null ? null : (
+                <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
+              )
+            }
+          >
+            <Fragment key={session.state.generation}>
+              {allowed ? <Outlet /> : <NotAllowedView t={t} />}
+            </Fragment>
+          </ShellFrame>
+          {session.state.status === "expired" ? <ReauthDialog /> : null}
+        </UnsavedChangesContext.Provider>
+      </ScreenAccessProvider>
+    </PageTitleProvider>
   );
 }
