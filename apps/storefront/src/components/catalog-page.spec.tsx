@@ -28,6 +28,8 @@ const reads = vi.hoisted(() => ({
   searched: [] as { query: SearchQuery; read: SearchReadOptions | undefined }[],
   listings: [] as unknown[][],
   sqlListings: [] as unknown[][],
+  /** `pageCount` of the stubbed SQL listing; a page above it is answered as past the last page. */
+  listingPageCount: 1,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -88,6 +90,9 @@ vi.mock("../lib/catalog-pages.server", () => ({
   getShopMoney: () => Promise.resolve({ currency: "UAH", exponent: 2 }),
   getListing: (...args: unknown[]) => {
     reads.listings.push(args);
+    if ((args[2] as number) > reads.listingPageCount) {
+      return Promise.resolve({ kind: "beyond_last_page", lastPage: reads.listingPageCount });
+    }
     return Promise.resolve({
       kind: "ok",
       products: { items: [summary("old-item")], total: 1, limit: 24, offset: 0 },
@@ -188,6 +193,7 @@ beforeEach(() => {
   reads.searched = [];
   reads.listings = [];
   reads.sqlListings = [];
+  reads.listingPageCount = 1;
 });
 
 describe("catalog routes with search off", () => {
@@ -199,7 +205,25 @@ describe("catalog routes with search off", () => {
     expect(html).not.toContain(en["catalog.fallback.title"]);
     expect(reads.listings).toEqual([["en", undefined, 1, "demo-brand"]]);
     expect(reads.searched).toEqual([]);
-    await expect(catalog({ page: "0" })).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+
+  // Review SQ-04 (2026-11-02): a bad page or brand answered "page not found"; it now redirects to the cleaned address.
+  it.each([
+    [{ page: "0" }, "/en/catalog"],
+    [{ page: "-1" }, "/en/catalog"],
+    [{ page: "abc" }, "/en/catalog"],
+    [{ page: "99999999" }, "/en/catalog?page=417"],
+    [{ brand: "Not A Slug", page: "2" }, "/en/catalog?page=2"],
+  ])("redirects the bad address %j to %s with search off", async (raw, target) => {
+    reads.enabled = false;
+    await expect(catalog(raw)).rejects.toThrow(`NEXT_REDIRECT ${target}`);
+    expect(reads.listings).toEqual([]);
+  });
+
+  it("redirects a page past the last one to the last page with search off", async () => {
+    reads.enabled = false;
+    reads.listingPageCount = 2;
+    await expect(catalog({ page: "7" })).rejects.toThrow("NEXT_REDIRECT /en/catalog?page=2");
   });
 });
 
@@ -268,11 +292,24 @@ describe("the catalog route with search on", () => {
     expect(reads.searched).toEqual([]);
   });
 
-  it("is a real 404 for words, a malformed parameter or a page past the last one", async () => {
-    await expect(catalog({ q: "shirt" })).rejects.toThrow("NEXT_NOT_FOUND");
-    await expect(catalog({ f: "nocolon" })).rejects.toThrow("NEXT_NOT_FOUND");
+  // Review SQ-04 (2026-11-02): words, a malformed parameter and a page past the last one answered "page not found".
+  it.each([
+    [{ q: "shirt" }, "/en/search?q=shirt"],
+    [{ q: "shirt", f: "brand:demo-brand" }, "/en/search?q=shirt&f=brand%3Ademo-brand"],
+    [{ q: "\u0000" }, "/en/catalog"],
+    [{ f: "nocolon" }, "/en/catalog"],
+    [{ sort: "zzz" }, "/en/catalog"],
+    [{ page: "-1" }, "/en/catalog"],
+    [{ page: "abc" }, "/en/catalog"],
+    [{ brand: "Not A Slug" }, "/en/catalog"],
+  ])("redirects %j to %s before it searches", async (raw, target) => {
+    await expect(catalog(raw)).rejects.toThrow(`NEXT_REDIRECT ${target}`);
+    expect(reads.searched).toEqual([]);
+  });
+
+  it("redirects a page past the last one to the last page", async () => {
     reads.outcome = results({ page: 2, pageCount: 1 });
-    await expect(catalog({ page: "2" })).rejects.toThrow("NEXT_NOT_FOUND");
+    await expect(catalog({ page: "2" })).rejects.toThrow("NEXT_REDIRECT /en/catalog");
   });
 
   for (const outcome of [
@@ -355,10 +392,10 @@ describe("the category route with search on", () => {
     expect(html).toContain('href="/en/c/screwdrivers"');
   });
 
-  it("is a real 404 for an unknown category or a category facet in the address", async () => {
+  it("is a real 404 for an unknown category; a category facet in the address is dropped by a redirect", async () => {
     await expect(categoryView({}, "nope")).rejects.toThrow("NEXT_NOT_FOUND");
     await expect(categoryView({ f: "category:category-screwdrivers" })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
+      "NEXT_REDIRECT /en/c/tools",
     );
     expect(reads.searched).toEqual([]);
   });

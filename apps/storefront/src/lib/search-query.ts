@@ -7,8 +7,10 @@ import { decimalToMinorUnits } from "./search-money";
  * takes, so a result can be shared and the back button works. Every change of the selection goes back to page 1.
  *
  * Decisions, each with a test:
- * - A malformed parameter is refused (the page answers 404), never silently dropped or replaced: a shared link must show
- *   what it says. Unknown parameters (`utm_source`) are ignored.
+ * - `parseSearchParams` refuses a malformed parameter; the route first cleans the address (`sanitizeSearchParams`: drop,
+ *   clamp, truncate) and REDIRECTS to the cleaned address, so a shared link still shows what its address says, without a
+ *   "page not found" for a typo (review SQ-04, 2026-11-02, replacing the earlier 404). Unknown parameters (`utm_source`)
+ *   are ignored.
  * - The API's rules are checked here only as far as they cost nothing and cannot drift: shape, lengths and the 50 values.
  *   Whether a facet key exists is the API's answer (`unknown_facet_key`, a 400 the page explains).
  * - The no-script submit of the filter form sends major units (`priceMin=12.50`) and ranges (`rmin.<key>`); the page turns
@@ -205,6 +207,49 @@ export function parseSearchParams(raw: RawSearchParams, exponent: number): Searc
   return { ok: true, query: { q, facets: kept, price, sort: normalizeSort(sort, q), page } };
 }
 
+/** `q` as the API takes it: control characters removed, trimmed, at most 200 code points (review SQ-04). */
+function cleanWords(text: string): string {
+  const kept = [...text]
+    .filter((character) => !hasControlCharacter(character))
+    .join("")
+    .trim();
+  return [...kept].slice(0, MAX_Q_CODE_POINTS).join("").trim();
+}
+
+/**
+ * The shared parameters of an address with everything the parser would refuse dropped or clamped (review SQ-04,
+ * 2026-11-02; it replaces "a malformed parameter is a 404"): `q` cleaned (`cleanWords`), malformed or repeated `f` entries
+ * dropped (at most 50 kept), a malformed `price` or unknown `sort` dropped, `page` dropped unless it is a whole number and
+ * capped at the last reachable page. The route compares the result with the address and redirects, so the address always
+ * says what the page shows. The filter form's own fields (`priceMin`, `rmin.*`, ...) are left as they are: a refused box
+ * keeps its "Check the filters" state.
+ */
+export function sanitizeSearchParams(raw: RawSearchParams): RawSearchParams {
+  const clean: Record<string, string | string[] | undefined> = { ...raw };
+  const q = first(raw["q"]);
+  if (q !== undefined) clean["q"] = cleanWords(q);
+  if (raw["f"] !== undefined) {
+    clean["f"] = [...new Set(all(raw["f"]).filter(isFacetEntry))].slice(0, MAX_FACET_VALUES);
+  }
+  const price = first(raw["price"]);
+  if (price !== undefined) {
+    if (parseSearchParams({ price }, 0).ok) clean["price"] = price;
+    else delete clean["price"];
+  }
+  const sort = first(raw["sort"]);
+  if (sort !== undefined) {
+    if (SEARCH_SORTS.includes(sort as SearchSort)) clean["sort"] = sort;
+    else delete clean["sort"];
+  }
+  const page = first(raw["page"]);
+  if (page !== undefined) {
+    const number = /^\d{1,15}$/.test(page) ? Number(page) : 0;
+    if (number < 1) delete clean["page"];
+    else clean["page"] = String(Math.min(number, MAX_SEARCH_PAGE));
+  }
+  return clean;
+}
+
 /** The entries of a submit of the filter form, as the query it asks for (always page 1). */
 export function parseSearchForm(
   entries: Iterable<readonly [string, string]>,
@@ -268,18 +313,25 @@ export type SearchAddress =
    * the rest of the address, with the form's failure (`describeFormFailure(reason)`) instead of a 404 (review F3).
    */
   | { kind: "form_error"; query: SearchQuery; reason: string }
-  /** A malformed shared parameter: the page is a real 404 (a link must show what it says). */
+  /**
+   * Not reachable from an address since review SQ-04 (`sanitizeSearchParams` cleans every shared parameter); kept so a
+   * future rule the cleaning does not cover fails as a 404, never as a silently different search.
+   */
   | { kind: "malformed" };
 
-/** What the results route does with an address: search it, redirect it, explain a refused form box, or 404. */
+/**
+ * What the results route does with an address: search it, redirect it (also to the cleaned form of a bad address, review
+ * SQ-04), or explain a refused form box.
+ */
 export function resolveSearchAddress(raw: RawSearchParams, exponent: number): SearchAddress {
-  const parsed = parseSearchParams(raw, exponent);
+  const clean = sanitizeSearchParams(raw);
+  const parsed = parseSearchParams(clean, exponent);
   if (parsed.ok) {
     return { kind: "query", query: parsed.query, canonical: isCanonicalSearch(raw, parsed.query) };
   }
-  if (!Object.keys(raw).some((name) => FORM_FIELD.test(name))) return { kind: "malformed" };
+  if (!Object.keys(clean).some((name) => FORM_FIELD.test(name))) return { kind: "malformed" };
   const rest = parseSearchParams(
-    Object.fromEntries(Object.entries(raw).filter(([name]) => !FORM_FIELD.test(name))),
+    Object.fromEntries(Object.entries(clean).filter(([name]) => !FORM_FIELD.test(name))),
     exponent,
   );
   if (!rest.ok) return { kind: "malformed" };

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 import type { ListingResult } from "./catalog-data";
 import { getListing, getShopMoney } from "./catalog-pages.server";
-import { parseCatalogQuery, type CatalogQuery } from "./catalog-query";
+import { catalogPath, normalizeCatalogQuery, type CatalogQuery } from "./catalog-query";
 import type { CatalogRouteList } from "../components/catalog-search-view";
 import { fallbackCatalogQuery, resolveCatalogAddress } from "./catalog-search";
 import { loadCatalogSearchPage, type CatalogSearchPage } from "./catalog-search-data";
@@ -12,7 +12,7 @@ import { categoryTrail } from "./category-trail";
 import { localizedHref } from "./locale-path";
 import type { ShopMoney } from "./order-model";
 import { getSearchEnabled, searchData } from "./search-data.server";
-import { searchPath, type RawSearchParams, type SearchQuery } from "./search-query";
+import { searchPath, setPage, type RawSearchParams, type SearchQuery } from "./search-query";
 import { storeData } from "./store-data.server";
 
 /**
@@ -28,6 +28,7 @@ export type CatalogRoute =
   | {
       mode: "sql";
       locale: Locale;
+      basePath: string;
       query: CatalogQuery;
       listing: Extract<ListingResult, { kind: "ok" }>;
       category: CategoryNode | null;
@@ -36,6 +37,7 @@ export type CatalogRoute =
   | {
       mode: "search";
       locale: Locale;
+      basePath: string;
       query: SearchQuery;
       formFailure: string | null;
       shop: ShopMoney;
@@ -64,20 +66,25 @@ export async function resolveCatalogRoute(input: {
   const raw = await input.searchParams;
 
   if (!(await getSearchEnabled())) {
-    const parsed = parseCatalogQuery(raw);
-    if (!parsed.ok) notFound();
-    const listing = await getListing(
-      locale,
-      input.categorySlug,
-      parsed.query.page,
-      parsed.query.brand,
-    );
+    // A bad page or brand redirects to the repaired address (review SQ-04), a page past the last one to the last page.
+    const normalized = normalizeCatalogQuery(raw);
+    if (!normalized.canonical) {
+      redirect(localizedHref(locale, catalogPath(input.basePath, normalized.query)));
+    }
+    const { query } = normalized;
+    const listing = await getListing(locale, input.categorySlug, query.page, query.brand);
     if (listing.kind === "not_found") notFound();
+    if (listing.kind === "beyond_last_page") {
+      redirect(
+        localizedHref(locale, catalogPath(input.basePath, { ...query, page: listing.lastPage })),
+      );
+    }
     if (input.categorySlug !== undefined && listing.category === null) notFound();
     return {
       mode: "sql",
       locale,
-      query: parsed.query,
+      basePath: input.basePath,
+      query,
       listing,
       category: listing.category,
       trail: listing.trail,
@@ -89,6 +96,8 @@ export async function resolveCatalogRoute(input: {
     categoryPage: input.categorySlug !== undefined,
   });
   if (address.kind === "malformed") notFound();
+  // Words belong to the results page: go there with them and the filters (review SQ-04; it was a 404).
+  if (address.kind === "words") redirect(localizedHref(locale, searchPath(address.query)));
   if (address.kind === "query" && !address.canonical) {
     redirect(localizedHref(locale, searchPath(address.query, input.basePath)));
   }
@@ -101,6 +110,7 @@ export async function resolveCatalogRoute(input: {
   return {
     mode: "search",
     locale,
+    basePath: input.basePath,
     query: address.query,
     formFailure: address.kind === "form_error" ? address.reason : null,
     shop,
@@ -125,6 +135,11 @@ export async function loadCatalogList(
     query: route.query,
   });
   if (page.kind === "not_found") notFound();
+  if (page.kind === "beyond_last_page") {
+    redirect(
+      localizedHref(route.locale, searchPath(setPage(route.query, page.lastPage), route.basePath)),
+    );
+  }
   switch (page.kind) {
     case "search":
     case "invalid":
