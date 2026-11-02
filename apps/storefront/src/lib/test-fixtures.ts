@@ -115,6 +115,8 @@ export function cartLine(variantId: string, overrides: Partial<CartLine> = {}): 
     compareAtAmount: null,
     lineTotal: { amount: 1999, currency: "UAH" },
     availability: "in_stock",
+    insufficientStock: false,
+    maxQuantity: null,
     notices: [],
     ...overrides,
   };

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SEARCH_LIMITS, SEARCH_SORTS } from "@fluxkit/core";
 import { storeProductListItemSchema } from "../../catalog/store/store.schemas.js";
+import { uuidSchema } from "../../common/openapi-formats.js";
 
 /**
  * `GET /store/search` and `GET /store/search/suggest` (ADR 0034 decision 10, `docs/api/search.md`). The query is strict:
@@ -81,8 +82,48 @@ export const storeSearchFacetSchema = z.object({
   }),
 });
 
+export const storeSearchMatchSchema = z.object({
+  variantId: uuidSchema.meta({
+    description:
+      "The representative matching variant (best availability, then lowest price, then the product's variant order): link to it.",
+  }),
+  variantCount: z
+    .number()
+    .int()
+    .min(1)
+    .meta({ description: "How many sellable variants of the product match." }),
+  price: z
+    .object({
+      from: z.number().int().min(0),
+      to: z.number().int().min(0),
+      currency: z.string().meta({ description: "Always the shop currency." }),
+    })
+    .meta({
+      description:
+        "Lowest and highest price of the matching variants, minor units of the shop currency.",
+    }),
+  availability: z.enum(["in_stock", "low_stock", "out_of_stock"]).meta({
+    description: "The best availability among the matching variants (the representative's).",
+  }),
+  optionValues: z.array(z.object({ optionCode: z.string(), valueCode: z.string() })).meta({
+    description:
+      "The representative's option values as codes (as `GET /store/products/{slug}` `variants[].optionValues`), sorted by option code.",
+  }),
+});
+
+export type StoreSearchMatch = z.output<typeof storeSearchMatchSchema>;
+
+export const storeSearchItemSchema = storeProductListItemSchema.extend({
+  match: storeSearchMatchSchema.nullable().optional().meta({
+    description:
+      "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
+  }),
+});
+
+export type StoreSearchItem = z.output<typeof storeSearchItemSchema>;
+
 export const storeSearchResponseSchema = z.object({
-  items: z.array(storeProductListItemSchema),
+  items: z.array(storeSearchItemSchema),
   total: z.number().int().min(0).meta({
     description:
       "Products the engine found (at most 10 000 can be paged). The page may hold fewer items than `limit` when a product stopped being for sale after it was indexed.",

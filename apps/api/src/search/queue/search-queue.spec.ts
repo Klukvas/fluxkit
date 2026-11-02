@@ -88,6 +88,34 @@ describe("SearchQueue (real Postgres)", () => {
     expect(row?.enqueued_at.getTime()).toBeLessThan(Date.now() - 50 * 60_000);
   });
 
+  it("a stale_hit mark adds a missing row but leaves a queued one untouched (no backoff reset, no new change_seq)", async () => {
+    const queued = randomUUID();
+    const fresh = randomUUID();
+    await database.transaction((tx) => queue.productsChanged(tx, [queued], "price_changed"));
+    // A product whose sync keeps failing waits for its hourly backoff.
+    await pool.query(
+      `update search_sync_queue set attempts = 6, last_error_code = 'engine_rejected',
+         next_attempt_at = now() + interval '1 hour' where product_id = $1`,
+      [queued],
+    );
+    const [before] = await rows();
+    // Every variant-filtered page that lists the product reports it stale (PR 214 review M1).
+    for (let view = 0; view < 3; view += 1) {
+      await database.transaction((tx) => queue.productsChanged(tx, [queued, fresh], "stale_hit"));
+    }
+    const after = await rows();
+    expect(after).toHaveLength(2);
+    expect(after.find((row) => row.product_id === queued)).toEqual(before);
+    const added = after.find((row) => row.product_id === fresh);
+    expect(added).toMatchObject({ reason: "stale_hit", attempts: 0 });
+    expect(added?.next_attempt_at.getTime()).toBeLessThanOrEqual(Date.now() + 1_000);
+    // A real change still coalesces onto a row that a stale hit created.
+    await database.transaction((tx) => queue.productsChanged(tx, [fresh], "stock_changed"));
+    const changed = (await rows()).find((row) => row.product_id === fresh);
+    expect(changed?.reason).toBe("stock_changed");
+    expect(Number(changed?.change_seq)).toBeGreaterThan(Number(added?.change_seq));
+  });
+
   it("does nothing for an empty list and refuses an id that is not a uuid (a caller bug)", async () => {
     await database.transaction((tx) => queue.productsChanged(tx, [], "product_changed"));
     expect(await rows()).toEqual([]);

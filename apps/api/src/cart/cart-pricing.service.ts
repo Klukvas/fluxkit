@@ -1,5 +1,6 @@
 import { Inject, Injectable } from "@nestjs/common";
 import {
+  cartLineStockHint,
   createMoney,
   isVariantSellable,
   priceCart,
@@ -14,6 +15,7 @@ import {
 import { productStatusSchema } from "../catalog/admin/products/products.schemas.js";
 import type {
   ProductMediaRow,
+  CartStockLevelRow,
   CartVariantRow,
   VariantOptionLabelRow,
 } from "../catalog/store/store.repository.js";
@@ -44,6 +46,8 @@ export interface PricedCart {
   readonly priced: ReadonlyMap<string, StoreVariantPricing>;
   readonly labelsByVariant: ReadonlyMap<string, readonly VariantOptionLabelRow[]>;
   readonly media: readonly ProductMediaRow[];
+  /** Every location's level of the lines' variants (availability), the default one marked (the stock hint). */
+  readonly levels: readonly CartStockLevelRow[];
   /** What core was given, in `present` order (the cart read prices it again without an overflowing line). */
   readonly inputs: readonly PricedLineInput[];
   readonly result: PriceCartResult;
@@ -97,7 +101,8 @@ function pickLineImage(
  * computed by core `priceCart`, with notices (ADR 0015). It reads the catalog through the store repository in a fixed
  * number of statements, whatever the number of lines, and applies the sellable rule of the store (`isVariantSellable`:
  * active product, active variant, price in the shop currency). It never does money arithmetic itself, never reads a
- * quantity of stock beyond feeding core's `availabilityOf`, and never returns one.
+ * quantity of stock beyond feeding core's `availabilityOf` and `cartLineStockHint`, and returns a quantity only as that
+ * hint's `maxQuantity` (at most `LOW_STOCK_THRESHOLD`).
  */
 @Injectable()
 export class CartPricingService {
@@ -214,7 +219,17 @@ export class CartPricingService {
         label,
       ]);
     }
-    return { stored: lines, present, rowsById, priced, labelsByVariant, media, inputs, result };
+    return {
+      stored: lines,
+      present,
+      rowsById,
+      priced,
+      labelsByVariant,
+      media,
+      levels,
+      inputs,
+      result,
+    };
   }
 
   /**
@@ -259,7 +274,7 @@ export class CartPricingService {
     locale: StoreLocale,
     overflowing: ReadonlySet<string> = new Set(),
   ): CartResponse {
-    const { present, rowsById, labelsByVariant, media, result } = context;
+    const { present, rowsById, labelsByVariant, media, result, priced, levels } = context;
     if (!result.ok) {
       throw this.unpriceable(result, present);
     }
@@ -290,6 +305,13 @@ export class CartPricingService {
           compareAtAmount: line.compareAtAmount,
           lineTotal: line.lineTotal,
           availability: line.availability,
+          ...this.stockHint(
+            row,
+            // A line taken out for its total is refused for that, never for stock (PR 214 review m4).
+            priced.has(line.variantId) && !overflowing.has(line.variantId),
+            line.quantity,
+            levels,
+          ),
           notices: overflowing.has(line.variantId)
             ? [{ code: "line_total_out_of_range" as const }]
             : line.notices.map((notice) =>
@@ -364,6 +386,29 @@ export class CartPricingService {
         requiresShipping: row.requiresShipping,
       };
     });
+  }
+
+  /**
+   * What the checkout would say about the line's quantity now (core `cartLineStockHint`, which is `decideReserve` on
+   * the default location's level). No hint on a line whose variant is not sellable: the checkout answers `cart_changed`
+   * for it before it looks at stock.
+   */
+  private stockHint(
+    row: CartVariantRow,
+    sellable: boolean,
+    quantity: number,
+    levels: readonly CartStockLevelRow[],
+  ): { insufficientStock: boolean; maxQuantity: number | null } {
+    if (!sellable) {
+      return { insufficientStock: false, maxQuantity: null };
+    }
+    const level = levels.find((entry) => entry.variantId === row.id && entry.isDefaultLocation);
+    return cartLineStockHint(
+      { trackInventory: row.trackInventory, allowBackorder: row.allowBackorder },
+      level === undefined ? null : { onHand: level.onHand, reserved: level.reserved },
+      quantity,
+      this.pricing.lowStockThreshold,
+    );
   }
 
   private unpriceable(
