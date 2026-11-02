@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
 import { option, product, summary, variant, category } from "../lib/test-fixtures";
+import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { CatalogView } from "./catalog-view";
 import { HomeSections } from "./home-sections";
@@ -414,7 +415,28 @@ describe("ProductPurchaseView", () => {
   // Plan 2026-11-03: the cart's line says the checkout would refuse it for stock; adding more cannot help.
   it("allows no more when the cart's line already exceeds the stock, naming the count when the API gives one", () => {
     const counted = view({ cartLines: inCart(8, true, 3) });
-    expect(counted).toContain("§product.quantity.stockLimit");
+    // Review m2: a plural form by the available count ("only 1 is available", never "only 1 are").
+    expect(counted).toContain("§product.quantity.stockLimit:3");
+    // A count of 0 (a multi-location shop's default location) says "more than the shop has", never "only 0".
+    const zero = view({ cartLines: inCart(2, true, 0) });
+    expect(zero).toContain("§product.quantity.stockShort");
+    expect(zero).not.toContain("§product.quantity.stockLimit");
+    const real = (messages: Record<string, string>, locale: "uk" | "en", available: number) =>
+      renderToStaticMarkup(
+        <ProductPurchaseView
+          onAddToCart={added}
+          product={multi}
+          gallery={gallery}
+          exponent={2}
+          locale={locale}
+          t={createTranslator(messages, locale)}
+          brand={null}
+          cartLines={inCart(8, true, available)}
+        />,
+      );
+    expect(real(en, "en", 1)).toContain("only 1 is available");
+    expect(real(en, "en", 3)).toContain("only 3 are available");
+    expect(real(uk, "uk", 1)).toContain("доступно лише 1 шт.");
     expect(counted).not.toContain("§product.quantity.atLimit");
     expect(counted).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
     expect(counted).toContain('href="/uk/cart"');

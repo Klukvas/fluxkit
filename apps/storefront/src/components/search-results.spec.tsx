@@ -207,6 +207,14 @@ describe("cards from the item's match (PR 214 `match`, plan 2026-11-03)", () => 
     expect(html).toContain('href="/uk/p/lamp"');
   });
 
+  // PR 215 review m4: next to the best availability, "3 matching options" alone reads as "all 3 in stock".
+  it("says that the badge shows the best of several matching options, in both languages", () => {
+    expect(en["search.card.matchingOptions.other"]).toMatch(/best/);
+    for (const form of ["one", "few", "many", "other"]) {
+      expect(uk[`search.card.matchingOptions.${form}` as keyof typeof uk]).toMatch(/найкращ/);
+    }
+  });
+
   it("has no stop-gap wording of PR 213 left in the messages", () => {
     for (const messages of [uk, en] as Record<string, string>[]) {
       expect(messages["search.card.priceDependsOnOption"]).toBeUndefined();

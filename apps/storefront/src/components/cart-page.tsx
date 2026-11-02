@@ -23,6 +23,7 @@ import { cartPageHandlers } from "../lib/cart-handlers";
 import {
   cartLineAnchor,
   checkoutBlock,
+  focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
   isLineBusy,
@@ -76,6 +77,9 @@ export interface CartPageViewProps {
   onDismissLeftFailure?: () => void;
 }
 
+/** Why the checkout button is blocked; the focus lands here when the checkout link turns into that button (review m5). */
+const CHECKOUT_REASON_ID = "cart-checkout-reason";
+
 const ANNOUNCEMENT_KEYS: Record<CartAnnouncement, string> = {
   updated: "cart.announce.updated",
   removed: "cart.announce.removed",
@@ -96,7 +100,7 @@ export function LineQuantityView({
   disabled,
   t,
   onChange,
-  max = MAX_LINE_QUANTITY,
+  stepMax = MAX_LINE_QUANTITY,
 }: {
   title: string;
   variantId: string;
@@ -107,8 +111,11 @@ export function LineQuantityView({
   disabled: boolean;
   t: Translator;
   onChange: (quantity: number) => void;
-  /** The highest quantity offered (`quantityStepperMax`: the API's stock count when it gave one, else the line limit). */
-  max?: number;
+  /**
+   * Where the step buttons stop (`quantityStepperMax`: the API's stock count when it gave one, else the line limit). A
+   * typed number is limited to the line limit only: above the hint the server answers (review m1 of PR 215).
+   */
+  stepMax?: number;
 }) {
   return (
     <div className="flex flex-col gap-1" aria-busy={autosave.pending}>
@@ -118,7 +125,8 @@ export function LineQuantityView({
           decreaseLabel={t("cart.line.decrease", { title })}
           increaseLabel={t("cart.line.increase", { title })}
           min={MIN_LINE_QUANTITY}
-          max={max}
+          max={MAX_LINE_QUANTITY}
+          stepMax={stepMax}
           value={quantity}
           onChange={onChange}
           disabled={disabled}
@@ -189,7 +197,7 @@ function LineQuantity({
       disabled={disabled || autosave === null}
       t={t}
       onChange={(quantity) => autosave?.change(quantity)}
-      max={quantityStepperMax(line)}
+      stepMax={quantityStepperMax(line)}
     />
   );
 }
@@ -275,23 +283,26 @@ export function CartLineView({
               <span>{t("cart.notice.unavailable.hint")}</span>
             </p>
           ) : null}
-          {flags.outOfStock ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
-              <span>
-                {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
-              </span>
-            </p>
-          ) : stock !== null ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="warning">{t("cart.stock.badge")}</Badge>
-              <span>{stockHintText(t, stock)}</span>
-            </p>
-          ) : !flags.unavailable && line.availability === "low_stock" ? (
-            <p className="text-sm text-foreground">
-              <Badge variant="warning">{t("availability.low_stock")}</Badge>
-            </p>
-          ) : null}
+          {/* Always mounted, so a hint an autosave answer brings or clears is announced (review m5 of PR 215). */}
+          <div aria-live="polite" aria-atomic="true" className="empty:-mt-2">
+            {flags.outOfStock ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
+                <span>
+                  {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
+                </span>
+              </p>
+            ) : stock !== null ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <Badge variant="warning">{t("cart.stock.badge")}</Badge>
+                <span>{stockHintText(t, stock)}</span>
+              </p>
+            ) : !flags.unavailable && line.availability === "low_stock" ? (
+              <p className="text-sm text-foreground">
+                <Badge variant="warning">{t("availability.low_stock")}</Badge>
+              </p>
+            ) : null}
+          </div>
           {flags.outOfRange ? (
             <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
               <Badge variant="danger">{t("cart.notice.outOfRange")}</Badge>
@@ -501,11 +512,15 @@ export function CartPageView({
               </Link>
             ) : (
               <>
-                <Button className="self-start" disabled aria-describedby="cart-checkout-reason">
+                <Button className="self-start" disabled aria-describedby={CHECKOUT_REASON_ID}>
                   {t("cart.checkout")}
                 </Button>
                 {block === "stock" ? (
-                  <div id="cart-checkout-reason" className="flex flex-col gap-1 text-sm">
+                  <div
+                    id={CHECKOUT_REASON_ID}
+                    tabIndex={-1}
+                    className={`flex flex-col gap-1 text-sm ${focusRing}`}
+                  >
                     <p className="text-foreground">{t("cart.checkout.stockBlocked")}</p>
                     <ul className="flex flex-col gap-1">
                       {stockProblemLines(cart).map((line) => (
@@ -521,7 +536,11 @@ export function CartPageView({
                     </ul>
                   </div>
                 ) : (
-                  <p id="cart-checkout-reason" className="text-sm text-muted-foreground">
+                  <p
+                    id={CHECKOUT_REASON_ID}
+                    tabIndex={-1}
+                    className={`text-sm text-muted-foreground ${focusRing}`}
+                  >
                     {t("cart.checkout.blocked")}
                   </p>
                 )}
@@ -561,6 +580,19 @@ export function CartPage({
     if (before.status !== "loading") void store.refresh();
     return () => store.dismissFailure();
   }, [store]);
+
+  // The checkout link turns into the blocked button when a save's answer flags a line (or empties nothing to order):
+  // when that removed the focused link, the focus goes to the reason instead of the page body (review m5 of PR 215).
+  const block = state.cart === null ? null : checkoutBlock(state.cart);
+  const previousBlock = useRef(block);
+  useEffect(() => {
+    const before = previousBlock.current;
+    previousBlock.current = block;
+    const focusLost = document.activeElement === null || document.activeElement === document.body;
+    if (focusCheckoutReason(before, block, focusLost)) {
+      document.getElementById(CHECKOUT_REASON_ID)?.focus();
+    }
+  }, [block]);
 
   async function checkoutWhenSaved(): Promise<void> {
     setLeaving(true);

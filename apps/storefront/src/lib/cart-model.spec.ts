@@ -4,6 +4,7 @@ import {
   cartLineFacts,
   cartNoticeMessageKey,
   checkoutBlock,
+  focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
   isLineBusy,
@@ -235,6 +236,20 @@ describe("quantityStepperMax", () => {
       999,
     );
     expect(quantityStepperMax(cartLine("a"))).toBe(999);
+  });
+});
+
+describe("focusCheckoutReason (PR 215 review m5)", () => {
+  it("moves the focus to the reason only when the checkout link just turned into the blocked button and the focus was lost", () => {
+    expect(focusCheckoutReason(null, "stock", true)).toBe(true);
+    expect(focusCheckoutReason(null, "lines", true)).toBe(true);
+    // The shopper is elsewhere (a stepper): leave the focus alone.
+    expect(focusCheckoutReason(null, "stock", false)).toBe(false);
+    // Already blocked before, or unblocked now: nothing moved.
+    expect(focusCheckoutReason("stock", "stock", true)).toBe(false);
+    expect(focusCheckoutReason("stock", null, true)).toBe(false);
+    // An emptied cart has no reason to focus.
+    expect(focusCheckoutReason(null, "empty", true)).toBe(false);
   });
 });
 

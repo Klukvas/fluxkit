@@ -1,7 +1,7 @@
 import type { Cart, Money, StoreClient } from "@fluxkit/api-client";
 import type { Locale } from "@fluxkit/ui";
 import type { CheckoutConfig } from "../config/checkout";
-import { hasPriceChange } from "./cart-model";
+import { hasPriceChange, lineStockHint } from "./cart-model";
 import type { CartStore } from "./cart-store";
 import {
   InsecureContextError,
@@ -224,18 +224,26 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
         void shipping.refresh();
         set({ pending: false, attemptPersistent: persistent });
         return;
-      case "refused":
-        set({
-          pending: false,
-          attemptPersistent: persistent,
-          lineErrors: { cart: cart.getState().cart, errors: outcome.lineErrors },
-        });
+      case "refused": {
+        const refused = { cart: cart.getState().cart, errors: outcome.lineErrors };
+        set({ pending: false, attemptPersistent: persistent, lineErrors: refused });
         // The server judged the stock differently from the cart this page read: read it again, so the lines' stock hints
-        // above the form are the current ones. The errors stay shown while the lines are the same (`sameLines`).
+        // above the form are the current ones. The errors stay shown while the lines are the same (`sameLines`), except a
+        // stock error of a line the fresh cart no longer flags (stock came back meanwhile; review m3 of PR 215).
         if (outcome.lineErrors.some((error) => error.code === "insufficient_stock")) {
-          void cart.refresh();
+          void cart.refresh().then((read) => {
+            // A newer submit or answer replaced these errors meanwhile: leave its state alone.
+            if (read.status !== "ok" || state.lineErrors !== refused) return;
+            const errors = refused.errors.filter((error) => {
+              if (error.code !== "insufficient_stock") return true;
+              const line = read.cart.lines[error.index];
+              return line !== undefined && lineStockHint(line) !== null;
+            });
+            set({ lineErrors: { cart: refused.cart, errors } });
+          });
         }
         return;
+      }
       case "cartEmpty":
         void cart.refresh();
         set({ pending: false, attemptPersistent: persistent });

@@ -361,6 +361,51 @@ describe("checkout store: the other outcomes", () => {
     expect(sameLines(checkout.getState().lineErrors?.cart ?? null, cart.getState().cart)).toBe(
       true,
     );
+    expect(checkout.getState().lineErrors?.errors).toHaveLength(1);
+  });
+
+  // PR 215 review m3: stock came back between the refusal and the re-read: the line's stock error would contradict the
+  // fresh cart (no warning above the form), so it is dropped; errors of other codes stay.
+  it("drops a stock error the re-read cart no longer flags, keeping the other codes", async () => {
+    const two = cartOf([cartLine("a"), cartLine("b")], {
+      total: { amount: 1999, currency: "UAH" },
+    });
+    const { checkout, cart, calls } = await setup({ cart: two });
+    const result = checkout.submit(values(), { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(
+      problem(409, "checkout_refused", {
+        errors: [
+          { path: "lines.0", code: "insufficient_stock" },
+          { path: "lines.1", code: "variant_not_sellable" },
+        ],
+      }),
+    );
+    expect((await result).kind).toBe("refused");
+    const reads = calls.filter((call) => call.url.startsWith("/store/cart"));
+    reads[1]?.answer(json(two));
+    await settle();
+    expect(cart.getState().cart).toEqual(two);
+    expect(checkout.getState().lineErrors?.errors).toEqual([
+      { index: 1, code: "variant_not_sellable", messageKey: "errors.field.variant_not_sellable" },
+    ]);
+  });
+
+  // PR 215 review m6: the 409 path itself: the cart before has no hints, the cart of the 409 has, and it is applied.
+  it("409 cart_changed applies the answer's cart with its stock hints", async () => {
+    const { checkout, cart, calls } = await setup();
+    expect(stockProblemLines(cart.getState().cart ?? cartOf([]))).toHaveLength(0);
+    const flagged = cartOf(
+      [cartLine("a", { quantity: 4, insufficientStock: true, maxQuantity: 2 })],
+      {
+        total: { amount: 7996, currency: "UAH" },
+      },
+    );
+    const result = checkout.submit(values(), { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(problem(409, "cart_changed", { cart: flagged }));
+    expect((await result).kind).toBe("cartChanged");
+    expect(cart.getState().cart).toEqual(flagged);
+    expect(stockProblemLines(cart.getState().cart ?? cartOf([]))).toEqual(flagged.lines);
+    expect(checkout.getState().needsConfirmation).toBe(true);
   });
 
   it("cart_empty and idempotency_key_reused clear the attempt; cart_empty also reads the cart", async () => {

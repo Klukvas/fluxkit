@@ -88,7 +88,17 @@ export function cartLineAnchor(variantId: string): string {
 
 /** The lines the checkout would refuse for stock, in cart order: named before the checkout form is filled in. */
 export function stockProblemLines(cart: Cart): CartLine[] {
-  return cart.lines.filter((line) => lineStockHint(line) !== null);
+  return stockProblems(cart).map((problem) => problem.line);
+}
+
+/** The same lines with their hints (never null), for lists that show both. */
+export function stockProblems(cart: Cart): { line: CartLine; hint: LineStockHint }[] {
+  const problems: { line: CartLine; hint: LineStockHint }[] = [];
+  for (const line of cart.lines) {
+    const hint = lineStockHint(line);
+    if (hint !== null) problems.push({ line, hint });
+  }
+  return problems;
 }
 
 /**
@@ -135,6 +145,19 @@ export function hasPriceChange(cart: Cart): boolean {
 export function checkoutBlock(cart: Cart): "empty" | "lines" | "stock" | null {
   if (!cart.purchasable) return cart.lines.length === 0 ? "empty" : "lines";
   return stockProblemLines(cart).length > 0 ? "stock" : null;
+}
+
+/**
+ * Whether the cart page moves the focus to the reason of the blocked checkout button (review m5 of PR 215): only when the
+ * link was there before (`before` null), a block with a shown reason replaced it, and the focus was lost with the link
+ * (on the page body). A shopper working elsewhere on the page keeps the focus.
+ */
+export function focusCheckoutReason(
+  before: ReturnType<typeof checkoutBlock>,
+  after: ReturnType<typeof checkoutBlock>,
+  focusLost: boolean,
+): boolean {
+  return before === null && (after === "stock" || after === "lines") && focusLost;
 }
 
 /** A whole-cart write (acknowledge, clear) is in flight. */

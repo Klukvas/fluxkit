@@ -33,10 +33,10 @@ import {
   hasPriceChange,
   lineFlags,
   lineName,
-  lineStockHint,
   noticeMoney,
   stockHintText,
   stockProblemLines,
+  stockProblems,
 } from "../lib/cart-model";
 import type { CartState } from "../lib/cart-store";
 import {
@@ -177,26 +177,23 @@ export function StockWarningsView({
   t: Translator;
   locale: Locale;
 }) {
-  const lines = stockProblemLines(cart);
+  const lines = stockProblems(cart);
   if (lines.length === 0) return null;
   return (
     <Alert variant="warning" title={t("checkout.stock.title")}>
       <p id={STOCK_WARNING_ID}>{t("checkout.stock.description")}</p>
       <ul className="mt-2 flex flex-col gap-1">
-        {lines.map((line) => {
-          const hint = lineStockHint(line);
-          return (
-            <li key={line.variantId} className="flex flex-wrap gap-x-2">
-              <Link
-                href={localizedHref(locale, `/cart#${cartLineAnchor(line.variantId)}`)}
-                className={`underline underline-offset-4 ${focusRing}`}
-              >
-                {lineName(line)}
-              </Link>
-              {hint === null ? null : <span>{stockHintText(t, hint)}</span>}
-            </li>
-          );
-        })}
+        {lines.map(({ line, hint }) => (
+          <li key={line.variantId} className="flex flex-wrap gap-x-2">
+            <Link
+              href={localizedHref(locale, `/cart#${cartLineAnchor(line.variantId)}`)}
+              className={`underline underline-offset-4 ${focusRing}`}
+            >
+              {lineName(line)}
+            </Link>
+            <span>{stockHintText(t, hint)}</span>
+          </li>
+        ))}
       </ul>
     </Alert>
   );

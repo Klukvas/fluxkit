@@ -307,11 +307,11 @@ export function ProductPurchaseView({
               {atLimit && stock !== null ? (
                 <p id={LIMIT_NOTE_ID} className="flex flex-wrap gap-x-2 text-sm text-foreground">
                   <span>
-                    {stock.available === null
+                    {/* No count, or 0 (a default location without stock): "more than the shop has", never "only 0". */}
+                    {stock.available === null || stock.available === 0
                       ? t("product.quantity.stockShort", { count: inCart })
-                      : t("product.quantity.stockLimit", {
-                          count: inCart,
-                          max: stock.available,
+                      : t.plural("product.quantity.stockLimit", stock.available, {
+                          inCart,
                         })}
                   </span>
                   <Link

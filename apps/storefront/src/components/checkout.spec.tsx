@@ -356,7 +356,9 @@ describe("checkout page: blocks and confirmations", () => {
     expect(render()).not.toContain("§checkout.stock.");
   });
 
-  it("shows the stock hints of the cart a 409 cart_changed handed over (the store applies that cart)", () => {
+  // The 409 cart_changed path itself (its cart applied with the hints) is driven through the store in
+  // `lib/checkout-store.spec.ts`; here: the warning also shows while the new total waits for confirmation.
+  it("keeps the stock warning above the form while a changed total waits for confirmation", () => {
     const changed = cartOf([
       cartLine("a", { title: "§title-a", quantity: 4, insufficientStock: true, maxQuantity: 2 }),
     ]);
@@ -364,7 +366,7 @@ describe("checkout page: blocks and confirmations", () => {
       cartState: ready(changed),
       checkout: { ...initialCheckoutState, needsConfirmation: true },
     });
-    expect(html).toContain("§checkout.stock.title");
+    expect(html.indexOf("§checkout.stock.title")).toBeLessThan(html.indexOf("<form"));
     expect(html).toContain("§cart.stock.only");
   });
 

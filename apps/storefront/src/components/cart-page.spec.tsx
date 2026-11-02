@@ -460,11 +460,37 @@ describe("CartPageView: stock hints of the API (insufficientStock, maxQuantity; 
     expect(html).not.toContain("§cart.stock.only");
   });
 
-  it("names the count when the API gives one and caps the stepper at it", () => {
+  it("names the count when the API gives one and stops the + button at it, never a typed number (review m1)", () => {
     const html = lineHtml(few);
     expect(html).toContain("§cart.stock.only");
-    expect(html).toMatch(/<input[^>]*type="number"[^>]*max="3"/);
-    expect(lineHtml(short)).toMatch(/<input[^>]*type="number"[^>]*max="999"/);
+    // A typed number above the hint goes to the server (the judge; the hint may be older than a restock).
+    expect(html).toMatch(/<input[^>]*type="number"[^>]*max="999"/);
+    // The stepper itself (the server render of a line is disabled until its autosave exists).
+    const stepper = (quantity: number, stepMax: number) =>
+      renderToStaticMarkup(
+        LineQuantityView({
+          title: "§few",
+          variantId: "few",
+          quantity,
+          autosave: idleAutosave,
+          disabled: false,
+          t,
+          onChange: vi.fn(),
+          stepMax,
+        }),
+      );
+    const increaseDisabled = /<button[^>]*aria-label="§cart\.line\.increase"[^>]*disabled=""/;
+    expect(stepper(8, 3)).toMatch(increaseDisabled);
+    expect(stepper(8, 3)).toMatch(/<input[^>]*max="999"/);
+    expect(stepper(30, 999)).not.toMatch(increaseDisabled);
+  });
+
+  it("announces a line's stock hint politely when it changes (review m5)", () => {
+    expect(lineHtml(few)).toMatch(
+      /<div[^>]*aria-live="polite"[^>]*>(?:(?!<\/div>).)*§cart\.stock\.only/s,
+    );
+    // The region is there before a hint appears, so the change is announced.
+    expect(lineHtml(cartLine("plain", { title: "§plain" }))).toContain('aria-live="polite"');
   });
 
   it("tells an out-of-stock line to be removed instead of 'may be refused'", () => {
@@ -489,6 +515,10 @@ describe("CartPageView: stock hints of the API (insufficientStock, maxQuantity; 
       /<button[^>]*disabled=""[^>]*aria-describedby="cart-checkout-reason"|<button[^>]*aria-describedby="cart-checkout-reason"[^>]*disabled=""/,
     );
     expect(html).toContain("§cart.checkout.stockBlocked");
+    // The focus target when the link turns into the blocked button (review m5).
+    expect(html).toMatch(
+      /id="cart-checkout-reason"[^>]*tabindex="-1"|tabindex="-1"[^>]*id="cart-checkout-reason"/i,
+    );
     expect(html).toContain('href="#cart-line-big"');
     expect(html).toContain('href="#cart-line-few"');
     expect(html).not.toContain('href="#cart-line-fine"');

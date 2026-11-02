@@ -164,7 +164,8 @@ test("8 of a variant with 3: 'Only 3 available', the stepper caps at 3, and lowe
     line.getByText("Only 3 available. Lower the quantity to 3 or remove the item."),
   ).toBeVisible();
   const quantity = page.getByRole("spinbutton", { name: "Quantity of Demo T-shirt" });
-  await expect(quantity).toHaveAttribute("max", "3");
+  // The + button stops at the hint; a typed number does not (review m1 of PR 215: the server answers it).
+  await expect(quantity).toHaveAttribute("max", "999");
   await expect(
     page.getByRole("button", { name: "Increase quantity of Demo T-shirt" }),
   ).toBeDisabled();
@@ -176,4 +177,27 @@ test("8 of a variant with 3: 'Only 3 available', the stepper caps at 3, and lowe
   await expect(line.getByText(/Only 3 available/)).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Checkout" })).toBeVisible();
   await expect(line.getByText("Only a few left", { exact: true })).toBeVisible();
+
+  // A typed 5 is sent as typed (not clamped to the old hint) and the server's answer flags it again.
+  await quantity.fill("5");
+  await expect(
+    line.getByText("Only 3 available. Lower the quantity to 3 or remove the item."),
+  ).toBeVisible();
+  await expect(quantity).toHaveValue("5");
+});
+
+test("Checkout pressed while a quantity saves that the server flags for stock: the focus lands on the reason (review m5)", async ({
+  page,
+  shopper,
+}) => {
+  const red = await shopper.variantBySku("demo-t-shirt", "DEMO-T-SHIRT-RED-S");
+  await shopper.addToCart(red.id, 1);
+  await page.goto("/en/cart");
+  await waitForHydration(page);
+  await page.getByRole("spinbutton", { name: "Quantity of Demo T-shirt" }).fill("50");
+  // Pressed within the save delay: the link waits for the save, whose answer blocks the checkout.
+  await page.getByRole("link", { name: /Checkout|Saving/ }).click();
+  await expect(page).toHaveURL(/\/en\/cart$/);
+  await expect(page.getByRole("button", { name: "Checkout" })).toBeDisabled();
+  await expect(page.locator("#cart-checkout-reason")).toBeFocused();
 });
