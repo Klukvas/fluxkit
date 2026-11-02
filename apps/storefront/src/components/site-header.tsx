@@ -6,9 +6,10 @@ import { localizedHref } from "../lib/locale-path";
 import { AccountLink } from "./account-link";
 import { CartBadge } from "./cart-badge";
 import { HeaderDisclosure, menuItem } from "./header-menu";
+import { HeaderSearchToggle } from "./header-search-toggle";
 import { MenuIcon } from "./icons";
 import { LocaleSwitcher } from "./locale-switcher";
-import { SearchBox } from "./search-box";
+import { SearchBox, SearchBoxFallback } from "./search-box";
 
 export interface NavigationCategory {
   slug: string;
@@ -37,8 +38,9 @@ function mainLinks(
 /**
  * Server-rendered header, ONE row of controls in every language (owner request 2026-11-02): the menu button (below `xl`),
  * the logo, the category links (from `xl`, a row that scrolls instead of wrapping when a shop has many or long names), the
- * search box (in the row from `lg`; below it a full-width second row, so it is never cut), then the language, cart and
- * account icons. The main navigation exists twice in the markup (inline and inside the menu); one of them is always
+ * search box (in the row from `lg`; below it a search icon that opens a full-width second row, `HeaderSearchToggle`), then
+ * the language, cart and account icons. Below `lg` the header is sticky (`.fk-site-header`: the cart count stays in view
+ * while scrolling; `scroll-padding-top` keeps anchors and focused fields out from under it). The main navigation exists twice in the markup (inline and inside the menu); one of them is always
  * `display: none`, so assistive technology meets one. `categories` is `null` when the API could not be read (the page still
  * renders, without the category links; the failure is logged where it happened). The cart, account, language and search
  * parts are client islands; `searchEnabled` false means NO search box (and no results page). Needs an `I18nProvider`.
@@ -56,7 +58,7 @@ export function SiteHeader({
 }) {
   const links = mainLinks(locale, t, categories);
   return (
-    <header className="border-b border-border bg-background">
+    <header className="fk-site-header">
       <Container className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4">
         <HeaderDisclosure
           label={t("nav.menu")}
@@ -95,12 +97,13 @@ export function SiteHeader({
           </ul>
         </nav>
         {searchEnabled ? (
-          <div className="order-last w-full lg:order-none lg:w-auto lg:min-w-72 lg:flex-1">
-            {/* `useSearchParams` in the box needs a boundary; the page is rendered per request, so it is never the fallback. */}
-            <Suspense fallback={null}>
+          <HeaderSearchToggle label={t("nav.search")}>
+            {/* `useSearchParams` in the box needs a boundary. On dynamic pages (catalog, product, results) the box streams in
+                after the shell, so the fallback is the same GET form: without a script it is the search (review M2). */}
+            <Suspense fallback={<SearchBoxFallback />}>
               <SearchBox locale={locale} />
             </Suspense>
-          </div>
+          </HeaderSearchToggle>
         ) : null}
         <div className="ms-auto flex shrink-0 items-center gap-1">
           <LocaleSwitcher />

@@ -14,6 +14,7 @@ import {
   type Ref,
 } from "react";
 import { floatingTop, isFormChanged } from "../lib/filter-draft";
+import { nextTrapIndex } from "../lib/mobile-ux";
 import { describeFormFailure } from "../lib/search-facets";
 import { localizedHref } from "../lib/locale-path";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../lib/search-ids";
 import { parseSearchForm, searchPath, type SearchQuery } from "../lib/search-query";
 import { useI18n } from "./i18n-provider";
+import { CloseIcon } from "./icons";
 import { focusRing } from "./styles";
 
 /**
@@ -32,7 +34,8 @@ import { focusRing } from "./styles";
  *   "updating" (dimmed, `aria-busy`) without moving anything, and the focus goes to the results heading when it is done;
  * - `SearchFilterForm`: the facet form is a plain GET form that works without a script. With one, the submit is checked in
  *   the browser (a bad price box is named, not sent) and navigates with the router, keeping the page's shell and focus;
- * - `SortSelect`: submits the form when the choice changes; `FiltersDisclosure`: the panel's toggle below the `lg` width.
+ * - `SortSelect`: submits the form when the choice changes;
+ * - `FiltersButton` and `FilterSheet`: below the `lg` width the panel is a full-screen modal sheet (mobile batch, review D-05).
  * Nothing here reads the API: the address is the state, the server renders it.
  */
 
@@ -40,6 +43,9 @@ interface PendingValue {
   pending: boolean;
   /** Goes to the results page of `query`, as a transition. */
   navigate(query: SearchQuery): void;
+  /** The mobile filter sheet is open (below `lg`, with a script). */
+  sheetOpen: boolean;
+  setSheetOpen(open: boolean): void;
 }
 
 const PendingContext = createContext<PendingValue | null>(null);
@@ -63,6 +69,7 @@ export function SearchPending({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const wasPending = useRef(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   // The address changed and the new results arrived: the reading position is the results heading (a query-only change
   // keeps the path, so `RouteFocus` does not move it).
@@ -74,8 +81,15 @@ export function SearchPending({
     wasPending.current = pending;
   }, [pending]);
 
+  // Applying from the sheet closes it: the new results are what the shopper looks at next.
+  useEffect(() => {
+    if (pending) setSheetOpen(false);
+  }, [pending]);
+
   const value: PendingValue = {
     pending,
+    sheetOpen,
+    setSheetOpen,
     navigate(query) {
       startTransition(() => {
         router.push(localizedHref(locale, searchPath(query, basePath)));
@@ -143,14 +157,20 @@ export function FloatingApplyView({
 export function SearchFilterForm({
   exponent,
   initialError = null,
+  action,
   children,
 }: {
+  /**
+   * The page's own path: a submit without a script goes there, so the `#search-filters-panel` fragment that opened the
+   * panel (`:target`) is not carried to the results.
+   */
+  action: string;
   exponent: number;
   /** A failure the server already found (a script-less submit with a refused box, review F3), in the shop's words. */
   initialError?: string | null;
   children: ReactNode;
 }) {
-  const { navigate, pending } = usePending();
+  const { navigate, pending, sheetOpen } = usePending();
   const { t } = useI18n();
   const [error, setError] = useState<string | null>(initialError);
   const formRef = useRef<HTMLFormElement>(null);
@@ -237,6 +257,7 @@ export function SearchFilterForm({
       ref={formRef}
       id={SEARCH_FORM_ID}
       method="get"
+      action={action}
       noValidate={scripted}
       onSubmit={onSubmit}
       onChange={onDraftChange}
@@ -245,7 +266,8 @@ export function SearchFilterForm({
       className="relative flex flex-col gap-4"
     >
       <FloatingApplyView
-        visible={changedRow !== null && !pending}
+        // In the mobile sheet the sticky Apply at its bottom does this job.
+        visible={changedRow !== null && !pending && !sheetOpen}
         label={t("searchForm.applyChanged")}
         pendingText={t("searchForm.changesPending")}
         buttonRef={floatingRef}
@@ -270,7 +292,7 @@ export function SortSelect({
   selected: string;
 }) {
   return (
-    <label className="flex flex-wrap items-center gap-2 text-foreground">
+    <label className="flex min-w-0 flex-1 flex-col gap-1 text-foreground lg:flex-none lg:flex-row lg:flex-wrap lg:items-center lg:gap-2">
       <span>{label}</span>
       <Select
         // The select belongs to the filter form (a form attribute), so one submit carries the sort and the filters.
@@ -292,24 +314,131 @@ export function SortSelect({
   );
 }
 
-/** The panel of filters: always shown from the `lg` width, behind a toggle button below it. */
-export function FiltersDisclosure({ title, children }: { title: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  const panelId = SEARCH_FILTERS_PANEL_ID;
+/**
+ * "Filters (N)" below the `lg` width, next to the sort (review D-05). Without a script it is a link to the panel, which CSS
+ * `:target` then shows in place (the plain GET form, `.fk-filter-panel` in `app/globals.css`); with one it opens the sheet.
+ */
+export function FiltersButton({ label }: { label: string }) {
+  const { sheetOpen, setSheetOpen } = usePending();
   return (
-    <div className="flex flex-col gap-3">
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={panelId}
-        onClick={() => setOpen((current) => !current)}
-        className={`inline-flex min-h-11 items-center justify-between rounded-md border border-border px-4 text-foreground lg:hidden ${focusRing}`}
-      >
-        {title}
-      </button>
-      <div id={panelId} className={open ? "block" : "hidden lg:block"}>
-        {children}
-      </div>
+    <a
+      href={`#${SEARCH_FILTERS_PANEL_ID}`}
+      id={FILTERS_BUTTON_ID}
+      aria-controls={SEARCH_FILTERS_PANEL_ID}
+      aria-haspopup="dialog"
+      aria-expanded={sheetOpen}
+      onClick={(event) => {
+        event.preventDefault();
+        setSheetOpen(true);
+      }}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-md border border-border-input bg-background px-4 font-medium text-foreground lg:hidden ${focusRing}`}
+    >
+      {label}
+    </a>
+  );
+}
+
+const FILTERS_BUTTON_ID = "search-filters-button";
+const SHEET_TITLE_ID = "search-filters-sheet-title";
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), summary, [tabindex]:not([tabindex="-1"])';
+
+/** The controls of `root` a Tab can reach (visible ones: a closed group's checkboxes are skipped). */
+function focusables(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    (element) => element.getClientRects().length > 0 && element.tabIndex !== -1,
+  );
+}
+
+/**
+ * The filter panel: a sidebar from the `lg` width; below it hidden until "Filters" opens it as a full-screen modal sheet
+ * (`role="dialog"`, `aria-modal`, the page behind it does not scroll, Tab stays inside, Escape or the close button close
+ * it and give the focus back to "Filters"). The sheet is the same form, not a copy. It closes by itself when the filters
+ * are applied (the results load) and when the window grows to the sidebar width.
+ */
+export function FilterSheet({
+  title,
+  closeLabel,
+  children,
+}: {
+  title: string;
+  closeLabel: string;
+  children: ReactNode;
+}) {
+  const { sheetOpen, setSheetOpen } = usePending();
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  useEffect(() => {
+    if (!sheetOpen) {
+      if (wasOpen.current) {
+        wasOpen.current = false;
+        document.documentElement.classList.remove("overflow-hidden");
+        document.getElementById(FILTERS_BUTTON_ID)?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    wasOpen.current = true;
+    document.documentElement.classList.add("overflow-hidden");
+    closeRef.current?.focus();
+    const wide = window.matchMedia("(min-width: 64rem)");
+    const onWide = () => {
+      if (wide.matches) setSheetOpen(false);
+    };
+    wide.addEventListener("change", onWide);
+    // Back (or Forward) while the sheet is open goes to the other results with the sheet closed (review m4 of PR 216).
+    const onHistory = () => setSheetOpen(false);
+    window.addEventListener("popstate", onHistory);
+    return () => {
+      window.removeEventListener("popstate", onHistory);
+      wide.removeEventListener("change", onWide);
+      document.documentElement.classList.remove("overflow-hidden");
+    };
+  }, [sheetOpen, setSheetOpen]);
+
+  return (
+    <div
+      ref={panelRef}
+      id={SEARCH_FILTERS_PANEL_ID}
+      {...(sheetOpen
+        ? { role: "dialog", "aria-modal": true, "aria-labelledby": SHEET_TITLE_ID }
+        : {})}
+      className={sheetOpen ? "fk-filter-panel fk-open" : "fk-filter-panel"}
+      onKeyDown={(event) => {
+        if (!sheetOpen) return;
+        if (event.key === "Escape") {
+          event.preventDefault();
+          setSheetOpen(false);
+          return;
+        }
+        if (event.key !== "Tab" || panelRef.current === null) return;
+        const items = focusables(panelRef.current);
+        const current = items.indexOf(document.activeElement as HTMLElement);
+        const next = nextTrapIndex(items.length, current, event.shiftKey);
+        if (next !== null) {
+          event.preventDefault();
+          items[next]?.focus();
+        }
+      }}
+    >
+      {sheetOpen ? (
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
+          <h2 id={SHEET_TITLE_ID} className="text-lg font-semibold text-foreground">
+            {title}
+          </h2>
+          <button
+            ref={closeRef}
+            type="button"
+            aria-label={closeLabel}
+            onClick={() => setSheetOpen(false)}
+            className={`inline-flex size-11 items-center justify-center rounded-md hover:bg-muted ${focusRing}`}
+          >
+            <CloseIcon />
+          </button>
+        </div>
+      ) : null}
+      <div className={sheetOpen ? "flex-1 overflow-y-auto px-4 pb-0 pt-4" : ""}>{children}</div>
     </div>
   );
 }

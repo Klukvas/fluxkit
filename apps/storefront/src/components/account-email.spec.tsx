@@ -172,7 +172,7 @@ describe("ForgotPasswordSentView", () => {
 
   it("says the same words in both locales for any input (the message keys are fixed)", () => {
     expect(en["account.forgot.sent.description"]).toMatch(/^If an account exists/);
-    expect(uk["account.forgot.sent.description"]).toMatch(/^Якщо .* існує обліковий запис/);
+    expect(uk["account.forgot.sent.description"]).toMatch(/^Якщо .* існує акаунт/);
     for (const messages of [en, uk] as Record<string, string>[]) {
       expect(messages["account.forgot.sent.description"]).not.toMatch(/\{/);
       expect(messages["account.forgot.sent.title"]).not.toMatch(/\{/);

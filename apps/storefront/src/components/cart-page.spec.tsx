@@ -330,6 +330,19 @@ describe("CartPageView: lines and notices", () => {
   });
 });
 
+describe("CartPageView on a phone (mobile batch, review D-09)", () => {
+  it("keeps the total and the checkout control in one bar that sticks to the bottom below md", () => {
+    const html = view(ready(cartOf([cartLine("a", { title: "§a" })])));
+    const bar =
+      /<div class="fk-sticky-bottom fk-bottom-bar[^"]*max-md:sticky max-md:bottom-0[^"]*">(.*?)<\/div><\/div>/.exec(
+        html,
+      );
+    expect(bar).not.toBeNull();
+    expect(bar?.[1]).toContain("§cart.summary.total");
+    expect(bar?.[1]).toContain('href="/uk/checkout"');
+  });
+});
+
 describe("CartPageView: banner, acknowledge, checkout", () => {
   it("shows the prices-changed banner only when a line has a price_changed notice", () => {
     expect(view(ready(mixedCart))).toContain("§cart.banner.title");
@@ -522,6 +535,21 @@ describe("CartPageView: stock hints of the API (insufficientStock, maxQuantity; 
     expect(html).toContain('href="#cart-line-big"');
     expect(html).toContain('href="#cart-line-few"');
     expect(html).not.toContain('href="#cart-line-fine"');
+  });
+
+  it("keeps the sticky bar short: one counted reason and one link to the first line; the full list stays in the page (review M1 of PR 216)", () => {
+    const html = view(ready(cartOf([fine, short, few])));
+    // The bar is the last part of the page.
+    const bar = html.slice(html.indexOf("fk-sticky-bottom"));
+    const page = html.slice(0, html.indexOf("fk-sticky-bottom"));
+    expect(bar).toContain("§cart.checkout.stockBlockedShort");
+    expect(bar).toContain("§cart.checkout.firstLine");
+    expect(bar.match(/href="#cart-line-/g)).toHaveLength(1);
+    expect(bar).toContain('href="#cart-line-big"');
+    expect(bar).not.toContain("§cart.checkout.stockBlocked<");
+    expect(page).toContain("§cart.checkout.stockBlocked");
+    expect(page).toContain('href="#cart-line-big"');
+    expect(page).toContain('href="#cart-line-few"');
   });
 });
 

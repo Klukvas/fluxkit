@@ -19,6 +19,7 @@ import {
   sortChoices,
   wordsInOtherScript,
 } from "../lib/search-facets";
+import { selectedFilterCount } from "../lib/mobile-ux";
 import { SEARCH_RESULTS_HEADING_ID } from "../lib/search-ids";
 import {
   MAX_SEARCH_PAGE,
@@ -32,7 +33,8 @@ import type { SearchOutcome } from "../lib/search-data";
 import { ProductGrid } from "./product-grid";
 import { SearchFilters } from "./search-filters";
 import {
-  FiltersDisclosure,
+  FilterSheet,
+  FiltersButton,
   SearchFilterForm,
   SearchPending,
   SearchResultsRegion,
@@ -201,14 +203,16 @@ export function FacetedResults({
   const chips = selectedFilters({ query, facets, t, currency, exponent });
   const sorts = sortChoices(query);
   const pageCount = Math.min(result.pageCount, MAX_SEARCH_PAGE);
+  const filterCount = selectedFilterCount(query, hiddenFacetKeys);
   return (
     <SearchPending locale={locale} basePath={basePath}>
-      <div className="grid gap-6 lg:grid-cols-4">
+      <div className="grid gap-x-6 lg:grid-cols-4 lg:gap-y-6">
         <aside aria-label={t("search.filters.title")} className="lg:col-span-1">
-          <FiltersDisclosure title={t("search.filters.title")}>
+          <FilterSheet title={t("search.filters.title")} closeLabel={t("search.filters.close")}>
             {/* Keyed by the address: the checkboxes are uncontrolled and must start over with every new result. */}
             <SearchFilterForm
               key={searchPath(query, basePath)}
+              action={localizedHref(locale, basePath)}
               exponent={exponent}
               initialError={
                 formFailure === null || formFailure === undefined
@@ -223,9 +227,12 @@ export function FacetedResults({
                 price={result.price}
                 currency={currency}
                 exponent={exponent}
+                clearHref={
+                  filterCount === 0 ? null : pageHref(locale, clearFilters(query), basePath)
+                }
               />
             </SearchFilterForm>
-          </FiltersDisclosure>
+          </FilterSheet>
         </aside>
 
         <section aria-label={listLabel} className="flex flex-col gap-4 lg:col-span-3">
@@ -241,14 +248,24 @@ export function FacetedResults({
                     {t.plural(countKey, result.total)}
                   </h2>
                 </LiveRegion>
-                <SortSelect
-                  label={t("search.sort.label")}
-                  selected={sorts.selected}
-                  options={sorts.options.map((value) => ({
-                    value,
-                    label: t(`search.sort.${value}`),
-                  }))}
-                />
+                {/* Below `lg`: "Filters (N)" next to the sort; the sheet opens from it. */}
+                <div className="flex w-full items-end gap-3 lg:w-auto lg:items-center">
+                  <FiltersButton
+                    label={
+                      filterCount === 0
+                        ? t("search.filters.title")
+                        : t("search.filters.withCount", { count: filterCount })
+                    }
+                  />
+                  <SortSelect
+                    label={t("search.sort.label")}
+                    selected={sorts.selected}
+                    options={sorts.options.map((value) => ({
+                      value,
+                      label: t(`search.sort.${value}`),
+                    }))}
+                  />
+                </div>
               </div>
 
               {chips.length === 0 ? null : (

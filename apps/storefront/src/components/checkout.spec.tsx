@@ -395,6 +395,41 @@ describe("checkout page: blocks and confirmations", () => {
     expect(changedQuantity).not.toContain("refusal");
   });
 
+  it("puts the order summary before the form, collapsed below lg behind a toggle, and opens it for a refused line (mobile batch)", () => {
+    const closed = render();
+    expect(closed.indexOf('aria-labelledby="checkout-summary-heading"')).toBeLessThan(
+      closed.indexOf("<form"),
+    );
+    expect(closed).toMatch(/aria-expanded="false" aria-controls="checkout-summary-details"/);
+    expect(closed).toContain(
+      'id="checkout-summary-details" class="flex flex-col gap-4 max-lg:hidden"',
+    );
+    expect(closed).toContain("§checkout.summary.toggleDetail");
+    expect(render({ summaryOpen: true })).toMatch(
+      /aria-expanded="true" aria-controls="checkout-summary-details"/,
+    );
+    const errors = [
+      { index: 1, code: "insufficient_stock", messageKey: "errors.field.insufficient_stock" },
+    ];
+    const refused = render({ checkout: { ...initialCheckoutState, lineErrors: { cart, errors } } });
+    expect(refused).toContain('id="checkout-summary-details" class="flex flex-col gap-4"');
+    // The shopper can still close it after a refusal, and the toggle says so (review m2 of PR 216).
+    const closedAfterRefusal = render({
+      checkout: { ...initialCheckoutState, lineErrors: { cart, errors } },
+      summaryOpen: false,
+    });
+    expect(closedAfterRefusal).toMatch(
+      /aria-expanded="false" aria-controls="checkout-summary-details"/,
+    );
+    expect(closedAfterRefusal).toContain(
+      'id="checkout-summary-details" class="flex flex-col gap-4 max-lg:hidden"',
+    );
+    // The submit row sticks to the bottom below lg, with the total.
+    expect(closed).toMatch(
+      /class="fk-sticky-bottom fk-bottom-bar[^"]*max-lg:sticky max-lg:bottom-0/,
+    );
+  });
+
   it("links a customer at the open-order limit to the order history", () => {
     expect(render({ ordersHref: "/uk/account/orders" })).toContain('href="/uk/account/orders"');
   });

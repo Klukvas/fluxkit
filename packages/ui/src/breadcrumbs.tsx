@@ -29,7 +29,14 @@ export function Breadcrumbs({ label, items }: BreadcrumbsProps) {
                   {item.label}
                 </span>
               ) : (
-                <a href={item.href} className={cn("underline", focusRing)}>
+                // At least 24 px high (WCAG 2.5.8), 44 px on a touch screen (review A-02).
+                <a
+                  href={item.href}
+                  className={cn(
+                    "inline-flex min-h-6 items-center underline pointer-coarse:min-h-11",
+                    focusRing,
+                  )}
+                >
                   {item.label}
                 </a>
               )}

@@ -243,3 +243,36 @@ export function SearchBox({ locale }: { locale: Locale }) {
   const fromAddress = pathname?.endsWith("/search") === true ? (params?.get("q") ?? "") : "";
   return <SearchBoxInner key={fromAddress} locale={locale} initialText={fromAddress} />;
 }
+
+const noop = () => {};
+
+/**
+ * What the header shows until `SearchBox` arrives: the same GET form with an empty box and no suggestions. On the pages
+ * whose header box is streamed (catalog, product and results pages: `useSearchParams` suspends there), only a script can
+ * swap the streamed box in, so without a script this form IS the search (review M2 of PR 216). Same markup as the box, so
+ * nothing moves when the real one replaces it.
+ */
+export function SearchBoxFallback() {
+  const { locale, t } = useI18n();
+  const id = `search-box-${useId().replace(/:/g, "")}`;
+  const [text, setText] = useState("");
+  return (
+    <SearchBoxView
+      t={t}
+      locale={locale}
+      id={id}
+      text={text}
+      combo={closedCombobox}
+      options={[]}
+      status="idle"
+      failure={null}
+      onTextChange={setText}
+      onKeyDown={noop}
+      onFocus={noop}
+      onBlur={noop}
+      onHighlight={noop}
+      onChoose={noop}
+      onSubmit={noop}
+    />
+  );
+}

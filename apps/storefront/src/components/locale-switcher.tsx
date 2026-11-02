@@ -58,7 +58,7 @@ function LocaleMenuFrame({
         summary={
           <>
             <span aria-hidden="true" className={flagClass(locale)} />
-            <span aria-hidden="true" className="text-sm font-semibold">
+            <span aria-hidden="true" className="text-sm font-semibold max-sm:hidden">
               {t(`locale.short.${locale}`)}
             </span>
             <ChevronDownIcon className="transition-transform group-open:rotate-180 motion-reduce:transition-none" />

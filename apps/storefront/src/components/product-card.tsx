@@ -93,9 +93,12 @@ export function ProductCard({
       {product.brand === null ? null : brandPath === null ? (
         <p className="text-sm text-muted-foreground">{product.brand.name}</p>
       ) : (
+        // A 24 px target with a mouse; on a touch screen not a target of its own (review N5): a tap there opens the product
+        // (the card's link lies under it), so a finger never lands on the filter by mistake. Keyboards and screen readers
+        // still reach the brand link.
         <Link
           href={localizedHref(locale, brandPath)}
-          className={`relative z-10 w-fit text-sm text-muted-foreground underline underline-offset-4 ${focusRing}`}
+          className={`relative z-10 inline-flex min-h-6 w-fit items-center text-sm text-muted-foreground underline underline-offset-4 pointer-coarse:pointer-events-none pointer-coarse:no-underline ${focusRing}`}
         >
           {product.brand.name}
         </Link>
