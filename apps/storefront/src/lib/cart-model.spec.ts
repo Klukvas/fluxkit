@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   cartBadgeState,
+  cartLineFacts,
   cartNoticeMessageKey,
   checkoutBlock,
+  focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
   isLineBusy,
   lineFlags,
+  lineStockHint,
   noticeMoney,
-  quantitiesByVariant,
-  stockWarnings,
+  quantityStepperMax,
+  stockProblemLines,
 } from "./cart-model";
 import { CART_BUSY_KEY, initialCartState, type CartState } from "./cart-store";
 import { cartLine, cartOf } from "./test-fixtures";
@@ -121,6 +124,15 @@ describe("checkoutBlock", () => {
   it("follows the API's purchasable flag and never recomputes it", () => {
     expect(checkoutBlock(cartOf([cartLine("v1")], { purchasable: false }))).toBe("lines");
   });
+
+  it("blocks a purchasable cart whose line the checkout would refuse for stock", () => {
+    expect(
+      checkoutBlock(
+        cartOf([cartLine("v1", { quantity: 999, insufficientStock: true, maxQuantity: null })]),
+      ),
+    ).toBe("stock");
+    expect(checkoutBlock(cartOf([cartLine("v1", { availability: "low_stock" })]))).toBeNull();
+  });
 });
 
 describe("isLineBusy", () => {
@@ -158,41 +170,94 @@ describe("cartNoticeMessageKey", () => {
   });
 });
 
-describe("stockWarnings (review SQ-02: say it before the form is filled in)", () => {
-  it("lists out-of-stock lines (the checkout refuses them) and low-stock lines, never unavailable ones", () => {
-    const cart = cartOf([
-      cartLine("a", { availability: "out_of_stock", notices: [{ code: "out_of_stock" }] }),
-      cartLine("b", { availability: "low_stock" }),
-      cartLine("c"),
-      cartLine("d", { availability: "out_of_stock", notices: [{ code: "unavailable" }] }),
-    ]);
-    expect(stockWarnings(cart)).toEqual({
-      outOfStock: [cart.lines[0]],
-      lowStock: [cart.lines[1]],
-    });
-    expect(stockWarnings(cartOf([cartLine("c")]))).toEqual({ outOfStock: [], lowStock: [] });
+describe("lineStockHint (the API's insufficientStock and maxQuantity, plan 2026-11-03)", () => {
+  it("is null while the checkout would accept the line, also for a low-stock line", () => {
+    expect(lineStockHint(cartLine("a"))).toBeNull();
+    expect(lineStockHint(cartLine("a", { availability: "low_stock", quantity: 2 }))).toBeNull();
   });
 
-  // PR 213 review m5: a line with its own block (unavailable, out of the money range) is never repeated as a stock warning,
-  // whatever its availability says (an out-of-range line keeps its stock status).
-  it("skips unavailable and out-of-range lines even when their status is low or out of stock", () => {
-    const cart = cartOf([
-      cartLine("range", {
-        availability: "low_stock",
-        notices: [{ code: "line_total_out_of_range" }],
-      }),
-      cartLine("gone", {
-        availability: "out_of_stock",
-        notices: [{ code: "unavailable" }, { code: "out_of_stock" }],
-      }),
-    ]);
-    expect(stockWarnings(cart)).toEqual({ outOfStock: [], lowStock: [] });
+  it("names the count when the API gives one, and says 'not enough' without one (999 of 22)", () => {
+    expect(
+      lineStockHint(cartLine("a", { quantity: 8, insufficientStock: true, maxQuantity: 3 })),
+    ).toEqual({ kind: "only", available: 3 });
+    expect(
+      lineStockHint(cartLine("a", { quantity: 999, insufficientStock: true, maxQuantity: null })),
+    ).toEqual({ kind: "short" });
+    expect(
+      lineStockHint(
+        cartLine("a", {
+          availability: "out_of_stock",
+          notices: [{ code: "out_of_stock" }],
+          insufficientStock: true,
+          maxQuantity: 0,
+        }),
+      ),
+    ).toEqual({ kind: "none" });
+  });
+
+  it("never trusts a count without the flag (the API gives none then)", () => {
+    expect(lineStockHint(cartLine("a", { insufficientStock: false, maxQuantity: 3 }))).toBeNull();
+  });
+
+  // PR 213 review m5: a line with its own block (unavailable, out of the money range) is never repeated as a stock problem.
+  it("skips unavailable and out-of-range lines", () => {
+    const flagged = { insufficientStock: true, maxQuantity: 0 } as const;
+    expect(
+      lineStockHint(cartLine("a", { ...flagged, notices: [{ code: "line_total_out_of_range" }] })),
+    ).toBeNull();
+    expect(
+      lineStockHint(cartLine("a", { ...flagged, notices: [{ code: "unavailable" }] })),
+    ).toBeNull();
   });
 });
 
-describe("quantitiesByVariant", () => {
-  it("maps each line's variant to its quantity, or null while there is no cart", () => {
-    expect(quantitiesByVariant(ready().cart)).toEqual(new Map([["v1", 3]]));
-    expect(quantitiesByVariant(initialCartState.cart)).toBeNull();
+describe("stockProblemLines (say it before the form is filled in)", () => {
+  it("lists the lines the checkout would refuse for stock, in cart order", () => {
+    const cart = cartOf([
+      cartLine("a", { insufficientStock: true, maxQuantity: null, quantity: 999 }),
+      cartLine("b", { availability: "low_stock" }),
+      cartLine("c", { insufficientStock: true, maxQuantity: 2, quantity: 5 }),
+      cartLine("d", {
+        insufficientStock: true,
+        maxQuantity: 0,
+        notices: [{ code: "unavailable" }],
+      }),
+    ]);
+    expect(stockProblemLines(cart)).toEqual([cart.lines[0], cart.lines[2]]);
+    expect(stockProblemLines(cartOf([cartLine("b", { availability: "low_stock" })]))).toEqual([]);
+  });
+});
+
+describe("quantityStepperMax", () => {
+  it("caps the stepper at the API's count, never below the minimum, and at the line limit otherwise", () => {
+    expect(quantityStepperMax(cartLine("a", { insufficientStock: true, maxQuantity: 3 }))).toBe(3);
+    expect(quantityStepperMax(cartLine("a", { insufficientStock: true, maxQuantity: 0 }))).toBe(1);
+    expect(quantityStepperMax(cartLine("a", { insufficientStock: true, maxQuantity: null }))).toBe(
+      999,
+    );
+    expect(quantityStepperMax(cartLine("a"))).toBe(999);
+  });
+});
+
+describe("focusCheckoutReason (PR 215 review m5)", () => {
+  it("moves the focus to the reason only when the checkout link just turned into the blocked button and the focus was lost", () => {
+    expect(focusCheckoutReason(null, "stock", true)).toBe(true);
+    expect(focusCheckoutReason(null, "lines", true)).toBe(true);
+    // The shopper is elsewhere (a stepper): leave the focus alone.
+    expect(focusCheckoutReason(null, "stock", false)).toBe(false);
+    // Already blocked before, or unblocked now: nothing moved.
+    expect(focusCheckoutReason("stock", "stock", true)).toBe(false);
+    expect(focusCheckoutReason("stock", null, true)).toBe(false);
+    // An emptied cart has no reason to focus.
+    expect(focusCheckoutReason(null, "empty", true)).toBe(false);
+  });
+});
+
+describe("cartLineFacts", () => {
+  it("maps each line's variant to its quantity and stock hint, or null while there is no cart", () => {
+    expect(cartLineFacts(ready().cart)).toEqual(
+      new Map([["v1", { quantity: 3, insufficientStock: false, maxQuantity: null }]]),
+    );
+    expect(cartLineFacts(initialCartState.cart)).toBeNull();
   });
 });

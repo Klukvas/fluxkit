@@ -51,22 +51,9 @@ test("prices render the same on the server and in the browser: no hydration erro
   expect(errors.filter((line) => HYDRATION.test(line))).toEqual([]);
 });
 
-test("a card under option filters does not claim the product's stock and opens the matching variant (SQ-03)", async ({
-  page,
-}) => {
-  await page.goto("/en/catalog?f=opt.color%3Ared&f=opt.size%3Al");
-  const card = page.getByRole("article").filter({ hasText: "Demo T-shirt" });
-  await expect(card).toBeVisible();
-  await expect(card.getByText("Price and stock depend on the option")).toBeVisible();
-  await expect(card.getByText("In stock", { exact: true })).toHaveCount(0);
-  const link = card.getByRole("link", { name: "Demo T-shirt" });
-  await expect(link).toHaveAttribute("href", "/en/p/demo-t-shirt?opt.color=red&opt.size=l");
-
-  // inStock:false alone: every matching variant is out of stock, and the card says so.
-  await page.goto("/en/catalog?f=inStock%3Afalse");
-  const outCard = page.getByRole("article").filter({ hasText: "Demo T-shirt" });
-  await expect(outCard.getByText("Out of stock", { exact: true })).toBeVisible();
-
+// The filtered cards and the stock messages moved to `match-and-stock-hints.e2e.ts` when the API gave the matched variants
+// and the cart's stock hints (plan 2026-11-03); what stays here is the product page's own part of SQ-03.
+test("the product page opens on the option values of the address (SQ-03)", async ({ page }) => {
   await page.goto("/en/p/demo-t-shirt?opt.color=red&opt.size=l");
   await expect(
     page.getByRole("group", { name: "Color", exact: true }).getByRole("radio", { name: "Red" }),
@@ -75,12 +62,6 @@ test("a card under option filters does not claim the product's stock and opens t
     page.getByRole("group", { name: "Size", exact: true }).getByRole("radio", { name: "L" }),
   ).toBeChecked();
   await expect(page.locator("#product-availability")).toHaveText("Out of stock");
-
-  // PR 213 review M1: "Has options in stock" includes low-stock options, so the card claims no green "In stock".
-  await page.goto("/en/catalog?f=inStock%3Atrue");
-  const inCard = page.getByRole("article").filter({ hasText: "Demo T-shirt" });
-  await expect(inCard.getByText("Price and stock depend on the option")).toBeVisible();
-  await expect(inCard.getByText("In stock", { exact: true })).toHaveCount(0);
 
   // PR 213 review m7: values that match nothing leave the address for the selection the page starts from.
   await page.goto("/en/p/demo-t-shirt?opt.color=nope");
@@ -91,9 +72,10 @@ test("the product page names the cart's quantity, caps the stepper and explains 
   page,
   shopper,
 }) => {
-  const red = await shopper.variantBySku("demo-t-shirt", "DEMO-T-SHIRT-RED-M");
-  await shopper.addToCart(red.id, 999);
-  await page.goto("/en/p/demo-t-shirt?opt.color=red&opt.size=m");
+  // The linen shirt blue/m allows backorder: the line limit (999), not the stock, stops the next add.
+  const blue = await shopper.variantBySku("demo-linen-shirt", "DEMO-LINEN-SHIRT-BLUE-M");
+  await shopper.addToCart(blue.id, 999);
+  await page.goto("/en/p/demo-linen-shirt?opt.color=blue&opt.size=m");
   await waitForHydration(page);
   await expect(
     page.getByText(
@@ -101,13 +83,6 @@ test("the product page names the cart's quantity, caps the stepper and explains 
     ),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Add to cart" })).toBeDisabled();
-
-  // The checkout names the problem lines as soon as it loads (the API gives no stock number; this line is not low stock,
-  // so only the refusal at submit can tell; an out-of-stock line is named at once).
-  const gone = await shopper.variantBySku("demo-t-shirt", "DEMO-T-SHIRT-RED-L");
-  await shopper.addToCart(gone.id, 1);
-  await page.goto("/en/checkout");
-  await expect(page.getByText(/^Out of stock: Demo T-shirt \(Red, L\)\./)).toBeVisible();
 });
 
 test("bad query parameters redirect to the cleaned address instead of 'page not found' (SQ-04)", async ({

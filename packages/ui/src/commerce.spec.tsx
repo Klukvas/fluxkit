@@ -31,6 +31,43 @@ describe("QuantityInput", () => {
     increaseLabel: "Increase quantity",
   };
 
+  // PR 215 review m1: a hint the "+" button stops at (`stepMax`) must not clamp a TYPED number, which is the shopper's
+  // own choice for the server to answer.
+  it("stops the increase button at stepMax while a typed number is clamped only to max", () => {
+    const changes: number[] = [];
+    const element = QuantityInput({
+      ...props,
+      value: 3,
+      min: 1,
+      max: 999,
+      stepMax: 3,
+      onChange: (next) => changes.push(next),
+    });
+    const [, input, increase] = (
+      element.props as { children: { props: Record<string, unknown> }[] }
+    ).children;
+    expect(increase?.props.disabled).toBe(true);
+    const typed = input?.props.onChange as (event: unknown) => void;
+    typed({ currentTarget: { valueAsNumber: 10 } });
+    typed({ currentTarget: { valueAsNumber: 5000 } });
+    expect(changes).toEqual([10, 999]);
+    expect(
+      first(render(<QuantityInput {...props} value={2} max={999} stepMax={3} />), "input")
+        .attributes,
+    ).toMatchObject({ max: "999" });
+    const below = QuantityInput({
+      ...props,
+      value: 2,
+      max: 999,
+      stepMax: 3,
+      onChange: (next) => changes.push(next),
+    });
+    const plus = (below.props as { children: { props: Record<string, unknown> }[] }).children[2];
+    expect(plus?.props.disabled).toBe(false);
+    (plus?.props.onClick as () => void)();
+    expect(changes.at(-1)).toBe(3);
+  });
+
   it("labels the input and both buttons from props", () => {
     const markup = render(<QuantityInput {...props} min={1} max={5} name="qty" />);
     const input = first(markup, "input");

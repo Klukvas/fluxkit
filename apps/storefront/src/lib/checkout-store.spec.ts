@@ -12,7 +12,13 @@ import {
   type AttemptStorage,
 } from "./checkout-attempt";
 import { initialCheckoutValues, type CheckoutValues } from "./checkout-form";
-import { checkoutBlock, createCheckoutStore, initialCheckoutState } from "./checkout-store";
+import { stockProblemLines } from "./cart-model";
+import {
+  checkoutBlock,
+  createCheckoutStore,
+  initialCheckoutState,
+  sameLines,
+} from "./checkout-store";
 import { cartLine, cartOf, shippingOption, shippingOptionsOf } from "./test-fixtures";
 import { json, problem, settle, stagedClient, type PendingCall } from "./test-fetch";
 
@@ -288,6 +294,13 @@ describe("checkout store: the total the shopper sees", () => {
     });
     expect(checkoutCalls(calls)).toHaveLength(0);
   });
+
+  // Plan 2026-11-03: the page lists such lines above the form; the server stays the judge (a hint can be older than the
+  // stock), so the store still sends the order and the API's refusal names the lines.
+  it("does not block on a stock hint: the server judges", async () => {
+    const short = cartOf([cartLine("a", { quantity: 999, insufficientStock: true })]);
+    expect(checkoutBlock(short, initialCheckoutState, NONE)).toBeNull();
+  });
 });
 
 describe("checkout store: the other outcomes", () => {
@@ -299,18 +312,100 @@ describe("checkout store: the other outcomes", () => {
   }
 
   it("checkout_refused keeps the lines' errors for the cart they belong to", async () => {
-    const { outcome, checkout, cart } = await answered(
+    const before = await setup();
+    const sentWith = before.cart.getState().cart;
+    const result = before.checkout.submit(values(), { signedIn: false });
+    (await sentCheckouts(before.calls, 1))[0]?.answer(
+      problem(409, "checkout_refused", {
+        errors: [{ path: "lines.0", code: "variant_not_sellable" }],
+      }),
+    );
+    expect((await result).kind).toBe("refused");
+    expect(before.checkout.getState().lineErrors).toEqual({
+      cart: sentWith,
+      errors: [
+        {
+          index: 0,
+          code: "variant_not_sellable",
+          messageKey: "errors.field.variant_not_sellable",
+        },
+      ],
+    });
+    // Only a stock refusal reads the cart again (below).
+    expect(before.calls.filter((call) => call.url.startsWith("/store/cart"))).toHaveLength(1);
+  });
+
+  // Plan 2026-11-03: the server is the judge; after its stock refusal the cart is read again, so the lines' stock hints
+  // (insufficientStock, maxQuantity) the page lists above the form are the current ones.
+  it("checkout_refused with insufficient_stock reads the cart again and applies its stock hints", async () => {
+    const { outcome, checkout, cart, calls } = await answered(
       problem(409, "checkout_refused", {
         errors: [{ path: "lines.0", code: "insufficient_stock" }],
       }),
     );
     expect(outcome.kind).toBe("refused");
-    expect(checkout.getState().lineErrors).toEqual({
-      cart: cart.getState().cart,
-      errors: [
-        { index: 0, code: "insufficient_stock", messageKey: "errors.field.insufficient_stock" },
-      ],
+    expect(checkout.getState().lineErrors?.errors).toEqual([
+      { index: 0, code: "insufficient_stock", messageKey: "errors.field.insufficient_stock" },
+    ]);
+    const reads = calls.filter((call) => call.url.startsWith("/store/cart"));
+    expect(reads).toHaveLength(2);
+    const fresh = cartOf(
+      cartA.lines.map((line) => ({ ...line, insufficientStock: true, maxQuantity: 1 })),
+      { subtotal: cartA.subtotal, total: cartA.total, itemCount: cartA.itemCount },
+    );
+    reads[1]?.answer(json(fresh));
+    await settle();
+    expect(cart.getState().cart).toEqual(fresh);
+    expect(stockProblemLines(fresh)).toHaveLength(1);
+    // The refused line keeps its error over the re-read cart: the same lines (`sameLines`).
+    expect(sameLines(checkout.getState().lineErrors?.cart ?? null, cart.getState().cart)).toBe(
+      true,
+    );
+    expect(checkout.getState().lineErrors?.errors).toHaveLength(1);
+  });
+
+  // PR 215 review m3: stock came back between the refusal and the re-read: the line's stock error would contradict the
+  // fresh cart (no warning above the form), so it is dropped; errors of other codes stay.
+  it("drops a stock error the re-read cart no longer flags, keeping the other codes", async () => {
+    const two = cartOf([cartLine("a"), cartLine("b")], {
+      total: { amount: 1999, currency: "UAH" },
     });
+    const { checkout, cart, calls } = await setup({ cart: two });
+    const result = checkout.submit(values(), { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(
+      problem(409, "checkout_refused", {
+        errors: [
+          { path: "lines.0", code: "insufficient_stock" },
+          { path: "lines.1", code: "variant_not_sellable" },
+        ],
+      }),
+    );
+    expect((await result).kind).toBe("refused");
+    const reads = calls.filter((call) => call.url.startsWith("/store/cart"));
+    reads[1]?.answer(json(two));
+    await settle();
+    expect(cart.getState().cart).toEqual(two);
+    expect(checkout.getState().lineErrors?.errors).toEqual([
+      { index: 1, code: "variant_not_sellable", messageKey: "errors.field.variant_not_sellable" },
+    ]);
+  });
+
+  // PR 215 review m6: the 409 path itself: the cart before has no hints, the cart of the 409 has, and it is applied.
+  it("409 cart_changed applies the answer's cart with its stock hints", async () => {
+    const { checkout, cart, calls } = await setup();
+    expect(stockProblemLines(cart.getState().cart ?? cartOf([]))).toHaveLength(0);
+    const flagged = cartOf(
+      [cartLine("a", { quantity: 4, insufficientStock: true, maxQuantity: 2 })],
+      {
+        total: { amount: 7996, currency: "UAH" },
+      },
+    );
+    const result = checkout.submit(values(), { signedIn: false });
+    (await sentCheckouts(calls, 1))[0]?.answer(problem(409, "cart_changed", { cart: flagged }));
+    expect((await result).kind).toBe("cartChanged");
+    expect(cart.getState().cart).toEqual(flagged);
+    expect(stockProblemLines(cart.getState().cart ?? cartOf([]))).toEqual(flagged.lines);
+    expect(checkout.getState().needsConfirmation).toBe(true);
   });
 
   it("cart_empty and idempotency_key_reused clear the attempt; cart_empty also reads the cart", async () => {

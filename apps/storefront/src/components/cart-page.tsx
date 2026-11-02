@@ -21,12 +21,19 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseE
 import { MAX_LINE_QUANTITY, MIN_LINE_QUANTITY } from "../lib/add-to-cart";
 import { cartPageHandlers } from "../lib/cart-handlers";
 import {
+  cartLineAnchor,
   checkoutBlock,
+  focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
   isLineBusy,
   lineFlags,
+  lineName,
+  lineStockHint,
   noticeMoney,
+  quantityStepperMax,
+  stockHintText,
+  stockProblemLines,
 } from "../lib/cart-model";
 import { LOAD_BUSY_KEY, type CartAnnouncement, type CartState } from "../lib/cart-store";
 import { failureText, type Failure } from "../lib/failure";
@@ -70,6 +77,9 @@ export interface CartPageViewProps {
   onDismissLeftFailure?: () => void;
 }
 
+/** Why the checkout button is blocked; the focus lands here when the checkout link turns into that button (review m5). */
+const CHECKOUT_REASON_ID = "cart-checkout-reason";
+
 const ANNOUNCEMENT_KEYS: Record<CartAnnouncement, string> = {
   updated: "cart.announce.updated",
   removed: "cart.announce.removed",
@@ -90,6 +100,7 @@ export function LineQuantityView({
   disabled,
   t,
   onChange,
+  stepMax = MAX_LINE_QUANTITY,
 }: {
   title: string;
   variantId: string;
@@ -100,6 +111,11 @@ export function LineQuantityView({
   disabled: boolean;
   t: Translator;
   onChange: (quantity: number) => void;
+  /**
+   * Where the step buttons stop (`quantityStepperMax`: the API's stock count when it gave one, else the line limit). A
+   * typed number is limited to the line limit only: above the hint the server answers (review m1 of PR 215).
+   */
+  stepMax?: number;
 }) {
   return (
     <div className="flex flex-col gap-1" aria-busy={autosave.pending}>
@@ -110,6 +126,7 @@ export function LineQuantityView({
           increaseLabel={t("cart.line.increase", { title })}
           min={MIN_LINE_QUANTITY}
           max={MAX_LINE_QUANTITY}
+          stepMax={stepMax}
           value={quantity}
           onChange={onChange}
           disabled={disabled}
@@ -180,6 +197,7 @@ function LineQuantity({
       disabled={disabled || autosave === null}
       t={t}
       onChange={(quantity) => autosave?.change(quantity)}
+      stepMax={quantityStepperMax(line)}
     />
   );
 }
@@ -211,9 +229,10 @@ export function CartLineView({
   registerLine?: (variantId: string, autosave: QuantityAutosave) => () => void;
 }) {
   const flags = lineFlags(line);
+  const stock = lineStockHint(line);
   const image = allowedImageUrl(line.image?.url, imageHosts);
   return (
-    <li aria-busy={busy}>
+    <li id={cartLineAnchor(line.variantId)} aria-busy={busy}>
       <Card className="flex gap-4 p-4">
         <div className="w-24 shrink-0">
           <StoreImage
@@ -264,18 +283,26 @@ export function CartLineView({
               <span>{t("cart.notice.unavailable.hint")}</span>
             </p>
           ) : null}
-          {flags.outOfStock ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
-              <span>{t("cart.notice.outOfStock.hint")}</span>
-            </p>
-          ) : null}
-          {!flags.outOfStock && !flags.unavailable && line.availability === "low_stock" ? (
-            <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
-              <Badge variant="warning">{t("availability.low_stock")}</Badge>
-              <span>{t("cart.notice.lowStock.hint")}</span>
-            </p>
-          ) : null}
+          {/* Always mounted, so a hint an autosave answer brings or clears is announced (review m5 of PR 215). */}
+          <div aria-live="polite" aria-atomic="true" className="empty:-mt-2">
+            {flags.outOfStock ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <Badge variant="warning">{t("availability.out_of_stock")}</Badge>
+                <span>
+                  {stock === null ? t("cart.notice.outOfStock.hint") : stockHintText(t, stock)}
+                </span>
+              </p>
+            ) : stock !== null ? (
+              <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <Badge variant="warning">{t("cart.stock.badge")}</Badge>
+                <span>{stockHintText(t, stock)}</span>
+              </p>
+            ) : !flags.unavailable && line.availability === "low_stock" ? (
+              <p className="text-sm text-foreground">
+                <Badge variant="warning">{t("availability.low_stock")}</Badge>
+              </p>
+            ) : null}
+          </div>
           {flags.outOfRange ? (
             <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
               <Badge variant="danger">{t("cart.notice.outOfRange")}</Badge>
@@ -485,12 +512,38 @@ export function CartPageView({
               </Link>
             ) : (
               <>
-                <Button className="self-start" disabled aria-describedby="cart-checkout-reason">
+                <Button className="self-start" disabled aria-describedby={CHECKOUT_REASON_ID}>
                   {t("cart.checkout")}
                 </Button>
-                <p id="cart-checkout-reason" className="text-sm text-muted-foreground">
-                  {t("cart.checkout.blocked")}
-                </p>
+                {block === "stock" ? (
+                  <div
+                    id={CHECKOUT_REASON_ID}
+                    tabIndex={-1}
+                    className={`flex flex-col gap-1 text-sm ${focusRing}`}
+                  >
+                    <p className="text-foreground">{t("cart.checkout.stockBlocked")}</p>
+                    <ul className="flex flex-col gap-1">
+                      {stockProblemLines(cart).map((line) => (
+                        <li key={line.variantId}>
+                          <a
+                            href={`#${cartLineAnchor(line.variantId)}`}
+                            className={`text-foreground underline underline-offset-4 ${focusRing}`}
+                          >
+                            {lineName(line)}
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <p
+                    id={CHECKOUT_REASON_ID}
+                    tabIndex={-1}
+                    className={`text-sm text-muted-foreground ${focusRing}`}
+                  >
+                    {t("cart.checkout.blocked")}
+                  </p>
+                )}
               </>
             )}
           </section>
@@ -528,12 +581,29 @@ export function CartPage({
     return () => store.dismissFailure();
   }, [store]);
 
+  // The checkout link turns into the blocked button when a save's answer flags a line (or empties nothing to order):
+  // when that removed the focused link, the focus goes to the reason instead of the page body (review m5 of PR 215).
+  const block = state.cart === null ? null : checkoutBlock(state.cart);
+  const previousBlock = useRef(block);
+  useEffect(() => {
+    const before = previousBlock.current;
+    previousBlock.current = block;
+    const focusLost = document.activeElement === null || document.activeElement === document.body;
+    if (focusCheckoutReason(before, block, focusLost)) {
+      document.getElementById(CHECKOUT_REASON_ID)?.focus();
+    }
+  }, [block]);
+
   async function checkoutWhenSaved(): Promise<void> {
     setLeaving(true);
     const saved = await registry.settled();
     setLeaving(false);
-    // A refused quantity stays on this page with its reason on the line; the shopper decides again.
-    if (saved) router.push(localizedHref(locale, "/checkout"));
+    // A refused quantity stays on this page with its reason on the line; the shopper decides again. So does a saved one
+    // the server's answer flags for stock: the page now shows the reason and the checkout button is blocked.
+    const cart = store.getState().cart;
+    if (saved && cart !== null && checkoutBlock(cart) === null) {
+      router.push(localizedHref(locale, "/checkout"));
+    }
   }
 
   return (

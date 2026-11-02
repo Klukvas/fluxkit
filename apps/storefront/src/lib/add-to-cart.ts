@@ -10,6 +10,23 @@ export function lineRoom(inCart: number): number {
   return Math.max(0, MAX_LINE_QUANTITY - inCart);
 }
 
+/**
+ * What one more add may still put on a variant's line, from the cart the browser last read (plan 2026-11-03): the line
+ * limit, and, when the API says the checkout would refuse the line for stock (`insufficientStock`), nothing more than the
+ * count it gave (`maxQuantity`) minus the line's quantity, or nothing at all without a count. `stock` is that hint, for
+ * the message. The API still judges every add; the cart's hint follows its answers.
+ */
+export function addRoom(
+  line: { quantity: number; insufficientStock: boolean; maxQuantity: number | null } | undefined,
+): { inCart: number; room: number; stock: { available: number | null } | null } {
+  const inCart = line?.quantity ?? 0;
+  const byLimit = lineRoom(inCart);
+  if (line === undefined || !line.insufficientStock) return { inCart, room: byLimit, stock: null };
+  const available = line.maxQuantity;
+  const byStock = available === null ? 0 : Math.max(0, available - inCart);
+  return { inCart, room: Math.min(byLimit, byStock), stock: { available } };
+}
+
 export interface AddQuantityRefusal {
   messageKey: "product.quantity.atLimit" | "product.quantity.overLimit";
   values: { count: number; max: number; room: number };

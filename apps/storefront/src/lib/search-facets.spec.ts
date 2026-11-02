@@ -1,11 +1,12 @@
-import type { SearchFacet, SearchFacetValue } from "@fluxkit/api-client";
+import type { SearchFacet, SearchFacetValue, SearchMatch } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
 import { sentinelTranslator } from "../components/test-helpers";
+import { summary } from "./test-fixtures";
 import {
   describeFormFailure,
   facetTitle,
   facetValueLabel,
-  cardMatch,
+  cardOffer,
   priceBoxHints,
   selectedFilters,
   sortChoices,
@@ -239,61 +240,76 @@ describe("priceBoxHints", () => {
   });
 });
 
-describe("cardMatch: what a card may claim under variant-level filters (review SQ-03, 2026-11-02)", () => {
-  const variantFacet = (key: string, selected: string[] = []): SearchFacet => ({
-    key,
-    kind: "code",
-    level: "variant",
-    label: null,
-    counted: false,
-    values: selected.map((code) => ({ code, label: null, count: null, selected: true })),
-    range: null,
+describe("cardOffer: what a card shows from the item's match (PR 214 `match`, plan 2026-11-03)", () => {
+  const base = summary("lamp", { price: { from: 1000, to: 5000, currency: "UAH" } }, "in_stock");
+  const match = (overrides: Partial<SearchMatch> = {}): SearchMatch => ({
+    variantId: "v-red-l",
+    variantCount: 1,
+    price: { from: 3000, to: 3000, currency: "UAH" },
+    availability: "low_stock",
+    optionValues: [
+      { optionCode: "color", valueCode: "red" },
+      { optionCode: "size", valueCode: "l" },
+    ],
+    ...overrides,
+  });
+  const noFilters = { facets: [], price: null };
+
+  it("is the product's own card when the item has no match (no variant-level selection, or the SQL fallback)", () => {
+    expect(cardOffer(base, noFilters)).toEqual({ kind: "product" });
+    // Filters in the address change nothing: the SQL fallback's items never carry `match` (its notice says so).
+    expect(cardOffer(base, { facets: ["opt.color:red"], price: null })).toEqual({
+      kind: "product",
+    });
   });
 
-  it("is null without a variant-level filter: the card shows the product's own price and stock", () => {
-    expect(cardMatch({ facets: [], price: null }, [])).toBeNull();
-    expect(cardMatch({ facets: ["brand:acme", "category:x"], price: null }, [])).toBeNull();
-  });
-
-  it("does not repeat the product's stock under option filters (the matching option may be out of stock)", () => {
-    expect(cardMatch({ facets: ["opt.color:red", "opt.size:l"], price: null }, [])).toEqual({
-      availability: null,
+  it("takes price, availability, count and link from the match, never from the product", () => {
+    // PR 213 review M1: the product is in stock, the representative low stock: the card says low stock.
+    expect(cardOffer({ ...base, match: match() }, noFilters)).toEqual({
+      kind: "matched",
+      price: { from: 3000, to: 3000, currency: "UAH" },
+      availability: "low_stock",
+      variantCount: 1,
       linkQuery: "opt.color=red&opt.size=l",
     });
   });
 
-  it("knows the matching options' stock from the availability filter alone (one document per variant)", () => {
-    // PR 213 review M1: the index's `inStock` is "not out of stock" (core document.ts), so matching variants may all be
-    // low stock: inStock:true fixes no badge; only inStock:false does (every matching variant is out of stock).
-    expect(cardMatch({ facets: ["inStock:true"], price: null }, [])).toEqual({
-      availability: null,
-      linkQuery: "",
+  it("links the representative's values, also when the address chose several values of an option", () => {
+    const offer = cardOffer(
+      {
+        ...base,
+        match: match({ variantCount: 3, price: { from: 3000, to: 4500, currency: "UAH" } }),
+      },
+      { facets: ["opt.color:red", "opt.color:blue"], price: null },
+    );
+    expect(offer).toMatchObject({
+      kind: "matched",
+      variantCount: 3,
+      linkQuery: "opt.color=red&opt.size=l",
     });
-    expect(cardMatch({ facets: ["inStock:false", "opt.size:l"], price: null }, [])).toEqual({
-      availability: "out_of_stock",
-      linkQuery: "opt.size=l",
-    });
-    expect(
-      cardMatch({ facets: ["inStock:true", "inStock:false"], price: null }, [])?.availability,
-    ).toBeNull();
   });
 
-  it("links only options pinned to ONE value (OR of several values names no single option)", () => {
+  it("encodes the codes, and links nothing for a product without options", () => {
     expect(
-      cardMatch({ facets: ["opt.color:red", "opt.color:blue", "opt.size:l"], price: null }, [])
-        ?.linkQuery,
-    ).toBe("opt.size=l");
-  });
-
-  it("treats a price range and a selected variant-level attribute as variant filters", () => {
-    expect(cardMatch({ facets: [], price: { min: 100, max: null } }, [])).toEqual({
-      availability: null,
+      cardOffer(
+        { ...base, match: match({ optionValues: [{ optionCode: "fit", valueCode: "a&b" }] }) },
+        noFilters,
+      ),
+    ).toMatchObject({ linkQuery: "opt.fit=a%26b" });
+    expect(cardOffer({ ...base, match: match({ optionValues: [] }) }, noFilters)).toMatchObject({
       linkQuery: "",
     });
+  });
+
+  it("falls back to the neutral note while the index is behind (match null), linking the options the address pins", () => {
     expect(
-      cardMatch({ facets: ["attr.fit:slim"], price: null }, [variantFacet("attr.fit", ["slim"])]),
-    ).toEqual({ availability: null, linkQuery: "" });
-    const productLevel = { ...variantFacet("attr.fit", ["slim"]), level: "product" as const };
-    expect(cardMatch({ facets: ["attr.fit:slim"], price: null }, [productLevel])).toBeNull();
+      cardOffer(
+        { ...base, match: null },
+        { facets: ["opt.color:red", "opt.color:blue", "opt.size:l", "inStock:false"], price: null },
+      ),
+    ).toEqual({ kind: "catchingUp", linkQuery: "opt.size=l" });
+    expect(
+      cardOffer({ ...base, match: null }, { facets: [], price: { min: 1, max: null } }),
+    ).toEqual({ kind: "catchingUp", linkQuery: "" });
   });
 });

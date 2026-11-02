@@ -1,4 +1,4 @@
-import type { SearchFacet, SearchResult } from "@fluxkit/api-client";
+import type { SearchFacet, SearchItem, SearchMatch, SearchResult } from "@fluxkit/api-client";
 import { createTranslator } from "@fluxkit/ui";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -110,44 +110,116 @@ const ok = (overrides: Partial<SearchResult> = {}): SearchPageOutcome => ({
   result: result(overrides),
 });
 
-describe("cards under variant-level filters (review SQ-03, 2026-11-02)", () => {
-  it("does not claim the product's 'In stock' under option filters, notes that price and stock depend on the option, and links the chosen option", () => {
-    const ranged = ok({
-      items: [
-        summary("lamp", { title: "§lamp", price: { from: 1999, to: 2999, currency: "UAH" } }),
-        summary("desk-lamp", { title: "§desk" }),
-      ],
+describe("cards from the item's match (PR 214 `match`, plan 2026-11-03)", () => {
+  const match = (overrides: Partial<SearchMatch> = {}): SearchMatch => ({
+    variantId: "v-red-l",
+    variantCount: 1,
+    price: { from: 2999, to: 2999, currency: "UAH" },
+    availability: "in_stock",
+    optionValues: [
+      { optionCode: "color", valueCode: "red" },
+      { optionCode: "size", valueCode: "l" },
+    ],
+    ...overrides,
+  });
+  // The product: from 19.99 to 99.99, in stock. Every assertion below must come from the match instead.
+  const product = (slug: string, title: string): SearchItem =>
+    summary(slug, { title, price: { from: 1999, to: 9999, currency: "UAH" } });
+  const optionQuery: SearchQuery = { ...query, facets: ["opt.color:red", "opt.size:l"] };
+
+  it("shows the matched variant's price, availability and a link that preselects it", () => {
+    const html = render(ok({ items: [{ ...product("lamp", "§lamp"), match: match() }] }), {
+      query: optionQuery,
     });
-    const html = render(ranged, { query: { ...query, facets: ["opt.color:red", "opt.size:l"] } });
-    expect(html).not.toContain("§availability.in_stock");
-    expect(html.match(/§search\.card\.dependsOnOption/g)).toHaveLength(1);
-    // PR 213 review m4: one price for every option: only the stock depends on the option.
-    expect(html.match(/§search\.card\.stockDependsOnOption/g)).toHaveLength(1);
+    expect(html).toContain(money(2999));
+    expect(html).not.toContain("§catalog.price.from");
+    expect(html).toContain("§availability.in_stock");
+    expect(html).toContain('href="/uk/p/lamp?opt.color=red&amp;opt.size=l"');
+    expect(html).not.toContain("§search.card.dependsOnOption");
+    expect(html).not.toContain("§search.card.matchingOptions");
+  });
+
+  it("says 'from' and how many options match when the matched variants differ (several options)", () => {
+    const several = match({ variantCount: 3, price: { from: 2999, to: 4999, currency: "UAH" } });
+    const html = render(ok({ items: [{ ...product("lamp", "§lamp"), match: several }] }), {
+      query: { ...query, facets: ["opt.color:red", "opt.color:blue"] },
+    });
+    expect(html).toContain("§catalog.price.from");
+    expect(html).toContain("§search.card.matchingOptions:3");
     expect(html).toContain('href="/uk/p/lamp?opt.color=red&amp;opt.size=l"');
   });
 
-  it("shows the matching options' stock when the availability filter says it", () => {
-    const out = render(ok(), { query: { ...query, facets: ["inStock:false"] } });
-    expect(out.match(/§availability\.out_of_stock/g)).toHaveLength(2);
-    expect(out).not.toContain("§availability.in_stock");
-    // PR 213 review M1: "has options in stock" includes low-stock options, so no green "In stock" badge is claimed; a
-    // low-stock product must never read "In stock" under the filter.
-    const low = ok({
-      items: [
-        summary("lamp", { title: "§lamp" }, "low_stock"),
-        summary("desk-lamp", { title: "§desk" }),
-      ],
-    });
-    const inStockOnly = render(low, { query: { ...query, facets: ["inStock:true"] } });
-    expect(inStockOnly).not.toContain("§availability.in_stock");
-    expect(inStockOnly.match(/§search\.card\.stockDependsOnOption/g)).toHaveLength(2);
+  it("never claims 'In stock' for a low-stock representative (PR 213 review M1), whatever the product says", () => {
+    const html = render(
+      ok({
+        items: [{ ...product("lamp", "§lamp"), match: match({ availability: "low_stock" }) }],
+      }),
+      { query: { ...query, facets: ["inStock:true"] } },
+    );
+    expect(html).toContain("§availability.low_stock");
+    expect(html).not.toContain("§availability.in_stock");
   });
 
-  it("keeps the product's own price, stock and plain link without variant filters", () => {
+  it("shows out of stock under the availability filter's other side and a price range's matched price", () => {
+    const out = render(
+      ok({
+        items: [{ ...product("lamp", "§lamp"), match: match({ availability: "out_of_stock" }) }],
+      }),
+      { query: { ...query, facets: ["inStock:false"] } },
+    );
+    expect(out).toContain("§availability.out_of_stock");
+    expect(out).not.toContain("§availability.in_stock");
+    const priced = render(
+      ok({
+        items: [
+          {
+            ...product("lamp", "§lamp"),
+            match: match({ price: { from: 5000, to: 5000, currency: "UAH" } }),
+          },
+        ],
+      }),
+      { query: { ...query, price: { min: 4000, max: 6000 } } },
+    );
+    expect(priced).toContain(money(5000));
+    expect(priced).not.toContain(money(1999));
+  });
+
+  it("falls back to the neutral note while the index catches up (match null): no badge, the pinned options in the link", () => {
+    const html = render(
+      ok({
+        items: [
+          { ...product("lamp", "§lamp"), match: null },
+          { ...product("desk-lamp", "§desk"), match: match() },
+        ],
+      }),
+      { query: optionQuery },
+    );
+    expect(html.match(/§search\.card\.dependsOnOption/g)).toHaveLength(1);
+    expect(html.match(/§availability\./g)).toHaveLength(1);
+    expect(html).toContain('href="/uk/p/lamp?opt.color=red&amp;opt.size=l"');
+    expect(html).toContain('href="/uk/p/desk-lamp?opt.color=red&amp;opt.size=l"');
+  });
+
+  it("keeps the product's own price, stock and plain link when the item has no match", () => {
     const html = render(ok(), { query: { ...query, facets: ["brand:zeta"] } });
     expect(html.match(/§availability\.in_stock/g)).toHaveLength(2);
     expect(html).not.toContain("§search.card.");
     expect(html).toContain('href="/uk/p/lamp"');
+  });
+
+  // PR 215 review m4: next to the best availability, "3 matching options" alone reads as "all 3 in stock".
+  it("says that the badge shows the best of several matching options, in both languages", () => {
+    expect(en["search.card.matchingOptions.other"]).toMatch(/best/);
+    for (const form of ["one", "few", "many", "other"]) {
+      expect(uk[`search.card.matchingOptions.${form}` as keyof typeof uk]).toMatch(/найкращ/);
+    }
+  });
+
+  it("has no stop-gap wording of PR 213 left in the messages", () => {
+    for (const messages of [uk, en] as Record<string, string>[]) {
+      expect(messages["search.card.priceDependsOnOption"]).toBeUndefined();
+      expect(messages["search.card.stockDependsOnOption"]).toBeUndefined();
+    }
   });
 });
 

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
 import { option, product, summary, variant, category } from "../lib/test-fixtures";
+import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { CatalogView } from "./catalog-view";
 import { HomeSections } from "./home-sections";
@@ -393,8 +394,11 @@ describe("ProductPurchaseView", () => {
     );
 
   // Review SQ-02 (2026-11-02): "add 1 more" to a line of 999 said "exceeds the allowed quantity" with no word of the 999.
+  const inCart = (quantity: number, insufficientStock = false, maxQuantity: number | null = null) =>
+    new Map([["mint-six", { quantity, insufficientStock, maxQuantity }]]);
+
   it("says how many of the chosen variant are already in the cart and caps the stepper at the room left", () => {
-    const html = view({ cartQuantities: new Map([["mint-six", 990]]) });
+    const html = view({ cartLines: inCart(990) });
     expect(html).toContain("§product.quantity.inCart");
     expect(html).toMatch(
       /<input[^>]*id="product-quantity"[^>]*max="9"|max="9"[^>]*id="product-quantity"/,
@@ -403,9 +407,43 @@ describe("ProductPurchaseView", () => {
   });
 
   it("names the cart's quantity and disables the button when the line is already at the limit", () => {
-    const html = view({ cartQuantities: new Map([["mint-six", 999]]) });
+    const html = view({ cartLines: inCart(999) });
     expect(html).toContain("§product.quantity.atLimit");
     expect(html).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+  });
+
+  // Plan 2026-11-03: the cart's line says the checkout would refuse it for stock; adding more cannot help.
+  it("allows no more when the cart's line already exceeds the stock, naming the count when the API gives one", () => {
+    const counted = view({ cartLines: inCart(8, true, 3) });
+    // Review m2: a plural form by the available count ("only 1 is available", never "only 1 are").
+    expect(counted).toContain("§product.quantity.stockLimit:3");
+    // A count of 0 (a multi-location shop's default location) says "more than the shop has", never "only 0".
+    const zero = view({ cartLines: inCart(2, true, 0) });
+    expect(zero).toContain("§product.quantity.stockShort");
+    expect(zero).not.toContain("§product.quantity.stockLimit");
+    const real = (messages: Record<string, string>, locale: "uk" | "en", available: number) =>
+      renderToStaticMarkup(
+        <ProductPurchaseView
+          onAddToCart={added}
+          product={multi}
+          gallery={gallery}
+          exponent={2}
+          locale={locale}
+          t={createTranslator(messages, locale)}
+          brand={null}
+          cartLines={inCart(8, true, available)}
+        />,
+      );
+    expect(real(en, "en", 1)).toContain("only 1 is available");
+    expect(real(en, "en", 3)).toContain("only 3 are available");
+    expect(real(uk, "uk", 1)).toContain("доступно лише 1 шт.");
+    expect(counted).not.toContain("§product.quantity.atLimit");
+    expect(counted).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(counted).toContain('href="/uk/cart"');
+    const uncounted = view({ cartLines: inCart(999, true, null) });
+    expect(uncounted).toContain("§product.quantity.stockShort");
+    expect(uncounted).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    expect(view({ cartLines: inCart(2) })).not.toContain("§product.quantity.stock");
   });
 
   it("starts from the option values the address asks for", () => {
@@ -413,15 +451,17 @@ describe("ProductPurchaseView", () => {
     expect(html).toMatch(/<input[^>]*checked=""[^>]*value="lemon"/);
   });
 
-  it("warns on a low-stock variant that the quantity is confirmed when the order is placed", () => {
+  it("shows the low-stock badge without the PR 213 stop-gap note (the cart line now carries the stock hint)", () => {
     const low = product({
       ...multi,
       variants: [
         variant("mint-six", { flavor: "mint", pack: "six" }, { availability: "low_stock" }),
       ],
     });
-    expect(view({ product: low })).toContain("§product.quantity.lowStock");
-    expect(view()).not.toContain("§product.quantity.lowStock");
+    const html = view({ product: low });
+    expect(html).toContain("§availability.low_stock");
+    expect(html).not.toContain("§product.quantity.lowStock");
+    expect((uk as Record<string, string>)["product.quantity.lowStock"]).toBeUndefined();
   });
 
   it("renders one radio group per option from the API's names, with the first available variant selected", () => {

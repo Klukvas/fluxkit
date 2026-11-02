@@ -1,4 +1,11 @@
-import type { SearchFacet, SearchFacetValue, SearchSort } from "@fluxkit/api-client";
+import type {
+  Availability,
+  PriceRange,
+  SearchFacet,
+  SearchFacetValue,
+  SearchItem,
+  SearchSort,
+} from "@fluxkit/api-client";
 import type { Locale, Translator } from "@fluxkit/ui";
 import { minorUnitsToInput } from "./search-money";
 import {
@@ -145,22 +152,28 @@ export function describeFormFailure(reason: string): FormFailureText {
 }
 
 /**
- * What a product card may claim while variant-level filters are on (review SQ-03, 2026-11-02). Filters operate on
- * variants and group results by product (AGENTS.md 2.3; the index holds one document per variant, ADR 0034), but a list
- * item is the PRODUCT: `GET /store/search` returns its lowest price and its best availability, and nothing about which
- * variants matched (`docs/api/search.md`, "response"; a field for that is a contract change, not made). So:
- * - `null`: no variant-level filter; the card shows the product's own price and availability.
- * - `availability`: `out_of_stock` when the availability filter alone (`inStock:false`) says that EVERY matching variant
- *   is out of stock; else `null` and the card says that the stock (and, with several prices, the price) depends on the
- *   option. `inStock:true` fixes no badge: the index's flag is "not out of stock" (core `search/document.ts`), so the
- *   matching variants may all be low stock, and a green "In stock" would over-claim (PR 213 review M1).
- * - `linkQuery`: the options the filters pin to exactly one value, as the product page's `?opt.<code>=<value>`
- *   (`lib/variant-matcher.ts`), so the card opens on a matching variant.
+ * What a product card shows for one search item (plan 2026-11-03; review SQ-03 of 2026-11-02). Filters operate on variants
+ * and group results by product (AGENTS.md 2.3), and the API names the variants of an item that fit the variant-level
+ * selection in `item.match` (`docs/api/search.md`, PR 214):
+ * - `product`: no `match` (no variant-level selection, or a SQL fallback item): the product's own price, availability
+ *   and link, as on the catalog.
+ * - `matched`: the matching variants' price range and best availability, and a link that opens the product page on the
+ *   representative (`?opt.<optionCode>=<valueCode>`, read by `lib/variant-matcher.ts`). The availability is the API's
+ *   status, so a low-stock representative never reads "In stock" (PR 213 review M1).
+ * - `catchingUp`: `match: null`, the index still lists a product none of whose variants fits any more: the API knows no
+ *   matching price or stock, so the card says that both depend on the option and links the options the address pins to
+ *   exactly one value.
  */
-export interface CardMatch {
-  availability: "out_of_stock" | null;
-  linkQuery: string;
-}
+export type CardOffer =
+  | { kind: "product" }
+  | {
+      kind: "matched";
+      price: PriceRange;
+      availability: Availability;
+      variantCount: number;
+      linkQuery: string;
+    }
+  | { kind: "catchingUp"; linkQuery: string };
 
 const OPTION_FACET_PREFIX = "opt.";
 
@@ -179,33 +192,39 @@ export function wordsInOtherScript(q: string, locale: Locale): boolean {
   return letters.length > 0 && !letters.some((letter) => LOCALE_SCRIPTS[locale].test(letter));
 }
 
-export function cardMatch(
-  query: Pick<SearchQuery, "facets" | "price">,
-  facets: readonly Pick<SearchFacet, "key" | "level">[],
-): CardMatch | null {
-  const variantKeys = new Set(
-    facets.filter((facet) => facet.level === "variant").map((facet) => facet.key),
-  );
+/** The options the address pins to exactly ONE value (several values of one key are OR and name no single option). */
+function pinnedOptionsQuery(facets: readonly string[]): string {
   const byKey = new Map<string, string[]>();
-  for (const entry of query.facets) {
+  for (const entry of facets) {
     const colon = entry.indexOf(":");
     const key = entry.slice(0, colon);
-    byKey.set(key, [...(byKey.get(key) ?? []), entry.slice(colon + 1)]);
-  }
-  const variantFiltered =
-    query.price !== null ||
-    [...byKey.keys()].some(
-      (key) => key === "inStock" || key.startsWith(OPTION_FACET_PREFIX) || variantKeys.has(key),
-    );
-  if (!variantFiltered) return null;
-  const stock = byKey.get("inStock") ?? [];
-  const only = stock.length === 1 ? stock[0] : undefined;
-  const availability = only === "false" ? "out_of_stock" : null;
-  const link = new URLSearchParams();
-  for (const [key, values] of byKey) {
-    if (key.startsWith(OPTION_FACET_PREFIX) && values.length === 1) {
-      link.append(key, values[0] as string);
+    if (key.startsWith(OPTION_FACET_PREFIX)) {
+      byKey.set(key, [...(byKey.get(key) ?? []), entry.slice(colon + 1)]);
     }
   }
-  return { availability, linkQuery: link.toString() };
+  const link = new URLSearchParams();
+  for (const [key, values] of byKey) {
+    if (values.length === 1) link.append(key, values[0] as string);
+  }
+  return link.toString();
+}
+
+export function cardOffer(
+  item: SearchItem,
+  query: Pick<SearchQuery, "facets" | "price">,
+): CardOffer {
+  if (item.match === undefined) return { kind: "product" };
+  if (item.match === null)
+    return { kind: "catchingUp", linkQuery: pinnedOptionsQuery(query.facets) };
+  const link = new URLSearchParams();
+  for (const pair of item.match.optionValues) {
+    link.append(`${OPTION_FACET_PREFIX}${pair.optionCode}`, pair.valueCode);
+  }
+  return {
+    kind: "matched",
+    price: item.match.price,
+    availability: item.match.availability,
+    variantCount: item.match.variantCount,
+    linkQuery: link.toString(),
+  };
 }

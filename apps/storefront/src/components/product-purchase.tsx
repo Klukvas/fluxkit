@@ -17,10 +17,10 @@ import {
   MAX_LINE_QUANTITY,
   MIN_LINE_QUANTITY,
   addQuantityRefusal,
-  lineRoom,
+  addRoom,
   quantityLimitRefusal,
 } from "../lib/add-to-cart";
-import { quantitiesByVariant } from "../lib/cart-model";
+import { cartLineFacts, type CartLineFacts } from "../lib/cart-model";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
@@ -69,8 +69,8 @@ export interface ProductPurchaseViewProps {
   preferredSelection?: Selection;
   /** Called with every selection the shopper makes (the island keeps it in the address). */
   onSelectionChange?: (selection: Selection) => void;
-  /** Quantity per variant id in the cart (`quantitiesByVariant`); `null` or absent while the cart is not known. */
-  cartQuantities?: ReadonlyMap<string, number> | null;
+  /** Quantity and stock hint per variant id in the cart (`cartLineFacts`); `null` or absent while the cart is not known. */
+  cartLines?: ReadonlyMap<string, CartLineFacts> | null;
   /** Adds to the cart: the island passes the cart store's `add` (the answer replaces the shared cart and tells the header badge). */
   onAddToCart: (input: { variantId: string; quantity: number }) => Promise<
     | { status: "added" }
@@ -99,7 +99,7 @@ export function ProductPurchaseView({
   onAddToCart,
   preferredSelection,
   onSelectionChange,
-  cartQuantities = null,
+  cartLines = null,
 }: ProductPurchaseViewProps) {
   const [selection, setSelection] = useState<Selection>(() =>
     initialSelection(product, preferredSelection),
@@ -123,9 +123,11 @@ export function ProductPurchaseView({
   const current = images[Math.min(activeImage, images.length - 1)] as GalleryItem;
   const shownAvailability = variant?.availability ?? product.availability;
   const availability = availabilityDisplay(shownAvailability);
-  // What the cart already holds of this variant (review SQ-02): the stepper offers only the room left on the line.
-  const inCart = variant === null ? 0 : (cartQuantities?.get(variant.id) ?? 0);
-  const room = lineRoom(inCart);
+  // What the cart already holds of this variant (review SQ-02) and its stock hint (plan 2026-11-03): the stepper offers
+  // only the room left on the line, and nothing when the cart's line already holds more than the shop can sell.
+  const { inCart, room, stock } = addRoom(
+    variant === null ? undefined : cartLines?.get(variant.id),
+  );
   const shownQuantity = Math.min(quantity, Math.max(MIN_LINE_QUANTITY, room));
   const atLimit = room === 0;
   const purchasable = variant !== null && canAddToCart(variant.availability) && !atLimit;
@@ -302,7 +304,24 @@ export function ProductPurchaseView({
                   {pending ? t("product.adding") : t("product.addToCart")}
                 </Button>
               </div>
-              {atLimit ? (
+              {atLimit && stock !== null ? (
+                <p id={LIMIT_NOTE_ID} className="flex flex-wrap gap-x-2 text-sm text-foreground">
+                  <span>
+                    {/* No count, or 0 (a default location without stock): "more than the shop has", never "only 0". */}
+                    {stock.available === null || stock.available === 0
+                      ? t("product.quantity.stockShort", { count: inCart })
+                      : t.plural("product.quantity.stockLimit", stock.available, {
+                          inCart,
+                        })}
+                  </span>
+                  <Link
+                    href={localizedHref(locale, "/cart")}
+                    className={`underline underline-offset-4 ${focusRing}`}
+                  >
+                    {t("product.viewCart")}
+                  </Link>
+                </p>
+              ) : atLimit ? (
                 <p id={LIMIT_NOTE_ID} className="text-sm text-foreground">
                   {t("product.quantity.atLimit", {
                     count: inCart,
@@ -314,9 +333,6 @@ export function ProductPurchaseView({
                 <p className="text-sm text-muted-foreground">
                   {t("product.quantity.inCart", { count: inCart })}
                 </p>
-              ) : null}
-              {variant?.availability === "low_stock" ? (
-                <p className="text-sm text-muted-foreground">{t("product.quantity.lowStock")}</p>
               ) : null}
               <div role="status" className="flex flex-col gap-2">
                 {status.state === "pending" ? <p>{t("product.adding")}</p> : null}
@@ -353,13 +369,13 @@ export function ProductPurchase(
   const { product } = props;
   // Only a new cart answer changes the quantities; busy marks and announcements do not.
   const cart = state.cart;
-  const cartQuantities = useMemo(() => quantitiesByVariant(cart), [cart]);
+  const cartLines = useMemo(() => cartLineFacts(cart), [cart]);
   return (
     <ProductPurchaseView
       {...props}
       locale={locale}
       t={t}
-      cartQuantities={cartQuantities}
+      cartLines={cartLines}
       onSelectionChange={(selection) => {
         // The choice lives in the address (review SQ-05): a reload, a shared link and the language switch keep it. Next's
         // router follows `history.replaceState`, so the language links pick up the new query.

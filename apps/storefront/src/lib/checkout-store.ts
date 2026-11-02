@@ -1,7 +1,7 @@
 import type { Cart, Money, StoreClient } from "@fluxkit/api-client";
 import type { Locale } from "@fluxkit/ui";
 import type { CheckoutConfig } from "../config/checkout";
-import { hasPriceChange } from "./cart-model";
+import { hasPriceChange, lineStockHint } from "./cart-model";
 import type { CartStore } from "./cart-store";
 import {
   InsecureContextError,
@@ -63,7 +63,7 @@ export interface CheckoutState {
   needsConfirmation: boolean;
   /** Set by a `409 shipping_changed`: the delivery price changed and the shopper must agree to the new one first. */
   shippingConsent: ShippingConsent | null;
-  /** Lines refused by `checkout_refused`, for the cart they were refused in (another cart shows none). */
+  /** Lines refused by `checkout_refused`, for the cart they were refused in (a cart with other lines shows none, `sameLines`). */
   lineErrors: { cart: Cart | null; errors: readonly LineError[] } | null;
   /** False once the attempt could not be kept in `sessionStorage`; the page warns that a reload loses it. */
   attemptPersistent: boolean;
@@ -86,6 +86,25 @@ export type SubmitResult =
   | { kind: "insecure"; failure: Failure };
 
 /**
+ * Whether two cart answers hold the same lines (variant and quantity, in order): the refusal of `checkout_refused` names
+ * lines by position, so it applies to a cart read again after it only while the lines are the same.
+ */
+export function sameLines(a: Cart | null, b: Cart | null): boolean {
+  if (a === null || b === null) return a === b;
+  return (
+    a.lines.length === b.lines.length &&
+    a.lines.every((line, index) => {
+      const other = b.lines[index];
+      return (
+        other !== undefined &&
+        other.variantId === line.variantId &&
+        other.quantity === line.quantity
+      );
+    })
+  );
+}
+
+/**
  * Why the order cannot be submitted now, or `null`. Flags of the API and the delivery plan only; nothing about money is
  * compared or added.
  */
@@ -97,6 +116,8 @@ export function checkoutBlock(
   if (cart === null) return "loading";
   if (cart.lines.length === 0) return "empty";
   if (!cart.purchasable) return "notPurchasable";
+  // A line the API flags with `insufficientStock` does NOT block here (plan 2026-11-03): the page lists it above the form
+  // (`StockWarningsView`) and the server judges the order; the cart page already blocks its checkout link for it.
   if (hasPriceChange(cart)) return "pricesChanged";
   if (delivery.kind === "blocked" && delivery.reason === "loading") return "shippingLoading";
   if (delivery.kind === "blocked" && delivery.reason === "error") return "shippingError";
@@ -203,13 +224,26 @@ export function createCheckoutStore(options: CheckoutStoreOptions): CheckoutStor
         void shipping.refresh();
         set({ pending: false, attemptPersistent: persistent });
         return;
-      case "refused":
-        set({
-          pending: false,
-          attemptPersistent: persistent,
-          lineErrors: { cart: cart.getState().cart, errors: outcome.lineErrors },
-        });
+      case "refused": {
+        const refused = { cart: cart.getState().cart, errors: outcome.lineErrors };
+        set({ pending: false, attemptPersistent: persistent, lineErrors: refused });
+        // The server judged the stock differently from the cart this page read: read it again, so the lines' stock hints
+        // above the form are the current ones. The errors stay shown while the lines are the same (`sameLines`), except a
+        // stock error of a line the fresh cart no longer flags (stock came back meanwhile; review m3 of PR 215).
+        if (outcome.lineErrors.some((error) => error.code === "insufficient_stock")) {
+          void cart.refresh().then((read) => {
+            // A newer submit or answer replaced these errors meanwhile: leave its state alone.
+            if (read.status !== "ok" || state.lineErrors !== refused) return;
+            const errors = refused.errors.filter((error) => {
+              if (error.code !== "insufficient_stock") return true;
+              const line = read.cart.lines[error.index];
+              return line !== undefined && lineStockHint(line) !== null;
+            });
+            set({ lineErrors: { cart: refused.cart, errors } });
+          });
+        }
         return;
+      }
       case "cartEmpty":
         void cart.refresh();
         set({ pending: false, attemptPersistent: persistent });

@@ -13,7 +13,7 @@ import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import {
-  cardMatch,
+  cardOffer,
   describeFormFailure,
   selectedFilters,
   sortChoices,
@@ -294,7 +294,7 @@ export function FacetedResults({
                   headingLevel="h3"
                   brandPathFor={brandPathFor}
                   label={listLabel}
-                  match={cardMatch(query, result.facets)}
+                  offerFor={(item) => cardOffer(item, query)}
                 />
               )}
 

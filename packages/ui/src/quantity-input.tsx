@@ -10,6 +10,11 @@ export interface QuantityInputProps {
   increaseLabel: string;
   min?: number;
   max?: number;
+  /**
+   * Where the step buttons stop (for example a stock hint), when lower than `max`. A TYPED number is clamped to `max`
+   * only: above a hint it is the shopper's choice, for the server to answer.
+   */
+  stepMax?: number;
   name?: string;
   id?: string;
   disabled?: boolean;
@@ -41,11 +46,14 @@ export function QuantityInput({
   increaseLabel,
   min = 1,
   max,
+  stepMax,
   name,
   id,
   disabled,
   className,
 }: QuantityInputProps) {
+  const stepLimit =
+    stepMax === undefined ? max : max === undefined ? stepMax : Math.min(max, stepMax);
   return (
     <div className={cn("inline-flex items-center gap-1", className)}>
       <button
@@ -53,7 +61,7 @@ export function QuantityInput({
         aria-label={decreaseLabel}
         className={buttonClasses}
         disabled={disabled || value <= min}
-        onClick={() => onChange(clampQuantity(value - 1, min, max))}
+        onClick={() => onChange(clampQuantity(value - 1, min, stepLimit))}
       >
         <span aria-hidden="true">&minus;</span>
       </button>
@@ -79,8 +87,8 @@ export function QuantityInput({
         type="button"
         aria-label={increaseLabel}
         className={buttonClasses}
-        disabled={disabled || (max !== undefined && value >= max)}
-        onClick={() => onChange(clampQuantity(value + 1, min, max))}
+        disabled={disabled || (stepLimit !== undefined && value >= stepLimit)}
+        onClick={() => onChange(clampQuantity(value + 1, min, stepLimit))}
       >
         <span aria-hidden="true">+</span>
       </button>
