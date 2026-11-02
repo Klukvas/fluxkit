@@ -5,7 +5,7 @@ import { availabilityDisplay } from "../lib/availability";
 import { allowedImageUrl } from "../lib/image-source";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
-import type { CardMatch } from "../lib/search-facets";
+import type { CardOffer } from "../lib/search-facets";
 import { StoreImage } from "./store-image";
 import { focusRing } from "./styles";
 
@@ -34,12 +34,14 @@ export interface ProductCardProps {
   /** First row of a list: its image is not lazy. */
   eager?: boolean;
   /**
-   * Variant-level filters are on (`cardMatch` of `lib/search-facets.ts`, review SQ-03): the badge shows the matching
-   * options' stock only when the filters say it, a note says that price and stock depend on the option, and the link opens
-   * the product page on the pinned option values. `null`: the product's own price and availability.
+   * What the card shows of a search item's `match` (`cardOffer` of `lib/search-facets.ts`): the matching variants' price,
+   * availability and link, or the neutral note while the index catches up. Absent: the product's own (catalog, home,
+   * SQL fallback).
    */
-  match?: CardMatch | null;
+  offer?: CardOffer;
 }
+
+const PRODUCT_OFFER: CardOffer = { kind: "product" };
 
 /**
  * One product in a list. The whole card is one click target (the title link stretches over it); the brand link sits above
@@ -54,21 +56,25 @@ export function ProductCard({
   brandPath,
   headingLevel: Heading,
   eager = false,
-  match = null,
+  offer = PRODUCT_OFFER,
 }: ProductCardProps) {
-  const shown = match === null ? product.availability : match.availability;
+  const shown =
+    offer.kind === "product"
+      ? product.availability
+      : offer.kind === "matched"
+        ? offer.availability
+        : null;
   const availability = shown === null ? null : availabilityDisplay(shown);
+  const price = offer.kind === "matched" ? offer.price : product.price;
   const path = localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`);
-  const href = match === null || match.linkQuery === "" ? path : `${path}?${match.linkQuery}`;
-  const onePrice = product.price.from === product.price.to;
+  const linkQuery = offer.kind === "product" ? "" : offer.linkQuery;
+  const href = linkQuery === "" ? path : `${path}?${linkQuery}`;
   const note =
-    match === null
-      ? null
-      : match.availability === null
-        ? t(onePrice ? "search.card.stockDependsOnOption" : "search.card.dependsOnOption")
-        : onePrice
-          ? null
-          : t("search.card.priceDependsOnOption");
+    offer.kind === "catchingUp"
+      ? t("search.card.dependsOnOption")
+      : offer.kind === "matched" && offer.variantCount > 1
+        ? t.plural("search.card.matchingOptions", offer.variantCount)
+        : null;
   return (
     <article className="relative flex h-full flex-col gap-2 rounded-lg border border-border bg-background p-3 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
       <StoreImage
@@ -95,7 +101,7 @@ export function ProductCard({
         </Link>
       )}
       <PriceText
-        price={listPriceLabel(product.price, exponent, locale, t)}
+        price={listPriceLabel(price, exponent, locale, t)}
         priceLabel={t("product.price.label")}
       />
       {availability === null ? null : (
