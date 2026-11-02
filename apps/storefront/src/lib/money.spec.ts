@@ -13,7 +13,7 @@ class BrowserLikeNumberFormat extends Intl.NumberFormat {
     return super
       .format(value as number)
       .replace("₴", "грн")
-      .replace(/ /g, " ");
+      .replace(/\u00a0/g, "\u202f");
   }
 }
 
@@ -38,7 +38,7 @@ describe("formatMoney does not depend on the runtime's ICU data (hydration, SQ-0
     expect(browser.formatMoney({ amount: 123456, currency: "UAH" }, 2, "en")).toBe(server.en);
     expect(browser.formatMoney({ amount: 999, currency: "EUR" }, 2, "uk")).toBe(server.ukEur);
     expect(browser.formatMoney({ amount: -250, currency: "USD" }, 2, "en")).toBe(server.enUsd);
-    expect(server.uk).toBe("1 234,56 ₴");
+    expect(server.uk).toBe("1\u00a0234,56\u00a0₴");
   });
 });
 
@@ -135,8 +135,8 @@ describe("formatMoney", () => {
   });
 
   it("uses no-break spaces, so a price never wraps inside itself", () => {
-    expect(formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk")).toBe("1 234,56 ₴");
-    expect(formatMoney({ amount: 59900, currency: "UAH" }, 2, "en")).toBe("UAH 599.00");
+    expect(formatMoney({ amount: 123456, currency: "UAH" }, 2, "uk")).toBe("1\u00a0234,56\u00a0₴");
+    expect(formatMoney({ amount: 59900, currency: "UAH" }, 2, "en")).toBe("UAH\u00a0599.00");
   });
 
   it("matches Node's Intl text where the storefront keeps that format (the e2e helpers rely on it)", () => {

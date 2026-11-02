@@ -18,7 +18,7 @@ export interface MoneyValue {
 
 const MAX_EXPONENT = 20;
 /** U+00A0: a price never wraps between its digits and its symbol. */
-const NO_BREAK_SPACE = " ";
+const NO_BREAK_SPACE = "\u00a0";
 
 /**
  * Decimal text of `amount` minor units with `exponent` fraction digits: `(123456, 2)` is `"1234.56"`. Integer arithmetic
