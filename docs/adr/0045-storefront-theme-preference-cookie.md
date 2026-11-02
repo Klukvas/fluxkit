@@ -1,7 +1,7 @@
 # 0045. Storefront theme: a preference cookie rendered by the server
 
-Status: proposed 2026-11-03 (design batch B, plan `docs/plans/2026-11-03-storefront-design-b.md`, decision 5; the orchestrator's task asked for a
-cookie-persisted dark theme switch). **Owner and legal confirmation needed** (see "Consequences"). Supersedes in part ADR 0033 decision 11 ("The
+Status: accepted by the owner 2026-11-02 (the cookie stays; lawyer confirmation still open; `showToggle: false` is the off switch). Proposed 2026-11-03 (design batch B, plan `docs/plans/2026-11-03-storefront-design-b.md`, decision 5; the orchestrator's task asked for a
+cookie-persisted dark theme switch). **Legal confirmation needed** (see "Consequences"). Supersedes in part ADR 0033 decision 11 ("The
 only cookies are `fluxkit_cart`, `fluxkit_customer_session`, `fluxkit_admin_session`" and the guard against any storefront cookie): it adds one
 storefront cookie. Keeps every other part of ADR 0033 decision 11 (first-party only, no analytics or advertising cookie, no consent banner, the
 API's cookie guard, the legal placeholder pages).
@@ -44,3 +44,5 @@ API's cookie guard, the legal placeholder pages).
   renders. Measured on `next start` with the dark cookie (`/en/p/<unknown>`, `/en/<unknown>`, `/xx`): the server HTML is
   `<html id="__next_error__">`, the body is empty until the script renders the page, then `data-theme="dark"`; without a script the page
   stays empty (as before this change, README finding).
+
+- The cookie has `Path=/`, so under the production edge proxy (same origin for `/store` and `/media`) the browser also sends it with API and media requests. It holds one of three words, the API ignores it, and it carries no personal data.

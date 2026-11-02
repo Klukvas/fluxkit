@@ -177,7 +177,7 @@ describe("headerRules: Referrer-Policy per page (Next's own matcher, last matchi
   });
 });
 
-describe("no third-party origin and no cookie of its own (ADR 0033 decision 11)", () => {
+describe("no third-party origin and no cookie but the theme cookie (ADR 0033 decision 11, ADR 0045)", () => {
   const imageHosts = ["cdn.example.com", "images.example.org"];
 
   it("lets the policy name nothing beyond the own origin, data: and the configured image hosts", () => {
