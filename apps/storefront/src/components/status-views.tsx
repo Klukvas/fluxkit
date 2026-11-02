@@ -46,8 +46,10 @@ export function NotFoundView({ t, homeHref }: { t: Translator; homeHref: string 
 }
 
 export function LoadingView({ t }: { t: Translator }) {
+  // At least a screen tall: the footer starts below the fold, so the page that replaces this view does not push a visible
+  // footer down (a layout shift of 0.26 on the home page, design batch B).
   return (
-    <Container className="flex flex-col gap-4 py-12" aria-busy="true">
+    <Container className="flex min-h-screen flex-col gap-4 py-12" aria-busy="true">
       <Spinner label={t("loading.page")} />
       <Skeleton className="h-8 w-1/2" />
       <Skeleton className="h-24 w-full" />

@@ -11,9 +11,6 @@ const localeRoot = join(appRoot, "[locale]");
  * "not found" must therefore have NO `loading.tsx` in any directory above it.
  */
 const mustAnswerRealNotFound = [
-  // The home page (design batch B): it no longer waits for data itself (its data sections stream in their own boundaries), so
-  // it needs no loading view; under `(site)/loading.tsx` its whole content was outlined behind that view (a layout shift).
-  "(catalog)/page.tsx",
   "(catalog)/catalog/page.tsx",
   "(catalog)/c/[slug]/page.tsx",
   "(catalog)/p/[slug]/page.tsx",
@@ -49,11 +46,11 @@ describe("route structure", () => {
   });
 
   it("keeps a loading.tsx only on pages that never call notFound() for missing content", () => {
-    // The home page used to be the one exception; since design batch B it lives in `(catalog)` (no loading view).
+    // The home page checks the locale (already checked by the layout) and is the one page under (site)/loading.tsx.
     const offenders = pagesCallingNotFound(localeRoot)
       .filter((page) => loadingFilesAbove(page).length > 0)
       .map((page) => relative(localeRoot, page));
-    expect(offenders).toEqual([]);
+    expect(offenders).toEqual(["(site)/page.tsx"]);
   });
 
   it("gives every personal page (cart, checkout, account, order) the noindex metadata of privateMetadata", () => {

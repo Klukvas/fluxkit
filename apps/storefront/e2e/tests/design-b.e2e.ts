@@ -32,17 +32,40 @@ const sectionIds = (page: Page) =>
 test("the home page shows the configured sections in order, one h1, the hero picture and no layout shift", async ({
   page,
 }) => {
+  // Layout shifts before and after the page itself is on screen (its hero is visible). Before it, the `(site)` loading view may
+  // be painted first and then replaced by the page (it moved the footer by 0.26 before `LoadingView` got a screen's height).
   await page.addInitScript(() => {
-    const record = window as unknown as { shift: number; shiftSources: string[] };
+    const record = window as unknown as {
+      shift: number;
+      loadingViewShift: number;
+      shiftSources: string[];
+      heroAt: number | null;
+    };
     record.shift = 0;
+    record.loadingViewShift = 0;
     record.shiftSources = [];
+    record.heroAt = null;
+    const watch = () => {
+      const hero = document.querySelector("main [data-hero]");
+      if (hero !== null && hero.getBoundingClientRect().height > 0) {
+        record.heroAt = performance.now();
+        return;
+      }
+      requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
     new PerformanceObserver((list) => {
       for (const entry of list.getEntries() as unknown as {
         value: number;
+        startTime: number;
         hadRecentInput: boolean;
         sources?: { node: Node | null }[];
       }[]) {
         if (entry.hadRecentInput) continue;
+        if (record.heroAt === null || entry.startTime <= record.heroAt) {
+          record.loadingViewShift += entry.value;
+          continue;
+        }
         record.shift += entry.value;
         for (const source of entry.sources ?? []) {
           const node = source.node;
@@ -95,11 +118,23 @@ test("the home page shows the configured sections in order, one h1, the hero pic
 
   await page.mouse.wheel(0, 3000);
   await page.waitForTimeout(500);
-  const { shift, shiftSources } = await page.evaluate(() => {
-    const record = window as unknown as { shift: number; shiftSources: string[] };
-    return { shift: record.shift, shiftSources: record.shiftSources };
+  const { shift, shiftSources, loadingViewShift } = await page.evaluate(() => {
+    const record = window as unknown as {
+      shift: number;
+      shiftSources: string[];
+      loadingViewShift: number;
+    };
+    return {
+      shift: record.shift,
+      shiftSources: record.shiftSources,
+      loadingViewShift: record.loadingViewShift,
+    };
   });
-  expect(shift, `cumulative layout shift: ${shiftSources.join(" | ")}`).toBeLessThan(0.05);
+  expect(shift, `layout shift after the page appeared: ${shiftSources.join(" | ")}`).toBeLessThan(
+    0.05,
+  );
+  // The loading view is at least a screen tall (`LoadingView`), so replacing it moves nothing on screen either.
+  expect(loadingViewShift, "layout shift while the loading view was replaced").toBeLessThan(0.05);
 });
 
 for (const width of [1280, 1024, 768, 390]) {
