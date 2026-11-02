@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { browserCheckoutDraftStorage, clearCheckoutDraft } from "../lib/checkout-draft";
 import { runAccountDeletion } from "../lib/delete-account";
 import { failureFromThrown } from "../lib/failure";
 import { browserDownloadEnvironment, downloadBlob } from "../lib/file-download";
@@ -122,6 +123,8 @@ function DeletePanel() {
                 },
                 sessionEnded: () => {
                   store.sessionEnded();
+                  // The deleted account's contact and address must not stay in this tab's checkout draft (review SQ-05).
+                  clearCheckoutDraft(browserCheckoutDraftStorage());
                 },
                 leave: () => {
                   router.replace(localizedHref(locale, "/account/deleted"));

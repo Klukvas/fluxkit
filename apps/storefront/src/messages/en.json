@@ -679,7 +679,7 @@
   "search.relaxed": "No product matches every word, so we are showing broader results that match some of them.",
   "search.list.label": "Search results",
   "search.empty.title": "Nothing found",
-  "search.empty.description": "Check the spelling, try fewer or different words, or browse the catalog.",
+  "search.empty.description": "Check the spelling, try fewer or different words, or browse the catalog. Search on this page looks at the product texts in English.",
   "search.empty.filtered": "No product matches these words and filters. Remove some filters to see more.",
   "search.empty.clear": "Clear the filters",
   "search.empty.catalog": "Browse the catalog",

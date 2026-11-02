@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { browserCheckoutDraftStorage, clearCheckoutDraft } from "../lib/checkout-draft";
 import type { Failure } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { useI18n } from "./i18n-provider";
@@ -30,6 +31,8 @@ export function useLogout() {
         setPending(false);
         return false;
       }
+      // The checkout draft of this tab holds the signed-out customer's contact and address (review SQ-05).
+      clearCheckoutDraft(browserCheckoutDraftStorage());
       router.replace(localizedHref(locale, "/"));
       return true;
     } catch (error) {
