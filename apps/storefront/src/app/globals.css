@@ -130,6 +130,14 @@
       @apply -mx-2 px-2 py-1;
     }
   }
+  /*
+   * The footer's theme switch (`theme-switch.tsx`, design batch B). One class for its three buttons: the footer is part of the
+   * first HTML before a page's late section, so it counts against the same budget as the header (see `.fk-menu-item`).
+   * The pressed state follows `aria-pressed`, so it cannot drift from what assistive technology hears.
+   */
+  .fk-theme-option {
+    @apply inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
+  }
   /* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
   .fk-icon {
     @apply fill-none stroke-current stroke-2;

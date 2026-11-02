@@ -1,10 +1,16 @@
 /*
  * Design tokens: the ONE place to rebrand Fluxkit. Components never use raw colors, fonts or radii
  * (AGENTS.md section 2.2); they use the semantic names mapped in tailwind.css.
- * Replace the values below (or add a theme preset selector) when delivering a client design.
+ * Replace the values below (or add a theme preset selector) when delivering a client design; a rebrand sets BOTH themes (and
+ * copies the changed dark colours and shadows into the system block at the end; a test keeps it equal to the dark block).
+ *
+ * Themes (`data-theme` on <html>): `light` (also the default without the attribute), `dark`, and `system`, which is light
+ * unless the OS asks for dark. `system` is opt-in on purpose: the admin app shares this file and sets `light`, so it never
+ * follows the OS. `color-scheme` makes native controls, scrollbars and select popups follow the theme.
  */
 :root,
 [data-theme="light"] {
+  color-scheme: light;
   --fk-color-background: #ffffff;
   --fk-color-foreground: #0f172a;
   --fk-color-muted: #f1f5f9;
@@ -49,6 +55,7 @@
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --fk-color-background: #0b1020;
   --fk-color-foreground: #e2e8f0;
   --fk-color-muted: #172036;
@@ -89,4 +96,30 @@
   --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
   --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
   --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+}
+
+/*
+ * System mode on a dark OS: the dark values of every token that differs between the themes (colours and shadows). Scoped to
+ * `[data-theme="system"]`, never `:root`, so a page that did not opt in (the admin) is not affected.
+ */
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    color-scheme: dark;
+    --fk-color-background: #0b1020;
+    --fk-color-foreground: #e2e8f0;
+    --fk-color-muted: #172036;
+    --fk-color-muted-foreground: #94a3b8;
+    --fk-color-border: #26314d;
+    --fk-color-border-input: #6b7a99;
+    --fk-color-primary: #818cf8;
+    --fk-color-primary-foreground: #0b1020;
+    --fk-color-danger: #f87171;
+    --fk-color-danger-foreground: #0b1020;
+    --fk-color-success: #4ade80;
+    --fk-color-warning: #fbbf24;
+    --fk-color-ring: #818cf8;
+    --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+    --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+    --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+  }
 }

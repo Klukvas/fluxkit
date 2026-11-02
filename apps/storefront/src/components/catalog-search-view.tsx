@@ -16,7 +16,13 @@ import {
   setPage,
   type SearchQuery,
 } from "../lib/search-query";
-import { CatalogHeader, CatalogView, EmptyList, Subcategories } from "./catalog-view";
+import {
+  CatalogHeader,
+  CatalogView,
+  EmptyList,
+  Subcategories,
+  type CategoryBanner,
+} from "./catalog-view";
 import { FacetedResults, ProblemState } from "./search-results";
 import { linkButton } from "./styles";
 
@@ -36,6 +42,8 @@ export interface CatalogSearchViewProps {
   t: Translator;
   heading: string;
   description: string | null;
+  /** A category page's banner header (`config/category-page.ts`). */
+  banner?: CategoryBanner | null;
   breadcrumbs: BreadcrumbItem[];
   /** Locale-less path of this list (`/catalog` or `/c/<slug>`). */
   basePath: string;
@@ -77,7 +85,12 @@ export function CatalogSearchView(props: CatalogSearchViewProps) {
   return (
     <Container className="flex flex-col gap-6 py-8">
       <Breadcrumbs label={t("breadcrumbs.label")} items={props.breadcrumbs} />
-      <CatalogHeader heading={props.heading} description={props.description} />
+      <CatalogHeader
+        t={t}
+        heading={props.heading}
+        description={props.description}
+        banner={props.banner ?? null}
+      />
       <Subcategories locale={locale} t={t} subcategories={props.subcategories} />
       {outcome.kind === "search" ? (
         <FacetedResults
@@ -141,6 +154,7 @@ export interface CatalogRouteViewProps {
   t: Translator;
   heading: string;
   description: string | null;
+  banner?: CategoryBanner | null;
   breadcrumbs: BreadcrumbItem[];
   basePath: string;
   subcategories: readonly CategoryNode[];

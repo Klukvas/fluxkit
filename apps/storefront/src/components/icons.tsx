@@ -111,3 +111,15 @@ export function ReturnIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   );
 }
+
+/** A category tile without a picture (`home-sections.tsx`). */
+export function CategoryIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </Icon>
+  );
+}

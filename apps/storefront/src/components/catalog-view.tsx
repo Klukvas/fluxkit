@@ -3,6 +3,7 @@ import {
   Breadcrumbs,
   Container,
   EmptyState,
+  Hero,
   Pagination,
   textStyles,
   type BreadcrumbItem,
@@ -11,10 +12,17 @@ import {
 } from "@fluxkit/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { LocalImage } from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
+import { LocalPicture } from "./local-picture";
 import { ProductGrid } from "./product-grid";
 import { focusRing, linkButton } from "./styles";
+
+/** A category page's banner header (`config/category-page.ts`): the name and description on a token surface. */
+export interface CategoryBanner {
+  image: LocalImage | null;
+}
 
 export interface CatalogViewProps {
   locale: Locale;
@@ -22,6 +30,8 @@ export interface CatalogViewProps {
   /** The `h1`. */
   heading: string;
   description: string | null;
+  /** Render the heading as a banner (`Hero`) instead of plain text; absent or `null` on the catalog page. */
+  banner?: CategoryBanner | null;
   breadcrumbs: BreadcrumbItem[];
   products: ProductList;
   page: number;
@@ -91,9 +101,33 @@ export function EmptyList({
 
 /** The `h1` and the description of a catalog or category page (shared with `catalog-search-view.tsx`). */
 export function CatalogHeader({
+  t,
   heading,
   description,
-}: Pick<CatalogViewProps, "heading" | "description">) {
+  banner = null,
+}: Pick<CatalogViewProps, "t" | "heading" | "description" | "banner">) {
+  if (banner !== null) {
+    const { image } = banner;
+    return (
+      <Hero
+        headingId="catalog-heading"
+        headingLevel="h1"
+        title={heading}
+        subline={description}
+        media={
+          image === null ? undefined : (
+            <LocalPicture
+              image={image}
+              t={t}
+              eager
+              sizes="(min-width: 768px) 50vw, 100vw"
+              className="h-auto w-full rounded-md"
+            />
+          )
+        }
+      />
+    );
+  }
   return (
     <header className="flex flex-col gap-2">
       <h1 className={textStyles.pageTitle}>{heading}</h1>
@@ -142,6 +176,7 @@ export function CatalogView({
   t,
   heading,
   description,
+  banner = null,
   breadcrumbs,
   products,
   page,
@@ -159,7 +194,7 @@ export function CatalogView({
   return (
     <Container className="flex flex-col gap-6 py-8">
       <Breadcrumbs label={t("breadcrumbs.label")} items={breadcrumbs} />
-      <CatalogHeader heading={heading} description={description} />
+      <CatalogHeader t={t} heading={heading} description={description} banner={banner} />
       <Subcategories locale={locale} t={t} subcategories={subcategories} />
       {notice}
 

@@ -1,5 +1,4 @@
-import type { CategoryNode, ProductDetail, ProductList, ProductSummary } from "@fluxkit/api-client";
-import type { HomeSection } from "../layout/home";
+import type { CategoryNode, ProductDetail, ProductList } from "@fluxkit/api-client";
 import {
   CATALOG_PAGE_SIZE,
   isPageInRange,
@@ -26,7 +25,8 @@ export class UnexpectedStoreResponseError extends Error {
   }
 }
 
-function unwrap<T>(operation: string, outcome: CatalogOutcome<T>): T {
+/** The data of an answer, or a logged `UnexpectedStoreResponseError` for a problem the page has no state for. */
+export function unwrap<T>(operation: string, outcome: CatalogOutcome<T>): T {
   if (outcome.ok) return outcome.data;
   const error = new UnexpectedStoreResponseError(operation, outcome.status, outcome.problem.code);
   console.error(error.message);
@@ -70,43 +70,6 @@ export async function loadOnlinePayment(data: StoreData): Promise<boolean> {
  */
 export async function loadSearchEnabled(data: StoreData): Promise<boolean> {
   return unwrap("GET /store/config", await data.getConfig()).search;
-}
-
-export interface HomeData {
-  newProducts?: ProductSummary[];
-  categories?: CategoryNode[];
-  /** `currencyExponent` of the shop, present whenever prices are shown. */
-  exponent?: number;
-}
-
-/** One request per data need: the products of `newProducts` and the category tree for `categoryTiles`. */
-export async function loadHomeData(
-  data: StoreData,
-  locale: string,
-  sections: readonly HomeSection[],
-): Promise<HomeData> {
-  const products = sections.find((section) => section.type === "newProducts");
-  const tiles = sections.find((section) => section.type === "categoryTiles");
-  const [newProducts, categories, exponent] = await Promise.all([
-    products === undefined
-      ? undefined
-      : data
-          .listProducts(locale, { limit: products.props.limit })
-          .then((outcome) => unwrap("GET /store/products", outcome).items),
-    tiles === undefined
-      ? undefined
-      : data
-          .listCategories(locale)
-          .then((outcome) => unwrap("GET /store/categories", outcome).items),
-    products === undefined
-      ? undefined
-      : data.getConfig().then((outcome) => unwrap("GET /store/config", outcome).currencyExponent),
-  ]);
-  return {
-    ...(newProducts === undefined ? {} : { newProducts }),
-    ...(categories === undefined ? {} : { categories }),
-    ...(exponent === undefined ? {} : { exponent }),
-  };
 }
 
 export type ListingResult =

@@ -3,19 +3,14 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { emailTheme } from "./email-theme.js";
 import { emailTheme as exported } from "./index.js";
+import { parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
 
 // The guard of ADR 0031 decision 14: `emailTheme` holds the resolved LIGHT values of tokens.css, so a rebrand of the
 // tokens cannot leave mail in the old colors.
 const tokensCss = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
-const [lightBlock] = tokensCss.split('[data-theme="dark"]') as [string, string];
 
 function lightTokens(): Map<string, string> {
-  return new Map(
-    [...lightBlock.matchAll(/(--fk-[a-z0-9-]+)\s*:\s*([^;]+);/g)].map((match) => [
-      match[1] as string,
-      (match[2] as string).trim(),
-    ]),
-  );
+  return tokenBlock(parseTokenBlocks(tokensCss), themeSelectors.light).tokens;
 }
 
 const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);

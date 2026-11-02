@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Button } from "./button";
 import { Disclosure } from "./disclosure";
+import { Hero } from "./hero";
 import { OptionPicker } from "./option-picker";
 import { PriceText } from "./price-text";
 import { StepIndicator } from "./step-indicator";
@@ -167,5 +168,44 @@ describe("textStyles", () => {
   it("uses only scale sizes and colour tokens", () => {
     expect(textStyles.pageTitle).toBe("text-3xl font-bold text-foreground");
     expect(textStyles.sectionTitle).toBe("text-xl font-semibold text-foreground");
+  });
+});
+
+describe("Hero (design batch B)", () => {
+  it("is a section labelled by its heading, at the level the page asks for", () => {
+    const markup = render(<Hero headingId="hero-a" headingLevel="h1" title="Welcome" />);
+    expect(first(markup, "section").attributes["aria-labelledby"]).toBe("hero-a");
+    expect(first(markup, "h1").attributes.id).toBe("hero-a");
+    expect(tags(markup, "h2")).toHaveLength(0);
+    const second = render(<Hero headingId="hero-b" headingLevel="h2" title="Sale" />);
+    expect(first(second, "h2").attributes.id).toBe("hero-b");
+    expect(tags(second, "h1")).toHaveLength(0);
+  });
+
+  it("renders the subline, the action and the picture only when given, text before the picture", () => {
+    const bare = render(<Hero headingId="h" headingLevel="h2" title="T" />);
+    expect(tags(bare, "p")).toHaveLength(0);
+    expect(String(first(bare, "section").attributes.class)).not.toContain("md:grid-cols-2");
+    const full = render(
+      <Hero
+        headingId="h"
+        headingLevel="h2"
+        title="T"
+        subline="S"
+        action={<a href="/c">Go</a>}
+        media={<img src="/x.svg" alt="" width={4} height={3} />}
+      />,
+    );
+    expect(text(full)).toBe("T S Go");
+    expect(String(first(full, "section").attributes.class)).toContain("md:grid-cols-2");
+    expect(full.indexOf("<h2")).toBeLessThan(full.indexOf("<img"));
+  });
+
+  it("sits on the muted token surface (text pairs foreground and muted-foreground on muted are contrast-tested)", () => {
+    const classes = String(
+      first(render(<Hero headingId="h" headingLevel="h2" title="T" />), "section").attributes.class,
+    );
+    expect(classes).toContain("bg-muted");
+    expect(classes).toContain("rounded-lg");
   });
 });

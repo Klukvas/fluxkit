@@ -20,6 +20,7 @@ const messages = Object.fromEntries(Object.keys(uk).map((key) => [key, `§${key}
 function shell(searchEnabled: boolean): string {
   return renderToStaticMarkup(
     <SiteShell
+      themeMode="light"
       locale="uk"
       messages={messages}
       t={t}

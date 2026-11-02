@@ -67,7 +67,7 @@ describe("legal pages configuration", () => {
 });
 
 describe("the cookie statement", () => {
-  it("lists exactly the cookies the API sets for a shopper, by the names its cookie modules define", () => {
+  it("lists exactly the cookies the API sets for a shopper, by the names its cookie modules define, and the storefront's theme cookie", () => {
     const apiSource = (file: string) =>
       readFileSync(join(srcRoot, "..", "..", "api", "src", file), "utf8");
     const defined = [
@@ -75,7 +75,12 @@ describe("the cookie statement", () => {
       /export const CUSTOMER_SESSION_COOKIE_NAME = "([a-z_]+)";/.exec(
         apiSource("customers/auth/customer-session-cookie.ts"),
       )?.[1],
+      // The storefront's own preference cookie (design batch B, `lib/theme-mode.ts`).
+      /export const THEME_COOKIE = "([a-z_]+)";/.exec(
+        readFileSync(join(srcRoot, "lib", "theme-mode.ts"), "utf8"),
+      )?.[1],
     ];
+    expect(defined).not.toContain(undefined);
     expect(cookieTable.map((row) => row.name)).toEqual(defined);
   });
 

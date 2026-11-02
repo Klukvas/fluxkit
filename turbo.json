@@ -17,6 +17,11 @@
       "dependsOn": ["^build"],
       "cache": false,
       "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "MEILI_URL", "MEILI_MASTER_KEY"]
+    },
+    "@fluxkit/admin#test": {
+      "dependsOn": ["^build", "build"],
+      "cache": false,
+      "passThroughEnv": ["DATABASE_URL", "REDIS_URL", "MEILI_URL", "MEILI_MASTER_KEY"]
     }
   }
 }

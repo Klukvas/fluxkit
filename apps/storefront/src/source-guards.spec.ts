@@ -21,17 +21,36 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     expect(sources.length).toBeGreaterThan(30);
   });
 
-  it("sets no cookie from the storefront: no source file writes document.cookie or uses the Cookie Store API (privacy UI review F3)", () => {
-    // The cookie statement (docs/privacy/README.md section 5) says the storefront sets none; the API sets the three cookies.
-    // A named-file guard would miss a new file, so this scans every non-spec source under src.
-    const writesCookie = /document\s*\.\s*cookie|\bcookieStore\b|["']set-cookie["']/i;
+  it("sets one cookie from the storefront, the theme preference, from exactly two files and only through themeCookie (privacy UI review F3, design batch B)", () => {
+    // The cookie statement (docs/privacy/README.md section 5): the API sets the cart and session cookies; the storefront sets
+    // only `fluxkit_theme` (a preference, set when the shopper picks a theme). A named-file guard would miss a new file, so
+    // this scans every non-spec source under src and allows the theme switch and the no-script route handler only.
+    const writesCookie =
+      /document\s*\.\s*cookie|\bcookieStore\b|["']set-cookie["']|\bcookies\s*\(\s*\)\s*\)?\s*\.\s*set\b|\.cookies\s*\.\s*set\b/i;
     const withoutComments = (text: string) =>
       text.replace(/\/\*[\s\S]*?\*\/|(^|[^:])\/\/[^\n]*/g, "$1");
     expect(writesCookie.test("document.cookie = 'a=b'")).toBe(true);
     expect(writesCookie.test("await cookieStore.set('a', 'b')")).toBe(true);
-    for (const file of sources) {
-      expect(writesCookie.test(withoutComments(file.text)), file.path).toBe(false);
+    expect(writesCookie.test("(await cookies()).set('a', 'b')")).toBe(true);
+    expect(writesCookie.test("cookies().set('a', 'b')")).toBe(true);
+    expect(writesCookie.test("response.cookies.set('a', 'b')")).toBe(true);
+    const allowed = [join("components", "theme-switch.tsx"), join("lib", "theme-route.ts")];
+    const writers = sources.filter((file) => writesCookie.test(withoutComments(file.text)));
+    expect(writers.map((file) => file.path).sort()).toEqual([...allowed].sort());
+    for (const file of writers) {
+      const code = withoutComments(file.text);
+      // Every write takes its whole value from `themeCookie` (lib/theme-mode.ts), which writes `fluxkit_theme` and nothing else.
+      const writes = [
+        ...code.matchAll(/document\.cookie\s*=\s*([^;]*);|["']Set-Cookie["']\s*:\s*([^,\n]*)/gi),
+      ];
+      expect(writes.length, file.path).toBeGreaterThan(0);
+      for (const write of writes) {
+        expect((write[1] ?? write[2] ?? "").trim(), file.path).toMatch(/^themeCookie\(/);
+      }
+      expect(code, file.path).not.toMatch(/\bcookieStore\b|\.cookies\s*\.\s*set\b/);
     }
+    const builder = readFileSync(join(root, "lib", "theme-mode.ts"), "utf8");
+    expect(builder).toMatch(/`\$\{THEME_COOKIE\}=\$\{mode\}`/);
   });
 
   it('gives every <form> method="post", so a submit before hydration never puts a password or personal data into a URL', () => {
@@ -56,7 +75,15 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       join("components", "search-box.tsx"),
       join("components", "search-island.tsx"),
     ];
+    // The theme switch (design batch B) posts its one value to the storefront's own `/theme` route without a script; it holds
+    // no personal data (light, dark or system, and the current path).
+    const themeForm = join("components", "theme-switch.tsx");
     for (const form of forms) {
+      if (form.path === themeForm) {
+        expect(form.tag).toMatch(/\bmethod="post"/);
+        expect(form.tag).toMatch(/\baction="\/theme"/);
+        continue;
+      }
       if (searchForms.includes(form.path)) {
         expect(form.tag, `${form.path}: a search form is GET`).toMatch(/\bmethod="get"/);
         continue;
@@ -121,8 +148,16 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
   });
 
   it("loads images only through StoreImage, so the host allow-list cannot be bypassed", () => {
+    // `LocalPicture` (design batch B) shows the template's own files under public/ from the config files only: it takes a
+    // `LocalImage` (a site-relative path, refused otherwise) and nothing a shopper or the API supplies.
+    const localPicture = sources.find(
+      (file) => file.path === join("components", "local-picture.tsx"),
+    );
+    expect(localPicture?.text).toMatch(/image: LocalImage;/);
+    expect(localPicture?.text).toContain("if (!/^\\/[A-Za-z0-9._-]/.test(image.src)) {");
     for (const file of sources) {
       if (file.path === join("components", "store-image.tsx")) continue;
+      if (file.path === join("components", "local-picture.tsx")) continue;
       expect(file.text, file.path).not.toMatch(/from ["']next\/image["']/);
       expect(file.text, file.path).not.toMatch(/<img[\s>]/);
     }
@@ -219,9 +254,10 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
       );
     }
     for (const file of sources) {
-      expect(code(file.text), file.path).not.toMatch(
-        /\b(localStorage|indexedDB)\b|document\.cookie/,
-      );
+      expect(code(file.text), file.path).not.toMatch(/\b(localStorage|indexedDB)\b/);
+      // The theme switch writes the theme preference cookie only (guarded by the cookie test at the top of this file).
+      if (file.path === join("components", "theme-switch.tsx")) continue;
+      expect(code(file.text), file.path).not.toMatch(/document\.cookie/);
     }
   });
 

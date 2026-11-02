@@ -221,9 +221,11 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
     page.getByText("TODO(fluxkit): replace with the shop's own legal text"),
   ).toBeVisible();
   const table = page.getByRole("table", { name: "The cookies of this shop" });
-  await expect(table.getByRole("row")).toHaveCount(3);
+  // Header row, the API's cart and session cookies, and the storefront's theme preference (design batch B, ADR 0045).
+  await expect(table.getByRole("row")).toHaveCount(4);
   await expect(table).toContainText("fluxkit_cart");
   await expect(table).toContainText("fluxkit_customer_session");
+  await expect(table).toContainText("fluxkit_theme");
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto("/en/legal/privacy");
   await expect(page.getByRole("heading", { level: 1, name: "Privacy notice" })).toBeVisible();

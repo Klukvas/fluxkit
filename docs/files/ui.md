@@ -36,6 +36,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
   - `src/price-text.tsx` - optional `discount` (`{text, label}`: the visible badge is `aria-hidden`, the label is read); only with a compare-at price. Computes nothing.
   - `src/option-picker.tsx` - `soldOut` values: struck through and muted but selectable; `soldOutLabel` is the radio's description (`aria-describedby` to a hidden element outside the label), so the value's name stays the same.
   - `src/trust-bar.tsx` - `TrustBar`: a labelled list of decorative icon + text items; renders nothing without items.
+  - `src/hero.tsx` - `Hero` (design batch B): a `section` labelled by its `h1` or `h2`, subline, an action and a picture slot (rendered by the app) on the `muted` surface, two columns from `md`, text first on a phone. The home page's `hero` sections and the category banner. Must NOT know copy, routing or image hosts.
   - `src/step-indicator.tsx` - `StepIndicator`: an `ol` in a labelled `nav`, `aria-current="step"`, completed steps linked when given an `href` and named with `completedLabel`; below `md` only the `compactText` line is shown (the list stays for assistive technology).
   - `src/disclosure.tsx` - `Disclosure`: a native `<details>` section, open by default, with a real heading in its `summary` and a labelled region; works without a script.
   - `src/design-kit.spec.tsx` - their markup, ARIA and classes; `no-hardcoded-text.spec.tsx` renders each with sentinels.

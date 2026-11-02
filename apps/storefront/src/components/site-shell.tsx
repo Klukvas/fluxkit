@@ -1,3 +1,4 @@
+import type { ThemeMode } from "@fluxkit/theme";
 import { SkipLink, type Locale, type Messages, type Translator } from "@fluxkit/ui";
 import type { ReactNode } from "react";
 import { MAIN_CONTENT_ID } from "../layout/navigation";
@@ -20,6 +21,7 @@ export function SiteShell({
   categories,
   searchEnabled,
   year,
+  themeMode,
   children,
 }: {
   locale: Locale;
@@ -29,6 +31,8 @@ export function SiteShell({
   /** `search` of the store config: false means no search box in the header. */
   searchEnabled: boolean;
   year: number;
+  /** The theme `<html data-theme>` was rendered with; the footer's switch starts from it. */
+  themeMode: ThemeMode;
   children: ReactNode;
 }) {
   return (
@@ -41,7 +45,7 @@ export function SiteShell({
           <SessionNotices />
           {children}
         </main>
-        <SiteFooter locale={locale} t={t} year={year} />
+        <SiteFooter locale={locale} t={t} year={year} themeMode={themeMode} />
       </SessionProvider>
     </I18nProvider>
   );

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { CatalogRouteView } from "../../../../../components/catalog-search-view";
 import { JsonLd } from "../../../../../components/json-ld";
+import { categoryPageConfig } from "../../../../../config/category-page";
 import {
   isFilteredCatalog,
   loadCatalogList,
@@ -65,6 +66,11 @@ export default async function CategoryPage(props: CategoryProps) {
         t={t}
         heading={category.name}
         description={category.description}
+        banner={
+          categoryPageConfig.header === "banner"
+            ? { image: categoryPageConfig.images[category.slug] ?? null }
+            : null
+        }
         breadcrumbs={[
           homeItem,
           ...ancestors.map((node) => ({

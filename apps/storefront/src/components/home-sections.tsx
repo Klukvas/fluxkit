@@ -1,182 +1,505 @@
-import { Card, EmptyState, textStyles, type Locale, type Translator } from "@fluxkit/ui";
+import type { CategoryNode, ProductSummary } from "@fluxkit/api-client";
+import {
+  Hero,
+  Skeleton,
+  textStyles,
+  VisuallyHidden,
+  type Locale,
+  type Translator,
+} from "@fluxkit/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
-import type { HomeSection, HomeSectionType } from "../layout/home";
-import type { HomeData } from "../lib/catalog-data";
+import { Suspense, type ReactNode } from "react";
+import { trustBarItems, type TrustBarItemConfig } from "../config/trust-bar";
+import {
+  isDataSection,
+  type CategoriesSection,
+  type HeroSection,
+  type HomeDataSection,
+  type HomeSection,
+  type ProductRowSection,
+  type RichTextSection,
+  type TrustSection,
+} from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
+import type { HomeSectionResult } from "../lib/home-data";
 import { localizedHref } from "../lib/locale-path";
+import { CategoryIcon } from "./icons";
+import { LocalPicture } from "./local-picture";
 import { ProductGrid } from "./product-grid";
 import { focusRing, linkButton } from "./styles";
+import { StoreTrustBar } from "./trust-bar";
 
-interface SectionContext {
+/**
+ * The home page from `config/home.ts` (review D-18, plan 2026-11-03-storefront-design-b.md). Every section is presentational:
+ * the page loads the data and passes each data section its result. `HomeSections` streams each data section into its own
+ * `Suspense` boundary (a skeleton of the same size meanwhile); `HomeSectionsView` renders already loaded results (tests).
+ */
+
+export interface HomeContext {
   locale: Locale;
   t: Translator;
-  /** What `loadHomeData` fetched for the configured sections. */
-  data: HomeData;
-  /** Hosts `next/image` may load from. */
+  /** Hosts `next/image` may load product images from. */
   imageHosts: readonly string[];
+  /** The trust bar's lines; `config/trust-bar.ts` unless a test passes others. */
+  trustItems?: readonly TrustBarItemConfig[];
 }
 
-type SectionOf<K extends HomeSectionType> = Extract<HomeSection, { type: K }>;
-type SectionRenderer<K extends HomeSectionType> = (
-  section: SectionOf<K>,
-  context: SectionContext,
-) => ReactNode;
+/** The heading level of each hero: the first section's hero is the page's `h1`; any other hero is an `h2`. */
+export function pageHeadingId(sections: readonly HomeSection[]): string | null {
+  const first = sections[0];
+  return first?.kind === "hero" ? first.id : null;
+}
 
-function Hero({
-  props,
-  context,
+function headingId(section: HomeSection): string {
+  return `${section.id}-title`;
+}
+
+function SectionShell({
+  section,
+  title,
+  action,
+  busy,
+  children,
 }: {
-  props: Extract<HomeSection, { type: "hero" }>["props"];
-  context: SectionContext;
+  section: HomeSection;
+  title: string;
+  /** A link beside the heading (for example "All products"). */
+  action?: ReactNode;
+  busy?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      aria-labelledby={headingId(section)}
+      aria-busy={busy ? "true" : undefined}
+      data-home-section={section.kind}
+      data-home-section-id={section.id}
+      className="flex flex-col gap-4"
+    >
+      {/* `min-h-11`: the same height with or without the link beside the heading, so a skeleton matches its section. */}
+      <div className="flex min-h-11 flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <h2 id={headingId(section)} className={textStyles.sectionTitle}>
+          {title}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function HeroView({
+  section,
+  context,
+  isPageHeading,
+}: {
+  section: HeroSection;
+  context: HomeContext;
+  isPageHeading: boolean;
 }) {
   const { t, locale } = context;
   return (
-    <section aria-labelledby="home-hero-title" className="py-12">
-      <h1 id="home-hero-title" className={textStyles.pageTitle}>
-        {t(props.titleKey)}
-      </h1>
-      <p className="mt-2 text-muted-foreground">{t(props.descriptionKey)}</p>
-      <Link href={localizedHref(locale, props.ctaHref)} className={`${linkButton} mt-6`}>
-        {t(props.ctaKey)}
-      </Link>
-    </section>
+    <Hero
+      headingId={headingId(section)}
+      headingLevel={isPageHeading ? "h1" : "h2"}
+      title={t(section.headlineKey)}
+      subline={section.sublineKey === undefined ? null : t(section.sublineKey)}
+      action={
+        section.cta === undefined ? undefined : (
+          <Link href={localizedHref(locale, section.cta.href)} className={`${linkButton} px-6`}>
+            {t(section.cta.labelKey)}
+          </Link>
+        )
+      }
+      media={
+        section.image === undefined ? undefined : (
+          <LocalPicture
+            image={section.image}
+            t={t}
+            // The first hero is the largest paint above the fold: load it at once.
+            eager={isPageHeading}
+            sizes="(min-width: 768px) 50vw, 100vw"
+            className="h-auto w-full rounded-md"
+          />
+        )
+      }
+    />
   );
 }
 
-function EmptySection({
-  id,
-  titleKey,
-  emptyTitleKey,
-  emptyDescriptionKey,
-  t,
-}: {
-  id: string;
-  titleKey: string;
-  emptyTitleKey: string;
-  emptyDescriptionKey: string;
-  t: Translator;
-}) {
-  return (
-    <section aria-labelledby={id} className="py-8">
-      <h2 id={id} className={textStyles.sectionTitle}>
-        {t(titleKey)}
-      </h2>
-      <EmptyState
-        headingAs="h3"
-        title={t(emptyTitleKey)}
-        description={t(emptyDescriptionKey)}
-        className="mt-4 rounded-md border border-border"
-      />
-    </section>
-  );
-}
+const tileGrid = "grid grid-cols-2 gap-4 md:grid-cols-3";
 
 function CategoryTiles({
-  props,
+  section,
+  categories,
   context,
 }: {
-  props: Extract<HomeSection, { type: "categoryTiles" }>["props"];
-  context: SectionContext;
+  section: CategoriesSection;
+  categories: readonly CategoryNode[];
+  context: HomeContext;
 }) {
-  const { t, locale, data } = context;
-  const categories = (data.categories ?? []).slice(0, props.limit);
-  if (categories.length === 0) {
-    return <EmptySection id="home-categories-title" {...props} t={t} />;
-  }
+  const { t, locale } = context;
   return (
-    <section aria-labelledby="home-categories-title" className="py-8">
-      <h2 id="home-categories-title" className={textStyles.sectionTitle}>
-        {t(props.titleKey)}
-      </h2>
-      <ul className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-        {categories.map((category) => (
-          <li key={category.id}>
-            <Card className="relative focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring">
+    <SectionShell section={section} title={t(section.titleKey)}>
+      <ul className={tileGrid}>
+        {categories.map((category) => {
+          const image = section.images?.[category.slug];
+          return (
+            <li key={category.id}>
               <Link
                 href={localizedHref(locale, `/c/${encodeURIComponent(category.slug)}`)}
-                className="text-lg font-medium text-foreground after:absolute after:inset-0 focus-visible:outline-none"
+                className={`group flex h-full flex-col overflow-hidden rounded-lg border border-border bg-background transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none ${focusRing}`}
               >
-                {category.name}
+                <span className="flex aspect-video items-center justify-center bg-muted text-muted-foreground">
+                  {image === undefined ? (
+                    <CategoryIcon width="40" height="40" />
+                  ) : (
+                    <LocalPicture
+                      image={image}
+                      t={t}
+                      eager={false}
+                      sizes="(min-width: 768px) 33vw, 50vw"
+                      className="h-full w-full object-cover"
+                    />
+                  )}
+                </span>
+                <span className="flex flex-col gap-1 p-3">
+                  <span className="font-medium text-foreground group-hover:underline group-hover:underline-offset-4">
+                    {category.name}
+                  </span>
+                  {category.children.length === 0 ? null : (
+                    <span className="text-sm text-muted-foreground">
+                      {t.plural("home.categoryTiles.subcategories", category.children.length)}
+                    </span>
+                  )}
+                </span>
               </Link>
-            </Card>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
-    </section>
+    </SectionShell>
   );
 }
 
-function NewProducts({
-  props,
+function productRowListPath(section: ProductRowSection): string {
+  const { category, brand } = section.source;
+  const base = category === undefined ? "/catalog" : `/c/${encodeURIComponent(category)}`;
+  return catalogPath(base, brand === undefined ? {} : { brand });
+}
+
+function ProductRow({
+  section,
+  products,
+  exponent,
   context,
 }: {
-  props: Extract<HomeSection, { type: "newProducts" }>["props"];
-  context: SectionContext;
+  section: ProductRowSection;
+  products: readonly ProductSummary[];
+  exponent: number;
+  context: HomeContext;
 }) {
-  const { t, locale, data, imageHosts } = context;
-  const products = data.newProducts ?? [];
-  if (products.length === 0 || data.exponent === undefined) {
-    return <EmptySection id="home-new-products-title" {...props} t={t} />;
-  }
+  const { t, locale, imageHosts } = context;
+  const title = t(section.titleKey);
   return (
-    <section aria-labelledby="home-new-products-title" className="py-8">
-      <h2 id="home-new-products-title" className={textStyles.sectionTitle}>
-        {t(props.titleKey)}
+    <SectionShell
+      section={section}
+      title={title}
+      action={
+        section.viewAll === undefined ? undefined : (
+          <Link
+            href={localizedHref(locale, productRowListPath(section))}
+            className={`inline-flex min-h-11 items-center font-medium text-foreground underline underline-offset-4 ${focusRing}`}
+          >
+            {t(section.viewAll.labelKey)}
+          </Link>
+        )
+      }
+    >
+      <ProductGrid
+        products={products}
+        locale={locale}
+        t={t}
+        exponent={exponent}
+        imageHosts={imageHosts}
+        headingLevel="h3"
+        brandPathFor={(slug) => catalogPath("/catalog", { brand: slug })}
+        label={title}
+        // Below the hero: every image waits until it nears the viewport.
+        eagerCount={0}
+      />
+    </SectionShell>
+  );
+}
+
+function TrustView({ section, context }: { section: TrustSection; context: HomeContext }) {
+  const { t, trustItems = trustBarItems } = context;
+  if (trustItems.length === 0) return null;
+  return (
+    <section
+      aria-labelledby={headingId(section)}
+      data-home-section="trust"
+      data-home-section-id={section.id}
+    >
+      <h2 id={headingId(section)} className="sr-only">
+        {t(section.titleKey)}
       </h2>
-      <div className="mt-4">
-        <ProductGrid
-          products={products}
-          locale={locale}
-          t={t}
-          exponent={data.exponent}
-          imageHosts={imageHosts}
-          headingLevel="h3"
-          brandPathFor={(slug) => catalogPath("/catalog", { brand: slug })}
-          label={t(props.titleKey)}
-        />
-      </div>
-      <Link
-        href={localizedHref(locale, "/catalog")}
-        className={`mt-4 inline-flex min-h-11 items-center underline underline-offset-4 ${focusRing}`}
-      >
-        {t(props.allKey)}
-      </Link>
+      <StoreTrustBar t={t} items={trustItems} className="md:flex-row md:justify-around md:py-4" />
     </section>
   );
 }
 
-/** The registry: one renderer per section type of `layout/home.ts`. Data arrives in the context, loaded by the page. */
-export const homeSectionRegistry: { [K in HomeSectionType]: SectionRenderer<K> } = {
-  hero: ({ props }, context) => <Hero props={props} context={context} />,
-  categoryTiles: ({ props }, context) => <CategoryTiles props={props} context={context} />,
-  newProducts: ({ props }, context) => <NewProducts props={props} context={context} />,
-};
+function RichTextView({ section, context }: { section: RichTextSection; context: HomeContext }) {
+  const { t } = context;
+  const paragraphs = t(section.bodyKey)
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.trim())
+    .filter((paragraph) => paragraph !== "");
+  if (paragraphs.length === 0) return null;
+  const body = (
+    <div className="flex max-w-prose flex-col gap-3 text-muted-foreground">
+      {paragraphs.map((paragraph, index) => (
+        <p key={index} className="whitespace-pre-line">
+          {paragraph}
+        </p>
+      ))}
+    </div>
+  );
+  if (section.titleKey === undefined) {
+    return (
+      <div data-home-section="richText" data-home-section-id={section.id}>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <SectionShell section={section} title={t(section.titleKey)}>
+      {body}
+    </SectionShell>
+  );
+}
 
+function SectionError({ section, context }: { section: HomeDataSection; context: HomeContext }) {
+  const { t } = context;
+  return (
+    <SectionShell section={section} title={t(section.titleKey)}>
+      <p
+        className="rounded-md border border-border p-4 text-muted-foreground"
+        data-home-section-error=""
+      >
+        {t("home.section.error")}
+      </p>
+    </SectionShell>
+  );
+}
+
+/** A data section with its loaded result: nothing when there is nothing to show, a short error when the read failed. */
+export function HomeDataSectionView({
+  section,
+  result,
+  context,
+}: {
+  section: HomeDataSection;
+  result: HomeSectionResult;
+  context: HomeContext;
+}) {
+  if (result.status === "error") return <SectionError section={section} context={context} />;
+  const { data } = result;
+  if (section.kind === "categories" && data.kind === "categories") {
+    if (data.categories.length === 0) return null;
+    return <CategoryTiles section={section} categories={data.categories} context={context} />;
+  }
+  if (section.kind === "productRow" && data.kind === "productRow") {
+    if (data.products.length === 0) return null;
+    return (
+      <ProductRow
+        section={section}
+        products={data.products}
+        exponent={data.exponent}
+        context={context}
+      />
+    );
+  }
+  throw new Error(
+    `Home section "${section.id}" (${section.kind}) got data of kind "${data.kind}".`,
+  );
+}
+
+/** The placeholder of a data section while it loads: the heading and boxes of the final size, so nothing moves. */
+export function HomeSectionSkeleton({
+  section,
+  context,
+}: {
+  section: HomeDataSection;
+  context: HomeContext;
+}) {
+  const { t } = context;
+  // One row of tiles (most shops show a few top-level categories), two rows of four product cards.
+  const count = Math.min(section.limit, section.kind === "categories" ? 3 : 8);
+  return (
+    <SectionShell section={section} title={t(section.titleKey)} busy>
+      <VisuallyHidden>{t("loading.page")}</VisuallyHidden>
+      {section.kind === "categories" ? (
+        <div className={tileGrid}>
+          {Array.from({ length: count }, (_, index) => (
+            <div
+              key={index}
+              className="flex flex-col overflow-hidden rounded-lg border border-border"
+            >
+              <Skeleton className="aspect-video" />
+              <div className="flex flex-col gap-1 p-3">
+                <Skeleton className="h-6 w-2/3" />
+                <Skeleton className="h-5 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: count }, (_, index) => (
+            <div key={index} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+              <Skeleton className="aspect-square w-full" />
+              <Skeleton className="h-5 w-1/3" />
+              <Skeleton className="h-6 w-3/4" />
+              <div className="pt-1">
+                <Skeleton className="h-6 w-1/2" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </SectionShell>
+  );
+}
+
+function StaticSectionView({
+  section,
+  context,
+  pageHeading,
+}: {
+  section: Exclude<HomeSection, HomeDataSection>;
+  context: HomeContext;
+  pageHeading: string | null;
+}) {
+  switch (section.kind) {
+    case "hero":
+      return (
+        <HeroView section={section} context={context} isPageHeading={pageHeading === section.id} />
+      );
+    case "trust":
+      return <TrustView section={section} context={context} />;
+    case "richText":
+      return <RichTextView section={section} context={context} />;
+    default: {
+      // A kind added to `HomeSection` without a renderer fails here at compile time.
+      const unknown: never = section;
+      throw new Error(`The home config names an unknown section kind: ${JSON.stringify(unknown)}`);
+    }
+  }
+}
+
+function HiddenPageHeading({ sections, t }: { sections: readonly HomeSection[]; t: Translator }) {
+  // Without a hero first the page still needs its one `h1` before the sections' `h2`s.
+  return pageHeadingId(sections) === null ? <h1 className="sr-only">{t("site.name")}</h1> : null;
+}
+
+const sectionStack = "flex flex-col gap-12 py-8";
+
+async function AwaitedSection({
+  section,
+  result,
+  context,
+}: {
+  section: HomeDataSection;
+  result: Promise<HomeSectionResult>;
+  context: HomeContext;
+}) {
+  return <HomeDataSectionView section={section} result={await result} context={context} />;
+}
+
+/**
+ * The page's version: data sections stream in. `load` is called for every data section before anything renders, so the
+ * reads run in parallel.
+ */
 export function HomeSections({
   sections,
-  locale,
-  t,
-  data,
-  imageHosts,
+  context,
+  load,
 }: {
   sections: readonly HomeSection[];
-  locale: Locale;
-  t: Translator;
-  data: HomeData;
-  imageHosts: readonly string[];
+  context: HomeContext;
+  load: (section: HomeDataSection) => Promise<HomeSectionResult>;
 }) {
+  const pageHeading = pageHeadingId(sections);
+  const pending = new Map(
+    sections.filter(isDataSection).map((section) => [section.id, load(section)] as const),
+  );
   return (
-    <>
+    <div className={sectionStack}>
+      <HiddenPageHeading sections={sections} t={context.t} />
       {sections.map((section) => {
-        // TypeScript cannot correlate the section's type with its renderer inside a loop; the registry type guarantees it.
-        const render = homeSectionRegistry[section.type] as
-          ((section: HomeSection, context: SectionContext) => ReactNode) | undefined;
-        if (render === undefined) {
-          throw new Error(`The home layout names the unknown section type "${section.type}".`);
+        if (!isDataSection(section)) {
+          return (
+            <StaticSectionView
+              key={section.id}
+              section={section}
+              context={context}
+              pageHeading={pageHeading}
+            />
+          );
         }
-        return <div key={section.type}>{render(section, { locale, t, data, imageHosts })}</div>;
+        const result = pending.get(section.id) as Promise<HomeSectionResult>;
+        return (
+          <Suspense
+            key={section.id}
+            fallback={<HomeSectionSkeleton section={section} context={context} />}
+          >
+            <AwaitedSection section={section} result={result} context={context} />
+          </Suspense>
+        );
       })}
-    </>
+    </div>
+  );
+}
+
+/** The same page with every data section already loaded (unit tests; no streaming). */
+export function HomeSectionsView({
+  sections,
+  context,
+  results,
+}: {
+  sections: readonly HomeSection[];
+  context: HomeContext;
+  /** By section id; a data section without a result renders its skeleton. */
+  results: Readonly<Record<string, HomeSectionResult>>;
+}) {
+  const pageHeading = pageHeadingId(sections);
+  return (
+    <div className={sectionStack}>
+      <HiddenPageHeading sections={sections} t={context.t} />
+      {sections.map((section) => {
+        if (!isDataSection(section)) {
+          return (
+            <StaticSectionView
+              key={section.id}
+              section={section}
+              context={context}
+              pageHeading={pageHeading}
+            />
+          );
+        }
+        const result = results[section.id];
+        return result === undefined ? (
+          <HomeSectionSkeleton key={section.id} section={section} context={context} />
+        ) : (
+          <HomeDataSectionView
+            key={section.id}
+            section={section}
+            result={result}
+            context={context}
+          />
+        );
+      })}
+    </div>
   );
 }

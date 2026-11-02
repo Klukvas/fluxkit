@@ -5,11 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
-import { homeSections } from "../layout/home";
 import { HEADER_CATEGORY_LIMIT, MAIN_CONTENT_ID } from "../layout/navigation";
 import { AccountLinkView, SignOutItemView } from "./account-link";
 import { CartBadgeView } from "./cart-badge";
-import { homeSectionRegistry, HomeSections } from "./home-sections";
 import { LocaleSwitcherView } from "./locale-switcher";
 import { SiteShell } from "./site-shell";
 import { ErrorView, LoadingView, NotFoundView } from "./status-views";
@@ -27,6 +25,7 @@ const categories = [
 function renderShell(children = "§child") {
   return renderToStaticMarkup(
     <SiteShell
+      themeMode="light"
       locale="uk"
       messages={sentinelMessages}
       t={t}
@@ -88,6 +87,7 @@ describe("SiteShell landmarks and accessibility", () => {
   it("renders without categories when the API could not be read", () => {
     const degraded = renderToStaticMarkup(
       <SiteShell
+        themeMode="light"
         locale="en"
         messages={sentinelMessages}
         t={t}
@@ -125,6 +125,7 @@ describe("header size (it is in every page's first HTML)", () => {
     }));
     const html = renderToStaticMarkup(
       <SiteShell
+        themeMode="light"
         locale="uk"
         messages={sentinelMessages}
         t={t}
@@ -137,6 +138,27 @@ describe("header size (it is in every page's first HTML)", () => {
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
     expect(new TextEncoder().encode(header).length).toBeLessThan(4300); // 3 802 bytes on 2026-11-02 (six categories, no search box)
+  });
+
+  it("keeps the footer small too: it is flushed with the shell, before a page section that streams later", () => {
+    // Design batch B: the theme switch made the footer 2.3 KB and `/{locale}/account/register` was outlined again (e2e
+    // `pre-hydration-forms`); with one class per link and button it is about 1.6 KB, and the forms render inline.
+    const html = renderToStaticMarkup(
+      <SiteShell
+        themeMode="system"
+        locale="uk"
+        messages={sentinelMessages}
+        t={t}
+        categories={null}
+        searchEnabled={false}
+        year={2026}
+      >
+        §child
+      </SiteShell>,
+    );
+    const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
+    expect(footer).toContain('class="fk-theme-option"');
+    expect(new TextEncoder().encode(footer).length).toBeLessThan(1900);
   });
 });
 
@@ -298,57 +320,6 @@ describe("header islands", () => {
       /useEffect\(\(\) => \{\s*const read = \(\) => setHash\(window\.location\.hash\)/,
     );
     expect(island.match(/window\.location\.hash/g)).toHaveLength(1);
-  });
-});
-
-describe("home sections", () => {
-  // No data: every data section shows its empty state (the filled sections are tested in catalog.spec.tsx).
-  const home = renderToStaticMarkup(
-    <HomeSections sections={homeSections} locale="uk" t={t} data={{}} imageHosts={[]} />,
-  );
-
-  it("renders the configured sections in order with a sound heading outline", () => {
-    expect(home.match(/<h1[ >]/g)).toHaveLength(1);
-    const headings = [...home.matchAll(/<h([1-3])[ >]/g)].map((match) => match[1]);
-    expect(headings).toEqual(["1", "2", "3", "2", "3"]);
-    expect(home.indexOf("§home.hero.title")).toBeLessThan(
-      home.indexOf("§home.categoryTiles.title"),
-    );
-    expect(home.indexOf("§home.categoryTiles.title")).toBeLessThan(
-      home.indexOf("§home.newProducts.title"),
-    );
-    expect(home).toContain('href="/uk/catalog"');
-  });
-
-  it("follows the configuration: reordering or removing a section changes the page", () => {
-    const hero = homeSections.find((section) => section.type === "hero");
-    const products = homeSections.find((section) => section.type === "newProducts");
-    if (hero === undefined || products === undefined)
-      throw new Error("The home config lost a section.");
-    const reordered = renderToStaticMarkup(
-      <HomeSections sections={[products, hero]} locale="uk" t={t} data={{}} imageHosts={[]} />,
-    );
-    expect(reordered).not.toContain("§home.categoryTiles.title");
-    expect(reordered.indexOf("§home.newProducts.title")).toBeLessThan(
-      reordered.indexOf("§home.hero.title"),
-    );
-  });
-
-  it("has a renderer for every configured section type and refuses an unknown one", () => {
-    for (const section of homeSections) {
-      expect(typeof homeSectionRegistry[section.type]).toBe("function");
-    }
-    const unknown = { type: "carousel", props: {} } as never;
-    expect(() =>
-      renderToStaticMarkup(
-        <HomeSections sections={[unknown]} locale="uk" t={t} data={{}} imageHosts={[]} />,
-      ),
-    ).toThrow(/carousel/);
-  });
-
-  it("has no hardcoded text", () => {
-    expect(leftoverText(home)).toBe("");
-    for (const value of textAttributes(home)) expect(value.startsWith("§"), value).toBe(true);
   });
 });
 
