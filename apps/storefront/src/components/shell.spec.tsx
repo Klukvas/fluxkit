@@ -2,19 +2,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import en from "../messages/en.json";
 import uk from "../messages/uk.json";
 import { homeSections } from "../layout/home";
 import { MAIN_CONTENT_ID } from "../layout/navigation";
-import { AccountLinkView } from "./account-link";
+import { AccountLinkView, SignOutItemView } from "./account-link";
 import { CartBadgeView } from "./cart-badge";
 import { homeSectionRegistry, HomeSections } from "./home-sections";
 import { LocaleSwitcherView } from "./locale-switcher";
 import { SiteShell } from "./site-shell";
 import { ErrorView, LoadingView, NotFoundView } from "./status-views";
 import { customer } from "../lib/test-fixtures";
-import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+import { findElements, leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 
 const t = sentinelTranslator();
 /** What the client islands read through the provider: every message is its own sentinel. */
@@ -63,8 +63,15 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
-    expect(navs).toHaveLength(3); // main, locale switcher, footer
+    // main (twice: inside the menu below `xl`, inline from `xl`; one is always display:none), locale switcher, footer
+    expect(navs).toHaveLength(4);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"/);
+    const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
+    expect(mains).toHaveLength(2);
+    expect(html).toMatch(
+      /<details class="[^"]*xl:hidden[^"]*"><summary role="button" aria-expanded="false" aria-label="§nav\.menu"/,
+    );
+    expect(html).toMatch(/<nav aria-label="§nav\.main\.label" class="hidden[^"]*xl:block/);
     expect(html).toContain('aria-label="§nav.main.label"');
     expect(html).toContain('aria-label="§footer.nav.label"');
     expect(html).toContain('aria-label="§locale.switcher.label"');
@@ -108,20 +115,31 @@ describe("SiteShell landmarks and accessibility", () => {
 });
 
 describe("header islands", () => {
-  it("keeps the cart slot width in every state (no layout shift)", () => {
+  it("shows the cart as an icon with a count badge only above 0, a spoken count, and a fixed slot (no layout shift)", () => {
     const slot = (state: Parameters<typeof CartBadgeView>[0]["state"]) =>
       renderToStaticMarkup(<CartBadgeView state={state} t={t} locale="uk" />);
     const loading = slot({ status: "loading" });
     const ready = slot({ status: "ready", count: 3 });
     const zero = slot({ status: "ready", count: 0 });
+    const many = slot({ status: "ready", count: 150 });
     const failed = slot({ status: "error" });
-    for (const html of [loading, ready, zero, failed]) {
-      expect(html).toContain("min-w-8");
+    for (const html of [loading, ready, zero, failed, many]) {
+      expect(html).toContain("min-h-11 min-w-11");
       expect(html).toContain('href="/uk/cart"');
       expect(html).toContain("§nav.cart");
+      expect(html).toMatch(/<svg[^>]*aria-hidden="true"/);
+      expect(html).toContain('aria-live="polite"');
     }
+    const badge =
+      /<span aria-hidden="true" class="[^"]*bg-danger[^"]*text-danger-foreground[^"]*">([^<]*)<\/span>/;
+    expect(ready.match(badge)?.[1]).toBe("3");
+    expect(zero).not.toMatch(badge);
+    expect(zero).not.toContain("bg-danger");
+    expect(loading).not.toContain("bg-danger");
+    expect(failed).not.toContain("bg-danger");
+    expect(many.match(badge)?.[1]).toBe("§nav.cart.overflow");
+    expect(many).toContain("§nav.cart.items:150");
     expect(loading).toContain("§nav.cart.loading");
-    expect(loading).toContain('aria-hidden="true"'); // the skeleton
     expect(ready).toContain("§nav.cart.items:3");
     expect(zero).toContain("§nav.cart.items:0");
     expect(failed).not.toContain("§nav.cart.items");
@@ -129,26 +147,71 @@ describe("header islands", () => {
     for (const html of [loading, ready, zero, failed]) expect(leftoverText(html)).toBe("");
   });
 
-  it("shows sign in for a guest, my account otherwise, and a fixed-width slot while loading", () => {
-    const slot = (state: Parameters<typeof AccountLinkView>[0]["state"]) =>
-      renderToStaticMarkup(<AccountLinkView state={state} t={t} locale="en" />);
-    expect(slot({ status: "guest" })).toContain('href="/en/account/login"');
-    expect(slot({ status: "guest" })).toContain("§nav.account.signIn");
-    expect(slot({ status: "signedIn", customer: customer() })).toContain('href="/en/account"');
-    expect(slot({ status: "signedIn", customer: customer() })).toContain("§nav.account.named");
-    expect(slot({ status: "error" })).toContain("§nav.account.account");
+  it("gives the account icon a menu: sign in and register for a guest, the account pages and sign out for a customer", () => {
+    const slot = (state: Parameters<typeof AccountLinkView>[0]["state"], signOut?: string) =>
+      renderToStaticMarkup(
+        <AccountLinkView state={state} t={t} locale="en" signOut={signOut ?? null} />,
+      );
+    const guest = slot({ status: "guest" });
+    expect(guest).toMatch(
+      /<details[^>]*><summary role="button" aria-expanded="false" aria-label="§nav\.account\.menu"/,
+    );
+    expect(guest).toContain('href="/en/account/login"');
+    expect(guest).toContain("§nav.account.signIn");
+    expect(guest).toContain('href="/en/account/register"');
+    expect(guest).toContain("§nav.account.register");
+    expect(guest).not.toContain('href="/en/account/orders"');
+    const signedIn = slot({ status: "signedIn", customer: customer() }, "§sign-out-item");
+    expect(signedIn).toMatch(
+      /<summary role="button" aria-expanded="false" aria-label="§nav\.account\.named"/,
+    );
+    for (const [href, key] of [
+      ["/en/account", "§nav.account.overview"],
+      ["/en/account/orders", "§nav.account.orders"],
+      ["/en/account/profile", "§nav.account.profile"],
+      ["/en/account/data", "§nav.account.privacy"],
+    ]) {
+      expect(signedIn).toContain(`href="${href}"`);
+      expect(signedIn).toContain(key);
+    }
+    expect(signedIn).toContain("§sign-out-item");
+    expect(signedIn).not.toContain('href="/en/account/login"');
     expect(slot({ status: "error" })).toContain('href="/en/account"');
+    expect(slot({ status: "error" })).toContain('aria-label="§nav.account.account"');
     const loading = slot({ status: "loading" });
     expect(loading).toContain("§nav.account.loading");
     expect(loading).not.toContain("<a ");
-    for (const state of [
-      { status: "loading" },
-      { status: "guest" },
-      { status: "signedIn", customer: customer() },
-      { status: "error" },
-    ] as const) {
-      expect(slot(state)).toContain("min-w-28");
-    }
+    expect(loading).not.toContain("<details");
+    for (const html of [guest, signedIn, loading]) expect(html).toContain("min-h-11 min-w-11");
+  });
+
+  it("signs out from the account menu with a busy state and shows a failed sign-out as an alert", () => {
+    const onLogout = vi.fn();
+    const idle = SignOutItemView({ t, pending: false, failure: null, onLogout });
+    const [button] = findElements(idle, (candidate) => candidate.type === "button");
+    (button?.props.onClick as () => void)();
+    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(renderToStaticMarkup(idle)).toContain("§account.logout");
+    const busy = renderToStaticMarkup(
+      <SignOutItemView t={t} pending failure={null} onLogout={onLogout} />,
+    );
+    expect(busy).toMatch(/<button[^>]*disabled=""[^>]*aria-busy="true"/);
+    expect(busy).toContain("§account.logout.pending");
+    const failed = renderToStaticMarkup(
+      <SignOutItemView
+        t={t}
+        pending={false}
+        failure={{
+          messageKey: "errors.network",
+          status: null,
+          code: null,
+          retryAfterSeconds: null,
+          fieldErrors: [],
+        }}
+        onLogout={onLogout}
+      />,
+    );
+    expect(failed).toMatch(/role="alert"[^>]*>§errors\.network/);
   });
 
   it("shows the customer's first name as plain text, never as markup", () => {
@@ -170,7 +233,14 @@ describe("header islands", () => {
     const html = renderToStaticMarkup(
       <LocaleSwitcherView locale="uk" t={t} pathname="/uk/catalog" search="?page=2" />,
     );
-    expect(html).toContain('<span lang="uk" aria-current="true"');
+    // A dropdown (owner request 2026-11-02): the summary is named "Site language: <name>", flags are decoration only.
+    expect(html).toMatch(
+      /<details[^>]*><summary role="button" aria-expanded="false" aria-label="§locale\.switcher\.current"/,
+    );
+    expect(html).toContain("§locale.short.uk");
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-ua"><\/span>/);
+    expect(html).toMatch(/<span aria-hidden="true" class="fk-flag fk-flag-gb"><\/span>/);
+    expect(html).toMatch(/<span lang="uk" aria-current="true"/);
     expect(html).toContain('href="/en/catalog?page=2"');
     expect(html).toContain('hrefLang="en"');
     expect(html).not.toContain('href="/uk/catalog');

@@ -1,17 +1,16 @@
 "use client";
 
 import type { Customer } from "@fluxkit/api-client";
-import { Alert, Button, Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Button, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { failureText, type Failure } from "../lib/failure";
 import { formatDate } from "../lib/date";
 import { localizedHref } from "../lib/locale-path";
 import { AccountGate } from "./account-gate";
 import { VerifyEmailNotice } from "./account-verify-notice";
 import { useI18n } from "./i18n-provider";
-import { useAccount } from "./session-provider";
+import { useLogout } from "./use-logout";
 import { linkButton } from "./styles";
 
 /** The signed-in customer's overview: who they are, a way to edit the profile, and sign out. */
@@ -37,7 +36,7 @@ export function AccountOverviewView({
   emailNotice?: ReactNode;
 }) {
   return (
-    <Container className="flex flex-col gap-6 py-8">
+    <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-foreground">{t("account.title")}</h1>
       {emailNotice}
       <h2 className="text-xl font-semibold text-foreground">{t("account.overview.profile")}</h2>
@@ -72,47 +71,21 @@ export function AccountOverviewView({
       </dl>
       {failure === null ? null : <Alert variant="danger">{failureText(t, failure)}</Alert>}
       <div className="flex flex-wrap gap-3">
-        <Link href={localizedHref(locale, "/account/orders")} className={linkButton}>
-          {t("account.overview.orders")}
-        </Link>
+        {/* My orders and Privacy and data are in the account menu beside the page (2026-11-02). */}
         <Link href={localizedHref(locale, "/account/profile")} className={linkButton}>
           {t("account.overview.edit")}
-        </Link>
-        <Link href={localizedHref(locale, "/account/data")} className={linkButton}>
-          {t("account.overview.data")}
         </Link>
         <Button variant="secondary" onClick={onLogout} disabled={pending} aria-busy={pending}>
           {pending ? t("account.logout.pending") : t("account.logout")}
         </Button>
       </div>
-    </Container>
+    </div>
   );
 }
 
 export function AccountOverview({ emailDelivery }: { emailDelivery: boolean }) {
   const { locale, t } = useI18n();
-  const { store } = useAccount();
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  const [failure, setFailure] = useState<Failure | null>(null);
-
-  async function logout(): Promise<void> {
-    if (pending) return;
-    setPending(true);
-    setFailure(null);
-    try {
-      const outcome = await store.logout();
-      if (outcome.status === "failed") {
-        setFailure(outcome.failure);
-        setPending(false);
-        return;
-      }
-      router.replace(localizedHref(locale, "/"));
-    } catch (error) {
-      setPending(false);
-      throw error;
-    }
-  }
+  const { pending, failure, logout } = useLogout();
 
   return (
     <AccountGate titleKey="account.title">
@@ -123,7 +96,7 @@ export function AccountOverview({ emailDelivery }: { emailDelivery: boolean }) {
           locale={locale}
           pending={pending}
           failure={failure}
-          onLogout={() => void logout()}
+          onLogout={logout}
           emailDelivery={emailDelivery}
           emailNotice={<VerifyEmailNotice customer={customer} emailDelivery={emailDelivery} />}
         />

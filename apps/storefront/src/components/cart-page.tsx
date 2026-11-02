@@ -110,7 +110,11 @@ export function LineQuantityView({
         </span>
       </div>
       {autosave.failure === null ? null : (
-        <p id={`cart-line-${variantId}-quantity-error`} role="alert" className="text-sm text-danger">
+        <p
+          id={`cart-line-${variantId}-quantity-error`}
+          role="alert"
+          className="text-sm text-danger"
+        >
           {t("cart.line.saveFailed", { reason: failureText(t, autosave.failure) })}
         </p>
       )}
@@ -266,12 +270,7 @@ export function CartLineView({
 
           <div className="flex flex-wrap items-center gap-3">
             {flags.canEditQuantity ? (
-              <LineQuantity
-                line={line}
-                disabled={cartBusy}
-                t={t}
-                onSetQuantity={onSetQuantity}
-              />
+              <LineQuantity line={line} disabled={cartBusy} t={t} onSetQuantity={onSetQuantity} />
             ) : (
               <p className="text-foreground">
                 {t("cart.line.quantityFixed", { count: line.quantity })}

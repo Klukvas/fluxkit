@@ -4,6 +4,27 @@
 /* Tailwind must also scan the shared UI library for class names. */
 @source "../../../../packages/ui/src";
 
+/*
+ * Flags of the language menu (`src/config/locale-flags.ts`): decorative pictures from `public/flags`, drawn as a background
+ * so they stay out of the accessibility tree and out of the component markup. Flag colours are content, not theme tokens.
+ */
+.fk-flag {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1rem;
+  flex-shrink: 0;
+  background-position: center;
+  background-size: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+.fk-flag-ua {
+  background-image: url("/flags/ua.svg");
+}
+.fk-flag-gb {
+  background-image: url("/flags/gb.svg");
+}
+
 body {
   background-color: var(--color-background);
   color: var(--color-foreground);

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Customer } from "@fluxkit/api-client";
-import { Alert, Button, Container, type Translator } from "@fluxkit/ui";
+import { Alert, Button, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import type { FormEvent, Ref } from "react";
 import { useState } from "react";
@@ -267,7 +267,7 @@ export function ProfilePage() {
   return (
     <AccountGate titleKey="account.profile.heading">
       {(customer) => (
-        <Container className="flex flex-col gap-10 py-8">
+        <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-2">
             <h1 className="text-3xl font-bold text-foreground">{t("account.profile.heading")}</h1>
             <Link
@@ -279,7 +279,7 @@ export function ProfilePage() {
           </div>
           <ProfileForm customer={customer} />
           <PasswordForm />
-        </Container>
+        </div>
       )}
     </AccountGate>
   );
