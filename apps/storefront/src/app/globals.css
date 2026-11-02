@@ -46,12 +46,9 @@
 .fk-menu-panel {
   @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-card;
 }
+/* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
 .fk-icon {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  @apply fill-none stroke-current stroke-2;
 }
 
 body {
