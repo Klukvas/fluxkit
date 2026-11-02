@@ -1,0 +1,47 @@
+# Storefront UX review, batch A (2026-11-02)
+
+Status: in progress. Branch `fix/storefront-ux-review-a` from `origin/main` `472fb56` (PR 211 merged). No PR is opened by the implementing agent.
+Source: the independent UX review of 2026-11-02 (shopper QA `SQ-xx`, designer `D-xx`, a11y `A-xx`); items 1 to 5 of the owner-approved order.
+Goal: fix the price format and its hydration error, make the filtered product card honest, tell the shopper about quantity limits and stock with the data the store API already gives, survive bad query parameters and a language switch, and validate the registration form before it is sent. Storefront only: no API, schema, contract or dependency change.
+
+## Items, root causes and fixes
+
+### 1. Price format (SQ-06, D-01)
+- **Symptom:** `599,00 ₴` in the server HTML, `599,00 грн` after hydration: React reports "Hydration failed" on every page with a price and re-renders the tree; the catalog (server) and the cart or checkout (client) show different symbols.
+- **Root cause:** `apps/storefront/src/lib/money.ts` formats with `Intl.NumberFormat(locale, {style: "currency"})`. The currency symbol comes from the runtime's ICU/CLDR data, which differs between Node 22 (ICU 77: `₴`) and Chromium (`грн`). `packages/ui/src/price-text.tsx` only renders the string it is given; it is the place where the mismatch shows, not its cause.
+- **Fix:** `formatMoney` no longer asks Intl for anything that is displayed. A per-locale table holds the decimal and grouping separators and the currency position (`uk`: `1 234,56 ₴`, suffix; `en`: `$1,234.56`, prefix), a per-locale symbol table covers every currency the API accepts (`SUPPORTED_SHOP_CURRENCIES` of `@fluxkit/config`: UAH, USD, EUR, PLN, GBP, CZK, CHF, CAD, JPY, KWD); an unknown code is shown as the code. Digits are grouped by plain string code (groups of three). The `en` rule for UAH stays `UAH 599.00` (the e2e helpers and the shop's tests already use it; a symbol the English shopper may not know is not better). The tables are typed by `Locale`, so a new locale fails the type check until it has a row. Intl stays only in `currencyExponent` (the number of minor digits, which is ISO 4217 data, not display).
+- **Tests:** failing first: a spec that replaces `Intl.NumberFormat` with one that answers like Chromium (`грн`, other spaces) and expects the same string as Node (fails on the old code). Table spec for uk and en across UAH, EUR, USD (and every supported currency), negative, zero, exponent 0 and 3, the largest amounts. E2e: no hydration warning in the browser console on the catalog, product, cart and checkout pages.
+
+### 2. Filtered card (SQ-03)
+- **Symptom:** with variant filters (`?f=opt.color:red&f=opt.size:l`, `inStock`) the card shows the product's "from" price and "In stock" and links to the default variant, although the matching variant costs more or is out of stock.
+- **Root cause / finding:** `GET /store/search` returns list items exactly as `GET /store/products`: `{id, slug, title, brand, image, publishedAt, price: {from, to, currency}, availability}` (`docs/api/search.md`, "response"), product-level only. The API does NOT say which variants matched, their prices, availability or ids. Using them needs a new field (for example `matchedVariants: [{id, price, availability}]` or a `match: {priceFrom, priceTo, availability, variantId}` per item): a public contract change (red zone, AGENTS.md 14), so it is NOT done here.
+- **Fix with what exists:** (a) with a variant-level filter active (`inStock`, an `opt.*` facet, a variant-level attribute facet, or a price range), the card's price reads "from" and its availability badge is replaced by a neutral note "Price and availability are for all options" (the existing "some options are out of stock" note stays for `inStock:false`); (b) the card links to the product page with the filtered option values preselected when each option filter has exactly one value (`?opt.<code>=<value>`); (c) the product page reads `opt.<code>=<value>` and starts from the first sellable variant (in stock first) that has those values; it keeps the shopper's choice in the address (`history.replaceState`), which also keeps it across a language switch (item 4).
+
+### 3. Quantity vs stock and messages (SQ-02)
+- **Finding:** the store API never returns a stock quantity (`docs/api/cart.md`: "Stock quantities ... never appear in a cart response"; `docs/api/orders.md`: the checkout refusal "never carries a stock quantity"; a deliberate rule against stock probing). Cart lines carry `availability` (`in_stock`, `low_stock`, `out_of_stock`) and an `out_of_stock` notice. A warning "only 22 available" before checkout needs an API field (red zone, not done): for example a per-line `insufficientStock` flag (no number) computed on each cart read.
+- **Fix with what exists:** (a) the product page knows the cart's quantity of the chosen variant (shared cart store): it says "You already have N in the cart", limits the stepper to `999 - N`, and refuses an add above 999 before sending with "You already have N in the cart; at most 999 of one item" (the same text for the API's `quantity_limit` answer); (b) a `low_stock` variant or line says "Only a few left: the shop confirms the quantity when you place the order"; (c) on load the checkout lists the lines that are `out_of_stock` (the API will refuse them) above the form, so the shopper learns it before filling the form; (d) the `insufficient_stock` message says to lower the quantity or remove the line and that the shop does not show how many are left. The server stays the judge of every quantity.
+
+### 4. Bad query parameters, language switch (SQ-04, SQ-05)
+- **SQ-04 root cause:** `lib/catalog-query.ts` and `lib/search-query.ts` refuse a malformed parameter by design ("never silently dropped", README "Not found, decided"), so `?sort=zzz`, `?page=-1`, `?page=abc`, `?page=999`, `?f=garbage`, `?q=%00x` and a 600-character `q` answer 404. **Change (owner-approved review item, supersedes that rule):** the page redirects (307) to the cleaned address: unknown `sort` dropped, a malformed `page` dropped (page 1), a page beyond the last one redirected to the last page once the answer is known, malformed `f` entries dropped, control characters removed and `q` cut to 200 code points. A redirect, not a silent render, so the address always shows what the page shows. Unknown category or product slugs stay a real 404.
+- **SQ-05 checkout draft:** the locale switch is a full page load (on purpose), so the checkout's component state is lost. The checkout keeps a draft of its form in `sessionStorage` (`fluxkit.checkoutDraft`, this tab only) and restores it on load; the key is removed when the order is placed, on sign-out and after one hour. What is stored: exactly the fields of the form (email, names, phone, address lines, city, postcode, country, comment, the chosen delivery method); no token, password, card data or order data. Documented in `docs/privacy/README.md` section 5 (browser storage) and the storefront README.
+- **SQ-05 product page:** the selection is in the address (item 2c), so the switch keeps it.
+- **SQ-05 search:** the switch already keeps `?q=`; an empty result for words of the other language shows the normal "no results for <words>" state. Checked in the e2e suite and fixed only if it is blank.
+
+### 5. Registration (D-06)
+- **Root cause:** `register-form.tsx` checks only that required fields are filled; the email shape and the password length (API rule: 12 to 128 characters, `docs/api/customers.md`) are judged only by the API, after the names are fixed.
+- **Fix:** a `check` in the form (the hook already supports it) reports an email without the `local@domain.tld` shape and a password shorter than 12 or longer than 128 characters together with the blank fields, with the existing per-field messages. The API stays the judge.
+
+## Files
+- `apps/storefront/src/lib/money.ts` (+ spec), `components/product-card.tsx`, `product-grid.tsx`, `search-results.tsx`, `catalog-search-view.tsx` or `catalog-view.tsx`, `product-purchase.tsx`, `app/[locale]/(catalog)/p/[slug]/page.tsx`, `lib/variant-matcher.ts`, `cart-page.tsx`, `checkout-page.tsx`, new `lib/checkout-draft.ts`, `lib/catalog-query.ts`, `lib/search-query.ts`, `lib/catalog-search.ts`, the catalog, category and search routes, `register-form.tsx`, messages `uk.json`/`en.json`, specs next to each, e2e specs in `apps/storefront/e2e/tests`.
+- Docs: `docs/files/storefront.md`, `apps/storefront/README.md`, `docs/privacy/README.md`, `CHANGELOG.md`, `docs/HANDOFF.md` (one line), this plan (results).
+
+## Risks
+- Money display is user-visible; amounts are untouched (no arithmetic), only the text. Every amount test is re-run.
+- Redirects instead of 404 on bad parameters change SEO-visible behaviour: a redirect keeps one canonical address; real 404s for unknown slugs stay.
+- The checkout draft holds personal data in the shopper's own tab: kept minimal, short-lived and cleared on placement and sign-out.
+
+## Verification
+Each separately with its exit code: `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries`, `pnpm check:docs`, `pnpm check:env`, `pnpm check:licenses`, the unit tests of `@fluxkit/ui`, `@fluxkit/theme` and `@fluxkit/storefront`, and the storefront e2e suite against this agent's own throwaway Postgres, Redis and Meilisearch (not the shared stack).
+
+## Results
+(filled in when done)
