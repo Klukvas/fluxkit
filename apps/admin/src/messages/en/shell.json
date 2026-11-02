@@ -7,5 +7,6 @@
   "shell.signOut": "Sign out",
   "shell.signingOut": "Signing out…",
   "shell.navigating": "Loading the page…",
-  "shell.sessionFailed": "Could not check your sign-in"
+  "shell.sessionFailed": "Could not check your sign-in",
+  "shell.contextHelp": "Help for this page"
 }

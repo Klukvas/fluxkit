@@ -26,6 +26,8 @@ export const NAVIGATION: readonly NavigationGroupConfig[] = [
     headingKey: "nav.group.settings",
     items: ["shipping", "email", "privacy", "auditLog", "users"],
   },
+  // Every signed-in role (the route's permission is the session's), so this group is never empty.
+  { id: "help", headingKey: "nav.group.help", items: ["help"] },
 ];
 
 export interface NavigationItem {

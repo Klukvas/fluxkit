@@ -51,6 +51,8 @@ export const PATHS = {
   users: "/users",
   userNew: "/users/new",
   userDetail: "/users/:id",
+  help: "/help",
+  helpArticle: "/help/:articleId",
 } as const;
 
 export type RouteId = keyof typeof PATHS;

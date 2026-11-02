@@ -47,5 +47,8 @@
   "page.privacy.title": "Personal data",
   "page.privacyLookup.title": "Look up by email",
   "page.privacyRequestDetail.title": "Privacy request",
-  "page.auditLog.title": "Audit log"
+  "page.auditLog.title": "Audit log",
+  "nav.group.help": "Help",
+  "page.help.title": "Help",
+  "page.helpArticle.title": "Help article"
 }

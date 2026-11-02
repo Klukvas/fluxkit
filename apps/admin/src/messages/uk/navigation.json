@@ -47,5 +47,8 @@
   "page.privacy.title": "Персональні дані",
   "page.privacyLookup.title": "Пошук за email",
   "page.privacyRequestDetail.title": "Запит щодо даних",
-  "page.auditLog.title": "Журнал дій"
+  "page.auditLog.title": "Журнал дій",
+  "nav.group.help": "Довідка",
+  "page.help.title": "Довідка",
+  "page.helpArticle.title": "Стаття довідки"
 }

@@ -106,6 +106,8 @@ describe("route table", () => {
       users: "users.manage",
       userNew: "users.manage",
       userDetail: "users.manage",
+      help: "authenticated",
+      helpArticle: "authenticated",
     };
     expect(Object.fromEntries(ROUTES.map((route) => [route.id, route.permission]))).toEqual(
       expected,
