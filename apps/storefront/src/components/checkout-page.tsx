@@ -12,6 +12,7 @@ import {
   Select,
   Skeleton,
   Spinner,
+  textStyles,
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
@@ -28,6 +29,8 @@ import {
   type Ref,
 } from "react";
 import { checkoutConfig, type AddressFieldName, type CheckoutConfig } from "../config/checkout";
+import { CheckoutSteps } from "./checkout-steps";
+import { StoreTrustBar } from "./trust-bar";
 import {
   cartLineAnchor,
   hasPriceChange,
@@ -323,7 +326,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
   if (cart === null && cartState.status === "error") {
     return (
       <Container className="flex flex-col items-start gap-4 py-8">
-        <h1 className="text-3xl font-bold text-foreground">{t("checkout.title")}</h1>
+        <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
         <Alert variant="danger" title={t("checkout.loadError")}>
           {cartState.failure === null ? null : <p>{failureText(t, cartState.failure)}</p>}
         </Alert>
@@ -334,7 +337,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
   if (cart === null) {
     return (
       <Container className="flex flex-col gap-4 py-8" aria-busy="true">
-        <h1 className="text-3xl font-bold text-foreground">{t("checkout.title")}</h1>
+        <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
         <Spinner label={t("checkout.loading")} />
         <Skeleton className="h-48 w-full" />
       </Container>
@@ -343,7 +346,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
   if (cart.lines.length === 0) {
     return (
       <Container className="flex flex-col gap-6 py-8">
-        <h1 className="text-3xl font-bold text-foreground">{t("checkout.title")}</h1>
+        <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
         <EmptyState
           title={t("checkout.empty.title")}
           description={t("checkout.empty.description")}
@@ -400,7 +403,8 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
 
   return (
     <Container className="flex flex-col gap-6 py-8">
-      <h1 className="text-3xl font-bold text-foreground">{t("checkout.title")}</h1>
+      <CheckoutSteps t={t} locale={locale} current="checkout" />
+      <h1 className={textStyles.pageTitle}>{t("checkout.title")}</h1>
 
       {checkout.insecure ? (
         <Alert variant="danger">{t("checkout.error.insecureContext")}</Alert>
@@ -568,6 +572,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             >
               {t("checkout.summary.editCart")}
             </Link>
+            <StoreTrustBar t={t} />
           </div>
         </section>
         <form
@@ -624,9 +629,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
 
           {deliveryUnknown ? (
             <div className="flex flex-col gap-3" aria-busy="true">
-              <h2 className="text-xl font-semibold text-foreground">
-                {t("checkout.shipping.title")}
-              </h2>
+              <h2 className={textStyles.sectionTitle}>{t("checkout.shipping.title")}</h2>
               <Spinner label={t("checkout.shipping.loading")} />
               <Skeleton className="h-24 w-full" />
             </div>
@@ -694,7 +697,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           )}
 
           <section aria-labelledby="checkout-payment-heading" className="flex flex-col gap-2">
-            <h2 id="checkout-payment-heading" className="text-xl font-semibold text-foreground">
+            <h2 id="checkout-payment-heading" className={textStyles.sectionTitle}>
               {t("checkout.payment.title")}
             </h2>
             <p className="text-foreground">

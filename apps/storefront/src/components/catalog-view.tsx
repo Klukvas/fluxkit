@@ -4,6 +4,7 @@ import {
   Container,
   EmptyState,
   Pagination,
+  textStyles,
   type BreadcrumbItem,
   type Locale,
   type Translator,
@@ -95,7 +96,7 @@ export function CatalogHeader({
 }: Pick<CatalogViewProps, "heading" | "description">) {
   return (
     <header className="flex flex-col gap-2">
-      <h1 className="text-3xl font-bold text-foreground">{heading}</h1>
+      <h1 className={textStyles.pageTitle}>{heading}</h1>
       {description === null ? null : (
         <p className="whitespace-pre-line text-muted-foreground">{description}</p>
       )}

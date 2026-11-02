@@ -735,5 +735,22 @@
   "search.facet.max": "To",
   "search.pagination.label": "Search result pages",
   "search.limit": "Only the first {limit} results can be shown. Add words or filters to narrow the search and see the rest.",
-  "search.loading": "Loading the results"
+  "search.loading": "Loading the results",
+  "product.discount.badge": "−{percent}%",
+  "product.discount.label": "Save {percent}%",
+  "product.sku.label": "SKU",
+  "product.sku.none": "—",
+  "product.soldOut": "out of stock",
+  "product.soldOut.hint": "This option is out of stock. Choose another one.",
+  "trust.label": "About your purchase",
+  "trust.delivery": "Delivery across the country",
+  "trust.payment": "Secure payment",
+  "trust.contact": "Easy to contact us",
+  "funnel.label": "Checkout progress",
+  "funnel.cart": "Cart",
+  "funnel.checkout": "Checkout",
+  "funnel.order": "Order",
+  "funnel.completed": "completed",
+  "funnel.compact": "Step {step} of {total}: {label}",
+  "search.empty.categories": "Browse categories"
 }

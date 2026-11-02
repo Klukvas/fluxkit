@@ -43,6 +43,10 @@
   .fk-nav-link {
     @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
+  /* The logo link, with the same focus ring as every other control (review A10: it showed the browser's default ring). */
+  .fk-logo {
+    @apply min-h-11 min-w-0 truncate rounded-md text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
+  }
   .fk-header-button {
     @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
@@ -50,7 +54,7 @@
     display: none;
   }
   .fk-menu-panel {
-    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-card;
+    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-overlay;
   }
   /*
    * Mobile batch (plan 2026-11-03-storefront-mobile-ux.md). Below `lg` the header is one sticky row; its search row opens behind
@@ -112,6 +116,19 @@
   /* A bar fixed or stuck to the bottom of a phone screen keeps clear of the home indicator. */
   .fk-bottom-bar {
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0));
+  }
+  /*
+   * The product page's sticky summary (`product-purchase.tsx`, from `lg`): never taller than the viewport, so its button and
+   * the trust bar cannot stay below the fold while the left column scrolls (review m4 of PR 217); a long summary scrolls on its
+   * own. The inline padding (with the same negative margin) keeps the controls' focus rings inside the scroll box.
+   */
+  @media (width >= 64rem) {
+    .fk-product-summary {
+      max-height: calc(100vh - 3rem);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      @apply -mx-2 px-2 py-1;
+    }
   }
   /* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
   .fk-icon {

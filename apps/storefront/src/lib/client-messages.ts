@@ -25,6 +25,11 @@ export const CLIENT_MESSAGE_PREFIXES = [
   // The header search box and the filter form of the results page (the page's own words stay server-side under "search.").
   "searchBox.",
   "searchForm.",
+  // Design batch A (plan 2026-11-03-storefront-design-a.md): the account pages' breadcrumbs, the trust bar and the funnel steps
+  // are rendered by client islands (account layout, product page, cart, checkout, order pages).
+  "breadcrumbs.",
+  "trust.",
+  "funnel.",
 ] as const;
 
 export function pickClientMessages(messages: Messages): Messages {

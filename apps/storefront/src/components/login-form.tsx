@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Button, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Button, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, Ref } from "react";
@@ -55,7 +55,7 @@ export function LoginFormView({
       aria-busy={pending}
       className="flex flex-col gap-4"
     >
-      <h1 className="text-3xl font-bold text-foreground">{t("account.login.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.login.title")}</h1>
       <FormErrorSummary
         failure={failure}
         t={t}
@@ -116,7 +116,7 @@ export function AlreadySignedInView({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <h1 className="text-3xl font-bold text-foreground">{t("account.signedIn.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.signedIn.title")}</h1>
       <Alert variant="success">
         {t("account.signedIn.description", { name: session.customer.firstName })}
       </Alert>

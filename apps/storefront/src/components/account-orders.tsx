@@ -10,6 +10,7 @@ import {
   Pagination,
   Skeleton,
   Spinner,
+  textStyles,
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
@@ -102,7 +103,7 @@ export function AccountOrdersView({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold text-foreground">{t("account.orders.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.orders.title")}</h1>
       {state.status === "loading" || state.status === "signedOut" ? (
         <div className="flex flex-col gap-4" aria-busy="true">
           <Spinner label={t("account.orders.loading")} />

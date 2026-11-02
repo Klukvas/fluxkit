@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Card,
+  textStyles,
   type BadgeVariant,
   type Locale,
   type Translator,
@@ -15,6 +16,7 @@ import { failureText } from "../lib/failure";
 import { canCancel, orderMoney, orderStatusKey, type ShopMoney } from "../lib/order-model";
 import type { CancelState } from "../lib/order-store";
 import { orderShippingPriceText, pickupKindKey, shipmentStatusKey } from "../lib/shipping-text";
+import { CheckoutSteps } from "./checkout-steps";
 
 /**
  * One order as the guest order page and the customer's order page show it: status (text and badge, never colour alone),
@@ -141,6 +143,10 @@ export function OrderDetailsView({
   const contactErased = order.contact.email === null;
   return (
     <div className="flex flex-col gap-6">
+      {/* The last funnel step while the order still waits for its payment; a paid or closed order is history, not a step. */}
+      {order.status === "awaiting_payment" ? (
+        <CheckoutSteps t={t} locale={locale} current="order" />
+      ) : null}
       <OrderHeading text={t("order.heading", { number: order.number })} number={order.number} />
       {/* Always mounted (a live region); while empty it takes no room, not even the gap above it (review D-10). */}
       <div
@@ -220,7 +226,7 @@ export function OrderDetailsView({
       )}
 
       <section aria-labelledby="order-items-heading" className="flex flex-col gap-3">
-        <h2 id="order-items-heading" className="text-xl font-semibold text-foreground">
+        <h2 id="order-items-heading" className={textStyles.sectionTitle}>
           {t("order.items.title")}
         </h2>
         <ul aria-label={t("order.items.label")} className="flex flex-col gap-3">
@@ -265,7 +271,7 @@ export function OrderDetailsView({
       </section>
 
       <section aria-labelledby="order-totals-heading" className="flex flex-col gap-3">
-        <h2 id="order-totals-heading" className="text-xl font-semibold text-foreground">
+        <h2 id="order-totals-heading" className={textStyles.sectionTitle}>
           {t("order.totals.title")}
         </h2>
         <dl className="flex max-w-sm flex-col gap-1 text-foreground">
@@ -284,7 +290,7 @@ export function OrderDetailsView({
 
       {order.shipping === null ? null : (
         <section aria-labelledby="order-shipping-heading" className="flex flex-col gap-3">
-          <h2 id="order-shipping-heading" className="text-xl font-semibold text-foreground">
+          <h2 id="order-shipping-heading" className={textStyles.sectionTitle}>
             {t("order.shipping.title")}
           </h2>
           <dl className="flex max-w-xl flex-col gap-2 text-foreground">
@@ -348,7 +354,7 @@ export function OrderDetailsView({
       )}
 
       <section aria-labelledby="order-contact-heading" className="flex flex-col gap-2">
-        <h2 id="order-contact-heading" className="text-xl font-semibold text-foreground">
+        <h2 id="order-contact-heading" className={textStyles.sectionTitle}>
           {t("order.contact.title")}
         </h2>
         {contactErased ? (
@@ -366,7 +372,7 @@ export function OrderDetailsView({
 
       {order.shippingAddress === null || point !== null || contactErased ? null : (
         <section aria-labelledby="order-address-heading" className="flex flex-col gap-2">
-          <h2 id="order-address-heading" className="text-xl font-semibold text-foreground">
+          <h2 id="order-address-heading" className={textStyles.sectionTitle}>
             {t("order.address.title")}
           </h2>
           <address className="flex flex-col not-italic text-foreground">
@@ -379,7 +385,7 @@ export function OrderDetailsView({
 
       {order.history.length === 0 ? null : (
         <section aria-labelledby="order-history-heading" className="flex flex-col gap-2">
-          <h2 id="order-history-heading" className="text-xl font-semibold text-foreground">
+          <h2 id="order-history-heading" className={textStyles.sectionTitle}>
             {t("order.history.title")}
           </h2>
           <ol className="flex flex-col gap-1 text-foreground">

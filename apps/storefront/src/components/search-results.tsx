@@ -6,9 +6,11 @@ import {
   EmptyState,
   LiveRegion,
   Pagination,
+  textStyles,
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
+import type { NavigationCategory } from "./site-header";
 import type { ReactNode } from "react";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
@@ -65,6 +67,8 @@ export interface SearchResultsViewProps {
   currency: string;
   exponent: number;
   imageHosts: readonly string[];
+  /** Top-level categories offered when nothing is found (`NoResults`); `null` or absent: none are shown. */
+  categories?: readonly NavigationCategory[] | null;
 }
 
 const chipLink = `inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-foreground ${focusRing}`;
@@ -340,6 +344,62 @@ export function FacetedResults({
   );
 }
 
+/** Nothing found and nothing to unselect: whether the page shows `NoResults` instead of the empty faceted layout. */
+export function isBareNoResults(query: SearchQuery, outcome: SearchPageOutcome): boolean {
+  return (
+    outcome.kind === "results" &&
+    outcome.result.total === 0 &&
+    query.facets.length === 0 &&
+    query.price === null
+  );
+}
+
+/**
+ * Nothing found for the words alone (review D-14): no filter panel and no sort (nothing to filter or sort), the empty state
+ * with its hints, and the shop's top-level categories as a way on (the header's categories; there is no popularity data, so
+ * they are not called popular). With selected filters the faceted layout stays: the shopper needs the panel to widen them.
+ */
+function NoResults({
+  locale,
+  t,
+  query,
+  categories,
+}: Pick<SearchResultsViewProps, "locale" | "t" | "query" | "categories">) {
+  return (
+    <section aria-label={t("search.list.label")} className="flex flex-col gap-6">
+      <LiveRegion>
+        <h2
+          id={SEARCH_RESULTS_HEADING_ID}
+          tabIndex={-1}
+          className="text-lg font-semibold text-foreground focus:outline-none"
+        >
+          {t.plural("search.count", 0)}
+        </h2>
+      </LiveRegion>
+      <EmptyResults locale={locale} t={t} query={query} />
+      {categories === null || categories === undefined || categories.length === 0 ? null : (
+        <nav aria-labelledby="search-categories-heading" className="flex flex-col gap-3">
+          <h3 id="search-categories-heading" className={textStyles.subsectionTitle}>
+            {t("search.empty.categories")}
+          </h3>
+          <ul className="flex flex-wrap gap-2">
+            {categories.map((category) => (
+              <li key={category.slug}>
+                <a
+                  href={localizedHref(locale, `/c/${encodeURIComponent(category.slug)}`)}
+                  className={`${chipLink} hover:bg-muted`}
+                >
+                  {category.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+    </section>
+  );
+}
+
 export function SearchResultsView(props: SearchResultsViewProps) {
   const { locale, t, query, outcome } = props;
   return (
@@ -351,12 +411,14 @@ export function SearchResultsView(props: SearchResultsViewProps) {
           { label: t("search.title") },
         ]}
       />
-      <h1 className="text-3xl font-bold text-foreground">
+      <h1 className={textStyles.pageTitle}>
         {query.q === ""
           ? t("search.heading.browse")
           : t("search.heading.query", { query: query.q })}
       </h1>
-      {outcome.kind === "results" ? (
+      {isBareNoResults(query, outcome) ? (
+        <NoResults locale={locale} t={t} query={query} categories={props.categories} />
+      ) : outcome.kind === "results" ? (
         <FacetedResults
           {...props}
           result={outcome.result}

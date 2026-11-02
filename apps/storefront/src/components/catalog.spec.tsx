@@ -562,11 +562,83 @@ describe("ProductPurchaseView", () => {
     expect(view()).toContain('<div role="status"');
   });
 
-  it("has an h1 with the title, a brand link to the filtered catalog and the SKU", () => {
+  it("has an h1 with the title and a brand link to the filtered catalog; the SKU is in the specifications (review D-08)", () => {
     const html = view();
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
     expect(html).toContain('href="/uk/catalog?brand=demo-brand"');
-    expect(html).toContain("§product.sku");
+    expect(html).not.toContain("SKU-1");
+    expect(html).not.toContain("§product.sku");
+    const withDetails = view({
+      children: <ProductDetails t={t} description={null} attributes={[]} />,
+    });
+    expect(withDetails).toMatch(/<dt[^>]*>§product\.sku\.label<\/dt><dd[^>]*>SKU-1<\/dd>/);
+    // A combination without a variant: the "none" mark, never a stale SKU.
+    const none = view({
+      children: <ProductDetails t={t} description={null} attributes={[]} />,
+      preferredSelection: { flavor: "lemon", pack: "six" },
+    });
+    expect(none).toMatch(/<dd[^>]*>(SKU-[^<]*|§product\.sku\.none)<\/dd>/);
+  });
+
+  it("lays the page out in two columns from lg with a sticky summary on the right (review D-08)", () => {
+    const html = view({ children: <ProductDetails t={t} description="§d" attributes={[]} /> });
+    const summary = /<div data-product-summary="" class="([^"]*)"/.exec(html)?.[1] ?? "";
+    for (const name of ["lg:sticky", "lg:col-span-5", "lg:row-span-2", "lg:self-start"]) {
+      expect(summary.split(" ")).toContain(name);
+    }
+    // In the page order the summary comes right after the gallery and before the details (phones keep that order).
+    expect(html.indexOf("data-product-summary")).toBeLessThan(
+      html.indexOf("product-description-title"),
+    );
+    expect(html.indexOf('aria-label="§product.gallery.label"')).toBeLessThan(
+      html.indexOf("data-product-summary"),
+    );
+  });
+
+  it("shows the discount of a compare-at price, rounded down, with spoken text (review D-08)", () => {
+    // mint-twelve: 29.99 instead of 39.99 = 25.006 %, shown as 25.
+    const english = createTranslator(en, "en");
+    const html = view({
+      t: english,
+      locale: "en",
+      preferredSelection: { flavor: "mint", pack: "twelve" },
+    });
+    expect(html).toMatch(
+      /<span aria-hidden="true"[^>]*bg-danger[^>]*>−25%<\/span><span class="sr-only">Save 25%<\/span>/,
+    );
+    // mint-six has no compare-at price: no badge.
+    expect(view({ t: english, locale: "en" })).not.toContain("Save ");
+  });
+
+  it("strikes a sold-out value, keeps it selectable and names the CTA after the stock (review D-15)", () => {
+    const stocked = product({
+      ...multi,
+      variants: [
+        variant("mint-six", { flavor: "mint", pack: "six" }),
+        variant(
+          "mint-twelve",
+          { flavor: "mint", pack: "twelve" },
+          { availability: "out_of_stock" },
+        ),
+        variant("lemon-twelve", { flavor: "lemon", pack: "twelve" }),
+      ],
+    });
+    const fine = view({ product: stocked });
+    expect(fine).toMatch(
+      /line-through[^"]*">§twelve<\/span><\/label><span id="p1-pack-twelve-sold-out" hidden="">§product\.soldOut</,
+    );
+    expect(fine).toContain('aria-describedby="p1-pack-twelve-sold-out"');
+    expect(fine).toContain("§product.addToCart");
+    expect(fine).not.toContain("§product.soldOut.hint");
+    const out = view({ product: stocked, preferredSelection: { flavor: "mint", pack: "twelve" } });
+    expect(out).toMatch(
+      /<button[^>]*type="submit"[^>]*disabled=""[^>]*>§availability\.out_of_stock<\/button>/,
+    );
+    expect(out).toContain("§product.soldOut.hint");
+  });
+
+  it("shows the trust bar from the config under the purchase form", () => {
+    expect(view()).toContain('aria-label="§trust.label"');
   });
 
   it("renders a gallery group with one labelled button per image and the first image eager", () => {
@@ -648,13 +720,29 @@ describe("ProductDetails", () => {
     expect(html).not.toContain("§product.description.title");
   });
 
-  it("renders nothing for a product without description or attributes", () => {
-    expect(renderToStaticMarkup(<ProductDetails t={t} description={null} attributes={[]} />)).toBe(
-      "",
+  it("shows only the specifications with the SKU row for a product without description or attributes", () => {
+    for (const description of [null, "  "]) {
+      const html = renderToStaticMarkup(
+        <ProductDetails t={t} description={description} attributes={[]} />,
+      );
+      expect(html).not.toContain("§product.description.title");
+      expect(html).toContain("§product.attributes.title");
+      expect(html.match(/<dt[ >]/g)).toHaveLength(1);
+      expect(html).toContain("§product.sku.label");
+    }
+  });
+
+  it("puts each section in an open details element with its h2 in the summary (works without a script)", () => {
+    const html = renderToStaticMarkup(
+      <ProductDetails
+        t={t}
+        description="§d"
+        attributes={[{ code: "a", name: "§n", text: "§v" }]}
+      />,
     );
-    expect(renderToStaticMarkup(<ProductDetails t={t} description="  " attributes={[]} />)).toBe(
-      "",
-    );
+    expect(html.match(/<details open=""/g)).toHaveLength(2);
+    expect(html).toMatch(/<summary[^>]*><h2 id="product-description-title"/);
+    expect(html).toMatch(/<summary[^>]*><h2 id="product-attributes-title"/);
   });
 });
 

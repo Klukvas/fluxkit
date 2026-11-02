@@ -7,6 +7,7 @@ import {
   Input,
   Skeleton,
   Spinner,
+  textStyles,
   VisuallyHidden,
   type Locale,
   type Translator,
@@ -52,7 +53,7 @@ export function OrderStatusView({
   if (state.status === "notFound") {
     return (
       <div className="flex flex-col items-start gap-4">
-        <h1 className="text-3xl font-bold text-foreground">{t("order.notFound.title")}</h1>
+        <h1 className={textStyles.pageTitle}>{t("order.notFound.title")}</h1>
         <p className="text-muted-foreground">{t("order.notFound.description")}</p>
         <Link href={localizedHref(locale, "/")} className={linkButton}>
           {t("nav.home")}
@@ -63,7 +64,7 @@ export function OrderStatusView({
   if (state.status === "error") {
     return (
       <div className="flex flex-col items-start gap-4">
-        <h1 className="text-3xl font-bold text-foreground">{t("order.title")}</h1>
+        <h1 className={textStyles.pageTitle}>{t("order.title")}</h1>
         <Alert variant="danger" title={t("order.error.title")}>
           <p>{failureText(t, state.failure)}</p>
         </Alert>
@@ -73,7 +74,7 @@ export function OrderStatusView({
   }
   return (
     <div className="flex flex-col gap-4" aria-busy="true">
-      <h1 className="text-3xl font-bold text-foreground">{t("order.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("order.title")}</h1>
       <Spinner label={t("order.loading")} />
       <Skeleton className="h-32 w-full" />
     </div>

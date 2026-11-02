@@ -8,6 +8,7 @@ import {
   OptionPicker,
   PriceText,
   QuantityInput,
+  textStyles,
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
@@ -22,6 +23,7 @@ import {
 } from "../lib/add-to-cart";
 import { cartLineFacts, type CartLineFacts } from "../lib/cart-model";
 import { availabilityDisplay, canAddToCart } from "../lib/availability";
+import { discountPercent } from "../lib/discount";
 import { localizedHref } from "../lib/locale-path";
 import { formatMoney } from "../lib/money";
 import { buyBarShown, selectionSummary } from "../lib/mobile-ux";
@@ -32,6 +34,7 @@ import {
   hasOptionPicker,
   initialSelection,
   isValueAvailable,
+  isValueSoldOut,
   selectValue,
   selectedValueIds,
   selectionQuery,
@@ -41,6 +44,8 @@ import { useI18n } from "./i18n-provider";
 import { useCart } from "./session-provider";
 import { StoreImage } from "./store-image";
 import { CloseIcon } from "./icons";
+import { SelectedSkuProvider } from "./selected-sku";
+import { StoreTrustBar } from "./trust-bar";
 import { PHONE_QUERY, StickyBuyBar, useInView, useMediaQuery } from "./sticky-buy-bar";
 import { focusRing } from "./styles";
 
@@ -201,10 +206,25 @@ export function ProductPurchaseView({
     }
   }
 
+  const discount =
+    variant === null || variant.price.compareAtAmount === null
+      ? null
+      : discountPercent(variant.price.amount, variant.price.compareAtAmount);
+  const soldOut = variant !== null && variant.availability === "out_of_stock";
+  // "Choose another" only when another variant can be bought.
+  const otherOnSale =
+    soldOut && product.variants.some((other) => other.availability !== "out_of_stock");
+
   return (
     <>
-      <div className="grid gap-8 md:grid-cols-2">
-        <div role="group" aria-label={t("product.gallery.label")} className="flex flex-col gap-3">
+      {/* Phones: gallery, summary, details. `md`: two columns, details below. From `lg` (review D-08): gallery and details on
+          the left (7 of 12), the summary on the right (5 of 12), sticky while the left column scrolls. */}
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-12 lg:gap-x-10">
+        <div
+          role="group"
+          aria-label={t("product.gallery.label")}
+          className="flex flex-col gap-3 lg:col-span-7"
+        >
           <StoreImage
             key={current.src ?? "placeholder"}
             src={current.src}
@@ -236,8 +256,11 @@ export function ProductPurchaseView({
           ) : null}
         </div>
 
-        <div className="flex flex-col gap-4">
-          <h1 className="text-3xl font-bold text-foreground">{product.title}</h1>
+        <div
+          data-product-summary=""
+          className="fk-product-summary flex flex-col gap-4 lg:sticky lg:top-6 lg:col-span-5 lg:col-start-8 lg:row-span-2 lg:row-start-1 lg:self-start"
+        >
+          <h1 className={textStyles.pageTitle}>{product.title}</h1>
           {brand === null ? null : (
             <p className="text-muted-foreground">
               {t("product.brand")}{" "}
@@ -277,6 +300,14 @@ export function ProductPurchaseView({
                 locale,
               )}
               compareAtLabel={t("product.compareAt.label")}
+              discount={
+                discount === null
+                  ? null
+                  : {
+                      text: t("product.discount.badge", { percent: discount }),
+                      label: t("product.discount.label", { percent: discount }),
+                    }
+              }
             />
           )}
 
@@ -284,11 +315,6 @@ export function ProductPurchaseView({
             <Badge variant={availability.variant} id="product-availability">
               {t(availability.messageKey)}
             </Badge>
-            {variant === null ? null : (
-              <span className="text-sm text-muted-foreground">
-                {t("product.sku", { sku: variant.sku })}
-              </span>
-            )}
           </div>
 
           <form
@@ -308,7 +334,9 @@ export function ProductPurchaseView({
                       value: value.code,
                       label: value.name,
                       disabled: !isValueAvailable(product, selection, option.code, value.code),
+                      soldOut: isValueSoldOut(product, selection, option.code, value.code),
                     }))}
+                    soldOutLabel={t("product.soldOut")}
                     selected={chosenValue(selection, option.code) ?? null}
                     onChange={(valueCode) => {
                       const next = selectValue(product, selection, option.code, valueCode);
@@ -321,6 +349,9 @@ export function ProductPurchaseView({
                   />
                 ))
               : null}
+            {otherOnSale && hasOptionPicker(product) ? (
+              <p className="text-sm text-muted-foreground">{t("product.soldOut.hint")}</p>
+            ) : null}
 
             <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-3">
@@ -345,12 +376,16 @@ export function ProductPurchaseView({
                   type="submit"
                   disabled={!purchasable}
                   aria-disabled={pending}
-                  className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto"
+                  className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto lg:min-h-12 lg:flex-1"
                   aria-describedby={
                     atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
                   }
                 >
-                  {pending ? t("product.adding") : t("product.addToCart")}
+                  {pending
+                    ? t("product.adding")
+                    : soldOut
+                      ? t("availability.out_of_stock")
+                      : t("product.addToCart")}
                 </Button>
               </div>
               {atLimit && stock !== null ? (
@@ -391,7 +426,7 @@ export function ProductPurchaseView({
                   <div
                     ref={toastRef}
                     hidden={!toastOpen}
-                    className="fk-toast z-40 items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-card max-md:fixed max-md:inset-x-4 max-md:top-20"
+                    className="fk-toast z-40 items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-overlay max-md:fixed max-md:inset-x-4 max-md:top-20"
                   >
                     <span className="flex-1">{t("product.added")}</span>
                     <Link
@@ -416,9 +451,16 @@ export function ProductPurchaseView({
               ) : null}
             </div>
           </form>
+          <StoreTrustBar t={t} />
         </div>
+        {children === undefined || children === null ? null : (
+          <div className="md:col-span-2 lg:col-span-7 lg:col-start-1">
+            <SelectedSkuProvider text={variant === null ? t("product.sku.none") : variant.sku}>
+              {children}
+            </SelectedSkuProvider>
+          </div>
+        )}
       </div>
-      {children}
       {phone ? (
         <StickyBuyBar
           visible={buyBarShown({ ctaInView, footerInView })}
@@ -428,7 +470,13 @@ export function ProductPurchaseView({
           min={MIN_LINE_QUANTITY}
           max={Math.max(MIN_LINE_QUANTITY, room)}
           canAdd={purchasable && !pending}
-          addLabel={pending ? t("product.adding") : t("product.addToCart")}
+          addLabel={
+            pending
+              ? t("product.adding")
+              : soldOut
+                ? t("availability.out_of_stock")
+                : t("product.addToCart")
+          }
           decreaseLabel={t("product.quantity.decrease")}
           increaseLabel={t("product.quantity.increase")}
           onQuantity={(next) => {

@@ -23,7 +23,29 @@
   --fk-radius-lg: 1rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
+  /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
+  --fk-font-size-xs: 0.75rem;
+  --fk-line-height-xs: 1rem;
+  --fk-font-size-sm: 0.875rem;
+  --fk-line-height-sm: 1.25rem;
+  --fk-font-size-base: 1rem;
+  --fk-line-height-base: 1.5rem;
+  --fk-font-size-lg: 1.125rem;
+  --fk-line-height-lg: 1.75rem;
+  --fk-font-size-xl: 1.25rem;
+  --fk-line-height-xl: 1.75rem;
+  --fk-font-size-2xl: 1.5rem;
+  --fk-line-height-2xl: 2rem;
+  --fk-font-size-3xl: 1.875rem;
+  --fk-line-height-3xl: 2.25rem;
+  --fk-font-size-4xl: 2.25rem;
+  --fk-line-height-4xl: 2.5rem;
+  /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
+  --fk-space-unit: 0.25rem;
+  /* Elevation: resting card, raised (a hovered card), overlay (menus, toasts, bars over the page). */
   --fk-shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.1);
+  --fk-shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.12), 0 2px 4px -2px rgb(15 23 42 / 0.08);
+  --fk-shadow-overlay: 0 12px 32px -8px rgb(15 23 42 / 0.2), 0 4px 8px -4px rgb(15 23 42 / 0.1);
 }
 
 [data-theme="dark"] {
@@ -45,5 +67,26 @@
   --fk-radius-lg: 1rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
+  /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
+  --fk-font-size-xs: 0.75rem;
+  --fk-line-height-xs: 1rem;
+  --fk-font-size-sm: 0.875rem;
+  --fk-line-height-sm: 1.25rem;
+  --fk-font-size-base: 1rem;
+  --fk-line-height-base: 1.5rem;
+  --fk-font-size-lg: 1.125rem;
+  --fk-line-height-lg: 1.75rem;
+  --fk-font-size-xl: 1.25rem;
+  --fk-line-height-xl: 1.75rem;
+  --fk-font-size-2xl: 1.5rem;
+  --fk-line-height-2xl: 2rem;
+  --fk-font-size-3xl: 1.875rem;
+  --fk-line-height-3xl: 2.25rem;
+  --fk-font-size-4xl: 2.25rem;
+  --fk-line-height-4xl: 2.5rem;
+  /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
+  --fk-space-unit: 0.25rem;
   --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
 }

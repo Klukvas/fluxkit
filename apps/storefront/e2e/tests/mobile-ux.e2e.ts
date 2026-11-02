@@ -31,6 +31,33 @@ async function box(
   return found;
 }
 
+/**
+ * The box of an element once it has stopped changing: two equal reads 100 ms apart, within 5 s. The header's search box is
+ * replaced by its hydrated island after its `Suspense` fallback streamed (review M2 of PR 216); a single read can land on the
+ * swap and see no box (the flake of the "one row" test, 4 to 5 of 30 runs on `d37bb4d`, fixed in PR 217).
+ */
+async function stableBox(
+  locator: Locator,
+): Promise<{ x: number; y: number; width: number; height: number }> {
+  let previous: { x: number; y: number; width: number; height: number } | null = null;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const current = await locator.boundingBox();
+    if (
+      current !== null &&
+      previous !== null &&
+      current.x === previous.x &&
+      current.y === previous.y &&
+      current.width === previous.width &&
+      current.height === previous.height
+    ) {
+      return current;
+    }
+    previous = current;
+    await locator.page().waitForTimeout(100);
+  }
+  throw new Error("the element has no stable box within 5 s");
+}
+
 /** Waits until the header's cart badge read the cart (the islands are hydrated). */
 async function hydrated(page: Page): Promise<void> {
   await expect(page.getByRole("banner").getByRole("link", { name: /Cart|Кошик/ })).toContainText(
@@ -357,10 +384,10 @@ for (const width of [1024, 1280]) {
       const header = page.getByRole("banner");
       await expect(header.locator('a[href="#site-search"]')).toBeHidden();
       await expect(header.getByRole("link", { name: "Search", exact: true })).toHaveCount(0);
-      expect((await box(header)).height).toBeLessThanOrEqual(64);
-      const logo = await box(header.getByRole("link", { name: "Fluxkit", exact: true }));
-      const search = await box(header.getByRole("combobox", { name: "Search products" }));
-      const cart = await box(header.getByRole("link", { name: /Cart/ }));
+      expect((await stableBox(header)).height).toBeLessThanOrEqual(64);
+      const logo = await stableBox(header.getByRole("link", { name: "Fluxkit", exact: true }));
+      const search = await stableBox(header.getByRole("combobox", { name: "Search products" }));
+      const cart = await stableBox(header.getByRole("link", { name: /Cart/ }));
       const middle = (item: { y: number; height: number }) => item.y + item.height / 2;
       expect(Math.abs(middle(logo) - middle(search))).toBeLessThan(8);
       expect(Math.abs(middle(search) - middle(cart))).toBeLessThan(8);

@@ -763,5 +763,22 @@
   "search.facet.max": "До",
   "search.pagination.label": "Сторінки результатів пошуку",
   "search.limit": "Можна показати лише перші {limit} результатів. Додайте слова або фільтри, щоб звузити пошук і побачити решту.",
-  "search.loading": "Завантажуємо результати"
+  "search.loading": "Завантажуємо результати",
+  "product.discount.badge": "−{percent} %",
+  "product.discount.label": "Знижка {percent} %",
+  "product.sku.label": "Артикул",
+  "product.sku.none": "—",
+  "product.soldOut": "немає в наявності",
+  "product.soldOut.hint": "Цього варіанта немає в наявності. Оберіть інший.",
+  "trust.label": "Про покупку",
+  "trust.delivery": "Доставка по всій країні",
+  "trust.payment": "Безпечна оплата",
+  "trust.contact": "Легко зв’язатися з нами",
+  "funnel.label": "Етапи оформлення замовлення",
+  "funnel.cart": "Кошик",
+  "funnel.checkout": "Оформлення",
+  "funnel.order": "Замовлення",
+  "funnel.completed": "виконано",
+  "funnel.compact": "Крок {step} з {total}: {label}",
+  "search.empty.categories": "Перегляньте категорії"
 }

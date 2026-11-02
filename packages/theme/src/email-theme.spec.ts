@@ -26,6 +26,15 @@ const notInMail: Record<string, string> = {
   "--fk-color-ring": "mail has no keyboard focus to show",
   "--fk-color-danger-foreground": "mail has no count badge or other text on a danger fill",
   "--fk-shadow-card": "box-shadow is not supported by common mail clients",
+  "--fk-shadow-raised": "box-shadow is not supported by common mail clients",
+  "--fk-shadow-overlay": "box-shadow is not supported by common mail clients",
+  "--fk-space-unit": "mail has its own px spacing (`emailTheme.space`)",
+  ...Object.fromEntries(
+    ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"].flatMap((step) => [
+      [`--fk-font-size-${step}`, "mail has its own px font sizes (`emailTheme.fontSize`)"],
+      [`--fk-line-height-${step}`, "mail has its own line height (`emailTheme.lineHeight`)"],
+    ]),
+  ),
 };
 
 describe("emailTheme", () => {

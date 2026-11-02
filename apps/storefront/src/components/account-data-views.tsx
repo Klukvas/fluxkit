@@ -1,4 +1,4 @@
-import { Alert, Button, type Translator } from "@fluxkit/ui";
+import { Alert, Button, textStyles, type Translator } from "@fluxkit/ui";
 import type { FormEvent, Ref } from "react";
 import { failureText, type Failure } from "../lib/failure";
 import { blockReasonKey, type ExportFailure, type WaitParts } from "../lib/personal-data";
@@ -57,7 +57,7 @@ export function ExportSection({
   const pending = state.status === "pending";
   return (
     <section aria-labelledby="data-export-heading" className="flex max-w-xl flex-col gap-3">
-      <h2 id="data-export-heading" className="text-xl font-semibold text-foreground">
+      <h2 id="data-export-heading" className={textStyles.sectionTitle}>
         {t("account.data.export.title")}
       </h2>
       <p className="text-foreground">{t("account.data.export.intro")}</p>
@@ -180,7 +180,7 @@ export function DeleteSection({
       aria-labelledby="data-delete-heading"
       className="flex max-w-xl flex-col gap-4"
     >
-      <h2 id="data-delete-heading" className="text-xl font-semibold text-foreground">
+      <h2 id="data-delete-heading" className={textStyles.sectionTitle}>
         {t("account.data.delete.title")}
       </h2>
       <DeleteExplanation t={t} />

@@ -334,7 +334,7 @@ describe("CartPageView on a phone (mobile batch, review D-09)", () => {
   it("keeps the total and the checkout control in one bar that sticks to the bottom below md", () => {
     const html = view(ready(cartOf([cartLine("a", { title: "§a" })])));
     const bar =
-      /<div class="fk-sticky-bottom fk-bottom-bar[^"]*max-md:sticky max-md:bottom-0[^"]*">(.*?)<\/div><\/div>/.exec(
+      /<div class="fk-sticky-bottom fk-bottom-bar[^"]*max-md:sticky max-md:bottom-0[^"]*">(.*?)<\/div><ul aria-label="§trust\.label"/.exec(
         html,
       );
     expect(bar).not.toBeNull();

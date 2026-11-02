@@ -3,6 +3,7 @@ import {
   chooseOptions,
   fillCheckoutForm,
   orderNumberOnPage,
+  rowValue,
   tokenOf,
   waitForHydration,
 } from "../support/flows.ts";
@@ -23,7 +24,10 @@ test("a guest buys a T-shirt from the home page and manages the order through it
   await expect(page.getByRole("heading", { level: 1, name: "Demo T-shirt" })).toBeVisible();
 
   await chooseOptions(page, { Color: "White", Size: "M" });
-  await expect(page.getByText("SKU: DEMO-T-SHIRT-WHITE-M")).toBeVisible();
+  // The SKU of the chosen variant is the first specification (design batch A, review D-08).
+  await expect(rowValue(page.getByRole("region", { name: "Specifications" }), "SKU")).toHaveText(
+    "DEMO-T-SHIRT-WHITE-M",
+  );
   await page.getByRole("button", { name: "Add to cart" }).click();
   await expect(page.getByRole("status").getByText("Added to the cart.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Cart.*1 item in the cart/ })).toBeVisible();

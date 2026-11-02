@@ -30,5 +30,14 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
   - `src/locale-text-field.tsx` - `LocaleTextField`: one `Field` + `Input` or `Textarea` per content locale in a `fieldset`/`legend`, `lang` per control, per-locale hint and error through `aria-describedby`, `required` only where the props say (the default locale), `readOnly`.
   - `src/status-badge.tsx` - `StatusBadge` (tone + visible text, on `Badge`); `src/live-region.tsx` - `LiveRegion` (`role="status"`, `aria-live="polite"`, `aria-atomic`, optional visually hidden; render it before its content changes).
 - `src/button.tsx` also has a `danger` variant (outlined with the danger token; the theme has no on-danger text color).
+- Design kit (design batch A, 2026-11-03, plan `docs/plans/2026-11-03-storefront-design-a.md`):
+  - `src/styles.ts` `textStyles` - text roles as class strings (`pageTitle`, `sectionTitle`, `subsectionTitle`, `meta`), built from the type-scale and colour tokens.
+  - `src/button.tsx` - `size` (`md` default, unchanged; `lg` 48 px) and a hover state only while enabled (`enabled:hover:`); no colour transition (it would animate the focus ring).
+  - `src/price-text.tsx` - optional `discount` (`{text, label}`: the visible badge is `aria-hidden`, the label is read); only with a compare-at price. Computes nothing.
+  - `src/option-picker.tsx` - `soldOut` values: struck through and muted but selectable; `soldOutLabel` is the radio's description (`aria-describedby` to a hidden element outside the label), so the value's name stays the same.
+  - `src/trust-bar.tsx` - `TrustBar`: a labelled list of decorative icon + text items; renders nothing without items.
+  - `src/step-indicator.tsx` - `StepIndicator`: an `ol` in a labelled `nav`, `aria-current="step"`, completed steps linked when given an `href` and named with `completedLabel`; below `md` only the `compactText` line is shown (the list stays for assistive technology).
+  - `src/disclosure.tsx` - `Disclosure`: a native `<details>` section, open by default, with a real heading in its `summary` and a labelled region; works without a script.
+  - `src/design-kit.spec.tsx` - their markup, ARIA and classes; `no-hardcoded-text.spec.tsx` renders each with sentinels.
 - `src/*.spec.ts(x)` - Vitest with `renderToStaticMarkup` (no DOM library); `src/test-helpers.ts` (not built) parses the markup. `no-hardcoded-text.spec.tsx` renders every component (the admin ones included, with loading, empty, busy and multiline variants) with sentinel strings and fails on any other text. Admin component specs: `admin-data.spec.tsx`, `admin-nav.spec.tsx`, `dialog.spec.tsx`, `tabs.spec.tsx`, `locale-text-field.spec.tsx`, `tab-navigation.spec.ts`, `dialog-focus.spec.ts`.
 - Built with `tsc` to `dist/` (bundler resolution, consumed by Next and Vite).

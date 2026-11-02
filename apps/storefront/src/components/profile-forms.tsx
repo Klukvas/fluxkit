@@ -1,7 +1,7 @@
 "use client";
 
 import type { Customer } from "@fluxkit/api-client";
-import { Alert, Button, type Translator } from "@fluxkit/ui";
+import { Alert, Button, textStyles, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import type { FormEvent, Ref } from "react";
 import { useState } from "react";
@@ -73,7 +73,7 @@ export function ProfileFormView({
       aria-busy={pending}
       className="flex max-w-md flex-col gap-4"
     >
-      <h2 className="text-xl font-semibold text-foreground">{t("account.profile.title")}</h2>
+      <h2 className={textStyles.sectionTitle}>{t("account.profile.title")}</h2>
       <FormErrorSummary
         failure={failure}
         t={t}
@@ -125,7 +125,7 @@ export function PasswordFormView({
       aria-busy={pending}
       className="flex max-w-md flex-col gap-4"
     >
-      <h2 className="text-xl font-semibold text-foreground">{t("account.password.title")}</h2>
+      <h2 className={textStyles.sectionTitle}>{t("account.password.title")}</h2>
       <FormErrorSummary
         failure={failure}
         t={t}
@@ -269,7 +269,7 @@ export function ProfilePage() {
       {(customer) => (
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold text-foreground">{t("account.profile.heading")}</h1>
+            <h1 className={textStyles.pageTitle}>{t("account.profile.heading")}</h1>
             <Link
               href={localizedHref(locale, "/account")}
               className="self-start underline underline-offset-4"

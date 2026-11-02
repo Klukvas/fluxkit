@@ -1,5 +1,6 @@
 "use client";
 
+import { textStyles } from "@fluxkit/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -142,7 +143,7 @@ export function AccountDataPage() {
       {() => (
         <div className="flex flex-col gap-10">
           <div className="flex flex-col gap-2">
-            <h1 className="text-3xl font-bold text-foreground">{t("account.data.title")}</h1>
+            <h1 className={textStyles.pageTitle}>{t("account.data.title")}</h1>
             <Link
               href={localizedHref(locale, "/account")}
               className="self-start underline underline-offset-4"

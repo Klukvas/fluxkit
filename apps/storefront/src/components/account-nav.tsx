@@ -1,10 +1,11 @@
 "use client";
 
-import { Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Breadcrumbs, Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { accountLinks, currentAccountLink } from "../layout/navigation";
+import { accountTrail } from "../lib/account-trail";
 import { localizedHref } from "../lib/locale-path";
 import { useI18n } from "./i18n-provider";
 import { focusRing } from "./styles";
@@ -50,25 +51,69 @@ export function AccountNavView({
   );
 }
 
-/** The side menu (desktop) or tab row (phone) next to a signed-in account page. */
-export function AccountLayoutView({ nav, children }: { nav: ReactNode; children: ReactNode }) {
+/** The account pages' breadcrumbs (review recommendation 3) from `accountTrail`; nothing for a path outside the account. */
+export function AccountBreadcrumbsView({
+  t,
+  locale,
+  pathname,
+}: {
+  t: Translator;
+  locale: Locale;
+  /** Locale-less path of the page. */
+  pathname: string;
+}) {
+  const trail = accountTrail(pathname);
+  if (trail.length === 0) return null;
   return (
-    <Container className="flex flex-col gap-6 py-8 lg:flex-row lg:gap-10">
-      <div className="lg:w-56 lg:shrink-0">{nav}</div>
-      <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
+    <Breadcrumbs
+      label={t("breadcrumbs.label")}
+      items={trail.map((crumb) => ({
+        label: crumb.labelKey === undefined ? (crumb.label ?? "") : t(crumb.labelKey),
+        ...(crumb.href === undefined ? {} : { href: localizedHref(locale, crumb.href) }),
+      }))}
+    />
+  );
+}
+
+/** The breadcrumbs above, and the side menu (desktop) or tab row (phone) next to, a signed-in account page. */
+export function AccountLayoutView({
+  nav,
+  breadcrumbs = null,
+  children,
+}: {
+  nav: ReactNode;
+  breadcrumbs?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Container className="flex flex-col gap-6 py-8">
+      {breadcrumbs}
+      <div className="flex flex-col gap-6 lg:flex-row lg:gap-10">
+        <div className="lg:w-56 lg:shrink-0">{nav}</div>
+        <div className="flex min-w-0 flex-1 flex-col gap-6">{children}</div>
+      </div>
     </Container>
   );
 }
 
-export function AccountNav() {
-  const { locale, t } = useI18n();
+/** The page's path without the locale prefix. */
+function useBarePath(locale: Locale): string {
   const pathname = usePathname() ?? "";
   const prefix = `/${locale}`;
-  const bare =
-    pathname === prefix
-      ? "/"
-      : pathname.startsWith(`${prefix}/`)
-        ? pathname.slice(prefix.length)
-        : pathname;
+  return pathname === prefix
+    ? "/"
+    : pathname.startsWith(`${prefix}/`)
+      ? pathname.slice(prefix.length)
+      : pathname;
+}
+
+export function AccountNav() {
+  const { locale, t } = useI18n();
+  const bare = useBarePath(locale);
   return <AccountNavView t={t} locale={locale} current={currentAccountLink(bare)} />;
+}
+
+export function AccountBreadcrumbs() {
+  const { locale, t } = useI18n();
+  return <AccountBreadcrumbsView t={t} locale={locale} pathname={useBarePath(locale)} />;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import type { Customer } from "@fluxkit/api-client";
-import { Alert, Button, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Button, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { failureText, type Failure } from "../lib/failure";
@@ -37,9 +37,9 @@ export function AccountOverviewView({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold text-foreground">{t("account.title")}</h1>
+      <h1 className={textStyles.pageTitle}>{t("account.title")}</h1>
       {emailNotice}
-      <h2 className="text-xl font-semibold text-foreground">{t("account.overview.profile")}</h2>
+      <h2 className={textStyles.sectionTitle}>{t("account.overview.profile")}</h2>
       <dl className="flex max-w-md flex-col gap-2 text-foreground">
         <div className="flex flex-wrap gap-x-6">
           <dt className="w-40 text-muted-foreground">{t("account.field.firstName")}</dt>
