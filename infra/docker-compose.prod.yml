@@ -60,11 +60,14 @@ services:
   meilisearch:
     <<: *hardening
     image: getmeili/meilisearch:v1.55.0
+    # The master key (MEILI_MASTER_KEY, SECRET, at least 16 bytes) lives in its own file, so the api never receives it: it
+    # only creates the API's scoped key (docs/deployment.md). A missing file stops `up`.
+    env_file: ["${FLUXKIT_MEILI_ENV_FILE:-meilisearch.env}"]
     environment:
       MEILI_ENV: production
-      # SECRET, at least 16 bytes. Used to create the API's scoped key (docs/deployment.md); the API never uses it.
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:?set MEILI_MASTER_KEY}
       MEILI_NO_ANALYTICS: "true"
+      # Indexing memory stays below the container limit.
+      MEILI_MAX_INDEXING_MEMORY: 512Mb
     volumes:
       - meili-data:/meili_data
     tmpfs: ["/tmp"]
@@ -104,6 +107,7 @@ services:
     depends_on:
       postgres: { condition: service_healthy }
       migrate: { condition: service_completed_successfully }
+      # Also with search off: a broken engine stops the boot instead of failing later (docs/deployment.md).
       meilisearch: { condition: service_healthy }
 
   storefront:

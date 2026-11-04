@@ -29,5 +29,6 @@ monobank-findings*.json
 
 # Production deployment (docs/deployment.md): the real env file and certificates, and the smoke test work directory
 infra/production.env
+infra/meilisearch.env
 infra/certs/
 infra/.smoke/

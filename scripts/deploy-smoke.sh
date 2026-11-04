@@ -66,6 +66,7 @@ cat >"$WORK/production.env" <<EOF
 FLUXKIT_DOMAIN=${DOMAIN}
 FLUXKIT_CERTS_DIR=$(pwd)/${WORK}/certs
 FLUXKIT_ENV_FILE=$(pwd)/${WORK}/production.env
+FLUXKIT_MEILI_ENV_FILE=$(pwd)/${WORK}/meilisearch.env
 FLUXKIT_IMAGE_PREFIX=${PREFIX}
 FLUXKIT_IMAGE_TAG=${TAG}
 FLUXKIT_HTTP_PORT=127.0.0.1:${HTTP_PORT}
@@ -74,11 +75,12 @@ POSTGRES_USER=fluxkit
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 POSTGRES_DB=fluxkit
 ORDER_TOKEN_SECRET=$(openssl rand -hex 32)
-MEILI_MASTER_KEY=$(openssl rand -hex 24)
 TRUST_PROXY=1
 STOREFRONT_IMAGE_HOSTS=${DOMAIN}
 STOREFRONT_FORWARD_CLIENT_ADDRESS=true
 EOF
+# The engine's master key is in its own file: the api never receives it (docs/deployment.md).
+printf 'MEILI_MASTER_KEY=%s\n' "$(openssl rand -hex 24)" >"$WORK/meilisearch.env"
 trap cleanup EXIT
 
 # --- images ---
@@ -111,6 +113,20 @@ SEARCH_KEY=$(jq -er .key <<<"$SEARCH_KEY_JSON") || fail "the engine did not retu
 printf 'SEARCH_ENABLED=true\nMEILI_API_KEY=%s\n' "$SEARCH_KEY" >>"$WORK/production.env"
 compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 api >/dev/null
 pass "scoped search key created through the engine container; the API restarted with search on"
+[[ -z "$(compose exec -T api printenv MEILI_MASTER_KEY 2>/dev/null || true)" ]] || fail "the api received the engine's master key"
+pass "the api container does not hold the engine's master key"
+# An empty catalog still builds, swaps and counts an index: this uses the scoped key for every engine call the API makes
+# (exit 2 = a scheduler tick held the lock at that moment; try again).
+REINDEX_STATUS=2
+for _ in 1 2 3 4 5; do
+  REINDEX_STATUS=0
+  REINDEX_OUT=$(compose run --rm --no-deps -T api node dist/search/reindex.js 2>&1) || REINDEX_STATUS=$?
+  [[ "$REINDEX_STATUS" != "2" ]] && break
+  sleep 5
+done
+[[ "$REINDEX_STATUS" == "0" ]] || fail "search reindex exited $REINDEX_STATUS (a wrong or under-scoped key shows here as engine_unauthorized)"
+pass "the scoped key builds and swaps the search indexes (reindex exit 0)"
+
 
 BODY="$WORK/body.txt"
 # request METHOD PATH [curl args...]: status in $STATUS, headers in $HEADERS (lower-case names), body in $BODY
@@ -285,9 +301,11 @@ request GET /store/config
 expect_status 200 "GET /store/config with search on"
 [[ "$(jq -r .search "$BODY")" == "true" ]] || fail "GET /store/config does not report search: true"
 request GET "/store/search?q=x"
-[[ "$STATUS" == "200" || "$STATUS" == "503" ]] || fail "GET /store/search: status $STATUS (200 once the index is built, 503 search_unavailable before)"
-pass "search is on (config says so; /store/search answers $STATUS, never 404 or 500)"
-[[ -z "$(docker port "$(compose ps -q meilisearch)" 2>/dev/null)" ]] || fail "the search engine publishes a port"
+expect_status 200 "GET /store/search after the reindex"
+pass "search is on and answers through the edge with the scoped key (config says so, /store/search is 200)"
+ENGINE_ID=$(compose ps -q meilisearch)
+[[ -n "$ENGINE_ID" ]] || fail "no meilisearch container"
+[[ -z "$(docker port "$ENGINE_ID" 2>/dev/null)" ]] || fail "the search engine publishes a port"
 pass "the search engine publishes no port"
 
 # --- a recreated API is found again without restarting the edge (resolver + upstream resolve) ---

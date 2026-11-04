@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0045, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-04 (production Compose gets the search engine, PR open); earlier: 2026-11-03, `origin/main` at `34c98e6` (PR 217 merged); PR 218 open (desktop design batch B, plan `docs/plans/2026-11-03-storefront-design-b.md`, independently reviewed, no blockers; owner accepted the theme cookie 2026-11-02).
+Last updated: 2026-11-04, `origin/main` at `e4b1a4f` (PR 218 merged); production Compose search engine PR open; earlier note: (desktop design batch B, plan `docs/plans/2026-11-03-storefront-design-b.md`, independently reviewed, no blockers; owner accepted the theme cookie 2026-11-02).
 
 ## 1. Current state
 

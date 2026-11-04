@@ -13,14 +13,15 @@
 
 ## Changes
 - `infra/docker-compose.prod.yml`: `meilisearch` service (pinned v1.55.0, `MEILI_ENV=production`, master key from the env file, no analytics, named volume `meili-data`, no published port, healthcheck, hardening); `api` waits for it to be healthy; `MEILI_URL=http://meilisearch:7700` fixed by the topology.
-- `infra/production.env.example`: `MEILI_MASTER_KEY`, `SEARCH_ENABLED`, `MEILI_API_KEY`, optional `MEILI_INDEX_PREFIX`.
+- `infra/production.env.example`: `SEARCH_ENABLED`, `MEILI_API_KEY`, optional `MEILI_INDEX_PREFIX`.
 - `docs/deployment.md`: topology, first-start order (engine up, create scoped key, enable search), backups (the index is rebuilt from Postgres), checklist, honest "not verified" list.
 - `scripts/deploy-smoke.sh`: start the engine, create the scoped key, enable search, check `/store/config` and `/store/search`.
 - CHANGELOG, HANDOFF, `docs/files` if infra is listed.
 
 ## Risks
 - No Docker daemon in the agent sandbox: the compose file is checked with `docker compose config` only; the real start (read-only root, caps dropped for Meilisearch) is verified by the CI job `deploy-smoke`. Not yet run on a real host.
-- The API container receives the whole env file, including `MEILI_MASTER_KEY` (same as `POSTGRES_PASSWORD` today); the API never reads it.
+- (Review fix) The master key is in a separate `infra/meilisearch.env`, given only to the engine, so the API never receives it; the smoke test asserts that.
+- The engine runs as root inside its container (the image has no `USER`), mitigated by `read_only`, `cap_drop: ALL`, `no-new-privileges`.
 
 ## Verification
 `docker compose config` (syntax), `pnpm check:env`, `pnpm check:docs`, prettier, CI `deploy-smoke`.

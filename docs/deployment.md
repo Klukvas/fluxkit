@@ -8,10 +8,10 @@ Plan and decisions: `docs/plans/2026-10-29-production-deploy.md`. Architecture: 
 | Piece | File | Verified |
 |---|---|---|
 | Images `api`, `storefront`, `edge` | `Dockerfile` (one file, three targets), `.dockerignore` | Built with Docker 29.8 / BuildKit; run by `scripts/deploy-smoke.sh` |
-| Compose example | `infra/docker-compose.prod.yml`, `infra/production.env.example` | Syntax checked with `docker compose config`; started healthy by the smoke test (read-only roots, non-root users, migrate before start). The `meilisearch` service and the search steps of the smoke test were added 2026-11-04 and are verified by the CI job `deploy-smoke` only (no Docker daemon in the agent sandbox) |
+| Compose example | `infra/docker-compose.prod.yml`, `infra/production.env.example` | Started healthy by the smoke test, including the `meilisearch` service and the search steps (read-only roots, migrate before start; non-root users except the engine, which runs as root inside its container under `read_only`, `cap_drop: ALL` and `no-new-privileges`: the image has no `USER`) |
 | Edge proxy (nginx, default) | `infra/proxy/nginx/` (templates, snippet, start-up script) | `nginx -t` in the running edge; routing, headers, TLS, body limits, client address forwarding by the smoke test |
 | Edge proxy (Caddy, alternative) | `infra/proxy/caddy/Caddyfile` | `caddy validate` and `caddy fmt` (Caddy 2.10.2); the admin SPA headers, `X-Forwarded-For` replacement, HSTS and the webhook body limit against a stub upstream. Not run with the real API or storefront, no ACME certificate |
-| Smoke test | `scripts/deploy-smoke.sh` (CI job `deploy-smoke`) | Passes locally; the CI job has not run on GitHub yet |
+| Smoke test | `scripts/deploy-smoke.sh` (CI job `deploy-smoke`) | Passes locally and in the CI job `deploy-smoke` on GitHub (green for the search engine change, 2026-11-04) |
 | Header copies | `apps/admin/edge-proxy-headers.spec.ts` | Fails when the nginx copy of the `/admin-ui` headers drifts from `apps/admin/security-headers.ts` |
 | `.env.example` completeness | `scripts/check-env-example.mjs` (`pnpm check:env`, CI `verify`) | Fails when the code reads a variable `.env.example` does not list |
 
@@ -31,9 +31,9 @@ volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 ```
 
 - Only the edge publishes ports. The API's `/docs`, `/docs-json` and `/health` are not routed (they answer the storefront's 404); the owner's decision on Swagger in production stays open, the default is "not public".
-- **Meilisearch is part of the example** (catalog search, ADR 0034; image pinned to the version CI tests, `MEILI_ENV=production`). It is reachable only by the API on the Compose network; the browser never talks to it. The index is rebuilt from Postgres, so `meili-data` is a cache, not a backup target.
+- **Meilisearch is part of the example** (catalog search, ADR 0034; image pinned to the version CI tests, `MEILI_ENV=production`). It is reachable only by the API on the Compose network; the browser never talks to it. `api` waits for it to be healthy even with search off, so a broken engine stops the boot instead of failing later. The index is rebuilt from Postgres, so `meili-data` is a cache, not a backup target.
 - **Redis is not part of the example on purpose**: `REDIS_URL` is parsed but no running code uses Redis or BullMQ (only the spike specs; `grep` for `redisUrl`, `ioredis`, `bullmq` outside specs, 2026-11-04). It comes with the queue or shared rate-limit plan, and runs then under the approved AGPLv3 exception (`docs/dependencies.md`).
-- **Run exactly one `api` container.** The rate limits, the login throttle, the shipping caches, the mail pacing and the local media disk are per process (ADR 0009, 0016, 0028; shipping step 6). Two instances double every limit and split the uploaded files. The scheduler (jobs 1 to 11, `docs/api/jobs.md`) runs inside that one API under a Postgres lock; there is no worker image. With `SCHEDULER_ENABLED=false` run `node dist/jobs/run-once.js` from a host cron (`docker compose ... run --rm api node dist/jobs/run-once.js`) instead.
+- **Run exactly one `api` container.** The rate limits, the login throttle, the shipping caches, the mail pacing and the local media disk are per process (ADR 0009, 0016, 0028; shipping step 6). Two instances double every limit and split the uploaded files. The scheduler (jobs 1 to 14, `docs/api/jobs.md`) runs inside that one API under a Postgres lock; there is no worker image. With `SCHEDULER_ENABLED=false` run `node dist/jobs/run-once.js` from a host cron (`docker compose ... run --rm api node dist/jobs/run-once.js`) instead.
 
 ## Prerequisites
 
@@ -44,14 +44,14 @@ volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 
 ## Configuration
 
-`cp infra/production.env.example infra/production.env`, fill it in, `chmod 600 infra/production.env`. The file is git-ignored. Compose reads it for the `${...}` values of `infra/docker-compose.prod.yml` (`--env-file`), and the `api` and `migrate` containers get all of it as their environment. The storefront and the edge get only their own variables. Nothing secret is built into an image.
+`cp infra/production.env.example infra/production.env`, fill it in, `chmod 600 infra/production.env`; likewise `cp infra/meilisearch.env.example infra/meilisearch.env` for the engine's master key (`FLUXKIT_MEILI_ENV_FILE` points elsewhere). The file is git-ignored. Compose reads it for the `${...}` values of `infra/docker-compose.prod.yml` (`--env-file`), and the `api` and `migrate` containers get all of it as their environment. The storefront and the edge get only their own variables. Nothing secret is built into an image.
 
 Secrets (generate, store in a password manager, back up with the database where noted):
 
 | Variable | Generate | Note |
 |---|---|---|
 | `POSTGRES_PASSWORD` | `openssl rand -hex 32` | Hex only: it is placed unescaped into `DATABASE_URL` by the Compose file |
-| `MEILI_MASTER_KEY` | `openssl rand -hex 32` | At least 16 bytes. Used by the engine and to create the API's scoped key. The `api` container receives the whole env file (like `POSTGRES_PASSWORD`), but the API never reads this variable |
+| `MEILI_MASTER_KEY` | `openssl rand -hex 32` | At least 16 bytes. Not in `production.env`: it is in `infra/meilisearch.env` (template `infra/meilisearch.env.example`, `chmod 600`, git-ignored), read only by the engine container, so the API process never holds a key that can mint other keys. Used once to create the scoped key |
 | `MEILI_API_KEY` | created once, see "Catalog search" | The scoped key the API uses; never the master key. Needed only with `SEARCH_ENABLED=true` |
 | `ORDER_TOKEN_SECRET` | `openssl rand -base64 48` | At least 32 characters. Changing it breaks the links of unpaid guest orders and every emailed reset or verification link (ADR 0023, 0031): keep it with the database backup |
 | `MONOBANK_TOKEN` | Monobank business cabinet | Only with `PAYMENT_PROVIDERS_ENABLED=monobank`; never logged |
@@ -61,7 +61,7 @@ Secrets (generate, store in a password manager, back up with the database where 
 
 Set by the Compose file (do not put them in the env file): `NODE_ENV=production`, `PORT=3000`, `DATABASE_URL` (from `POSTGRES_*`), `STOREFRONT_PUBLIC_URL=https://<FLUXKIT_DOMAIN>`, `MEDIA_STORAGE_DRIVER=local`, `MEDIA_DIR=/var/lib/fluxkit/media`, `MEDIA_PUBLIC_BASE_URL=https://<FLUXKIT_DOMAIN>/media`, `MEILI_URL=http://meilisearch:7700`, `API_INTERNAL_URL=http://api:3000` (storefront).
 
-Required in the env file: `FLUXKIT_DOMAIN`, `FLUXKIT_CERTS_DIR`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `ORDER_TOKEN_SECRET`, `MEILI_MASTER_KEY`, `TRUST_PROXY`. Everything else has a default (`.env.example` and `docs/contracts/config.md` explain each variable; `pnpm check:env` keeps `.env.example` complete).
+Required in the env file: `FLUXKIT_DOMAIN`, `FLUXKIT_CERTS_DIR`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `ORDER_TOKEN_SECRET`, `TRUST_PROXY`, plus `MEILI_MASTER_KEY` in `infra/meilisearch.env`. Everything else has a default (`.env.example` and `docs/contracts/config.md` explain each variable; `pnpm check:env` keeps `.env.example` complete).
 
 - `TRUST_PROXY=1` matches the example (the edge is the only proxy and replaces `X-Forwarded-For`). With a CDN or load balancer in front of the edge it becomes 2, and the edge must then APPEND instead of replace (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` in `infra/proxy/nginx/snippets/forwarded-headers.conf`, the ONE snippet that both the API locations and the storefront location include, so the change covers the search results page too; ADR 0038): too high lets a client choose its rate-limit key, too low puts every shopper into one window (ADR 0024, README "Deployment notes").
 - `STOREFRONT_FORWARD_CLIENT_ADDRESS=true` (the example's value; ADR 0038) makes the storefront pass the edge's `X-Forwarded-For` on to the API for the search results page, so its `search` window counts shoppers. **The storefront must be reachable only through the edge when this is on** (the Compose example publishes no storefront port): a client that reaches `next start` directly would choose its own rate-limit key, or use up another address's window. Unset or `false`: every results page counts as the Next server's one address (one shared window for page searches; the browser's own `/store/*` calls stay per shopper).
@@ -96,11 +96,11 @@ $C exec -T meilisearch sh -c 'wget -q -O - --header "Authorization: Bearer $MEIL
   --post-data "{\"description\":\"fluxkit API\",\"indexes\":[\"fluxkit_*\"],\"expiresAt\":null,\"actions\":[\"search\",\"documents.add\",\"documents.delete\",\"indexes.create\",\"indexes.delete\",\"indexes.swap\",\"settings.update\",\"settings.get\",\"tasks.get\",\"tasks.delete\",\"stats.get\"]}" \
   http://127.0.0.1:7700/keys'
 # Put the "key" field of the answer into infra/production.env as MEILI_API_KEY=..., add SEARCH_ENABLED=true, then:
-$C up -d --wait api
+$C up -d --no-deps --force-recreate --wait api
 ```
 
 - Use your `MEILI_INDEX_PREFIX` instead of `fluxkit_` in `indexes` when you set one (README "Catalog search" has the same call with `curl`).
-- The scheduler builds the indexes on its first tick (jobs 13 and 14); until then `GET /store/search` answers `503 search_unavailable` and the storefront falls back to SQL. After a bulk import or a restore, `docker compose ... run --rm --no-deps api node dist/search/reindex.js` builds at once.
+- The scheduler builds the indexes on its first tick (jobs 13 and 14); until then `GET /store/search` answers `503 search_unavailable` and the storefront falls back to SQL. After a bulk import or a restore, `docker compose ... run --rm --no-deps api node dist/search/reindex.js` builds at once (exit 2 means a scheduler tick held the lock at that moment: the rebuild is requested and the scheduler does it, or run the command again).
 - Never publish the engine's port and never route it through the edge: the index holds public data only, but the engine API must stay private (ADR 0034).
 - The engine needs memory for indexing (`mem_limit: 1g` in the example, enough for a small catalog; raise it with the catalog). Losing `meili-data` costs a rebuild, not data.
 
@@ -192,7 +192,7 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 - [ ] `EMAIL_PROVIDER`, `PAYMENT_PROVIDERS_ENABLED` and `SHIPPING_PROVIDERS_ENABLED` decided (the fakes are refused in production); for Monobank the webhook URL `https://<domain>/webhooks/payments/monobank` reachable from the internet.
 - [ ] `STOREFRONT_IMAGE_HOSTS` set before the storefront image was built; an uploaded image shows in the storefront (hairpin works).
 - [ ] Backups of Postgres and the media volume scheduled and a restore tested.
-- [ ] Search: `MEILI_MASTER_KEY` generated, the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
+- [ ] Search: `infra/meilisearch.env` written (master key generated), the scoped key made, `SEARCH_ENABLED=true`, `GET /store/config` says `search: true`, a product found after the index is built; the engine's port is not published.
 - [ ] Swagger UI decision (not routed by the example).
 - [ ] Launch blockers in `docs/HANDOFF.md` reviewed (catalog read rate limits, privacy plan before the EU launch).
 - [ ] The Docker images' own licences reviewed before images are handed to a client (below).
