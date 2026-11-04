@@ -74,6 +74,7 @@ POSTGRES_USER=fluxkit
 POSTGRES_PASSWORD=$(openssl rand -hex 24)
 POSTGRES_DB=fluxkit
 ORDER_TOKEN_SECRET=$(openssl rand -hex 32)
+MEILI_MASTER_KEY=$(openssl rand -hex 24)
 TRUST_PROXY=1
 STOREFRONT_IMAGE_HOSTS=${DOMAIN}
 STOREFRONT_FORWARD_CLIENT_ADDRESS=true
@@ -91,7 +92,7 @@ pass "images built: ${PREFIX}-api, ${PREFIX}-storefront, ${PREFIX}-edge"
 
 compose config --quiet
 compose up -d --no-build --wait --wait-timeout 180
-pass "stack healthy (postgres, migrate, api, storefront, edge)"
+pass "stack healthy (postgres, meilisearch, migrate, api, storefront, edge)"
 
 [[ "$(docker inspect -f '{{.State.ExitCode}}' "$(compose ps -a -q migrate)")" == "0" ]] || fail "migrate did not exit 0"
 MIGRATE_LOG=$(compose logs --no-color migrate)
@@ -101,6 +102,16 @@ pass "migrations applied by the migrate service before the API started"
 # --- helpers ---
 CURL=(curl -sS --noproxy "*" --cacert "$CA" --resolve "${DOMAIN}:${HTTPS_PORT}:127.0.0.1")
 HEADERS="$WORK/headers.txt"
+# --- search engine: the API's scoped key is made once with the master key, then search is switched on (docs/deployment.md) ---
+SEARCH_KEY_JSON=$(compose exec -T meilisearch sh -c 'wget -q -O - \
+  --header "Authorization: Bearer $MEILI_MASTER_KEY" --header "Content-Type: application/json" \
+  --post-data "{\"description\":\"fluxkit API\",\"indexes\":[\"fluxkit_*\"],\"expiresAt\":null,\"actions\":[\"search\",\"documents.add\",\"documents.delete\",\"indexes.create\",\"indexes.delete\",\"indexes.swap\",\"settings.update\",\"settings.get\",\"tasks.get\",\"tasks.delete\",\"stats.get\"]}" \
+  http://127.0.0.1:7700/keys')
+SEARCH_KEY=$(jq -er .key <<<"$SEARCH_KEY_JSON") || fail "the engine did not return a scoped key"
+printf 'SEARCH_ENABLED=true\nMEILI_API_KEY=%s\n' "$SEARCH_KEY" >>"$WORK/production.env"
+compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 api >/dev/null
+pass "scoped search key created through the engine container; the API restarted with search on"
+
 BODY="$WORK/body.txt"
 # request METHOD PATH [curl args...]: status in $STATUS, headers in $HEADERS (lower-case names), body in $BODY
 request() {
@@ -268,6 +279,16 @@ req.end(body);
 ")
 [[ "$OTHER_CLIENT" == "401" ]] || fail "a second client was limited too ($OTHER_CLIENT): the API counts the proxy, not the client"
 pass "another client address keeps its own window (the API counts clients, not the edge)"
+
+# --- catalog search through the edge (the engine is reachable only from the API) ---
+request GET /store/config
+expect_status 200 "GET /store/config with search on"
+[[ "$(jq -r .search "$BODY")" == "true" ]] || fail "GET /store/config does not report search: true"
+request GET "/store/search?q=x"
+[[ "$STATUS" == "200" || "$STATUS" == "503" ]] || fail "GET /store/search: status $STATUS (200 once the index is built, 503 search_unavailable before)"
+pass "search is on (config says so; /store/search answers $STATUS, never 404 or 500)"
+[[ -z "$(docker port "$(compose ps -q meilisearch)" 2>/dev/null)" ]] || fail "the search engine publishes a port"
+pass "the search engine publishes no port"
 
 # --- a recreated API is found again without restarting the edge (resolver + upstream resolve) ---
 compose up -d --no-build --no-deps --force-recreate --wait --wait-timeout 120 api >/dev/null
