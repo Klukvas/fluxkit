@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import type {
   CatalogSeed,
   SeedAttribute,
+  SeedBanner,
   SeedCategory,
   SeedProduct,
   SeedShippingMethod,
@@ -17,6 +18,7 @@ import { ZodValidationPipe } from "../common/zod-validation.pipe.js";
 import { DRIZZLE, type Database } from "../database/database.module.js";
 import {
   attribute,
+  banner,
   brand,
   category,
   media as productMedia,
@@ -25,6 +27,8 @@ import {
   productType,
   shippingMethod,
 } from "../database/schema/index.js";
+import { createBannerSchema, updateBannerSchema } from "../banners/banners.schemas.js";
+import { BannersService } from "../banners/banners.service.js";
 import { AttributesService } from "../catalog/admin/attributes/attributes.service.js";
 import {
   createAttributeOptionSchema,
@@ -81,9 +85,9 @@ export const DEFAULT_SEED_ASSETS_DIR = fileURLToPath(
   new URL("../../../../seeds/assets", import.meta.url),
 );
 
-/** Uploads one image file of the seed and answers the URL the media service stored it under. */
+/** Uploads one image file of the seed and answers the upload's id and the URL the media service stored it under. */
 export interface SeedImageUploader {
-  upload(bytes: Uint8Array): Promise<string>;
+  upload(bytes: Uint8Array): Promise<{ id: string; url: string }>;
 }
 
 /** The demo stock is received at the default location (the `main` location of the migration). */
@@ -97,6 +101,7 @@ export const SEED_ENTITY_KINDS = [
   "categories",
   "products",
   "shippingMethods",
+  "banners",
 ] as const;
 export type SeedEntityKind = (typeof SEED_ENTITY_KINDS)[number];
 
@@ -120,8 +125,8 @@ export interface SeedSummary {
     skippedLocales: string[];
   };
   /**
-   * Product images, uploaded through the media service (ADR 0028) for the products this run created. With
-   * `MEDIA_STORAGE_DRIVER=none` nothing is uploaded and those products get no images.
+   * Images, uploaded through the media service (ADR 0028) for the products and home banners this run created. With
+   * `MEDIA_STORAGE_DRIVER=none` nothing is uploaded: products get no images and no banner is created (a banner needs one).
    */
   images: {
     uploadsEnabled: boolean;
@@ -143,6 +148,7 @@ function emptyCounts(): Record<SeedEntityKind, number> {
     categories: 0,
     products: 0,
     shippingMethods: 0,
+    banners: 0,
   };
 }
 
@@ -197,6 +203,7 @@ export class CatalogSeeder {
     private readonly pricing: PricingConfig,
     private readonly shippingMethods: ShippingMethodsService,
     private readonly shippingProviders: ShippingProviderRegistry,
+    private readonly banners: BannersService,
     /** `null` with search off: the demo synonym groups are then not written at all. */
     private readonly synonyms: SearchSynonymSeeder | null,
     /** `null` with `MEDIA_STORAGE_DRIVER=none`: products are then created without images. */
@@ -223,7 +230,12 @@ export class CatalogSeeder {
     const images: SeedImageUploader | null =
       media.driver === "none"
         ? null
-        : { upload: async (bytes) => (await uploads.storeSystemImage(bytes)).url };
+        : {
+            upload: async (bytes) => {
+              const { id, url } = await uploads.storeSystemImage(bytes);
+              return { id, url };
+            },
+          };
     return new CatalogSeeder(
       app.get<Database>(DRIZZLE, { strict: false }),
       get(AttributesService),
@@ -239,6 +251,7 @@ export class CatalogSeeder {
       app.get<PricingConfig>(PRICING_CONFIG, { strict: false }),
       get(ShippingMethodsService),
       get(ShippingProviderRegistry),
+      get(BannersService),
       synonyms,
       images,
       assetsDir,
@@ -268,7 +281,75 @@ export class CatalogSeeder {
       await this.ensureShippingMethod(definition);
     }
     await this.ensureSynonymGroups(seed.synonymGroups);
+    for (const definition of seed.banners) {
+      await this.ensureBanner(definition);
+    }
     return this.summary;
+  }
+
+  /**
+   * A demo home banner (ADR 0046), through the rules of the admin API (`BannersService`: core's link, text and layout rules,
+   * the 50 cap, every picture marked attached so job 7 never deletes it). Found by its fixed id: an existing banner is left
+   * alone, a deleted one is created again. The service generates ids, so the new banner is created INACTIVE, gets the fixed
+   * id, then its own locale pictures and the active flag: a run that stops in between leaves an inactive banner that the
+   * storefront never shows (delete it in the admin). With uploads off no banner is created (a banner needs a picture).
+   */
+  private async ensureBanner(definition: SeedBanner): Promise<void> {
+    const [row] = await this.database
+      .select({ id: banner.id })
+      .from(banner)
+      .where(eq(banner.id, definition.id));
+    if (row !== undefined) {
+      this.summary.existing.banners += 1;
+      return;
+    }
+    if (this.images === null) {
+      return;
+    }
+    // Read before anything is written, so a missing file stops the run before an upload or a banner exists.
+    const defaultBytes = await this.readImage(definition.image);
+    const localeBytes = await Promise.all(
+      (definition.localeImages ?? []).map((item) => this.readImage(item.file)),
+    );
+    const defaultPicture = await this.uploadBannerImage(defaultBytes, this.images);
+    const created = await this.banners.create(
+      parse(createBannerSchema, {
+        layout: definition.layout,
+        ...(definition.title === undefined ? {} : { title: definition.title }),
+        ...(definition.text === undefined ? {} : { text: definition.text }),
+        ...(definition.imageAlt === undefined ? {} : { imageAlt: definition.imageAlt }),
+        imageUploadId: defaultPicture,
+        link: definition.link,
+        tone: definition.tone,
+        isActive: false,
+      }),
+    );
+    // No picture row refers to it yet, so the primary key can still change (`banner_image` would block it).
+    await this.database.update(banner).set({ id: definition.id }).where(eq(banner.id, created.id));
+    const images: { locale: string; imageUploadId: string }[] = [];
+    for (const [index, item] of (definition.localeImages ?? []).entries()) {
+      images.push({
+        locale: item.locale,
+        imageUploadId: await this.uploadBannerImage(localeBytes[index], this.images),
+      });
+    }
+    await this.banners.update(
+      definition.id,
+      parse(updateBannerSchema, { ...(images.length === 0 ? {} : { images }), isActive: true }),
+    );
+    this.summary.created.banners += 1;
+  }
+
+  private async uploadBannerImage(
+    bytes: Uint8Array | undefined,
+    uploader: SeedImageUploader,
+  ): Promise<string> {
+    if (bytes === undefined) {
+      throw new Error("A banner image of the seed was not read.");
+    }
+    const { id } = await uploader.upload(bytes);
+    this.summary.images.uploaded += 1;
+    return id;
   }
 
   /**
@@ -690,7 +771,7 @@ export class CatalogSeeder {
       if (data === undefined) {
         throw new Error(`Seed image "${item.file}" was not read.`);
       }
-      uploaded.push({ item, url: await uploader.upload(data) });
+      uploaded.push({ item, url: (await uploader.upload(data)).url });
       this.summary.images.uploaded += 1;
     }
     return uploaded;

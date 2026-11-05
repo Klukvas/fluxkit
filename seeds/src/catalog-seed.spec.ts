@@ -1,6 +1,9 @@
 import {
   MAX_AMOUNT,
   MAX_ON_HAND,
+  checkBannerContent,
+  checkBannerImageLocales,
+  checkBannerLink,
   isValidCode,
   isValidValueCode,
   parseSynonymTerms,
@@ -341,6 +344,64 @@ describe("catalog seed data", () => {
           .flatMap((group) => group.terms);
         expect(unique(terms), locale).toBe(true);
       }
+    });
+  });
+
+  describe("demo home banners (ADR 0046)", () => {
+    const { banners } = catalogSeed;
+    const locales = { defaultLocale: "uk", locales: ["uk", "en"] };
+
+    it("are three, with fixed distinct ids: two cards and one picture banner with an own en picture", () => {
+      expect(banners.map((banner) => banner.layout)).toEqual(["card", "card", "image"]);
+      expect(unique(banners.map((banner) => banner.id))).toBe(true);
+      for (const banner of banners) {
+        expect(banner.id).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+        );
+      }
+      expect(banners.flatMap((banner) => banner.localeImages ?? [])).toEqual([
+        { locale: "en", file: "banner-collection-en.webp" },
+      ]);
+    });
+
+    it("pass core's banner rules: texts per layout, links, picture locales", () => {
+      for (const banner of banners) {
+        expect(
+          checkBannerContent(
+            {
+              layout: banner.layout,
+              title: banner.title ?? null,
+              text: banner.text ?? null,
+              imageAlt: banner.imageAlt ?? null,
+            },
+            locales,
+          ),
+          banner.id,
+        ).toEqual([]);
+        expect(checkBannerLink(banner.link, locales.locales).ok, banner.link).toBe(true);
+        expect(
+          checkBannerImageLocales(
+            (banner.localeImages ?? []).map((image) => image.locale),
+            locales.locales,
+          ),
+        ).toEqual([]);
+        for (const text of [banner.title, banner.text, banner.imageAlt]) {
+          if (text !== undefined) expectBothLocales(text, banner.id);
+        }
+      }
+    });
+
+    it("mark their visible copy as demo text (TODO(fluxkit)) and show each picture once", () => {
+      for (const banner of banners.filter((item) => item.layout === "card")) {
+        expect(banner.text?.uk, banner.id).toContain("TODO(fluxkit)");
+        expect(banner.text?.en, banner.id).toContain("TODO(fluxkit)");
+      }
+      const files = banners.flatMap((banner) => [
+        banner.image,
+        ...(banner.localeImages ?? []).map((image) => image.file),
+      ]);
+      expect(unique(files)).toBe(true);
+      for (const file of files) expect(file).toMatch(/^banner-[a-z-]+\.webp$/);
     });
   });
 
