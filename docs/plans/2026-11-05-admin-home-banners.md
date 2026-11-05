@@ -311,6 +311,13 @@ other browsers than Chromium; the Docker `compose` and `deploy-smoke` jobs; the 
 - Failing first for m3, m4, m6, m7 and the time hints: the 6 new tests failed against the previous sources and pass now.
 - E2E: a new scenario checks that the list shows every stored banner (the seed's demo banners included), no empty state, and
   "Shown on the storefront" on exactly the banners the API marks (at most 3).
+
+- **Storefront on the shared card** (review M2, separate commit after merging PR 229): `BannersView` renders every item, both
+  sources and both layouts, through `BannerCard`; `home-sections.tsx` passes the picture (`LocalPicture` or `StoreImage` with
+  `fill`) and the link (`next/link` or an anchor). `BannerCard` took the storefront's exact classes first (image layout: no
+  background, hover border). A source guard in `home-sections.spec.tsx` failed on the merged main and passes now; every storefront
+  unit test of PR 229 passes unchanged.
+
 ## 10. Results: PR 3 (storefront and seed; branch `feature/banners-storefront`, 2026-11-05; not reviewed yet)
 
 (Section 9 is left to PR 2, built in parallel.)
@@ -351,8 +358,8 @@ Decisions taken outside the letter of the plan or the task (for the reviewer):
   specs that run the seed (`seed.spec.ts`, `newest-order.spec.ts`) leave the shared test database clean.
 - The admin e2e (`apps/admin/e2e/prepare-database.ts` runs `pnpm seed`) now starts with three demo banners: PR 2's admin banner e2e must
   expect them (not changed here).
-- The storefront keeps its own rendering; the shared presentational `BannerCard` of `@fluxkit/ui` (section 7) comes with PR 2. Switching
-  the storefront to it is a small follow-up after both PRs are merged.
+- The storefront kept its own rendering in PR 3; PR 2 (after merging it) switched `BannersView` to the shared `BannerCard` of
+  `@fluxkit/ui` (section 7), so the storefront and the admin preview draw one card.
 
 Not verified: the Docker `compose`/`deploy-smoke` jobs; a production build with a real https media host (only the placeholder path and
 `next dev` were seen); the full API suite (only the specs above); the admin screen (PR 2).

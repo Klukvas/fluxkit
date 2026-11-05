@@ -1,5 +1,7 @@
 import type { CategoryNode, ProductSummary } from "@fluxkit/api-client";
 import {
+  BannerCard,
+  type BannerCardLinkProps,
   Hero,
   Skeleton,
   textStyles,
@@ -146,24 +148,12 @@ const bannerColumns: Record<number, { grid: string; sizes: string }> = {
   3: { grid: "grid-cols-1 md:grid-cols-3", sizes: "(min-width: 768px) 33vw, 100vw" },
 };
 
-const bannerTones: Record<BannerTone, { card: string; text: string }> = {
-  surface: {
-    card: "border-border bg-background text-foreground hover:border-border-input",
-    text: "text-muted-foreground",
-  },
-  accent: {
-    card: "border-primary bg-primary text-primary-foreground",
-    // Inherits the card's `primary-foreground` (the muted grey would not read on the primary fill).
-    text: "",
-  },
-};
-
 /** A banner's picture: a file of the template (`config` source) or an uploaded image of the API (`admin` source). */
 type BannerPicture =
   { kind: "local"; image: LocalImage } | ({ kind: "remote" } & StoreBannerPicture);
 
 /** One banner as `BannersView` draws it, whichever source it came from. */
-type BannerCard =
+type BannerItem =
   | {
       id: string;
       layout: "card";
@@ -175,7 +165,7 @@ type BannerCard =
     }
   | { id: string; layout: "image"; link: BannerLink; picture: BannerPicture };
 
-function configBannerCards(section: ConfigBannersSection, context: HomeContext): BannerCard[] {
+function configBannerCards(section: ConfigBannersSection, context: HomeContext): BannerItem[] {
   checkBannersSection(section);
   const { t, locale } = context;
   return section.items.map((banner) => ({
@@ -189,7 +179,7 @@ function configBannerCards(section: ConfigBannersSection, context: HomeContext):
   }));
 }
 
-function storeBannerCards(banners: readonly StoreBannerView[]): BannerCard[] {
+function storeBannerCards(banners: readonly StoreBannerView[]): BannerItem[] {
   return banners.map((banner) => ({
     ...banner,
     picture: { kind: "remote", ...banner.picture },
@@ -197,10 +187,10 @@ function storeBannerCards(banners: readonly StoreBannerView[]): BannerCard[] {
 }
 
 /**
- * The fixed 2:1 frame of every banner picture (`object-cover`): any upload size or ratio fills it, cropped, and the frame
- * reserves the space before the picture loads, so nothing moves.
+ * A banner's picture inside the fixed 2:1 frame of `BannerCard` (`object-cover`): any upload size or ratio fills it,
+ * cropped, and the frame reserves the space before the picture loads, so nothing moves.
  */
-function BannerFrame({
+function BannerPictureView({
   picture,
   context,
   eager,
@@ -211,57 +201,30 @@ function BannerFrame({
   eager: boolean;
   sizes: string;
 }) {
-  return (
-    <span className="block aspect-2/1 overflow-hidden bg-muted">
-      {picture.kind === "local" ? (
-        <LocalPicture
-          image={picture.image}
-          t={context.t}
-          eager={eager}
-          sizes={sizes}
-          className="h-full w-full object-cover"
-        />
-      ) : (
-        <StoreImage
-          src={picture.src}
-          alt={picture.alt}
-          width={picture.width}
-          height={picture.height}
-          sizes={sizes}
-          eager={eager}
-          fill
-        />
-      )}
-    </span>
+  return picture.kind === "local" ? (
+    <LocalPicture
+      image={picture.image}
+      t={context.t}
+      eager={eager}
+      sizes={sizes}
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <StoreImage
+      src={picture.src}
+      alt={picture.alt}
+      width={picture.width}
+      height={picture.height}
+      sizes={sizes}
+      eager={eager}
+      fill
+    />
   );
 }
 
-function BannerAnchor({
-  link,
-  className,
-  labelledBy,
-  describedBy,
-  children,
-}: {
-  link: BannerLink;
-  className: string;
-  labelledBy?: string;
-  describedBy?: string;
-  children: ReactNode;
-}) {
-  const aria = {
-    ...(labelledBy === undefined ? {} : { "aria-labelledby": labelledBy }),
-    ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
-  };
-  return link.external ? (
-    <a href={link.href} className={className} {...aria}>
-      {children}
-    </a>
-  ) : (
-    <Link href={link.href} className={className} {...aria}>
-      {children}
-    </Link>
-  );
+/** The one link of a banner: a router link inside the shop, a plain anchor for an `https` address. */
+function BannerAnchor({ link, ...props }: { link: BannerLink } & BannerCardLinkProps) {
+  return link.external ? <a href={link.href} {...props} /> : <Link href={link.href} {...props} />;
 }
 
 /**
@@ -279,7 +242,7 @@ function BannersView({
   isFirst,
 }: {
   section: BannersSection;
-  cards: readonly BannerCard[];
+  cards: readonly BannerItem[];
   context: HomeContext;
   /** The first section of the page: its pictures are above the fold and load at once; otherwise lazily. */
   isFirst: boolean;
@@ -296,56 +259,26 @@ function BannersView({
         {context.t(section.titleKey)}
       </h2>
       <ul className={`grid gap-4 ${columns.grid}`}>
-        {cards.map((banner) => {
-          const frame = (
-            <BannerFrame
-              picture={banner.picture}
-              context={context}
-              eager={isFirst}
-              sizes={columns.sizes}
+        {cards.map((banner) => (
+          <li key={banner.id} data-banner-id={banner.id} data-banner-layout={banner.layout}>
+            <BannerCard
+              id={`${section.id}-${banner.id}`}
+              layout={banner.layout}
+              {...(banner.layout === "card"
+                ? { title: banner.title, text: banner.text, tone: banner.tone }
+                : {})}
+              picture={
+                <BannerPictureView
+                  picture={banner.picture}
+                  context={context}
+                  eager={isFirst}
+                  sizes={columns.sizes}
+                />
+              }
+              renderLink={(props) => <BannerAnchor link={banner.link} {...props} />}
             />
-          );
-          if (banner.layout === "image") {
-            return (
-              <li key={banner.id} data-banner-id={banner.id} data-banner-layout="image">
-                <BannerAnchor
-                  link={banner.link}
-                  className={`group block overflow-hidden rounded-lg border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none ${focusRing}`}
-                >
-                  {frame}
-                </BannerAnchor>
-              </li>
-            );
-          }
-          const tone = bannerTones[banner.tone];
-          const titleId = `${section.id}-${banner.id}-title`;
-          const textId = `${section.id}-${banner.id}-text`;
-          return (
-            <li key={banner.id} data-banner-id={banner.id} data-banner-layout="card">
-              <BannerAnchor
-                link={banner.link}
-                labelledBy={titleId}
-                {...(banner.text === null ? {} : { describedBy: textId })}
-                className={`group flex h-full flex-col overflow-hidden rounded-lg border transition-shadow hover:shadow-raised motion-reduce:transition-none ${tone.card} ${focusRing}`}
-              >
-                {frame}
-                <span className="flex flex-col gap-1 p-4">
-                  <h3
-                    id={titleId}
-                    className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
-                  >
-                    {banner.title}
-                  </h3>
-                  {banner.text === null ? null : (
-                    <span id={textId} className={tone.text === "" ? undefined : tone.text}>
-                      {banner.text}
-                    </span>
-                  )}
-                </span>
-              </BannerAnchor>
-            </li>
-          );
-        })}
+          </li>
+        ))}
       </ul>
     </section>
   );
