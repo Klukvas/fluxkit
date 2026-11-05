@@ -13,7 +13,7 @@ No new dependency, environment variable, API route, schema or public contract. O
 ## Steps
 1. **Refuse cross-site `POST /theme` (security, TDD).** `403`, nothing set, when `Sec-Fetch-Site` is `cross-site` or `same-site` (a sibling host is another
    origin), or when `Origin` is present and is not the public origin (`null` included). `same-origin`, `none` and requests without both headers (old
-   browsers without a script, curl) keep working. The route passes `publicOrigin` instead of a `secure` callback; `secure` is derived from it.
+   browsers without a script, curl) keep working. The route passes `publicOrigin` next to the `secure` callback (both read the same origin; derivation inside the function is a later cleanup).
 2. **No hardcoded English in the `400` bodies.** Status only, empty body (the switch is a form; a shopper never sees these answers from the page).
 3. **Dark 404 (investigate).** Fix only if the server can put `data-theme` on the 404 document without a second cookie reader or a Next patch; else report.
 4. **`/uk/account/register` without a script.** Extend `pre-hydration-forms.e2e.ts` to uk (must fail first), measure, then the smallest markup change within

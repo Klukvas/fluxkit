@@ -62,6 +62,16 @@ describe("POST /theme (the switch without a script)", () => {
     }
   });
 
+  it("answers 400, not 500, for a multipart body that cannot be parsed", async () => {
+    const response = await themeFormResponse(
+      post("not a multipart body", "multipart/form-data; boundary=missing"),
+      enabled,
+    );
+    expect(response.status).toBe(400);
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(await response.text()).toBe("");
+  });
+
   it("does not exist while the switch is hidden in the config", async () => {
     const response = await themeFormResponse(post("mode=dark&return=%2Fuk"), {
       ...enabled,

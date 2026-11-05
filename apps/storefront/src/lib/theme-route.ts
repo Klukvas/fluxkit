@@ -32,7 +32,16 @@ export async function themeFormResponse(
   ) {
     return new Response(null, { status: 400 });
   }
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch (error) {
+    // Only the client's malformed body is a 400; anything else is a bug and must stay loud.
+    if (error instanceof TypeError) {
+      return new Response(null, { status: 400 });
+    }
+    throw error;
+  }
   const value = form.get("mode");
   const mode = parseThemeMode(typeof value === "string" ? value : null);
   if (mode === null) {
