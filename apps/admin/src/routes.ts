@@ -255,6 +255,33 @@ export const ROUTES: readonly AppRoute[] = [
     ),
   ),
   route(
+    "banners",
+    "listHomeBanners",
+    "page.banners.title",
+    areaPage(
+      () => import("./areas/banners"),
+      (module) => module.BannersPage,
+    ),
+  ),
+  route(
+    "bannerNew",
+    "createHomeBanner",
+    "page.bannerNew.title",
+    areaPage(
+      () => import("./areas/banners"),
+      (module) => module.BannerNewPage,
+    ),
+  ),
+  route(
+    "bannerDetail",
+    "getHomeBanner",
+    "page.bannerDetail.title",
+    areaPage(
+      () => import("./areas/banners"),
+      (module) => module.BannerDetailPage,
+    ),
+  ),
+  route(
     "orders",
     "listOrders",
     "page.orders.title",

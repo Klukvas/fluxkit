@@ -7,7 +7,7 @@ The articles of the admin's Help area (`/admin-ui/help`). They are TypeScript da
 | File | Holds |
 |---|---|
 | `index.ts` | `HELP_LIBRARY`: the topics in menu order and the articles in reading order (previous and next follow it). |
-| `start.ts`, `catalog.ts`, `prices-stock.ts`, `sales.ts`, `settings.ts` | One topic each: the topic and its articles. |
+| `start.ts`, `catalog.ts`, `storefront.ts`, `prices-stock.ts`, `sales.ts`, `settings.ts` | One topic each: the topic and its articles. |
 | `../help-model.ts` | The shapes (`HelpArticle`, `HelpBlock`, `HelpText`); not content, keep it when you replace this folder. |
 
 ## An article

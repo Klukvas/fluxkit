@@ -40,7 +40,7 @@ export const KNOWN_PROBLEM_CODES = [
 
 /**
  * Rules and field error codes the admin pages of `docs/api/` document (catalog, pricing, inventory, orders, customers,
- * auth, media). A test scans those pages and fails on a snake-case word that is neither here nor in its list of non-codes.
+ * auth, media, banners). A test scans those pages and fails on a snake-case word that is neither here nor in its list of non-codes.
  */
 export const KNOWN_REASON_CODES = [
   // request schema
@@ -152,6 +152,17 @@ export const KNOWN_REASON_CODES = [
   "shipping_address_required",
   "line_total_out_of_range",
   "subtotal_out_of_range",
+  // home banners (`docs/api/banners.md`): the i18n text codes not listed above, the link, layout, window, picture locales,
+  // reorder and the 50 cap
+  "locale_not_allowed",
+  "invalid_characters",
+  "duplicate",
+  "invalid_link",
+  "not_allowed_for_layout",
+  "invalid_window",
+  "out_of_range",
+  "order_mismatch",
+  "too_many_banners",
 ] as const;
 
 /** What to show: a message key with its values, and for an unknown code the code itself (small print). */

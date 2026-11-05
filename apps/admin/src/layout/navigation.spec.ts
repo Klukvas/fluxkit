@@ -18,6 +18,7 @@ describe("navigation configuration", () => {
       "brands",
       "categories",
       "search",
+      "banners",
       "orders",
       "customers",
       "payments",
@@ -36,7 +37,7 @@ describe("navigation configuration", () => {
     }
   });
 
-  it("shows the viewer the catalog only (the Search status is read with catalog.read)", () => {
+  it("shows the viewer the catalog and the home banners only (both read with catalog.read)", () => {
     expect(ids([...ROLE_PERMISSIONS.viewer])).toEqual([
       "products",
       "attributes",
@@ -45,6 +46,7 @@ describe("navigation configuration", () => {
       "brands",
       "categories",
       "search",
+      "banners",
       "help",
     ]);
   });
@@ -103,5 +105,17 @@ describe("navigation configuration", () => {
     // Help is the only group of a session without permissions; every other group is dropped.
     expect(visibleNavigation([]).map((group) => group.id)).toEqual(["help"]);
     expect(visibleNavigation(["orders.read"]).map((group) => group.id)).toEqual(["sales", "help"]);
+  });
+
+  it("shows Home banners to every role that reads the catalog, in its own Storefront group after the catalog", () => {
+    for (const role of ["owner", "manager", "viewer"] as const) {
+      expect(ids([...ROLE_PERMISSIONS[role]]), role).toContain("banners");
+    }
+    expect(visibleNavigation(["catalog.read"]).map((group) => group.id)).toEqual([
+      "catalog",
+      "storefront",
+      "help",
+    ]);
+    expect(ids(["orders.read", "shipping.manage"])).not.toContain("banners");
   });
 });

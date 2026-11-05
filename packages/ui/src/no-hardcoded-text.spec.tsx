@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
 import { Alert } from "./alert";
 import { Badge } from "./badge";
+import { BannerCard } from "./banner-card";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Checkbox } from "./checkbox";
 import { ConfirmDialog } from "./confirm-dialog";
@@ -307,6 +308,29 @@ const cases: [string, ReactElement][] = [
       current={1}
       completedLabel={s("done")}
       compactText={s("compact")}
+    />,
+  ],
+  [
+    "BannerCard card",
+    <BannerCard
+      key="y6"
+      id="b"
+      layout="card"
+      tone="accent"
+      title={s("title")}
+      text={s("text")}
+      picture={<img src="/a.webp" alt="" width={2} height={1} />}
+      renderLink={(props) => <a href="/x" {...props} />}
+    />,
+  ],
+  [
+    "BannerCard image",
+    <BannerCard
+      key="y7"
+      id="i"
+      layout="image"
+      picture={<img src="/a.webp" alt={s("alt")} width={2} height={1} />}
+      renderLink={(props) => <a href="/x" {...props} />}
     />,
   ],
   [

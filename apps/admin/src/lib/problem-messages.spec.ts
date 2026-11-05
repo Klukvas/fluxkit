@@ -27,6 +27,7 @@ const ADMIN_DOCS = [
   "customers.md",
   "auth.md",
   "media.md",
+  "banners.md",
 ];
 
 /**

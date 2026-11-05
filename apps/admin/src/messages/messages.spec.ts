@@ -4,6 +4,7 @@ import { messagePlaceholders, type Locale, type Messages } from "@fluxkit/ui";
 import { beforeAll, describe, expect, it } from "vitest";
 import * as account from "../areas/account/account-page";
 import * as audit from "../areas/audit";
+import * as banners from "../areas/banners";
 import * as catalogDictionaries from "../areas/catalog-dictionaries";
 import * as customers from "../areas/customers";
 import * as email from "../areas/email";
@@ -188,6 +189,7 @@ describe("the lazy file loader", () => {
       audit: { uk: unused, en: unused },
       search: { uk: unused, en: unused },
       help: { uk: unused, en: unused },
+      banners: { uk: unused, en: unused },
     });
     const [first, second] = await Promise.all([
       load("catalog-dictionaries", "uk"),
@@ -221,6 +223,7 @@ const sourceRoot = join(directory, "..");
 const AREA_FOLDERS: Record<string, readonly LazyFile[]> = {
   account: account.MESSAGE_FILES,
   audit: audit.MESSAGE_FILES,
+  banners: banners.MESSAGE_FILES,
   auth: [],
   "catalog-dictionaries": catalogDictionaries.MESSAGE_FILES,
   customers: customers.MESSAGE_FILES,
