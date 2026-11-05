@@ -7,6 +7,7 @@ import { adminClient } from "../../lib/api";
 import { browserTimeZone } from "../../lib/date-range";
 import { jsonEqual } from "../../lib/diff-for-patch";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
+import { useResource } from "../../lib/use-resource";
 import { PATHS, buildPath } from "../../router/paths";
 import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
@@ -40,11 +41,13 @@ import {
   validateBannerForm,
   type BannerFormValues,
 } from "./banner-form";
-import { BannerFormView } from "./banner-form-view";
+import { BannerFormView, firstInvalidBannerField } from "./banner-form-view";
 import { bannerName } from "./banner-list-view";
 import { useCanWriteBanners } from "./banner-permissions";
 import { useBannerPictureUpload, type PictureSlot } from "./banner-picture-upload";
 import { BannerPreview } from "./banner-preview";
+import { BANNER_LIMITS } from "./banner-rules";
+import { bannerPlacement, type BannerPlacement } from "./banner-visibility";
 import { zoneLabel } from "./banner-time";
 import { BannersFrame } from "./banners-frame";
 
@@ -80,6 +83,17 @@ function useBannerForm(initial: BannerFormValues, content: ContentLocales, saved
   return { values, setValues, timeZone, form, upload, blocker };
 }
 
+/**
+ * Where the banner stands among the others (`bannerPlacement`), from one read of the list. A hint only: while the list
+ * loads or when it cannot be read the form says nothing about the place (the list screen shows it as well).
+ */
+function useBannerPlacement(id: string | null): BannerPlacement | null {
+  const list = useResource((signal) => adminClient.listHomeBanners({ signal }), []);
+  return list.status === "ready"
+    ? bannerPlacement(list.data.items, id, BANNER_LIMITS.maxShown)
+    : null;
+}
+
 function BannerCreate() {
   const { t, locale } = useI18n();
   const content = useContentLocales();
@@ -89,6 +103,7 @@ function BannerCreate() {
   const [unknown, setUnknown] = useState(false);
   const state = useBannerForm(initial, content, created !== null);
   const { values, setValues, timeZone, form, upload, blocker } = state;
+  const placement = useBannerPlacement(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -96,7 +111,7 @@ function BannerCreate() {
     if (form.state.busy || !canWrite || upload.running) return;
     const issues = validateBannerForm(values, content, timeZone);
     if (hasIssues(issues)) {
-      form.showIssues(issues);
+      form.showIssues(issues, firstInvalidBannerField);
       return;
     }
     const outcome = await form.submit(() =>
@@ -154,6 +169,7 @@ function BannerCreate() {
             zone={zoneLabel(timeZone, Date.now())}
             warnings={bannerWarnings(values, content.locales, timeZone, Date.now())}
             preview={<BannerPreview t={t} uiLocale={locale} content={content} values={values} />}
+            placement={placement}
           />
         </>
       )}
@@ -190,6 +206,7 @@ function BannerEditForm({
     content,
     false,
   );
+  const placement = useBannerPlacement(banner.id);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,7 +214,7 @@ function BannerEditForm({
     if (form.state.busy || !canWrite || upload.running) return;
     const issues = validateBannerForm(values, content, timeZone, initial);
     if (hasIssues(issues)) {
-      form.showIssues(issues);
+      form.showIssues(issues, firstInvalidBannerField);
       return;
     }
     const body = bannerPatchBody(initial, values, content.locales, timeZone);
@@ -233,6 +250,7 @@ function BannerEditForm({
         warnings={bannerWarnings(values, content.locales, timeZone, Date.now(), initial)}
         initial={initial}
         preview={<BannerPreview t={t} uiLocale={locale} content={content} values={values} />}
+        placement={placement}
       />
       <UnsavedChangesDialog blocker={blocker} />
     </>
