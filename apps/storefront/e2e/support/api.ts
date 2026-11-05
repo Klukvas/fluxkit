@@ -245,6 +245,40 @@ export class AdminApi {
     return new AdminApi(context);
   }
 
+  /** `POST /admin/media/uploads` (docs/api/media.md): the upload's id, for a banner picture. */
+  async uploadImage(bytes: Buffer): Promise<{ id: string; url: string }> {
+    return json(
+      await this.context.post("/admin/media/uploads", {
+        headers: { ...CSRF, "Content-Type": "application/octet-stream" },
+        data: bytes,
+      }),
+      201,
+    );
+  }
+
+  /** `POST /admin/banners` (docs/api/banners.md): appended at the end of the list. */
+  async createBanner(body: Record<string, unknown>): Promise<{ id: string }> {
+    return json(await this.context.post("/admin/banners", { headers: CSRF, data: body }), 201);
+  }
+
+  /** Every banner, in order (`GET /admin/banners`). */
+  async listBanners(): Promise<{ id: string }[]> {
+    return (await json<{ items: { id: string }[] }>(await this.context.get("/admin/banners"), 200))
+      .items;
+  }
+
+  /** `PUT /admin/banners/order`: exactly the current banners, in the new order. */
+  async reorderBanners(ids: readonly string[]): Promise<void> {
+    await json(
+      await this.context.put("/admin/banners/order", { headers: CSRF, data: { ids } }),
+      200,
+    );
+  }
+
+  async deleteBanner(id: string): Promise<void> {
+    await json(await this.context.delete(`/admin/banners/${id}`, { headers: CSRF }), [204, 404]);
+  }
+
   async setPrice(productId: string, variantId: string, amount: number): Promise<void> {
     await json(
       await this.context.put(`/admin/products/${productId}/variants/${variantId}/prices/UAH`, {
