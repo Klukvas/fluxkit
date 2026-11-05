@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+  <!-- Fluxkit demo banner picture (generated, no branding): shopping bags and a price tag on their own neutral background, so it
+       reads on the light and the dark theme. TODO(fluxkit): a client fork replaces it (config/home.ts, "home-banners"). -->
+  <rect width="640" height="320" fill="#e8eaf6"/>
+  <circle cx="560" cy="70" r="80" fill="#d6daf0"/>
+  <ellipse cx="300" cy="292" rx="220" ry="16" fill="#d2d6ea"/>
+  <path d="M170 120h150l-12 170H182z" fill="#7c86b8"/>
+  <path d="M170 120h150l-3 30H173z" fill="#6873a6"/>
+  <path d="M215 130v-30a30 30 0 0 1 60 0v30" fill="none" stroke="#4b5482" stroke-width="9" stroke-linecap="round"/>
+  <path d="M300 160h120l-10 130H310z" fill="#c9a77c"/>
+  <path d="M300 160h120l-2 24H302z" fill="#b8956a"/>
+  <path d="M335 168v-22a25 25 0 0 1 50 0v22" fill="none" stroke="#8a6a44" stroke-width="8" stroke-linecap="round"/>
+  <path d="M440 110l70 0 30 30-70 70-60-60z" fill="#f1d9a0"/>
+  <circle cx="500" cy="130" r="8" fill="#e8eaf6"/>
+  <rect x="455" y="160" width="40" height="8" rx="4" transform="rotate(-45 475 164)" fill="#d4b56f"/>
+</svg>

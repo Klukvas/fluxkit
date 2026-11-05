@@ -128,7 +128,7 @@ See `docs/files/storefront.md` for one line per file. In short:
 
 ### Layout composition is configuration
 
-- Home page: `src/config/home.ts` lists the sections in order (`hero`, `categories`, `productRow`, `trust`, `richText`; see "Desktop design, batch B"); `components/home-sections.tsx` renders each `kind` (a `switch` with a `never` check). The page starts one load per data section (`getHomeSection`, `lib/home-data.ts`) and streams each into its own `Suspense` boundary; the renderers are synchronous and receive the loaded result, so they stay testable with `renderToStaticMarkup` (`HomeSectionsView`).
+- Home page: `src/config/home.ts` lists the sections in order (`hero`, `banners`, `categories`, `productRow`, `trust`, `richText`; see "Desktop design, batch B" and "Home banners"); `components/home-sections.tsx` renders each `kind` (a `switch` with a `never` check). The page starts one load per data section (`getHomeSection`, `lib/home-data.ts`) and streams each into its own `Suspense` boundary; the renderers are synchronous and receive the loaded result, so they stay testable with `renderToStaticMarkup` (`HomeSectionsView`).
 - Category page header: `src/config/category-page.ts` (`banner`: the category's name and description in the `Hero` component, optional picture per slug; `plain`).
 - Theme: `src/config/theme.ts` (`defaultMode`, `showToggle`).
 - Header and footer links: `src/layout/navigation.ts` (message keys and locale-less paths; `localizedHref` adds the locale and refuses anything that is not a plain path).
@@ -464,6 +464,27 @@ Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements a
   row); e2e `e2e/tests/design-b.e2e.ts` (section order, h1, hero picture, CLS, 1280/1024/768/390 without sideways scroll, the banner, the
   server HTML per cookie, the system mode under an emulated scheme, the switch by keyboard and without a script, computed-colour contrast of
   the home, product, category, cart and checkout pages in dark).
+
+## Home banners (2026-11-05)
+
+Plan `docs/plans/2026-11-05-home-banners.md` (screenshots and results there).
+
+- **What:** the `banners` section of `config/home.ts`: 0 to 3 promotional cards in one row (one column below 768 px), static (no carousel,
+  no autoplay, no client script). Each card is ONE link named by its title (`aria-labelledby`) and described by its text
+  (`aria-describedby`), with a local picture (`LocalPicture`, intrinsic `width`/`height`, lazy unless the section is the first on the page),
+  an `h3` title and a short text under a visually hidden `h2`. Tones from existing tokens: `surface` (default; page background and border)
+  or `accent` (the `primary` fill). The default home shows three demo banners after the hero (`TODO(fluxkit)`).
+- **Edit banners (a client fork):** change `items` of the `home-banners` entry in `src/config/home.ts`: per banner a unique slug `id`,
+  `titleKey`, `textKey`, `image { src, width, height, altKey }` and `href`, optional `tone`. Put the pictures in `public/home/` with their
+  real size (draw their own background so they read on the dark theme; `config/home.spec.ts` checks the file, its `viewBox` and that it
+  loads nothing). Add the texts as `home.banners.*` in BOTH `src/messages/uk.json` and `en.json`. `href` is a storefront path without the
+  locale (`/catalog`, `/c/<slug>`; checked like the hero's link) or an `https://` address (same tab); `http:`, `javascript:`, `//host` and
+  the like fail the render and the config spec (`lib/home-banners.ts`). A fourth banner fails `tsc`; `items: []` or removing the entry hides
+  the section. Banners edited in the admin are NOT built (a later option in the plan: it needs an API and a table).
+- **Tests:** `lib/home-banners.spec.ts` (links, count, ids), `config/home.spec.ts` (default banners, compile-time checks of the count and the
+  section kinds), `components/home-sections.spec.tsx` (markup, accessible name, tones, columns, lazy or eager, hidden when empty, no
+  hardcoded text); e2e `e2e/tests/home-banners.e2e.ts` (order, names, links, pictures, keyboard, 390/768/1024/1280) and the dark contrast
+  walk of `design-b.e2e.ts`, which now asserts the banners are on the page.
 
 ## Accessibility baseline (what was checked)
 

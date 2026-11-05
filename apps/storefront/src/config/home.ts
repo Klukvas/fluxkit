@@ -69,8 +69,51 @@ export interface RichTextSection {
   bodyKey: string;
 }
 
+/** The most banners one `banners` section shows (one row on desktop). */
+export const MAX_BANNERS = 3;
+
+/** Colour of a banner card, from existing tokens only: `surface` = background and border, `accent` = the primary colour. */
+export type BannerTone = "surface" | "accent";
+
+export interface Banner {
+  /** Unique within its section: part of the card's heading id. */
+  id: string;
+  titleKey: string;
+  textKey: string;
+  /**
+   * Where the whole card links to: a storefront path without the locale (`/catalog`, checked like the hero's link), or an
+   * absolute `https://` address (opens in the same tab). Anything else fails the render (`lib/home-banners.ts`).
+   */
+  href: string;
+  /** With its own background drawn in, so it reads on the light and the dark theme. */
+  image: LocalImage;
+  /** Default `surface`. */
+  tone?: BannerTone;
+}
+
+/** 0 to `MAX_BANNERS` banners: a fourth one fails the TypeScript build. */
+export type BannerList =
+  readonly [] | readonly [Banner] | readonly [Banner, Banner] | readonly [Banner, Banner, Banner];
+
+/**
+ * Promotional cards in one row (one column on phones). No carousel: every card is visible and nothing moves by itself
+ * (plan 2026-11-05-home-banners.md). An empty `items` hides the section.
+ */
+export interface BannersSection {
+  kind: "banners";
+  id: string;
+  /** Heading of the section (visually hidden: the cards' titles speak for themselves). */
+  titleKey: string;
+  items: BannerList;
+}
+
 export type HomeSection =
-  HeroSection | CategoriesSection | ProductRowSection | TrustSection | RichTextSection;
+  | HeroSection
+  | BannersSection
+  | CategoriesSection
+  | ProductRowSection
+  | TrustSection
+  | RichTextSection;
 
 export type HomeSectionKind = HomeSection["kind"];
 
@@ -82,8 +125,14 @@ export function isDataSection(section: HomeSection): section is HomeDataSection 
 }
 
 /**
- * TODO(fluxkit): demo composition and copy. A client fork replaces the hero texts and picture, the "about" text and the
- * section list with its own (the trust lines are `config/trust-bar.ts`). The picture is a neutral generated illustration.
+ * TODO(fluxkit): demo composition and copy. A client fork replaces the hero texts and picture, the banners, the "about" text
+ * and the section list with its own (the trust lines are `config/trust-bar.ts`). The pictures are neutral generated
+ * illustrations.
+ *
+ * Replacing the banners: edit `items` of `home-banners` below (0 to 3; each `href` a storefront path or an `https://` address;
+ * `tone` `surface` or `accent`), put the pictures under `public/home/` with their real `width`/`height` (each with its own
+ * background, so it reads on the dark theme too) and change the `home.banners.*` texts in BOTH `src/messages/uk.json` and
+ * `en.json`. `items: []` or removing the entry hides the section.
  */
 export const homeSections: readonly HomeSection[] = [
   {
@@ -93,6 +142,50 @@ export const homeSections: readonly HomeSection[] = [
     sublineKey: "home.hero.description",
     cta: { labelKey: "home.hero.cta", href: "/catalog" },
     image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
+  },
+  {
+    kind: "banners",
+    id: "home-banners",
+    titleKey: "home.banners.title",
+    items: [
+      {
+        id: "season",
+        titleKey: "home.banners.season.title",
+        textKey: "home.banners.season.text",
+        href: "/catalog",
+        image: {
+          src: "/home/banner-1.svg",
+          width: 640,
+          height: 320,
+          altKey: "home.banners.season.alt",
+        },
+        tone: "accent",
+      },
+      {
+        id: "gifts",
+        titleKey: "home.banners.gifts.title",
+        textKey: "home.banners.gifts.text",
+        href: "/catalog",
+        image: {
+          src: "/home/banner-2.svg",
+          width: 640,
+          height: 320,
+          altKey: "home.banners.gifts.alt",
+        },
+      },
+      {
+        id: "account",
+        titleKey: "home.banners.account.title",
+        textKey: "home.banners.account.text",
+        href: "/account/register",
+        image: {
+          src: "/home/banner-3.svg",
+          width: 640,
+          height: 320,
+          altKey: "home.banners.account.alt",
+        },
+      },
+    ],
   },
   {
     kind: "categories",
