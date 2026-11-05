@@ -65,9 +65,10 @@ a separate architect plan if the owner wants it. Record the choice in ADR 0046 (
 | Column | Type | Rule |
 |---|---|---|
 | `id` | uuid pk | |
-| `title` | jsonb `I18nText` not null | default locale required, 1 to 80 characters, `validateI18nText` |
+| `layout` | text not null default `'card'` | CHECK in (`card`, `image`): `card` = picture, title, text, link; `image` = the picture alone (designed in Figma or Canva), with the link (owner decision 2026-11-05) |
+| `title` | jsonb `I18nText` null | required for `card` (default locale, 1 to 80 characters, `validateI18nText`); not used for `image` |
 | `text` | jsonb `I18nText` null | 0 to 200 |
-| `image_alt` | jsonb `I18nText` null | 0 to 150; absent = decorative picture (`alt=""`, the card's name is the title) |
+| `image_alt` | jsonb `I18nText` null | 0 to 150. `card`: absent = decorative picture (`alt=""`, the link's name is the title). `image`: REQUIRED in the default locale: it is the link's accessible name, because the picture is the only content |
 | `image_upload_id` | uuid not null, FK `media_upload(id)` ON DELETE RESTRICT | width, height and URL come from the upload row |
 | `link` | text not null | storefront path or `https` URL, at most 2048, rules below; stored without a locale prefix |
 | `tone` | text not null default `'surface'` | CHECK in (`surface`, `accent`) |
@@ -190,3 +191,11 @@ Every PR: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:e
 4. No audit entries for banner changes (a recorded gap, like catalog edits). Answered by the owner.
 5. Links: storefront paths and any `https` address. NOT asked: the recommended default stands, the owner may change it.
 6. Limits: up to 50 stored, 3 shown, home page only. NOT asked: the recommended default stands, the owner may change it.
+
+## 7. Amendments (owner, 2026-11-05)
+
+- **Admin interface = "variant 2"**: list and form with a live preview. The preview renders the storefront's own banner component (extracted into `@fluxkit/ui` so the admin and the storefront draw the same card, tokens only), per locale, with light/dark and phone/desktop switches. Reorder by drag and by up/down buttons (keyboard, live region). Live checks: picture ratio 2:1 (with the real size shown), text lengths, "both languages required to activate", date window in the past. A conductor of sections (variant 3) and on-page editing (variant 4) are NOT part of this plan.
+- **No custom HTML or iframes for the owner** (XSS, CSP, theming, accessibility; AGENTS section 11). The owner's freedom of design comes from the new **`image` layout** (D2): a finished picture with a description and a link. A developer who needs more adds a section in a fork's `config/home.ts`. A sanitised HTML block stays a possible later plan (needs a sanitiser dependency: red zone).
+- **`image` layout rules**: `image_alt` required in the default locale (also the link's name), title and text hidden and stored null; the storefront renders one link around the picture in the fixed 2:1 frame (no overlay text, no tone); the same 3-shown limit and date window; the admin preview shows only the picture; the form warns that text inside a picture is not translated and not read by screen readers, so the same words belong in the description.
+- **Open question 7 (new, not yet asked)**: pictures with text inside are language specific. Default for v1: ONE picture per banner for all languages (document it: keep text out of the picture or use `card`). Alternative: one picture per locale (an additive `banner_image(banner_id, locale, upload_id)` table, more UI). Recommended: ship v1 with one picture, add per-locale pictures when a client needs them.
+- Tests added for the layout: core rules (alt required for `image`, title required for `card`), API validation, storefront rendering of both layouts (accessible name from alt for `image`), admin form switching layouts without losing the shared fields.
