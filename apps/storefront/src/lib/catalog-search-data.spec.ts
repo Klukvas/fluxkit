@@ -50,6 +50,9 @@ function fakes(answer: SearchOutcome | (() => Promise<SearchOutcome>)) {
     getProduct: async () => {
       throw new Error("not used");
     },
+    listBanners: async () => {
+      throw new Error("not used");
+    },
   };
   const search: SearchData = {
     async search(locale, query, read) {

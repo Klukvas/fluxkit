@@ -4,8 +4,9 @@
  * here and edits the `home.*` messages; no component changes. Texts are message keys (uk and en in `src/messages`), never
  * literal strings. `components/home-sections.tsx` renders each `kind`; a `kind` it does not know fails the TypeScript build.
  *
- * Data sections (`categories`, `productRow`) read the store API through the 60 s data cache; one with nothing to show is left
- * out, and one whose read failed shows a short error while the rest of the page renders.
+ * Data sections (`categories`, `productRow`, and `banners` with `source: "admin"`) read the store API through the 60 s data
+ * cache; one with nothing to show is left out, and one whose read failed shows a short error while the rest of the page
+ * renders. Banners are left out on a failed read instead: a promotion slot that says "could not load" helps nobody.
  */
 
 /** A picture served from `apps/storefront/public` (never a remote URL: no image host to allow, no request to a third party). */
@@ -69,7 +70,7 @@ export interface RichTextSection {
   bodyKey: string;
 }
 
-/** The most banners one `banners` section shows (one row on desktop). */
+/** The most banners one `banners` section shows (one row on desktop); `GET /store/banners` returns at most as many. */
 export const MAX_BANNERS = 3;
 
 /** Colour of a banner card, from existing tokens only: `surface` = background and border, `accent` = the primary colour. */
@@ -81,8 +82,8 @@ export interface Banner {
   titleKey: string;
   textKey: string;
   /**
-   * Where the whole card links to: a storefront path without the locale (`/catalog`, checked like the hero's link), or an
-   * absolute `https://` address (opens in the same tab). Anything else fails the render (`lib/home-banners.ts`).
+   * Where the whole card links to: a storefront path without the locale (`/catalog`), or an absolute `https://` address
+   * (opens in the same tab). The same rule as the admin's banners (`lib/home-banners.ts`); anything else fails the render.
    */
   href: string;
   /** With its own background drawn in, so it reads on the light and the dark theme. */
@@ -95,17 +96,35 @@ export interface Banner {
 export type BannerList =
   readonly [] | readonly [Banner] | readonly [Banner, Banner] | readonly [Banner, Banner, Banner];
 
-/**
- * Promotional cards in one row (one column on phones). No carousel: every card is visible and nothing moves by itself
- * (plan 2026-11-05-home-banners.md). An empty `items` hides the section.
- */
-export interface BannersSection {
+interface BannersSectionBase {
   kind: "banners";
   id: string;
   /** Heading of the section (visually hidden: the cards' titles speak for themselves). */
   titleKey: string;
+}
+
+/**
+ * The banners the shop manages in the admin (plan 2026-11-05-admin-home-banners.md, D6): `GET /store/banners` (at most 3,
+ * live now, texts and picture already resolved for the page's locale), through the 60 s data cache, so a change shows up to
+ * a minute late. No banner, or a store that cannot answer, hides the section (the failure is logged); a banner whose link or
+ * data fails the storefront's own check is skipped and logged.
+ */
+export interface AdminBannersSection extends BannersSectionBase {
+  source: "admin";
+}
+
+/** Banners in code: the typed `items`, edited by a developer (plan 2026-11-05-home-banners.md). `items: []` hides the section. */
+export interface ConfigBannersSection extends BannersSectionBase {
+  source: "config";
   items: BannerList;
 }
+
+/**
+ * Promotional cards in one row (one column on phones). No carousel: every card is visible and nothing moves by itself.
+ * `source` says where they come from; there is no fallback from one source to the other (an owner who deletes every banner
+ * in the admin must not see demo banners come back).
+ */
+export type BannersSection = AdminBannersSection | ConfigBannersSection;
 
 export type HomeSection =
   | HeroSection
@@ -117,22 +136,73 @@ export type HomeSection =
 
 export type HomeSectionKind = HomeSection["kind"];
 
-/** Section kinds whose content comes from the store API. */
-export type HomeDataSection = CategoriesSection | ProductRowSection;
+/** Sections whose content comes from the store API: category tiles, a product row and the banners of the admin. */
+export type HomeDataSection = CategoriesSection | ProductRowSection | AdminBannersSection;
 
 export function isDataSection(section: HomeSection): section is HomeDataSection {
-  return section.kind === "categories" || section.kind === "productRow";
+  return (
+    section.kind === "categories" ||
+    section.kind === "productRow" ||
+    (section.kind === "banners" && section.source === "admin")
+  );
 }
 
 /**
- * TODO(fluxkit): demo composition and copy. A client fork replaces the hero texts and picture, the banners, the "about" text
- * and the section list with its own (the trust lines are `config/trust-bar.ts`). The pictures are neutral generated
- * illustrations.
+ * TODO(fluxkit): the static demo banners of the `config` source (PR 225). Not on the page by default (the template shows the
+ * banners of the admin); a fork that prefers banners in code shows these, or its own, with
+ * `{ kind: "banners", source: "config", id: "home-banners", titleKey: "home.banners.title", items: demoConfigBanners }`.
  *
- * Replacing the banners: edit `items` of `home-banners` below (0 to 3; each `href` a storefront path or an `https://` address;
- * `tone` `surface` or `accent`), put the pictures under `public/home/` with their real `width`/`height` (each with its own
- * background, so it reads on the dark theme too) and change the `home.banners.*` texts in BOTH `src/messages/uk.json` and
- * `en.json`. `items: []` or removing the entry hides the section.
+ * Replacing them: 0 to 3 items (each `href` a storefront path without the locale or an `https://` address; `tone` `surface`
+ * or `accent`), pictures under `public/home/` with their real `width`/`height` (each with its own background, so it reads on
+ * the dark theme too) and the `home.banners.*` texts in BOTH `src/messages/uk.json` and `en.json`.
+ */
+export const demoConfigBanners: BannerList = [
+  {
+    id: "season",
+    titleKey: "home.banners.season.title",
+    textKey: "home.banners.season.text",
+    href: "/catalog",
+    image: {
+      src: "/home/banner-1.svg",
+      width: 640,
+      height: 320,
+      altKey: "home.banners.season.alt",
+    },
+    tone: "accent",
+  },
+  {
+    id: "gifts",
+    titleKey: "home.banners.gifts.title",
+    textKey: "home.banners.gifts.text",
+    href: "/catalog",
+    image: {
+      src: "/home/banner-2.svg",
+      width: 640,
+      height: 320,
+      altKey: "home.banners.gifts.alt",
+    },
+  },
+  {
+    id: "account",
+    titleKey: "home.banners.account.title",
+    textKey: "home.banners.account.text",
+    href: "/account/register",
+    image: {
+      src: "/home/banner-3.svg",
+      width: 640,
+      height: 320,
+      altKey: "home.banners.account.alt",
+    },
+  },
+];
+
+/**
+ * TODO(fluxkit): demo composition and copy. A client fork replaces the hero texts and picture, the "about" text and the
+ * section list with its own (the trust lines are `config/trust-bar.ts`). The pictures are neutral generated illustrations.
+ *
+ * Banners: the shop edits them in the admin (`source: "admin"`; `pnpm seed` creates three demo ones). Removing the entry
+ * hides the section and the storefront never asks the API for banners; `source: "config"` keeps them in code instead
+ * (`demoConfigBanners` above).
  */
 export const homeSections: readonly HomeSection[] = [
   {
@@ -143,50 +213,7 @@ export const homeSections: readonly HomeSection[] = [
     cta: { labelKey: "home.hero.cta", href: "/catalog" },
     image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
   },
-  {
-    kind: "banners",
-    id: "home-banners",
-    titleKey: "home.banners.title",
-    items: [
-      {
-        id: "season",
-        titleKey: "home.banners.season.title",
-        textKey: "home.banners.season.text",
-        href: "/catalog",
-        image: {
-          src: "/home/banner-1.svg",
-          width: 640,
-          height: 320,
-          altKey: "home.banners.season.alt",
-        },
-        tone: "accent",
-      },
-      {
-        id: "gifts",
-        titleKey: "home.banners.gifts.title",
-        textKey: "home.banners.gifts.text",
-        href: "/catalog",
-        image: {
-          src: "/home/banner-2.svg",
-          width: 640,
-          height: 320,
-          altKey: "home.banners.gifts.alt",
-        },
-      },
-      {
-        id: "account",
-        titleKey: "home.banners.account.title",
-        textKey: "home.banners.account.text",
-        href: "/account/register",
-        image: {
-          src: "/home/banner-3.svg",
-          width: 640,
-          height: 320,
-          altKey: "home.banners.account.alt",
-        },
-      },
-    ],
-  },
+  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
   {
     kind: "categories",
     id: "home-categories",
