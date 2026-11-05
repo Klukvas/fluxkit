@@ -243,3 +243,49 @@ For PR 2: `apps/admin/src/lib/problem-messages.spec.ts` scans the admin API docs
 
 Not verified: the admin screen and the storefront (PRs 2 and 3); e2e suites (no UI change); the Docker `compose` and `deploy-smoke`
 jobs; a real host.
+
+## 10. Results: PR 3 (storefront and seed; branch `feature/banners-storefront`, 2026-11-05; not reviewed yet)
+
+(Section 9 is left to PR 2, built in parallel.)
+
+Built:
+- Storefront: `BannersSection` is `AdminBannersSection | ConfigBannersSection` (`source` required, typed; compile-time checks in
+  `config/home.spec.ts`); template default `source: "admin"`; the PR 225 cards stay as `demoConfigBanners` for `source: "config"`.
+  `StoreData.listBanners` (tag `store:banners`, 60 s cache, last-good copy), a `banners` case in `lib/home-data.ts`, the checks of an API
+  banner in `lib/home-banners.ts` (`checkStoreBanner`, `storeBannerViews`), one renderer for both sources and both layouts in
+  `components/home-sections.tsx` (2:1 `object-cover` frame, `StoreImage` with a new `fill` mode for uploads, `LocalPicture` for config).
+- The storefront link check (`checkBannerHref`) restates core `checkBannerLink`: the two PR 225 minors are fixed (`%2e` dot segments, a
+  leading locale segment); `lib/home-banners-parity.spec.ts` runs core's case table (copied row for row, 13 accepted, 47 refused, 17 more).
+  `localizedHref` (navigation and hero links, developer config) is unchanged.
+- Seed: `seeds/src/banners.ts` (two `card`, one `image` banner with an own `en` picture; `TODO(fluxkit)` copy), four WebP pictures from
+  `scripts/generate-demo-images.mjs` (`--only` added; 35 KB), the runner's `ensureBanner` (through `BannersService`; fixed id, see below).
+- Docs: storefront README "Home banners", e2e README, `docs/files/{storefront,seeds,api}.md`, `seeds/README.md`, root README "Try it
+  locally", CHANGELOG, HANDOFF line.
+
+Verified (real commands, each exit code read): see the PR report (lint, format:check, typecheck, check:boundaries, check:env, check:docs,
+theme 97, storefront unit 1958, seeds 20, core 2176, API seed/banners/media/newest-order specs on real Postgres, Redis and Meilisearch,
+full storefront e2e 152 passed and 4 skipped (`search-off`, by design)). The e2e test "a banner created through the admin API" waited
+46 s in one run and 60 s in another: the 60 s data cache is real and bounded; the test reloads, it has no test-only cache switch.
+Screenshots before/after (uk, en, light, dark, 390, 1280), under `next dev` with the development `/media` rule: the `en` page shows the
+English picture of the picture banner, `uk` the default (Ukrainian) one.
+
+Decisions taken outside the letter of the plan or the task (for the reviewer):
+- A picture whose host `allowedImageUrl` refuses shows the token PLACEHOLDER (plan D6, the product image rule) and is logged; it is not
+  skipped. Reason: the host is a deployment setting shared by all banners (skipping would hide the whole section on one missing
+  `STOREFRONT_IMAGE_HOSTS` entry), and the e2e stack serves media over plain `http`, so skipping would make the banners untestable there.
+  A banner whose link or shape fails is skipped and logged as asked.
+- The admin's banners are awaited by the page, not streamed (no `Suspense` boundary of their own): no skeleton can match an unknown
+  number and layout, and a row arriving late near the top would shift the page. The layout above already waits for the API.
+- An outage hides the section (D6): the loader logs it like every data section (`Home section "home-banners" could not be loaded.`).
+- The seed creates a banner INACTIVE through `BannersService.create`, sets the fixed id with one `UPDATE banner SET id` (the only write
+  outside an admin service; the service generates ids and `apps/api/src/banners` was not in this PR's paths), then adds the locale
+  picture and activates it through `BannersService.update`. A cleaner later option: an optional id on the service's create, for the seed only.
+- `apps/api/src/test/seed-rows.ts` (outside the owned paths, test support of the seed) removes the demo banners and their uploads, so the
+  specs that run the seed (`seed.spec.ts`, `newest-order.spec.ts`) leave the shared test database clean.
+- The admin e2e (`apps/admin/e2e/prepare-database.ts` runs `pnpm seed`) now starts with three demo banners: PR 2's admin banner e2e must
+  expect them (not changed here).
+- The storefront keeps its own rendering; the shared presentational `BannerCard` of `@fluxkit/ui` (section 7) comes with PR 2. Switching
+  the storefront to it is a small follow-up after both PRs are merged.
+
+Not verified: the Docker `compose`/`deploy-smoke` jobs; a production build with a real https media host (only the placeholder path and
+`next dev` were seen); the full API suite (only the specs above); the admin screen (PR 2).
