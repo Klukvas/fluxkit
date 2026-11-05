@@ -8,6 +8,7 @@ import type {
 import {
   Button,
   Checkbox,
+  ConfirmDialog,
   DataTable,
   Field,
   Select,
@@ -27,6 +28,7 @@ import { useUnsavedChangesGuard } from "../../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
 import { PATHS, buildPath } from "../../../router/paths";
 import { FailureMessage } from "../../../views/status-views";
+import { useAdminConfig } from "../../catalog-dictionaries/config-gate";
 import { linkClass } from "../../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../../catalog-dictionaries/form-dialog";
 import {
@@ -52,6 +54,7 @@ import {
   type AttributeFormValues,
 } from "../attribute-values-form";
 import { TabProblemsView } from "../editor-views";
+import { zeroPricedVariantIds } from "../prices/price-grid";
 import { VARIANTS_FOCUS_ID, variantRowFocusId } from "../field-ids";
 import { variantIssues, variantProblems, type PublishProblem } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
@@ -864,6 +867,9 @@ export function VariantsTab({
   const [editing, setEditing] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<AdminVariant | null>(null);
+  // A variant priced 0 that the admin is switching on in a published product, while asked about it.
+  const [zeroActivation, setZeroActivation] = useState<AdminVariant | null>(null);
+  const config = useAdminConfig();
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<MessageDescriptor | null>(null);
   const failureRef = useRef<HTMLDivElement>(null);
@@ -896,6 +902,32 @@ export function VariantsTab({
     }
   }
 
+  function setActive(variant: AdminVariant, next: boolean) {
+    void write(
+      () => adminClient.updateVariant(product.id, variant.id, { isActive: next }),
+      () => onChanged("saved", { variantId: variant.id }),
+    );
+  }
+
+  /**
+   * Switching a variant on in a published product puts it on sale: with a price of 0 in the shop currency it would be
+   * given away (the API allows it), so ask first. When the prices cannot be read, switch it on as before (the API decides).
+   */
+  async function activateAskingForZero(variant: AdminVariant) {
+    let zero = false;
+    try {
+      const prices = await adminClient.listProductPrices(product.id);
+      zero =
+        prices.ok &&
+        zeroPricedVariantIds(prices.data.items, [variant.id], config.shopCurrency).length > 0;
+    } catch (bug) {
+      crash(bug);
+      return;
+    }
+    if (zero) setZeroActivation(variant);
+    else setActive(variant, true);
+  }
+
   const actions: VariantRowActions = {
     canEdit: canUpdate,
     canDelete,
@@ -909,11 +941,10 @@ export function VariantsTab({
         () => adminClient.updateVariant(product.id, variant.id, { isDefault: true }),
         () => onChanged("saved", { variantId: variant.id }),
       ),
-    onToggleActive: (variant, next) =>
-      void write(
-        () => adminClient.updateVariant(product.id, variant.id, { isActive: next }),
-        () => onChanged("saved", { variantId: variant.id }),
-      ),
+    onToggleActive: (variant, next) => {
+      if (next && product.status === "active") void activateAskingForZero(variant);
+      else setActive(variant, next);
+    },
     onDelete: (variant) => setDeleting(variant),
   };
 
@@ -1021,6 +1052,19 @@ export function VariantsTab({
           onCancel={() => setCreating(false)}
         />
       ) : null}
+      <ConfirmDialog
+        open={zeroActivation !== null}
+        onClose={() => setZeroActivation(null)}
+        onConfirm={() => {
+          const variant = zeroActivation;
+          setZeroActivation(null);
+          if (variant !== null) setActive(variant, true);
+        }}
+        title={t("products.variants.zeroActivateTitle", { sku: zeroActivation?.sku ?? "" })}
+        description={t("products.variants.zeroActivateBody")}
+        confirmLabel={t("products.variants.zeroActivateConfirm")}
+        cancelLabel={t("dict.form.cancel")}
+      />
       {deleting === null ? null : (
         <ConfirmDelete
           t={t}

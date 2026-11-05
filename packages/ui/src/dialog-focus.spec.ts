@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  nativeCloseAction,
-  openModal,
-  type DialogLike,
-  type FocusableLike,
-} from "./dialog-focus";
+import { nativeCloseAction, openModal, type DialogLike, type FocusableLike } from "./dialog-focus";
 
 function fakeDialog(options: { initialFocus?: FocusableLike | null; open?: boolean } = {}) {
   const calls: string[] = [];
