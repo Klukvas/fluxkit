@@ -53,7 +53,7 @@ const TONES: Record<BannerCardTone, { card: string; text: string | null }> = {
   },
 };
 
-const FRAME = "block aspect-2/1 w-full overflow-hidden bg-muted";
+const FRAME = "block aspect-2/1 overflow-hidden bg-muted";
 
 /**
  * A home page promotional banner (plan 2026-11-05-admin-home-banners.md, D6 and section 7), shared by the storefront and
@@ -74,7 +74,7 @@ export function BannerCard({
   if (layout === "image") {
     return renderLink({
       className: cn(
-        "group block h-full overflow-hidden rounded-lg border border-border bg-background transition-shadow hover:shadow-raised motion-reduce:transition-none",
+        "group block overflow-hidden rounded-lg border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none",
         focusRing,
       ),
       children: <span className={FRAME}>{picture}</span>,
