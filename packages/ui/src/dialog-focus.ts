@@ -14,6 +14,29 @@ export interface DialogLike {
 /** Marks the control that gets the focus when a dialog opens (the safe choice of a confirmation). */
 export const initialFocusSelector = "[data-autofocus]";
 
+/** What the dialog does with a native `close` event. */
+export type NativeCloseAction = "ignore" | "close" | "reopen";
+
+/**
+ * The answer to a native `close` event of a controlled dialog (the browser closed it without asking React, for example a
+ * second Escape that fires no `cancel`):
+ * - `ignore` while the state says closed (the dialog was closed by state, nothing to bring in line), and while the element
+ *   is open again: the event is stale. React's StrictMode (the admin's `vite dev`) runs the open effect, its cleanup
+ *   (`dialog.close()`, which QUEUES a `close` event) and the effect again (`showModal()`) before the event fires; acting on
+ *   it would close a dialog that has just opened. Production builds run the effect once, so they never saw it.
+ * - `close` (tell the caller) when it may be dismissed, else `reopen` it.
+ */
+export function nativeCloseAction(
+  propOpen: boolean,
+  elementOpen: boolean,
+  dismissible: boolean,
+): NativeCloseAction {
+  if (!propOpen || elementOpen) {
+    return "ignore";
+  }
+  return dismissible ? "close" : "reopen";
+}
+
 /**
  * Opens the dialog as a modal and returns the function that closes it and puts the focus back on the element that
  * opened it. Returning the focus is done here, not left to the browser, so it also works when the dialog is closed by

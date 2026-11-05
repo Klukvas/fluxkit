@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, type DialogHTMLAttributes, type ReactNode } from "react";
 import { cn } from "./cn";
-import { openModal } from "./dialog-focus";
+import { nativeCloseAction, openModal } from "./dialog-focus";
 
 export interface DialogProps extends Omit<
   DialogHTMLAttributes<HTMLDialogElement>,
@@ -65,15 +65,14 @@ export function Dialog({
           onClose();
         }
       }}
-      // A second Escape press can close the dialog natively without a cancel event; bring the state back in line.
-      onClose={() => {
-        if (!open) {
-          return;
-        }
-        if (dismissible) {
+      // A second Escape press can close the dialog natively without a cancel event; bring the state back in line. A stale
+      // event (queued by the cleanup's close() before the dialog was opened again) is ignored: `nativeCloseAction`.
+      onClose={(event) => {
+        const action = nativeCloseAction(open, event.currentTarget.open, dismissible);
+        if (action === "close") {
           onClose();
-        } else {
-          dialogRef.current?.showModal();
+        } else if (action === "reopen") {
+          event.currentTarget.showModal();
         }
       }}
       className={cn(
