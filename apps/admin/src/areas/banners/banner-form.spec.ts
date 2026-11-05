@@ -129,6 +129,50 @@ describe("checks before sending", () => {
   });
 });
 
+describe("the activation rule on an edit (review of PR 230, m3)", () => {
+  // Created through the API: switched on with the default-locale title only (the API allows it).
+  const stored = filled({ isActive: true, title: { uk: "Розпродаж", en: "" } });
+
+  it("does not block an unrelated edit of a banner that was already on; warns instead", () => {
+    const next = { ...stored, link: "/sale" };
+    expect(validateBannerForm(next, CONTENT, ZONE, stored)).toEqual({});
+    expect(bannerWarnings(next, CONTENT.locales, ZONE, 0, stored)).toContainEqual({
+      kind: "missingLanguage",
+      path: "title.en",
+    });
+  });
+
+  it("blocks when this save switches it on, changes the layout or empties that language's naming text", () => {
+    const off = { ...stored, isActive: false };
+    expect(validateBannerForm(stored, CONTENT, ZONE, off)["title.en"]?.key).toBe(
+      "banners.form.requiredToActivate",
+    );
+    const full = { ...stored, title: { uk: "Розпродаж", en: "Sale" } };
+    expect(validateBannerForm(stored, CONTENT, ZONE, full)["title.en"]?.key).toBe(
+      "banners.form.requiredToActivate",
+    );
+    const image = { ...stored, layout: "image" as const, imageAlt: { uk: "Опис", en: "" } };
+    expect(validateBannerForm(image, CONTENT, ZONE, stored)["imageAlt.en"]?.key).toBe(
+      "banners.form.requiredToActivate",
+    );
+    // A create has no stored values: always blocked.
+    expect(validateBannerForm(stored, CONTENT, ZONE)["title.en"]?.key).toBe(
+      "banners.form.requiredToActivate",
+    );
+  });
+});
+
+describe("times the zone skips or has twice", () => {
+  it("are pointed out on their field with what is saved", () => {
+    const values = filled({ startsAt: "2026-03-29T03:30", endsAt: "2026-10-25T03:30" });
+    expect(validateBannerForm(values, CONTENT, ZONE)).toEqual({});
+    expect(bannerWarnings(values, CONTENT.locales, ZONE, 0)).toEqual([
+      { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30" },
+      { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30" },
+    ]);
+  });
+});
+
 describe("warnings that do not block", () => {
   it("warn about every picture that is not 2:1 and about an end in the past", () => {
     const now = Date.UTC(2026, 10, 5, 12);

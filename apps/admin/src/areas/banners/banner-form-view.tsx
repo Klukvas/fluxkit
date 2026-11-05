@@ -59,7 +59,7 @@ export interface BannerFormViewProps {
 function RadioGroup<Value extends string>({
   id,
   legend,
-  hint,
+  error,
   options,
   value,
   readOnly,
@@ -67,24 +67,20 @@ function RadioGroup<Value extends string>({
 }: {
   id: string;
   legend: string;
-  hint?: string;
+  /** A refusal of the server at the whole field (`layout`, `tone`). */
+  error?: string;
   options: readonly { value: Value; label: string; description?: string }[];
   value: Value;
   readOnly: boolean;
   onChange: (value: Value) => void;
 }) {
-  const hintId = `${id}-hint`;
+  const errorId = `${id}-error`;
   return (
     <fieldset
       className="flex flex-col gap-2"
-      aria-describedby={hint === undefined ? undefined : hintId}
+      aria-describedby={error === undefined ? undefined : errorId}
     >
       <legend className="mb-1 font-semibold text-foreground">{legend}</legend>
-      {hint === undefined ? null : (
-        <p id={hintId} className="text-sm text-muted-foreground">
-          {hint}
-        </p>
-      )}
       {options.map((option) => {
         const optionId = `${id}-${option.value}`;
         return (
@@ -111,6 +107,11 @@ function RadioGroup<Value extends string>({
           </div>
         );
       })}
+      {error === undefined ? null : (
+        <p id={errorId} className="text-sm text-danger">
+          {error}
+        </p>
+      )}
     </fieldset>
   );
 }
@@ -195,23 +196,26 @@ function PictureSlotView({
       ) : (
         <PictureFacts t={t} picture={picture} />
       )}
-      {canWrite && upload.uploadsEnabled ? (
+      {canWrite ? (
         <div className="flex flex-wrap items-start gap-3">
-          <UploadPanel
-            t={t}
-            id={`${id}-upload`}
-            label={
-              picture === null
-                ? slot === null
-                  ? t("banners.picture.upload")
-                  : t("banners.picture.uploadLocale", { language })
-                : slot === null
-                  ? t("banners.picture.replace")
-                  : t("banners.picture.replaceLocale", { language })
-            }
-            multiple={false}
-            controls={controls}
-          />
+          {upload.uploadsEnabled ? (
+            <UploadPanel
+              t={t}
+              id={`${id}-upload`}
+              label={
+                picture === null
+                  ? slot === null
+                    ? t("banners.picture.upload")
+                    : t("banners.picture.uploadLocale", { language })
+                  : slot === null
+                    ? t("banners.picture.replace")
+                    : t("banners.picture.replaceLocale", { language })
+              }
+              multiple={false}
+              controls={controls}
+            />
+          ) : null}
+          {/* Going back to the main picture needs no upload, so it is offered with uploads switched off too. */}
           {slot !== null && picture !== null ? (
             <Button variant="secondary" onClick={onRemove} disabled={upload.running}>
               {t("banners.picture.removeLocale", { language })}
@@ -241,6 +245,7 @@ function LocaleText({
   error,
   locale,
   extraHint,
+  warning,
   onChange,
 }: {
   t: Translator;
@@ -254,14 +259,17 @@ function LocaleText({
   error: MessageDescriptor | undefined;
   locale: string;
   extraHint?: string;
+  /** Pointed out, not refused (a language missing on a banner that was already switched on). */
+  warning?: string;
   onChange: (value: string) => void;
 }) {
   const count = t("banners.form.count", { length: codePointLength(value.trim()), limit });
+  const hint = [extraHint, count, warning].filter((part) => part !== undefined).join(" ");
   return (
     <Field
       id={id}
       label={label}
-      hint={extraHint === undefined ? count : `${extraHint} ${count}`}
+      hint={hint}
       error={error === undefined ? undefined : describe(t, error)}
       required={required}
       requiredIndicator={t("dict.form.requiredMark")}
@@ -322,6 +330,18 @@ export function BannerFormView({
   const setText = (field: "title" | "text" | "imageAlt", locale: string, text: string) =>
     onChange({ ...values, [field]: { ...values[field], [locale]: text } });
   const ended = warnings.some((warning) => warning.kind === "ended");
+  /**
+   * A locale's error, and for the default locale also a refusal of the whole field (`title`, `text`, `imageAlt`), so
+   * "check the marked fields" always has a marked field.
+   */
+  const textError = (field: "title" | "text" | "imageAlt", locale: string) =>
+    issues[`${field}.${locale}`] ?? (locale === content.defaultLocale ? issues[field] : undefined);
+  const missingLanguage = (path: string) =>
+    warnings.some((warning) => warning.kind === "missingLanguage" && warning.path === path)
+      ? t("banners.form.missingLanguage")
+      : undefined;
+  const whole = (field: "layout" | "tone") =>
+    issues[field] === undefined ? undefined : describe(t, issues[field]);
   return (
     <div className="grid gap-8 xl:grid-cols-2">
       {/* The form checks itself (the picture slots are no native fields): one translated summary, no browser bubble. */}
@@ -331,6 +351,7 @@ export function BannerFormView({
           id="banner-layout"
           legend={t("banners.form.layout")}
           value={values.layout}
+          error={whole("layout")}
           readOnly={readOnly}
           onChange={(layout) => set({ layout })}
           options={[
@@ -432,7 +453,8 @@ export function BannerFormView({
                     required={requiredHere}
                     multiline={false}
                     readOnly={readOnly}
-                    error={issues[`title.${locale}`]}
+                    error={textError("title", locale)}
+                    warning={missingLanguage(`title.${locale}`)}
                     locale={locale}
                     onChange={(text) => setText("title", locale, text)}
                   />
@@ -445,7 +467,7 @@ export function BannerFormView({
                     required={false}
                     multiline
                     readOnly={readOnly}
-                    error={issues[`text.${locale}`]}
+                    error={textError("text", locale)}
                     locale={locale}
                     onChange={(text) => setText("text", locale, text)}
                   />
@@ -465,7 +487,8 @@ export function BannerFormView({
                 required={!card && requiredHere}
                 multiline={!card}
                 readOnly={readOnly}
-                error={issues[`imageAlt.${locale}`]}
+                error={textError("imageAlt", locale)}
+                warning={missingLanguage(`imageAlt.${locale}`)}
                 locale={locale}
                 onChange={(text) => setText("imageAlt", locale, text)}
               />
@@ -483,7 +506,6 @@ export function BannerFormView({
             value={values.link}
             readOnly={readOnly}
             required
-            maxLength={BANNER_LIMITS.linkMaxLength}
             autoComplete="off"
             error={issues["link"]}
             onChange={(link) => set({ link })}
@@ -498,6 +520,7 @@ export function BannerFormView({
             id="banner-tone"
             legend={t("banners.form.tone")}
             value={values.tone}
+            error={whole("tone")}
             readOnly={readOnly}
             onChange={(tone) => set({ tone })}
             options={[
@@ -532,29 +555,44 @@ export function BannerFormView({
             {t("banners.form.zone", { zone })}
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
-            {(["startsAt", "endsAt"] as const).map((field) => (
-              <Field
-                key={field}
-                id={`banner-${field}`}
-                label={t(field === "startsAt" ? "banners.form.startsAt" : "banners.form.endsAt")}
-                hint={t(
-                  field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint",
-                )}
-                error={issues[field] === undefined ? undefined : describe(t, issues[field])}
-              >
-                {(control) => (
-                  <Input
-                    {...control}
-                    aria-describedby={`${control["aria-describedby"] ?? ""} banner-zone`.trim()}
-                    type="datetime-local"
-                    name={field}
-                    value={values[field]}
-                    readOnly={readOnly}
-                    onChange={(event) => set({ [field]: event.target.value })}
-                  />
-                )}
-              </Field>
-            ))}
+            {(["startsAt", "endsAt"] as const).map((field) => {
+              const note = warnings.find(
+                (warning) => warning.kind === "time" && warning.field === field,
+              );
+              const base = t(
+                field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint",
+              );
+              return (
+                <Field
+                  key={field}
+                  id={`banner-${field}`}
+                  label={t(field === "startsAt" ? "banners.form.startsAt" : "banners.form.endsAt")}
+                  hint={
+                    note?.kind === "time"
+                      ? `${base} ${t(
+                          note.note === "gap"
+                            ? "banners.form.timeGap"
+                            : "banners.form.timeAmbiguous",
+                          { time: note.shown },
+                        )}`
+                      : base
+                  }
+                  error={issues[field] === undefined ? undefined : describe(t, issues[field])}
+                >
+                  {(control) => (
+                    <Input
+                      {...control}
+                      aria-describedby={`${control["aria-describedby"] ?? ""} banner-zone`.trim()}
+                      type="datetime-local"
+                      name={field}
+                      value={values[field]}
+                      readOnly={readOnly}
+                      onChange={(event) => set({ [field]: event.target.value })}
+                    />
+                  )}
+                </Field>
+              );
+            })}
           </div>
           {ended ? (
             <p className="text-sm font-medium text-warning">{t("banners.form.endedWarning")}</p>

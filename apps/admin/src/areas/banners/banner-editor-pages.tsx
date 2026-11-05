@@ -195,7 +195,7 @@ function BannerEditForm({
     event.preventDefault();
     // A save must not race a picture that is still uploading.
     if (form.state.busy || !canWrite || upload.running) return;
-    const issues = validateBannerForm(values, content, timeZone);
+    const issues = validateBannerForm(values, content, timeZone, initial);
     if (hasIssues(issues)) {
       form.showIssues(issues);
       return;
@@ -230,7 +230,7 @@ function BannerEditForm({
         cancelTo={PATHS.banners}
         upload={upload}
         zone={zoneLabel(timeZone, Date.now())}
-        warnings={bannerWarnings(values, content.locales, timeZone, Date.now())}
+        warnings={bannerWarnings(values, content.locales, timeZone, Date.now(), initial)}
         preview={<BannerPreview t={t} uiLocale={locale} content={content} values={values} />}
       />
       <UnsavedChangesDialog blocker={blocker} />

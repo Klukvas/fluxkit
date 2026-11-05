@@ -20,7 +20,7 @@ import {
 } from "../catalog-dictionaries/locale-text";
 import { formErrorsFromProblem } from "../catalog-dictionaries/submit-errors";
 import { BANNER_LIMITS, checkBannerLink, codePointLength, inWindowBounds } from "./banner-rules";
-import { isoToLocalInput, localInputToIso } from "./banner-time";
+import { isoToLocalInput, localInputToIso, type LocalTimeNote } from "./banner-time";
 
 /**
  * The banner form (plan D5 and section 7): the values the admin edits, the checks before sending, the request bodies and
@@ -208,6 +208,8 @@ export function validateBannerForm(
   values: BannerFormValues,
   content: ContentLocales,
   timeZone: string,
+  /** The stored values of an edit (the activation rule applies to what this save changes). */
+  initial?: BannerFormValues,
 ): FormIssues {
   const issues: FormIssues = {};
   if (values.picture === null) issues[pictureField(null)] = issue("banners.form.pictureRequired");
@@ -231,14 +233,8 @@ export function validateBannerForm(
       maxLength: BANNER_LIMITS.imageAltMaxLength,
     }),
   );
-  if (values.isActive) {
-    const naming = values.layout === "card" ? "title" : "imageAlt";
-    for (const locale of content.locales) {
-      const path = `${naming}.${locale}`;
-      if ((values[naming][locale] ?? "").trim() === "" && issues[path] === undefined) {
-        issues[path] = issue("banners.form.requiredToActivate");
-      }
-    }
+  for (const path of missingNamingTexts(values, content.locales, initial)) {
+    if (issues[path] === undefined) issues[path] = issue("banners.form.requiredToActivate");
   }
   const link = checkBannerLink(values.link.trim(), content.locales);
   if (!link.ok) issues["link"] = issue(`banners.link.${link.reason}`);
@@ -246,20 +242,64 @@ export function validateBannerForm(
   return issues;
 }
 
+/**
+ * The naming-text fields (`title.<locale>` of a `card`, `imageAlt.<locale>` of an `image`) that are empty while the banner
+ * is switched on. With `initial` (an edit) only those this save is responsible for: the banner is switched on now, its
+ * layout changed, or that locale's naming text was changed. A banner that was already on with a language missing (the
+ * API allows it) is not blocked from unrelated edits; the form warns instead (`bannerWarnings`).
+ */
+function missingNamingTexts(
+  values: BannerFormValues,
+  locales: readonly string[],
+  initial: BannerFormValues | undefined,
+  only: "blocking" | "warning" = "blocking",
+): string[] {
+  if (!values.isActive) return [];
+  const naming = values.layout === "card" ? "title" : "imageAlt";
+  const blank = locales.filter((locale) => (values[naming][locale] ?? "").trim() === "");
+  const responsible = (locale: string) =>
+    initial === undefined ||
+    !initial.isActive ||
+    initial.layout !== values.layout ||
+    (initial[naming][locale] ?? "") !== (values[naming][locale] ?? "");
+  return blank
+    .filter((locale) => (only === "blocking") === responsible(locale))
+    .map((locale) => `${naming}.${locale}`);
+}
+
 export type BannerWarning =
-  { kind: "ratio"; locale: string | null; width: number; height: number } | { kind: "ended" };
+  | { kind: "ratio"; locale: string | null; width: number; height: number }
+  | { kind: "ended" }
+  | { kind: "time"; field: "startsAt" | "endsAt"; note: LocalTimeNote; shown: string }
+  | { kind: "missingLanguage"; path: string };
 
 /**
- * What the form points out without refusing: a picture that is not 2:1 (the storefront crops it) and an end that is
- * already past (the banner will not be shown again).
+ * What the form points out without refusing: a picture that is not 2:1 (the storefront crops it), an end that is already
+ * past (the banner will not be shown again), a typed time the zone skips or has twice (what is saved instead), and a
+ * language without its naming text on a banner that was already switched on (`missingNamingTexts`).
  */
 export function bannerWarnings(
   values: BannerFormValues,
   locales: readonly string[],
   timeZone: string,
   now: number,
+  initial?: BannerFormValues,
 ): BannerWarning[] {
   const warnings: BannerWarning[] = [];
+  for (const field of ["startsAt", "endsAt"] as const) {
+    const typed = localInputToIso(values[field], timeZone);
+    if (typed.ok && typed.value !== null && typed.note !== null) {
+      warnings.push({
+        kind: "time",
+        field,
+        note: typed.note,
+        shown: isoToLocalInput(typed.value, timeZone).replace("T", " "),
+      });
+    }
+  }
+  for (const path of missingNamingTexts(values, locales, initial, "warning")) {
+    warnings.push({ kind: "missingLanguage", path });
+  }
   const pictures: [string | null, BannerPicture | null | undefined][] = [
     [null, values.picture],
     ...locales.map((locale) => [locale, values.localePictures[locale]] as [string, BannerPicture]),

@@ -267,6 +267,52 @@ describe("the banner form", () => {
     expect(html).not.toContain('type="file"');
   });
 
+  it("offers going back to the main picture with uploads switched off (it needs no upload)", () => {
+    const html = form(
+      { ...card, localePictures: { en: { ...PICTURE, uploadId: "en" } } },
+      { upload: { uploadsEnabled: false, running: false, controlsFor: () => uploadControls() } },
+    );
+    expect(html).not.toContain('type="file"');
+    expect(html.match(/§banners\.picture\.removeLocale/g)).toHaveLength(1);
+  });
+
+  it("marks a refusal of a whole field: title, text and description at the default locale, layout and tone at their controls", () => {
+    const html = form(card, {
+      issues: {
+        title: { key: "errors.reason.not_allowed_for_layout" },
+        text: { key: "errors.reason.invalid_type" },
+        layout: { key: "errors.reason.invalid_value" },
+        tone: { key: "errors.reason.required" },
+      },
+    });
+    expect(html).toMatch(/<input[^>]*id="banner-title-uk"[^>]*aria-invalid="true"/);
+    expect(html).not.toMatch(/<input[^>]*id="banner-title-en"[^>]*aria-invalid="true"/);
+    expect(html).toMatch(/<textarea[^>]*id="banner-text-uk"[^>]*aria-invalid="true"/);
+    expect(html).toContain('id="banner-layout-error"');
+    expect(html).toContain("§errors.reason.invalid_value");
+    expect(html).toContain('id="banner-tone-error"');
+    expect(html).toContain("§errors.reason.required");
+    const image = form({ ...card, layout: "image" }, { issues: { imageAlt: { key: "x" } } });
+    expect(image).toMatch(/<textarea[^>]*id="banner-imageAlt-uk"[^>]*aria-invalid="true"/);
+  });
+
+  it("lets the link rule report a too long link (no maxLength cuts it off)", () => {
+    expect(form(card)).not.toMatch(/<input[^>]*id="banner-link"[^>]*maxLength/i);
+  });
+
+  it("says under the date field when the typed time is skipped or occurs twice, and warns about a missing language", () => {
+    const html = form(card, {
+      warnings: [
+        { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30" },
+        { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30" },
+        { kind: "missingLanguage", path: "title.en" },
+      ],
+    });
+    expect(html).toMatch(/id="banner-startsAt-hint"[^>]*>[^<]*§banners\.form\.timeGap/);
+    expect(html).toMatch(/id="banner-endsAt-hint"[^>]*>[^<]*§banners\.form\.timeAmbiguous/);
+    expect(html).toMatch(/id="banner-title-en-hint"[^>]*>[^<]*§banners\.form\.missingLanguage/);
+  });
+
   it("locks Save while a picture uploads", () => {
     const html = form(card, {
       upload: {

@@ -75,12 +75,24 @@ export function isoToLocalInput(iso: string | null, timeZone: string): string {
   return `${pad(clock.year, 4)}-${pad(clock.month)}-${pad(clock.day)}T${pad(clock.hour)}:${pad(clock.minute)}`;
 }
 
+/** `gap`: the zone skips that wall clock (clocks go forward); `ambiguous`: it occurs twice (clocks go back). */
+export type LocalTimeNote = "gap" | "ambiguous";
+
 export type LocalInputResult =
-  { ok: true; value: null } | { ok: true; value: string; instant: number } | { ok: false };
+  | { ok: true; value: null }
+  | { ok: true; value: string; instant: number; note: LocalTimeNote | null }
+  | { ok: false };
+
+const MS_PER_DAY = 86_400_000;
 
 /**
- * The UTC instant (`...Z`) of a typed `datetime-local` value in `timeZone`; `""` is no bound. A wall-clock time that the
- * zone skips (the hour a daylight-saving change jumps over) moves forward by the jump, as browsers do.
+ * The UTC instant (`...Z`) of a typed `datetime-local` value in `timeZone`; `""` is no bound. One rule for every zone,
+ * whatever the sign of its offset:
+ * - the offsets in force a day before, at and a day after the wall clock are the candidates; every candidate instant whose
+ *   wall clock in the zone is the typed one is a reading of it;
+ * - two readings (the hour the clocks go back): the EARLIER instant (`note: "ambiguous"`);
+ * - no reading (the hour the clocks jump over): the offset in force BEFORE the change, which moves the time forward by
+ *   the size of the jump, as `new Date(y, m, d, h, min)` does in browsers (`note: "gap"`).
  */
 export function localInputToIso(text: string, timeZone: string): LocalInputResult {
   if (text === "") return { ok: true, value: null };
@@ -97,10 +109,19 @@ export function localInputToIso(text: string, timeZone: string): LocalInputResul
   const wall = Date.UTC(year, month - 1, day, hour, minute);
   const check = new Date(wall);
   if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) return { ok: false };
-  // Two steps: the offset near the wall clock, then the offset at the instant that gives (it differs across a change).
-  const first = wall - offsetAt(wall, timeZone);
-  const instant = wall - offsetAt(first, timeZone);
-  return { ok: true, value: new Date(instant).toISOString(), instant };
+  const offsets = new Set(
+    [-MS_PER_DAY, 0, MS_PER_DAY].map((shift) => offsetAt(wall + shift, timeZone)),
+  );
+  const readings = [...offsets]
+    .map((offset) => wall - offset)
+    .filter((instant) => asUtc(wallClock(instant, timeZone)) === wall)
+    .sort((left, right) => left - right);
+  const earliest = readings[0];
+  const [instant, note]: [number, LocalTimeNote | null] =
+    earliest === undefined
+      ? [wall - offsetAt(wall - MS_PER_DAY, timeZone), "gap"]
+      : [earliest, readings.length > 1 ? "ambiguous" : null];
+  return { ok: true, value: new Date(instant).toISOString(), instant, note };
 }
 
 /** The zone and its current offset for the hint next to the date fields (`Europe/Kyiv, UTC+02:00`). */

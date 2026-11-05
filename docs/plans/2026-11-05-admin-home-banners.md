@@ -289,3 +289,25 @@ Decisions inside the plan's frame (listed for the reviewer):
 
 Not verified: the storefront rendering of admin banners (PR 3); a screen reader (roles and names are checked by the specs and e2e);
 other browsers than Chromium; the Docker `compose` and `deploy-smoke` jobs; the article texts by the owner.
+
+### PR 2 follow-up: core link-rule port and review fixes (2026-11-05)
+
+- **Link rule** (PR 229 tightened core `checkBannerLink`: dot-like characters in a host, a numeric last label unless a dotted
+  IPv4, malformed IPv6 literals): the admin copy follows. Failing first: the 10 refused and 7 accepted rows plus 4 extra host
+  rows, run against core built from PR 229's sources (not committed here), failed 25 tests (24 rows, the count guard) before the
+  port and passed after. Until PR 229 is merged, the parity rows of this branch disagree with this branch's own core (merge
+  order: PR 229 first).
+- **M1 time zones**: `localInputToIso` now has one rule for every zone: the offsets a day before, at and a day after the wall
+  clock are the candidates; two readings (clocks go back) take the EARLIER instant; none (clocks go forward) uses the offset
+  before the change, moving the time forward by the jump. The result names the case (`note: "gap" | "ambiguous"`), and the
+  date field says what is saved. Failing first: the cases for Kyiv, New York, Lord Howe (30 minutes), UTC and Etc/GMT-14 failed
+  (9 tests); the old algorithm moved New York's gap backward (02:30 -> 01:30 EST) and took the later Kyiv reading. The year
+  bounds message says the year is counted in UTC.
+- **m3** the "every language before switching on" block applies only when this save switches the banner on, changes the
+  layout or changes that language's naming text; an already-active banner with a language missing gets a warning.
+- **m4** refusals at `title`, `text`, `imageAlt` mark the default-locale field; `layout` and `tone` errors show at their
+  controls. **m5** the picture limits text says a replaced or removed picture stays in the media storage. **m6** "Use the main
+  picture" is offered with uploads off. **m7** no `maxLength` on the link (the rule reports `too_long`).
+- Failing first for m3, m4, m6, m7 and the time hints: the 6 new tests failed against the previous sources and pass now.
+- E2E: a new scenario checks that the list shows every stored banner (the seed's demo banners included), no empty state, and
+  "Shown on the storefront" on exactly the banners the API marks (at most 3).

@@ -72,7 +72,12 @@ describe("banner area source guards", () => {
 
   it("renders the upload controls only behind write permission and the server's switch", () => {
     const view = file("banner-form-view.tsx");
-    expect(view.match(/canWrite && upload\.uploadsEnabled/g)).toHaveLength(2);
+    // The limits line, and in each slot the upload panel inside the write-only block.
+    expect(view.match(/canWrite && upload\.uploadsEnabled/g)).toHaveLength(1);
+    expect(view).toMatch(
+      /\{canWrite \? \(\s*<div[^>]*>\s*\{upload\.uploadsEnabled \? \(\s*<UploadPanel/,
+    );
+    expect(view.match(/<UploadPanel/g)).toHaveLength(1);
   });
 
   it("puts uploaded addresses into img src only through safeHttpUrl", () => {

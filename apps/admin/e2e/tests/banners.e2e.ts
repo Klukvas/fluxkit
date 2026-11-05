@@ -345,3 +345,31 @@ test("the viewer reads the banners without any write control", async ({
   await expect(main.getByRole("button", { name: "Save changes" })).toHaveCount(0);
   await expect(main.getByLabel("Upload the main picture")).toHaveCount(0);
 });
+
+test("the list shows every stored banner, the seed's demo banners included, and marks only the first 3 live as shown", async ({
+  page,
+  signIn,
+  apiContext,
+}, testInfo) => {
+  const u = unique(testInfo);
+  const name = `Top ${u}`;
+  const { api, context } = await ownerApi(apiContext);
+  const top = await createBanner(api, context, name);
+  // Put it first: the first live banner is always one of the 3 the storefront shows.
+  const ids = await storedIds(api);
+  await api.put("/admin/banners/order", { ids: [top.id, ...ids.filter((id) => id !== top.id)] });
+  const stored = (
+    await api.get<{ items: (StoredBanner & { shownOnStorefront: boolean })[] }>("/admin/banners")
+  ).items;
+  const shown = stored.filter((banner) => banner.shownOnStorefront).length;
+  expect(shown).toBeGreaterThanOrEqual(1);
+  expect(shown).toBeLessThanOrEqual(3);
+
+  await signIn("manager");
+  await openList(page);
+  const list = page.getByRole("list", { name: "Banners in the order the home page shows them" });
+  await expect(page.getByText("No banners yet")).toHaveCount(0);
+  await expect(list.getByRole("listitem")).toHaveCount(stored.length);
+  await expect(row(page, name).getByText("Shown on the storefront")).toBeVisible();
+  await expect(list.getByText("Shown on the storefront", { exact: true })).toHaveCount(shown);
+});
