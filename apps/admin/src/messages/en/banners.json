@@ -74,7 +74,7 @@
   "banners.form.endsAtHint": "Empty: no end. The banner disappears at this moment.",
   "banners.form.endedWarning": "This end is in the past: the banner will not be shown.",
   "banners.form.timeGap": "This time does not exist in your time zone (the clocks go forward): it is saved as {time}.",
-  "banners.form.timeAmbiguous": "This time occurs twice in your time zone (the clocks go back): the earlier {time} is used.",
+  "banners.form.timeAmbiguous": "This time occurs twice in your time zone (the clocks go back): the earlier one is used, {time}.",
   "banners.form.missingLanguage": "Empty in this language while the banner is switched on: shoppers in this language see the main language's text.",
   "banners.form.create": "Create the banner",
   "banners.link.empty": "Enter a link.",

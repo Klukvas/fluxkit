@@ -126,8 +126,13 @@ export function localInputToIso(text: string, timeZone: string): LocalInputResul
 
 /** The zone and its current offset for the hint next to the date fields (`Europe/Kyiv, UTC+02:00`). */
 export function zoneLabel(timeZone: string, now: number): string {
-  const minutes = offsetAt(now, timeZone) / MS_PER_MINUTE;
+  return `${timeZone}, ${offsetLabel(now, timeZone)}`;
+}
+
+/** The zone's offset at `instant` as text (`UTC+03:00`): which of two equal wall clocks is meant. */
+export function offsetLabel(instant: number, timeZone: string): string {
+  const minutes = offsetAt(instant, timeZone) / MS_PER_MINUTE;
   const sign = minutes < 0 ? "-" : "+";
   const absolute = Math.abs(minutes);
-  return `${timeZone}, UTC${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
+  return `UTC${sign}${pad(Math.floor(absolute / 60))}:${pad(absolute % 60)}`;
 }

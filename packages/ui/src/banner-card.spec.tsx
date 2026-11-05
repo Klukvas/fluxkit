@@ -56,6 +56,23 @@ describe("BannerCard, card layout", () => {
     expect(tags(markup, "h3")).toHaveLength(0);
   });
 
+  it("treats an empty text like no text: no description element, no aria-describedby", () => {
+    for (const text of ["", null, undefined]) {
+      const markup = render(
+        <BannerCard
+          id="e"
+          layout="card"
+          title="New"
+          text={text}
+          picture={picture("")}
+          renderLink={anchor("/x")}
+        />,
+      );
+      expect(first(markup, "a").attributes["aria-describedby"], String(text)).toBeUndefined();
+      expect(markup, String(text)).not.toContain('id="e-text"');
+    }
+  });
+
   it("draws the tones with tokens only: surface on the background, accent on the primary fill", () => {
     const surface = classTokens(
       render(

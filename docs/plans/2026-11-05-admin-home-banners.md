@@ -281,7 +281,7 @@ Decisions inside the plan's frame (listed for the reviewer):
   button (its twin when the row reached an end), a polite status line announces "moved to position N of M". Dragging is a pointer
   enhancement only.
 - `BannerCard` puts every picture in a fixed 2:1 frame (`aspect-2/1`, `object-cover`), as D6 asks for admin banners; the config
-  mode's pictures are 2:1 today. Whether and how the storefront adopts it is PR 3's call (no storefront file changed here).
+  mode's pictures are 2:1 today.
 - The preview's desktop width is a fixed three-column row (the card at one third, as with three banners) that scrolls sideways in a
   narrow column (a focusable region); phone width is 20 rem.
 - Navigation: the Storefront group sits between Catalog and Sales; the help topic between Catalog and Prices (the "previous" link of
@@ -290,7 +290,7 @@ Decisions inside the plan's frame (listed for the reviewer):
 Not verified: the storefront rendering of admin banners (PR 3); a screen reader (roles and names are checked by the specs and e2e);
 other browsers than Chromium; the Docker `compose` and `deploy-smoke` jobs; the article texts by the owner.
 
-### PR 2 follow-up: core link-rule port and review fixes (2026-11-05)
+### Review fixes of PR 230
 
 - **Link rule** (PR 229 tightened core `checkBannerLink`: dot-like characters in a host, a numeric last label unless a dotted
   IPv4, malformed IPv6 literals): the admin copy follows. Failing first: the 10 refused and 7 accepted rows plus 4 extra host
@@ -317,6 +317,11 @@ other browsers than Chromium; the Docker `compose` and `deploy-smoke` jobs; the 
   `fill`) and the link (`next/link` or an anchor). `BannerCard` took the storefront's exact classes first (image layout: no
   background, hover border). A source guard in `home-sections.spec.tsx` failed on the merged main and passes now; every storefront
   unit test of PR 229 passes unchanged.
+- **Second review** (no blocker, no major): the form's link check asks the browser's URL parser after core's rule, like
+  the storefront (`https://xn--/`, full-width `＠`, `：` or digits, a joiner in the host are refused before saving; core is
+  unchanged, its parity is checked on `checkCoreBannerLink`); the doubled-hour hint names the offset of the reading used; the
+  required mark follows the blocking rule (`activationRequires`), so a language that is only warned about is not marked;
+  `BannerCard` pins that an empty text is no text. Failing first: the 6 link rows, the hint text and the required mark.
 
 ## 10. Results: PR 3 (storefront and seed; branch `feature/banners-storefront`, 2026-11-05; not reviewed yet)
 

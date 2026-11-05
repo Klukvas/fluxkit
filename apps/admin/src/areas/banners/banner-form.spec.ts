@@ -167,8 +167,8 @@ describe("times the zone skips or has twice", () => {
     const values = filled({ startsAt: "2026-03-29T03:30", endsAt: "2026-10-25T03:30" });
     expect(validateBannerForm(values, CONTENT, ZONE)).toEqual({});
     expect(bannerWarnings(values, CONTENT.locales, ZONE, 0)).toEqual([
-      { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30" },
-      { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30" },
+      { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30 UTC+03:00" },
+      { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30 UTC+03:00" },
     ]);
   });
 });

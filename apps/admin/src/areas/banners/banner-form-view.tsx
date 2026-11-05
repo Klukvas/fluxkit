@@ -14,6 +14,7 @@ import { languageName } from "../catalog-dictionaries/locale-text";
 import { UploadPanel, type UploadControls } from "../catalog-dictionaries/upload-panel";
 import { limitValues } from "../catalog-dictionaries/upload-queue";
 import {
+  activationRequires,
   hasBannerRatio,
   localesUsingDefault,
   pictureField,
@@ -54,6 +55,8 @@ export interface BannerFormViewProps {
   warnings: readonly BannerWarning[];
   /** The live preview, placed next to the form on wide screens. */
   preview: ReactNode;
+  /** The stored values of an edit: the activation rule asks what this save changes. */
+  initial?: BannerFormValues;
 }
 
 function RadioGroup<Value extends string>({
@@ -322,6 +325,7 @@ export function BannerFormView({
   zone,
   warnings,
   preview,
+  initial,
 }: BannerFormViewProps) {
   const readOnly = !canWrite;
   const card = values.layout === "card";
@@ -434,7 +438,8 @@ export function BannerFormView({
         {content.locales.map((locale) => {
           const language = languageName(locale, uiLocale);
           const isDefault = locale === content.defaultLocale;
-          const requiredHere = isDefault || values.isActive;
+          // Required by the rule that blocks the save (`activationRequires`); a mere warning never shows the mark.
+          const requiredHere = isDefault || activationRequires(values, locale, initial);
           return (
             <fieldset key={locale} className="flex flex-col gap-4">
               <legend className="mb-1 text-lg font-semibold text-foreground">

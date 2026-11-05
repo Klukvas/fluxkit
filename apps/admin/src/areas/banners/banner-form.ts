@@ -20,7 +20,7 @@ import {
 } from "../catalog-dictionaries/locale-text";
 import { formErrorsFromProblem } from "../catalog-dictionaries/submit-errors";
 import { BANNER_LIMITS, checkBannerLink, codePointLength, inWindowBounds } from "./banner-rules";
-import { isoToLocalInput, localInputToIso, type LocalTimeNote } from "./banner-time";
+import { isoToLocalInput, localInputToIso, offsetLabel, type LocalTimeNote } from "./banner-time";
 
 /**
  * The banner form (plan D5 and section 7): the values the admin edits, the checks before sending, the request bodies and
@@ -257,14 +257,29 @@ function missingNamingTexts(
   if (!values.isActive) return [];
   const naming = values.layout === "card" ? "title" : "imageAlt";
   const blank = locales.filter((locale) => (values[naming][locale] ?? "").trim() === "");
-  const responsible = (locale: string) =>
+  return blank
+    .filter((locale) => (only === "blocking") === activationRequires(values, locale, initial))
+    .map((locale) => `${naming}.${locale}`);
+}
+
+/**
+ * Whether switching on requires the naming text of `locale` on THIS save: the banner is (to be) switched on and this save
+ * switches it on, changes the layout or changes that locale's text (or it is a create). The form marks the field required
+ * by the same rule that blocks the save, so the mark never contradicts a mere warning.
+ */
+export function activationRequires(
+  values: BannerFormValues,
+  locale: string,
+  initial: BannerFormValues | undefined,
+): boolean {
+  if (!values.isActive) return false;
+  const naming = values.layout === "card" ? "title" : "imageAlt";
+  return (
     initial === undefined ||
     !initial.isActive ||
     initial.layout !== values.layout ||
-    (initial[naming][locale] ?? "") !== (values[naming][locale] ?? "");
-  return blank
-    .filter((locale) => (only === "blocking") === responsible(locale))
-    .map((locale) => `${naming}.${locale}`);
+    (initial[naming][locale] ?? "") !== (values[naming][locale] ?? "")
+  );
 }
 
 export type BannerWarning =
@@ -293,7 +308,8 @@ export function bannerWarnings(
         kind: "time",
         field,
         note: typed.note,
-        shown: isoToLocalInput(typed.value, timeZone).replace("T", " "),
+        // The wall clock plus its offset: for a doubled hour the offset says which of the two readings is saved.
+        shown: `${isoToLocalInput(typed.value, timeZone).replace("T", " ")} ${offsetLabel(typed.instant, timeZone)}`,
       });
     }
   }

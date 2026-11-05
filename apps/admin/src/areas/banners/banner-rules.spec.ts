@@ -10,6 +10,7 @@ import {
   BANNER_LIMITS,
   BANNER_WINDOW_BOUNDS,
   checkBannerLink,
+  checkCoreBannerLink,
   codePointLength,
   inWindowBounds,
 } from "./banner-rules";
@@ -159,6 +160,22 @@ describe("banner rules copied from core", () => {
     );
   });
 
+  // The form runs in a browser: after core's checks the browser's own URL parser has the last word, like the storefront's
+  // `checkBannerHref`, so a link the storefront would drop is refused before saving (core is pure and cannot ask it).
+  it.each([
+    ["https://xn--/"],
+    ["https://xn--a/"],
+    ["https://user＠example.com/"],
+    ["https://example.com：8443/"],
+    ["https://example.１２３/"],
+    ["https://exa‍mple.com/"],
+  ])("refuses %j, which the URL parser refuses", (href) => {
+    expect(checkBannerLink(href, ["uk", "en"])).toEqual({
+      ok: false,
+      reason: "not_path_or_https",
+    });
+  });
+
   it("have the same limits and window bounds as core", () => {
     expect({ ...BANNER_LIMITS }).toEqual({ ...coreLimits });
     expect({ ...BANNER_WINDOW_BOUNDS }).toEqual({ ...coreBounds });
@@ -168,6 +185,8 @@ describe("banner rules copied from core", () => {
     "check the link %s exactly as core does",
     (_label, href) => {
       for (const locales of [["uk", "en"], ["uk", "en", "pl"], []] as const) {
+        expect(checkCoreBannerLink(href, locales)).toEqual(coreCheck(href, locales));
+        // The browser check refuses nothing core accepts in this table (it only adds refusals).
         expect(checkBannerLink(href, locales)).toEqual(coreCheck(href, locales));
       }
     },

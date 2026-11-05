@@ -126,15 +126,34 @@ function checkHttps(href: string): BannerLinkResult {
 }
 
 /**
- * Core `checkBannerLink`: a storefront path (one leading `/`, no `//`, no `.`/`..` segment even as `%2e`, no leading
- * content-locale segment) or an `https` address with a host and no credentials; never whitespace, a control character
- * or a backslash; at most 2048 characters.
+ * Core `checkBannerLink`, copied: a storefront path (one leading `/`, no `//`, no `.`/`..` segment even as `%2e`, no
+ * leading content-locale segment) or an `https` address with a host and no credentials; never whitespace, a control
+ * character or a backslash; at most 2048 characters. `banner-rules.spec.ts` compares it with core case by case.
  */
-export function checkBannerLink(href: string, locales: readonly string[]): BannerLinkResult {
+export function checkCoreBannerLink(href: string, locales: readonly string[]): BannerLinkResult {
   if (href.length === 0) return refuse("empty");
   if (href.length > BANNER_LIMITS.linkMaxLength) return refuse("too_long");
   if (hasBlankControlOrBackslash(href)) return refuse("invalid_characters");
   return href.startsWith("/") ? checkPath(href, locales) : checkHttps(href);
+}
+
+/**
+ * The link rule of the form: core's rule, then, for an `https` address, the browser's own URL parser has the last word,
+ * as in the storefront's `checkBannerHref` (core is pure and cannot ask it). So an address the storefront would drop
+ * (`https://xn--/`, a full-width `＠` or `：`, full-width digits, a joiner in the host) is refused before saving.
+ */
+export function checkBannerLink(href: string, locales: readonly string[]): BannerLinkResult {
+  const core = checkCoreBannerLink(href, locales);
+  if (!core.ok || core.kind === "path") return core;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return refuse("not_path_or_https");
+  }
+  if (url.protocol !== "https:" || url.hostname === "") return refuse("not_path_or_https");
+  if (url.username !== "" || url.password !== "") return refuse("credentials");
+  return core;
 }
 
 /** Length in Unicode code points, the way the API (core `codePointLength`) and Postgres count characters. */

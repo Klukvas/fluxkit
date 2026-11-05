@@ -303,8 +303,8 @@ describe("the banner form", () => {
   it("says under the date field when the typed time is skipped or occurs twice, and warns about a missing language", () => {
     const html = form(card, {
       warnings: [
-        { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30" },
-        { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30" },
+        { kind: "time", field: "startsAt", note: "gap", shown: "2026-03-29 04:30 UTC+03:00" },
+        { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30 UTC+03:00" },
         { kind: "missingLanguage", path: "title.en" },
       ],
     });
@@ -354,6 +354,43 @@ describe("the banner form", () => {
     expect(html).toContain("§dict.form.checkFields");
     expect(html).toContain("§banners.form.endedWarning");
     expect(html).toMatch(/<input[^>]*id="banner-title-en"[^>]*aria-invalid="true"/);
+  });
+
+  it("marks a language required only where the save would be blocked (second review of PR 230, item 4)", () => {
+    const requiredInput = (html: string, id: string) =>
+      new RegExp(`<input[^>]*id="${id}"[^>]*required=""`).test(html);
+    const active = { ...card, isActive: true, title: { uk: "Розпродаж", en: "" } };
+    // A create that switches it on: every language is required.
+    expect(requiredInput(form(active), "banner-title-en")).toBe(true);
+    // Already on with English missing (the API allows it), and this edit does not touch it: a warning, no required mark.
+    const html = form(active, {
+      mode: "edit",
+      initial: active,
+      warnings: [{ kind: "missingLanguage", path: "title.en" }],
+    });
+    expect(requiredInput(html, "banner-title-en")).toBe(false);
+    expect(requiredInput(html, "banner-title-uk")).toBe(true);
+    expect(html).toContain("§banners.form.missingLanguage");
+    // Switched on by this edit: required again.
+    expect(
+      requiredInput(
+        form(active, { mode: "edit", initial: { ...active, isActive: false } }),
+        "banner-title-en",
+      ),
+    ).toBe(true);
+  });
+
+  it("names the offset of the reading used for a doubled hour", () => {
+    const html = form(
+      card,
+      {
+        warnings: [
+          { kind: "time", field: "endsAt", note: "ambiguous", shown: "2026-10-25 03:30 UTC+03:00" },
+        ],
+      },
+      en,
+    );
+    expect(html).toContain("the earlier one is used, 2026-10-25 03:30 UTC+03:00.");
   });
 
   it("says that an https link leaves the shop", () => {

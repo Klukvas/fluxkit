@@ -231,6 +231,7 @@ function BannerEditForm({
         upload={upload}
         zone={zoneLabel(timeZone, Date.now())}
         warnings={bannerWarnings(values, content.locales, timeZone, Date.now(), initial)}
+        initial={initial}
         preview={<BannerPreview t={t} uiLocale={locale} content={content} values={values} />}
       />
       <UnsavedChangesDialog blocker={blocker} />
