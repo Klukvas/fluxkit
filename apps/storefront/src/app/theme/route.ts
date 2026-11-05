@@ -7,5 +7,6 @@ export async function POST(request: Request): Promise<Response> {
   return themeFormResponse(request, {
     enabled: themeConfig.showToggle,
     secure: async () => (await publicOrigin()).startsWith("https:"),
+    publicOrigin,
   });
 }

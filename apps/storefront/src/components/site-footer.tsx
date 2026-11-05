@@ -22,7 +22,7 @@ export function SiteFooter({
   showThemeSwitch?: boolean;
 }) {
   return (
-    <footer className="mt-12 border-t border-border py-6 text-muted-foreground">
+    <footer className="fk-site-footer">
       <Container className="flex flex-col gap-2">
         {/* One class per link (`.fk-nav-link`, app/globals.css) and a compact switch: the footer is part of every page's first
             HTML, which has the same size budget as the header (README, "Keep the header small"; spec in shell.spec.tsx). */}
