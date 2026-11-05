@@ -455,7 +455,9 @@ Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements a
   `<html data-theme>` from the `fluxkit_theme` cookie (or the default), so the first paint has the right theme with no script; `system`
   follows the device through the CSS media query (works without a script). The footer's switch (`theme-switch.tsx`): Light / Dark / System
   buttons with `aria-pressed` in a group named "Theme"; with a script it writes the cookie and the attribute in place, without one it posts
-  to `/theme` (`303` back to the same path). `showToggle: false` hides it, ignores the cookie and makes `/theme` a 404. Colours come from the
+  to `/theme` (`303` back to the same path). The route refuses a form posted from another site with `403` (`Sec-Fetch-Site`
+  `cross-site` or `same-site`, or an `Origin` other than `STOREFRONT_PUBLIC_URL`; a request with neither header passes), so a storefront
+  reached under another origin than that variable cannot use the script-less switch. `showToggle: false` hides it, ignores the cookie and makes `/theme` a 404. Colours come from the
   tokens only, so every page, form control, badge, skeleton, toast, the filter sheet and the buy bar follow; product pictures keep their own
   background on the `muted` surface; `color-scheme` follows the theme (native controls and scrollbars). Mail stays light. The admin is not
   affected (it sets `data-theme="light"`; spec on its built CSS).

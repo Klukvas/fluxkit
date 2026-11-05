@@ -4,8 +4,8 @@ import { parseThemeMode, safeThemeReturnPath, themeCookie } from "./theme-mode";
  * The answer of `POST /theme` (`app/theme/route.ts`): the footer's theme switch without a script
  * (`components/theme-switch.tsx`; with a script it applies the choice in the browser and never posts). Stores the choice in
  * the `fluxkit_theme` cookie and sends the shopper back to the page they were on (`303`, a checked path of this storefront
- * only). Anything but the form's own values is refused with `400`; with the switch hidden in `config/theme.ts` the route
- * does not exist (`404`).
+ * only). A form posted from another site or origin is refused with `403` (`isCrossOrigin`); anything but the form's own
+ * values with `400`; with the switch hidden in `config/theme.ts` the route does not exist (`404`).
  */
 export async function themeFormResponse(
   request: Request,
@@ -14,10 +14,15 @@ export async function themeFormResponse(
     enabled: boolean;
     /** Whether the shop is served over https (the cookie then gets `Secure`). */
     secure: () => Promise<boolean>;
+    /** The storefront's public origin (`STOREFRONT_PUBLIC_URL`), the only `Origin` a form may be posted from. */
+    publicOrigin: () => Promise<string>;
   },
 ): Promise<Response> {
   if (!options.enabled) {
     return new Response(null, { status: 404 });
+  }
+  if (isCrossOrigin(request, await options.publicOrigin())) {
+    return new Response(null, { status: 403 });
   }
   const type = request.headers.get("content-type") ?? "";
   if (
@@ -40,6 +45,20 @@ export async function themeFormResponse(
       "Cache-Control": "no-store",
     },
   });
+}
+
+/**
+ * A form another site makes the browser post (review m1 of design batch B): `Sec-Fetch-Site` says so, or `Origin` names
+ * another origin (`null` included). A sibling host (`same-site`) is another origin too. A request with neither header (an
+ * old browser, curl) passes: it cannot be told apart, and the worst it does is set a theme.
+ */
+function isCrossOrigin(request: Request, publicOrigin: string): boolean {
+  const site = request.headers.get("sec-fetch-site");
+  if (site === "cross-site" || site === "same-site") {
+    return true;
+  }
+  const origin = request.headers.get("origin");
+  return origin !== null && origin !== publicOrigin;
 }
 
 function plain(status: number, text: string): Response {
