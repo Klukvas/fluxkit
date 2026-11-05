@@ -8,6 +8,7 @@ import type {
   AuthResult,
   Cart,
   CategoryList,
+  HomeBannerList,
   ChangePasswordBody,
   CheckoutBody,
   CheckoutResult,
@@ -181,6 +182,8 @@ export interface StoreClient {
     paymentId: string,
     options?: CallOptions,
   ): Result<PaymentState>;
+  /** The home banners live now (at most 3, public fields only); no cookie is needed. */
+  listBanners(options?: LocaleOptions): Result<HomeBannerList>;
   listCategories(options?: LocaleOptions): Result<CategoryList>;
   getConfig(options?: CallOptions): Result<StoreConfig>;
   listProducts(options?: ListProductsOptions): Result<ProductList>;
@@ -282,6 +285,7 @@ export function createStoreClient(options: StoreClientOptions): StoreClient {
     },
     getAccountOrderPayment: (number, paymentId, opts) =>
       call("getAccountOrderPayment", { pathParams: { number, paymentId }, options: opts }),
+    listBanners: (opts) => call("listBanners", { options: opts }),
     listCategories: (opts) => call("listCategories", { options: opts }),
     getConfig: (opts) => call("getConfig", { options: opts }),
     listProducts: (opts) => call("listProducts", { options: opts }),

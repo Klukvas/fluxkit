@@ -2,7 +2,7 @@ import { classified, none } from "./builders.js";
 import type { Inventory } from "./types.js";
 
 /**
- * Tables with no personal data (plan row D24): catalog, pricing, inventory levels, shipping method texts, health.
+ * Tables with no personal data (plan row D24): catalog, home banners, pricing, inventory levels, shipping method texts, health.
  * A column added to one of them that does hold personal data must be moved to a classified entry elsewhere; the rule
  * `checkInventory` rejects a `none` column whose name looks like personal data.
  */
@@ -36,6 +36,25 @@ export const noPersonalDataTables: Inventory = {
     "created_at",
     "updated_at",
   ),
+  // Home banners (ADR 0046): public marketing copy, a link and upload ids. Staff must not type personal data into the texts.
+  banner: none(
+    "D24",
+    "id",
+    "layout",
+    "title",
+    "text",
+    "image_alt",
+    "image_upload_id",
+    "link",
+    "tone",
+    "position",
+    "is_active",
+    "starts_at",
+    "ends_at",
+    "created_at",
+    "updated_at",
+  ),
+  banner_image: none("D24", "banner_id", "locale", "image_upload_id"),
   brand: none("D24", "id", "slug", "name", "description", "logo_url", "created_at", "updated_at"),
   category: none(
     "D24",

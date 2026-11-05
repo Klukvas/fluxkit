@@ -12,6 +12,7 @@ import type {
   CartLine,
   CartLineNotice,
   CategoryList,
+  HomeBannerList,
   ChangePasswordBody,
   PasswordResetAccepted,
   PasswordResetConfirmBody,
@@ -609,6 +610,31 @@ const categoryList: Shape<CategoryList> = {
   object: { items: { array: categoryLevel(4) } },
 } as Shape<CategoryList>;
 
+const homeBannerList: Shape<HomeBannerList> = {
+  object: {
+    items: {
+      array: {
+        object: {
+          id: "string",
+          layout: { enum: ["card", "image"] },
+          title: { nullable: "string" },
+          text: { nullable: "string" },
+          href: "string",
+          tone: { enum: ["surface", "accent"] },
+          image: {
+            object: {
+              url: "string",
+              width: "integer",
+              height: "integer",
+              alt: { nullable: "string" },
+            },
+          },
+        },
+      },
+    },
+  },
+};
+
 const fieldError = {
   object: { path: "string", code: "string", message: { optional: "string" } },
 } as const;
@@ -785,6 +811,7 @@ const RESPONSE_SHAPES: { [N in OperationName]: Shape<DataOf<N>> } = {
   getOrderPaymentStatus: paymentState,
   createAccountOrderPayment: createdPayment,
   getAccountOrderPayment: paymentState,
+  listBanners: homeBannerList,
   listCategories: categoryList,
   getConfig: storeConfig,
   listProducts: productList,
@@ -826,6 +853,7 @@ const REQUEST_SHAPES: { [N in OperationName]: ShapeNode | null } = {
   getOrderPaymentStatus: orderPaymentStatusBody,
   createAccountOrderPayment: createAccountOrderPaymentBody,
   getAccountOrderPayment: null,
+  listBanners: null,
   listCategories: null,
   getConfig: null,
   listProducts: null,

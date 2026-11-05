@@ -686,6 +686,88 @@ export interface UpdateAdminBrandBody {
   slug?: string;
 }
 
+// -------------------------------------------------------------- home banners (ADR 0046)
+
+export type AdminHomeBannerLayout = "card" | "image";
+export type AdminHomeBannerTone = "surface" | "accent";
+/** `live`: active and inside its window; `scheduled`: before `startsAt`; `expired`: from `endsAt` on. */
+export type AdminHomeBannerState = "live" | "scheduled" | "expired" | "inactive";
+
+export interface AdminHomeBannerPicture {
+  uploadId: string;
+  url: string;
+  width: number;
+  height: number;
+}
+
+export interface AdminHomeBanner {
+  id: string;
+  layout: AdminHomeBannerLayout;
+  title: LocalizedText | null;
+  text: LocalizedText | null;
+  imageAlt: LocalizedText | null;
+  /** The default picture, shown for every locale without its own. */
+  image: AdminHomeBannerPicture;
+  /** Own pictures per content locale, ordered by locale. */
+  images: (AdminHomeBannerPicture & { locale: string })[];
+  link: string;
+  tone: AdminHomeBannerTone;
+  position: number;
+  isActive: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  state: AdminHomeBannerState;
+  /** One of the first 3 live banners, the ones `GET /store/banners` returns. */
+  shownOnStorefront: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Every banner (at most 50), by position. */
+export interface AdminHomeBannerList {
+  items: AdminHomeBanner[];
+}
+
+export interface AdminHomeBannerImageInput {
+  locale: string;
+  imageUploadId: string;
+}
+
+export interface CreateAdminHomeBannerBody {
+  layout?: AdminHomeBannerLayout;
+  title?: LocalizedText | null;
+  text?: LocalizedText | null;
+  imageAlt?: LocalizedText | null;
+  imageUploadId: string;
+  images?: AdminHomeBannerImageInput[];
+  link: string;
+  tone?: AdminHomeBannerTone;
+  isActive?: boolean;
+  /** ISO 8601 with `Z` or an offset. */
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
+/** Only the given fields change; `images` replaces the whole set of own pictures. */
+export interface UpdateAdminHomeBannerBody {
+  layout?: AdminHomeBannerLayout;
+  title?: LocalizedText | null;
+  text?: LocalizedText | null;
+  imageAlt?: LocalizedText | null;
+  imageUploadId?: string;
+  images?: AdminHomeBannerImageInput[];
+  link?: string;
+  tone?: AdminHomeBannerTone;
+  isActive?: boolean;
+  startsAt?: string | null;
+  endsAt?: string | null;
+}
+
+/** Every banner id exactly once, in the new order. */
+export interface ReorderAdminHomeBannersBody {
+  ids: string[];
+}
+
 // ----------------------------------------------------------------- shipping
 
 export type AdminShippingMethodKind = "address" | "pickup_point" | "store_pickup";

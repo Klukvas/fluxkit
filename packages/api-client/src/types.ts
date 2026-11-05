@@ -565,6 +565,35 @@ export interface CategoryList {
   items: CategoryNode[];
 }
 
+// ----------------------------------------------------------------- home banners (ADR 0046)
+
+export type HomeBannerLayout = "card" | "image";
+export type HomeBannerTone = "surface" | "accent";
+
+/** A live home banner as `GET /store/banners` returns it: public fields only, texts and picture for the asked locale. */
+export interface HomeBanner {
+  id: string;
+  layout: HomeBannerLayout;
+  /** `null` for the `image` layout. */
+  title: string | null;
+  text: string | null;
+  /** A storefront path without the locale prefix, or an `https://` address; re-check it before rendering. */
+  href: string;
+  tone: HomeBannerTone;
+  image: {
+    url: string;
+    width: number;
+    height: number;
+    /** `null` = a decorative picture (only for the `card` layout). */
+    alt: string | null;
+  };
+}
+
+/** 0 to 3 banners, in order. */
+export interface HomeBannerList {
+  items: HomeBanner[];
+}
+
 export interface StoreConfig {
   currency: string;
   currencyExponent: number;

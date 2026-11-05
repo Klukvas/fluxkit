@@ -53,6 +53,8 @@ import type {
   SendAdminTestEmailBody,
   UpdateAdminShippingMethodBody,
   AdminBrandList,
+  AdminHomeBanner,
+  AdminHomeBannerList,
   AdminCategory,
   AdminCategoryList,
   AdminChangePasswordBody,
@@ -91,6 +93,7 @@ import type {
   CreateAdminAttributeBody,
   CreateAdminAttributeOptionBody,
   CreateAdminBrandBody,
+  CreateAdminHomeBannerBody,
   CreateAdminCategoryBody,
   CreateAdminOptionBody,
   CreateAdminOptionValueBody,
@@ -114,6 +117,8 @@ import type {
   UpdateAdminAttributeBody,
   UpdateAdminAttributeOptionBody,
   UpdateAdminBrandBody,
+  UpdateAdminHomeBannerBody,
+  ReorderAdminHomeBannersBody,
   UpdateAdminCategoryBody,
   UpdateAdminCustomerBody,
   UpdateAdminOptionBody,
@@ -464,6 +469,23 @@ export interface AdminClient {
   getBrand(id: string, options?: CallOptions): Result<AdminBrand>;
   updateBrand(id: string, body: UpdateAdminBrandBody, options?: CallOptions): Result<AdminBrand>;
   deleteBrand(id: string, options?: CallOptions): Result<undefined>;
+
+  // home banners (ADR 0046)
+  listHomeBanners(options?: CallOptions): Result<AdminHomeBannerList>;
+  /** `409 rule_violation` `too_many_banners` at 50 stored banners. */
+  createHomeBanner(body: CreateAdminHomeBannerBody, options?: CallOptions): Result<AdminHomeBanner>;
+  /** `400 order_mismatch` unless `ids` is exactly the current set. */
+  reorderHomeBanners(
+    body: ReorderAdminHomeBannersBody,
+    options?: CallOptions,
+  ): Result<AdminHomeBannerList>;
+  getHomeBanner(id: string, options?: CallOptions): Result<AdminHomeBanner>;
+  updateHomeBanner(
+    id: string,
+    body: UpdateAdminHomeBannerBody,
+    options?: CallOptions,
+  ): Result<AdminHomeBanner>;
+  deleteHomeBanner(id: string, options?: CallOptions): Result<undefined>;
   /** Search routes: `404` while `getConfig().search` is false. */
   getSearchStatus(options?: CallOptions): Result<AdminSearchStatus>;
   /** Records a full rebuild of every locale; job 14 runs it (`202`). */
@@ -798,6 +820,13 @@ export function createAdminClient(options: AdminClientOptions): AdminClient {
     updateBrand: (id, body, opts) =>
       call("updateBrand", { pathParams: { id }, body, options: opts }),
     deleteBrand: (id, opts) => call("deleteBrand", { pathParams: { id }, options: opts }),
+    listHomeBanners: (opts) => call("listHomeBanners", { options: opts }),
+    createHomeBanner: (body, opts) => call("createHomeBanner", { body, options: opts }),
+    reorderHomeBanners: (body, opts) => call("reorderHomeBanners", { body, options: opts }),
+    getHomeBanner: (id, opts) => call("getHomeBanner", { pathParams: { id }, options: opts }),
+    updateHomeBanner: (id, body, opts) =>
+      call("updateHomeBanner", { pathParams: { id }, body, options: opts }),
+    deleteHomeBanner: (id, opts) => call("deleteHomeBanner", { pathParams: { id }, options: opts }),
     getSearchStatus: (opts) => call("getSearchStatus", { options: opts }),
     requestSearchRebuild: (opts) => call("requestSearchRebuild", { options: opts }),
     listSynonymGroups: (opts) => call("listSynonymGroups", { options: opts }),

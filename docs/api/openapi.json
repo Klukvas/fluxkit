@@ -5093,6 +5093,1612 @@
         "x-fluxkit-permission": "customers.write"
       }
     },
+    "/admin/banners": {
+      "get": {
+        "operationId": "AdminBannersController_list",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Every banner (at most 50).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "layout": {
+                            "type": "string",
+                            "enum": ["card", "image"]
+                          },
+                          "title": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "text": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "imageAlt": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "image": {
+                            "type": "object",
+                            "properties": {
+                              "uploadId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "url": {
+                                "type": "string",
+                                "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                              },
+                              "width": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["uploadId", "url", "width", "height"],
+                            "additionalProperties": false,
+                            "description": "The default picture."
+                          },
+                          "images": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "uploadId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                                },
+                                "width": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "height": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "locale": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["uploadId", "url", "width", "height", "locale"],
+                              "additionalProperties": false
+                            },
+                            "description": "Own pictures per locale, ordered by locale."
+                          },
+                          "link": {
+                            "type": "string"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": ["surface", "accent"]
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "startsAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "endsAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": ["live", "scheduled", "expired", "inactive"],
+                            "description": "`live` (active, inside its window), `scheduled` (before `startsAt`), `expired` (from `endsAt` on), `inactive`."
+                          },
+                          "shownOnStorefront": {
+                            "type": "boolean",
+                            "description": "One of the first 3 live banners, which `GET /store/banners` returns."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "layout",
+                          "title",
+                          "text",
+                          "imageAlt",
+                          "image",
+                          "images",
+                          "link",
+                          "tone",
+                          "position",
+                          "isActive",
+                          "startsAt",
+                          "endsAt",
+                          "state",
+                          "shownOnStorefront",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Every banner (at most 50), by position, then id."
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List every home banner by position, with its state",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.read"
+      },
+      "post": {
+        "operationId": "AdminBannersController_create",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "layout": {
+                    "default": "card",
+                    "type": "string",
+                    "enum": ["card", "image"]
+                  },
+                  "title": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "text": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "imageAlt": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "imageUploadId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+                    "description": "Id of an upload."
+                  },
+                  "images": {
+                    "default": [],
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "locale": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 16,
+                          "description": "One of the content locales."
+                        },
+                        "imageUploadId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+                          "description": "Id of an upload."
+                        }
+                      },
+                      "required": ["locale", "imageUploadId"],
+                      "additionalProperties": false
+                    },
+                    "description": "The banner's own picture per content locale; a locale without one shows `imageUploadId`. Replaces the whole set."
+                  },
+                  "link": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "description": "A storefront path without the locale prefix (`/catalog`) or an `https://` address. Refused as `invalid_link`."
+                  },
+                  "tone": {
+                    "default": "surface",
+                    "type": "string",
+                    "enum": ["surface", "accent"]
+                  },
+                  "isActive": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "startsAt": {
+                    "nullable": true,
+                    "description": "ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01; stored and returned in UTC.",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "endsAt": {
+                    "nullable": true,
+                    "description": "ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01; stored and returned in UTC.",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "required": ["imageUploadId", "link"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created banner. `Location` points to it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "layout": {
+                      "type": "string",
+                      "enum": ["card", "image"]
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "text": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "imageAlt": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "uploadId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["uploadId", "url", "width", "height"],
+                      "additionalProperties": false,
+                      "description": "The default picture."
+                    },
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "uploadId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                          },
+                          "width": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "locale": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["uploadId", "url", "width", "height", "locale"],
+                        "additionalProperties": false
+                      },
+                      "description": "Own pictures per locale, ordered by locale."
+                    },
+                    "link": {
+                      "type": "string"
+                    },
+                    "tone": {
+                      "type": "string",
+                      "enum": ["surface", "accent"]
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "startsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "endsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["live", "scheduled", "expired", "inactive"],
+                      "description": "`live` (active, inside its window), `scheduled` (before `startsAt`), `expired` (from `endsAt` on), `inactive`."
+                    },
+                    "shownOnStorefront": {
+                      "type": "boolean",
+                      "description": "One of the first 3 live banners, which `GET /store/banners` returns."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "layout",
+                    "title",
+                    "text",
+                    "imageAlt",
+                    "image",
+                    "images",
+                    "link",
+                    "tone",
+                    "position",
+                    "isActive",
+                    "startsAt",
+                    "endsAt",
+                    "state",
+                    "shownOnStorefront",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict: unique value taken, record in use, or a rule/transition is violated (see code).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Create a home banner (appended at the end)",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/admin/banners/order": {
+      "put": {
+        "operationId": "AdminBannersController_reorder",
+        "parameters": [
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "ids": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+                    }
+                  }
+                },
+                "required": ["ids"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Every banner in the new order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "layout": {
+                            "type": "string",
+                            "enum": ["card", "image"]
+                          },
+                          "title": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "text": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "imageAlt": {
+                            "nullable": true,
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            },
+                            "description": "Translated text: locale code to text. The default locale is required for required texts."
+                          },
+                          "image": {
+                            "type": "object",
+                            "properties": {
+                              "uploadId": {
+                                "type": "string",
+                                "format": "uuid"
+                              },
+                              "url": {
+                                "type": "string",
+                                "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                              },
+                              "width": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": ["uploadId", "url", "width", "height"],
+                            "additionalProperties": false,
+                            "description": "The default picture."
+                          },
+                          "images": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "uploadId": {
+                                  "type": "string",
+                                  "format": "uuid"
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                                },
+                                "width": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "height": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "locale": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": ["uploadId", "url", "width", "height", "locale"],
+                              "additionalProperties": false
+                            },
+                            "description": "Own pictures per locale, ordered by locale."
+                          },
+                          "link": {
+                            "type": "string"
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": ["surface", "accent"]
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "isActive": {
+                            "type": "boolean"
+                          },
+                          "startsAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "endsAt": {
+                            "nullable": true,
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": ["live", "scheduled", "expired", "inactive"],
+                            "description": "`live` (active, inside its window), `scheduled` (before `startsAt`), `expired` (from `endsAt` on), `inactive`."
+                          },
+                          "shownOnStorefront": {
+                            "type": "boolean",
+                            "description": "One of the first 3 live banners, which `GET /store/banners` returns."
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "ISO 8601, UTC."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "layout",
+                          "title",
+                          "text",
+                          "imageAlt",
+                          "image",
+                          "images",
+                          "link",
+                          "tone",
+                          "position",
+                          "isActive",
+                          "startsAt",
+                          "endsAt",
+                          "state",
+                          "shownOnStorefront",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "description": "Every banner (at most 50), by position, then id."
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reorder the home banners (every banner exactly once)",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/admin/banners/{id}": {
+      "get": {
+        "operationId": "AdminBannersController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Banner id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The banner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "layout": {
+                      "type": "string",
+                      "enum": ["card", "image"]
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "text": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "imageAlt": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "uploadId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["uploadId", "url", "width", "height"],
+                      "additionalProperties": false,
+                      "description": "The default picture."
+                    },
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "uploadId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                          },
+                          "width": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "locale": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["uploadId", "url", "width", "height", "locale"],
+                        "additionalProperties": false
+                      },
+                      "description": "Own pictures per locale, ordered by locale."
+                    },
+                    "link": {
+                      "type": "string"
+                    },
+                    "tone": {
+                      "type": "string",
+                      "enum": ["surface", "accent"]
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "startsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "endsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["live", "scheduled", "expired", "inactive"],
+                      "description": "`live` (active, inside its window), `scheduled` (before `startsAt`), `expired` (from `endsAt` on), `inactive`."
+                    },
+                    "shownOnStorefront": {
+                      "type": "boolean",
+                      "description": "One of the first 3 live banners, which `GET /store/banners` returns."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "layout",
+                    "title",
+                    "text",
+                    "imageAlt",
+                    "image",
+                    "images",
+                    "link",
+                    "tone",
+                    "position",
+                    "isActive",
+                    "startsAt",
+                    "endsAt",
+                    "state",
+                    "shownOnStorefront",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Get a home banner",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.read"
+      },
+      "patch": {
+        "operationId": "AdminBannersController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Banner id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "layout": {
+                    "type": "string",
+                    "enum": ["card", "image"]
+                  },
+                  "title": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "text": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "imageAlt": {
+                    "nullable": true,
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Translated text: locale code to text. The default locale is required for required texts."
+                  },
+                  "imageUploadId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+                    "description": "Id of an upload."
+                  },
+                  "images": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "locale": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 16,
+                          "description": "One of the content locales."
+                        },
+                        "imageUploadId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+                          "description": "Id of an upload."
+                        }
+                      },
+                      "required": ["locale", "imageUploadId"],
+                      "additionalProperties": false
+                    },
+                    "description": "The banner's own picture per content locale; a locale without one shows `imageUploadId`. Replaces the whole set."
+                  },
+                  "link": {
+                    "type": "string",
+                    "maxLength": 2048,
+                    "description": "A storefront path without the locale prefix (`/catalog`) or an `https://` address. Refused as `invalid_link`."
+                  },
+                  "tone": {
+                    "type": "string",
+                    "enum": ["surface", "accent"]
+                  },
+                  "isActive": {
+                    "type": "boolean"
+                  },
+                  "startsAt": {
+                    "nullable": true,
+                    "description": "ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01; stored and returned in UTC.",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  },
+                  "endsAt": {
+                    "nullable": true,
+                    "description": "ISO 8601 with `Z` or an offset, between 2000-01-01 and 2200-01-01; stored and returned in UTC.",
+                    "type": "string",
+                    "format": "date-time",
+                    "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated banner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "layout": {
+                      "type": "string",
+                      "enum": ["card", "image"]
+                    },
+                    "title": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "text": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "imageAlt": {
+                      "nullable": true,
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      },
+                      "description": "Translated text: locale code to text. The default locale is required for required texts."
+                    },
+                    "image": {
+                      "type": "object",
+                      "properties": {
+                        "uploadId": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "url": {
+                          "type": "string",
+                          "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                        },
+                        "width": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "height": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": ["uploadId", "url", "width", "height"],
+                      "additionalProperties": false,
+                      "description": "The default picture."
+                    },
+                    "images": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "uploadId": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "url": {
+                            "type": "string",
+                            "description": "`MEDIA_PUBLIC_BASE_URL` + `/` + the storage key."
+                          },
+                          "width": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "height": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 9007199254740991
+                          },
+                          "locale": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["uploadId", "url", "width", "height", "locale"],
+                        "additionalProperties": false
+                      },
+                      "description": "Own pictures per locale, ordered by locale."
+                    },
+                    "link": {
+                      "type": "string"
+                    },
+                    "tone": {
+                      "type": "string",
+                      "enum": ["surface", "accent"]
+                    },
+                    "position": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991
+                    },
+                    "isActive": {
+                      "type": "boolean"
+                    },
+                    "startsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "endsAt": {
+                      "nullable": true,
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["live", "scheduled", "expired", "inactive"],
+                      "description": "`live` (active, inside its window), `scheduled` (before `startsAt`), `expired` (from `endsAt` on), `inactive`."
+                    },
+                    "shownOnStorefront": {
+                      "type": "boolean",
+                      "description": "One of the first 3 live banners, which `GET /store/banners` returns."
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "ISO 8601, UTC."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "layout",
+                    "title",
+                    "text",
+                    "imageAlt",
+                    "image",
+                    "images",
+                    "link",
+                    "tone",
+                    "position",
+                    "isActive",
+                    "startsAt",
+                    "endsAt",
+                    "state",
+                    "shownOnStorefront",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Change a home banner (only the listed fields)",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.write"
+      },
+      "delete": {
+        "operationId": "AdminBannersController_delete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Banner id.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Fluxkit-CSRF",
+            "in": "header",
+            "required": true,
+            "description": "Must be `1` on every state-changing admin request, the sign-in included, also for anonymous callers (CSRF defence, ADR 0009). Requests with a body also need `Content-Type: application/json`.",
+            "schema": {
+              "type": "string",
+              "enum": ["1"]
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden: the role lacks the route's permission, or the X-Fluxkit-CSRF header or JSON content type is missing on a state-changing request.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Delete a home banner (its uploads and files stay)",
+        "tags": ["admin-banners"],
+        "x-fluxkit-permission": "catalog.write"
+      }
+    },
+    "/store/banners": {
+      "get": {
+        "operationId": "StoreBannersController_list",
+        "parameters": [
+          {
+            "name": "locale",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The live banners, wrapped in `items`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "format": "uuid"
+                          },
+                          "layout": {
+                            "type": "string",
+                            "enum": ["card", "image"]
+                          },
+                          "title": {
+                            "nullable": true,
+                            "description": "`null` for the `image` layout.",
+                            "type": "string"
+                          },
+                          "text": {
+                            "nullable": true,
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string",
+                            "description": "A storefront path without the locale prefix, or an `https://` address."
+                          },
+                          "tone": {
+                            "type": "string",
+                            "enum": ["surface", "accent"]
+                          },
+                          "image": {
+                            "type": "object",
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "height": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "alt": {
+                                "nullable": true,
+                                "description": "`null` = a decorative picture (only for the `card` layout).",
+                                "type": "string"
+                              }
+                            },
+                            "required": ["url", "width", "height", "alt"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["id", "layout", "title", "text", "href", "tone", "image"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["items"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed: malformed request or invalid fields (see errors).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error. Details are only in the server log.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetailsDoc"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Home banners live now: active and inside their window, at most 3, by position",
+        "tags": ["store"]
+      }
+    },
     "/admin/products/{id}/inventory": {
       "get": {
         "description": "One entry per variant in variant order, each exactly the shape of the per-variant read (`levels` per location, `totalAvailable`). Not paged: a product has at most 250 variants. Reads create nothing.",

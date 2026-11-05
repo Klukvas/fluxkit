@@ -102,6 +102,7 @@ const INVOCATIONS: Record<keyof StoreClient, (client: StoreClient) => Promise<un
       { idempotencyKey: "5f1c1f6e-7a52-4a8a-8c7e-0d4f3a1b2c3d" },
     ),
   getAccountOrderPayment: (c) => c.getAccountOrderPayment("FK-1", VARIANT_ID),
+  listBanners: (c) => c.listBanners({ locale: "en" }),
   listCategories: (c) => c.listCategories(),
   getConfig: (c) => c.getConfig(),
   listProducts: (c) => c.listProducts(),

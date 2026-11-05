@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "@fluxkit/config";
 import type { ProblemBody } from "../common/problem.filter.js";
 import { withTransaction } from "../common/transaction.js";
+import { DRIZZLE, type Database } from "../database/database.module.js";
 import { brand, mediaUpload, product, productType } from "../database/schema/index.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { startApp, type RunningApp } from "../test/app.js";
@@ -434,5 +435,107 @@ describe("attach marking while MEDIA_STORAGE_DRIVER=none (step 9 review M-2)", (
     expect(result.body.errors).toEqual([
       expect.objectContaining({ path: "media.0.url", code: "upload_not_found" }),
     ]);
+  });
+});
+
+describe("markAttachedByIds (banner pictures, ADR 0046)", () => {
+  let media: MediaApp;
+  let disabled: RunningApp;
+  const pool = new pg.Pool({ connectionString: requireTestDatabaseUrl() });
+  const MISSING_ID = "6f1c1d2e-8b43-4f4e-9c55-0a1b2c3d4e5f";
+
+  beforeAll(async () => {
+    await ensureMigrated();
+    media = await startMediaApp();
+    // No public base URL at all: ids are still checked and marked (unlike a URL, an id is never "foreign").
+    disabled = await startApp({ mediaStorageDriver: "none" });
+  });
+
+  afterAll(async () => {
+    try {
+      await disabled.app.close();
+      await media.close();
+    } finally {
+      await pool.end();
+    }
+  });
+
+  async function uploadId(): Promise<string> {
+    const response = await fetch(`${media.baseUrl}/admin/media/uploads`, {
+      method: "POST",
+      headers: { "content-type": "application/octet-stream", "x-fluxkit-csrf": "1" },
+      body: await images.jpeg(8, 8),
+    });
+    expect(response.status).toBe(201);
+    return ((await response.json()) as { id: string }).id;
+  }
+
+  async function attachedAt(id: string): Promise<Date | null | undefined> {
+    const result = await pool.query<{ first_attached_at: Date | null }>(
+      "select first_attached_at from media_upload where id = $1",
+      [id],
+    );
+    return result.rows[0]?.first_attached_at;
+  }
+
+  function mark(app: RunningApp, references: { path: string; id: string }[]): Promise<void> {
+    const db = app.app.get<Database>(DRIZZLE);
+    const attach = app.app.get(MediaAttachService);
+    return withTransaction(db, (tx) => attach.markAttachedByIds(tx, references));
+  }
+
+  it("marks every named upload and keeps the first time on later marks; a repeated or upper-case id is fine", async () => {
+    const [first, second] = [await uploadId(), await uploadId()];
+    await mark(media, [
+      { path: "imageUploadId", id: first },
+      { path: "images.0.imageUploadId", id: second },
+      { path: "images.1.imageUploadId", id: first.toUpperCase() },
+    ]);
+    const marked = await attachedAt(first);
+    expect(marked).toBeInstanceOf(Date);
+    expect(await attachedAt(second)).toBeInstanceOf(Date);
+    await mark(media, [{ path: "imageUploadId", id: first }]);
+    expect(await attachedAt(first)).toEqual(marked);
+  });
+
+  it("reports upload_not_found at the field of every unknown id and rolls the transaction back", async () => {
+    const known = await uploadId();
+    await expect(
+      mark(media, [
+        { path: "imageUploadId", id: MISSING_ID },
+        { path: "images.0.imageUploadId", id: known },
+        { path: "images.1.imageUploadId", id: MISSING_ID },
+      ]),
+    ).rejects.toMatchObject({
+      code: "validation_failed",
+      errors: [
+        expect.objectContaining({ path: "imageUploadId", code: "upload_not_found" }),
+        expect.objectContaining({ path: "images.1.imageUploadId", code: "upload_not_found" }),
+      ],
+    });
+    expect(await attachedAt(known)).toBeNull();
+  });
+
+  it("does nothing for an empty list", async () => {
+    await expect(mark(media, [])).resolves.toBeUndefined();
+  });
+
+  it("checks and marks ids also without MEDIA_PUBLIC_BASE_URL (driver none)", async () => {
+    const id = await uploadId();
+    await mark(disabled, [{ path: "imageUploadId", id }]);
+    expect(await attachedAt(id)).toBeInstanceOf(Date);
+    await expect(mark(disabled, [{ path: "imageUploadId", id: MISSING_ID }])).rejects.toMatchObject(
+      { code: "validation_failed" },
+    );
+  });
+
+  it("an attach that committed first wins: the job's delete then finds nothing to delete", async () => {
+    const id = await uploadId();
+    await mark(media, [{ path: "imageUploadId", id }]);
+    const deleted = await pool.query(
+      "delete from media_upload where id = $1 and first_attached_at is null returning storage_key",
+      [id],
+    );
+    expect(deleted.rowCount).toBe(0);
   });
 });
