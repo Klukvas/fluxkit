@@ -64,9 +64,50 @@ function checkPath(href: string, locales: readonly string[]): BannerLinkResult {
 }
 
 const HTTPS_PREFIX = /^https:\/\//iu;
-const FORBIDDEN_HOST = /[#/:<>?@[\]^|%"{}`]/u;
-const IPV6_LITERAL = /^\[[0-9a-f:.]+\]$/iu;
+// WHATWG forbidden host code points plus `%`, and the characters IDNA maps to a dot (one dot leader, ideographic and
+// full-width full stops): `example.com․evil.test` would name another host.
+const FORBIDDEN_HOST = /[#/:<>?@[\]^|%"{}`․。．｡]/u;
 const PORT = /^\d{0,5}$/u;
+const IPV4_PART = /^(?:0|[1-9]\d{0,2})$/u;
+const IPV6_GROUP = /^[0-9a-f]{1,4}$/iu;
+
+/** A dotted IPv4 address: exactly four decimal parts from 0 to 255 (no leading zeros, no other notation). */
+function isDottedIpv4(host: string): boolean {
+  const parts = host.split(".");
+  return parts.length === 4 && parts.every((part) => IPV4_PART.test(part) && Number(part) <= 255);
+}
+
+/** An IPv6 literal without brackets: 1 to 4 hex digits a group, at most one `::`, 8 groups (fewer only with `::`). */
+function isIpv6(literal: string): boolean {
+  const halves = literal.split("::");
+  if (halves.length > 2) return false;
+  const groupsOf = (half: string): string[] => (half === "" ? [] : half.split(":"));
+  const all = halves.flatMap(groupsOf);
+  let count = 0;
+  for (const [index, group] of all.entries()) {
+    if (index === all.length - 1 && group.includes(".")) {
+      if (!isDottedIpv4(group)) return false;
+      count += 2;
+    } else if (IPV6_GROUP.test(group)) {
+      count += 1;
+    } else {
+      return false;
+    }
+  }
+  return halves.length === 2 ? count <= 7 : count === 8;
+}
+
+/** A bracketed IPv6 literal, or a name whose last label is not all digits (or `0x...`) unless it is a dotted IPv4. */
+function isValidHost(host: string): boolean {
+  if (host.startsWith("[")) return host.endsWith("]") && isIpv6(host.slice(1, -1));
+  if (host === "" || FORBIDDEN_HOST.test(host)) return false;
+  const labels = host.split(".");
+  const last = labels.at(-1) === "" ? labels.at(-2) : labels.at(-1);
+  if (last !== undefined && (/^\d+$/u.test(last) || /^0x[0-9a-f]*$/iu.test(last))) {
+    return isDottedIpv4(host);
+  }
+  return true;
+}
 
 function checkHttps(href: string): BannerLinkResult {
   if (!HTTPS_PREFIX.test(href)) return refuse("not_path_or_https");
@@ -78,10 +119,9 @@ function checkHttps(href: string): BannerLinkResult {
     : authority.indexOf(":");
   const host = portSeparator === -1 ? authority : authority.slice(0, portSeparator);
   const port = portSeparator === -1 ? "" : authority.slice(portSeparator + 1);
-  const validHost = host.startsWith("[")
-    ? IPV6_LITERAL.test(host)
-    : host !== "" && !FORBIDDEN_HOST.test(host);
-  if (!validHost || !PORT.test(port) || Number(port) > 65535) return refuse("not_path_or_https");
+  if (!isValidHost(host) || !PORT.test(port) || Number(port) > 65535) {
+    return refuse("not_path_or_https");
+  }
   return { ok: true, kind: "https" };
 }
 

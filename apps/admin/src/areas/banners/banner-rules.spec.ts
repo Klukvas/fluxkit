@@ -99,9 +99,66 @@ const LINKS: readonly string[] = [
   "https://example.com#top",
   `/${"a".repeat(2047)}`,
   `/${"a".repeat(2048)}`,
+  ...[
+    // Host tightening of core (review M1 of PR 229): refused...
+    "https://example.com․evil.test/",
+    "https://1.2.3.4.5/",
+    "https://999.1.1.1/",
+    "https://shop.123/",
+    "https://[1::2::3]/",
+    "https://[1:2:3:4:5:6:7:8:9]/",
+    "https://[12345::1]/",
+    "https://[1:2:3:4:5:6:7:1.2.3.4]/",
+    "https://[::1.2.3.256]/",
+    "https://[1:2:3]/",
+    // ...and accepted.
+    "https://1.2.3.4/x",
+    "https://[1:2:3:4:5:6:7:8]/",
+    "https://[::]/",
+    "https://[::ffff:1.2.3.4]/",
+    "https://[1:2:3:4:5:6:1.2.3.4]/",
+    "https://shop.example/",
+    "https://123.example.com/",
+  ],
+];
+
+/** The rows of core's host tightening, with core's answer (the parity rows above run them through core as well). */
+const HOST_ROWS: readonly [string, boolean][] = [
+  ["https://example.com․evil.test/", false],
+  ["https://example.com。evil.test/", false],
+  ["https://example.com．evil.test/", false],
+  ["https://example.com｡evil.test/", false],
+  ["https://1.2.3.4.5/", false],
+  ["https://999.1.1.1/", false],
+  ["https://shop.123/", false],
+  ["https://shop.0x1f/", false],
+  ["https://[1::2::3]/", false],
+  ["https://[1:2:3:4:5:6:7:8:9]/", false],
+  ["https://[12345::1]/", false],
+  ["https://[1:2:3:4:5:6:7:1.2.3.4]/", false],
+  ["https://[::1.2.3.256]/", false],
+  ["https://[1:2:3]/", false],
+  ["https://1.2.3.4/x", true],
+  ["https://[1:2:3:4:5:6:7:8]/", true],
+  ["https://[::]/", true],
+  ["https://[::ffff:1.2.3.4]/", true],
+  ["https://[1:2:3:4:5:6:1.2.3.4]/", true],
+  ["https://shop.example/", true],
+  ["https://123.example.com/", true],
 ];
 
 describe("banner rules copied from core", () => {
+  it("keep the case table complete (core's table plus its edge cases and the host rows)", () => {
+    expect(LINKS).toHaveLength(96);
+    expect(new Set(LINKS).size).toBe(LINKS.length);
+  });
+
+  it.each(HOST_ROWS)("refuse a host no browser can reach, accept real ones: %s", (href, ok) => {
+    expect(checkBannerLink(href, ["uk", "en"])).toEqual(
+      ok ? { ok: true, kind: "https" } : { ok: false, reason: "not_path_or_https" },
+    );
+  });
+
   it("have the same limits and window bounds as core", () => {
     expect({ ...BANNER_LIMITS }).toEqual({ ...coreLimits });
     expect({ ...BANNER_WINDOW_BOUNDS }).toEqual({ ...coreBounds });
