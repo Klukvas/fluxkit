@@ -15,6 +15,7 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import { useMemo, useRef, useState, type FormEvent, type Ref } from "react";
+import { Link } from "react-router";
 import { useI18n } from "../../../i18n/i18n-context";
 import { adminClient } from "../../../lib/api";
 import { jsonEqual } from "../../../lib/diff-for-patch";
@@ -24,7 +25,9 @@ import { useCrash } from "../../../lib/use-crash";
 import { useFocusAfterCommit } from "../../../lib/use-focus-after-commit";
 import { useUnsavedChangesGuard } from "../../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
+import { PATHS, buildPath } from "../../../router/paths";
 import { FailureMessage } from "../../../views/status-views";
+import { linkClass } from "../../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../../catalog-dictionaries/form-dialog";
 import {
   FormActions,
@@ -68,6 +71,7 @@ import {
   variantErrorsFromProblem,
   variantFormFrom,
   variantPatchBody,
+  variantsNeedOptions,
   type VariantCreateValues,
   type VariantFormValues,
 } from "../variant-form";
@@ -850,8 +854,10 @@ export function VariantsTab({
   const crash = useCrash();
   const canUpdate = useCan("updateVariant");
   const canDelete = useCan("deleteVariant");
-  const canGenerate = useCan("generateVariants");
-  const canCreate = useCan("createVariant");
+  // Without options there is nothing to combine: the only variant is the default one (`variantsNeedOptions`).
+  const needsOptions = variantsNeedOptions(product);
+  const canGenerate = useCan("generateVariants") && !needsOptions;
+  const canCreate = useCan("createVariant") && !needsOptions;
   const specs = useMemo(() => attributeFieldSpecs(productType, "variant"), [productType]);
   const definitions = useOptionDefinitions(product.options.map((option) => option.optionId));
   const naming: VariantNaming = { uiLocale: locale, content, options: definitions.byId };
@@ -926,6 +932,19 @@ export function VariantsTab({
           <p>{t("products.variants.generatedInactive")}</p>
         ) : null}
       </div>
+      {needsOptions ? (
+        <div className="flex flex-col gap-2 rounded-md border border-border p-4">
+          <p>{t("products.variants.needsOptions")}</p>
+          <p>
+            <Link
+              to={buildPath(PATHS.productTypeDetail, { id: productType.id })}
+              className={linkClass}
+            >
+              {t("products.attributes.openType")}
+            </Link>
+          </p>
+        </div>
+      ) : null}
       <TabProblemsView t={t} id={VARIANTS_FOCUS_ID} problems={orphans} />
       {failure === null ? null : (
         <div ref={failureRef} tabIndex={-1}>

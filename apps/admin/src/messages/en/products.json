@@ -288,6 +288,7 @@
   "products.variants.deleteBody": "The variant and its prices are deleted for good. Only a variant of a draft product can be deleted, never the default or the last one, and never one with stock history or orders.",
   "products.variants.deleteHint": "This variant cannot be deleted. Switch it off instead.",
   "products.variants.combinationTaken": "A variant with these values exists already.",
+  "products.variants.needsOptions": "A product without options has one variant. To sell several sizes (e.g. 50 g and 100 g), allow an option in the product type and choose its values on the Options tab.",
   "products.notice.generated": "Variants generated: {created} new, {skipped} combinations had one already.",
   "products.notice.created": "Variant {sku} created.",
   "products.notice.deleted": "Variant {sku} deleted.",

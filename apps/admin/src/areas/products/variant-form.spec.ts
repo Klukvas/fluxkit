@@ -23,6 +23,7 @@ import {
   variantErrorsFromProblem,
   variantFormFrom,
   variantPatchBody,
+  variantsNeedOptions,
 } from "./variant-form";
 
 function variant(id: string, overrides: Partial<AdminVariant> = {}): AdminVariant {
@@ -189,6 +190,15 @@ describe("creating a variant by hand (draft products)", () => {
     expect(validateVariantCreate({ ...fresh, sku: "no spaces" }, free)["sku"]).toEqual({
       key: "errors.reason.invalid_format",
     });
+  });
+
+  it("a product without options cannot get a second variant: it says so instead of 'this combination exists'", () => {
+    const single = product({ options: [], variants: [variant("only", { isDefault: true })] });
+    expect(variantsNeedOptions(single)).toBe(true);
+    expect(variantsNeedOptions(product())).toBe(false);
+    const issues = validateVariantCreate(newVariantValues(single, true), single);
+    expect(issues["optionValueIds"]).toEqual({ key: "products.variants.needsOptions" });
+    expect(Object.values(issues)).not.toContainEqual({ key: "products.variants.combinationTaken" });
   });
 
   it("sends the values in the product's option order, a SKU only when typed, every flag", () => {
