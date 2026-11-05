@@ -12,6 +12,8 @@ import { Suspense, type ReactNode } from "react";
 import { trustBarItems, type TrustBarItemConfig } from "../config/trust-bar";
 import {
   isDataSection,
+  type BannersSection,
+  type BannerTone,
   type CategoriesSection,
   type HeroSection,
   type HomeDataSection,
@@ -21,6 +23,7 @@ import {
   type TrustSection,
 } from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
+import { bannerLink, checkBannersSection } from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
 import { localizedHref } from "../lib/locale-path";
 import { CategoryIcon } from "./icons";
@@ -124,6 +127,110 @@ function HeroView({
         )
       }
     />
+  );
+}
+
+/** One column on phones; from `md` one row of as many columns as there are banners (1 to 3). */
+const bannerColumns: Record<number, { grid: string; sizes: string }> = {
+  1: { grid: "grid-cols-1", sizes: "100vw" },
+  2: { grid: "grid-cols-1 md:grid-cols-2", sizes: "(min-width: 768px) 50vw, 100vw" },
+  3: { grid: "grid-cols-1 md:grid-cols-3", sizes: "(min-width: 768px) 33vw, 100vw" },
+};
+
+const bannerTones: Record<BannerTone, { card: string; text: string }> = {
+  surface: {
+    card: "border-border bg-background text-foreground hover:border-border-input",
+    text: "text-muted-foreground",
+  },
+  accent: {
+    card: "border-primary bg-primary text-primary-foreground",
+    // Inherits the card's `primary-foreground` (the muted grey would not read on the primary fill).
+    text: "",
+  },
+};
+
+/**
+ * Promotional cards (plan 2026-11-05-home-banners.md): each card is ONE link named by its title (`aria-labelledby`) and
+ * described by its text, so the picture's alt and the text do not pile up in the name. Static, server-rendered, no script.
+ */
+function BannersView({
+  section,
+  context,
+  isFirst,
+}: {
+  section: BannersSection;
+  context: HomeContext;
+  /** The first section of the page: its pictures are above the fold and load at once; otherwise lazily. */
+  isFirst: boolean;
+}) {
+  checkBannersSection(section);
+  const { t, locale } = context;
+  if (section.items.length === 0) return null;
+  const columns = bannerColumns[section.items.length] as { grid: string; sizes: string };
+  return (
+    <section
+      aria-labelledby={headingId(section)}
+      data-home-section="banners"
+      data-home-section-id={section.id}
+    >
+      <h2 id={headingId(section)} className="sr-only">
+        {t(section.titleKey)}
+      </h2>
+      <ul className={`grid gap-4 ${columns.grid}`}>
+        {section.items.map((banner) => {
+          const link = bannerLink(locale, banner.href);
+          const tone = bannerTones[banner.tone ?? "surface"];
+          const titleId = `${section.id}-${banner.id}-title`;
+          const textId = `${section.id}-${banner.id}-text`;
+          const className = `group flex h-full flex-col overflow-hidden rounded-lg border transition-shadow hover:shadow-raised motion-reduce:transition-none ${tone.card} ${focusRing}`;
+          const content = (
+            <>
+              <LocalPicture
+                image={banner.image}
+                t={t}
+                eager={isFirst}
+                sizes={columns.sizes}
+                className="h-auto w-full"
+              />
+              <span className="flex flex-col gap-1 p-4">
+                <h3
+                  id={titleId}
+                  className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
+                >
+                  {t(banner.titleKey)}
+                </h3>
+                <span id={textId} className={tone.text === "" ? undefined : tone.text}>
+                  {t(banner.textKey)}
+                </span>
+              </span>
+            </>
+          );
+          return (
+            <li key={banner.id} data-banner-id={banner.id}>
+              {link.external ? (
+                <a
+                  href={link.href}
+                  aria-labelledby={titleId}
+                  aria-describedby={textId}
+                  className={className}
+                >
+                  {content}
+                </a>
+              ) : (
+                <Link
+                  href={link.href}
+                  aria-labelledby={titleId}
+                  aria-describedby={textId}
+                  className={className}
+                >
+                  {content}
+                </Link>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
@@ -376,16 +483,20 @@ function StaticSectionView({
   section,
   context,
   pageHeading,
+  isFirst,
 }: {
   section: Exclude<HomeSection, HomeDataSection>;
   context: HomeContext;
   pageHeading: string | null;
+  isFirst: boolean;
 }) {
   switch (section.kind) {
     case "hero":
       return (
         <HeroView section={section} context={context} isPageHeading={pageHeading === section.id} />
       );
+    case "banners":
+      return <BannersView section={section} context={context} isFirst={isFirst} />;
     case "trust":
       return <TrustView section={section} context={context} />;
     case "richText":
@@ -437,7 +548,7 @@ export function HomeSections({
   return (
     <div className={sectionStack}>
       <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section) => {
+      {sections.map((section, index) => {
         if (!isDataSection(section)) {
           return (
             <StaticSectionView
@@ -445,6 +556,7 @@ export function HomeSections({
               section={section}
               context={context}
               pageHeading={pageHeading}
+              isFirst={index === 0}
             />
           );
         }
@@ -477,7 +589,7 @@ export function HomeSectionsView({
   return (
     <div className={sectionStack}>
       <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section) => {
+      {sections.map((section, index) => {
         if (!isDataSection(section)) {
           return (
             <StaticSectionView
@@ -485,6 +597,7 @@ export function HomeSectionsView({
               section={section}
               context={context}
               pageHeading={pageHeading}
+              isFirst={index === 0}
             />
           );
         }

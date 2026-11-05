@@ -94,6 +94,7 @@ test("the home page shows the configured sections in order, one h1, the hero pic
   await expect(products.getByRole("listitem")).toHaveCount(8);
   // Read once the streamed sections are in (a skeleton has the section's h2 but no product h3 yet).
   expect(await sectionIds(page)).toEqual([
+    "home-banners",
     "home-categories",
     "home-new-products",
     "home-trust",
@@ -102,7 +103,8 @@ test("the home page shows the configured sections in order, one h1, the hero pic
   const headings = await main
     .locator("h1, h2, h3")
     .evaluateAll((elements) => elements.map((element) => element.tagName));
-  expect(headings.slice(0, 4)).toEqual(["H1", "H2", "H2", "H3"]);
+  // The hero's h1, the banners' hidden h2 and their three h3, the category tiles' h2, the product row's h2 and h3.
+  expect(headings.slice(0, 8)).toEqual(["H1", "H2", "H3", "H3", "H3", "H2", "H2", "H3"]);
   // Below the hero: no product image of the home row is fetched eagerly.
   expect(
     await products
@@ -358,6 +360,10 @@ test("in dark, the text of the home, product, cart and checkout pages keeps its 
     if (path.startsWith("/en")) await waitForHydration(page);
     else await expect(page.getByRole("link", { name: /Кошик.*\d+/ })).toBeVisible();
     expect(await bodyBackground(page), path).toBe(DARK_BACKGROUND);
+    // The home walk includes the banner cards (plan 2026-11-05-home-banners.md): the accent and the surface tone.
+    if (path === "/en" || path === "/uk") {
+      await expect(page.locator('main [data-home-section="banners"] li')).toHaveCount(3);
+    }
     expect(await contrastFailures(page), path).toEqual([]);
   }
   // Focus ring: the ring token on the dark page.

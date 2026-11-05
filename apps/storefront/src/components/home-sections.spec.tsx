@@ -2,6 +2,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
   homeSections,
+  type Banner,
+  type BannersSection,
+  type BannerTone,
   type CategoriesSection,
   type HeroSection,
   type HomeSection,
@@ -206,14 +209,114 @@ describe("home data sections: empty, error and loading", () => {
   });
 });
 
+describe("home banners", () => {
+  const card = (id: string, href: string, tone?: BannerTone): Banner => ({
+    id,
+    titleKey: `${id}.title`,
+    textKey: `${id}.text`,
+    href,
+    image: { src: "/home/banner-1.svg", width: 640, height: 320, altKey: `${id}.alt` },
+    ...(tone === undefined ? {} : { tone }),
+  });
+  const banners: BannersSection = {
+    kind: "banners",
+    id: "promo",
+    titleKey: "b.title",
+    items: [
+      card("one", "/catalog", "accent"),
+      card("two", "https://example.com/sale"),
+      card("three", "/account/register", "surface"),
+    ],
+  };
+  const html = render([hero, banners, tiles]);
+  const items = (markup: string) =>
+    [...markup.matchAll(/<li data-banner-id="[^"]+">.*?<\/li>/g)].map((match) => match[0]);
+
+  it("renders a labelled section with a visually hidden h2 and one h3 per card, after the hero", () => {
+    expect(sectionOrder(html)).toEqual(["promo", "tiles"]);
+    expect(html).toMatch(
+      /<section aria-labelledby="promo-title" data-home-section="banners"[^>]*><h2 id="promo-title" class="sr-only">§b.title<\/h2>/,
+    );
+    expect(headings(html).slice(0, 5)).toEqual(["h1", "h2", "h3", "h3", "h3"]);
+  });
+
+  it("makes each whole card ONE link, named by its title and described by its text", () => {
+    const cards = items(html);
+    expect(cards).toHaveLength(3);
+    for (const [index, id] of ["one", "two", "three"].entries()) {
+      const markup = cards[index] as string;
+      expect(markup.match(/<a /g), id).toHaveLength(1);
+      expect(markup).toContain(`aria-labelledby="promo-${id}-title"`);
+      expect(markup).toContain(`aria-describedby="promo-${id}-text"`);
+      expect(markup).toMatch(new RegExp(`<h3 id="promo-${id}-title"[^>]*>§${id}.title</h3>`));
+      expect(markup).toMatch(new RegExp(`<span id="promo-${id}-text"[^>]*>§${id}.text</span>`));
+      expect(markup).toContain(`alt="§${id}.alt"`);
+      expect(markup).toContain('width="640" height="320"');
+    }
+    expect(cards[0]).toContain('href="/uk/catalog"');
+    expect(cards[1]).toContain('href="https://example.com/sale"');
+    expect(cards[1]).not.toContain("target=");
+    expect(cards[2]).toContain('href="/uk/account/register"');
+  });
+
+  it("colours a card from tokens only: accent is the primary colour, surface (the default) the page background", () => {
+    const [accent, plain, surface] = items(html) as [string, string, string];
+    expect(accent).toContain("bg-primary text-primary-foreground");
+    expect(plain).toContain("bg-background text-foreground");
+    expect(surface).toContain("bg-background text-foreground");
+  });
+
+  it("lays the cards out in one column on phones and up to three from md", () => {
+    expect(html).toContain('<ul class="grid gap-4 grid-cols-1 md:grid-cols-3">');
+    const two = render([{ ...banners, items: [card("a", "/"), card("b", "/catalog")] }]);
+    expect(two).toContain('<ul class="grid gap-4 grid-cols-1 md:grid-cols-2">');
+    const one = render([{ ...banners, items: [card("a", "/")] }]);
+    expect(one).toContain('<ul class="grid gap-4 grid-cols-1">');
+  });
+
+  it("loads the pictures lazily below the first section, and at once when the banners come first", () => {
+    for (const markup of items(html)) {
+      expect(markup).toContain('loading="lazy"');
+      expect(markup).not.toContain('fetchPriority="high"');
+    }
+    const first = render([banners, hero]);
+    for (const markup of items(first)) expect(markup).toContain('loading="eager"');
+    // Without a hero first, the page keeps one (hidden) h1.
+    expect(headings(first)[0]).toBe("h1");
+  });
+
+  it("hides the section when the list is empty", () => {
+    const empty = render([hero, { ...banners, items: [] }]);
+    expect(sectionOrder(empty)).toEqual([]);
+    expect(empty).not.toContain("§b.title");
+  });
+
+  it("refuses an unsafe link or a fourth banner on render (fails loudly)", () => {
+    expect(() => render([{ ...banners, items: [card("x", "javascript:alert(1)")] }])).toThrow();
+    expect(() => render([{ ...banners, items: [card("x", "http://example.com/")] }])).toThrow();
+    const four = [card("a", "/"), card("b", "/"), card("c", "/"), card("d", "/")];
+    expect(() => render([{ ...banners, items: four } as unknown as BannersSection])).toThrow(
+      /at most 3/,
+    );
+  });
+
+  it("has no hardcoded text", () => {
+    expect(leftoverText(html.replace(/[\d\s,]+₴|₴/g, " "))).toBe("");
+    for (const value of textAttributes(html)) {
+      expect(value === "" || value.startsWith("§"), value).toBe(true);
+    }
+  });
+});
+
 describe("the default home config renders", () => {
-  it("as hero, categories, products, trust and the about text", () => {
+  it("as hero, banners, categories, products, trust and the about text", () => {
     const results: Record<string, HomeSectionResult> = {
       "home-categories": loaded.tiles as HomeSectionResult,
       "home-new-products": loaded.row as HomeSectionResult,
     };
     const html = render(homeSections, results);
     expect(sectionOrder(html)).toEqual([
+      "home-banners",
       "home-categories",
       "home-new-products",
       "home-trust",

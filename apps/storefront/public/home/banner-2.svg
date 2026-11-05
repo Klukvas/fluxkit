@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 320" width="640" height="320">
+  <!-- Fluxkit demo banner picture (generated, no branding): a wrapped gift box on its own neutral background, so it reads on the
+       light and the dark theme. TODO(fluxkit): a client fork replaces it (config/home.ts, "home-banners"). -->
+  <rect width="640" height="320" fill="#eceee9"/>
+  <circle cx="90" cy="70" r="70" fill="#dde2d6"/>
+  <ellipse cx="320" cy="292" rx="200" ry="16" fill="#d6dbcf"/>
+  <rect x="220" y="150" width="200" height="140" rx="8" fill="#8fae8b"/>
+  <rect x="205" y="120" width="230" height="40" rx="8" fill="#7a9a76"/>
+  <rect x="305" y="120" width="30" height="170" fill="#e7c9a5"/>
+  <path d="M320 120c-30-50-90-40-70-5 10 15 45 10 70 5z" fill="#d9a873"/>
+  <path d="M320 120c30-50 90-40 70-5-10 15-45 10-70 5z" fill="#d9a873"/>
+  <circle cx="320" cy="118" r="12" fill="#c48f57"/>
+  <circle cx="510" cy="110" r="10" fill="#c9d3c1"/>
+  <circle cx="540" cy="170" r="6" fill="#c9d3c1"/>
+  <circle cx="130" cy="200" r="8" fill="#c9d3c1"/>
+</svg>
