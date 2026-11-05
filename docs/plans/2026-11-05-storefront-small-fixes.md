@@ -30,4 +30,18 @@ No new dependency, environment variable, API route, schema or public contract. O
 (`pre-hydration-forms`, `design-b`) against natively started Postgres, Redis and Meilisearch on free ports.
 
 ## Results
-(filled in after the work)
+- **1 (`7863949`):** failing first: `expected 303 to be 403` for `{"sec-fetch-site":"cross-site"}`; then 7 of 7. Real `next start`: foreign `Origin` 403,
+  `Sec-Fetch-Site: cross-site` 403, own origin 303, no headers 303.
+- **2 (`70be3d1`):** failing first: `expected 'Unknown theme.' to be ''`; then 7 of 7; real server: `400` with an empty body.
+- **3, not fixed (no clean way):** checked on `next start` with `fluxkit_theme=dark`: `/en/p/no-such-product`, `/en/no-such-page` and `/foo` answer 404 with
+  `<html id="__next_error__">` (no `lang`, no `data-theme`); `/en` has `data-theme="dark"`. Next 16.4.3 builds that element as a constant in
+  `getErrorRSCPayload` (`next/dist/server/app-render/app-render.js`); no layout, `not-found.tsx` or route reaches it. `global-not-found` (experimental flag)
+  is for URLs whose root layout cannot render, not for a page's `notFound()`, and would add a second cookie reader. A CSS default would follow the device,
+  not the cookie. With a script the page turns dark when the payload renders; without one the page is empty anyway (README "Known gaps").
+- **4:** what counts (react-dom 19.3 source, offline check with Next's compiled React): body shell + `<head>` + the loading fallback (even when not sent) +
+  the finished section, limit 12 800. Real build, search on: uk register about 13.1 KB (outlined), en 12.3 KB; e2e uk failed first
+  (`locator.fill: Timeout 15000ms exceeded`, en passed). Single `.fk-*` classes in header and footer and icon caps in `.fk-icon`: uk header 5 397 -> 4 832 bytes,
+  footer 1 408 -> 1 367, uk register about 12.5 KB, inline. Margin about 0.3 KB: longer client category names can outline it again (the e2e test catches it).
+- **Checks:** `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env` exit 0; storefront unit tests 106 files, 1 802 tests passed; full storefront
+  e2e (search on) 144 passed, 4 skipped (the search-off file), against Postgres 16, Redis and Meilisearch 1.55 started natively. Not run: the admin suites
+  (admin untouched), `E2E_SEARCH=off`, a real browser look at the header (classes are the same utilities through `@apply`; the generated CSS was checked).
