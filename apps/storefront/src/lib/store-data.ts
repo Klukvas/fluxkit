@@ -7,6 +7,7 @@ import {
   type ProductDetail,
   type ProductList,
   type CategoryList,
+  type HomeBannerList,
   type StoreConfig,
   type StoreClient,
   type StoreResult,
@@ -31,6 +32,7 @@ export const STORE_TAGS = {
   categories: "store:categories",
   products: "store:products",
   search: "store:search",
+  banners: "store:banners",
 } as const;
 
 /** Most last-good responses kept in memory per server process (oldest dropped first). */
@@ -87,6 +89,8 @@ export interface StoreData {
     read?: ReadOptions,
   ): Promise<CatalogOutcome<ProductList>>;
   getProduct(locale: string, slug: string): Promise<CatalogOutcome<ProductDetail>>;
+  /** The home banners live now (`GET /store/banners`, ADR 0046): cached like the catalog, so a change shows up to 60 s late. */
+  listBanners(locale: string, read?: ReadOptions): Promise<CatalogOutcome<HomeBannerList>>;
 }
 
 export function createStoreData(dependencies: StoreDataDependencies): StoreData {
@@ -182,6 +186,10 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
         STORE_TAGS.products,
         {},
         (client, options) => client.getProduct(slug, { ...options, locale }),
+      ),
+    listBanners: (locale, read = {}) =>
+      run("GET /store/banners", `banners:${locale}`, STORE_TAGS.banners, read, (client, options) =>
+        client.listBanners({ ...options, locale }),
       ),
   };
 }

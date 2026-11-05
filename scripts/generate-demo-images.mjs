@@ -1,17 +1,20 @@
 #!/usr/bin/env node
-// Draws the demo product illustrations of `seeds/assets/` (plan docs/plans/2026-11-01-demo-images-local-run.md).
+// Draws the demo pictures of `seeds/assets/` (plan docs/plans/2026-11-01-demo-images-local-run.md): the product
+// illustrations (800 x 800) and the home banners (1280 x 640, plan docs/plans/2026-11-05-admin-home-banners.md).
 //
-// Each image is a flat SVG illustration (no text, no brand, no person) encoded to WebP with the `sharp` that `apps/api`
-// already depends on (ADR 0028), so no dependency is added. The output is committed as seed data; run this script again
-// only when a drawing changes:
+// Each image is a flat SVG illustration (no brand, no person; only the demo picture banner has words, in uk and en) encoded
+// to WebP with the `sharp` that `apps/api` already depends on (ADR 0028), so no dependency is added. The media service
+// accepts JPEG, PNG and WebP only, never SVG. The output is committed as seed data; run this script again only when a
+// drawing changes:
 //
-//   node scripts/generate-demo-images.mjs            # writes seeds/assets/*.webp
-//   node scripts/generate-demo-images.mjs --check    # exits 1 when a file the seed names is missing (no writes)
+//   node scripts/generate-demo-images.mjs                   # writes seeds/assets/*.webp
+//   node scripts/generate-demo-images.mjs --only banner-    # writes only the files whose name starts with "banner-"
+//   node scripts/generate-demo-images.mjs --check           # exits 1 when a file the seed names is missing (no writes)
 //
 // `pnpm install` must have run (sharp is resolved from apps/api). SVG rendering goes through the local librsvg, so the
 // bytes can differ slightly between machines; that is why the files are committed instead of generated on every seed.
 import { Buffer } from "node:buffer";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -162,7 +165,43 @@ function templatePack() {
   );
 }
 
-/** Every file the demo seed names (`seeds/src/products.ts`), with its drawing. */
+// Home banners (plan docs/plans/2026-11-05-admin-home-banners.md, PR 3): 2:1 pictures, the frame the storefront draws them in.
+const BANNER = { width: 1280, height: 640 };
+
+/**
+ * A picture of the storefront's `config` banners (`apps/storefront/public/home/banner-<n>.svg`, 640 x 320, drawn for PR 225),
+ * rendered at the banner size: the two demo card banners of the seed show the same illustrations as the static ones.
+ */
+function storefrontBanner(file) {
+  // Drawn at 640 x 320: twice the density renders it sharp at 1280 x 640 (no upscaled bitmap).
+  const svg = readFileSync(resolve(repoRoot, "apps/storefront/public/home", file));
+  return { svg, density: 144, ...BANNER };
+}
+
+/**
+ * The demo picture banner (`layout: image`): a finished picture WITH its words drawn in, one per language, which is why the
+ * seed gives it an own picture for `en` besides the default one. The words are the banner's alt text too (a screen reader
+ * does not read a picture). TODO(fluxkit): demo only; a client designs its own banners.
+ */
+function collectionBanner(headline, subline) {
+  const { width, height } = BANNER;
+  return {
+    svg: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <rect width="${width}" height="${height}" fill="#1f2a44"/>
+  <circle cx="1080" cy="120" r="260" fill="#2c3b5e"/>
+  <circle cx="1180" cy="560" r="150" fill="#33456d"/>
+  <rect x="820" y="210" width="300" height="330" rx="24" fill="#e7c56b"/>
+  <path d="M870 210 C870 120 1070 120 1070 210" fill="none" stroke="#e7c56b" stroke-width="22" stroke-linecap="round"/>
+  <rect x="860" y="300" width="220" height="26" rx="13" fill="#c9a34a"/>
+  <text x="96" y="300" font-family="DejaVu Sans, Verdana, sans-serif" font-size="78" font-weight="700" fill="#f8f7f3">${headline}</text>
+  <text x="96" y="390" font-family="DejaVu Sans, Verdana, sans-serif" font-size="40" fill="#cfd6e6">${subline}</text>
+  <rect x="96" y="450" width="260" height="8" rx="4" fill="#e7c56b"/>
+</svg>`),
+    ...BANNER,
+  };
+}
+
+/** Every file the demo seed names (`seeds/src/products.ts`, `seeds/src/banners.ts`), with its drawing. */
 const IMAGES = {
   "t-shirt-front": () => tShirt("white"),
   "t-shirt-black": () => tShirt("black"),
@@ -175,7 +214,28 @@ const IMAGES = {
   wrench,
   "e-book-cover": eBook,
   "template-pack": templatePack,
+  "banner-season": () => storefrontBanner("banner-1.svg"),
+  "banner-gifts": () => storefrontBanner("banner-2.svg"),
+  "banner-collection-uk": () => collectionBanner("Нова колекція", "Демо-банер: замініть його"),
+  "banner-collection-en": () => collectionBanner("New collection", "Demo banner: replace it"),
 };
+
+/** A drawing is an SVG string (800 x 800) or `{svg, width, height, density?}`; the output is WebP at that size. */
+function rasterize(sharp, drawing) {
+  if (typeof drawing === "string") return sharp(Buffer.from(drawing));
+  return sharp(drawing.svg, { density: drawing.density ?? 72 }).resize(
+    drawing.width,
+    drawing.height,
+    { fit: "fill" },
+  );
+}
+
+/** `--only <prefix>`: write only the files whose name starts with it (the other committed files stay byte for byte). */
+function selected() {
+  const index = process.argv.indexOf("--only");
+  const prefix = index === -1 ? "" : (process.argv[index + 1] ?? "");
+  return Object.entries(IMAGES).filter(([name]) => name.startsWith(prefix));
+}
 
 async function main() {
   if (process.argv.includes("--check")) {
@@ -192,13 +252,14 @@ async function main() {
   const sharp = createRequire(resolve(repoRoot, "apps/api/package.json"))("sharp");
   await mkdir(assetsDir, { recursive: true });
   let total = 0;
-  for (const [name, draw] of Object.entries(IMAGES)) {
-    const bytes = await sharp(Buffer.from(draw())).webp({ quality: 82, effort: 6 }).toBuffer();
+  const images = selected();
+  for (const [name, draw] of images) {
+    const bytes = await rasterize(sharp, draw()).webp({ quality: 82, effort: 6 }).toBuffer();
     await writeFile(resolve(assetsDir, `${name}.webp`), bytes);
     total += bytes.length;
     console.log(`${name}.webp ${bytes.length} bytes`);
   }
-  console.log(`${Object.keys(IMAGES).length} images, ${total} bytes in total, in seeds/assets/`);
+  console.log(`${images.length} images, ${total} bytes in total, in seeds/assets/`);
 }
 
 main().catch((error) => {

@@ -128,7 +128,7 @@ See `docs/files/storefront.md` for one line per file. In short:
 
 ### Layout composition is configuration
 
-- Home page: `src/config/home.ts` lists the sections in order (`hero`, `banners`, `categories`, `productRow`, `trust`, `richText`; see "Desktop design, batch B" and "Home banners"); `components/home-sections.tsx` renders each `kind` (a `switch` with a `never` check). The page starts one load per data section (`getHomeSection`, `lib/home-data.ts`) and streams each into its own `Suspense` boundary; the renderers are synchronous and receive the loaded result, so they stay testable with `renderToStaticMarkup` (`HomeSectionsView`).
+- Home page: `src/config/home.ts` lists the sections in order (`hero`, `banners`, `categories`, `productRow`, `trust`, `richText`; see "Desktop design, batch B" and "Home banners"); `components/home-sections.tsx` renders each `kind` (a `switch` with a `never` check). The page starts one load per data section (`getHomeSection`, `lib/home-data.ts`) and streams each into its own `Suspense` boundary (except the admin's banners, which the page waits for: "Home banners"); the renderers are synchronous and receive the loaded result, so they stay testable with `renderToStaticMarkup` (`HomeSectionsView`).
 - Category page header: `src/config/category-page.ts` (`banner`: the category's name and description in the `Hero` component, optional picture per slug; `plain`).
 - Theme: `src/config/theme.ts` (`defaultMode`, `showToggle`).
 - Header and footer links: `src/layout/navigation.ts` (message keys and locale-less paths; `localizedHref` adds the locale and refuses anything that is not a plain path).
@@ -470,24 +470,52 @@ Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements a
 
 ## Home banners (2026-11-05)
 
-Plan `docs/plans/2026-11-05-home-banners.md` (screenshots and results there).
+Plans `docs/plans/2026-11-05-home-banners.md` (static banners, PR 225) and `docs/plans/2026-11-05-admin-home-banners.md` (banners from the
+admin, PR 3: D6, section 7; results and screenshots there). API: `docs/api/banners.md`, ADR 0046.
 
 - **What:** the `banners` section of `config/home.ts`: 0 to 3 promotional cards in one row (one column below 768 px), static (no carousel,
-  no autoplay, no client script). Each card is ONE link named by its title (`aria-labelledby`) and described by its text
-  (`aria-describedby`), with a local picture (`LocalPicture`, intrinsic `width`/`height`, lazy unless the section is the first on the page),
-  an `h3` title and a short text under a visually hidden `h2`. Tones from existing tokens: `surface` (default; page background and border)
-  or `accent` (the `primary` fill). The default home shows three demo banners after the hero (`TODO(fluxkit)`).
-- **Edit banners (a client fork):** change `items` of the `home-banners` entry in `src/config/home.ts`: per banner a unique slug `id`,
-  `titleKey`, `textKey`, `image { src, width, height, altKey }` and `href`, optional `tone`. Put the pictures in `public/home/` with their
-  real size (draw their own background so they read on the dark theme; `config/home.spec.ts` checks the file, its `viewBox` and that it
-  loads nothing). Add the texts as `home.banners.*` in BOTH `src/messages/uk.json` and `en.json`. `href` is a storefront path without the
-  locale (`/catalog`, `/c/<slug>`; checked like the hero's link) or an `https://` address (same tab); `http:`, `javascript:`, `//host` and
-  the like fail the render and the config spec (`lib/home-banners.ts`). A fourth banner fails `tsc`; `items: []` or removing the entry hides
-  the section. Banners edited in the admin are NOT built (a later option in the plan: it needs an API and a table).
-- **Tests:** `lib/home-banners.spec.ts` (links, count, ids), `config/home.spec.ts` (default banners, compile-time checks of the count and the
-  section kinds), `components/home-sections.spec.tsx` (markup, accessible name, tones, columns, lazy or eager, hidden when empty, no
-  hardcoded text); e2e `e2e/tests/home-banners.e2e.ts` (order, names, links, pictures, keyboard, 390/768/1024/1280) and the dark contrast
-  walk of `design-b.e2e.ts`, which now asserts the banners are on the page.
+  no autoplay). Each banner is ONE link. Every picture sits in a fixed 2:1 frame (`aspect-2/1`, `object-cover`): any picture size fills it,
+  cropped, and the frame reserves the space, so nothing moves when it loads. Pictures load lazily unless the section is the first on the
+  page. Under a visually hidden `h2`, two layouts:
+  - `card`: the picture, an `h3` title and an optional short text; the link is named by the title (`aria-labelledby`) and described by the
+    text (`aria-describedby`). The picture is decorative (`alt=""`) unless it has its own alt text. Tones from existing tokens: `surface`
+    (page background and border) or `accent` (the `primary` fill).
+  - `image` (admin only): a finished picture alone, no text over it, no tone; its alt text (required by the API) names the link.
+- **Two sources; a fork chooses with `source` on the `home-banners` entry** (no fallback from one to the other):
+  - `source: "admin"` (the template default): the banners the shop manages in the admin (`/admin/banners`; the admin screen comes with PR 2
+    of the plan, until then the API only). `GET /store/banners?locale=` through the typed api-client (`listBanners`) and the 60 s data cache
+    (tag `store:banners`), so a change, a start or an end time shows up to about a minute late. The API returns at most 3 live banners with
+    the texts and the picture of the page's locale already chosen. The section is HIDDEN when there is no banner and when the store cannot
+    answer (the failure is logged in full like every data section; a promotion slot that says "could not load" helps nobody). Each banner is
+    checked again here (`lib/home-banners.ts` `checkStoreBanner`: shape, the link rule below, an `image` banner needs alt text): a bad one is
+    skipped and logged with its id and a code (`Home banner <id> is not shown: link_dot_segment.`; once per server process and reason,
+    not on every render: a set of at most 200 keys, cleared when full), never a page error, and never replaced by
+    a 4th. Not streamed: the page waits for this one read (the `(site)` loading view meanwhile), because no skeleton can match an unknown
+    number of banners in an unknown layout and a late row near the top would push the page down. `pnpm seed` creates three demo banners.
+  - `source: "config"` with `items`: banners in code (PR 225). Per banner a unique slug `id`, `titleKey`, `textKey`, `image { src, width,
+    height, altKey }`, `href`, optional `tone`; pictures in `public/home/` (their own background so they read on the dark theme;
+    `config/home.spec.ts` checks the file, its `viewBox` and that it loads nothing); texts as `home.banners.*` in BOTH `uk.json` and
+    `en.json`. `demoConfigBanners` in `config/home.ts` keeps the three static demo banners for this mode. A bad link or a fourth banner
+    fails the render and the spec (a fourth fails `tsc` too); `items: []` hides the section. Removing the entry hides the section in both
+    modes; with it removed the storefront never asks the API for banners.
+- **Pictures of the admin's banners** are uploads (`MEDIA_PUBLIC_BASE_URL/<key>`) and go through `StoreImage` and `allowedImageUrl`, like
+  product images: production needs the media host in `STOREFRONT_IMAGE_HOSTS` ("Images" above); under `next dev` the development-only
+  `/media` rule shows local uploads. A picture whose host is not allowed shows the token placeholder (the banner stays, named by its alt
+  text) and is logged once per server process (`Home banner <id> shows a placeholder ...`): the same rule as product images, and the only way the
+  e2e stack (plain `http`) can test the banners at all.
+- **Link rule** (both sources; `checkBannerHref`): a storefront path without the locale (`/catalog`, `/c/<slug>`) or an `https://` address
+  (same tab). Refused: `http:`, `javascript:`, `data:`, `mailto:`, `//host`, a relative path, whitespace or control characters, a backslash,
+  credentials, a `.`/`..` segment also when percent-encoded (`/%2e%2e/admin`), and a leading locale segment (`/uk/catalog`: the storefront
+  adds the locale). The same rule as core `checkBannerLink`, which the API applies when a banner is saved: the storefront does not depend on
+  `@fluxkit/core`, so `lib/home-banners-parity.spec.ts` runs core's case table, copied row for row, against it. Change both together.
+- **Tests:** `lib/home-banners.spec.ts` (links, count, ids, checks of an API banner, skipped and logged items, at most 3),
+  `lib/home-banners-parity.spec.ts` (core's link table), `lib/home-data.spec.ts` (one read per locale, empty, outage and 404 hide the
+  section, bad item skipped, the locale's picture), `config/home.spec.ts` (default `source: "admin"`, the config demo banners, compile-time
+  checks of the count, the kinds and the sources), `components/home-sections.spec.tsx` (both layouts and both sources: names, frame, tones,
+  columns, lazy or eager, placeholder, hidden when empty or failed, no hardcoded text); e2e `e2e/tests/home-banners.e2e.ts` (the seeded
+  banners in uk and en, names, links, layouts, the per-locale picture through `GET /store/banners`, keyboard, 390/768/1024/1280 without
+  sideways scroll, a banner created through the admin API showing within the cache window while an inactive, a future and an expired one
+  never do) and the dark contrast walk of `design-b.e2e.ts`, which asserts the banners are on the page.
 
 ## Accessibility baseline (what was checked)
 

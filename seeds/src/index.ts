@@ -1,3 +1,4 @@
+import { demoBanners } from "./banners.js";
 import { demoAttributes, demoOptions } from "./dictionaries.js";
 import { productTypePresets } from "./presets.js";
 import { demoProducts } from "./products.js";
@@ -6,6 +7,7 @@ import { demoSynonymGroups } from "./synonyms.js";
 import { demoBrands, demoCategories } from "./taxonomy.js";
 import type { CatalogSeed } from "./types.js";
 
+export { demoBanners } from "./banners.js";
 export { demoAttributes, demoOptions } from "./dictionaries.js";
 export { productTypePresets } from "./presets.js";
 export { INTERNAL_SUPPLIER_MARKER, demoProducts } from "./products.js";
@@ -24,4 +26,5 @@ export const catalogSeed: CatalogSeed = {
   products: demoProducts,
   shippingMethods: demoShippingMethods,
   synonymGroups: demoSynonymGroups,
+  banners: demoBanners,
 };

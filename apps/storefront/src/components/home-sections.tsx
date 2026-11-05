@@ -15,20 +15,29 @@ import {
   type BannersSection,
   type BannerTone,
   type CategoriesSection,
+  type ConfigBannersSection,
   type HeroSection,
   type HomeDataSection,
   type HomeSection,
+  type LocalImage,
   type ProductRowSection,
   type RichTextSection,
   type TrustSection,
 } from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
-import { bannerLink, checkBannersSection } from "../lib/home-banners";
+import {
+  bannerLink,
+  checkBannersSection,
+  type BannerLink,
+  type StoreBannerPicture,
+  type StoreBannerView,
+} from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
 import { localizedHref } from "../lib/locale-path";
 import { CategoryIcon } from "./icons";
 import { LocalPicture } from "./local-picture";
 import { ProductGrid } from "./product-grid";
+import { StoreImage } from "./store-image";
 import { focusRing, linkButton } from "./styles";
 import { StoreTrustBar } from "./trust-bar";
 
@@ -149,24 +158,134 @@ const bannerTones: Record<BannerTone, { card: string; text: string }> = {
   },
 };
 
+/** A banner's picture: a file of the template (`config` source) or an uploaded image of the API (`admin` source). */
+type BannerPicture =
+  { kind: "local"; image: LocalImage } | ({ kind: "remote" } & StoreBannerPicture);
+
+/** One banner as `BannersView` draws it, whichever source it came from. */
+type BannerCard =
+  | {
+      id: string;
+      layout: "card";
+      title: string;
+      text: string | null;
+      tone: BannerTone;
+      link: BannerLink;
+      picture: BannerPicture;
+    }
+  | { id: string; layout: "image"; link: BannerLink; picture: BannerPicture };
+
+function configBannerCards(section: ConfigBannersSection, context: HomeContext): BannerCard[] {
+  checkBannersSection(section);
+  const { t, locale } = context;
+  return section.items.map((banner) => ({
+    id: banner.id,
+    layout: "card",
+    title: t(banner.titleKey),
+    text: t(banner.textKey),
+    tone: banner.tone ?? "surface",
+    link: bannerLink(locale, banner.href),
+    picture: { kind: "local", image: banner.image },
+  }));
+}
+
+function storeBannerCards(banners: readonly StoreBannerView[]): BannerCard[] {
+  return banners.map((banner) => ({
+    ...banner,
+    picture: { kind: "remote", ...banner.picture },
+  }));
+}
+
 /**
- * Promotional cards (plan 2026-11-05-home-banners.md): each card is ONE link named by its title (`aria-labelledby`) and
- * described by its text, so the picture's alt and the text do not pile up in the name. Static, server-rendered, no script.
+ * The fixed 2:1 frame of every banner picture (`object-cover`): any upload size or ratio fills it, cropped, and the frame
+ * reserves the space before the picture loads, so nothing moves.
+ */
+function BannerFrame({
+  picture,
+  context,
+  eager,
+  sizes,
+}: {
+  picture: BannerPicture;
+  context: HomeContext;
+  eager: boolean;
+  sizes: string;
+}) {
+  return (
+    <span className="block aspect-2/1 overflow-hidden bg-muted">
+      {picture.kind === "local" ? (
+        <LocalPicture
+          image={picture.image}
+          t={context.t}
+          eager={eager}
+          sizes={sizes}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        <StoreImage
+          src={picture.src}
+          alt={picture.alt}
+          width={picture.width}
+          height={picture.height}
+          sizes={sizes}
+          eager={eager}
+          fill
+        />
+      )}
+    </span>
+  );
+}
+
+function BannerAnchor({
+  link,
+  className,
+  labelledBy,
+  describedBy,
+  children,
+}: {
+  link: BannerLink;
+  className: string;
+  labelledBy?: string;
+  describedBy?: string;
+  children: ReactNode;
+}) {
+  const aria = {
+    ...(labelledBy === undefined ? {} : { "aria-labelledby": labelledBy }),
+    ...(describedBy === undefined ? {} : { "aria-describedby": describedBy }),
+  };
+  return link.external ? (
+    <a href={link.href} className={className} {...aria}>
+      {children}
+    </a>
+  ) : (
+    <Link href={link.href} className={className} {...aria}>
+      {children}
+    </Link>
+  );
+}
+
+/**
+ * Promotional cards (plans 2026-11-05-home-banners.md and 2026-11-05-admin-home-banners.md). Each banner is ONE link:
+ * - `card`: the picture, a title and an optional text; the link is named by its title (`aria-labelledby`) and described by
+ *   its text, so the picture's alt and the text do not pile up in the name. The picture is decorative (`alt=""`) unless it
+ *   has its own alt text.
+ * - `image` (admin only): the finished picture alone, no text over it and no tone; its alt text is the link's name.
+ * Server-rendered; the only script is the placeholder fallback of an uploaded picture that fails to load.
  */
 function BannersView({
   section,
+  cards,
   context,
   isFirst,
 }: {
   section: BannersSection;
+  cards: readonly BannerCard[];
   context: HomeContext;
   /** The first section of the page: its pictures are above the fold and load at once; otherwise lazily. */
   isFirst: boolean;
 }) {
-  checkBannersSection(section);
-  const { t, locale } = context;
-  if (section.items.length === 0) return null;
-  const columns = bannerColumns[section.items.length] as { grid: string; sizes: string };
+  if (cards.length === 0) return null;
+  const columns = bannerColumns[cards.length] as { grid: string; sizes: string };
   return (
     <section
       aria-labelledby={headingId(section)}
@@ -174,58 +293,56 @@ function BannersView({
       data-home-section-id={section.id}
     >
       <h2 id={headingId(section)} className="sr-only">
-        {t(section.titleKey)}
+        {context.t(section.titleKey)}
       </h2>
       <ul className={`grid gap-4 ${columns.grid}`}>
-        {section.items.map((banner) => {
-          const link = bannerLink(locale, banner.href);
-          const tone = bannerTones[banner.tone ?? "surface"];
+        {cards.map((banner) => {
+          const frame = (
+            <BannerFrame
+              picture={banner.picture}
+              context={context}
+              eager={isFirst}
+              sizes={columns.sizes}
+            />
+          );
+          if (banner.layout === "image") {
+            return (
+              <li key={banner.id} data-banner-id={banner.id} data-banner-layout="image">
+                <BannerAnchor
+                  link={banner.link}
+                  className={`group block overflow-hidden rounded-lg border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none ${focusRing}`}
+                >
+                  {frame}
+                </BannerAnchor>
+              </li>
+            );
+          }
+          const tone = bannerTones[banner.tone];
           const titleId = `${section.id}-${banner.id}-title`;
           const textId = `${section.id}-${banner.id}-text`;
-          const className = `group flex h-full flex-col overflow-hidden rounded-lg border transition-shadow hover:shadow-raised motion-reduce:transition-none ${tone.card} ${focusRing}`;
-          const content = (
-            <>
-              <LocalPicture
-                image={banner.image}
-                t={t}
-                eager={isFirst}
-                sizes={columns.sizes}
-                className="h-auto w-full"
-              />
-              <span className="flex flex-col gap-1 p-4">
-                <h3
-                  id={titleId}
-                  className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
-                >
-                  {t(banner.titleKey)}
-                </h3>
-                <span id={textId} className={tone.text === "" ? undefined : tone.text}>
-                  {t(banner.textKey)}
-                </span>
-              </span>
-            </>
-          );
           return (
-            <li key={banner.id} data-banner-id={banner.id}>
-              {link.external ? (
-                <a
-                  href={link.href}
-                  aria-labelledby={titleId}
-                  aria-describedby={textId}
-                  className={className}
-                >
-                  {content}
-                </a>
-              ) : (
-                <Link
-                  href={link.href}
-                  aria-labelledby={titleId}
-                  aria-describedby={textId}
-                  className={className}
-                >
-                  {content}
-                </Link>
-              )}
+            <li key={banner.id} data-banner-id={banner.id} data-banner-layout="card">
+              <BannerAnchor
+                link={banner.link}
+                labelledBy={titleId}
+                {...(banner.text === null ? {} : { describedBy: textId })}
+                className={`group flex h-full flex-col overflow-hidden rounded-lg border transition-shadow hover:shadow-raised motion-reduce:transition-none ${tone.card} ${focusRing}`}
+              >
+                {frame}
+                <span className="flex flex-col gap-1 p-4">
+                  <h3
+                    id={titleId}
+                    className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
+                  >
+                    {banner.title}
+                  </h3>
+                  {banner.text === null ? null : (
+                    <span id={textId} className={tone.text === "" ? undefined : tone.text}>
+                      {banner.text}
+                    </span>
+                  )}
+                </span>
+              </BannerAnchor>
             </li>
           );
         })}
@@ -386,7 +503,13 @@ function RichTextView({ section, context }: { section: RichTextSection; context:
   );
 }
 
-function SectionError({ section, context }: { section: HomeDataSection; context: HomeContext }) {
+function SectionError({
+  section,
+  context,
+}: {
+  section: CategoriesSection | ProductRowSection;
+  context: HomeContext;
+}) {
   const { t } = context;
   return (
     <SectionShell section={section} title={t(section.titleKey)}>
@@ -400,18 +523,36 @@ function SectionError({ section, context }: { section: HomeDataSection; context:
   );
 }
 
-/** A data section with its loaded result: nothing when there is nothing to show, a short error when the read failed. */
+/**
+ * A data section with its loaded result: nothing when there is nothing to show, a short error when the read failed (the
+ * banners: nothing either; the failure is already logged by the loader).
+ */
 export function HomeDataSectionView({
   section,
   result,
   context,
+  isFirst = false,
 }: {
   section: HomeDataSection;
   result: HomeSectionResult;
   context: HomeContext;
+  /** The first section of the page (above the fold): banner pictures load at once. */
+  isFirst?: boolean;
 }) {
-  if (result.status === "error") return <SectionError section={section} context={context} />;
+  if (result.status === "error") {
+    return section.kind === "banners" ? null : <SectionError section={section} context={context} />;
+  }
   const { data } = result;
+  if (section.kind === "banners" && data.kind === "banners") {
+    return (
+      <BannersView
+        section={section}
+        cards={storeBannerCards(data.banners)}
+        context={context}
+        isFirst={isFirst}
+      />
+    );
+  }
   if (section.kind === "categories" && data.kind === "categories") {
     if (data.categories.length === 0) return null;
     return <CategoryTiles section={section} categories={data.categories} context={context} />;
@@ -440,6 +581,9 @@ export function HomeSectionSkeleton({
   section: HomeDataSection;
   context: HomeContext;
 }) {
+  // The admin's banners have no skeleton: how many there are and which layout is unknown until they load, so the page
+  // waits for them instead (`HomeSections`).
+  if (section.kind === "banners") return null;
   const { t } = context;
   // One row of tiles (most shops show a few top-level categories), two rows of four product cards.
   const count = Math.min(section.limit, section.kind === "categories" ? 3 : 8);
@@ -496,7 +640,14 @@ function StaticSectionView({
         <HeroView section={section} context={context} isPageHeading={pageHeading === section.id} />
       );
     case "banners":
-      return <BannersView section={section} context={context} isFirst={isFirst} />;
+      return (
+        <BannersView
+          section={section}
+          cards={configBannerCards(section, context)}
+          context={context}
+          isFirst={isFirst}
+        />
+      );
     case "trust":
       return <TrustView section={section} context={context} />;
     case "richText":
@@ -520,17 +671,31 @@ async function AwaitedSection({
   section,
   result,
   context,
+  isFirst,
 }: {
   section: HomeDataSection;
   result: Promise<HomeSectionResult>;
   context: HomeContext;
+  isFirst: boolean;
 }) {
-  return <HomeDataSectionView section={section} result={await result} context={context} />;
+  return (
+    <HomeDataSectionView
+      section={section}
+      result={await result}
+      context={context}
+      isFirst={isFirst}
+    />
+  );
 }
 
 /**
- * The page's version: data sections stream in. `load` is called for every data section before anything renders, so the
- * reads run in parallel.
+ * The page's version: the category tiles and product rows stream in, each behind a skeleton of its size. `load` is called
+ * for every data section before anything renders, so the reads run in parallel.
+ *
+ * The admin's banners have no boundary of their own: the page waits for them (the `(site)` loading view meanwhile). They
+ * sit near the top and no skeleton can match an unknown number of banners in an unknown layout, so streaming them in would
+ * push the page down. The wait is one read of the 60 s data cache, bounded by the read timeout, and the layout around the
+ * page already waits for the API.
  */
 export function HomeSections({
   sections,
@@ -561,12 +726,22 @@ export function HomeSections({
           );
         }
         const result = pending.get(section.id) as Promise<HomeSectionResult>;
+        const awaited = (
+          <AwaitedSection
+            key={section.id}
+            section={section}
+            result={result}
+            context={context}
+            isFirst={index === 0}
+          />
+        );
+        if (section.kind === "banners") return awaited;
         return (
           <Suspense
             key={section.id}
             fallback={<HomeSectionSkeleton section={section} context={context} />}
           >
-            <AwaitedSection section={section} result={result} context={context} />
+            {awaited}
           </Suspense>
         );
       })}
@@ -610,6 +785,7 @@ export function HomeSectionsView({
             section={section}
             result={result}
             context={context}
+            isFirst={index === 0}
           />
         );
       })}

@@ -10,6 +10,17 @@ export async function removeSeedRows(pool: pg.Pool): Promise<void> {
     catalogSeed;
   const demoSynonymTerms = catalogSeed.synonymGroups.flatMap((group) => [...group.terms]);
   const productSlugs = products.map((product) => product.slug);
+  // The demo home banners (fixed ids), then the seed's own uploads they used (their `banner_image` rows go by cascade).
+  const bannerIds = catalogSeed.banners.map((item) => item.id);
+  const bannerUploads = await pool.query<{ id: string }>(
+    `select image_upload_id as id from banner where id = any($1::uuid[])
+     union select image_upload_id from banner_image where banner_id = any($1::uuid[])`,
+    [bannerIds],
+  );
+  await pool.query("delete from banner where id = any($1::uuid[])", [bannerIds]);
+  await pool.query("delete from media_upload where created_by is null and id = any($1::uuid[])", [
+    bannerUploads.rows.map((row) => row.id),
+  ]);
   const where = "product_id in (select id from product where slug = any($1))";
   // The seed's own uploads (no admin) that the demo products name; the files stay in the spec's temp media directory.
   await pool.query(

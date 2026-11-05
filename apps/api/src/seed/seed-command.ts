@@ -88,7 +88,7 @@ export function formatSummary(summary: SeedSummary): string {
 
 function imageLine(images: SeedSummary["images"]): string {
   if (!images.uploadsEnabled) {
-    return "  images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images)";
+    return "  images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images, home banners not created: a banner needs a picture)";
   }
   return `  images        uploaded ${String(images.uploaded).padStart(3)} (through the media service, into MEDIA_DIR)`;
 }

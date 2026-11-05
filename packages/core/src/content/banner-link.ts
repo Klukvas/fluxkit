@@ -58,10 +58,59 @@ function checkPath(href: string, locales: readonly string[]): BannerLinkResult {
 }
 
 const HTTPS_PREFIX = /^https:\/\//iu;
-// WHATWG forbidden host code points (whitespace, controls and `\` are refused before) plus `%`: a host never needs them.
-const FORBIDDEN_HOST = /[#/:<>?@[\]^|%"{}`]/u;
-const IPV6_LITERAL = /^\[[0-9a-f:.]+\]$/iu;
+// WHATWG forbidden host code points (whitespace, controls and `\` are refused before) plus `%`, and the characters IDNA maps
+// to a dot (one dot leader, ideographic and full-width full stops): `example.com․evil.test` would name another host.
+const FORBIDDEN_HOST = /[#/:<>?@[\]^|%"{}`\u2024\u3002\uFF0E\uFF61]/u;
 const PORT = /^\d{0,5}$/u;
+const IPV4_PART = /^(?:0|[1-9]\d{0,2})$/u;
+const IPV6_GROUP = /^[0-9a-f]{1,4}$/iu;
+
+/** A dotted IPv4 address: exactly four decimal parts from 0 to 255 (no leading zeros, no other notation). */
+function isDottedIpv4(host: string): boolean {
+  const parts = host.split(".");
+  return parts.length === 4 && parts.every((part) => IPV4_PART.test(part) && Number(part) <= 255);
+}
+
+/**
+ * An IPv6 literal without its brackets: hex groups of 1 to 4 digits, at most one `::`, 8 groups in all (fewer only with `::`),
+ * an optional trailing dotted IPv4 counting as two groups.
+ */
+function isIpv6(literal: string): boolean {
+  const halves = literal.split("::");
+  if (halves.length > 2) return false;
+  const groupsOf = (half: string): string[] => (half === "" ? [] : half.split(":"));
+  const all = halves.flatMap(groupsOf);
+  let count = 0;
+  for (const [index, group] of all.entries()) {
+    if (index === all.length - 1 && group.includes(".")) {
+      if (!isDottedIpv4(group)) return false;
+      count += 2;
+    } else if (IPV6_GROUP.test(group)) {
+      count += 1;
+    } else {
+      return false;
+    }
+  }
+  return halves.length === 2 ? count <= 7 : count === 8;
+}
+
+/**
+ * A host name or address a browser can reach: a bracketed IPv6 literal, or a name without forbidden characters whose last
+ * label is not all digits unless the whole host is a dotted IPv4 (WHATWG reads such a host as a number: `999.1.1.1`,
+ * `1.2.3.4.5` and `shop.123` are refused by the URL parser).
+ */
+function isValidHost(host: string): boolean {
+  if (host.startsWith("[")) {
+    return host.endsWith("]") && isIpv6(host.slice(1, -1));
+  }
+  if (host === "" || FORBIDDEN_HOST.test(host)) return false;
+  const labels = host.split(".");
+  const last = labels.at(-1) === "" ? labels.at(-2) : labels.at(-1);
+  if (last !== undefined && (/^\d+$/u.test(last) || /^0x[0-9a-f]*$/iu.test(last))) {
+    return isDottedIpv4(host);
+  }
+  return true;
+}
 
 /**
  * Core is pure (no `URL` global), so the authority of `https://authority/...` is read by hand: no `@` (credentials), a
@@ -81,10 +130,7 @@ function checkHttps(href: string): BannerLinkResult {
     : authority.indexOf(":");
   const host = portSeparator === -1 ? authority : authority.slice(0, portSeparator);
   const port = portSeparator === -1 ? "" : authority.slice(portSeparator + 1);
-  const validHost = host.startsWith("[")
-    ? IPV6_LITERAL.test(host)
-    : host !== "" && !FORBIDDEN_HOST.test(host);
-  if (!validHost || !PORT.test(port) || Number(port) > 65535) {
+  if (!isValidHost(host) || !PORT.test(port) || Number(port) > 65535) {
     return refuse("not_path_or_https");
   }
   return { ok: true, kind: "https" };
