@@ -1,6 +1,6 @@
 # Plan: promotional banners on the storefront home page
 
-Status: implemented on `feature/home-banners` (from `origin/main` `49a9c95`), see "Results"; not independently reviewed; no PR opened.
+Status: implemented on `feature/home-banners` (from `origin/main` `49a9c95`), see "Results"; PR 225, independently reviewed (no blocker, minors recorded in docs/HANDOFF.md).
 Owner request 2026-11-05. Storefront only: no API, schema, dependency, environment variable, theme token or public contract change.
 
 ## Goal
