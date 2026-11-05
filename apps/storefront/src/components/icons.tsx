@@ -10,9 +10,7 @@ function Icon({ children, className = "", ...props }: SVGProps<SVGSVGElement>) {
       viewBox="0 0 24 24"
       width="24"
       height="24"
-      // Fill, stroke colour and width come from `.fk-icon` (app/globals.css): fewer bytes in every page's header.
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      // Fill, stroke colour, width, caps and joins come from `.fk-icon` (app/globals.css): fewer bytes in every page's header.
       aria-hidden="true"
       focusable="false"
       {...props}

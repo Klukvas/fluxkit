@@ -38,6 +38,10 @@ describe("app/globals.css component classes", () => {
     expect(outside.match(/\.fk(?:-\w+)+/g) ?? []).toEqual([]);
   });
 
+  it("keeps the account placeholder as large as the control that replaces it (no layout shift)", () => {
+    expect(inside).toMatch(/\.fk-header-slot \{\s*@apply [^;]*\bmin-h-11 min-w-11\b/);
+  });
+
   it("has no @apply outside a layer (an unlayered utility would beat the responsive ones)", () => {
     expect(outside).not.toContain("@apply");
   });

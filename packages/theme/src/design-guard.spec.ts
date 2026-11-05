@@ -70,7 +70,7 @@ const colorUtility = new RegExp(
 );
 // Same prefixes, but the value is a size, alignment, width or keyword, not a color.
 const notAColor =
-  /^([trblxyse]|xs|sm|base|lg|xl|[2-9]xl|left|center|right|start|end|justify|wrap|nowrap|balance|pretty|ellipsis|clip|none|inherit|current|transparent|solid|dashed|dotted|inset|card|raised|overlay|\d+|\d+\/\d+|offset-\d+)$/;
+  /^([trblxyse]|xs|sm|base|lg|xl|[2-9]xl|left|center|right|start|end|justify|wrap|nowrap|balance|pretty|ellipsis|clip|none|inherit|current|transparent|solid|dashed|dotted|inset|card|raised|overlay|\d+|\d+\/\d+|offset-\d+|linecap|linejoin|miterlimit|dasharray|dashoffset)$/;
 
 function nonTokenColorClasses(source: string): string[] {
   return [...source.matchAll(colorUtility)]
@@ -94,6 +94,12 @@ describe("design guard, token-only color classes", () => {
     expect(nonTokenColorClasses(`"bg-brand"`)).toEqual(["bg-brand"]);
     expect(nonTokenColorClasses(`"focus:ring-teal"`)).toEqual(["focus:ring-teal"]);
     expect(nonTokenColorClasses(`"text-red-500"`)).toEqual(["text-red-500"]);
+  });
+
+  it("does not mistake the stroke geometry properties for colors", () => {
+    expect(nonTokenColorClasses(`stroke-linecap: round; stroke-linejoin: round;`)).toEqual([]);
+    expect(nonTokenColorClasses(`"stroke-teal"`)).toEqual(["stroke-teal"]);
+    expect(nonTokenColorClasses(`"stroke-linecap-teal"`)).toEqual(["stroke-linecap-teal"]);
   });
 
   it("finds no non-token color classes in components or apps", () => {

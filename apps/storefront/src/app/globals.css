@@ -66,6 +66,31 @@
     @apply border-b border-border bg-background max-lg:sticky max-lg:top-0 max-lg:z-30;
     padding-top: env(safe-area-inset-top, 0);
   }
+  /*
+   * More single classes of the header (2026-11-05): the uk header plus the uk registration form passed the budget above and
+   * the form was outlined without a script (e2e `pre-hydration-forms`, uk).
+   */
+  .fk-header-row {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4;
+  }
+  .fk-header-nav {
+    @apply flex flex-nowrap items-center gap-x-1 overflow-x-auto *:shrink-0;
+  }
+  .fk-header-end {
+    @apply ms-auto flex shrink-0 items-center gap-1;
+  }
+  .fk-site-footer {
+    @apply mt-12 border-t border-border py-6 text-muted-foreground;
+  }
+  .fk-header-slot {
+    @apply inline-flex min-h-11 min-w-11 items-center justify-center;
+  }
+  .fk-chevron {
+    @apply transition-transform group-open:rotate-180 motion-reduce:transition-none;
+  }
+  .fk-suggest-list {
+    @apply max-h-72 overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-card;
+  }
   .fk-header-search {
     @apply order-last hidden w-full lg:order-none lg:block lg:w-auto lg:min-w-72 lg:flex-1;
   }
@@ -138,9 +163,11 @@
   .fk-theme-option {
     @apply inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
   }
-  /* Line caps and joins are attributes of the icon components (`components/icons.tsx`). */
+  /* The icon components (`components/icons.tsx`) carry no presentation attributes: fewer bytes in every page's header. */
   .fk-icon {
     @apply fill-none stroke-current stroke-2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
   }
 }
 

@@ -3,6 +3,24 @@ import { waitForHydration } from "../support/flows.ts";
 
 const SECRET = "S3cret-Passw0rd!";
 
+/** The form labels per locale (`messages/*.json`, `account.field.*`). */
+const LABELS = {
+  en: {
+    email: "Email",
+    password: "Password",
+    firstName: "First name",
+    lastName: "Last name",
+    phone: /^Phone/,
+  },
+  uk: {
+    email: "Електронна пошта",
+    password: "Пароль",
+    firstName: "Ім’я",
+    lastName: "Прізвище",
+    phone: /^Телефон/,
+  },
+} as const;
+
 /** Every URL a page or request touched must be free of the secret and of the email (query string, path, fragment). */
 function leaks(urls: readonly string[], email: string): string[] {
   return urls.filter(
@@ -17,58 +35,64 @@ test.describe("before hydration, nothing personal reaches a URL (review H1)", ()
   test.describe("JavaScript off: the browser submits natively", () => {
     test.use({ javaScriptEnabled: false });
 
-    test("the sign-in form posts, the address stays clean and the page comes back", async ({
-      page,
-    }, testInfo) => {
-      const email = uniqueEmail(testInfo, "nojs-login");
-      const urls: string[] = [];
-      const statuses: number[] = [];
-      page.on("request", (request) => urls.push(request.url()));
-      page.on("framenavigated", (frame) => urls.push(frame.url()));
-      page.on("response", (response) => {
-        if (response.request().resourceType() === "document") statuses.push(response.status());
+    for (const locale of ["en", "uk"] as const) {
+      const label = LABELS[locale];
+
+      test(`${locale}: the sign-in form posts, the address stays clean and the page comes back`, async ({
+        page,
+      }, testInfo) => {
+        const email = uniqueEmail(testInfo, `nojs-login-${locale}`);
+        const urls: string[] = [];
+        const statuses: number[] = [];
+        page.on("request", (request) => urls.push(request.url()));
+        page.on("framenavigated", (frame) => urls.push(frame.url()));
+        page.on("response", (response) => {
+          if (response.request().resourceType() === "document") statuses.push(response.status());
+        });
+        await page.goto(`/${locale}/account/login`);
+        await page.getByLabel(label.email, { exact: true }).fill(email);
+        await page.getByLabel(label.password, { exact: true }).fill(SECRET);
+        await page.getByLabel(label.password, { exact: true }).press("Enter");
+        await page.waitForLoadState("load");
+        await expect.poll(() => statuses.length).toBeGreaterThanOrEqual(2);
+
+        expect(leaks(urls, email)).toEqual([]);
+        expect(page.url()).toMatch(new RegExp(`/${locale}/account/login$`));
+        expect(
+          statuses.every((status) => status < 500),
+          `statuses ${statuses.join(",")}`,
+        ).toBe(true);
+        // The response never echoes what was sent.
+        const html = await page.content();
+        expect(html).not.toContain(SECRET);
+        expect(html).not.toContain(email);
       });
-      await page.goto("/en/account/login");
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      await page.getByLabel("Password", { exact: true }).fill(SECRET);
-      await page.getByLabel("Password", { exact: true }).press("Enter");
-      await page.waitForLoadState("load");
-      await expect.poll(() => statuses.length).toBeGreaterThanOrEqual(2);
 
-      expect(leaks(urls, email)).toEqual([]);
-      expect(page.url()).toMatch(/\/en\/account\/login$/);
-      expect(
-        statuses.every((status) => status < 500),
-        `statuses ${statuses.join(",")}`,
-      ).toBe(true);
-      // The response never echoes what was sent.
-      const html = await page.content();
-      expect(html).not.toContain(SECRET);
-      expect(html).not.toContain(email);
-    });
+      // In uk the header and the form are longer (two bytes per Cyrillic letter): the form must still be in the first HTML,
+      // not outlined behind the loading view (README, "Keep the header small").
+      test(`${locale}: the register form posts too (email, password, name and phone stay out of the URL)`, async ({
+        page,
+      }, testInfo) => {
+        const email = uniqueEmail(testInfo, `nojs-register-${locale}`);
+        const urls: string[] = [];
+        page.on("request", (request) => urls.push(request.url()));
+        page.on("framenavigated", (frame) => urls.push(frame.url()));
+        await page.goto(`/${locale}/account/register`);
+        await page.getByLabel(label.email, { exact: true }).fill(email);
+        await page.getByLabel(label.password, { exact: true }).fill(SECRET);
+        await page.getByLabel(label.firstName, { exact: true }).fill("Olena");
+        await page.getByLabel(label.lastName, { exact: true }).fill("Petrenko");
+        await page.getByLabel(label.phone).fill("+380501112233");
+        await page.getByLabel(label.phone).press("Enter");
+        await page.waitForLoadState("load");
 
-    test("the register form posts too (email, password, name and phone stay out of the URL)", async ({
-      page,
-    }, testInfo) => {
-      const email = uniqueEmail(testInfo, "nojs-register");
-      const urls: string[] = [];
-      page.on("request", (request) => urls.push(request.url()));
-      page.on("framenavigated", (frame) => urls.push(frame.url()));
-      await page.goto("/en/account/register");
-      await page.getByLabel("Email", { exact: true }).fill(email);
-      await page.getByLabel("Password", { exact: true }).fill(SECRET);
-      await page.getByLabel("First name", { exact: true }).fill("Olena");
-      await page.getByLabel("Last name", { exact: true }).fill("Petrenko");
-      await page.getByLabel(/^Phone/).fill("+380501112233");
-      await page.getByLabel(/^Phone/).press("Enter");
-      await page.waitForLoadState("load");
-
-      expect(leaks(urls, email)).toEqual([]);
-      expect(page.url()).toMatch(/\/en\/account\/register$/);
-      const html = await page.content();
-      expect(html).not.toContain(SECRET);
-      expect(html).not.toContain(email);
-    });
+        expect(leaks(urls, email)).toEqual([]);
+        expect(page.url()).toMatch(new RegExp(`/${locale}/account/register$`));
+        const html = await page.content();
+        expect(html).not.toContain(SECRET);
+        expect(html).not.toContain(email);
+      });
+    }
   });
 
   test("scripts delayed: a submit before hydration puts nothing in a URL or a Referer", async ({
