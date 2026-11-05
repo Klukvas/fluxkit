@@ -1,6 +1,6 @@
 # Plan: home page banners managed in the admin
 
-Status: proposed (plan only, nothing built). Owner decision 2026-11-05: the shop owner manages the home banners in the admin instead of
+Status: owner decisions 2026-11-05 recorded in section 6 (questions 1 to 4 answered with the recommended defaults; 5 and 6 keep the recommended defaults until the owner says otherwise); plan only, nothing built, step 1 (red zone: schema, public contract, media attach) still needs the owner's go. Owner decision 2026-11-05: the shop owner manages the home banners in the admin instead of
 editing `apps/storefront/src/config/home.ts`. Structured banners only (no HTML, no iframes). Follows PR 225
 (`docs/plans/2026-11-05-home-banners.md`, "Later option").
 Red zones (AGENTS.md section 14): DB schema and migration, public API contract, media attach change. Owner approval is needed before
@@ -181,3 +181,12 @@ Every PR: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:e
 4. Audit log entries for banner changes: none, like catalog edits (recommended), or new `banner.*` actions (migration change to the audit target kinds)?
 5. Links: storefront paths and any `https` address (recommended, as today), or storefront paths only?
 6. Limits: up to 50 stored, 3 shown, home page only (recommended); or a `placement` for other pages (category banners) now?
+
+### Owner answers (2026-11-05)
+
+1. Core module, no flag (ADR 0046). Answered by the owner.
+2. Template default: banners from the admin, three demo banners created by `pnpm seed`. Answered by the owner.
+3. Permission: reuse `catalog.read` / `catalog.write`. Answered by the owner.
+4. No audit entries for banner changes (a recorded gap, like catalog edits). Answered by the owner.
+5. Links: storefront paths and any `https` address. NOT asked: the recommended default stands, the owner may change it.
+6. Limits: up to 50 stored, 3 shown, home page only. NOT asked: the recommended default stands, the owner may change it.
