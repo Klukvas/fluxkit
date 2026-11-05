@@ -57,6 +57,8 @@ describe("POST /theme (the switch without a script)", () => {
       const response = await themeFormResponse(request, enabled);
       expect(response.status).toBe(400);
       expect(response.headers.get("set-cookie")).toBeNull();
+      // Status only: no hardcoded (untranslated) text reaches the shopper.
+      expect(await response.text()).toBe("");
     }
   });
 

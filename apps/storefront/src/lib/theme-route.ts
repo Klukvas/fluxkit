@@ -5,7 +5,8 @@ import { parseThemeMode, safeThemeReturnPath, themeCookie } from "./theme-mode";
  * (`components/theme-switch.tsx`; with a script it applies the choice in the browser and never posts). Stores the choice in
  * the `fluxkit_theme` cookie and sends the shopper back to the page they were on (`303`, a checked path of this storefront
  * only). A form posted from another site or origin is refused with `403` (`isCrossOrigin`); anything but the form's own
- * values with `400`; with the switch hidden in `config/theme.ts` the route does not exist (`404`).
+ * values with `400`; with the switch hidden in `config/theme.ts` the route does not exist (`404`). Refusals carry no body:
+ * the shop's own form never gets one, and a body would be untranslated text.
  */
 export async function themeFormResponse(
   request: Request,
@@ -29,13 +30,13 @@ export async function themeFormResponse(
     !type.startsWith("application/x-www-form-urlencoded") &&
     !type.startsWith("multipart/form-data")
   ) {
-    return plain(400, "Expected a form.");
+    return new Response(null, { status: 400 });
   }
   const form = await request.formData();
   const value = form.get("mode");
   const mode = parseThemeMode(typeof value === "string" ? value : null);
   if (mode === null) {
-    return plain(400, "Unknown theme.");
+    return new Response(null, { status: 400 });
   }
   return new Response(null, {
     status: 303,
@@ -59,8 +60,4 @@ function isCrossOrigin(request: Request, publicOrigin: string): boolean {
   }
   const origin = request.headers.get("origin");
   return origin !== null && origin !== publicOrigin;
-}
-
-function plain(status: number, text: string): Response {
-  return new Response(text, { status, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 }
