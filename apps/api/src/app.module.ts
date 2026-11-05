@@ -3,6 +3,7 @@ import type { AdminAuthenticator } from "./auth/admin-authenticator.js";
 import { DEFAULT_ADMIN_AUTH_CONFIG, type AdminAuthConfig } from "./auth/auth-config.js";
 import { AdminConfigModule } from "./admin-config/admin-config.module.js";
 import { AuthModule } from "./auth/auth.module.js";
+import { BannersModule } from "./banners/banners.module.js";
 import type { Clock } from "./auth/clock.js";
 import type { ScryptParams } from "./auth/password-hasher.js";
 import { CartModule } from "./cart/cart.module.js";
@@ -138,6 +139,7 @@ export class AppModule {
         AdminConfigModule,
         CustomersModule,
         CatalogModule,
+        BannersModule,
         InventoryModule,
         CartModule.register({ config: options.cart ?? DEFAULT_CART_CONFIG }),
         OrdersModule.register({ config: options.orders ?? DEFAULT_ORDERS_CONFIG }),

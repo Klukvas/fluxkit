@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as auth from "./auth/index.js";
 import * as cart from "./cart/index.js";
 import * as catalog from "./catalog/index.js";
+import * as content from "./content/index.js";
 import * as email from "./email/index.js";
 import * as core from "./index.js";
 import * as inventory from "./inventory/index.js";
@@ -299,6 +300,27 @@ describe("public entry point", () => {
     }
   });
 
+  it("exports the home banner rules and limits (ADR 0046)", () => {
+    for (const name of [
+      "checkBannerLink",
+      "checkBannerWindow",
+      "bannerWindowState",
+      "isBannerLive",
+      "selectLiveBanners",
+      "checkBannerContent",
+      "checkBannerImageLocales",
+      "resolveBannerPicture",
+      "checkBannerOrder",
+      "checkBannerCount",
+    ] as const) {
+      expect(typeof core[name], name).toBe("function");
+    }
+    expect(core.MAX_STORE_BANNERS).toBe(3);
+    expect(core.MAX_STORED_BANNERS).toBe(50);
+    expect(core.BANNER_LAYOUTS).toEqual(["card", "image"]);
+    expect(core.BANNER_TONES).toEqual(["surface", "accent"]);
+  });
+
   it("exports the new admin permissions", () => {
     for (const permission of [
       "orders.read",
@@ -335,6 +357,7 @@ describe("public entry point", () => {
       auth,
       cart,
       catalog,
+      content,
       email,
       inventory,
       media,

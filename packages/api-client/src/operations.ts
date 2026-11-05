@@ -97,6 +97,7 @@ export const OPERATIONS = {
     "/store/account/orders/{number}/payments/{paymentId}",
     [200],
   ),
+  listBanners: operation("GET", "/store/banners", [200], { query: LOCALE }),
   listCategories: operation("GET", "/store/categories", [200], { query: LOCALE }),
   getConfig: operation("GET", "/store/config", [200]),
   listProducts: operation("GET", "/store/products", [200], {

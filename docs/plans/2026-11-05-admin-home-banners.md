@@ -1,6 +1,6 @@
 # Plan: home page banners managed in the admin
 
-Status: owner decisions 2026-11-05 recorded in section 6 (questions 1 to 4 answered with the recommended defaults; 5 and 6 keep the recommended defaults until the owner says otherwise); plan only, nothing built, step 1 (red zone: schema, public contract, media attach) still needs the owner's go. Owner decision 2026-11-05: the shop owner manages the home banners in the admin instead of
+Status: owner decisions 2026-11-05 recorded in section 6 (questions 1 to 4 answered with the recommended defaults; 5 and 6 keep the recommended defaults until the owner says otherwise). PR 1 (API, branch `feature/banners-api`) built after the owner approved its red zones (schema `0012_banner`, the additive contract, `markAttachedByIds`, ADR 0046); not reviewed yet, see section 8. PRs 2 and 3 not started. Owner decision 2026-11-05: the shop owner manages the home banners in the admin instead of
 editing `apps/storefront/src/config/home.ts`. Structured banners only (no HTML, no iframes). Follows PR 225
 (`docs/plans/2026-11-05-home-banners.md`, "Later option").
 Red zones (AGENTS.md section 14): DB schema and migration, public API contract, media attach change. Owner approval is needed before
@@ -201,3 +201,45 @@ Every PR: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:e
 - **Pictures per language (question 7, answered by the owner 2026-11-05)**: one picture per locale PLUS a default picture, in v1 (D2: table `banner_image`). The preview shows the picture of the locale being previewed; the form states which locales still use the default; migration `0012_banner` creates both tables (down drops `banner_image` first); the storefront resolves the locale picture on the server (the API already returns the right one).
 - Tests added for the layout: core rules (alt required for `image`, title required for `card`), API validation, storefront rendering of both layouts (accessible name from alt for `image`), admin form switching layouts without losing the shared fields.
 - Tests for the per-language pictures: locale picture chosen over the default and the default used when a locale has none (API and storefront), a locale outside the content locales refused, every picture marked attached in the save's transaction, removing a locale picture frees its upload, cascade on banner delete, migration up/down/up/down with both tables.
+
+## 8. Results
+
+### PR 1 (API; branch `feature/banners-api`, 2026-11-05; not reviewed yet)
+
+Built: ADR 0046; `packages/core/src/content` (link, window, live selection, layouts, pictures, order, count); schema `banners.ts` and
+migration `0012_banner` (generated) with the hand-written down script; `markAttachedByIds` in the media module; `apps/api/src/banners`
+(admin and store routes); privacy inventory (`banner`, `banner_image`: D24, no personal data); api-client (`listBanners`, six
+`*HomeBanner*` admin methods); `openapi.json`; docs (`docs/api/banners.md`, index, `docs/contracts/api.md`, `docs/files`, the media
+and audit notes, CHANGELOG).
+
+Verified (real commands, each exit code read):
+- Core TDD: the specs of `src/content` were written first: with the modules missing, 3 files failed to load; with throwing stubs,
+  98 of 98 tests failed; after the implementation 98 of 98 passed. Mutation check of the window: 8 mutants (start `<` to `<=`, end
+  `>=` to `>`, the invalid-window guard, "inactive wins" removed, both year bounds, position order), each killed.
+- API integration on real Postgres, Redis and Meilisearch (native, private ports): `banners.spec.ts` (34) and `store-banners.spec.ts`
+  (10), the new `markAttachedByIds` block in `media-attach.spec.ts`, `migrations.spec.ts` (0012 up, down with data twice, up; the
+  dependent-object refusal) and `migrate-entry.spec.ts`. Full API suite: 256 files, 4468 tests, exit 0 (the first full run found four destructive schema specs whose drop lists and catalog-name checks did not know the new tables; fixed).
+- `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `check:docs`, `pnpm --filter @fluxkit/api db:drift`: 0.
+  Core 2176, api-client 1399, theme 97 tests pass; the consumers too: admin 1666 (after `pnpm --filter @fluxkit/admin build`), storefront 1833. `pnpm openapi:export` followed by Prettier (the committed file is Prettier
+  formatted; the export alone writes unformatted JSON, as before) leaves no diff; the freshness test compares parsed JSON.
+
+Decisions taken inside the plan's frame (not red zone, listed for the reviewer):
+- Every refused link answers the one code `invalid_link` (the core reason is in `message`); the leading-locale refusal uses the
+  configured `LOCALES`, without regard to case.
+- `layout: image` with a title or text in the request is `400 not_allowed_for_layout` (not silently dropped); a PATCH that switches a
+  stored banner to `image` clears its title and text. Other codes: `invalid_window`, `out_of_range` (window), `locale_not_allowed`,
+  `duplicate` (picture locales), `order_mismatch` (`400 validation_failed` at `ids`).
+- `markAttachedByIds` checks ids whatever `MEDIA_PUBLIC_BASE_URL` and the driver are (an id is never "foreign").
+- Admin list and reorder answer `{items}` without paging (at most 50). The store route refuses unknown query parameters (strict, like
+  the other store routes) and returns `tone` for the `image` layout too.
+- `banner_image.locale` has a CHECK on the locale-code shape of `@fluxkit/config`; which locales are allowed stays a service rule.
+- The list lock key is `BANNER_LIST_LOCK_KEY = 7_302_150_002`; "now" comes from the injected `CLOCK`.
+
+Correction to D2 and section 7: "replacing or removing a locale picture frees the old upload for job 7" does not hold: the old upload
+was marked attached when it was saved, and job 7 deletes never-attached uploads only (ADR 0028). It is no longer referenced (no
+foreign key holds it) but it stays, with its file: the known "no purge" media gap. Tested as such.
+
+For PR 2: `apps/admin/src/lib/problem-messages.spec.ts` scans the admin API docs for codes; once `banners.md` joins its list, the new codes (`invalid_link`, `not_allowed_for_layout`, `invalid_window`, `order_mismatch`, `too_many_banners`, `duplicate`) need admin messages.
+
+Not verified: the admin screen and the storefront (PRs 2 and 3); e2e suites (no UI change); the Docker `compose` and `deploy-smoke`
+jobs; a real host.

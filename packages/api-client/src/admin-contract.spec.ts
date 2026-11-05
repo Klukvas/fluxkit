@@ -807,6 +807,36 @@ const brand: Shape<AdminBrand> = {
   },
 };
 const brandList: Shape<AdminBrandList> = paginated(brand);
+const bannerPicture = {
+  uploadId: "string",
+  url: "string",
+  width: "integer",
+  height: "integer",
+} as const;
+const homeBanner: Shape<Admin.AdminHomeBanner> = {
+  object: {
+    id: "string",
+    layout: { enum: ["card", "image"] },
+    title: { nullable: localized },
+    text: { nullable: localized },
+    imageAlt: { nullable: localized },
+    image: { object: bannerPicture },
+    images: { array: { object: { ...bannerPicture, locale: "string" } } },
+    link: "string",
+    tone: { enum: ["surface", "accent"] },
+    position: "integer",
+    isActive: "boolean",
+    startsAt: { nullable: "string" },
+    endsAt: { nullable: "string" },
+    state: { enum: ["live", "scheduled", "expired", "inactive"] },
+    shownOnStorefront: "boolean",
+    createdAt: "string",
+    updatedAt: "string",
+  },
+};
+const homeBannerList: Shape<Admin.AdminHomeBannerList> = {
+  object: { items: { array: homeBanner } },
+};
 const nullableTimestamp = { nullable: "string" } as const;
 const searchStatus: Shape<Admin.AdminSearchStatus> = {
   object: {
@@ -1310,6 +1340,39 @@ const body = {
   createSynonymGroup: {
     object: { locale: "string", terms: { array: "string" } },
   } satisfies Shape<Admin.CreateSynonymGroupBody>,
+  createHomeBanner: {
+    object: {
+      layout: { optional: { enum: ["card", "image"] } },
+      title: { optional: { nullable: localized } },
+      text: { optional: { nullable: localized } },
+      imageAlt: { optional: { nullable: localized } },
+      imageUploadId: "string",
+      images: { optional: { array: { object: { locale: "string", imageUploadId: "string" } } } },
+      link: "string",
+      tone: { optional: { enum: ["surface", "accent"] } },
+      isActive: { optional: "boolean" },
+      startsAt: { optional: { nullable: "string" } },
+      endsAt: { optional: { nullable: "string" } },
+    },
+  } satisfies Shape<Admin.CreateAdminHomeBannerBody>,
+  updateHomeBanner: {
+    object: {
+      layout: { optional: { enum: ["card", "image"] } },
+      title: { optional: { nullable: localized } },
+      text: { optional: { nullable: localized } },
+      imageAlt: { optional: { nullable: localized } },
+      imageUploadId: { optional: "string" },
+      images: { optional: { array: { object: { locale: "string", imageUploadId: "string" } } } },
+      link: { optional: "string" },
+      tone: { optional: { enum: ["surface", "accent"] } },
+      isActive: { optional: "boolean" },
+      startsAt: { optional: { nullable: "string" } },
+      endsAt: { optional: { nullable: "string" } },
+    },
+  } satisfies Shape<Admin.UpdateAdminHomeBannerBody>,
+  reorderHomeBanners: {
+    object: { ids: { array: "string" } },
+  } satisfies Shape<Admin.ReorderAdminHomeBannersBody>,
   updateSynonymGroup: {
     object: { terms: { array: "string" } },
   } satisfies Shape<Admin.UpdateSynonymGroupBody>,
@@ -1565,6 +1628,12 @@ const RESPONSE_SHAPES: { [N in AdminOperationName]: ResponseShapeOf<N> } = {
   getBrand: brand,
   updateBrand: brand,
   deleteBrand: "none",
+  listHomeBanners: homeBannerList,
+  createHomeBanner: homeBanner,
+  reorderHomeBanners: homeBannerList,
+  getHomeBanner: homeBanner,
+  updateHomeBanner: homeBanner,
+  deleteHomeBanner: "none",
   getSearchStatus: searchStatus,
   requestSearchRebuild: searchRebuild,
   listSynonymGroups: synonymGroupList,
@@ -1697,6 +1766,12 @@ const REQUEST_SHAPES: { [N in AdminOperationName]: RequestShapeOf<N> } = {
   getBrand: null,
   updateBrand: body.updateBrand,
   deleteBrand: null,
+  listHomeBanners: null,
+  createHomeBanner: body.createHomeBanner,
+  reorderHomeBanners: body.reorderHomeBanners,
+  getHomeBanner: null,
+  updateHomeBanner: body.updateHomeBanner,
+  deleteHomeBanner: null,
   getSearchStatus: null,
   requestSearchRebuild: null,
   listSynonymGroups: null,

@@ -285,6 +285,16 @@ export const ADMIN_OPERATIONS = {
   getBrand: operation("GET", "/admin/brands/{id}", [200], "catalog.read"),
   updateBrand: operation("PATCH", "/admin/brands/{id}", [200], "catalog.write", { body: "json" }),
   deleteBrand: operation("DELETE", "/admin/brands/{id}", [204], "catalog.write"),
+  listHomeBanners: operation("GET", "/admin/banners", [200], "catalog.read"),
+  createHomeBanner: operation("POST", "/admin/banners", [201], "catalog.write", { body: "json" }),
+  reorderHomeBanners: operation("PUT", "/admin/banners/order", [200], "catalog.write", {
+    body: "json",
+  }),
+  getHomeBanner: operation("GET", "/admin/banners/{id}", [200], "catalog.read"),
+  updateHomeBanner: operation("PATCH", "/admin/banners/{id}", [200], "catalog.write", {
+    body: "json",
+  }),
+  deleteHomeBanner: operation("DELETE", "/admin/banners/{id}", [204], "catalog.write"),
   createShippingMethod: operation("POST", "/admin/shipping/methods", [201], "shipping.manage", {
     body: "json",
   }),

@@ -40,6 +40,8 @@ describe("catalog schema (real Postgres)", () => {
     await pool.query('drop schema if exists "drizzle" cascade');
     // Reverse dependency order, no CASCADE (same reasoning as migrations.spec.ts).
     for (const name of [
+      "banner_image",
+      "banner",
       "search_synonym_group",
       "search_sync_queue",
       "search_index_state",
@@ -1448,7 +1450,7 @@ describe("catalog schema (real Postgres)", () => {
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
           'shipment_status_change', 'customer_auth_token', 'email_message', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
-          'search_sync_queue', 'search_index_state', 'search_synonym_group'
+          'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )
       `);
       const unnamed = result.rows.filter(
@@ -1473,7 +1475,7 @@ describe("catalog schema (real Postgres)", () => {
           'media_upload', 'shipping_method', 'shipping_provider_setting', 'order_shipping', 'shipment',
           'shipment_status_change', 'customer_auth_token', 'email_message', 'payment', 'payment_event',
           'payment_refund', 'privacy_request', 'admin_audit_event',
-          'search_sync_queue', 'search_index_state', 'search_synonym_group'
+          'search_sync_queue', 'search_index_state', 'search_synonym_group', 'banner', 'banner_image'
         )
       `);
       // Indexes behind primary keys and unique constraints carry the constraint's name.

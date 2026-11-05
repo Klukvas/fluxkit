@@ -37,4 +37,20 @@ export class MediaUploadRepository {
       .returning({ storageKey: mediaUpload.storageKey });
     return new Set(rows.map((row) => row.storageKey));
   }
+
+  /**
+   * `markAttached` for uploads named by id (banner pictures, ADR 0046): the same ONE `UPDATE ... RETURNING` in the caller's
+   * transaction, with the same row locks against the cleanup job's delete. Returns the ids that exist.
+   */
+  async markAttachedByIds(db: DbExecutor, ids: readonly string[]): Promise<Set<string>> {
+    if (ids.length === 0) {
+      return new Set();
+    }
+    const rows = await db
+      .update(mediaUpload)
+      .set({ firstAttachedAt: sql`coalesce(${mediaUpload.firstAttachedAt}, now())` })
+      .where(inArray(mediaUpload.id, [...ids]))
+      .returning({ id: mediaUpload.id });
+    return new Set(rows.map((row) => row.id));
+  }
 }

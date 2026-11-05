@@ -24,6 +24,8 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `admin_user` | `password_hash` | secret hash (H) | D18 | excluded | out_of_scope | A hash is never exported. Staff data: admin users are deactivated, never deleted (ADR 0009); staff requests are handled by the employer (plan D18). |
 | `attribute` | all 16 columns | none | D24 | not_applicable | not_applicable | |
 | `attribute_option` | all 7 columns | none | D24 | not_applicable | not_applicable | |
+| `banner` | all 14 columns | none | D24 | not_applicable | not_applicable | |
+| `banner_image` | all 3 columns | none | D24 | not_applicable | not_applicable | |
 | `brand` | all 7 columns | none | D24 | not_applicable | not_applicable | |
 | `cart` | `id`, `created_at`, `updated_at`, `expires_at` | none | D5 | not_applicable | not_applicable |  |
 | `cart` | `token_hash` | secret hash (H) | D5 | excluded | cascade | A hash is never exported. |
