@@ -488,7 +488,8 @@ admin, PR 3: D6, section 7; results and screenshots there). API: `docs/api/banne
     the texts and the picture of the page's locale already chosen. The section is HIDDEN when there is no banner and when the store cannot
     answer (the failure is logged in full like every data section; a promotion slot that says "could not load" helps nobody). Each banner is
     checked again here (`lib/home-banners.ts` `checkStoreBanner`: shape, the link rule below, an `image` banner needs alt text): a bad one is
-    skipped and logged with its id and a code (`Home banner <id> is not shown: link_dot_segment.`), never a page error, and never replaced by
+    skipped and logged with its id and a code (`Home banner <id> is not shown: link_dot_segment.`; once per server process and reason,
+    not on every render: a set of at most 200 keys, cleared when full), never a page error, and never replaced by
     a 4th. Not streamed: the page waits for this one read (the `(site)` loading view meanwhile), because no skeleton can match an unknown
     number of banners in an unknown layout and a late row near the top would push the page down. `pnpm seed` creates three demo banners.
   - `source: "config"` with `items`: banners in code (PR 225). Per banner a unique slug `id`, `titleKey`, `textKey`, `image { src, width,
@@ -500,7 +501,7 @@ admin, PR 3: D6, section 7; results and screenshots there). API: `docs/api/banne
 - **Pictures of the admin's banners** are uploads (`MEDIA_PUBLIC_BASE_URL/<key>`) and go through `StoreImage` and `allowedImageUrl`, like
   product images: production needs the media host in `STOREFRONT_IMAGE_HOSTS` ("Images" above); under `next dev` the development-only
   `/media` rule shows local uploads. A picture whose host is not allowed shows the token placeholder (the banner stays, named by its alt
-  text) and is logged on every render of the page (`Home banner <id> shows a placeholder ...`): the same rule as product images, and the only way the
+  text) and is logged once per server process (`Home banner <id> shows a placeholder ...`): the same rule as product images, and the only way the
   e2e stack (plain `http`) can test the banners at all.
 - **Link rule** (both sources; `checkBannerHref`): a storefront path without the locale (`/catalog`, `/c/<slug>`) or an `https://` address
   (same tab). Refused: `http:`, `javascript:`, `data:`, `mailto:`, `//host`, a relative path, whitespace or control characters, a backslash,

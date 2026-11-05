@@ -289,3 +289,17 @@ Decisions taken outside the letter of the plan or the task (for the reviewer):
 
 Not verified: the Docker `compose`/`deploy-smoke` jobs; a production build with a real https media host (only the placeholder path and
 `next dev` were seen); the full API suite (only the specs above); the admin screen (PR 2).
+
+### Review fixes of PR 229 (independent review)
+
+- M1: core `checkBannerLink` accepted hosts the WHATWG parser (and so the storefront) refuses: dot-like characters (`․` U+2024,
+  `。`, `．`, `｡`), a last label of digits that is not a valid dotted IPv4 (`1.2.3.4.5`, `999.1.1.1`, `shop.123`) and malformed IPv6
+  literals (`[1::2::3]`, more than 8 groups, a 5-digit group, a bad embedded IPv4). Core now refuses them (`not_path_or_https`); 10
+  refused and 7 accepted rows were added to core's table and to the storefront's parity copy. TDD: with the rows added and the code
+  unchanged, `banner-link.spec.ts` failed 10 of 76; after the fix 110 of 110 content specs pass; the storefront parity spec passes with
+  no storefront code change (its URL parser already refused them). The admin form's copy of the rule (PR 2,
+  `apps/admin/src/areas/banners/banner-rules.ts`) must get the same change.
+- M2: a skipped banner and a placeholder picture are logged once per server process and reason (a set of at most 200 keys, cleared
+  when full), not on every render. With the dedupe disabled the two new specs fail; with it they pass.
+- m2: `apps/storefront/next-env.d.ts` restored (a drive-by of `next dev`). m3: HANDOFF "Last updated". m5: the `seeds/README.md` table
+  rows render as one table again.

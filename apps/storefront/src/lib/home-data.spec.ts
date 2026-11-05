@@ -1,10 +1,15 @@
 import type { HomeBanner, HomeBannerList, ProblemDetails } from "@fluxkit/api-client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminBannersSection, CategoriesSection, ProductRowSection } from "../config/home";
 import { UnexpectedStoreResponseError } from "./catalog-data";
+import { forgetBannerWarnings } from "./home-banners";
 import { loadHomeSection, loadHomeSectionResult } from "./home-data";
 import { StoreUnavailableError, type CatalogOutcome, type StoreData } from "./store-data";
 import { category, summary } from "./test-fixtures";
+
+beforeEach(() => {
+  forgetBannerWarnings();
+});
 
 const config = {
   currency: "UAH",

@@ -1,12 +1,17 @@
 import type { HomeBanner } from "@fluxkit/api-client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Banner, ConfigBannersSection } from "../config/home";
 import {
   bannerLink,
   checkBannersSection,
   checkStoreBanner,
+  forgetBannerWarnings,
   storeBannerViews,
 } from "./home-banners";
+
+beforeEach(() => {
+  forgetBannerWarnings();
+});
 
 // The banners section of the home page (plans 2026-11-05-home-banners.md and 2026-11-05-admin-home-banners.md): link and
 // count checks of the config source, and the checks of the banners the API returns. The full link case table of core is in
@@ -265,6 +270,41 @@ describe("storeBannerViews", () => {
     );
     expect(views.map((view) => view.id)).toEqual(ids.slice(1, 3));
     expect(warn.mock.calls[0]?.[0]).toMatch(/returned 4 banners; only the first 3/);
+  });
+
+  it("logs each banner and reason once per process, not on every render (review M2 of PR 229)", () => {
+    const warn = vi.fn();
+    const bad = card({ id: "1b6e0a64-2c4f-4c8e-8f1a-3d5b7c9e1f20", href: "/a/../b" });
+    for (let render = 0; render < 5; render += 1) {
+      storeBannerViews([bad, card()], "uk", [], warn);
+    }
+    expect(warn.mock.calls).toEqual([
+      ["Home banner 1b6e0a64-2c4f-4c8e-8f1a-3d5b7c9e1f20 is not shown: link_dot_segment."],
+      [expect.stringMatching(new RegExp(`^Home banner ${ID} shows a placeholder`))],
+    ]);
+    // The same banner failing for another reason is news: logged once more, then quiet again.
+    const changed = { ...bad, href: "http://example.com/" };
+    storeBannerViews([changed], "uk", HOSTS, warn);
+    storeBannerViews([changed], "uk", HOSTS, warn);
+    expect(warn).toHaveBeenCalledTimes(3);
+    expect(warn.mock.calls[2]).toEqual([
+      "Home banner 1b6e0a64-2c4f-4c8e-8f1a-3d5b7c9e1f20 is not shown: link_not_path_or_https.",
+    ]);
+  });
+
+  it("keeps the memory bounded: past 200 keys it starts over, and an old key logs again", () => {
+    const warn = vi.fn();
+    const id = (index: number) => `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+    for (let index = 0; index < 200; index += 1) {
+      storeBannerViews([card({ id: id(index), href: "javascript:x" })], "uk", HOSTS, warn);
+    }
+    expect(warn).toHaveBeenCalledTimes(200);
+    storeBannerViews([card({ id: id(0), href: "javascript:x" })], "uk", HOSTS, warn);
+    expect(warn).toHaveBeenCalledTimes(200);
+    // The 201st key clears the memory; the first banner is then logged once more.
+    storeBannerViews([card({ id: id(200), href: "javascript:x" })], "uk", HOSTS, warn);
+    storeBannerViews([card({ id: id(0), href: "javascript:x" })], "uk", HOSTS, warn);
+    expect(warn).toHaveBeenCalledTimes(202);
   });
 
   it("returns nothing for an empty answer, without logging", () => {

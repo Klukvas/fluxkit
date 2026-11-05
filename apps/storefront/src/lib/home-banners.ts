@@ -236,10 +236,33 @@ export function checkStoreBanner(
   };
 }
 
+/** Most distinct warnings remembered per server process; past it the memory starts over (and each logs once more). */
+const MAX_REMEMBERED_WARNINGS = 200;
+
+/**
+ * Warnings already logged by this server process, by key (`<banner id>:<reason>`, `<banner id>:placeholder`). The home page
+ * renders the same cached answer on every request: without this, one bad banner would write a line per page view (review
+ * M2 of PR 229). The first occurrence of a key is logged in full; a new reason for the same banner logs again.
+ */
+const loggedWarnings = new Set<string>();
+
+function warnOnce(key: string, message: string, warn: (message: string) => void): void {
+  if (loggedWarnings.has(key)) return;
+  if (loggedWarnings.size >= MAX_REMEMBERED_WARNINGS) loggedWarnings.clear();
+  loggedWarnings.add(key);
+  warn(message);
+}
+
+/** TEST ONLY: forgets the warnings logged so far, so each spec starts from a fresh server process. */
+export function forgetBannerWarnings(): void {
+  loggedWarnings.clear();
+}
+
 /**
  * The banners of one `GET /store/banners` answer that the page shows: at most `MAX_BANNERS` (the API sends no more; a 4th
  * is never shown, also not in place of a skipped one), each checked by `checkStoreBanner`. A skipped banner and a picture
- * whose host is not allowed are logged with the banner id and a code only (no text, no URL: AGENTS.md section 11).
+ * whose host is not allowed are logged with the banner id and a code only (no text, no URL: AGENTS.md section 11), once per
+ * server process and reason (`warnOnce`).
  */
 export function storeBannerViews(
   banners: readonly HomeBanner[],
@@ -248,8 +271,10 @@ export function storeBannerViews(
   warn: (message: string) => void = console.warn,
 ): StoreBannerView[] {
   if (banners.length > MAX_BANNERS) {
-    warn(
+    warnOnce(
+      `answer:${String(banners.length)}`,
       `GET /store/banners returned ${String(banners.length)} banners; only the first ${String(MAX_BANNERS)} are shown.`,
+      warn,
     );
   }
   const views: StoreBannerView[] = [];
@@ -257,12 +282,18 @@ export function storeBannerViews(
     const checked = checkStoreBanner(banner, locale, imageHosts);
     const id = typeof banner.id === "string" && BANNER_ID.test(banner.id) ? banner.id : "unknown";
     if (!checked.ok) {
-      warn(`Home banner ${id} is not shown: ${checked.reason}.`);
+      warnOnce(
+        `${id}:${checked.reason}`,
+        `Home banner ${id} is not shown: ${checked.reason}.`,
+        warn,
+      );
       continue;
     }
     if (checked.view.picture.src === null) {
-      warn(
+      warnOnce(
+        `${id}:placeholder`,
         `Home banner ${id} shows a placeholder: its picture's host is not allowed (STOREFRONT_IMAGE_HOSTS, https only).`,
+        warn,
       );
     }
     views.push(checked.view);

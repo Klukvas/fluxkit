@@ -47,7 +47,7 @@ The API (`apps/api`) reads facts from the database, calls these functions inside
 
 - `src/content/index.ts` - barrel of the content modules below.
 - `src/content/limits.ts` - `BANNER_LIMITS` (50 stored, 3 shown, title 80, text 200, alt 150, link 2048), `MAX_STORE_BANNERS`, `MAX_STORED_BANNERS`, `BANNER_LAYOUTS`, `BANNER_TONES`, `BANNER_STATES`, `BANNER_WINDOW_BOUNDS`.
-- `src/content/banner-link.ts` - `checkBannerLink(href, locales)`: a storefront path (no `//`, dot segments also as `%2e`, leading locale segment) or an `https` address with a host and no credentials; whitespace, controls and `\` refused. Pure: no `URL` global.
+- `src/content/banner-link.ts` - `checkBannerLink(href, locales)`: a storefront path (no `//`, dot segments also as `%2e`, leading locale segment) or an `https` address with a reachable host (no dot-like characters, a last label of digits only in a valid dotted IPv4, a well-formed IPv6 literal) and no credentials; whitespace, controls and `\` refused. Pure: no `URL` global.
 - `src/content/banner-window.ts` - `checkBannerWindow`, `bannerWindowState`, `isBannerLive`, `selectLiveBanners` (half-open window, inactive wins, by position then id, cap).
 - `src/content/banner-content.ts` - `checkBannerContent` (layout rules with `validateI18nText`), `checkBannerImageLocales`, `resolveBannerPicture`, `checkBannerOrder`, `checkBannerCount`.
 - `src/content/*.spec.ts` - the case tables (link, window boundaries, layouts); the link table is the one the storefront parity spec copies.

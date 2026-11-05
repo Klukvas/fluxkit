@@ -77,6 +77,16 @@ const REFUSED: readonly [string, BannerHrefRefusal][] = [
   ["/en#top", "locale_prefix"],
   ["https://user:secret@example.com/x", "credentials"],
   ["https://user@example.com/x", "credentials"],
+  ["https://example.com․evil.test/", "not_path_or_https"],
+  ["https://1.2.3.4.5/", "not_path_or_https"],
+  ["https://999.1.1.1/", "not_path_or_https"],
+  ["https://shop.123/", "not_path_or_https"],
+  ["https://[1::2::3]/", "not_path_or_https"],
+  ["https://[1:2:3:4:5:6:7:8:9]/", "not_path_or_https"],
+  ["https://[12345::1]/", "not_path_or_https"],
+  ["https://[1:2:3:4:5:6:7:1.2.3.4]/", "not_path_or_https"],
+  ["https://[::1.2.3.256]/", "not_path_or_https"],
+  ["https://[1:2:3]/", "not_path_or_https"],
 ];
 
 // The other rows of core's spec (its separate cases), each with core's answer.
@@ -98,6 +108,13 @@ const MORE: readonly [string, "path" | "https" | BannerHrefRefusal][] = [
   ["https://магазин.укр/акції", "https"],
   ["https://example.com?x=1", "https"],
   ["https://example.com#top", "https"],
+  ["https://1.2.3.4/x", "https"],
+  ["https://[1:2:3:4:5:6:7:8]/", "https"],
+  ["https://[::]/", "https"],
+  ["https://[::ffff:1.2.3.4]/", "https"],
+  ["https://[1:2:3:4:5:6:1.2.3.4]/", "https"],
+  ["https://shop.example/", "https"],
+  ["https://123.example.com/", "https"],
 ];
 
 describe("checkBannerHref agrees with core checkBannerLink on its case table", () => {
@@ -137,6 +154,6 @@ describe("checkBannerHref agrees with core checkBannerLink on its case table", (
   });
 
   it("copies core's table without dropping rows (counts match the source spec)", () => {
-    expect([ACCEPTED.length, REFUSED.length]).toEqual([13, 47]);
+    expect([ACCEPTED.length, REFUSED.length, MORE.length]).toEqual([13, 57, 24]);
   });
 });

@@ -72,6 +72,17 @@ const REFUSED: readonly [string, BannerLinkRefusal][] = [
   ["/en#top", "locale_prefix"],
   ["https://user:secret@example.com/x", "credentials"],
   ["https://user@example.com/x", "credentials"],
+  // Hosts the WHATWG parser refuses or that cannot name a real site (review M1 of PR 229): a banner with one would never show.
+  ["https://example.com\u2024evil.test/", "not_path_or_https"],
+  ["https://1.2.3.4.5/", "not_path_or_https"],
+  ["https://999.1.1.1/", "not_path_or_https"],
+  ["https://shop.123/", "not_path_or_https"],
+  ["https://[1::2::3]/", "not_path_or_https"],
+  ["https://[1:2:3:4:5:6:7:8:9]/", "not_path_or_https"],
+  ["https://[12345::1]/", "not_path_or_https"],
+  ["https://[1:2:3:4:5:6:7:1.2.3.4]/", "not_path_or_https"],
+  ["https://[::1.2.3.256]/", "not_path_or_https"],
+  ["https://[1:2:3]/", "not_path_or_https"],
 ];
 
 describe("checkBannerLink", () => {
@@ -141,6 +152,13 @@ describe("checkBannerLink", () => {
       "https://магазин.укр/акції",
       "https://example.com?x=1",
       "https://example.com#top",
+      "https://1.2.3.4/x",
+      "https://[1:2:3:4:5:6:7:8]/",
+      "https://[::]/",
+      "https://[::ffff:1.2.3.4]/",
+      "https://[1:2:3:4:5:6:1.2.3.4]/",
+      "https://shop.example/",
+      "https://123.example.com/",
     ]) {
       expect(checkBannerLink(href, LOCALES), href).toEqual({ ok: true, kind: "https" });
     }
