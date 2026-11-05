@@ -1,5 +1,12 @@
 export { Alert, type AlertProps, type AlertVariant } from "./alert";
 export { Badge, type BadgeProps, type BadgeVariant } from "./badge";
+export {
+  BannerCard,
+  type BannerCardLayout,
+  type BannerCardLinkProps,
+  type BannerCardProps,
+  type BannerCardTone,
+} from "./banner-card";
 export { Breadcrumbs, type BreadcrumbItem, type BreadcrumbsProps } from "./breadcrumbs";
 export { Button, type ButtonProps, type ButtonSize, type ButtonVariant } from "./button";
 export { Card } from "./card";

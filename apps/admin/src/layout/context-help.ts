@@ -26,6 +26,7 @@ const SHIPPING_METHODS: ContextHelpTarget = { article: "shipping", section: "met
 const CARRIERS: ContextHelpTarget = { article: "shipping", section: "carriers" };
 const PRIVACY: ContextHelpTarget = { article: "personal-data", section: "requests" };
 const USERS: ContextHelpTarget = { article: "users-roles", section: "roles" };
+const BANNERS: ContextHelpTarget = { article: "home-banners" };
 
 export const CONTEXT_HELP: Readonly<Partial<Record<RouteId, ContextHelpTarget>>> = {
   home: { article: "first-steps" },
@@ -50,6 +51,9 @@ export const CONTEXT_HELP: Readonly<Partial<Record<RouteId, ContextHelpTarget>>>
   categoryDetail: CATEGORIES,
   search: { article: "search" },
   searchSynonyms: { article: "search", section: "synonyms" },
+  banners: BANNERS,
+  bannerNew: { article: "home-banners", section: "create" },
+  bannerDetail: { article: "home-banners", section: "create" },
   orders: { article: "orders" },
   orderDetail: { article: "orders", section: "statuses" },
   customers: { article: "customers" },

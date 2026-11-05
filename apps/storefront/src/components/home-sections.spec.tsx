@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { HomeBanner } from "@fluxkit/api-client";
@@ -494,5 +495,16 @@ describe("the default home config renders", () => {
     ]);
     expect(html).toContain('src="/home/hero.svg"');
     expect(headings(html)[0]).toBe("h1");
+  });
+});
+
+describe("one banner card for the storefront and the admin preview", () => {
+  it("draws every banner through BannerCard of @fluxkit/ui, with no card markup of its own", () => {
+    const source = readFileSync(new URL("./home-sections.tsx", import.meta.url), "utf8");
+    expect(source).toMatch(/\bBannerCard,\n/);
+    expect(source).toContain('} from "@fluxkit/ui";');
+    expect(source.match(/<BannerCard\b/g)).toHaveLength(1);
+    // The card's classes, frame and title live in BannerCard only.
+    expect(source).not.toMatch(/aspect-2\/1|bannerTones|BannerFrame|<h3/);
   });
 });

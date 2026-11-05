@@ -176,7 +176,8 @@ describe("the article page", () => {
     expect(html).toContain('href="/admin-ui/help/prices#compare-at"');
     expect(html).toContain('href="/admin-ui/products"');
     expect(html).toContain("Open this screen: Products");
-    expect(html).toContain('href="/admin-ui/help/search"');
+    // The Storefront topic (home banners) comes between the catalog and prices.
+    expect(html).toContain('href="/admin-ui/help/home-banners"');
     expect(html).toContain('href="/admin-ui/help/stock"');
     expect(html).toContain("Compare-at price");
   });

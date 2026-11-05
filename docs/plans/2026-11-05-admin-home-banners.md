@@ -244,6 +244,85 @@ For PR 2: `apps/admin/src/lib/problem-messages.spec.ts` scans the admin API docs
 Not verified: the admin screen and the storefront (PRs 2 and 3); e2e suites (no UI change); the Docker `compose` and `deploy-smoke`
 jobs; a real host.
 
+## 9. Results of PR 2 (admin screen; branch `feature/banners-admin`, 2026-11-05; not reviewed yet)
+
+Built: `apps/admin/src/areas/banners/` (list, create and edit pages, form model, preview, picture uploads, reorder, permissions),
+navigation group "Storefront" with "Home banners" and three routes (`/storefront/banners`, `/new`, `/:id`; permissions from
+`ADMIN_OPERATIONS`), "Help for this page" entries, lazy messages `banners.json` (uk, en), the API's banner codes in `errors.json`
+and `KNOWN_REASON_CODES` (`problem-messages.spec.ts` now scans `docs/api/banners.md`), help topic "Storefront" with the article
+`home-banners`, `BannerCard` in `@fluxkit/ui` (markup and classes of the storefront's `BannersView`, tokens only), admin e2e
+`banners.e2e.ts`, docs (`docs/files/admin.md`, `docs/files/ui.md`, `apps/admin/README.md`, `apps/admin/e2e/README.md`, CHANGELOG,
+HANDOFF). No API, schema, permission, configuration variable or dependency change; `docs/api/*` untouched.
+
+Verified (real commands, each exit code read; services native on private ports):
+- `pnpm lint`, `pnpm format:check`, `pnpm typecheck`, `pnpm check:boundaries`, `pnpm check:env`, `pnpm check:docs`: 0.
+- Unit: admin 1813 tests in 159 files after `pnpm --filter @fluxkit/admin build` (the banner specs: 146 tests), `@fluxkit/ui` 212,
+  `@fluxkit/theme` 97 (design guard and contrast scan over the new files). `@fluxkit/api-client` not touched.
+- Failing first: `problem-messages.spec.ts` with `banners.md` in its list failed on the main branch's code map (7 codes missing:
+  `too_many_banners`, `order_mismatch`, `not_allowed_for_layout`, `locale_not_allowed`, `invalid_characters`, `invalid_window`,
+  `out_of_range`), then passed with the messages added. The 2:1 tolerance spec caught a float rounding bug in the first
+  `hasBannerRatio` (1344 x 640, exactly 5 % off, was refused); fixed with whole-number arithmetic.
+- Admin e2e on real Postgres 16, Redis 8 and Meilisearch 1.55: `banners.e2e.ts` 5 of 5, then `--repeat-each=4` 20 of 20; the whole
+  admin suite 60 of 60.
+
+Decisions inside the plan's frame (listed for the reviewer):
+- **Core rules are copied, not imported**: the admin's source guard forbids `@fluxkit/core` in the browser bundle (it would pull zod
+  and all of core; `form-rules.ts` does the same). `banner-rules.ts` repeats `checkBannerLink`, the limits and the window bounds;
+  `banner-rules.spec.ts` runs every case of core's own table (and its edge cases) through both and compares. `validateI18nText` is
+  not copied whole: the form checks required, default locale and the code-point length; the server's other codes are mapped.
+- The list shows the API's `state` and `shownOnStorefront` (computed with the server's clock); core's `bannerWindowState` is not
+  needed in the browser.
+- "Both languages required to activate" (section 7) is a block before sending: switched on, a `card` needs its title and an `image`
+  its description in EVERY content locale (the API itself requires only the default locale).
+- The form is `noValidate` (like the Shipping forms): its own summary and field messages, translated, also for the picture slots.
+- One upload queue for all picture slots (one file at a time; a selection made while one uploads is ignored, so the slot cannot
+  switch under a running upload).
+- Reorder: one request per move or drop, the buttons stay focusable (`aria-disabled`) while it runs, the focus returns to the
+  button (its twin when the row reached an end), a polite status line announces "moved to position N of M". Dragging is a pointer
+  enhancement only.
+- `BannerCard` puts every picture in a fixed 2:1 frame (`aspect-2/1`, `object-cover`), as D6 asks for admin banners; the config
+  mode's pictures are 2:1 today.
+- The preview's desktop width is a fixed three-column row (the card at one third, as with three banners) that scrolls sideways in a
+  narrow column (a focusable region); phone width is 20 rem.
+- Navigation: the Storefront group sits between Catalog and Sales; the help topic between Catalog and Prices (the "previous" link of
+  the `prices` article changed, its spec was updated).
+
+Not verified: the storefront rendering of admin banners (PR 3); a screen reader (roles and names are checked by the specs and e2e);
+other browsers than Chromium; the Docker `compose` and `deploy-smoke` jobs; the article texts by the owner.
+
+### Review fixes of PR 230
+
+- **Link rule** (PR 229 tightened core `checkBannerLink`: dot-like characters in a host, a numeric last label unless a dotted
+  IPv4, malformed IPv6 literals): the admin copy follows. Failing first: the 10 refused and 7 accepted rows plus 4 extra host
+  rows, run against core built from PR 229's sources (not committed here), failed 25 tests (24 rows, the count guard) before the
+  port and passed after. Until PR 229 is merged, the parity rows of this branch disagree with this branch's own core (merge
+  order: PR 229 first).
+- **M1 time zones**: `localInputToIso` now has one rule for every zone: the offsets a day before, at and a day after the wall
+  clock are the candidates; two readings (clocks go back) take the EARLIER instant; none (clocks go forward) uses the offset
+  before the change, moving the time forward by the jump. The result names the case (`note: "gap" | "ambiguous"`), and the
+  date field says what is saved. Failing first: the cases for Kyiv, New York, Lord Howe (30 minutes), UTC and Etc/GMT-14 failed
+  (9 tests); the old algorithm moved New York's gap backward (02:30 -> 01:30 EST) and took the later Kyiv reading. The year
+  bounds message says the year is counted in UTC.
+- **m3** the "every language before switching on" block applies only when this save switches the banner on, changes the
+  layout or changes that language's naming text; an already-active banner with a language missing gets a warning.
+- **m4** refusals at `title`, `text`, `imageAlt` mark the default-locale field; `layout` and `tone` errors show at their
+  controls. **m5** the picture limits text says a replaced or removed picture stays in the media storage. **m6** "Use the main
+  picture" is offered with uploads off. **m7** no `maxLength` on the link (the rule reports `too_long`).
+- Failing first for m3, m4, m6, m7 and the time hints: the 6 new tests failed against the previous sources and pass now.
+- E2E: a new scenario checks that the list shows every stored banner (the seed's demo banners included), no empty state, and
+  "Shown on the storefront" on exactly the banners the API marks (at most 3).
+
+- **Storefront on the shared card** (review M2, separate commit after merging PR 229): `BannersView` renders every item, both
+  sources and both layouts, through `BannerCard`; `home-sections.tsx` passes the picture (`LocalPicture` or `StoreImage` with
+  `fill`) and the link (`next/link` or an anchor). `BannerCard` took the storefront's exact classes first (image layout: no
+  background, hover border). A source guard in `home-sections.spec.tsx` failed on the merged main and passes now; every storefront
+  unit test of PR 229 passes unchanged.
+- **Second review** (no blocker, no major): the form's link check asks the browser's URL parser after core's rule, like
+  the storefront (`https://xn--/`, full-width `＠`, `：` or digits, a joiner in the host are refused before saving; core is
+  unchanged, its parity is checked on `checkCoreBannerLink`); the doubled-hour hint names the offset of the reading used; the
+  required mark follows the blocking rule (`activationRequires`), so a language that is only warned about is not marked;
+  `BannerCard` pins that an empty text is no text. Failing first: the 6 link rows, the hint text and the required mark.
+
 ## 10. Results: PR 3 (storefront and seed; branch `feature/banners-storefront`, 2026-11-05; not reviewed yet)
 
 (Section 9 is left to PR 2, built in parallel.)
@@ -284,8 +363,8 @@ Decisions taken outside the letter of the plan or the task (for the reviewer):
   specs that run the seed (`seed.spec.ts`, `newest-order.spec.ts`) leave the shared test database clean.
 - The admin e2e (`apps/admin/e2e/prepare-database.ts` runs `pnpm seed`) now starts with three demo banners: PR 2's admin banner e2e must
   expect them (not changed here).
-- The storefront keeps its own rendering; the shared presentational `BannerCard` of `@fluxkit/ui` (section 7) comes with PR 2. Switching
-  the storefront to it is a small follow-up after both PRs are merged.
+- The storefront kept its own rendering in PR 3; PR 2 (after merging it) switched `BannersView` to the shared `BannerCard` of
+  `@fluxkit/ui` (section 7), so the storefront and the admin preview draw one card.
 
 Not verified: the Docker `compose`/`deploy-smoke` jobs; a production build with a real https media host (only the placeholder path and
 `next dev` were seen); the full API suite (only the specs above); the admin screen (PR 2).

@@ -130,5 +130,14 @@
   "errors.reason.invalid_idempotency_key": "The request key is not valid.",
   "errors.reason.shipping_address_required": "A shipping address is required.",
   "errors.reason.line_total_out_of_range": "A line total is too large.",
-  "errors.reason.subtotal_out_of_range": "The order total is too large."
+  "errors.reason.subtotal_out_of_range": "The order total is too large.",
+  "errors.reason.locale_not_allowed": "This language is not one of the shop's languages.",
+  "errors.reason.invalid_characters": "The text contains characters that cannot be stored (control characters).",
+  "errors.reason.duplicate": "This value is given twice.",
+  "errors.reason.invalid_link": "Enter a shop page that starts with / (without the language) or an address that starts with https://.",
+  "errors.reason.not_allowed_for_layout": "This layout has no title or text: the picture says everything.",
+  "errors.reason.invalid_window": "The end must be after the start.",
+  "errors.reason.out_of_range": "Enter a date between 2000 and 2199, counted in UTC (the year at Greenwich time).",
+  "errors.reason.order_mismatch": "The list was changed meanwhile (by another admin or in another tab). It was loaded again; move the banner once more.",
+  "errors.reason.too_many_banners": "The shop already keeps the most banners it can. Delete one to create another."
 }

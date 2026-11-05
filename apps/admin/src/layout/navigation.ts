@@ -20,6 +20,8 @@ export const NAVIGATION: readonly NavigationGroupConfig[] = [
     headingKey: "nav.group.catalog",
     items: ["products", "attributes", "options", "productTypes", "brands", "categories", "search"],
   },
+  // What the shop shows besides the catalog (plan 2026-11-05-admin-home-banners.md, D5); catalog.read, like the catalog.
+  { id: "storefront", headingKey: "nav.group.storefront", items: ["banners"] },
   { id: "sales", headingKey: "nav.group.sales", items: ["orders", "customers", "payments"] },
   {
     id: "settings",

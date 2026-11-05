@@ -481,9 +481,13 @@ admin, PR 3: D6, section 7; results and screenshots there). API: `docs/api/banne
     text (`aria-describedby`). The picture is decorative (`alt=""`) unless it has its own alt text. Tones from existing tokens: `surface`
     (page background and border) or `accent` (the `primary` fill).
   - `image` (admin only): a finished picture alone, no text over it, no tone; its alt text (required by the API) names the link.
+- **One card, shared with the admin:** every banner, from either source, is drawn by `BannerCard` of `@fluxkit/ui`, the same
+  component the admin's live preview uses; `components/home-sections.tsx` only chooses the picture (`LocalPicture` for config
+  pictures, `StoreImage` with `allowedImageUrl` and its placeholder for uploads) and the link (`next/link` inside the shop, a plain
+  anchor for an `https` address). A redesign of the banner card is one change in `packages/ui/src/banner-card.tsx`.
 - **Two sources; a fork chooses with `source` on the `home-banners` entry** (no fallback from one to the other):
-  - `source: "admin"` (the template default): the banners the shop manages in the admin (`/admin/banners`; the admin screen comes with PR 2
-    of the plan, until then the API only). `GET /store/banners?locale=` through the typed api-client (`listBanners`) and the 60 s data cache
+  - `source: "admin"` (the template default): the banners the shop manages in the admin (`/admin/banners`; the admin screen is
+    Storefront -> Home banners). `GET /store/banners?locale=` through the typed api-client (`listBanners`) and the 60 s data cache
     (tag `store:banners`), so a change, a start or an end time shows up to about a minute late. The API returns at most 3 live banners with
     the texts and the picture of the page's locale already chosen. The section is HIDDEN when there is no banner and when the store cannot
     answer (the failure is logged in full like every data section; a promotion slot that says "could not load" helps nobody). Each banner is

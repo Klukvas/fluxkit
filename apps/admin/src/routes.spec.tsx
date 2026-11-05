@@ -84,6 +84,9 @@ describe("route table", () => {
       categoryDetail: "catalog.read",
       search: "catalog.read",
       searchSynonyms: "catalog.read",
+      banners: "catalog.read",
+      bannerNew: "catalog.write",
+      bannerDetail: "catalog.read",
       orders: "orders.read",
       orderDetail: "orders.read",
       customers: "customers.read",
@@ -187,6 +190,9 @@ describe("lazy pages and their message files", () => {
     expect(declared.auditLog).toEqual(["audit"]);
     expect(declared.search).toEqual(["search"]);
     expect(declared.searchSynonyms).toEqual(["search"]);
+    for (const id of ["banners", "bannerNew", "bannerDetail"]) {
+      expect(declared[id], id).toEqual(["catalog-dictionaries", "banners"]);
+    }
     expect(declared.products).toEqual(["catalog-dictionaries", "products"]);
     expect(declared.productDetail).toEqual(["catalog-dictionaries", "products"]);
   });
