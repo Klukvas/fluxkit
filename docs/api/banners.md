@@ -22,7 +22,7 @@ Core module, no feature flag (ADR 0046, plan `docs/plans/2026-11-05-admin-home-b
 - Admin banner: `{id, layout, title, text, imageAlt, image: {uploadId, url, width, height}, images: [{locale, uploadId, url, width,
   height}], link, tone, position, isActive, startsAt, endsAt, state, shownOnStorefront, createdAt, updatedAt}`. `state` is `live`,
   `scheduled` (before `startsAt`), `expired` (from `endsAt` on) or `inactive`; `shownOnStorefront` marks the first 3 live banners. Times are
-  UTC. `url` is `MEDIA_PUBLIC_BASE_URL/<key>`.
+  UTC. `url` is `MEDIA_PUBLIC_BASE_URL/<key>`; production needs `MEDIA_PUBLIC_BASE_URL` set, otherwise the url is relative and the storefront refuses it (ADR 0028).
 - Store banner: `title` and `text` are `null` for `layout: image`; `alt` is `null` for a decorative `card` picture. Texts fall back per field
   to the default locale. `image` is the locale's own picture, else the default one (never another locale's own picture). Never returned:
   the active flag, the window, the position, timestamps, upload ids.
