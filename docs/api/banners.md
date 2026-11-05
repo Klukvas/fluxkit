@@ -34,7 +34,7 @@ Core module, no feature flag (ADR 0046, plan `docs/plans/2026-11-05-admin-home-b
   must be absent (`not_allowed_for_layout`); switching a stored banner to `image` clears them. Text errors use the i18n codes
   (`required`, `default_locale_missing`, `locale_not_allowed`, `empty`, `too_long`, `invalid_characters`) at `title.<locale>` and so on.
 - `link` (`400 invalid_link` at `link`): a storefront path without the locale prefix (one leading `/`, no `//`, no `.`/`..` segment, also
-  not as `%2e`, no leading `/uk/`, `/en/`) or an `https://` address with a host and no credentials; no whitespace, control character or
+  not as `%2e`, no leading `/uk/`, `/en/`) or an `https://` address with a host the URL parser accepts (no dot-like characters such as `․`, digits-only last label only in a valid dotted IPv4, a well-formed IPv6 literal) and no credentials; no whitespace, control character or
   backslash; at most 2048 characters. `http:`, `javascript:`, `data:`, `mailto:` and relative paths are refused.
 - Window: half-open `[startsAt, endsAt)`, `null` = open; `endsAt` must be after `startsAt` (`invalid_window` at `endsAt`); instants between
   2000-01-01 and 2200-01-01 (`out_of_range`).

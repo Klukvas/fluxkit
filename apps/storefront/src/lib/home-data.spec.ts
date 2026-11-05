@@ -1,10 +1,15 @@
-import type { ProblemDetails } from "@fluxkit/api-client";
-import { describe, expect, it, vi } from "vitest";
-import type { CategoriesSection, ProductRowSection } from "../config/home";
+import type { HomeBanner, HomeBannerList, ProblemDetails } from "@fluxkit/api-client";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AdminBannersSection, CategoriesSection, ProductRowSection } from "../config/home";
 import { UnexpectedStoreResponseError } from "./catalog-data";
+import { forgetBannerWarnings } from "./home-banners";
 import { loadHomeSection, loadHomeSectionResult } from "./home-data";
 import { StoreUnavailableError, type CatalogOutcome, type StoreData } from "./store-data";
 import { category, summary } from "./test-fixtures";
+
+beforeEach(() => {
+  forgetBannerWarnings();
+});
 
 const config = {
   currency: "UAH",
@@ -44,9 +49,35 @@ function fakeData(overrides: Partial<StoreData> = {}) {
       return ok({ items: [summary("a"), summary("b")], total: 2, limit: 8, offset: 0 });
     },
     getProduct: async () => problem(404, "not_found"),
+    listBanners: async () => ok({ items: [] }),
     ...overrides,
   } as unknown as StoreData;
   return { data, calls };
+}
+
+const banners: AdminBannersSection = {
+  kind: "banners",
+  source: "admin",
+  id: "home-banners",
+  titleKey: "t",
+};
+
+function storeBanner(id: string, overrides: Partial<HomeBanner> = {}): HomeBanner {
+  return {
+    id,
+    layout: "card",
+    title: `Title ${id}`,
+    text: null,
+    href: "/catalog",
+    tone: "surface",
+    image: {
+      url: `https://media.example.com/${"a".repeat(32)}.webp`,
+      width: 1280,
+      height: 640,
+      alt: null,
+    },
+    ...overrides,
+  };
 }
 
 const categories: CategoriesSection = { kind: "categories", id: "c", titleKey: "t", limit: 2 };
@@ -92,6 +123,108 @@ describe("loadHomeSection", () => {
       ["uk", { limit: 8, category: "tools" }],
       ["uk", { limit: 4, brand: "acme" }],
     ]);
+  });
+});
+
+describe("loadHomeSection: banners of the admin (source admin)", () => {
+  it("reads GET /store/banners once for the page's locale and keeps the checked banners in the API's order", async () => {
+    const asked: unknown[][] = [];
+    const { data } = fakeData({
+      listBanners: async (...args: unknown[]) => {
+        asked.push(args);
+        return ok({
+          items: [
+            storeBanner("b1", { tone: "accent" }),
+            storeBanner("b2", {
+              layout: "image",
+              title: null,
+              text: null,
+              image: { ...storeBanner("b2").image, alt: "Collection" },
+            }),
+          ],
+        });
+      },
+    });
+    const result = await loadHomeSection(data, "en", banners, {
+      imageHosts: ["media.example.com"],
+    });
+    expect(asked).toEqual([["en"]]);
+    expect(result.kind === "banners" && result.banners.map((banner) => banner.id)).toEqual([
+      "b1",
+      "b2",
+    ]);
+    expect(result.kind === "banners" && result.banners[0]?.link).toEqual({
+      href: "/en/catalog",
+      external: false,
+    });
+  });
+
+  it("renders the picture URL the API resolved for the locale (it chooses the locale's own picture or the default)", async () => {
+    const own = `https://media.example.com/${"e".repeat(32)}.webp`;
+    const fallback = `https://media.example.com/${"d".repeat(32)}.webp`;
+    const { data } = fakeData({
+      listBanners: async (locale: string) =>
+        ok({
+          items: [
+            storeBanner("b1", {
+              image: { url: locale === "en" ? own : fallback, width: 1280, height: 640, alt: null },
+            }),
+          ],
+        }),
+    });
+    const options = { imageHosts: ["media.example.com"] };
+    const en = await loadHomeSection(data, "en", banners, options);
+    const uk = await loadHomeSection(data, "uk", banners, options);
+    expect(en.kind === "banners" && en.banners[0]?.picture.src).toBe(own);
+    expect(uk.kind === "banners" && uk.banners[0]?.picture.src).toBe(fallback);
+  });
+
+  it("is empty when the shop has no live banner (the section is then hidden)", async () => {
+    const { data } = fakeData();
+    expect(await loadHomeSection(data, "uk", banners)).toEqual({ kind: "banners", banners: [] });
+  });
+
+  it("skips a bad banner, logs it, and keeps the others (never a page error)", async () => {
+    const warn = vi.fn();
+    const { data } = fakeData({
+      listBanners: async () =>
+        ok({ items: [storeBanner("bad", { href: "javascript:alert(1)" }), storeBanner("good")] }),
+    });
+    const result = await loadHomeSection(data, "uk", banners, {
+      imageHosts: ["media.example.com"],
+      warn,
+    });
+    expect(result.kind === "banners" && result.banners.map((banner) => banner.id)).toEqual([
+      "good",
+    ]);
+    expect(warn).toHaveBeenCalledWith("Home banner bad is not shown: link_not_path_or_https.");
+  });
+
+  it("treats an answer without an items list as a response the page cannot handle", async () => {
+    const { data } = fakeData({ listBanners: async () => ok({} as HomeBannerList) });
+    const log = vi.fn();
+    expect(await loadHomeSectionResult(data, "uk", banners, log)).toEqual({ status: "error" });
+    expect(log.mock.calls[0]?.[1]).toBeInstanceOf(UnexpectedStoreResponseError);
+  });
+
+  it("turns an outage into the error state (the page then hides the section) and logs it in full", async () => {
+    const outage = new StoreUnavailableError("GET /store/banners", new Error("ECONNREFUSED"));
+    const { data } = fakeData({
+      listBanners: async () => {
+        throw outage;
+      },
+    });
+    const log = vi.fn();
+    expect(await loadHomeSectionResult(data, "uk", banners, log)).toEqual({ status: "error" });
+    expect(log).toHaveBeenCalledWith('Home section "home-banners" could not be loaded.', outage);
+  });
+
+  it("turns a 404 of an older API (no banners route) into the error state too", async () => {
+    const { data } = fakeData({ listBanners: async () => problem(404, "not_found") });
+    const log = vi.fn();
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    expect(await loadHomeSectionResult(data, "uk", banners, log)).toEqual({ status: "error" });
+    consoleError.mockRestore();
   });
 });
 

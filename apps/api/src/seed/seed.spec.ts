@@ -45,7 +45,14 @@ const {
   products,
   shippingMethods,
   synonymGroups,
+  banners,
 } = catalogSeed;
+
+/** Every picture of the demo banners: the default one and each own locale picture, one upload each. */
+const bannerFiles = banners.flatMap((item) => [
+  item.image,
+  ...(item.localeImages ?? []).map((image) => image.file),
+]);
 
 /** Every term of the demo synonym groups: a group holding one of them is a demo group (the runner's own test). */
 const demoSynonymTerms = synonymGroups.flatMap((group) => [...group.terms]);
@@ -132,11 +139,14 @@ function expectedCounts(): Record<(typeof SEED_ENTITY_KINDS)[number], number> {
     categories: allCategories(categories).length,
     products: products.length,
     shippingMethods: methodsWithoutProvider.length,
+    banners: banners.length,
   };
 }
 
-/** Every media entry of the demo seed: one upload each. */
+/** Every media entry of the demo products: one upload each. */
 const mediaCount = products.reduce((sum, product) => sum + product.media.length, 0);
+/** Everything the seed uploads: the product images and the banner pictures. */
+const uploadCount = mediaCount + bannerFiles.length;
 
 /** The storage key at the end of an uploaded image's URL (`<base>/<32 hex>.<ext>`), or `undefined`. */
 function keyOf(url: string): string | undefined {
@@ -247,16 +257,19 @@ describe("catalog seed (real app, real Postgres)", () => {
         expect(existsSync(join(DEFAULT_SEED_ASSETS_DIR, item.file)), item.file).toBe(true);
       }
     }
+    for (const file of bannerFiles) {
+      expect(existsSync(join(DEFAULT_SEED_ASSETS_DIR, file)), file).toBe(true);
+    }
   });
 
   it("uploads every demo image through the media service and attaches it to its product", async () => {
     expect(firstRun.images).toEqual({
       uploadsEnabled: true,
-      uploaded: mediaCount,
+      uploaded: uploadCount,
       existingWithoutImages: [],
     });
     expect(formatSummary(firstRun)).toContain(
-      `images        uploaded ${String(mediaCount).padStart(3)}`,
+      `images        uploaded ${String(uploadCount).padStart(3)}`,
     );
     const rows = await demoMediaRows();
     expect(rows).toHaveLength(mediaCount);
@@ -269,7 +282,8 @@ describe("catalog seed (real app, real Postgres)", () => {
       expect(row.created_by).toBeNull();
     }
     expect(new Set(rows.map((row) => row.storage_key)).size).toBe(mediaCount);
-    expect(await filesUnder(mediaDir)).toHaveLength(mediaCount);
+    // The banner pictures are files of the same directory.
+    expect(await filesUnder(mediaDir)).toHaveLength(uploadCount);
     // The read route serves them.
     const [first] = rows;
     const served = await fetch(`${running.baseUrl}/media/${first?.storage_key ?? ""}`);
@@ -296,6 +310,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       categories: 0,
       products: 0,
       shippingMethods: 0,
+      banners: 0,
     });
     // The pickup point demo method needs the test-only fake provider, which this run does not load.
     expect(firstRun.skippedShippingMethods).toEqual(["demo_pickup_point"]);
@@ -658,6 +673,142 @@ describe("catalog seed (real app, real Postgres)", () => {
     });
   });
 
+  describe("demo home banners (ADR 0046, plan 2026-11-05-admin-home-banners.md PR 3)", () => {
+    const ids = banners.map((item) => item.id);
+
+    /** The seed's uploads a demo banner names: the default picture and its own locale pictures. */
+    async function bannerUploads(bannerIds: readonly string[]) {
+      const result = await pool.query<{
+        banner_id: string;
+        locale: string | null;
+        first_attached_at: Date | null;
+        created_by: string | null;
+        content_type: string;
+        width: number;
+      }>(
+        `select b.id as banner_id, null as locale, u.first_attached_at, u.created_by, u.content_type, u.width
+           from banner b join media_upload u on u.id = b.image_upload_id where b.id = any($1::uuid[])
+         union all
+         select i.banner_id, i.locale, u.first_attached_at, u.created_by, u.content_type, u.width
+           from banner_image i join media_upload u on u.id = i.image_upload_id where i.banner_id = any($1::uuid[])`,
+        [bannerIds],
+      );
+      return result.rows;
+    }
+
+    it("creates the three demo banners active, with their fixed ids, in order, without a window", async () => {
+      const rows = await pool.query<{
+        id: string;
+        layout: string;
+        tone: string;
+        link: string;
+        is_active: boolean;
+        starts_at: Date | null;
+        ends_at: Date | null;
+        title: Record<string, string> | null;
+      }>(
+        "select id, layout, tone, link, is_active, starts_at, ends_at, title from banner where id = any($1::uuid[]) order by position, id",
+        [ids],
+      );
+      expect(rows.rows.map((row) => row.id)).toEqual(ids);
+      expect(rows.rows.map((row) => [row.layout, row.tone, row.link])).toEqual(
+        banners.map((item) => [item.layout, item.tone, item.link]),
+      );
+      expect(
+        rows.rows.every((row) => row.is_active && row.starts_at === null && row.ends_at === null),
+      ).toBe(true);
+      // The image layout stores no title (the API's rule).
+      expect(rows.rows[2]?.title).toBeNull();
+    });
+
+    it("uploads every banner picture through the media service and marks it attached (job 7 never deletes it)", async () => {
+      const uploads = await bannerUploads(ids);
+      expect(uploads).toHaveLength(bannerFiles.length);
+      for (const upload of uploads) {
+        expect(upload.first_attached_at).not.toBeNull();
+        expect(upload.created_by).toBeNull();
+        expect(upload.content_type).toBe("image/webp");
+        expect(upload.width).toBe(1280);
+      }
+      expect(
+        uploads.filter((upload) => upload.locale !== null).map((upload) => upload.locale),
+      ).toEqual(["en"]);
+    });
+
+    it("serves them on GET /store/banners in uk and en: texts per locale, the own en picture, the default for uk", async () => {
+      type Item = {
+        id: string;
+        layout: string;
+        title: string | null;
+        text: string | null;
+        href: string;
+        image: { url: string; width: number; height: number; alt: string | null };
+      };
+      const uk = await http<{ items: Item[] }>(running.baseUrl, "GET", "/store/banners?locale=uk");
+      const en = await http<{ items: Item[] }>(running.baseUrl, "GET", "/store/banners?locale=en");
+      expect(uk.status).toBe(200);
+      expect(en.status).toBe(200);
+      expect(uk.body.items.map((item) => item.id)).toEqual(ids);
+      expect(en.body.items.map((item) => item.id)).toEqual(ids);
+      const [season, gifts, collection] = banners;
+      expect(uk.body.items[0]).toMatchObject({
+        layout: "card",
+        title: season?.title?.uk,
+        text: season?.text?.uk,
+        href: "/catalog",
+        image: { width: 1280, height: 640, alt: season?.imageAlt?.uk },
+      });
+      expect(en.body.items[0]?.title).toBe(season?.title?.en);
+      // The second card has no alt text: a decorative picture.
+      expect(en.body.items[1]).toMatchObject({ title: gifts?.title?.en, image: { alt: null } });
+      expect(uk.body.items[2]).toMatchObject({
+        layout: "image",
+        title: null,
+        text: null,
+        image: { alt: collection?.imageAlt?.uk },
+      });
+      expect(en.body.items[2]?.image.alt).toBe(collection?.imageAlt?.en);
+      // The image banner's own en picture differs from the default one uk shows; the cards share one picture per banner.
+      expect(en.body.items[2]?.image.url).not.toBe(uk.body.items[2]?.image.url);
+      expect(en.body.items[0]?.image.url).toBe(uk.body.items[0]?.image.url);
+      for (const item of [...uk.body.items, ...en.body.items]) {
+        expect(keyOf(item.image.url), item.image.url).toBeDefined();
+      }
+    });
+
+    it("leaves an edited demo banner alone and creates a deleted one again, with the same id", async () => {
+      const [first, second] = ids as [string, string];
+      await pool.query("update banner set tone = 'accent' where id = $1", [second]);
+      const deletedUploads = await bannerUploads([first]);
+      const uploadIds = await pool.query<{ id: string }>(
+        "select image_upload_id as id from banner where id = $1",
+        [first],
+      );
+      await pool.query("delete from banner where id = $1", [first]);
+      try {
+        const run = await runSeedCommand([], env);
+        expect(run.created.banners).toBe(1);
+        expect(run.existing.banners).toBe(banners.length - 1);
+        expect(run.images.uploaded).toBe(deletedUploads.length);
+        const rows = await pool.query<{ id: string; tone: string; is_active: boolean }>(
+          "select id, tone, is_active from banner where id = any($1::uuid[]) order by position",
+          [[first, second]],
+        );
+        // Re-created at the end of the list, active; the edited one kept its change.
+        expect(rows.rows).toEqual([
+          { id: second, tone: "accent", is_active: true },
+          { id: first, tone: banners[0]?.tone, is_active: true },
+        ]);
+      } finally {
+        await pool.query("update banner set tone = $2 where id = $1", [second, banners[1]?.tone]);
+        // The deleted banner's old upload is no longer referenced (kept by the media rules); remove it here.
+        await pool.query("delete from media_upload where id = any($1::uuid[])", [
+          uploadIds.rows.map((row) => row.id),
+        ]);
+      }
+    });
+  });
+
   describe("idempotency", () => {
     it("runs a second time without errors, duplicates or new rows", async () => {
       const before = await tableCounts();
@@ -692,6 +843,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         categories: 0,
         products: 0,
         shippingMethods: 0,
+        banners: 0,
       });
       expect(second.existing).toEqual(expectedCounts());
       expect(second.variantsCreated).toBe(0);
@@ -1024,14 +1176,19 @@ describe("catalog seed (real app, real Postgres)", () => {
         MEDIA_STORAGE_DRIVER: "none",
       });
       expect(summary.created.products).toBe(products.length);
+      expect(summary.created.banners).toBe(0);
       expect(summary.images).toEqual({
         uploadsEnabled: false,
         uploaded: 0,
         existingWithoutImages: [],
       });
       expect(formatSummary(summary)).toContain(
-        "images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images)",
+        "images not uploaded: MEDIA_STORAGE_DRIVER is none (products created without images, home banners not created: a banner needs a picture)",
       );
+      const demoBannerRows = await pool.query("select id from banner where id = any($1::uuid[])", [
+        banners.map((item) => item.id),
+      ]);
+      expect(demoBannerRows.rows).toEqual([]);
       expect(await demoMediaRows()).toEqual([]);
       const uploadsAfter = await pool.query<{ count: number }>(
         "select count(*)::int as count from media_upload",

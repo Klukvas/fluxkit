@@ -9,6 +9,7 @@ import {
   loadShopMoney,
 } from "./catalog-data";
 import { loadHomeSectionResult } from "./home-data";
+import { imageHosts } from "./image-hosts.server";
 import { storeData } from "./store-data.server";
 
 /**
@@ -18,7 +19,7 @@ import { storeData } from "./store-data.server";
 
 /** One data section of the home page (`config/home.ts`); an outage is the section's error state, not the page's. */
 export const getHomeSection = cache((locale: string, section: HomeDataSection) =>
-  loadHomeSectionResult(storeData, locale, section),
+  loadHomeSectionResult(storeData, locale, section, console.error, { imageHosts: imageHosts() }),
 );
 
 export const getListing = cache(

@@ -134,6 +134,29 @@ export interface SeedSynonymGroup {
   terms: readonly string[];
 }
 
+/**
+ * A demo home banner (ADR 0046), created through the admin rules of `POST /admin/banners`. The runner finds it by its fixed
+ * `id` (the API generates ids, so the runner gives the new banner this one), which makes the seed idempotent: a banner with
+ * this id is left alone, even when an admin changed it; a deleted one is created again.
+ */
+export interface SeedBanner {
+  /** A fixed UUID, never reused for anything else. */
+  id: string;
+  layout: "card" | "image";
+  /** `card` only: required in the default locale. */
+  title?: I18nText;
+  text?: I18nText;
+  /** Required for `image` (it names the link); for `card` absent = a decorative picture. */
+  imageAlt?: I18nText;
+  /** The default picture: a file in `seeds/assets/` (WebP, 2:1, drawn by `scripts/generate-demo-images.mjs`), uploaded. */
+  image: string;
+  /** Own pictures of single locales (a picture with words in it); the other locales show `image`. */
+  localeImages?: readonly { locale: string; file: string }[];
+  /** A storefront path without the locale, or an `https://` address. */
+  link: string;
+  tone: "surface" | "accent";
+}
+
 export interface CatalogSeed {
   attributes: readonly SeedAttribute[];
   options: readonly SeedOption[];
@@ -143,4 +166,6 @@ export interface CatalogSeed {
   products: readonly SeedProduct[];
   shippingMethods: readonly SeedShippingMethod[];
   synonymGroups: readonly SeedSynonymGroup[];
+  /** Created in this order, after any banner the shop already has; active, without a time window. */
+  banners: readonly SeedBanner[];
 }

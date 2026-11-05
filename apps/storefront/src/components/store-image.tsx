@@ -16,6 +16,11 @@ export interface StoreImageProps {
   sizes: string;
   /** Above the fold: load at once and with high priority. Everything else is lazy. */
   eager?: boolean;
+  /**
+   * Fill a parent frame of fixed ratio (`object-cover`, cropped to it) instead of the default square box: the home banners'
+   * 2:1 frame. The frame reserves the space, so any upload size causes no layout shift.
+   */
+  fill?: boolean;
   className?: string;
 }
 
@@ -31,6 +36,7 @@ export function StoreImage({
   height,
   sizes,
   eager = false,
+  fill = false,
   className,
 }: StoreImageProps) {
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -45,7 +51,14 @@ export function StoreImage({
 
   if (src === null || failedSrc === src) {
     return (
-      <ProductImage src={null} alt={alt} width={width} height={height} className={className} />
+      <ProductImage
+        src={null}
+        alt={alt}
+        width={width}
+        height={height}
+        // With both a width and a height set, the placeholder's square ratio no longer applies: it fills the frame.
+        className={cn(fill && "h-full", className)}
+      />
     );
   }
   return (
@@ -58,7 +71,10 @@ export function StoreImage({
       sizes={sizes}
       loading={eager ? "eager" : "lazy"}
       fetchPriority={eager ? "high" : "auto"}
-      className={cn("aspect-square h-auto w-full rounded-md object-cover", className)}
+      className={cn(
+        fill ? "h-full w-full object-cover" : "aspect-square h-auto w-full rounded-md object-cover",
+        className,
+      )}
       onError={() => setFailedSrc(src)}
     />
   );
