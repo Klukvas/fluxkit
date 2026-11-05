@@ -118,7 +118,9 @@ describe("header size (it is in every page's first HTML)", () => {
   it("stays small, so the sign-in and registration forms still render before their script runs", () => {
     // React 19.3 moves a finished page section out of place (to be put back by a script) once the HTML before it plus the
     // section pass 12 800 bytes (`progressiveChunkSize`); the e2e `pre-hydration-forms` test then sees only the loading
-    // view. Measured 2026-11-02 with the real build: header 4.7 KB, `/uk/account/register` inline; at 5.3 KB it was not.
+    // view. The `<head>` counts too, and the loading view even when it is not sent. Measured 2026-11-05 with the real build
+    // and the search box: uk header 5.4 KB and `/uk/account/register` outlined (e2e uk failed); 4.8 KB after more single
+    // classes (`.fk-header-row` and others) and inline (README, "Keep the header small").
     const longNames = Array.from({ length: HEADER_CATEGORY_LIMIT }, (_, index) => ({
       slug: `category-${String(index)}`,
       name: `§Category name ${String(index)}`,
@@ -137,7 +139,7 @@ describe("header size (it is in every page's first HTML)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(4300); // 3 802 bytes on 2026-11-02 (six categories, no search box)
+    expect(new TextEncoder().encode(header).length).toBeLessThan(3700); // 3 427 bytes on 2026-11-05 (six categories, no search box; 3 802 on 2026-11-02)
   });
 
   it("keeps the footer small too: it is flushed with the shell, before a page section that streams later", () => {
@@ -158,7 +160,7 @@ describe("header size (it is in every page's first HTML)", () => {
     );
     const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
     expect(footer).toContain('class="fk-theme-option"');
-    expect(new TextEncoder().encode(footer).length).toBeLessThan(1900);
+    expect(new TextEncoder().encode(footer).length).toBeLessThan(1400); // 1 261 bytes on 2026-11-05
   });
 });
 
@@ -232,7 +234,8 @@ describe("header islands", () => {
     expect(loading).not.toContain("<a ");
     expect(loading).not.toContain("<details");
     for (const html of [guest, signedIn]) expect(html).toContain(`class="fk-header-button"`);
-    expect(loading).toContain("min-h-11 min-w-11");
+    // The same 44 x 44 slot as the control that replaces it (`.fk-header-slot`, checked in `globals-css.spec.ts`).
+    expect(loading).toContain('class="fk-header-slot ');
   });
 
   it("signs out from the account menu with a busy state and shows a failed sign-out as an alert", () => {

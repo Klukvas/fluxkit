@@ -31,10 +31,9 @@ export function AccountLinkView({
   /** The "Sign out" entry of a signed-in customer's menu (`SignOutItem`, which needs the router). */
   signOut?: ReactNode;
 }) {
-  const slot = "inline-flex min-h-11 min-w-11 items-center justify-center";
   if (state.status === "loading") {
     return (
-      <div className={`${slot} text-muted-foreground`} aria-live="polite">
+      <div className="fk-header-slot text-muted-foreground" aria-live="polite">
         {/* The icon, muted and not a control yet: a grey placeholder pill read as broken (review N9). */}
         <UserIcon />
         <VisuallyHidden>{t("nav.account.loading")}</VisuallyHidden>

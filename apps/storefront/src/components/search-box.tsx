@@ -130,7 +130,7 @@ export function SearchBoxView(props: SearchBoxViewProps) {
             role="listbox"
             aria-label={t("searchBox.suggestions.label")}
             hidden={!showList}
-            className="max-h-72 overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-card"
+            className="fk-suggest-list"
           >
             {options.map((option, index) => (
               <li

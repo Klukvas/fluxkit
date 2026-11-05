@@ -59,7 +59,7 @@ export function SiteHeader({
   const links = mainLinks(locale, t, categories);
   return (
     <header className="fk-site-header">
-      <Container className="flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4">
+      <Container className="fk-header-row">
         <HeaderDisclosure
           label={t("nav.menu")}
           summary={<MenuIcon />}
@@ -82,7 +82,7 @@ export function SiteHeader({
           {t("site.name")}
         </Link>
         <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">
-          <ul className="flex flex-nowrap items-center gap-x-1 overflow-x-auto *:shrink-0">
+          <ul className="fk-header-nav">
             {links.map((link) => (
               <li key={link.key}>
                 <Link href={link.href} className="fk-nav-link">
@@ -101,7 +101,7 @@ export function SiteHeader({
             </Suspense>
           </HeaderSearchToggle>
         ) : null}
-        <div className="ms-auto flex shrink-0 items-center gap-1">
+        <div className="fk-header-end">
           <LocaleSwitcher />
           <CartBadge />
           <AccountLink />
