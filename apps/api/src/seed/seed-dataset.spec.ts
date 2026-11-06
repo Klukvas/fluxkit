@@ -1,6 +1,9 @@
+import { existsSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { seedDatasets } from "@fluxkit/seeds";
 import { datasetOf, formatSummary, runSeedCommand } from "./seed-command.js";
-import { SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
+import { DEFAULT_SEED_ASSETS_DIR, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
 
 // No database: the dataset is chosen from the arguments before anything is touched.
 describe("seed dataset selection (--dataset)", () => {
@@ -37,5 +40,25 @@ describe("seed dataset selection (--dataset)", () => {
     };
     expect(formatSummary(summary, "test").split("\n")[0]).toBe("Seed finished (dataset test).");
     expect(formatSummary(summary).split("\n")[0]).toBe("Seed finished.");
+  });
+});
+
+describe("seed pictures of both datasets", () => {
+  it("every file a dataset names is committed in seeds/assets; the coffee ones within the 40 KB budget", () => {
+    for (const [name, seed] of Object.entries(seedDatasets)) {
+      const files = [
+        ...seed.products.flatMap((product) => product.media.map((item) => item.file)),
+        ...seed.banners.flatMap((banner) => [
+          banner.image,
+          ...(banner.localeImages ?? []).map((image) => image.file),
+        ]),
+      ];
+      expect(files.length, name).toBeGreaterThan(0);
+      for (const file of files) {
+        const path = join(DEFAULT_SEED_ASSETS_DIR, file);
+        expect(existsSync(path), `${name}: ${file}`).toBe(true);
+        if (name === "coffee") expect(statSync(path).size, file).toBeLessThanOrEqual(40_000);
+      }
+    }
   });
 });

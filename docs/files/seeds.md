@@ -1,16 +1,33 @@
 # seeds (`@fluxkit/seeds`)
 
 - `package.json` - private workspace package; no runtime dependencies (`@fluxkit/core` is a dev dependency for types and for the data checks).
-- `src/types.ts` - data shapes of the seed (`CatalogSeed`, `SeedProduct`, `SeedVariantCommerce`, `SeedBanner`, ...). Entities refer to each other by code or slug, never by id; a variant is identified by its option values. The one exception: a demo banner has a fixed id (banners have no code or slug).
-- `src/dictionaries.ts` - demo attributes (with select options) and options (color, size).
-- `src/presets.ts` - ProductType presets: `clothing`, `hand_tool`, `digital_product`.
-- `src/taxonomy.ts` - demo brand and the two-level category tree.
-- `src/products.ts` - demo products (placeholder texts in `uk` and `en`, image files of `assets/`) with the price, compare-at price, stock and backorder flag of every variant. Amounts are minor units without a currency.
-- `src/shipping.ts` - demo delivery methods (`demo_courier` address, `demo_pickup_point` with the test-only `fake` provider, `demo_store_pickup`), placeholder texts and prices; the runner creates them inactive.
-- `src/synonyms.ts` - demo synonym groups of catalog search (uk and en, generic words; `нога`/`ноги`/`нозі` for the stemmer's documented miss, irregular English plurals, Russian query words only for words of the demo titles). Written by the runner only with `SEARCH_ENABLED=true`.
-- `src/banners.ts` - three demo home banners (ADR 0046; `TODO(fluxkit)` copy in `uk` and `en`): two `card` banners and one `image` banner with an own `en` picture besides its default one; fixed ids (the runner's idempotency key), picture files of `assets/`, storefront path links. The runner creates them active, after any banner the shop has.
-- `src/index.ts` - public entry: `catalogSeed` plus the parts and types. Must contain no I/O and no client data.
-- `src/catalog-seed.spec.ts` - data checks: unique and valid codes and slugs, `uk`+`en` texts, references resolve, no URL at all, image files `<name>.webp` and unique per product, one price entry per generated variant, price and stock limits, stock only for tracked variants, every store availability state present, synonym groups valid by core `parseSynonymTerms` (already normalized), both locales, no term repeated within a locale; demo banners valid by core `checkBannerContent`, `checkBannerLink` and `checkBannerImageLocales`, fixed distinct UUIDs, demo copy marked `TODO(fluxkit)`, each picture file once.
+- `src/types.ts` - data shapes of the seed (`CatalogSeed`, `SeedProduct`, `SeedVariantCommerce` with an optional explicit `sku`, `SeedBanner`, ...). Entities refer to each other by code or slug, never by id; a variant is identified by its option values. The one exception: a demo banner has a fixed id (banners have no code or slug).
+- `src/index.ts` - public entry: `coffeeCatalogSeed`, `testCatalogSeed`, `seedDatasets` (`coffee`, `test`), `DEFAULT_SEED_DATASET` (`coffee`), the named parts of the test fixture and the types. Must contain no I/O and no client data.
+- `src/datasets.spec.ts` - the two datasets and the default; they share no code, slug, banner id or synonym term, only the shipping methods.
+- `src/shared/shipping.ts` - the demo delivery methods of both datasets (`demo_courier` address, `demo_pickup_point` with the test-only `fake` provider, `demo_store_pickup`), placeholder texts and prices; the runner creates them inactive.
+
+## `src/coffee/` - the demo shop of `pnpm seed` (coffee-shop supplies)
+
+- `index.ts` - `coffeeCatalogSeed`.
+- `dictionaries.ts` - 20 attributes (select, number, localized text; `supplier_code` internal) and 8 options (`volume`, `pack_size`, `net_weight`, `grind`, `diameter`, `cup_slots`, `glove_size`, `card_value`). Codes differ from the fixture's.
+- `presets.ts` - 10 ProductType presets (`disposable_ware`, `coffee`, `dairy`, `ice`, `grocery`, `syrup_sauce`, `equipment`, `cleaning`, `consumables`, `digital_goods`).
+- `taxonomy.ts` - 11 invented brands and the category tree (35 categories, one third level).
+- `product-builder.ts` - `coffeeProduct()`: a compact product spec to a `SeedProduct` (every option combination, systematic SKUs `<STEM>-<VALUE CODES>`, the picture `coffee/<slug>.webp`); a combination without a price fails when the module loads. Must stay pure data building.
+- `products-ware.ts`, `products-food.ts`, `products-equipment.ts` - the 90 products (uk and en texts, prices in minor units, stock, compare-at prices, one backorder, digital goods untracked).
+- `synonyms.ts` - 16 synonym groups, only for words of the coffee titles. `banners.ts` - three home banners with fixed ids and `coffee/banner-*.webp` pictures.
+- `coffee-seed.spec.ts` - data checks: at least 70 products, tree depth, unique valid codes, slugs and SKUs, uk and en texts, no `TODO`/URL, references and required attributes, options a subset of the type's, every picture committed and under 40 KB, variants per combination, positive integer prices, every stock state, synonym groups valid and found in titles, banners valid by core rules and linking existing categories.
+
+## `src/test-fixture/` - the test fixture of `pnpm seed:test` (values asserted by tests; change only with them)
+
+- `index.ts` - `testCatalogSeed`.
+- `dictionaries.ts` - attributes (with select options) and options (color, size). `presets.ts` - `clothing`, `hand_tool`, `digital_product`. `taxonomy.ts` - one brand and the two-level category tree.
+- `products.ts` - 8 products (placeholder texts, image files of `assets/`) with the price, compare-at price, stock and backorder flag of every variant; SKUs proposed by core.
+- `synonyms.ts` - synonym groups (generic words, the `нозі` stemmer miss, irregular English plurals, Russian query words of the fixture titles). `banners.ts` - three home banners with fixed ids.
+- `catalog-seed.spec.ts` - the data checks of the fixture (unchanged in substance).
+
+## Assets
+
 - Seeds create no customers, carts or orders (the runner in `apps/api/src/seed/` writes catalog, price, stock, inactive demo shipping method and demo home banner data only; the README Checkout walkthrough shows the cart and order flow).
-- `assets/*.webp` - the demo pictures (committed seed data, drawn by `scripts/generate-demo-images.mjs`; the media service accepts no SVG): 11 product illustrations (800 x 800, 74 KB) and 4 banner pictures (1280 x 640, 35 KB: `banner-season` and `banner-gifts` rendered from the storefront's `public/home/banner-1.svg` and `banner-2.svg`, `banner-collection-uk` and `-en` with their words drawn in). The runner uploads them through the media service.
-- `README.md` - what is seeded, how to run it, runner rules, how to add a preset.
+- `assets/*.webp` - the fixture pictures (committed, drawn by `scripts/generate-demo-images.mjs`): 11 product illustrations (800 x 800) and 4 banner pictures (1280 x 640).
+- `assets/coffee/*.webp` - the coffee pictures (committed, drawn by `scripts/generate-coffee-images.mjs`): 91 product pictures (1200 x 1200) and 4 banner pictures (1280 x 640), 1.3 MB. The media service accepts no SVG; the runner uploads the WebP through it.
+- `README.md` - the datasets, what is seeded, how to run it, runner rules, how to add a preset.

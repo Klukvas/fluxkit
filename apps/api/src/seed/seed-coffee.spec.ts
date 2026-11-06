@@ -6,23 +6,21 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { coffeeCatalogSeed, type SeedCategory } from "@fluxkit/seeds";
 import type { Page } from "../common/pagination.js";
 import type { StoreProductDetail, StoreProductListItem } from "../catalog/store/store.schemas.js";
-import { SearchIndexer } from "../search/indexer/index.js";
 import { startApp, type RunningApp } from "../test/app.js";
 import { requireTestDatabaseUrl } from "../test/env.js";
 import { http } from "../test/http.js";
 import { filesUnder, TEST_MEDIA_BASE_URL } from "../test/media-app.js";
 import { ensureMigrated } from "../test/migrate.js";
-import { allDocuments, meiliUrl } from "../test/search-engine.js";
-import { SearchWorld, UNLIMITED_BUDGET } from "../test/search-world.js";
 import { removeSeedRows } from "../test/seed-rows.js";
 import { formatSummary, runSeedCommand } from "./seed-command.js";
 
 /**
  * The coffee demo of `pnpm seed` (the default dataset) through the real runner: real app module, real Postgres, real media
- * service, and for the last block the real Meilisearch. The test fixture dataset has its own spec (`seed.spec.ts`).
+ * service. The test fixture dataset has its own spec (`seed.spec.ts`); search on the coffee catalog:
+ * `src/search/store/coffee-demo-search.spec.ts`.
  */
 
-const { products, categories, banners, synonymGroups } = coffeeCatalogSeed;
+const { products, categories, banners } = coffeeCatalogSeed;
 const slugs = products.map((product) => product.slug);
 const variantCount = products.reduce((sum, product) => sum + product.variants.length, 0);
 const mediaCount = products.reduce((sum, product) => sum + product.media.length, 0);
@@ -169,57 +167,4 @@ describe("coffee demo seed (real app, real Postgres)", () => {
     },
     SEED_TIMEOUT,
   );
-
-  describe("search (real Meilisearch)", () => {
-    let world: SearchWorld;
-    let app: RunningApp;
-
-    beforeAll(async () => {
-      await removeSeedRows(pool, coffeeCatalogSeed);
-      world = await SearchWorld.create("coffee");
-      await pool.query("delete from search_index_state");
-      await runSeedCommand([], {
-        DATABASE_URL: requireTestDatabaseUrl(),
-        MEDIA_STORAGE_DRIVER: "none",
-        SEARCH_ENABLED: "true",
-        MEILI_URL: meiliUrl(),
-        MEILI_API_KEY: world.key,
-        MEILI_INDEX_PREFIX: world.prefix,
-      });
-      app = await startApp({
-        search: world.env,
-        rateLimits: { search: { maxAttempts: 10_000, windowMinutes: 1 } },
-      });
-      const result = await app.app.get(SearchIndexer).rebuild(new Date(), UNLIMITED_BUDGET);
-      expect(result.failures, JSON.stringify(result)).toEqual([]);
-    }, SEED_TIMEOUT);
-
-    afterAll(async () => {
-      await app?.app.close();
-      await world?.dispose(pool);
-    }, SEED_TIMEOUT);
-
-    it("indexes one document per variant of the coffee catalog in each locale", async () => {
-      for (const locale of ["uk", "en"]) {
-        const documents = await allDocuments(world.liveUid(locale));
-        expect(documents, locale).toHaveLength(variantCount);
-      }
-    });
-
-    it("finds products by a title word and by a demo synonym (кофемашина -> кавомашина)", async () => {
-      expect(synonymGroups.some((group) => group.terms.includes("кофемашина"))).toBe(true);
-      for (const query of ["кавомашина", "кофемашина"]) {
-        const found = await http<{ items: { slug: string }[] }>(
-          app.baseUrl,
-          "GET",
-          `/store/search?locale=uk&q=${encodeURIComponent(query)}&limit=24`,
-        );
-        expect(found.status, JSON.stringify(found.body)).toBe(200);
-        expect(
-          found.body.items.map((item) => item.slug),
-          query,
-        ).toContain("espresso-machine-1-group");
-      }
-    });
-  });
 });

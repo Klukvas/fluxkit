@@ -1,5 +1,3 @@
-import { existsSync, statSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import {
   CATALOG_LIMITS,
   MAX_AMOUNT,
@@ -21,7 +19,6 @@ import { coffeeCatalogSeed } from "./index.js";
 // Data-only checks of the coffee demo (`pnpm seed`): they catch a typo before the runner meets it. The runner validates again
 // through the admin services, and `apps/api/src/seed/seed-coffee.spec.ts` seeds it into a real database.
 
-const ASSETS_DIR = fileURLToPath(new URL("../../assets/", import.meta.url));
 const LOW_STOCK_THRESHOLD = 5;
 
 const { attributes, options, productTypes, brands, categories, products, synonymGroups, banners } =
@@ -210,16 +207,13 @@ describe("coffee demo dataset", () => {
     ).toBeGreaterThanOrEqual(5);
   });
 
-  it("names a committed picture for every product, each once, within the size budget", () => {
+  it("names a picture of the coffee folder for every product, each once", () => {
+    // That the files exist and stay within the size budget: apps/api/src/seed/seed-dataset.spec.ts (this package has no Node types).
     for (const product of products) {
       expect(product.media.length, product.slug).toBeGreaterThan(0);
       const files = product.media.map((item) => item.file);
       expect(unique(files), product.slug).toBe(true);
-      for (const file of files) {
-        expect(file).toMatch(/^coffee\/[a-z0-9-]+\.webp$/);
-        expect(existsSync(`${ASSETS_DIR}${file}`), file).toBe(true);
-        expect(statSync(`${ASSETS_DIR}${file}`).size, file).toBeLessThanOrEqual(40_000);
-      }
+      for (const file of files) expect(file).toMatch(/^coffee\/[a-z0-9-]+\.webp$/);
     }
   });
 
@@ -358,7 +352,6 @@ describe("coffee demo dataset", () => {
           ...(banner.localeImages ?? []).map((image) => image.file),
         ]) {
           expect(file).toMatch(/^coffee\/banner-[a-z-]+\.webp$/);
-          expect(existsSync(`${ASSETS_DIR}${file}`), file).toBe(true);
         }
         for (const text of [banner.title, banner.text, banner.imageAlt]) {
           if (text !== undefined) expectBothLocales(text, banner.id);

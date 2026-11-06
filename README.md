@@ -43,7 +43,7 @@ One command prepares a demo shop on a macOS or Linux machine with Node 22, pnpm 
 
 ```bash
 pnpm install
-pnpm demo:up        # .env (if missing), Postgres + Redis + Meilisearch, build, migrate, seed, search index, admin owner
+pnpm demo:up        # .env (if missing), Postgres + Redis + Meilisearch, build, migrate, seed (coffee demo), search index, admin owner
 ```
 
 - Without `.env` it writes one from `.env.example` with random secrets of this machine (mode 0600, git-ignored, never commit it): database `fluxkit_dev`, search on, local image uploads (`var/media`), plain-HTTP cookies, and the TEST-ONLY providers `fake` for shipping and payment (`FAKE_PAYMENT_ADOPT_WEBHOOKS=true`; both are refused under `NODE_ENV=production`, never use this file for a real shop). An existing `.env` is used as it is; only a placeholder `MEILI_API_KEY` is replaced by a key scoped to the index prefix. Its `DATABASE_URL` must name a database ending in `_dev`, `_demo`, `_local` or `_test` (an older quick-start `.env` with `.../fluxkit` is refused: rename the database in it or delete the file), and `PORT` must be a whole number from 1 to 65535. `--skip-docker` uses services that already run.
@@ -51,6 +51,7 @@ pnpm demo:up        # .env (if missing), Postgres + Redis + Meilisearch, build, 
 - Then start the three servers, each in its own terminal: `pnpm --filter @fluxkit/api start` (API on http://127.0.0.1:3000), `pnpm --filter @fluxkit/storefront dev -p 3001` (shop: http://localhost:3001/uk), `pnpm --filter @fluxkit/admin dev` (admin: http://localhost:5173/admin-ui/, sign in with the printed password).
 - Delivery: the seed creates the demo delivery methods INACTIVE. In the admin, Shipping, open `demo_courier` (or another one), tick "Active (offered at checkout)" and save to see the delivery step; without an active method the checkout has none.
 - Payment: the `fake` provider charges nothing and has no payment page, so "Pay now" lands on `https://pay.fake.invalid/...`, which does not load. Then run `pnpm demo:pay` (`--order <number>` for a specific order, `--fail` for a declined payment): it sends the provider's signed webhook to the local API, the order becomes paid, and it prints the payment result page to open.
+- Catalog: the demo shop is a coffee-shop supplies store (`pnpm seed`, `seeds/README.md`): 90 products (cups, lids, straws, milk, ice, coffee, syrups, machines, tools, cleaning products, packaging, a gift card) in a category tree, with options, filterable attributes, sale prices, low and sold-out stock and search synonyms. The small T-shirt, hammer and e-book catalog the tests use is `pnpm seed:test`.
 - Images: the demo products carry drawn illustrations uploaded through the media service; the admin and the shop show them. The shop can do that only under `next dev`: a development-only rule (owner decision 2026-11-01) renders an image whose URL is exactly `<MEDIA_PUBLIC_BASE_URL>/<key>` as the same-origin `/media/<key>` and rewrites `/media/*` to the API. `demo:up` writes `MEDIA_PUBLIC_BASE_URL=http://127.0.0.1:<PORT>/media` (unset, `next dev` assumes `API_INTERNAL_URL` + `/media`, the API's own development default). A production build and `next start` keep the `https` + `STOREFRONT_IMAGE_HOSTS` rule ("Uploaded images" below). After seeding a NEW database for a dev server that ran before, the first page view may still show the previous catalog from Next's data cache; reload.
 - Home banners: the seed creates three demo banners (two cards and one picture banner whose picture differs between uk and en) that the shop's home page shows after the hero, through `GET /store/banners`. They are managed through the admin API (`/admin/banners`, `docs/api/banners.md`); the admin screen for them comes with a later PR of `docs/plans/2026-11-05-admin-home-banners.md` and is not built yet. A change shows on the home page up to a minute later (the storefront's data cache).
 - `pnpm demo:down` stops the services and keeps their data. To start over from nothing: `docker compose --env-file .env -f infra/docker-compose.yml down -v`, delete `.env` and `var/media`, run `pnpm demo:up` (the Postgres volume keeps the password it was created with, so a new `.env` needs new volumes).
@@ -75,7 +76,7 @@ docker compose --env-file .env -f infra/docker-compose.yml exec postgres created
 
 pnpm build
 pnpm db:migrate                         # applies the pending migrations to DATABASE_URL (forward only, safe to repeat), see Database migrations
-pnpm seed                               # optional: demo catalog (needs a migrated database, see seeds/README.md)
+pnpm seed                               # optional: demo catalog, coffee-shop supplies (needs a migrated database, see seeds/README.md)
 pnpm admin:create --email you@example.com   # first owner (needs a migrated database); asks for the password, see Admin sign-in
 pnpm --filter @fluxkit/api start        # API on PORT (default 3000); try /health and /docs
 pnpm --filter @fluxkit/storefront dev -p 3001   # http://localhost:3001/uk (the API already uses 3000); reads API_INTERNAL_URL from .env and proxies /store/* to the API (development only)
@@ -404,7 +405,7 @@ H=(-H 'X-Fluxkit-CSRF: 1' -H 'Content-Type: application/json')
 # 1. Read the shop settings and the catalog (public, no cookie)
 curl -s $API/store/config
 curl -s "$API/store/products?limit=20" | jq -r '.items[] | "\(.slug)  \(.price.from) \(.price.currency)  \(.availability)"'
-VARIANT_ID=$(curl -s $API/store/products/demo-e-book | jq -r '.variants[0].id')   # a digital product: no shipping address needed
+VARIANT_ID=$(curl -s $API/store/products/barista-guide-pdf | jq -r '.variants[0].id')   # a digital product: no shipping address needed
 
 # 2. Add to the cart as a guest (the first write creates the cart and sets the fluxkit_cart cookie), then read it
 curl -s -c shop.jar -b shop.jar "${H[@]}" -X POST $API/store/cart/items \
@@ -494,7 +495,8 @@ Notes:
 | `pnpm test` | builds, then runs Vitest in every package (needs the services above) |
 | `pnpm test:e2e` | builds, then runs the Playwright browser tests of the storefront and then of the admin (Chromium; needs the services above, a `*_e2e_test` database in `E2E_DATABASE_URL` that each suite wipes, and `playwright install chromium` once); not part of `pnpm test`, see `apps/storefront/e2e/README.md` and `apps/admin/e2e/README.md` |
 | `pnpm db:migrate` | builds, then applies the pending migrations to `DATABASE_URL` (forward only, safe to repeat); see Database migrations |
-| `pnpm seed` | builds, then seeds the demo catalog through the admin services (idempotent, refuses `NODE_ENV=production`) |
+| `pnpm seed` | builds, then seeds the demo catalog (coffee-shop supplies) through the admin services (idempotent, refuses `NODE_ENV=production`) |
+| `pnpm seed:test` | the same runner with the test fixture dataset (`--dataset test`: the T-shirt, hammer and e-book catalog the specs, e2e suites and feature matrix assert) |
 | `pnpm admin:create --email <address> [--role <role>]` | builds, then creates one admin user (default role `owner`); password from `ADMIN_PASSWORD` or a prompt; never updates an existing user |
 | `pnpm admin:unlock --email <address>` | builds, then clears the failed-login counter and the lock of one admin user (nothing else changes); see Admin sign-in |
 | `pnpm demo:up` / `pnpm demo:down` / `pnpm demo:pay` | local demo only: prepare and start everything, stop the services (data kept), pay the newest unpaid order of the test-only `fake` payment provider; see Try it locally |
