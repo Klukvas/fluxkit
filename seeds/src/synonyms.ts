@@ -17,7 +17,6 @@ export const demoSynonymGroups: readonly SeedSynonymGroup[] = [
   { locale: "uk", terms: ["сорочка", "рубашка"] },
   { locale: "uk", terms: ["худі", "толстовка", "худи"] },
   // Russian query words for words of the demo titles (UX round 2, 2026-11-06); nothing for "gift", no product has it.
-  { locale: "uk", terms: ["молоток", "молоточек"] },
   { locale: "uk", terms: ["розвідний", "разводной"] },
   { locale: "uk", terms: ["лляна", "льняная"] },
   { locale: "uk", terms: ["електронна", "электронная"] },
