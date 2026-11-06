@@ -26,6 +26,7 @@ import { StoreTrustBar } from "./trust-bar";
 import {
   cartLineAnchor,
   checkoutBlock,
+  focusCartHeading,
   focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
@@ -79,6 +80,9 @@ export interface CartPageViewProps {
   leftFailure?: Failure | null;
   onDismissLeftFailure?: () => void;
 }
+
+/** The page heading; the focus lands here when the last line was removed (UX round 2, batch 3A item 5). */
+const CART_HEADING_ID = "cart-heading";
 
 /** Why the checkout button is blocked; the focus lands here when the checkout link turns into that button (review m5). */
 const CHECKOUT_REASON_ID = "cart-checkout-reason";
@@ -400,7 +404,10 @@ export function CartPageView({
       {cart !== null && cart.lines.length > 0 ? (
         <CheckoutSteps t={t} locale={locale} current="cart" />
       ) : null}
-      <h1 className={textStyles.pageTitle}>{t("cart.title")}</h1>
+      {/* Focusable by the script only: removing the last line moves the focus here (`focusCartHeading`). */}
+      <h1 id={CART_HEADING_ID} tabIndex={-1} className={`${textStyles.pageTitle} ${focusRing}`}>
+        {t("cart.title")}
+      </h1>
       <div
         role="status"
         aria-live="polite"
@@ -645,6 +652,19 @@ export function CartPage({
       document.getElementById(CHECKOUT_REASON_ID)?.focus();
     }
   }, [block]);
+
+  // Removing the last line removes its focused button with it, and the empty state has nothing focused: the focus goes to the
+  // heading instead of the page body (UX round 2, batch 3A item 5). The live region above still says "removed".
+  const lineCount = state.cart === null ? null : state.cart.lines.length;
+  const previousLineCount = useRef(lineCount);
+  useEffect(() => {
+    const before = previousLineCount.current;
+    previousLineCount.current = lineCount;
+    const focusLost = document.activeElement === null || document.activeElement === document.body;
+    if (focusCartHeading(before, lineCount, focusLost)) {
+      document.getElementById(CART_HEADING_ID)?.focus();
+    }
+  }, [lineCount]);
 
   async function checkoutWhenSaved(): Promise<void> {
     setLeaving(true);

@@ -68,3 +68,26 @@ test("a cancelled order's page shows no payment block and no pay action, althoug
     await expect(main).not.toContainText(words.expired);
   }
 });
+
+test("removing the last cart line by keyboard moves the focus to the cart heading, and the removal is still announced (item 5)", async ({
+  page,
+  shopper,
+}) => {
+  // A digital product without stock: no other file can sell it out.
+  const pack = (await shopper.product("demo-template-pack")).variants[0];
+  if (pack === undefined) throw new Error("The seed has no variant for demo-template-pack.");
+  await shopper.addToCart(pack.id, 1);
+  await page.goto("/en/cart");
+  await waitForHydration(page);
+  await page.getByRole("button", { name: "Remove Demo Template Pack" }).focus();
+  await page.keyboard.press("Enter");
+
+  await expect(page.getByRole("heading", { level: 2, name: "Your cart is empty" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Cart" })).toBeFocused();
+  await expect(page.getByRole("status").filter({ hasText: "Item removed." })).toContainText(
+    "Items in the cart: 0.",
+  );
+  // The next Tab goes on from the heading into the page (the empty state's link), not from the top of the document.
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Browse the catalog" })).toBeFocused();
+});

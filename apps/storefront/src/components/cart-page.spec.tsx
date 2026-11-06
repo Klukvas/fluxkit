@@ -737,4 +737,17 @@ describe("CartPageView: language, headings, accessibility", () => {
     expect(html).toContain('id="cart-summary-heading"');
     expect(html).toContain('aria-label="§cart.lines.label"');
   });
+
+  it("lets the script focus the heading (removing the last line moves the focus there, batch 3A item 5), in every state", () => {
+    const empty = cartOf([], {
+      itemCount: 0,
+      subtotal: { amount: 0, currency: "UAH" },
+      total: { amount: 0, currency: "UAH" },
+    });
+    for (const state of [ready(mixedCart), ready(empty), initialCartState]) {
+      expect(view(state)).toMatch(
+        /<h1 id="cart-heading" tabindex="-1" class="[^"]*">§cart\.title<\/h1>/,
+      );
+    }
+  });
 });
