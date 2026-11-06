@@ -235,15 +235,20 @@ describe("the banner form", () => {
     const html = form(values);
     // Only the English title: the English text has its own, the alt text has no main-language text, uk is the main one.
     expect(html.match(/§banners\.form\.copyDefault</g)).toHaveLength(1);
-    expect(html).toMatch(/<button[^>]*aria-label="§banners\.form\.copyDefaultLabel"[^>]*>/);
     const englishTitle = html.indexOf('id="banner-title-en"');
     const button = html.indexOf("§banners.form.copyDefault<");
     expect(button).toBeGreaterThan(englishTitle);
     expect(button).toBeLessThan(html.indexOf('id="banner-text-en"'));
-    // The button is named with the field and the language for a screen reader.
-    expect(form(values, {}, en)).toContain(
-      "Copy the main language text (Ukrainian) into “Title (English)”",
+    // Label in name (WCAG 2.5.3, review m3 of PR 235): no aria-label; the name is the visible text, then the field in a
+    // visually hidden part.
+    const english = form(values, {}, en);
+    const copyButton =
+      /<button[^>]*>Copy from the main language[^]*?<\/button>/.exec(english)?.[0] ?? "";
+    expect(copyButton).not.toContain("aria-label");
+    expect(copyButton.replace(/<[^>]*>/g, "")).toBe(
+      "Copy from the main language (Ukrainian) into “Title (English)”",
     );
+    expect(copyButton).toMatch(/<span class="sr-only[^"]*"> into “Title \(English\)”<\/span>/);
     // Nothing to copy for a reader.
     expect(form(values, { canWrite: false })).not.toContain("§banners.form.copyDefault");
   });

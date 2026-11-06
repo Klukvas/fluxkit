@@ -1,4 +1,13 @@
-import { Alert, Button, Checkbox, Field, Input, Textarea, type Translator } from "@fluxkit/ui";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Field,
+  Input,
+  Textarea,
+  VisuallyHidden,
+  type Translator,
+} from "@fluxkit/ui";
 import type { FormEvent, ReactNode, Ref } from "react";
 import { dateHint } from "../../lib/date-input-echo";
 import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
@@ -288,7 +297,7 @@ function LocaleText({
   /** Pointed out, not refused (a language missing on a banner that was already switched on). */
   warning?: string;
   /** "Copy from the main language" under an empty field of another language whose main-language text exists. */
-  copy?: { label: string; accessibleName: string; onCopy: () => void };
+  copy?: { label: string; field: string; onCopy: () => void };
   onChange: (value: string) => void;
 }) {
   const count = t("banners.form.count", { length: codePointLength(value.trim()), limit });
@@ -327,13 +336,10 @@ function LocaleText({
       </Field>
       {copy === undefined ? null : (
         <div>
-          <Button
-            variant="secondary"
-            className="min-h-11 px-3 py-1 text-sm"
-            aria-label={copy.accessibleName}
-            onClick={copy.onCopy}
-          >
+          <Button variant="secondary" className="min-h-11 px-3 py-1 text-sm" onClick={copy.onCopy}>
+            {/* The visible words start the accessible name (WCAG 2.5.3); the field is added for a screen reader only. */}
             {copy.label}
+            <VisuallyHidden> {copy.field}</VisuallyHidden>
           </Button>
         </div>
       )}
@@ -385,16 +391,13 @@ export function BannerFormView({
     field: "title" | "text" | "imageAlt",
     locale: string,
     fieldLabel: string,
-  ): { label: string; accessibleName: string; onCopy: () => void } | undefined => {
+  ): { label: string; field: string; onCopy: () => void } | undefined => {
     const source = values[field][content.defaultLocale] ?? "";
     if (readOnly || locale === content.defaultLocale) return undefined;
     if (source.trim() === "" || (values[field][locale] ?? "").trim() !== "") return undefined;
     return {
       label: t("banners.form.copyDefault", { language: defaultLanguage }),
-      accessibleName: t("banners.form.copyDefaultLabel", {
-        language: defaultLanguage,
-        field: fieldLabel,
-      }),
+      field: t("banners.form.copyDefaultField", { field: fieldLabel }),
       onCopy: () => {
         setText(field, locale, source);
         focusAfterCommit(`banner-${field}-${locale}`);

@@ -82,7 +82,7 @@
   "banners.form.timeAmbiguous": "This time occurs twice in your time zone (the clocks go back): the earlier one is used, {time}.",
   "banners.form.missingLanguage": "Empty in this language while the banner is switched on: shoppers in this language see the main language's text.",
   "banners.form.copyDefault": "Copy from the main language ({language})",
-  "banners.form.copyDefaultLabel": "Copy the main language text ({language}) into “{field}”",
+  "banners.form.copyDefaultField": "into “{field}”",
   "banners.form.create": "Create the banner",
   "banners.link.empty": "Enter a link.",
   "banners.link.too_long": "The link is too long: at most 2048 characters.",
