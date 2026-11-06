@@ -541,6 +541,11 @@ export function CartPageView({
                 <dd>{formatMoney(cart.total, exponent, locale)}</dd>
               </div>
             </dl>
+            {/* The cart knows no delivery price (it depends on the address and the method chosen at checkout): say so next to the
+                total instead of letting the checkout's delivery line come as a surprise (UX round 2, batch 3A item 1). */}
+            <p id="cart-delivery-note" className="text-sm text-muted-foreground">
+              {t("cartDelivery.note")}
+            </p>
             {block === null ? (
               <Link
                 href={localizedHref(locale, "/checkout")}

@@ -343,6 +343,32 @@ describe("CartPageView on a phone (mobile batch, review D-09)", () => {
   });
 });
 
+describe("CartPageView: delivery is not in the total yet (UX round 2, batch 3A item 1)", () => {
+  const empty = cartOf([], {
+    itemCount: 0,
+    subtotal: { amount: 0, currency: "UAH" },
+    total: { amount: 0, currency: "UAH" },
+  });
+
+  it("says right under the total that delivery is calculated at checkout, and names no amount for it", () => {
+    const html = view(ready(cartOf([cartLine("a", { title: "§a" })])));
+    expect(html).toMatch(
+      /§cart\.summary\.total<\/dt><dd>[^<]*<\/dd><\/div><\/dl><p id="cart-delivery-note" class="[^"]*">§cartDelivery\.note<\/p>/,
+    );
+    expect(html.match(/§cartDelivery\./g)).toHaveLength(1);
+  });
+
+  it("says nothing about delivery while the cart is empty, loading or failed", () => {
+    expect(view(ready(empty))).not.toContain("§cartDelivery.");
+    expect(view(initialCartState)).not.toContain("§cartDelivery.");
+  });
+
+  it("has the line in both languages", () => {
+    expect(uk["cartDelivery.note"]).toBe("Доставка розраховується при оформленні замовлення");
+    expect(en["cartDelivery.note"]).toBe("Delivery is calculated at checkout");
+  });
+});
+
 describe("CartPageView: banner, acknowledge, checkout", () => {
   it("shows the prices-changed banner only when a line has a price_changed notice", () => {
     expect(view(ready(mixedCart))).toContain("§cart.banner.title");

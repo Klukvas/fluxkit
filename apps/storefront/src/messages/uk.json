@@ -243,6 +243,7 @@
   "cart.summary.items": "Товарів",
   "cart.summary.subtotal": "Проміжна сума",
   "cart.summary.total": "Разом",
+  "cartDelivery.note": "Доставка розраховується при оформленні замовлення",
   "cart.checkout": "Оформити замовлення",
   "cart.checkout.saving": "Зберігаємо зміни…",
   "cart.leftFailure": "Зміну кількості, зроблену перед виходом з кошика, не збережено: {reason}",

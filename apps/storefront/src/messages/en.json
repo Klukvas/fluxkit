@@ -233,6 +233,7 @@
   "cart.summary.items": "Items",
   "cart.summary.subtotal": "Subtotal",
   "cart.summary.total": "Total",
+  "cartDelivery.note": "Delivery is calculated at checkout",
   "cart.checkout": "Checkout",
   "cart.checkout.saving": "Saving your changes…",
   "cart.leftFailure": "A quantity change made before you left the cart was not saved: {reason}",
