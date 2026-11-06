@@ -82,19 +82,7 @@ export function DataTable<Row>({
           id={hintId}
           className="mb-2 flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground md:hidden"
         >
-          <svg
-            aria-hidden="true"
-            focusable="false"
-            viewBox="0 0 24 24"
-            className="size-5 shrink-0"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M7 8 3 12l4 4M17 8l4 4-4 4M3 12h18" />
-          </svg>
+          <span aria-hidden="true">↔</span>
           {scrollHint}
         </p>
       ) : null}

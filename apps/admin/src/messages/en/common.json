@@ -14,6 +14,6 @@
   "unsaved.leave": "Leave",
   "unsaved.stay": "Stay",
   "common.dateChosen": "Chosen: {date}",
-  "common.dateFormat": "Your browser sets the order in the field: mm/dd/yyyy has the month first, dd/mm/yyyy the day first.",
-  "common.dateTimeFormat": "Your browser sets the order in the field: mm/dd/yyyy has the month first, dd/mm/yyyy the day first; the time follows."
+  "common.dateFormat": "The browser sets the order: mm/dd/yyyy is month first.",
+  "common.dateTimeFormat": "The browser sets the order: mm/dd/yyyy is month first; then the time."
 }
