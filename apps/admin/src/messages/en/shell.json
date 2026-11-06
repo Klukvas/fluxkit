@@ -8,5 +8,8 @@
   "shell.signingOut": "Signing out…",
   "shell.navigating": "Loading the page…",
   "shell.sessionFailed": "Could not check your sign-in",
-  "shell.contextHelp": "Help for this page"
+  "shell.contextHelp": "Help for this page",
+  "shell.menuOpen": "Menu",
+  "shell.menuClose": "Close the menu",
+  "shell.tableScrollHint": "Swipe the table sideways to see every column."
 }

@@ -16,6 +16,7 @@ import { Link } from "react-router";
 import { actorLabel } from "../../lib/actor-label";
 import type { DayRangeFailure } from "../../lib/date-range";
 import { formatDateTime } from "../../lib/format";
+import { dateHint } from "../../lib/date-input-echo";
 import { buildPath, PATHS } from "../../router/paths";
 import { LoadingView } from "../../views/status-views";
 import {
@@ -40,6 +41,8 @@ export interface AuditFilterFormProps {
   adminEmails: ReadonlyMap<string, string> | null;
   rangeError: { field: "from" | "to"; reason: DayRangeFailure } | null;
   onApply: (query: AuditQuery) => void;
+  /** The UI language: the date fields repeat the chosen day in it (`dateHint`). */
+  uiLocale?: string;
 }
 
 /** The filters as one labelled form, applied together (the Apply button or Enter). */
@@ -49,6 +52,7 @@ export function AuditFilterForm({
   adminEmails,
   rangeError,
   onApply,
+  uiLocale,
 }: AuditFilterFormProps) {
   const [action, setAction] = useState<string>(query.action ?? "");
   const [targetKind, setTargetKind] = useState<string>(query.targetKind ?? "");
@@ -169,6 +173,7 @@ export function AuditFilterForm({
       <Field
         id="audit-filter-from"
         label={t("audit.list.from")}
+        hint={dateHint(t, from, uiLocale)}
         error={rangeError?.field === "from" ? rangeMessage : undefined}
       >
         {(control) => (
@@ -186,6 +191,7 @@ export function AuditFilterForm({
       <Field
         id="audit-filter-to"
         label={t("audit.list.to")}
+        hint={dateHint(t, to, uiLocale)}
         error={rangeError?.field === "to" ? rangeMessage : undefined}
       >
         {(control) => (

@@ -1,5 +1,6 @@
 import { Alert, Button, Checkbox, Field, Input, Textarea, type Translator } from "@fluxkit/ui";
 import type { FormEvent, ReactNode, Ref } from "react";
+import { dateHint } from "../../lib/date-input-echo";
 import { firstInvalidControl } from "../../lib/first-invalid";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { safeHttpUrl } from "../../lib/safe-http-url";
@@ -595,9 +596,13 @@ export function BannerFormView({
               const note = warnings.find(
                 (warning) => warning.kind === "time" && warning.field === field,
               );
-              const base = t(
-                field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint",
-              );
+              const chosen = dateHint(t, values[field], uiLocale);
+              const base = [
+                t(field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint"),
+                chosen,
+              ]
+                .filter((part) => part !== undefined)
+                .join(" ");
               return (
                 <Field
                   key={field}

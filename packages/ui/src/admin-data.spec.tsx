@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DataTable, type DataTableColumn } from "./data-table";
+import { DataTable, DataTableScrollHint, type DataTableColumn } from "./data-table";
 import { DescriptionList } from "./description-list";
 import { LiveRegion } from "./live-region";
 import { StatusBadge } from "./status-badge";
@@ -56,6 +56,29 @@ const table = (options: Options = {}): string =>
   );
 
 describe("DataTable", () => {
+  it("is the containing block of its hidden texts, so a wide table scrolls inside and never widens the page", () => {
+    // `sr-only` texts are absolutely positioned: without a positioned scroll box they escape it and stretch the document.
+    expect(table()).toMatch(/^<div[^>]*><div class="relative overflow-x-auto"/);
+  });
+
+  it("shows the app's scroll hint above the table on small screens only, and none without a provider", () => {
+    expect(text(table())).not.toContain("Swipe");
+    const markup = render(
+      <DataTableScrollHint.Provider value="Swipe sideways">
+        <DataTable
+          caption="Products"
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          emptyMessage="No products yet"
+        />
+      </DataTableScrollHint.Provider>,
+    );
+    expect(markup).toMatch(
+      /<p class="[^"]*md:hidden[^"]*">Swipe sideways<\/p><div class="relative/,
+    );
+  });
+
   it("starts with a caption and gives every column header scope=col", () => {
     const markup = table();
     expect(markup).toMatch(/<table[^>]*><caption[^>]*>Products<\/caption>/);
@@ -135,7 +158,7 @@ describe("DataTable", () => {
   });
 
   it("scrolls horizontally inside a wrapper instead of widening the page", () => {
-    expect(first(table(), "div").attributes.class).toContain("overflow-x-auto");
+    expect(table()).toContain('class="relative overflow-x-auto"');
   });
 });
 

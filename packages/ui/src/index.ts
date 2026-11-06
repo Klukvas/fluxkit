@@ -14,7 +14,12 @@ export { Checkbox, type CheckboxProps } from "./checkbox";
 export { cn } from "./cn";
 export { ConfirmDialog, type ConfirmDialogProps } from "./confirm-dialog";
 export { Container } from "./container";
-export { DataTable, type DataTableColumn, type DataTableProps } from "./data-table";
+export {
+  DataTable,
+  DataTableScrollHint,
+  type DataTableColumn,
+  type DataTableProps,
+} from "./data-table";
 export { Disclosure, type DisclosureProps } from "./disclosure";
 export {
   DescriptionList,
