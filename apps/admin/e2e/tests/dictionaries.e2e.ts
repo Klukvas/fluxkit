@@ -104,7 +104,7 @@ test("dictionaries: option with values, attribute with options, product type, br
   const allow = page.getByRole("dialog", { name: "Allow an option" });
   await allow
     .getByRole("combobox", { name: "Option", exact: true })
-    .selectOption({ label: `finish_${u} - Finish ${u}` });
+    .selectOption({ label: `Finish ${u} (finish_${u})` });
   await allow.getByRole("button", { name: "Save" }).click();
   await expect(allow).toBeHidden();
   await expect(
