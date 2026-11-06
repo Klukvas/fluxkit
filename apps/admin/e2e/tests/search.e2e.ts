@@ -33,7 +33,7 @@ test("status: the engine, the index of each language, the queue, and a rebuild t
   const main = page.getByRole("main");
 
   // The search service answers; one section per language with the live index of this suite's prefix and its documents.
-  await expect(main.getByText("The search service answers")).toBeVisible();
+  await expect(main.getByText("The search service answers", { exact: true })).toBeVisible();
   const uk = main.getByRole("region", { name: "Ukrainian" });
   const en = main.getByRole("region", { name: "English" });
   await expect(uk.getByText(/adme2e\d+_catalog_uk/)).toBeVisible();
@@ -271,7 +271,7 @@ test("the viewer reads the status and the synonym groups and changes nothing", a
     await nav.getByRole("link", { name: "Search", exact: true }).click();
     await expect(page.getByRole("heading", { level: 1, name: "Search" })).toBeVisible();
     const main = page.getByRole("main");
-    await expect(main.getByText("The search service answers")).toBeVisible();
+    await expect(main.getByText("The search service answers", { exact: true })).toBeVisible();
     await expect(main.getByText("You can read the search status.")).toBeVisible();
     await expect(main.getByRole("button", { name: "Rebuild index" })).toHaveCount(0);
 

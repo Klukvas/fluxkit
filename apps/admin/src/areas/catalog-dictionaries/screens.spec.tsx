@@ -696,6 +696,36 @@ describe("server picker", () => {
     { id: "b", name: "Beta" },
   ];
 
+  it("allow an option: enabled as soon as the option list is loaded, each option as “name (code)” (CI e2e of PR 235)", async () => {
+    const en = createTranslator(await messagesForArea("en", MESSAGE_FILES), "en");
+    const html = renderInRouter(
+      <ServerPickerView
+        t={t}
+        id="option"
+        name="optionId"
+        label="§label"
+        value=""
+        onChange={noop}
+        state={{
+          status: "ready",
+          items: [{ id: "o1", code: "finish_1", name: "Finish 1" }],
+          total: 1,
+          loadingMore: false,
+          moreFailed: false,
+        }}
+        keyOf={(item) => item.id}
+        labelOf={(item) =>
+          en("dict.assignment.option.choice", { name: item.name, code: item.code })
+        }
+        onLoadMore={noop}
+        onRetry={noop}
+      />,
+    );
+    expect(html).not.toMatch(/<select[^>]*\sdisabled=""/);
+    expect(html).not.toContain('aria-busy="true"');
+    expect(html).toContain('<option value="o1">Finish 1 (finish_1)</option>');
+  });
+
   it("is disabled and busy while the first page loads", () => {
     const html = picker(initialPickerState);
     expect(html).toMatch(/<select[^>]*\sdisabled=""/);
