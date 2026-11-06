@@ -1,0 +1,6 @@
+{
+  "shopPages": ["delivery-and-payment", "returns", "faq", "about", "size-guide", "contacts"],
+  "contacts": true,
+  "home": true,
+  "trustBar": true
+}

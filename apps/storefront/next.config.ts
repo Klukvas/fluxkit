@@ -33,8 +33,10 @@ export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal te
  * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
  * production build REFUSES while ANY legal placeholder remains: a `legal.*` message of any language that still carries the
  * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves), or
- * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank. Each offender is
- * named. Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
+ * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank, or (repair batch 2)
+ * an entry of `src/config/demo-content.json` that still marks a shop page, the contacts, the home texts or the trust bar as the
+ * template's demo copy. Each offender is named. The legal marker stays in the messages but is not shown on the page
+ * (`withoutLegalMarker` in `src/config/legal.ts`). Master builds without the variable (it ships placeholders), so its CI and e2e builds are unaffected. Fails closed:
  * when asked to check and the messages or the identity file cannot be read, the build stops.
  */
 export const LEGAL_IDENTITY_FIELDS = [
@@ -44,10 +46,50 @@ export const LEGAL_IDENTITY_FIELDS = [
   "lastUpdated",
 ] as const;
 
+/**
+ * The entries of `src/config/demo-content.json` (repair batch 2, plan docs/plans/2026-11-06-storefront-shop-pages.md; the app's
+ * typed copy is `src/config/demo-content.ts`, a spec keeps the two equal): the shop pages whose texts are still the template's
+ * (a list of slugs), and three flags for the contacts, the home texts and the trust bar.
+ */
+export const DEMO_CONTENT_FLAGS = ["contacts", "home", "trustBar"] as const;
+
+/**
+ * What of `demo-content.json` is still demo copy, one line per entry (`shopPages: faq`, `contacts`). Fails closed: a missing or
+ * malformed file, an unknown key or a value of the wrong type throws, so a typo cannot switch the check off.
+ */
+export function demoContentLeft(file: string): string[] {
+  if (!existsSync(file)) {
+    throw new Error(
+      `STOREFRONT_REQUIRE_LEGAL_TEXT is set but the demo content file was not found (${file}).`,
+    );
+  }
+  const content = JSON.parse(readFileSync(file, "utf8")) as unknown;
+  if (typeof content !== "object" || content === null || Array.isArray(content)) {
+    throw new Error(`${file} must hold an object.`);
+  }
+  const entries = content as Record<string, unknown>;
+  const known = new Set<string>(["shopPages", ...DEMO_CONTENT_FLAGS]);
+  const unknown = Object.keys(entries).filter((key) => !known.has(key));
+  if (unknown.length > 0) throw new Error(`${file} has unknown keys: ${unknown.join(", ")}.`);
+  const pages = entries["shopPages"] ?? [];
+  if (!Array.isArray(pages) || pages.some((slug) => typeof slug !== "string")) {
+    throw new Error(`${file}: "shopPages" must be a list of page slugs.`);
+  }
+  const left = (pages as string[]).map((slug) => `shopPages: ${slug}`);
+  for (const flag of DEMO_CONTENT_FLAGS) {
+    const value = entries[flag] ?? false;
+    if (typeof value !== "boolean") throw new Error(`${file}: "${flag}" must be true or false.`);
+    if (value) left.push(flag);
+  }
+  return left;
+}
+
 export function assertNoLegalPlaceholders(options: {
   enabled: boolean;
   messagesDir: string;
   identityFile: string;
+  /** `src/config/demo-content.json`: the shop pages, contacts, home texts and trust bar that are still demo copy. */
+  demoContentFile: string;
 }): void {
   if (!options.enabled) return;
   if (!existsSync(options.messagesDir)) {
@@ -83,6 +125,7 @@ export function assertNoLegalPlaceholders(options: {
     const value = identity[field];
     return typeof value !== "string" || value.trim() === "";
   });
+  const demo = demoContentLeft(options.demoContentFile);
   const problems: string[] = [];
   if (found.length > 0) {
     problems.push(`these messages still carry the placeholder marker:\n${found.join("\n")}`);
@@ -92,9 +135,14 @@ export function assertNoLegalPlaceholders(options: {
       `these legal identity values in ${options.identityFile} are still unset or empty:\n${unset.join("\n")}`,
     );
   }
+  if (demo.length > 0) {
+    problems.push(
+      `these parts are still the template's demo copy (replace them, then remove them from ${options.demoContentFile}):\n${demo.join("\n")}`,
+    );
+  }
   if (problems.length > 0) {
     throw new Error(
-      "A production build with STOREFRONT_REQUIRE_LEGAL_TEXT=true needs the shop's own legal texts and identity, but " +
+      "A production build with STOREFRONT_REQUIRE_LEGAL_TEXT=true needs the shop's own legal texts, identity, shop pages and contacts, but " +
         problems.join("\n"),
     );
   }
@@ -115,6 +163,7 @@ export default function config(phase: string): NextConfig {
       enabled: process.env.STOREFRONT_REQUIRE_LEGAL_TEXT === "true",
       messagesDir: resolve(process.cwd(), "src/messages"),
       identityFile: resolve(process.cwd(), "src/config/legal-identity.json"),
+      demoContentFile: resolve(process.cwd(), "src/config/demo-content.json"),
     });
   }
   // Read once, here, by `next build` (the CSP headers are stored in the build output, so changing the CSP list needs a

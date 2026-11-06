@@ -165,7 +165,7 @@ describe("a legal page", () => {
     }
   });
 
-  it("renders with the real messages in uk and en with no raw key left and the marker visible", () => {
+  it("renders with the real messages in uk and en with no raw key left, the placeholder box shown and the marker NOT shown", () => {
     for (const [locale, messages] of [
       ["uk", uk],
       ["en", en],
@@ -174,7 +174,9 @@ describe("a legal page", () => {
       for (const page of legalPages) {
         const html = renderToStaticMarkup(<LegalPage slug={page.slug} locale={locale} t={real} />);
         expect(html).not.toMatch(/legal\.[a-z]+\.[A-Za-z_.]+/);
-        expect(html).toContain(LEGAL_PLACEHOLDER_MARKER.replace("'", "&#x27;"));
+        // Repair batch 2: the marker stays in the message (release check, box) but is an English developer note, never shown.
+        expect(html).not.toContain(LEGAL_PLACEHOLDER_MARKER.replace("'", "&#x27;"));
+        expect(html).toContain(messages["legal.placeholder.title"]);
       }
     }
   });
