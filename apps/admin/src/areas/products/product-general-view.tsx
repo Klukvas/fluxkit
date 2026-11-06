@@ -14,7 +14,7 @@ import {
   type FormIssues,
 } from "../catalog-dictionaries/form-rules";
 import { GENERAL_FIELD_IDS } from "./field-ids";
-import type { ProductFormValues } from "./product-form";
+import { TITLE_MAX_LENGTH, type ProductFormValues } from "./product-form";
 
 export interface ProductGeneralViewProps {
   t: Translator;
@@ -58,7 +58,9 @@ export function ProductGeneralView({
 }: ProductGeneralViewProps) {
   const create = mode === "create";
   return (
-    <form method="post" onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6">
+    // `noValidate`: the form checks itself (`validateProductForm`) and shows translated messages and the summary; the
+    // browser's own bubbles (in the browser's language) are never shown.
+    <form method="post" onSubmit={onSubmit} className="flex max-w-2xl flex-col gap-6" noValidate>
       <FormErrorSummary t={t} summary={summary} summaryRef={summaryRef} />
       {typePicker}
       <LocaleFields
@@ -71,6 +73,12 @@ export function ProductGeneralView({
         values={values.title}
         errors={issues}
         readOnly={!canWrite}
+        hint={(locale) =>
+          t("products.form.titleCount", {
+            length: [...(values.title[locale] ?? "")].length,
+            limit: TITLE_MAX_LENGTH,
+          })
+        }
         onChange={(locale, text) =>
           onChange({ ...values, title: { ...values.title, [locale]: text } })
         }

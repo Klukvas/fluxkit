@@ -145,6 +145,33 @@ export function offeredPaymentActions(
   );
 }
 
+/**
+ * What a cancelled or expired order says about money the shop still holds (a `succeeded` attempt with something left to
+ * refund), `null` otherwise. `automatic`: the shop refunds it by itself (a payment that came too late or twice gets an
+ * automatic refund, `docs/api/payments.md`), the admin only checks it; `refund`: nothing is refunded automatically (an
+ * admin's cancel of a paid order refunds nothing, `docs/api/orders.md`), so the admin refunds it.
+ */
+export function closedOrderMoneyNote(
+  orderStatus: string,
+  payments: readonly Pick<
+    AdminPayment,
+    "status" | "refundableAmount" | "attentionCode" | "refunds"
+  >[],
+): "refund" | "automatic" | null {
+  if (orderStatus !== "cancelled" && orderStatus !== "expired") return null;
+  const held = payments.filter(
+    (payment) => payment.status === "succeeded" && payment.refundableAmount.amount > 0,
+  );
+  if (held.length === 0) return null;
+  const automatic = held.every(
+    (payment) =>
+      payment.attentionCode === "late_payment" ||
+      payment.attentionCode === "duplicate_payment" ||
+      payment.refunds.some((refund) => refund.reason !== "admin" && refund.status !== "failed"),
+  );
+  return automatic ? "automatic" : "refund";
+}
+
 /** Whether the panel mentions refunds at all: the order has a succeeded attempt. */
 export function hasSucceededPayment(payments: readonly Pick<AdminPayment, "status">[]): boolean {
   return payments.some((payment) => payment.status === "succeeded");

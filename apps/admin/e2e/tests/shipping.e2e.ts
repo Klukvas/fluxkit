@@ -153,7 +153,7 @@ test("shipping methods: tiers and a pickup point are typed as decimals and a bad
     await main.getByRole("textbox", { name: "Countries" }).fill("UA PL");
     await main
       .getByRole("combobox", { name: "Price type" })
-      .selectOption({ label: "By cart total (tiers)" });
+      .selectOption({ label: "By cart total, in steps" });
     await main.getByRole("textbox", { name: "Tier 1: price, UAH" }).fill("120");
     await main.getByRole("button", { name: "Add a tier" }).click();
     await main.getByRole("textbox", { name: "Tier 2: from cart total, UAH" }).fill("0");

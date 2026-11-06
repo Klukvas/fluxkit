@@ -297,6 +297,7 @@ export function PaymentSection({
         t={t}
         uiLocale={locale}
         money={money}
+        orderStatus={order.status}
         payments={order.payments}
         actionsFor={(payment) => offeredPaymentActions(payment, permissions)}
         onAction={onAction}

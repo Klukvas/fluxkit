@@ -35,6 +35,7 @@
   "products.create.next": "Fill in its attributes and categories in the editor; variants, prices and stock follow.",
   "products.create.openEditor": "Open the product",
   "products.form.title": "Title",
+  "products.form.titleCount": "{length} of {limit} characters.",
   "products.form.description": "Description",
   "products.form.slug": "Slug",
   "products.form.slugHintCreate": "The product’s address in the shop. Leave it empty to make one from the title.",

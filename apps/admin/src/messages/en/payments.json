@@ -4,7 +4,6 @@
   "payment.card.title": "Payment of {amount}, started {at}",
   "payment.card.unknownTitle": "The provider did not answer",
   "payment.card.unknownBody": "The payment page may or may not exist at the provider. A new attempt is refused until the shop settles this one, and a payment may still arrive. Use Check status; do not mark the order paid by hand without checking.",
-
   "payment.field.status": "Status",
   "payment.field.amount": "Amount",
   "payment.field.finalAmount": "Amount charged",
@@ -20,17 +19,14 @@
   "payment.field.created": "Created",
   "payment.field.updated": "Updated",
   "payment.field.nextCheck": "Next automatic check",
-
   "payment.createdBy.customer": "The customer",
   "payment.createdBy.guest": "A guest",
   "payment.createdBy.admin": "An admin",
-
   "payment.outcome.applied": "The order was marked paid",
   "payment.outcome.already_paid": "The order was already paid with this payment",
   "payment.outcome.order_not_payable": "The order could no longer be paid (expired or cancelled)",
   "payment.outcome.amount_mismatch": "The amount did not match the order, so the order was not paid",
   "payment.outcome.reference_conflict": "The order was already paid another way",
-
   "payment.status.creating": "Being created",
   "payment.status.awaiting_customer": "Waiting for the customer",
   "payment.status.processing": "Processing",
@@ -39,25 +35,24 @@
   "payment.status.expired": "Expired",
   "payment.status.invalidated": "Closed",
   "payment.status.create_unknown": "Provider did not answer",
-
   "payment.refundStatus.requested": "Requested",
   "payment.refundStatus.processing": "Processing",
   "payment.refundStatus.succeeded": "Refunded",
   "payment.refundStatus.failed": "Refused",
   "payment.refundStatus.unknown": "Result unknown",
-
   "payment.refundReason.admin": "By an admin",
   "payment.refundReason.late_payment": "Automatic: paid too late",
   "payment.refundReason.duplicate_payment": "Automatic: paid twice",
   "payment.refundReason.amount_mismatch": "Amount mismatch",
-
   "payment.source.webhook": "Provider notice",
   "payment.source.poll": "Status check",
   "payment.source.create": "Payment started",
   "payment.source.admin": "Admin",
   "payment.source.system": "System",
-
   "payment.attention.title": "This payment needs your attention",
+  "payment.closedOrder.title": "The order is closed, but the shop still holds money for it",
+  "payment.closedOrder.refund": "Nothing is returned automatically for a cancelled order. Refund the payment with Refund below (the money goes back the way the customer paid), or settle it with the customer another way.",
+  "payment.closedOrder.automatic": "The customer paid after the order was closed, or paid twice: the shop refunds this payment automatically. Check that the refund below turns Refunded; until then it is also listed under Payments to review.",
   "payment.attention.closed": "An earlier attention item was closed: {code}.",
   "payment.attention.code.late_payment": "Paid after the order could no longer be paid",
   "payment.attention.code.duplicate_payment": "Paid twice",
@@ -81,11 +76,9 @@
   "payment.attention.help.refund_mismatch": "The provider's record of a refund differs from the shop's. Use Check status and compare with the provider's cabinet before refunding again.",
   "payment.attention.help.reconcile_gave_up": "The shop checked this payment for a long time and stopped. Use Check status once; if the status is still unclear, look at the payment in the provider's cabinet.",
   "payment.attention.help.unknown": "Check the payment in the provider's cabinet, then close this item.",
-
   "payment.action.refund": "Refund",
   "payment.action.resync": "Check status",
   "payment.action.clearAttention": "Close attention item",
-
   "payment.refunds.caption": "Refunds of this payment",
   "payment.refunds.at": "Requested",
   "payment.refunds.amount": "Amount",
@@ -98,7 +91,6 @@
   "payment.refunds.noCode": "None",
   "payment.refunds.empty": "No refunds yet.",
   "payment.refunds.waiting": "A refund is waiting for the provider. A refund that is requested or whose result is unknown keeps its amount reserved and is never sent twice; the shop settles it from the provider's records. Use Check status to look again.",
-
   "payment.journal.summary": "Journal ({count})",
   "payment.journal.caption": "Journal of this payment",
   "payment.journal.at": "When",
@@ -114,7 +106,6 @@
   "payment.journal.noChange": "No change",
   "payment.journal.attentionCleared": "Attention item closed",
   "payment.journal.empty": "No journal entries.",
-
   "payment.notice.codes": "Provider code:",
   "payment.notice.lostTitle": "No answer",
   "payment.notice.refund.succeeded.title": "Refund done",
@@ -133,7 +124,6 @@
   "payment.notice.resyncLost": "No answer came, so the status was not checked. The payment was read again; try Check status once more.",
   "payment.notice.cleared": "The attention item was closed.",
   "payment.notice.clearLost": "No answer came, so it is not known whether the item was closed. The payment was read again; look at it before trying again.",
-
   "payment.unavailable": "The payment provider is not available right now. Nothing was changed; try again later.",
   "payment.unavailableRetry": "The payment provider is not available right now. Nothing was changed; try again in {seconds} seconds.",
   "payment.refusal.refund_not_allowed": "This payment cannot be refunded (it is not paid, or it is still being settled). Nothing was changed.",
@@ -145,7 +135,6 @@
   "payment.refusal.keyReused": "This refund form was already used for a different amount or note. Close the dialog and open Refund again.",
   "payment.fieldError.invalid_amount": "Enter an amount of at least the smallest currency unit.",
   "payment.fieldError.currency_mismatch": "The amount is not in the payment's currency.",
-
   "payment.refund.title": "Refund order {number}",
   "payment.refund.description": "Return money to the customer's card. A partial amount is allowed. The order status does not change.",
   "payment.refund.confirmDescription": "Check the amount before you confirm. The money is sent back to the customer's card.",
@@ -176,13 +165,11 @@
   "payment.refund.noteIssue.required": "Give a reason.",
   "payment.refund.noteIssue.too_long": "The reason is too long.",
   "payment.refund.noteIssue.invalid_characters": "The reason has characters that are not allowed.",
-
   "payment.clear.title": "Close this attention item?",
   "payment.clear.body": "The payment is no longer listed as needing attention. The code stays on the payment and the journal records who closed it.",
   "payment.clear.note": "Close it only after you have dealt with it. Closing changes nothing at the provider.",
   "payment.clear.confirm": "Close item",
   "payment.clear.keep": "Keep open",
-
   "payment.list.intro": "Payments that need an admin: paid too late, paid twice, a wrong amount, a refund that failed or whose result is unknown, or a payment the shop stopped checking. Open the order to check, refund or close the item.",
   "payment.list.caption": "Payments that need attention",
   "payment.list.order": "Order",

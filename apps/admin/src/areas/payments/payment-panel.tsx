@@ -22,6 +22,7 @@ import {
   PAYMENT_STATUS_TONES,
   REFUND_STATUS_TONES,
   attentionCodeKey,
+  closedOrderMoneyNote,
   paymentEntryActor,
   paymentStatusLabelKey,
   refundActor,
@@ -426,6 +427,8 @@ export interface PaymentPanelProps {
   emails: ReadonlyMap<string, string> | null;
   /** The status line (always rendered, a focus target after an action). */
   statusLine: ReactNode;
+  /** The order's status: a cancelled or expired order that still holds money says what to do (`closedOrderMoneyNote`). */
+  orderStatus?: string;
 }
 
 export function PaymentPanel({
@@ -439,13 +442,20 @@ export function PaymentPanel({
   meId,
   emails,
   statusLine,
+  orderStatus,
 }: PaymentPanelProps) {
+  const closedNote = orderStatus === undefined ? null : closedOrderMoneyNote(orderStatus, payments);
   return (
     <section aria-labelledby="order-payments" className="flex flex-col gap-4">
       <h2 id="order-payments" className="text-lg font-semibold text-foreground">
         {t("payment.title")}
       </h2>
       {statusLine}
+      {closedNote === null ? null : (
+        <Alert variant="warning" title={t("payment.closedOrder.title")}>
+          <p>{t(`payment.closedOrder.${closedNote}`)}</p>
+        </Alert>
+      )}
       {payments.length === 0 ? (
         <p className="text-muted-foreground">{t("payment.none")}</p>
       ) : (

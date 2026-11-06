@@ -35,6 +35,7 @@
   "products.create.next": "Заповніть атрибути й категорії в редакторі; варіанти, ціни й залишки — далі.",
   "products.create.openEditor": "Відкрити товар",
   "products.form.title": "Назва",
+  "products.form.titleCount": "{length} з {limit} символів.",
   "products.form.description": "Опис",
   "products.form.slug": "Slug",
   "products.form.slugHintCreate": "Адреса товару в магазині. Залиште порожнім, щоб створити її з назви.",

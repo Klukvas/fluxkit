@@ -41,6 +41,8 @@ export function NotConfigured({ t }: { t: Translator }) {
       <h2 id="email-setup" className="text-lg font-semibold text-foreground">
         {t("mail.setup.title")}
       </h2>
+      {/* The steps are server settings, not something to do in this panel: say who does them before listing them. */}
+      <p className="font-medium text-foreground">{t("mail.setup.who")}</p>
       <ol className="flex list-decimal flex-col gap-1 ps-6">
         {SETUP_STEP_KEYS.map((key) => (
           <li key={key}>{t(key)}</li>
