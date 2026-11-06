@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useId, type ReactNode } from "react";
 import { cn } from "./cn";
 import { Skeleton } from "./skeleton";
+import { focusRing } from "./styles";
 import { VisuallyHidden } from "./visually-hidden";
 
 export interface DataTableColumn<Row> {
@@ -68,17 +69,31 @@ export function DataTable<Row>({
   }
   const columnCount = columns.length + (actions ? 1 : 0);
   const scrollHint = useContext(DataTableScrollHint);
+  const hasHint = scrollHint !== null && scrollHint !== undefined;
+  const captionId = useId();
+  const hintId = useId();
 
   return (
     <div>
-      {scrollHint === null || scrollHint === undefined ? null : (
-        <p className="pb-1 text-sm text-muted-foreground md:hidden">{scrollHint}</p>
-      )}
+      {hasHint ? (
+        <p id={hintId} className="pb-1 text-sm text-muted-foreground md:hidden">
+          {scrollHint}
+        </p>
+      ) : null}
       {/* `relative`: the containing block of the visually hidden (absolutely positioned) texts, so they scroll with the
-          table instead of stretching the page sideways. */}
-      <div className="relative overflow-x-auto">
+          table instead of stretching the page sideways. A focusable region named by the caption, so a keyboard can scroll
+          it where the browser does not (Firefox, Safari); it is a Tab stop even when nothing overflows (measuring that
+          would need a resize observer in every table). */}
+      <div
+        role="region"
+        tabIndex={0}
+        aria-labelledby={captionId}
+        aria-describedby={hasHint ? hintId : undefined}
+        className={cn("relative overflow-x-auto", focusRing)}
+      >
         <table aria-busy={loading || undefined} className="w-full text-start">
           <caption
+            id={captionId}
             className={cn(
               captionHidden ? "sr-only" : "pb-2 text-start font-semibold text-foreground",
             )}
