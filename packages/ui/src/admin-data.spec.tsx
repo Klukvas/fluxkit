@@ -96,6 +96,11 @@ describe("DataTable", () => {
     );
     const hint = first(markup, "p");
     expect(hint.attributes.class).toContain("md:hidden");
+    // Set apart from the page's own grey notes (UX round 2): a bordered callout in body text colour with a decorative arrow.
+    expect(hint.attributes.class).toContain("border");
+    expect(hint.attributes.class).toContain("text-foreground");
+    expect(hint.attributes.class).not.toContain("text-muted-foreground");
+    expect(markup).toMatch(/<p[^>]*><svg aria-hidden="true"/);
     expect(text(markup)).toContain("Swipe sideways");
     const box = scrollBox(markup);
     expect(box.attributes["aria-describedby"]).toBe(hint.attributes.id);

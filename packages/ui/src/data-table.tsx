@@ -75,8 +75,26 @@ export function DataTable<Row>({
 
   return (
     <div>
+      {/* A callout with an arrow, not a grey line: a plain muted sentence under a form's grey notes was read as part of
+          them and missed (UX round 2 on the orders list at 390 px). */}
       {hasHint ? (
-        <p id={hintId} className="pb-1 text-sm text-muted-foreground md:hidden">
+        <p
+          id={hintId}
+          className="mb-2 flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground md:hidden"
+        >
+          <svg
+            aria-hidden="true"
+            focusable="false"
+            viewBox="0 0 24 24"
+            className="size-5 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M7 8 3 12l4 4M17 8l4 4-4 4M3 12h18" />
+          </svg>
           {scrollHint}
         </p>
       ) : null}
