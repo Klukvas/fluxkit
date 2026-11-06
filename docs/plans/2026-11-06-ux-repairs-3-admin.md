@@ -75,4 +75,41 @@ browser checks and screenshots (390 and 1366, uk) under `vite dev` with mocked `
 
 ## Results
 
-Filled in after the work.
+Environment: no Docker; Postgres could not be started (the agent sandbox refuses the switch to the `postgres` user), so the admin e2e and
+API integration tests were NOT run (left to CI). Browser checks ran against the admin under `vite dev` (port 3390) with `/admin/*` answered by
+Playwright route mocks (a harness outside the repository). Screenshots (uk, 390 and 1366): `repairs-3b-shots/` in the session scratchpad; no
+"before" shot of the mark-paid dialog (the first mock of the order was malformed).
+
+| # | Done | Evidence |
+| - | ---- | -------- |
+| 1 | Labels, hints, list search, help; e2e labels `Slug`/`Slug (part of the address)` -> `Page address` | messages spec, unit tests |
+| 2 | `itemName`; seven delete texts use `{name}`; `order.dialog.cancel` "Скасувати"/"Cancel"; e2e `Close` -> `Cancel` | failing first: `dictionary-messages.spec.ts` failed on `Опцію {code}…` before the message change; browser: "Значення «Olena2 Короткий» буде видалено" |
+| 3 | Irreversible warning, reference label, payer texts, help steps; e2e `Payment reference` -> `Transfer or receipt number` | failing first: `orders-screen.spec.tsx` failed with the dialog change set aside, passed with it |
+| 4, 15 | Publish, unpublish notices and the unpublish dialog: "within a minute or two" | the storefront's product page is also cached 60 s (`CATALOG_REVALIDATE_SECONDS`), so the old "disappears at once" was wrong too |
+| 5 | `MediaRow.uploaded`, `markMediaSaved`; read-only address, save hint | specs |
+| 6 | Callout hint; header one row below `md` | spec; 390 px: header 61 px instead of about 200 px, no horizontal page scroll on the shot screens |
+| 7 | `dateHint` always gives the format line | failing first (new behaviour): `date-input-echo.spec.ts` |
+| 8 | Copy button, focus to the filled field | spec; browser: copied, focus on `banner-title-en`, button gone |
+| 9 | Help section `customer-says-paid`, order card link | `help-content.spec.ts` |
+| 10 | Create-type link (with the not-kept note), hint, option names (`use-option-names.ts`), shared-values hint | specs. (b) the type picker already showed "name (code)"; unchanged |
+| 11 | Caption; slot input `aria-invalid` + description, danger frame | failing first: `banner-screens.spec.tsx` failed on the missing `aria-invalid` |
+| 12 | `showOnlineNotStartedNote` and the dialog note | failing first: `mark-paid-form.spec.ts` (function missing); browser shot |
+| 13 | Fulfil text | messages |
+| 14 | Search screen words; e2e `The engine answers` -> `The search service answers` | unit tests |
+| 16 | Button names, developer notes at the end (shipping, payments) | `help-content.spec.ts` |
+
+Commands (each exit code read on its own): `pnpm lint` 0, `pnpm format:check` 0, `pnpm typecheck` 0, `pnpm check:boundaries` 0 (2147 modules, 0
+violations), `pnpm check:env` 0, `pnpm --filter @fluxkit/theme test` 0 (97), `pnpm --filter @fluxkit/ui test` 0 (220), `pnpm --filter @fluxkit/admin
+test` 0 (1914, after `pnpm --filter @fluxkit/admin build`), `pnpm check:docs` 0.
+
+### Decisions outside the plan
+
+- Admin initial JavaScript raw budget 440 000 -> 445 000 (`build-output.spec.ts`): main measured 439 651 raw / 131 228 gzip (349 bytes left), this
+  branch 440 412 / 131 421 after trimming the hint icon to a glyph and shortening the date texts. The gzip budget (135 000) is unchanged.
+- Item 12 wording differs from the request: "the payment would be double" is not what the shop does (after mark-paid a card payment is refused and
+  a late success of an open attempt is refunded automatically), so the note says the customer can no longer pay by card.
+- Item 7: the format line does not claim the field shows дд.мм.рррр (Chromium draws it in the browser's language: measured mm/dd/yyyy in a `uk-UA`
+  page); it says that in mm/dd/yyyy the month comes first.
+- Item 15 also corrects item 4's first wording (the product page is cached 60 s too).
+- Item 16 also moved the Monobank simulator note of the payments article; the email article's Resend note is unchanged.
+- Brand and category slug labels changed with the product's (item 1) for one word across the admin.
