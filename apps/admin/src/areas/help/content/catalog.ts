@@ -123,8 +123,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
             en: "Create the attributes “Material” (one choice) and “Care” (text).",
           },
           {
-            uk: "Створіть тип «Футболка»: додайте обидві опції та обидва атрибути на рівні товару.",
-            en: "Create the type “T-shirt”: add both options and both attributes at product level.",
+            uk: "Створіть тип «Футболка». На його сторінці натисніть «Дозволити опцію» для кожної з двох опцій і «Призначити атрибут» для кожного з двох атрибутів (рівень «товар»).",
+            en: "Create the type “T-shirt”. On its page press “Allow option” for each of the two options and “Assign attribute” for each of the two attributes (level “product”).",
           },
           {
             uk: "Створіть товар цього типу й виберіть розміри та кольори: вийде 6 варіантів (3 розміри × 2 кольори).",
