@@ -914,7 +914,7 @@ export function VariantsTab({
    * given away (the API allows it), so ask first. When the prices cannot be read, switch it on as before (the API decides).
    */
   async function activateAskingForZero(variant: AdminVariant) {
-    let zero = false;
+    let zero: boolean;
     try {
       const prices = await adminClient.listProductPrices(product.id);
       zero =
