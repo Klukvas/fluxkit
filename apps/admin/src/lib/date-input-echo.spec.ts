@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { dateInputEcho } from "./date-input-echo";
+import type { Translator } from "@fluxkit/ui";
+import { dateHint, dateInputEcho } from "./date-input-echo";
 
 describe("dateInputEcho (the chosen date in the UI language, under a native date field)", () => {
   it("writes a date field's value in words of the UI language, whatever the browser's own format", () => {
@@ -16,5 +17,25 @@ describe("dateInputEcho (the chosen date in the UI language, under a native date
     expect(dateInputEcho("", "uk")).toBeNull();
     expect(dateInputEcho("2026-13-40", "uk")).toBeNull();
     expect(dateInputEcho("tomorrow", "en")).toBeNull();
+  });
+});
+
+describe("dateHint (the help text under a native date field)", () => {
+  const t = ((key: string, values?: Record<string, unknown>) =>
+    values === undefined ? `§${key}` : `§${key}(${String(values["date"])})`) as Translator;
+
+  it("always names the expected format, also before a date is chosen (UX round 2: the browser drew mm/dd/yyyy)", () => {
+    expect(dateHint(t, "", "uk")).toBe("§common.dateFormat");
+    expect(dateHint(t, "", "uk", "datetime")).toBe("§common.dateTimeFormat");
+  });
+
+  it("adds the chosen date in words once there is one", () => {
+    expect(dateHint(t, "2026-12-01", "uk")).toBe(
+      "§common.dateFormat §common.dateChosen(1 грудня 2026 р.)",
+    );
+  });
+
+  it("says nothing without a UI language", () => {
+    expect(dateHint(t, "2026-12-01", undefined)).toBeUndefined();
   });
 });

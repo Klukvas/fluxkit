@@ -1,4 +1,4 @@
-import type { AdminOrder, MarkAdminOrderPaidBody } from "@fluxkit/api-client";
+import type { AdminOrder, AdminPayment, MarkAdminOrderPaidBody } from "@fluxkit/api-client";
 import { checkActionText, type TextIssue } from "./action-text";
 
 /**
@@ -20,6 +20,28 @@ export interface MarkPaidValues {
 }
 
 export const EMPTY_MARK_PAID: MarkPaidValues = { reference: "", received: false };
+
+/** Attempts after which the note is wrong or useless: a success, or a payment under way (mark paid is refused then). */
+const SETTLED_OR_UNDER_WAY: ReadonlySet<AdminPayment["status"]> = new Set([
+  "succeeded",
+  "creating",
+  "processing",
+  "create_unknown",
+]);
+
+/**
+ * Whether the mark-paid dialog says that no card payment has succeeded: the shop takes online payments (`GET /admin/config`
+ * `onlinePayment`) and no attempt succeeded or is under way. Failed, expired and closed attempts leave the customer free to
+ * pay by card again, and an open payment page (`awaiting_customer`) is closed by the mark paid. After a mark-paid the shop
+ * refuses a new card payment (`order_not_payable`) and refunds a late success of a closed attempt automatically
+ * (`docs/api/payments.md`), so the note says to mark paid only with the money in hand and that the card payment ends.
+ */
+export function showNoCardPaymentNote(
+  onlinePayment: boolean,
+  payments: readonly Pick<AdminPayment, "status">[],
+): boolean {
+  return onlinePayment && !payments.some((payment) => SETTLED_OR_UNDER_WAY.has(payment.status));
+}
 
 export interface MarkPaidIssues {
   reference?: TextIssue;

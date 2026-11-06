@@ -59,7 +59,11 @@ import { VARIANTS_FOCUS_ID, variantRowFocusId } from "../field-ids";
 import { variantIssues, variantProblems, type PublishProblem } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { useCan } from "../use-can";
-import { optionName, useOptionDefinitions, valueLabel } from "../use-option-definitions";
+import {
+  optionName,
+  useOptionDefinitions,
+  valueLabel,
+} from "../../catalog-dictionaries/use-option-definitions";
 import {
   BARCODE_MAX_LENGTH,
   SKU_MAX_LENGTH,

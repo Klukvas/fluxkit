@@ -334,7 +334,9 @@ function BrandEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.brand.deleteTitle", { slug: brand.slug })}
+              title={t("dict.brand.deleteTitle", {
+                name: resolveLocalized(brand.name, locale, content.defaultLocale) || brand.slug,
+              })}
               description={t("dict.brand.deleteBody")}
               hint={t("dict.brand.deleteHint")}
               confirmLabel={t("dict.brand.deleteConfirm")}

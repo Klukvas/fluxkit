@@ -1,4 +1,5 @@
 import type {
+  LocalizedText,
   AdminOption,
   AdminProductTypeAttribute,
   AdminProductTypeOptionAssignment,
@@ -337,7 +338,8 @@ export function AttributeAssignmentsSection({
 
 // -------------------------------------------------------------- option assignments
 
-type OptionTarget = { mode: "add" } | { mode: "edit"; row: AdminProductTypeOptionAssignment };
+type OptionTarget =
+  { mode: "add" } | { mode: "edit"; row: AdminProductTypeOptionAssignment; name: string };
 
 function OptionAssignmentDialog({
   t,
@@ -406,7 +408,7 @@ function OptionAssignmentDialog({
           id={`${formId}-option`}
           name="optionCode"
           label={t("dict.assignment.option.option")}
-          value={target.row.optionCode}
+          value={target.name}
           readOnly
           onChange={() => undefined}
         />
@@ -423,7 +425,10 @@ function OptionAssignmentDialog({
           fetchPage={(offset, limit, signal) => adminClient.listOptions({ offset, limit, signal })}
           keyOf={(option) => option.id}
           labelOf={(option) =>
-            `${option.code} - ${resolveLocalized(option.name, uiLocale, content.defaultLocale)}`
+            t("dict.assignment.option.choice", {
+              name: resolveLocalized(option.name, uiLocale, content.defaultLocale) || option.code,
+              code: option.code,
+            })
           }
           disabledReason={(option) =>
             assigned.has(option.id) ? t("dict.assignment.alreadyAssigned") : null
@@ -448,9 +453,22 @@ function OptionAssignmentDialog({
 /** The options (variant axes) a product type allows, with their position. Reads only without write permission. */
 export function OptionAssignmentsSection({
   rows,
+  optionNames = new Map(),
+  namesFailed = false,
+  onRetryNames,
   ...props
-}: AssignmentSectionProps & { rows: readonly AdminProductTypeOptionAssignment[] }) {
+}: AssignmentSectionProps & {
+  rows: readonly AdminProductTypeOptionAssignment[];
+  /** The options by id (`useOptionDefinitions`); an option without one is shown by its code. */
+  optionNames?: ReadonlyMap<string, { name: LocalizedText }>;
+  /** The names could not be read: the codes stay, with a note and a retry. */
+  namesFailed?: boolean;
+  onRetryNames?: () => void;
+}) {
   const { t, content, uiLocale, productTypeId, canWrite, onChanged } = props;
+  const nameOf = (row: AdminProductTypeOptionAssignment) =>
+    resolveLocalized(optionNames.get(row.optionId)?.name, uiLocale, content.defaultLocale) ||
+    row.optionCode;
   const dialog = useDialogTarget<OptionTarget>();
   const removing = useDialogTarget<AdminProductTypeOptionAssignment>();
   const toRemove = removing.target;
@@ -468,6 +486,17 @@ export function OptionAssignmentsSection({
           </Button>
         ) : null}
       </div>
+      <p className="text-sm text-muted-foreground">{t("dict.assignment.option.sharedHint")}</p>
+      {namesFailed ? (
+        <div role="status" className="flex flex-wrap items-center gap-3 text-sm">
+          <span>{t("dict.assignment.option.namesFailed")}</span>
+          {onRetryNames === undefined ? null : (
+            <Button variant="secondary" onClick={onRetryNames}>
+              {t("action.retry")}
+            </Button>
+          )}
+        </div>
+      ) : null}
       <DataTable
         caption={t("dict.assignment.option.caption")}
         captionHidden
@@ -476,9 +505,17 @@ export function OptionAssignmentsSection({
             id: "option",
             header: t("dict.assignment.option.option"),
             cell: (row) => (
-              <Link to={buildPath(PATHS.optionDetail, { id: row.optionId })} className={linkClass}>
-                {row.optionCode}
-              </Link>
+              <span className="flex flex-col">
+                <Link
+                  to={buildPath(PATHS.optionDetail, { id: row.optionId })}
+                  className={linkClass}
+                >
+                  {nameOf(row)}
+                </Link>
+                {nameOf(row) === row.optionCode ? null : (
+                  <small className="text-muted-foreground">{row.optionCode}</small>
+                )}
+              </span>
             ),
           },
           {
@@ -499,14 +536,14 @@ export function OptionAssignmentsSection({
                   <span className="inline-flex flex-wrap justify-end gap-2">
                     <Button
                       variant="secondary"
-                      aria-label={t("dict.assignment.option.editLabel", { code: row.optionCode })}
-                      onClick={() => dialog.open({ mode: "edit", row })}
+                      aria-label={t("dict.assignment.option.editLabel", { name: nameOf(row) })}
+                      onClick={() => dialog.open({ mode: "edit", row, name: nameOf(row) })}
                     >
                       {t("dict.form.edit")}
                     </Button>
                     <Button
                       variant="danger"
-                      aria-label={t("dict.assignment.option.removeLabel", { code: row.optionCode })}
+                      aria-label={t("dict.assignment.option.removeLabel", { name: nameOf(row) })}
                       onClick={() => removing.open(row)}
                     >
                       {t("dict.assignment.remove")}
@@ -546,7 +583,7 @@ export function OptionAssignmentsSection({
             removing.close();
             onChanged("unknown");
           }}
-          title={t("dict.assignment.option.removeTitle", { code: toRemove.optionCode })}
+          title={t("dict.assignment.option.removeTitle", { name: nameOf(toRemove) })}
           description={t("dict.assignment.option.removeBody")}
           hint={t("dict.assignment.option.removeHint")}
           confirmLabel={t("dict.assignment.remove")}

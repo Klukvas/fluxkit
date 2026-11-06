@@ -40,6 +40,8 @@ export interface MarkPaidDialogProps {
   errorRef?: Ref<HTMLDivElement>;
   /** After a lost answer: the reference is the one sent before (a retry with it is safe). */
   retrying: boolean;
+  /** The shop takes online payments and no card payment has succeeded or is under way (`showNoCardPaymentNote`). */
+  noCardPayment?: boolean;
   busy: boolean;
   onSubmit: () => void;
   onClose: () => void;
@@ -58,6 +60,7 @@ export function MarkPaidDialog({
   error,
   errorRef,
   retrying,
+  noCardPayment = false,
   busy,
   onSubmit,
   onClose,
@@ -97,6 +100,11 @@ export function MarkPaidDialog({
         noValidate
       >
         <DialogError t={t} descriptor={error} innerRef={errorRef} />
+        {/* Nothing moves an order back from paid (docs/api/orders.md): the admin is told before, not after. */}
+        {noCardPayment ? (
+          <Alert variant="warning">{t("order.markPaid.noCardPayment")}</Alert>
+        ) : null}
+        <Alert variant="warning">{t("order.markPaid.irreversible")}</Alert>
         <div className="flex flex-col gap-1">
           <p className="font-medium text-foreground" id="order-mark-paid-amount-label">
             {t("order.markPaid.amount")}

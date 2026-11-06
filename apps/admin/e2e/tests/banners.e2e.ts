@@ -117,7 +117,12 @@ test("the manager creates a card banner with an uploaded picture: early checks, 
   await main.getByRole("button", { name: "Create the banner" }).click();
   const summary = main.getByRole("alert").filter({ hasText: "Check the marked fields." });
   await expect(summary).toBeVisible();
-  await expect(main.getByText("Upload the main picture.", { exact: true })).toBeVisible();
+  await expect(
+    main.getByText(
+      "Upload the main picture: a banner is saved only with one, even when every language has its own.",
+      { exact: true },
+    ),
+  ).toBeVisible();
 
   await main.getByLabel("Upload the main picture").setInputFiles(asPayload(picture));
   await expect(uploadStatus(main, picture.name)).toContainText("Uploaded");

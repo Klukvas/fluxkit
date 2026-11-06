@@ -55,7 +55,8 @@ export const CONTEXT_HELP: Readonly<Partial<Record<RouteId, ContextHelpTarget>>>
   bannerNew: { article: "home-banners", section: "create" },
   bannerDetail: { article: "home-banners", section: "create" },
   orders: { article: "orders" },
-  orderDetail: { article: "orders", section: "statuses" },
+  // The question managers bring to an order card most (UX round 2): "they say they paid".
+  orderDetail: { article: "orders", section: "customer-says-paid" },
   customers: { article: "customers" },
   customerDetail: { article: "customers", section: "actions" },
   payments: { article: "payments", section: "attention" },

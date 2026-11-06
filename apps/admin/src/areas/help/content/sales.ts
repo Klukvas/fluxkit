@@ -86,16 +86,53 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
             en: "The amount is the order total and cannot be changed: partial payment is not supported.",
           },
           {
-            uk: "Введіть номер платежу (переказу чи чека), поставте позначку «Я отримав цю суму» і підтвердьте.",
-            en: "Type the payment reference (transfer or receipt number), tick “I received this amount” and confirm.",
+            uk: "Заповніть «Номер переказу або квитанції», поставте позначку «Я отримав(-ла) цю суму» і підтвердьте.",
+            en: "Fill in “Transfer or receipt number”, tick “I received this amount” and confirm.",
           },
         ],
       },
       {
         kind: "note",
         text: {
-          uk: "Той самий номер платежу вдруге не запише другу оплату. Поки триває онлайн-оплата замовлення, позначити його оплаченим чи скасувати не можна.",
-          en: "The same reference a second time never records a second payment. While an online payment of the order is in progress, it cannot be marked paid or cancelled.",
+          uk: "Скасувати позначку оплати не можна: замовлення не повернеться в «Очікує оплати». Той самий номер переказу вдруге не запише другу оплату. Поки триває онлайн-оплата замовлення, позначити його оплаченим чи скасувати не можна.",
+          en: "Marking paid cannot be undone: the order does not go back to “Awaiting payment”. The same transfer number a second time never records a second payment. While an online payment of the order is in progress, it cannot be marked paid or cancelled.",
+        },
+      },
+      {
+        kind: "heading",
+        id: "customer-says-paid",
+        text: {
+          uk: "Клієнт каже, що заплатив, а статус не оплачено",
+          en: "The customer says they paid, but the order is not paid",
+        },
+      },
+      {
+        kind: "steps",
+        items: [
+          {
+            uk: "Знайдіть замовлення: у списку замовлень введіть його номер або точну адресу email клієнта. Можливо, клієнт оформив два замовлення й оплатив інше.",
+            en: "Find the order: in the order list type its number or the customer's exact email address. The customer may have placed two orders and paid the other one.",
+          },
+          {
+            uk: "Якщо клієнт платив карткою онлайн: відкрийте замовлення й подивіться панель «Онлайн-оплата». «Перевірити статус» питає платіжного провайдера зараз; поки оплата обробляється, зачекайте.",
+            en: "If the customer paid by card online: open the order and look at the “Online payment” panel. “Check status” asks the payment provider now; while a payment is processing, wait.",
+          },
+          {
+            uk: "Відкрийте «Платежі на перевірку»: оплата, що прийшла після скасування чи прострочення замовлення або з іншою сумою, буде там із поясненням, що робити.",
+            en: "Open “Payments to review”: a payment that arrived after the order was cancelled or expired, or with another amount, is listed there with what to do.",
+          },
+          {
+            uk: "Якщо клієнт платив переказом або готівкою і ви бачите гроші на своєму рахунку: «Позначити оплаченим» з номером переказу або квитанції.",
+            en: "If the customer paid by transfer or cash and you see the money in your account: “Mark paid” with the transfer or receipt number.",
+          },
+        ],
+      },
+      { kind: "screen", route: "payments" },
+      {
+        kind: "warning",
+        text: {
+          uk: "Не позначайте оплаченим, поки не побачили гроші на своєму рахунку: знімок екрана від клієнта не доказ, а позначку оплати скасувати не можна. Не позначайте оплаченим замовлення, онлайн-оплата якого ще обробляється (адмінка цього й не дозволить). Не просіть клієнта оформити замовлення ще раз, поки не зʼясуєте: товар буде зарезервовано двічі, а оплата могла дійти до першого замовлення.",
+          en: "Do not mark it paid until you see the money in your account: a screenshot from the customer is no proof, and marking paid cannot be undone. Do not mark paid an order whose online payment is still processing (the admin refuses it anyway). Do not ask the customer to order again until you know: the stock would be reserved twice, and the payment may have reached the first order.",
         },
       },
       { kind: "heading", id: "fulfil", text: { uk: "Позначити виконаним", en: "Mark fulfilled" } },
@@ -222,8 +259,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Шаблон містить провайдер Monobank і тестовий провайдер «fake». «fake» лише для тестів: справжні гроші він не приймає. Monobank поки перевірено лише на імітаторі, не на справжньому рахунку; перед запуском попросіть розробника перевірити його з вашим договором. Екрани налаштувань не показують, який саме провайдер увімкнено; кожна спроба оплати в замовленні називає свого провайдера.",
-          en: "The template has the Monobank provider and the test provider “fake”. “fake” is for tests only: it takes no real money. Monobank has so far been checked only against a simulator, not a real account; before launch, ask your developer to verify it with your merchant contract. The settings screens do not show which provider is on; each payment attempt on an order names its provider.",
+          uk: "Шаблон містить провайдер Monobank і тестовий провайдер «fake». «fake» лише для тестів: справжні гроші він не приймає. Перед запуском попросіть розробника перевірити Monobank з вашим договором. Екрани налаштувань не показують, який саме провайдер увімкнено; кожна спроба оплати в замовленні називає свого провайдера.",
+          en: "The template has the Monobank provider and the test provider “fake”. “fake” is for tests only: it takes no real money. Before launch, ask your developer to verify Monobank with your merchant contract. The settings screens do not show which provider is on; each payment attempt on an order names its provider.",
         },
       },
       { kind: "heading", id: "panel", text: { uk: "Панель оплати", en: "The payment panel" } },
@@ -272,6 +309,18 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         },
       },
       { kind: "screen", route: "payments" },
+      {
+        kind: "heading",
+        id: "developer",
+        text: { uk: "Для розробника", en: "For the developer" },
+      },
+      {
+        kind: "note",
+        text: {
+          uk: "Monobank поки перевірено лише на імітаторі, не на справжньому рахунку.",
+          en: "Monobank has so far been checked only against a simulator, not a real account.",
+        },
+      },
     ],
   },
   {
@@ -347,8 +396,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "warning",
         text: {
-          uk: "Нова пошта підтримує лише пункти видачі (відділення й поштомати): немає доставки за адресою, накладеного платежу і кількох посилок. Підключення перевірено лише на імітаторі; створення накладної у справжньому сервісі ще не підтверджено. Справжній сервіс відповів на запит етикетки помилкою 422, тож «Друкувати етикетку» може не спрацювати (екран скаже, що сервіс недоступний). Тестовий перевізник «fake» — лише для тестів. Перед запуском перевірте все на реальному замовленні.",
-          en: "Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. The connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet. The real service answered the label request with error 422, so “Print label” may fail (the screen says the service is unavailable). The test carrier “fake” is for tests only. Check everything with a real order before launch.",
+          uk: "Нова пошта підтримує лише пункти видачі (відділення й поштомати): немає доставки за адресою, накладеного платежу і кількох посилок. «Друкувати етикетку» може поки не спрацювати (екран скаже, що сервіс недоступний). Тестовий перевізник «fake» — лише для тестів. Перед запуском перевірте все на реальному замовленні.",
+          en: "Nova Post supports pickup points only (branches and lockers): no delivery to an address, no cash on delivery, no several parcels. “Print label” may not work yet (the screen says the service is unavailable). The test carrier “fake” is for tests only. Check everything with a real order before launch.",
         },
       },
       {
@@ -382,6 +431,18 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
         text: {
           uk: "«Скасувати накладну» можна, лише поки накладна в стані «Створено» (ще не в дорозі). Коли налаштовано пошту, покупець отримує лист із номером для відстеження.",
           en: "“Cancel the waybill” works only while the waybill is in the state “Created” (not yet in transit). When email is set up, the shopper receives a mail with the tracking number.",
+        },
+      },
+      {
+        kind: "heading",
+        id: "developer",
+        text: { uk: "Для розробника", en: "For the developer" },
+      },
+      {
+        kind: "note",
+        text: {
+          uk: "Підключення Нової пошти перевірено лише на імітаторі; створення накладної у справжньому сервісі ще не підтверджено, а запит етикетки справжній сервіс відхилив помилкою 422.",
+          en: "The Nova Post connection was checked only against a simulator; creating a waybill in the real service is not confirmed yet, and the real service refused the label request with error 422.",
         },
       },
     ],

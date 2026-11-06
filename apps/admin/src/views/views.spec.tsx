@@ -175,6 +175,18 @@ describe("shell frame", () => {
     expect(html).toContain('role="group" aria-label="§language.label"');
   });
 
+  it("below md keeps the header to one row: language and user controls are behind the Menu button with the navigation", () => {
+    const account = /<div id="admin-account" class="([^"]*)"/.exec(html)?.[1] ?? "";
+    // Closed menu: hidden on a phone, shown from md.
+    expect(account.split(" ")).toContain("hidden");
+    expect(account.split(" ")).toContain("md:flex");
+    expect(html.indexOf("§shell.signOut")).toBeGreaterThan(html.indexOf('id="admin-account"'));
+    expect(html.indexOf('aria-label="§language.label"')).toBeGreaterThan(
+      html.indexOf('id="admin-account"'),
+    );
+    expect(html).toContain('aria-controls="admin-account admin-navigation"');
+  });
+
   it("contains no hardcoded text", () => {
     // The email is data, not UI text.
     expectNoHardcodedText(html.replace("admin@example.com", ""));

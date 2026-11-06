@@ -493,7 +493,7 @@ function CategoryEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.category.deleteTitle", { slug: category.slug })}
+              title={t("dict.category.deleteTitle", { name: title })}
               description={t("dict.category.deleteBody")}
               hint={t("dict.category.deleteHint")}
               confirmLabel={t("dict.category.deleteConfirm")}

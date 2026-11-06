@@ -374,7 +374,10 @@ function AttributeEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.attribute.deleteTitle", { code: attribute.code })}
+              title={t("dict.attribute.deleteTitle", {
+                name:
+                  resolveLocalized(attribute.name, locale, content.defaultLocale) || attribute.code,
+              })}
               description={t("dict.attribute.deleteBody")}
               hint={t("dict.attribute.deleteHint")}
               confirmLabel={t("dict.attribute.deleteConfirm")}

@@ -48,7 +48,7 @@
   "errors.reason.last_owner_cannot_be_demoted": "Останньому активному власнику не можна змінити роль. Спершу призначте власником іншого користувача.",
   "errors.reason.last_owner_cannot_be_deactivated": "Останнього активного власника не можна деактивувати. Спершу призначте власником іншого користувача.",
   "errors.reason.title_invalid": "Назва відсутня або неправильна мовою за замовчуванням.",
-  "errors.reason.slug_missing": "Відсутній слаг.",
+  "errors.reason.slug_missing": "Відсутня адреса сторінки.",
   "errors.reason.default_locale_missing": "Потрібен текст мовою за замовчуванням.",
   "errors.reason.attribute_invalid": "Значення атрибута неправильне.",
   "errors.reason.attribute_assigned": "Атрибут призначено типу товару. Спершу приберіть його з типів товарів.",

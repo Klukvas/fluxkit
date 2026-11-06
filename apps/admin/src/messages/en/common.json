@@ -13,5 +13,7 @@
   "unsaved.description": "Your unsaved changes will be lost.",
   "unsaved.leave": "Leave",
   "unsaved.stay": "Stay",
-  "common.dateChosen": "Chosen: {date}"
+  "common.dateChosen": "Chosen: {date}",
+  "common.dateFormat": "Dates use your browser's format, for example mm/dd/yyyy (month first).",
+  "common.dateTimeFormat": "Dates use your browser's format, for example mm/dd/yyyy hh:mm (month first)."
 }

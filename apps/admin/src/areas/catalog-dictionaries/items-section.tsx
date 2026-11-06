@@ -58,6 +58,14 @@ export const ITEM_MESSAGE_SUFFIXES = [
 
 export type ItemPrefix = "attributeOption" | "optionValue";
 
+/**
+ * How a row is named to a person (the delete dialog): its label in the UI language, else the default language, else its
+ * code (a row without any label). The code is a technical id the shop manager did not choose to read.
+ */
+export function itemName(row: ItemRow, uiLocale: string, defaultLocale: string): string {
+  return resolveLocalized(row.label, uiLocale, defaultLocale) || row.code;
+}
+
 export interface ItemsSectionProps {
   t: Translator;
   prefix: ItemPrefix;
@@ -304,7 +312,9 @@ export function ItemsSection({
             onChanged("unknown");
           }}
           title={t(`dict.${prefix}.deleteTitle`)}
-          description={t(`dict.${prefix}.deleteBody`, { code: toDelete.code })}
+          description={t(`dict.${prefix}.deleteBody`, {
+            name: itemName(toDelete, uiLocale, content.defaultLocale),
+          })}
           hint={t(`dict.${prefix}.deleteHint`)}
           confirmLabel={t(`dict.${prefix}.deleteConfirm`)}
         />

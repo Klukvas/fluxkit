@@ -139,6 +139,24 @@ function expectTarget(label: string, target: { article: string; section?: string
   }
 }
 
+describe("the order card's help (UX round 2)", () => {
+  it("opens the section on a customer who says they paid, which names the field and the review screen", () => {
+    const target = contextHelpFor("orderDetail", null);
+    expect(target).toEqual({ article: "orders", section: "customer-says-paid" });
+    const article = library.articles.find((entry) => entry.id === "orders");
+    expect(article && sectionsOf(article).map((section) => section.id)).toContain(
+      "customer-says-paid",
+    );
+    const words = article
+      ? textsOf(article)
+          .map((entry) => entry.text.uk)
+          .join(" ")
+      : "";
+    expect(words).toContain("Номер переказу або квитанції");
+    expect(words).toContain("Платежі на перевірку");
+  });
+});
+
 describe("links into the help", () => {
   it("points every contextual help entry at an existing article and section", () => {
     const routeIds = new Set(ROUTES.map((route) => route.id));
