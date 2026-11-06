@@ -226,6 +226,28 @@ describe("the banner form", () => {
     expect(html).not.toMatch(/<form[^>]*action=/);
   });
 
+  it("offers copying the main language's text into an empty field of another language only (UX round 2)", () => {
+    const values: BannerFormValues = {
+      ...card,
+      title: { uk: "Розпродаж", en: "" },
+      text: { uk: "Знижки", en: "Already translated" },
+    };
+    const html = form(values);
+    // Only the English title: the English text has its own, the alt text has no main-language text, uk is the main one.
+    expect(html.match(/§banners\.form\.copyDefault</g)).toHaveLength(1);
+    expect(html).toMatch(/<button[^>]*aria-label="§banners\.form\.copyDefaultLabel"[^>]*>/);
+    const englishTitle = html.indexOf('id="banner-title-en"');
+    const button = html.indexOf("§banners.form.copyDefault<");
+    expect(button).toBeGreaterThan(englishTitle);
+    expect(button).toBeLessThan(html.indexOf('id="banner-text-en"'));
+    // The button is named with the field and the language for a screen reader.
+    expect(form(values, {}, en)).toContain(
+      "Copy the main language text (Ukrainian) into “Title (English)”",
+    );
+    // Nothing to copy for a reader.
+    expect(form(values, { canWrite: false })).not.toContain("§banners.form.copyDefault");
+  });
+
   it("card: one fieldset per content locale with title, text and the optional picture description", () => {
     const html = form(card);
     expect(html.match(/<fieldset class="flex flex-col gap-4">/g)).toHaveLength(2);

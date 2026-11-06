@@ -1,6 +1,7 @@
 import { Alert, Button, Checkbox, Field, Input, Textarea, type Translator } from "@fluxkit/ui";
 import type { FormEvent, ReactNode, Ref } from "react";
 import { dateHint } from "../../lib/date-input-echo";
+import { useFocusAfterCommit } from "../../lib/use-focus-after-commit";
 import { firstInvalidControl } from "../../lib/first-invalid";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { safeHttpUrl } from "../../lib/safe-http-url";
@@ -269,6 +270,7 @@ function LocaleText({
   locale,
   extraHint,
   warning,
+  copy,
   onChange,
 }: {
   t: Translator;
@@ -284,41 +286,57 @@ function LocaleText({
   extraHint?: string;
   /** Pointed out, not refused (a language missing on a banner that was already switched on). */
   warning?: string;
+  /** "Copy from the main language" under an empty field of another language whose main-language text exists. */
+  copy?: { label: string; accessibleName: string; onCopy: () => void };
   onChange: (value: string) => void;
 }) {
   const count = t("banners.form.count", { length: codePointLength(value.trim()), limit });
   const hint = [extraHint, count, warning].filter((part) => part !== undefined).join(" ");
   return (
-    <Field
-      id={id}
-      label={label}
-      hint={hint}
-      error={error === undefined ? undefined : describe(t, error)}
-      required={required}
-      requiredIndicator={t("dict.form.requiredMark")}
-    >
-      {(control) =>
-        multiline ? (
-          <Textarea
-            {...control}
-            lang={locale}
-            rows={3}
-            readOnly={readOnly}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          />
-        ) : (
-          <Input
-            {...control}
-            lang={locale}
-            readOnly={readOnly}
-            autoComplete="off"
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-          />
-        )
-      }
-    </Field>
+    <div className="flex flex-col gap-2">
+      <Field
+        id={id}
+        label={label}
+        hint={hint}
+        error={error === undefined ? undefined : describe(t, error)}
+        required={required}
+        requiredIndicator={t("dict.form.requiredMark")}
+      >
+        {(control) =>
+          multiline ? (
+            <Textarea
+              {...control}
+              lang={locale}
+              rows={3}
+              readOnly={readOnly}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+            />
+          ) : (
+            <Input
+              {...control}
+              lang={locale}
+              readOnly={readOnly}
+              autoComplete="off"
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+            />
+          )
+        }
+      </Field>
+      {copy === undefined ? null : (
+        <div>
+          <Button
+            variant="secondary"
+            className="min-h-11 px-3 py-1 text-sm"
+            aria-label={copy.accessibleName}
+            onClick={copy.onCopy}
+          >
+            {copy.label}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -355,6 +373,33 @@ export function BannerFormView({
   const setText = (field: "title" | "text" | "imageAlt", locale: string, text: string) =>
     onChange({ ...values, [field]: { ...values[field], [locale]: text } });
   const ended = warnings.some((warning) => warning.kind === "ended");
+  const focusAfterCommit = useFocusAfterCommit();
+  const defaultLanguage = languageName(content.defaultLocale, uiLocale);
+  /**
+   * The copy button of a text of another language (UX round 2: every language is needed to switch a banner on): only for a
+   * writer, under an empty field, when the main language has text. The button goes away with the copy, so the focus moves
+   * to the filled field (never to the page), where the admin goes on to translate it.
+   */
+  const copyFrom = (
+    field: "title" | "text" | "imageAlt",
+    locale: string,
+    fieldLabel: string,
+  ): { label: string; accessibleName: string; onCopy: () => void } | undefined => {
+    const source = values[field][content.defaultLocale] ?? "";
+    if (readOnly || locale === content.defaultLocale) return undefined;
+    if (source.trim() === "" || (values[field][locale] ?? "").trim() !== "") return undefined;
+    return {
+      label: t("banners.form.copyDefault", { language: defaultLanguage }),
+      accessibleName: t("banners.form.copyDefaultLabel", {
+        language: defaultLanguage,
+        field: fieldLabel,
+      }),
+      onCopy: () => {
+        setText(field, locale, source);
+        focusAfterCommit(`banner-${field}-${locale}`);
+      },
+    };
+  };
   /**
    * A locale's error, and for the default locale also a refusal of the whole field (`title`, `text`, `imageAlt`), so
    * "check the marked fields" always has a marked field.
@@ -467,6 +512,11 @@ export function BannerFormView({
           const isDefault = locale === content.defaultLocale;
           // Required by the rule that blocks the save (`activationRequires`); a mere warning never shows the mark.
           const requiredHere = isDefault || activationRequires(values, locale, initial);
+          const titleLabel = t("banners.form.title", { language });
+          const textLabel = t("banners.form.text", { language });
+          const altLabel = card
+            ? t("banners.form.altCard", { language })
+            : t("banners.form.altImage", { language });
           return (
             <fieldset key={locale} className="flex flex-col gap-4">
               <legend className="mb-1 text-lg font-semibold text-foreground">
@@ -479,7 +529,7 @@ export function BannerFormView({
                   <LocaleText
                     t={t}
                     id={`banner-title-${locale}`}
-                    label={t("banners.form.title", { language })}
+                    label={titleLabel}
                     value={values.title[locale] ?? ""}
                     limit={BANNER_LIMITS.titleMaxLength}
                     required={requiredHere}
@@ -488,12 +538,13 @@ export function BannerFormView({
                     error={textError("title", locale)}
                     warning={missingLanguage(`title.${locale}`)}
                     locale={locale}
+                    copy={copyFrom("title", locale, titleLabel)}
                     onChange={(text) => setText("title", locale, text)}
                   />
                   <LocaleText
                     t={t}
                     id={`banner-text-${locale}`}
-                    label={t("banners.form.text", { language })}
+                    label={textLabel}
                     value={values.text[locale] ?? ""}
                     limit={BANNER_LIMITS.textMaxLength}
                     required={false}
@@ -501,6 +552,7 @@ export function BannerFormView({
                     readOnly={readOnly}
                     error={textError("text", locale)}
                     locale={locale}
+                    copy={copyFrom("text", locale, textLabel)}
                     onChange={(text) => setText("text", locale, text)}
                   />
                 </>
@@ -508,11 +560,7 @@ export function BannerFormView({
               <LocaleText
                 t={t}
                 id={`banner-imageAlt-${locale}`}
-                label={
-                  card
-                    ? t("banners.form.altCard", { language })
-                    : t("banners.form.altImage", { language })
-                }
+                label={altLabel}
                 extraHint={
                   card
                     ? t("banners.form.altCardHint")
@@ -527,6 +575,7 @@ export function BannerFormView({
                 error={textError("imageAlt", locale)}
                 warning={missingLanguage(`imageAlt.${locale}`)}
                 locale={locale}
+                copy={copyFrom("imageAlt", locale, altLabel)}
                 onChange={(text) => setText("imageAlt", locale, text)}
               />
             </fieldset>

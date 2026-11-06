@@ -81,6 +81,8 @@
   "banners.form.timeGap": "Такого часу у вашому часовому поясі немає (годинник переводять вперед): буде збережено {time}.",
   "banners.form.timeAmbiguous": "Цей час у вашому часовому поясі настає двічі (годинник переводять назад): використано перший, {time}.",
   "banners.form.missingLanguage": "Порожньо цією мовою, хоча банер увімкнено: покупці цієї мови бачать текст основної мови.",
+  "banners.form.copyDefault": "Скопіювати з основної мови ({language})",
+  "banners.form.copyDefaultLabel": "Скопіювати в поле «{field}» текст основної мови ({language})",
   "banners.form.create": "Створити банер",
   "banners.link.empty": "Вкажіть посилання.",
   "banners.link.too_long": "Посилання задовге: не більше 2048 символів.",
