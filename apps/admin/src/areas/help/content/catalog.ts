@@ -530,13 +530,13 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "heading",
         id: "capacity",
-        text: { uk: "Пропускна здатність пошуку в магазині", en: "Store search capacity" },
+        text: { uk: "Навантаження на пошук", en: "Load on search" },
       },
       {
         kind: "paragraph",
         text: {
-          uk: "Блок показує, скільки пошуків сервер обробляє одночасно, найбільші значення і скільки пошуків відхилено та чому. Лічильники ведуться з останнього запуску сервера. Якщо пошуки часто відхиляються, а в сервера є вільна потужність процесора, розробник може збільшити ліміт у налаштуваннях.",
-          en: "The block shows how many searches the server handles at once, the peaks, and how many searches were turned away and why. The counters run since the server last started. If searches are often turned away and the server has spare processor capacity, your developer can raise the limit in the configuration.",
+          uk: "Блок показує, скільки пошуків пошукова служба обробляє одночасно (ліміт одночасних запитів), найбільші значення і скільки пошуків відхилено та чому. Лічильники ведуться з останнього запуску сервера. Якщо пошуки часто відхиляються, а в сервера є вільна потужність процесора, розробник може збільшити ліміт у налаштуваннях.",
+          en: "The block shows how many searches the search service handles at once (the concurrent request limit), the peaks, and how many searches were turned away and why. The counters run since the server last started. If searches are often turned away and the server has spare processor capacity, your developer can raise the limit in the configuration.",
         },
       },
       {
