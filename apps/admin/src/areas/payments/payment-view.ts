@@ -153,21 +153,17 @@ export function offeredPaymentActions(
  */
 export function closedOrderMoneyNote(
   orderStatus: string,
-  payments: readonly Pick<
-    AdminPayment,
-    "status" | "refundableAmount" | "attentionCode" | "refunds"
-  >[],
+  payments: readonly Pick<AdminPayment, "status" | "refundableAmount" | "refunds">[],
 ): "refund" | "automatic" | null {
   if (orderStatus !== "cancelled" && orderStatus !== "expired") return null;
   const held = payments.filter(
     (payment) => payment.status === "succeeded" && payment.refundableAmount.amount > 0,
   );
   if (held.length === 0) return null;
-  const automatic = held.every(
-    (payment) =>
-      payment.attentionCode === "late_payment" ||
-      payment.attentionCode === "duplicate_payment" ||
-      payment.refunds.some((refund) => refund.reason !== "admin" && refund.status !== "failed"),
+  // Only a refund the shop queued itself that has not failed counts: a failed one is never retried (it frees its amount),
+  // and an attention code stays after the item is closed, so neither says the money is on its way back (review M1).
+  const automatic = held.every((payment) =>
+    payment.refunds.some((refund) => refund.reason !== "admin" && refund.status !== "failed"),
   );
   return automatic ? "automatic" : "refund";
 }

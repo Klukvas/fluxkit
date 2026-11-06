@@ -35,6 +35,20 @@ describe("closedOrderMoneyNote (a cancelled or expired order that still holds a 
     });
     expect(closedOrderMoneyNote("expired", [late])).toBe("automatic");
   });
+
+  it("asks for a refund by hand when the automatic refund failed (it is never retried)", () => {
+    const failed = paymentFixture({
+      needsAttention: true,
+      attentionCode: "late_payment",
+      refunds: [refundFixture({ status: "failed", reason: "late_payment" })],
+    });
+    expect(closedOrderMoneyNote("expired", [failed])).toBe("refund");
+  });
+
+  it("asks for a refund by hand when an attention code is kept but no automatic refund exists", () => {
+    const cleared = paymentFixture({ attentionCode: "duplicate_payment", refunds: [] });
+    expect(closedOrderMoneyNote("cancelled", [cleared])).toBe("refund");
+  });
 });
 import {
   PAYMENT_ACTION_OPERATIONS,
