@@ -97,7 +97,7 @@ function AuditResults({
 
 /** `/audit`: what admins did (owner only, `users.manage`); filters live in the URL, older events load on request. */
 export function AuditLogPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   const query = readAuditQuery(params);
   const queryKey = writeAuditQuery(query);
@@ -114,6 +114,7 @@ export function AuditLogPage() {
       <AuditFilterForm
         key={`filters${queryKey}`}
         t={t}
+        uiLocale={locale}
         query={query}
         adminEmails={adminEmails}
         rangeError={request.ok ? null : { field: request.field, reason: request.reason }}

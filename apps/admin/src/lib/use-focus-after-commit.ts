@@ -1,7 +1,10 @@
 import { useCallback, useLayoutEffect, useState, type RefObject } from "react";
 
-/** What to focus: the id of an element, or a ref to it. */
-export type FocusTarget = string | RefObject<HTMLElement | null>;
+/**
+ * What to focus: the id of an element, a ref to it, or a function that finds it in the commit (for a target that depends
+ * on what the commit rendered, such as the first field marked invalid).
+ */
+export type FocusTarget = string | RefObject<HTMLElement | null> | (() => HTMLElement | null);
 
 interface FocusRequest {
   target: FocusTarget;
@@ -10,7 +13,8 @@ interface FocusRequest {
 }
 
 function resolve(target: FocusTarget): HTMLElement | null {
-  return typeof target === "string" ? document.getElementById(target) : target.current;
+  if (typeof target === "string") return document.getElementById(target);
+  return typeof target === "function" ? target() : target.current;
 }
 
 /**

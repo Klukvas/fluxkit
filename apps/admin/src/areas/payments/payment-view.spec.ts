@@ -10,7 +10,46 @@ import {
   ROLE_PERMISSIONS,
 } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
-import { paymentFixture } from "../../test-helpers";
+import { paymentFixture, refundFixture } from "../../test-helpers";
+
+describe("closedOrderMoneyNote (a cancelled or expired order that still holds a captured payment)", () => {
+  it("says nothing for an open or fulfilled order, or when no money is held", () => {
+    expect(closedOrderMoneyNote("paid", [paymentFixture()])).toBeNull();
+    expect(closedOrderMoneyNote("fulfilled", [paymentFixture()])).toBeNull();
+    expect(closedOrderMoneyNote("cancelled", [])).toBeNull();
+    expect(closedOrderMoneyNote("cancelled", [paymentFixture({ status: "failed" })])).toBeNull();
+    const refunded = paymentFixture({ refundableAmount: { amount: 0, currency: "UAH" } });
+    expect(closedOrderMoneyNote("cancelled", [refunded])).toBeNull();
+  });
+
+  it("asks for a refund by hand when the shop holds money of a cancelled order (nothing is refunded automatically)", () => {
+    expect(closedOrderMoneyNote("cancelled", [paymentFixture()])).toBe("refund");
+    expect(closedOrderMoneyNote("expired", [paymentFixture()])).toBe("refund");
+  });
+
+  it("points to the automatic refund of a late or duplicate payment that is still on its way", () => {
+    const late = paymentFixture({
+      needsAttention: true,
+      attentionCode: "late_payment",
+      refunds: [refundFixture({ status: "requested", reason: "late_payment" })],
+    });
+    expect(closedOrderMoneyNote("expired", [late])).toBe("automatic");
+  });
+
+  it("asks for a refund by hand when the automatic refund failed (it is never retried)", () => {
+    const failed = paymentFixture({
+      needsAttention: true,
+      attentionCode: "late_payment",
+      refunds: [refundFixture({ status: "failed", reason: "late_payment" })],
+    });
+    expect(closedOrderMoneyNote("expired", [failed])).toBe("refund");
+  });
+
+  it("asks for a refund by hand when an attention code is kept but no automatic refund exists", () => {
+    const cleared = paymentFixture({ attentionCode: "duplicate_payment", refunds: [] });
+    expect(closedOrderMoneyNote("cancelled", [cleared])).toBe("refund");
+  });
+});
 import {
   PAYMENT_ACTION_OPERATIONS,
   PAYMENT_ATTENTION_CODES,
@@ -23,6 +62,7 @@ import {
   REFUND_STATUS_LIST,
   REFUND_STATUS_TONES,
   attentionCodeKey,
+  closedOrderMoneyNote,
   hasSucceededPayment,
   offeredPaymentActions,
   paymentEntryActor,

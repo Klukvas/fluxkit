@@ -18,6 +18,7 @@ import { primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
 import type { ContentLocales } from "../catalog-dictionaries/form-parts";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import { BANNER_LIMITS } from "./banner-rules";
+import { bannerVisibility } from "./banner-visibility";
 
 const STATE_TONE: Record<AdminHomeBannerState, StatusTone> = {
   live: "success",
@@ -106,6 +107,7 @@ export function BannerListView({
     );
   }
   const draggable = canWrite && banners.length > 1;
+  const visibility = bannerVisibility(banners, BANNER_LIMITS.maxShown);
   return (
     <div className="flex flex-col gap-4">
       {full ? (
@@ -199,22 +201,31 @@ export function BannerListView({
                   </Link>
                 </h2>
                 <p className="flex flex-wrap items-center gap-2">
-                  <StatusBadge
-                    tone={STATE_TONE[banner.state]}
-                    label={t(`banners.state.${banner.state}`)}
-                  />
-                  {banner.shownOnStorefront ? (
+                  {/* A live banner after the first 3 live ones is NOT on the home page: its state says so, never "Live now". */}
+                  {visibility[index] === "liveNotShown" ? (
+                    <StatusBadge
+                      tone="warning"
+                      label={t("banners.list.liveNotShown", { shown: BANNER_LIMITS.maxShown })}
+                    />
+                  ) : (
+                    <StatusBadge
+                      tone={STATE_TONE[banner.state]}
+                      label={t(`banners.state.${banner.state}`)}
+                    />
+                  )}
+                  {visibility[index] === "shown" ? (
                     <Badge variant="success">{t("banners.list.shown")}</Badge>
-                  ) : banner.state === "live" ? (
-                    <Badge>
-                      {t("banners.list.liveNotShown", { shown: BANNER_LIMITS.maxShown })}
-                    </Badge>
                   ) : null}
                   <span className="text-sm text-muted-foreground">
                     {t(`banners.layout.${banner.layout}`)}
                   </span>
                 </p>
                 <p className="text-sm text-muted-foreground">{windowText(t, banner, uiLocale)}</p>
+                {visibility[index] === "behindShown" ? (
+                  <p className="text-sm text-foreground">
+                    {t("banners.list.behindShown", { shown: BANNER_LIMITS.maxShown })}
+                  </p>
+                ) : null}
               </div>
               {canWrite ? (
                 <div className="flex flex-wrap gap-2">

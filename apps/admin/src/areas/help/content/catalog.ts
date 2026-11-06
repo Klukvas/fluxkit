@@ -233,8 +233,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
         kind: "steps",
         items: [
           {
-            uk: "«Створити відсутні варіанти» створює поєднання, яких ще немає (повторне натискання нічого не дублює).",
-            en: "“Generate missing variants” creates the combinations that do not exist yet (pressing it again duplicates nothing).",
+            uk: "«Створити відсутні варіанти» створює поєднання, яких ще немає (повторне натискання нічого не дублює). Товар без опцій має лише один варіант, тому цих кнопок у нього немає: щоб продавати, наприклад, 50 г і 100 г, дозвольте опцію в типі товару й оберіть її значення на вкладці «Опції».",
+            en: "“Generate missing variants” creates the combinations that do not exist yet (pressing it again duplicates nothing). A product without options has one variant only, so it has no such buttons: to sell, say, 50 g and 100 g, allow an option in the product type and choose its values on the Options tab.",
           },
           {
             uk: "Кнопка редагування в рядку: артикул, штрихкод, увімкнений, «Рахувати залишки», «Продавати понад наявний залишок», атрибути варіанта.",

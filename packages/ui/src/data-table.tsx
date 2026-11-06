@@ -1,6 +1,9 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { createContext, useContext, useId, type ReactNode } from "react";
 import { cn } from "./cn";
 import { Skeleton } from "./skeleton";
+import { focusRing } from "./styles";
 import { VisuallyHidden } from "./visually-hidden";
 
 export interface DataTableColumn<Row> {
@@ -32,6 +35,13 @@ export interface DataTableProps<Row> {
   actions?: { header: ReactNode; render: (row: Row) => ReactNode };
 }
 
+/**
+ * A short text the app provides once (its own words, for example "Swipe the table sideways to see every column"): every
+ * table shows it above itself on small screens, where a wide table scrolls inside its box and its right part is out of
+ * view. `null` (the default): no hint.
+ */
+export const DataTableScrollHint = createContext<ReactNode>(null);
+
 const cellClasses = "px-3 py-2 align-top";
 const alignClass = (align: DataTableColumn<unknown>["align"]): string | false =>
   align === "end" && "text-end";
@@ -58,101 +68,123 @@ export function DataTable<Row>({
     throw new Error(`DataTable: row header column "${rowHeaderId}" is not one of the columns`);
   }
   const columnCount = columns.length + (actions ? 1 : 0);
+  const scrollHint = useContext(DataTableScrollHint);
+  const hasHint = scrollHint !== null && scrollHint !== undefined;
+  const captionId = useId();
+  const hintId = useId();
 
   return (
-    <div className="overflow-x-auto">
-      <table aria-busy={loading || undefined} className="w-full text-start">
-        <caption
-          className={cn(
-            captionHidden ? "sr-only" : "pb-2 text-start font-semibold text-foreground",
-          )}
-        >
-          {caption}
-        </caption>
-        <thead>
-          <tr className="bg-muted text-foreground">
-            {columns.map((column) => (
-              <th
-                key={column.id}
-                scope="col"
-                className={cn(
-                  cellClasses,
-                  "font-semibold",
-                  alignClass(column.align) || "text-start",
-                )}
-              >
-                {column.header}
-              </th>
-            ))}
-            {actions ? (
-              <th scope="col" className={cn(cellClasses, "text-end")}>
-                <VisuallyHidden>{actions.header}</VisuallyHidden>
-              </th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {loading ? (
-            Array.from({ length: loadingRowCount }, (_, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-border">
-                {columns.map((column) => {
-                  const skeleton = <Skeleton className="h-5 w-full" />;
-                  return column.id === rowHeaderId ? (
-                    <th key={column.id} scope="row" className={cn(cellClasses, "text-start")}>
-                      {rowIndex === 0 && loadingLabel ? (
-                        <VisuallyHidden>{loadingLabel}</VisuallyHidden>
-                      ) : null}
-                      {skeleton}
-                    </th>
-                  ) : (
-                    <td key={column.id} className={cellClasses}>
-                      {skeleton}
-                    </td>
-                  );
-                })}
-                {actions ? (
-                  <td className={cellClasses}>
-                    <Skeleton className="ms-auto h-5 w-12" />
-                  </td>
-                ) : null}
-              </tr>
-            ))
-          ) : rows.length === 0 ? (
-            <tr>
-              <td colSpan={columnCount} className="p-6 text-center text-muted-foreground">
-                {emptyMessage}
-              </td>
+    <div>
+      {hasHint ? (
+        <p id={hintId} className="pb-1 text-sm text-muted-foreground md:hidden">
+          {scrollHint}
+        </p>
+      ) : null}
+      {/* `relative`: the containing block of the visually hidden (absolutely positioned) texts, so they scroll with the
+          table instead of stretching the page sideways. A focusable region named by the caption, so a keyboard can scroll
+          it where the browser does not (Firefox, Safari); it is a Tab stop even when nothing overflows (measuring that
+          would need a resize observer in every table). */}
+      <div
+        role="region"
+        tabIndex={0}
+        aria-labelledby={captionId}
+        aria-describedby={hasHint ? hintId : undefined}
+        className={cn("relative overflow-x-auto", focusRing)}
+      >
+        <table aria-busy={loading || undefined} className="w-full text-start">
+          <caption
+            id={captionId}
+            className={cn(
+              captionHidden ? "sr-only" : "pb-2 text-start font-semibold text-foreground",
+            )}
+          >
+            {caption}
+          </caption>
+          <thead>
+            <tr className="bg-muted text-foreground">
+              {columns.map((column) => (
+                <th
+                  key={column.id}
+                  scope="col"
+                  className={cn(
+                    cellClasses,
+                    "font-semibold",
+                    alignClass(column.align) || "text-start",
+                  )}
+                >
+                  {column.header}
+                </th>
+              ))}
+              {actions ? (
+                <th scope="col" className={cn(cellClasses, "text-end")}>
+                  <VisuallyHidden>{actions.header}</VisuallyHidden>
+                </th>
+              ) : null}
             </tr>
-          ) : (
-            rows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-border">
-                {columns.map((column) =>
-                  column.id === rowHeaderId ? (
-                    <th
-                      key={column.id}
-                      scope="row"
-                      className={cn(
-                        cellClasses,
-                        "font-medium",
-                        alignClass(column.align) || "text-start",
-                      )}
-                    >
-                      {column.cell(row)}
-                    </th>
-                  ) : (
-                    <td key={column.id} className={cn(cellClasses, alignClass(column.align))}>
-                      {column.cell(row)}
+          </thead>
+          <tbody>
+            {loading ? (
+              Array.from({ length: loadingRowCount }, (_, rowIndex) => (
+                <tr key={rowIndex} className="border-b border-border">
+                  {columns.map((column) => {
+                    const skeleton = <Skeleton className="h-5 w-full" />;
+                    return column.id === rowHeaderId ? (
+                      <th key={column.id} scope="row" className={cn(cellClasses, "text-start")}>
+                        {rowIndex === 0 && loadingLabel ? (
+                          <VisuallyHidden>{loadingLabel}</VisuallyHidden>
+                        ) : null}
+                        {skeleton}
+                      </th>
+                    ) : (
+                      <td key={column.id} className={cellClasses}>
+                        {skeleton}
+                      </td>
+                    );
+                  })}
+                  {actions ? (
+                    <td className={cellClasses}>
+                      <Skeleton className="ms-auto h-5 w-12" />
                     </td>
-                  ),
-                )}
-                {actions ? (
-                  <td className={cn(cellClasses, "text-end")}>{actions.render(row)}</td>
-                ) : null}
+                  ) : null}
+                </tr>
+              ))
+            ) : rows.length === 0 ? (
+              <tr>
+                <td colSpan={columnCount} className="p-6 text-center text-muted-foreground">
+                  {emptyMessage}
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
+            ) : (
+              rows.map((row) => (
+                <tr key={rowKey(row)} className="border-b border-border">
+                  {columns.map((column) =>
+                    column.id === rowHeaderId ? (
+                      <th
+                        key={column.id}
+                        scope="row"
+                        className={cn(
+                          cellClasses,
+                          "font-medium",
+                          alignClass(column.align) || "text-start",
+                        )}
+                      >
+                        {column.cell(row)}
+                      </th>
+                    ) : (
+                      <td key={column.id} className={cn(cellClasses, alignClass(column.align))}>
+                        {column.cell(row)}
+                      </td>
+                    ),
+                  )}
+                  {actions ? (
+                    <td className={cn(cellClasses, "text-end")}>{actions.render(row)}</td>
+                  ) : null}
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

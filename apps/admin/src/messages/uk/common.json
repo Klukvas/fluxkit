@@ -12,5 +12,6 @@
   "unsaved.title": "Залишити сторінку?",
   "unsaved.description": "Незбережені зміни буде втрачено.",
   "unsaved.leave": "Залишити",
-  "unsaved.stay": "Залишитися"
+  "unsaved.stay": "Залишитися",
+  "common.dateChosen": "Обрано: {date}"
 }

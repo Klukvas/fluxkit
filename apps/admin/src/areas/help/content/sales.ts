@@ -102,8 +102,8 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Коли товар відправлено чи видано, натисніть «Позначити виконаним». Якщо в замовленні є товар під замовлення, якого ще немає на складі, дію буде відхилено: спершу оприбуткуйте його. Створення накладної статус не змінює.",
-          en: "When the goods are shipped or handed over, press “Mark fulfilled”. If the order has a backordered line that is not on hand yet, it is refused: receive the stock first. Creating a waybill does not change the status.",
+          uk: "Порядок такий: спершу накладна (якщо відправляєте перевізником), потім «Позначити виконаним». Для виконаного замовлення накладну створити вже не можна, а створення накладної статус не змінює. Коли товар відправлено чи видано, натисніть «Позначити виконаним». Якщо в замовленні є товар під замовлення, якого ще немає на складі, дію буде відхилено: спершу оприбуткуйте його.",
+          en: "The order is: first the waybill (when a carrier ships it), then “Mark fulfilled”. A fulfilled order cannot get a waybill any more, and creating a waybill does not change the status. When the goods are shipped or handed over, press “Mark fulfilled”. If the order has a backordered line that is not on hand yet, it is refused: receive the stock first.",
         },
       },
       {

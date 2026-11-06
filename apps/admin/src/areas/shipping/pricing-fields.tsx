@@ -102,6 +102,7 @@ export function PricingFields({
       <Field
         id={`${idPrefix}-type`}
         label={t("ship.pricing.type")}
+        hint={t("ship.pricing.typeHint")}
         required
         requiredIndicator={t("dict.form.requiredMark")}
       >

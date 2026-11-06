@@ -16,8 +16,11 @@ import {
 export interface FormSubmit {
   state: SubmitState;
   summaryRef: RefObject<HTMLDivElement | null>;
-  /** Shows local issues (and moves the focus to the summary). Nothing is sent. */
-  showIssues: (issues: FormIssues) => void;
+  /**
+   * Shows local issues and moves the focus to the summary, or to `focus` when given (a form that leads to its first invalid
+   * field; it falls back to the summary when that finds nothing). Nothing is sent.
+   */
+  showIssues: (issues: FormIssues, focus?: () => HTMLElement | null) => void;
   /**
    * Runs one write once; the outcome says what the screen does next. Never repeats the write. While a write of this form
    * runs, another submit sends nothing, leaves the state alone and answers `aborted` (nothing to act on).
@@ -89,11 +92,13 @@ export function useFormSubmit(
   const focusSummary = useCallback(() => focusAfterCommit(summaryRef), [focusAfterCommit]);
 
   const showIssues = useCallback(
-    (issues: FormIssues) => {
+    (issues: FormIssues, focus?: () => HTMLElement | null) => {
       setState(stateWithIssues(issues));
-      focusSummary();
+      if (focus === undefined) focusSummary();
+      // Resolved in the commit that marks the fields, so the first marked field exists when it is looked up.
+      else focusAfterCommit(() => focus() ?? summaryRef.current);
     },
-    [focusSummary],
+    [focusSummary, focusAfterCommit],
   );
 
   // One writer (and so one single flight) for the life of the form; `crash` and `focusSummary` are stable.

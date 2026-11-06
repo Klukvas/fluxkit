@@ -50,6 +50,9 @@ describe("product general form screen", () => {
     const html = render("create", true);
     expect(html).toMatch(/<form\b[^>]*method="post"/);
     expect(html).not.toMatch(/<form[^>]*action=/);
+    // The app's own messages and summary, never the browser's bubbles; a live length count under each title.
+    expect(html).toMatch(/<form\b[^>]*novalidate/i);
+    expect(html.match(/§products\.form\.titleCount/g)).toHaveLength(2);
     expect(tagOf(html, "product-title-uk")).toContain("required");
     expect(tagOf(html, "product-title-en")).not.toContain("required");
     expect(tagOf(html, "product-slug")).not.toContain("required");

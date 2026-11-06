@@ -7,6 +7,7 @@ import type {
 } from "@fluxkit/api-client";
 import {
   Button,
+  ConfirmDialog,
   DataTable,
   Field,
   Input,
@@ -432,6 +433,8 @@ function PricesEditor({
   const initial = useMemo(() => gridFrom(stored, context), [stored, context]);
   const [grid, setGrid] = useState(initial);
   const [removal, setRemoval] = useState<PriceRemoval | null>(null);
+  // How many changed cells would store the price 0, while the admin is asked about them (`null`: no question open).
+  const [zeroAsk, setZeroAsk] = useState<number | null>(null);
   const sentKeys = useRef<readonly string[]>([]);
   const fieldNames = useMemo(
     () =>
@@ -453,8 +456,14 @@ function PricesEditor({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    save(false);
+  }
+
+  function save(zeroConfirmed: boolean) {
     void savePrices({
       busy: form.state.busy || form.pending(),
+      zeroConfirmed,
+      confirmZero: (keys) => setZeroAsk(keys.length),
       plan: () => planPriceSave(grid, stored, context),
       showIssues: (planIssues) => form.showIssues(issuesOf(planIssues)),
       nothingChanged: () => {
@@ -533,6 +542,18 @@ function PricesEditor({
           confirmLabel={t("products.prices.remove")}
         />
       )}
+      <ConfirmDialog
+        open={zeroAsk !== null}
+        onClose={() => setZeroAsk(null)}
+        onConfirm={() => {
+          setZeroAsk(null);
+          save(true);
+        }}
+        title={t("products.prices.zeroTitle")}
+        description={t.plural("products.prices.zeroBody", zeroAsk ?? 1)}
+        confirmLabel={t("products.prices.zeroConfirm")}
+        cancelLabel={t("products.prices.zeroCancel")}
+      />
       <UnsavedChangesDialog blocker={blocker} />
     </>
   );

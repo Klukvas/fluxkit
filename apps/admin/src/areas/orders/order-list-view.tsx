@@ -14,6 +14,7 @@ import {
 } from "@fluxkit/ui";
 import type { FormEvent, ReactNode } from "react";
 import { Link } from "react-router";
+import { dateHint } from "../../lib/date-input-echo";
 import { formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, buildPath } from "../../router/paths";
@@ -64,6 +65,8 @@ export interface OrderListViewProps {
   onToChange: (day: string) => void;
   /** The list without the customer filter (the chip's remove link). */
   hrefWithoutCustomer: string;
+  /** The UI language: the date fields repeat the chosen day in it (`dateHint`); none without it. */
+  uiLocale?: string;
 }
 
 /**
@@ -83,6 +86,7 @@ export function OrderListView({
   onFromChange,
   onToChange,
   hrefWithoutCustomer,
+  uiLocale,
 }: OrderListViewProps) {
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -140,6 +144,7 @@ export function OrderListView({
         <Field
           id="order-placed-from"
           label={t("order.list.placedFrom")}
+          hint={dateHint(t, query.from, uiLocale)}
           error={rangeError?.field === "from" ? rangeMessage : undefined}
         >
           {(control) => (
@@ -157,6 +162,7 @@ export function OrderListView({
         <Field
           id="order-placed-to"
           label={t("order.list.placedTo")}
+          hint={dateHint(t, query.to, uiLocale)}
           error={rangeError?.field === "to" ? rangeMessage : undefined}
         >
           {(control) => (

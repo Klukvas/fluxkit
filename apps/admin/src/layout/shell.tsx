@@ -1,6 +1,15 @@
 import type { AdminOperationPermission } from "@fluxkit/api-client";
-import { LiveRegion, SideNav, SkipLink, type SideNavGroup, type Translator } from "@fluxkit/ui";
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import {
+  Button,
+  DataTableScrollHint,
+  LiveRegion,
+  SideNav,
+  SkipLink,
+  cn,
+  type SideNavGroup,
+  type Translator,
+} from "@fluxkit/ui";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, Outlet, useLocation, useMatches, useNavigation } from "react-router";
 import { useI18n } from "../i18n/i18n-context";
 import { PageTitleProvider, type PageTitleOverride } from "../i18n/page-title";
@@ -44,8 +53,13 @@ export interface ShellFrameProps {
   navigating: boolean;
   /** The link to the help of the current page (`ContextHelpLink`), above the page; none on screens without one. */
   contextHelp?: ReactNode;
+  /** Changes with every navigation (`location.key`, also a link to the page shown): the small-screen menu closes. */
+  navigationKey?: string;
   children: ReactNode;
 }
+
+/** The id of the navigation panel the small-screen Menu button opens and closes. */
+export const NAVIGATION_PANEL_ID = "admin-navigation";
 
 /** "Help for this page": the article (and section) of the screen, from `context-help.ts`. */
 export function ContextHelpLink({ t, href }: { t: Translator; href: string }) {
@@ -76,8 +90,17 @@ export function ShellFrame({
   userMenu,
   navigating,
   contextHelp,
+  navigationKey,
   children,
 }: ShellFrameProps) {
+  // Below `md` the navigation is behind a Menu button (it filled the whole first screen of a phone); from `md` it is always
+  // shown and the button is hidden. It closes when the page changes, on Escape (the focus goes back to the button) and with
+  // the button.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [navigationKey]);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SkipLink targetId="main">{t("shell.skipLink")}</SkipLink>
@@ -86,6 +109,16 @@ export function ShellFrame({
           <Link to={PATHS.home} className="text-lg font-semibold text-foreground">
             {t("app.name")}
           </Link>
+          <Button
+            ref={menuButton}
+            variant="secondary"
+            className="md:hidden"
+            aria-expanded={menuOpen}
+            aria-controls={NAVIGATION_PANEL_ID}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {t(menuOpen ? "shell.menuClose" : "shell.menuOpen")}
+          </Button>
           <div className="flex flex-wrap items-center gap-4">
             {languageSwitch}
             {userMenu}
@@ -93,7 +126,19 @@ export function ShellFrame({
         </div>
       </header>
       <div className="flex flex-col md:flex-row">
-        <aside className="border-b border-border p-4 md:w-64 md:shrink-0 md:border-e md:border-b-0">
+        <aside
+          id={NAVIGATION_PANEL_ID}
+          className={cn(
+            "border-b border-border p-4 md:block md:w-64 md:shrink-0 md:border-e md:border-b-0",
+            menuOpen ? "block" : "hidden",
+          )}
+          onKeyDown={(event) => {
+            if (event.key === "Escape" && menuOpen) {
+              setMenuOpen(false);
+              menuButton.current?.focus();
+            }
+          }}
+        >
           <SideNav
             label={t("shell.navLabel")}
             groups={navigation}
@@ -104,12 +149,14 @@ export function ShellFrame({
             )}
           />
         </aside>
-        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-6">
+        <main id="main" tabIndex={-1} className="min-w-0 flex-1 p-4 md:p-6">
           <LiveRegion visuallyHidden>{navigating ? t("shell.navigating") : null}</LiveRegion>
           {contextHelp === undefined || contextHelp === null ? null : (
             <div className="mb-2 flex justify-end">{contextHelp}</div>
           )}
-          {children}
+          <DataTableScrollHint.Provider value={t("shell.tableScrollHint")}>
+            {children}
+          </DataTableScrollHint.Provider>
         </main>
       </div>
     </div>
@@ -177,6 +224,7 @@ export function Shell() {
             languageSwitch={<LanguageSwitch />}
             userMenu={<UserMenu />}
             navigating={navigation.state === "loading"}
+            navigationKey={location.key}
             contextHelp={
               help === null ? null : (
                 <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />

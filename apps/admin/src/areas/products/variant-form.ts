@@ -151,12 +151,27 @@ export function combinationTaken(product: AdminProduct, valueIds: readonly strin
   );
 }
 
-/** Early feedback: a value per option (`optionValueIds.<optionId>`), a free combination, a valid SKU when typed. */
+/**
+ * A product without options has exactly one variant (its default): every further variant would have the same, empty,
+ * combination. Generating and adding variants need an option allowed by the product type and chosen on the Options tab.
+ */
+export function variantsNeedOptions(product: AdminProduct): boolean {
+  return product.options.length === 0;
+}
+
+/**
+ * Early feedback: options to choose from at all (`products.variants.needsOptions`), a value per option
+ * (`optionValueIds.<optionId>`), a free combination, a valid SKU when typed.
+ */
 export function validateVariantCreate(
   values: VariantCreateValues,
   product: AdminProduct,
 ): FormIssues {
   const issues: FormIssues = {};
+  if (variantsNeedOptions(product)) {
+    issues["optionValueIds"] = issue("products.variants.needsOptions");
+    return issues;
+  }
   const chosen: string[] = [];
   for (const option of optionOrder(product)) {
     const valueId = values.valueIds[option.optionId] ?? "";

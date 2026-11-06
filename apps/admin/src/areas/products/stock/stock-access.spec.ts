@@ -200,6 +200,7 @@ describe("savePrices (the Prices tab's bulk save, step 13 review G06)", () => {
       },
       onSaved: (count) => log.push(`saved ${String(count)}`),
       onUnknown: () => log.push("unknown"),
+      confirmZero: (keys) => log.push(`confirm ${keys.join(",")}`),
       ...overrides,
     };
   }
@@ -208,6 +209,30 @@ describe("savePrices (the Prices tab's bulk save, step 13 review G06)", () => {
     const log: string[] = [];
     await savePrices(parts({}, log));
     expect(log).toEqual(["plan", "keys v1:UAH", "put", "saved 1"]);
+  });
+
+  it("asks first when a price of 0 would be saved, and sends only once the admin confirmed", async () => {
+    const free: PricePlan = {
+      ok: true,
+      items: [
+        {
+          key: "v1:UAH",
+          item: { variantId: "v1", currency: "UAH", amount: 0, compareAtAmount: null },
+        },
+        {
+          key: "v2:UAH",
+          item: { variantId: "v2", currency: "UAH", amount: 500, compareAtAmount: null },
+        },
+      ],
+    };
+    const asked: string[] = [];
+    await savePrices(
+      parts({ plan: () => free, confirmZero: (keys) => asked.push(...keys) }, asked),
+    );
+    expect(asked).toEqual(["v1:UAH"]);
+    const log: string[] = [];
+    await savePrices(parts({ plan: () => free, zeroConfirmed: true }, log));
+    expect(log).toEqual(["keys v1:UAH,v2:UAH", "put", "saved 2"]);
   });
 
   it("does nothing while a save runs: no plan, no new sent keys, no request", async () => {

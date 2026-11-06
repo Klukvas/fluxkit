@@ -8,5 +8,8 @@
   "shell.signingOut": "Вихід…",
   "shell.navigating": "Завантаження сторінки…",
   "shell.sessionFailed": "Не вдалося перевірити вхід",
-  "shell.contextHelp": "Довідка до цієї сторінки"
+  "shell.contextHelp": "Довідка до цієї сторінки",
+  "shell.menuOpen": "Меню",
+  "shell.menuClose": "Закрити меню",
+  "shell.tableScrollHint": "Гортайте таблицю вбік, щоб побачити всі стовпці."
 }

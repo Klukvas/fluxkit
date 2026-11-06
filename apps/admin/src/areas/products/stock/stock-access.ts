@@ -101,6 +101,18 @@ export interface PriceSave {
   submit: (items: readonly PlannedItem[]) => Promise<WriteOutcome<unknown>>;
   onSaved: (count: number) => void;
   onUnknown: () => void;
+  /**
+   * A changed cell would store the price 0 (the variant would be given away; the API allows it): ask first, with the keys
+   * of those cells. Nothing is sent; the tab calls `savePrices` again with `zeroConfirmed` once the admin agreed.
+   */
+  confirmZero: (keys: readonly string[]) => void;
+  /** The admin agreed to the prices of 0 of this grid. */
+  zeroConfirmed?: boolean;
+}
+
+/** The keys of the planned cells that store the price 0. */
+export function zeroPriceKeys(items: readonly PlannedItem[]): string[] {
+  return items.filter((entry) => entry.item.amount === 0).map((entry) => entry.key);
 }
 
 /**
@@ -117,6 +129,11 @@ export async function savePrices(parts: PriceSave): Promise<void> {
   }
   if (plan.items.length === 0) {
     parts.nothingChanged();
+    return;
+  }
+  const zero = zeroPriceKeys(plan.items);
+  if (zero.length > 0 && parts.zeroConfirmed !== true) {
+    parts.confirmZero(zero);
     return;
   }
   parts.rememberSent(plan.items.map((entry) => entry.key));

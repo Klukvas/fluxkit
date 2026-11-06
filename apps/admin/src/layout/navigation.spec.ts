@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
 import { routeById } from "../routes";
@@ -117,5 +119,15 @@ describe("navigation configuration", () => {
       "help",
     ]);
     expect(ids(["orders.read", "shipping.manage"])).not.toContain("banners");
+  });
+});
+
+describe("the small-screen menu (source guard)", () => {
+  it("closes on every navigation, a link to the page already shown included (location.key, not the path)", () => {
+    const shell = readFileSync(join(import.meta.dirname, "shell.tsx"), "utf8");
+    expect(shell).toMatch(/navigationKey=\{location\.key\}/);
+    expect(shell).toMatch(
+      /useEffect\(\(\) => \{\s*setMenuOpen\(false\);\s*\}, \[navigationKey\]\);/,
+    );
   });
 });

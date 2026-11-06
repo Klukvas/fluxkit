@@ -12,5 +12,6 @@
   "unsaved.title": "Leave this page?",
   "unsaved.description": "Your unsaved changes will be lost.",
   "unsaved.leave": "Leave",
-  "unsaved.stay": "Stay"
+  "unsaved.stay": "Stay",
+  "common.dateChosen": "Chosen: {date}"
 }
