@@ -1,6 +1,7 @@
 import { locales, type Locale } from "@fluxkit/ui";
 import {
   knownShopPageSlugs,
+  productOptionGuide,
   productPageNote,
   shopPages,
   type ShopPageConfig,
@@ -192,6 +193,15 @@ export function productNoteView(
   return links.length === 0
     ? null
     : { titleKey: note.titleKey, summaryKey: note.summaryKey, links };
+}
+
+/** The link next to the option pickers (`productOptionGuide`), or `null` when it is switched off or its page is not enabled. */
+export function optionGuideLink(
+  locale: Locale,
+  guide: ShopPageSlug | null = productOptionGuide,
+  pages: readonly ShopPageConfig[] = shopPages,
+): ShopPageLink | null {
+  return guide === null ? null : (shopPageLinks(locale, [guide], pages)[0] ?? null);
 }
 
 /** Plain text to paragraphs: a blank line starts a new one; blank paragraphs are dropped. */

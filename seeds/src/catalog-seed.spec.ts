@@ -337,6 +337,32 @@ describe("catalog seed data", () => {
       }
     });
 
+    it("bring Russian query words to demo products, only for words the demo titles contain, and none for 'gift' (UX round 2)", () => {
+      const russian: [string, string][] = [
+        ["викрутка", "отвертка"],
+        ["худі", "худи"],
+        ["розвідний", "разводной"],
+        ["лляна", "льняная"],
+        ["електронна", "электронная"],
+      ];
+      const titles = products.map((product) => (product.title.uk ?? "").toLowerCase()).join(" ");
+      for (const [ukrainian, russianWord] of russian) {
+        expect(titles, ukrainian).toContain(ukrainian);
+        expect(
+          groups.some(
+            (group) =>
+              group.locale === "uk" &&
+              group.terms.includes(ukrainian) &&
+              group.terms.includes(russianWord),
+          ),
+          `${ukrainian} ${russianWord}`,
+        ).toBe(true);
+      }
+      // No product contains these words, so a synonym would only promise results that do not exist.
+      const allTerms = groups.flatMap((group) => group.terms).join(" ");
+      expect(allTerms).not.toMatch(/подар|gift/i);
+    });
+
     it("never share a term within a locale (the runner treats a group as existing when any of its terms is)", () => {
       for (const locale of ["uk", "en"]) {
         const terms = groups
@@ -405,6 +431,22 @@ describe("catalog seed data", () => {
       ]);
       expect(unique(files)).toBe(true);
       for (const file of files) expect(file).toMatch(/^banner-[a-z-]+\.webp$/);
+    });
+
+    it("link the gift banner to the catalog filtered by price up to 500.00, which lists several demo products (UX round 2)", () => {
+      const gifts = banners[1];
+      expect(gifts?.title?.en).toBe("Gift ideas");
+      // `price=<min>..<max>` in minor units is the catalog's own address of a price filter (storefront `lib/search-query.ts`).
+      expect(gifts?.link).toBe("/catalog?price=..50000");
+      const match = /^\/catalog\?price=\.\.(\d+)$/.exec(gifts?.link ?? "");
+      const max = Number(match?.[1]);
+      const cheap = products.filter((product) =>
+        product.variants.some((variant) => variant.amount <= max),
+      );
+      expect(cheap.length).toBeGreaterThanOrEqual(3);
+      // The text says what the link shows (no "by category" any more).
+      expect(gifts?.text?.uk).toMatch(/500/);
+      expect(gifts?.text?.en).toMatch(/500/);
     });
   });
 

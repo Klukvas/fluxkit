@@ -4,6 +4,7 @@ import {
   cartLineFacts,
   cartNoticeMessageKey,
   checkoutBlock,
+  focusCartHeading,
   focusCheckoutReason,
   hasPriceChange,
   isCartBusy,
@@ -250,6 +251,25 @@ describe("focusCheckoutReason (PR 215 review m5)", () => {
     expect(focusCheckoutReason("stock", null, true)).toBe(false);
     // An emptied cart has no reason to focus.
     expect(focusCheckoutReason(null, "empty", true)).toBe(false);
+  });
+});
+
+describe("focusCartHeading (UX round 2, batch 3A item 5; review m7 of PR 234)", () => {
+  it("moves the focus to the heading when the shopper removed the last line here and the focus went with its button", () => {
+    expect(focusCartHeading(1, 0, true, true)).toBe(true);
+    expect(focusCartHeading(3, 0, true, true)).toBe(true);
+  });
+
+  it("leaves the focus alone otherwise: lines remain, the cart was already empty or not read, or the focus is elsewhere", () => {
+    expect(focusCartHeading(2, 1, true, true)).toBe(false);
+    expect(focusCartHeading(0, 0, true, true)).toBe(false);
+    expect(focusCartHeading(null, 0, true, true)).toBe(false);
+    expect(focusCartHeading(1, null, true, true)).toBe(false);
+    expect(focusCartHeading(1, 0, false, true)).toBe(false);
+  });
+
+  it("moves nothing when the cart was emptied elsewhere (another tab, a sign-out), without a remove on this page", () => {
+    expect(focusCartHeading(1, 0, true, false)).toBe(false);
   });
 });
 

@@ -10,6 +10,7 @@ import {
   RESERVED_SLUGS,
   checkShopPages,
   findShopPage,
+  optionGuideLink,
   paragraphsOf,
   productNoteView,
   shopPageLinks,
@@ -20,6 +21,7 @@ import {
 import { demoContent } from "./demo-content";
 import { trustBarItems } from "./trust-bar";
 import {
+  productOptionGuide,
   productPageNote,
   shopPages,
   type ShopPageConfig,
@@ -166,6 +168,18 @@ describe("shop pages config (config/shop-pages.ts)", () => {
     ]);
     expect(productNoteView("en", productPageNote, [page("faq")])).toBeNull();
     expect(productNoteView("en", null)).toBeNull();
+  });
+
+  // UX round 2, batch 3A item 7: a link to the size guide next to the option pickers, data-driven (no option code is read).
+  it("links the option guide (the size guide by default) only while that page is enabled", () => {
+    expect(productOptionGuide).toBe("size-guide");
+    expect(optionGuideLink("uk")).toEqual({
+      slug: "size-guide",
+      href: "/uk/size-guide",
+      titleKey: "shopPages.sizeGuide.title",
+    });
+    expect(optionGuideLink("en", "size-guide", [page("faq")])).toBeNull();
+    expect(optionGuideLink("en", null)).toBeNull();
   });
 
   it("links the trust bar's contact line to the contacts page", () => {

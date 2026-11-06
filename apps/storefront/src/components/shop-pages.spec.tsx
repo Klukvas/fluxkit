@@ -81,13 +81,30 @@ describe("a shop page", () => {
       '<caption class="sr-only">§shopPages.delivery.methods.caption</caption>',
     );
     expect(delivery.match(/<th scope="col"/g)).toHaveLength(3);
-    expect(delivery.match(/<th scope="row"/g)).toHaveLength(3);
-    expect(delivery).toContain("§shopPages.delivery.methods.pickup.cost");
+    // One row per method the demo checkout really offers: the courier (UX round 2, batch 3A item 2).
+    expect(delivery.match(/<th scope="row"/g)).toHaveLength(1);
+    expect(delivery).toContain("§shopPages.delivery.methods.courier.cost");
+    expect(delivery).not.toMatch(/§shopPages\.delivery\.methods\.(branch|pickup)\./);
     // A wide table scrolls in its own box, never the page.
     expect(delivery).toContain("overflow-x-auto");
     const sizes = render("size-guide");
     expect(sizes.match(/<th scope="row"/g)).toHaveLength(5);
     expect(sizes).toContain(">96–100<");
+  });
+
+  it("promises no delivery or payment method the demo checkout does not offer (no branch, locker, pickup or cash)", () => {
+    const delivery = shopPages.find((entry) => entry.slug === "delivery-and-payment");
+    const keys = Object.keys(uk).filter(
+      (key) => key.startsWith("shopPages.delivery.") || key.startsWith("shopPages.faq."),
+    );
+    expect(delivery).toBeDefined();
+    for (const messages of [uk, en] as Record<string, string>[]) {
+      for (const key of keys) {
+        expect(messages[key], key).not.toMatch(
+          /відділен|поштомат|самовивіз|післяплат|накладен|готівк|branch|locker|pickup|pick up|cash/i,
+        );
+      }
+    }
   });
 
   it("shows the FAQ as closed native disclosures, the question a heading inside the summary", () => {

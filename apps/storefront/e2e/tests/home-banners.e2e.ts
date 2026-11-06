@@ -1,5 +1,5 @@
 import type { Page } from "@playwright/test";
-import { E2E_ORIGIN } from "../support/env.ts";
+import { E2E_ORIGIN, E2E_SEARCH_ENABLED } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { tabTo } from "../support/flows.ts";
 
@@ -32,8 +32,9 @@ const SEEDED = {
     },
     {
       name: "Gift ideas",
-      description: "Browse the catalog by category to find a gift.",
-      href: "/en/c/demo-clothing",
+      description: "Products up to UAH 500, for a gift or for yourself.",
+      // The catalog filtered by price up to 500.00 (UX round 2; it linked the clothing category before).
+      href: "/en/catalog?price=..50000",
       picture: null,
     },
   ],
@@ -84,7 +85,14 @@ test("the seeded banners sit between the hero and the categories: two cards and 
 
   // The whole card is the target: its picture opens the link too.
   await section.getByRole("link", { name: "Gift ideas" }).locator('[class*="aspect-2/1"]').click();
-  await expect(page).toHaveURL(`${E2E_ORIGIN}/en/c/demo-clothing`);
+  await expect(page).toHaveURL(`${E2E_ORIGIN}/en/catalog?price=..50000`);
+  if (E2E_SEARCH_ENABLED) {
+    // The filtered list: the cheap tools and digital goods (189.00 to 499.00), no clothing (599.00 and up).
+    const main = page.getByRole("main");
+    await expect(main.getByRole("link", { name: "Demo Screwdriver" }).first()).toBeVisible();
+    await expect(main.getByRole("link", { name: "Demo E-book" }).first()).toBeVisible();
+    await expect(main.getByRole("link", { name: "Demo T-shirt" })).toHaveCount(0);
+  }
 });
 
 test("each locale gets its texts, and the picture banner its own en picture (the API's answer the page reads)", async ({

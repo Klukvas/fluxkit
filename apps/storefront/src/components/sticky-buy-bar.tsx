@@ -48,7 +48,7 @@ export const PHONE_QUERY = "(max-width: 47.99rem)";
 export interface StickyBuyBarProps {
   visible: boolean;
   price: string | null;
-  /** The chosen values ("Black · S"), or the reason the button is off (the line limit, out of stock). */
+  /** The chosen values ("Black, S"), or the reason the button is off (the line limit, out of stock). */
   note: string;
   quantity: number;
   min: number;

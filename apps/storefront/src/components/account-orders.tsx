@@ -21,8 +21,13 @@ import { formatDate } from "../lib/date";
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { accountOrderHref, accountOrdersHref, isOrderNumber } from "../lib/order-links";
-import { orderMoney, orderStatusKey, parseOrdersPage, type ShopMoney } from "../lib/order-model";
-import { paymentSection } from "../lib/payment-model";
+import {
+  orderMoney,
+  orderPaymentSection,
+  orderStatusKey,
+  parseOrdersPage,
+  type ShopMoney,
+} from "../lib/order-model";
 import { accountPaySource } from "../lib/payment-store";
 import {
   accountOrderSource,
@@ -260,7 +265,7 @@ function OrderDetail({
     [client, number, locale, malformed],
   );
   const payment =
-    state.load.status === "ready" ? paymentSection(state.load.order, onlinePayment) : null;
+    state.load.status === "ready" ? orderPaymentSection(state.load.order, onlinePayment) : null;
 
   useEffect(() => {
     // A number that cannot exist is the same not-found state, without a request.
