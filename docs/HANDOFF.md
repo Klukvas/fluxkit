@@ -3,7 +3,7 @@
 Read this first (Claude Code, Codex or a human). Rules live in `AGENTS.md`; decisions in `docs/adr/` (0001 to 0045, index in `docs/adr/README.md`); plans in `docs/plans/`.
 The long per-step history that used to live here is archived verbatim in `docs/HISTORY.md` (not current). Update this file in every PR that changes project state; keep it short and keep "Last updated" to one line.
 
-Last updated: 2026-11-06, `origin/main` at `06c61f3` (PR 234, storefront and seed repairs 3A, merged); PR 235 (admin repairs 3B) open, independently reviewed, fixes applied; the coffee-shop seed is being built.
+Last updated: 2026-11-06, `origin/main` at `8dff5b8` (PRs 234 and 235, repairs 3A and 3B, merged); the coffee-shop seed PR is open.
 
 ## 1. Current state
 
