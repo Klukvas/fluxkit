@@ -53,7 +53,7 @@ export interface ShellFrameProps {
   navigating: boolean;
   /** The link to the help of the current page (`ContextHelpLink`), above the page; none on screens without one. */
   contextHelp?: ReactNode;
-  /** Changes with every page (the path): the small-screen menu closes when it changes. */
+  /** Changes with every navigation (`location.key`, also a link to the page shown): the small-screen menu closes. */
   navigationKey?: string;
   children: ReactNode;
 }
@@ -224,7 +224,7 @@ export function Shell() {
             languageSwitch={<LanguageSwitch />}
             userMenu={<UserMenu />}
             navigating={navigation.state === "loading"}
-            navigationKey={location.pathname}
+            navigationKey={location.key}
             contextHelp={
               help === null ? null : (
                 <ContextHelpLink t={t} href={helpArticlePath(help.article, help.section)} />
