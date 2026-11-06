@@ -73,6 +73,8 @@ export interface ProductPurchaseViewProps {
   brand: { name: string; path: string } | null;
   /** Server-rendered content below the purchase block (description, specifications). */
   children?: ReactNode;
+  /** Server-rendered note under the trust bar (the delivery and returns note, `components/product-page-note.tsx`). */
+  note?: ReactNode;
   /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
   preferredSelection?: Selection;
   /** Called with every selection the shopper makes (the island keeps it in the address). */
@@ -104,6 +106,7 @@ export function ProductPurchaseView({
   t,
   brand,
   children,
+  note,
   onAddToCart,
   preferredSelection,
   onSelectionChange,
@@ -451,7 +454,8 @@ export function ProductPurchaseView({
               ) : null}
             </div>
           </form>
-          <StoreTrustBar t={t} />
+          <StoreTrustBar t={t} locale={locale} />
+          {note}
         </div>
         {children === undefined || children === null ? null : (
           <div className="md:col-span-2 lg:col-span-7 lg:col-start-1">

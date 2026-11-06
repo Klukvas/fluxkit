@@ -2,9 +2,31 @@ import type { ThemeMode } from "@fluxkit/theme";
 import { Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { themeConfig } from "../config/theme";
-import { footerLinks } from "../layout/navigation";
+import { footerLinks, footerShopLinks, type NavigationLink } from "../layout/navigation";
+import { contactsView, type ContactsView } from "../lib/contacts";
 import { localizedHref } from "../lib/locale-path";
+import { FooterContacts } from "./contact-details";
 import { ThemeSwitch } from "./theme-switch";
+
+function LinkList({
+  links,
+  locale,
+  t,
+}: {
+  links: readonly NavigationLink[];
+  locale: Locale;
+  t: Translator;
+}) {
+  return (
+    <ul>
+      {links.map((link) => (
+        <li key={link.href}>
+          <Link href={localizedHref(locale, link.href)}>{t(link.labelKey)}</Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function SiteFooter({
   locale,
@@ -12,6 +34,8 @@ export function SiteFooter({
   year,
   themeMode,
   showThemeSwitch = themeConfig.showToggle,
+  shopLinks = footerShopLinks,
+  contacts = contactsView(),
 }: {
   locale: Locale;
   t: Translator;
@@ -20,23 +44,22 @@ export function SiteFooter({
   themeMode: ThemeMode;
   /** `showToggle` of `config/theme.ts`; a prop for tests. */
   showThemeSwitch?: boolean;
+  /** The shop pages with `inFooter` (`config/shop-pages.ts`); a prop for tests. */
+  shopLinks?: readonly NavigationLink[];
+  /** `config/contacts.ts`; a prop for tests. */
+  contacts?: ContactsView;
 }) {
   return (
     <footer className="fk-site-footer">
       <Container className="flex flex-col gap-2">
-        {/* One class per link (`.fk-nav-link`, app/globals.css) and a compact switch: the footer is part of every page's first
-            HTML, which has the same size budget as the header (README, "Keep the header small"; spec in shell.spec.tsx). */}
+        {/* No class on the lists, links and contacts (`.fk-site-footer ul`, `nav`, `address` in app/globals.css) and a compact
+            switch: the footer is part of every page's first HTML, which has the same size budget as the header (README, "Keep
+            the header small"; spec in shell.spec.tsx). */}
         <nav aria-label={t("footer.nav.label")}>
-          <ul className="flex flex-wrap gap-x-2">
-            {footerLinks.map((link) => (
-              <li key={link.href}>
-                <Link href={localizedHref(locale, link.href)} className="fk-nav-link">
-                  {t(link.labelKey)}
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {shopLinks.length === 0 ? null : <LinkList links={shopLinks} locale={locale} t={t} />}
+          <LinkList links={footerLinks} locale={locale} t={t} />
         </nav>
+        <FooterContacts contacts={contacts} />
         {showThemeSwitch ? (
           <ThemeSwitch
             initialMode={themeMode}

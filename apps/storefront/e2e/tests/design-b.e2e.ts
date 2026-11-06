@@ -341,7 +341,7 @@ async function contrastFailures(page: Page): Promise<string[]> {
   });
 }
 
-test("in dark, the text of the home, product, cart and checkout pages keeps its contrast (computed colours)", async ({
+test("in dark, the text of the home, product, cart, checkout and shop pages keeps its contrast (computed colours)", async ({
   page,
   context,
   shopper,
@@ -356,6 +356,13 @@ test("in dark, the text of the home, product, cart and checkout pages keeps its 
     "/en/c/demo-tools",
     "/en/cart",
     "/en/checkout",
+    // The shop pages (repair batch 2): tables, the FAQ, the contacts and the footer's new lists.
+    "/en/delivery-and-payment",
+    "/uk/returns",
+    "/en/faq",
+    "/uk/about",
+    "/en/size-guide",
+    "/uk/contacts",
   ]) {
     await page.goto(path);
     if (path.startsWith("/en")) await waitForHydration(page);

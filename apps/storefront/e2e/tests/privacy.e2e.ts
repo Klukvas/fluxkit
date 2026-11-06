@@ -183,7 +183,7 @@ test("a shopper downloads their data and deletes the account; the admin sees the
   for (const name of names) expect(["fluxkit_cart", "fluxkit_customer_session"]).toContain(name);
 });
 
-test("the daily limit of the download shows its wait, and the legal pages are placeholders with the marker", async ({
+test("the daily limit of the download shows its wait, and the legal pages are placeholders with the placeholder box", async ({
   page,
   shopper,
 }, testInfo) => {
@@ -206,7 +206,7 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   await expect(limited).toContainText(/Try again in about \d+ (hours?|minutes?)\./);
   await expect(limited).toBeFocused();
 
-  // Legal pages: placeholders with the visible template marker, linked from the footer, no cookie banner.
+  // Legal pages: placeholders with the "Template placeholder" box, linked from the footer, no cookie banner.
   const footer = page.getByRole("navigation", { name: "Footer navigation" });
   for (const [name, path] of [
     ["Privacy notice", "/en/legal/privacy"],
@@ -217,9 +217,10 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   }
   await footer.getByRole("link", { name: "Cookies", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Cookies" })).toBeVisible();
-  await expect(
-    page.getByText("TODO(fluxkit): replace with the shop's own legal text"),
-  ).toBeVisible();
+  // The "Template placeholder" box stays while the text carries the marker, but the marker (an English developer note) is
+  // never shown (repair batch 2).
+  await expect(page.getByText("Template placeholder")).toBeVisible();
+  await expect(page.getByText("TODO(fluxkit)")).toHaveCount(0);
   const table = page.getByRole("table", { name: "The cookies of this shop" });
   // Header row, the API's cart and session cookies, and the storefront's theme preference (design batch B, ADR 0045).
   await expect(table.getByRole("row")).toHaveCount(4);
@@ -229,7 +230,7 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.goto("/en/legal/privacy");
   await expect(page.getByRole("heading", { level: 1, name: "Privacy notice" })).toBeVisible();
-  await expect(page.getByText("[to be filled in by the shop]").first()).toBeVisible();
+  await expect(page.getByText("Not provided by the shop yet").first()).toBeVisible();
   // An unknown legal page is a real 404.
   const unknown = await page.goto("/en/legal/nothing");
   expect(unknown?.status()).toBe(404);

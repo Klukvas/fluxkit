@@ -104,7 +104,10 @@ describe("SiteShell landmarks and accessibility", () => {
   });
 
   it("contains no hardcoded user-facing text or attribute text", () => {
-    expect(leftoverText(html)).toBe("");
+    // The footer's phone and email are the shop's data from `config/contacts.ts` (repair batch 2), not words.
+    const withoutContacts = html.replace(/<address>.*?<\/address>/, "");
+    expect(withoutContacts).not.toBe(html);
+    expect(leftoverText(withoutContacts)).toBe("");
     for (const value of textAttributes(html)) expect(value.startsWith("§"), value).toBe(true);
   });
 
@@ -160,7 +163,9 @@ describe("header size (it is in every page's first HTML)", () => {
     );
     const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
     expect(footer).toContain('class="fk-theme-option"');
-    expect(new TextEncoder().encode(footer).length).toBeLessThan(1400); // 1 261 bytes on 2026-11-05
+    // 1 261 bytes on 2026-11-05; 1 372 on 2026-11-06 with the shop pages and the contacts (1 377 with the `<br>` between phone and email, review m8 of PR 232) (repair batch 2): the lists, links and
+    // contacts carry no class, and catalog, cart and account (all in the header) left the footer.
+    expect(new TextEncoder().encode(footer).length).toBeLessThan(1400);
   });
 });
 

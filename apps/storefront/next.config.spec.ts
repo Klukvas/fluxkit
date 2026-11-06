@@ -7,7 +7,13 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import config, { LEGAL_MARKER, assertNoLegalPlaceholders, loadRootEnvFile } from "./next.config.js";
+import config, {
+  DEMO_CONTENT_FLAGS,
+  LEGAL_MARKER,
+  assertNoLegalPlaceholders,
+  demoContentLeft,
+  loadRootEnvFile,
+} from "./next.config.js";
 import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
 
 // `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
@@ -237,6 +243,14 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     lastUpdated: "2026-10-29",
   };
 
+  const masterDemoContent = join(import.meta.dirname, "src", "config", "demo-content.json");
+  /** What a fork that replaced every demo text has (repair batch 2). */
+  const clearedDemo = { shopPages: [], contacts: false, home: false, trustBar: false };
+  const sharedDirectory = mkdtempSync(join(tmpdir(), "storefront-demo-"));
+  const clearedDemoFile = join(sharedDirectory, "demo-content.json");
+  writeFileSync(clearedDemoFile, JSON.stringify(clearedDemo));
+  afterAll(() => rmSync(sharedDirectory, { recursive: true, force: true }));
+
   /** A scratch copy of master's messages plus an identity file, for a case that edits some of them. */
   function scratch(
     edit: (messages: Record<string, string>) => void,
@@ -255,9 +269,13 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     return { directory, identityFile };
   }
 
-  function failureOf(options: { messagesDir: string; identityFile: string }): string {
+  function failureOf(options: {
+    messagesDir: string;
+    identityFile: string;
+    demoContentFile?: string;
+  }): string {
     try {
-      assertNoLegalPlaceholders({ enabled: true, ...options });
+      assertNoLegalPlaceholders({ enabled: true, demoContentFile: clearedDemoFile, ...options });
     } catch (error) {
       return (error as Error).message;
     }
@@ -348,6 +366,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           enabled: true,
           messagesDir: directory,
           identityFile: join(directory, "missing.json"),
+          demoContentFile: clearedDemoFile,
         }),
       ).toThrow(/identity/);
     } finally {
@@ -355,11 +374,16 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
   });
 
-  it("passes for a fully filled-in set: no marker in any legal text and a complete identity", () => {
+  it("passes for a fully filled-in set: no marker in any legal text, a complete identity and no demo content left", () => {
     const { directory, identityFile } = scratch(withoutMarkers);
     try {
       expect(() =>
-        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory, identityFile }),
+        assertNoLegalPlaceholders({
+          enabled: true,
+          messagesDir: directory,
+          identityFile,
+          demoContentFile: clearedDemoFile,
+        }),
       ).not.toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -373,7 +397,12 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     });
     try {
       expect(() =>
-        assertNoLegalPlaceholders({ enabled: true, messagesDir: directory, identityFile }),
+        assertNoLegalPlaceholders({
+          enabled: true,
+          messagesDir: directory,
+          identityFile,
+          demoContentFile: clearedDemoFile,
+        }),
       ).not.toThrow();
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -386,9 +415,77 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
         enabled: false,
         messagesDir: masterMessages,
         identityFile: masterIdentity,
+        demoContentFile: masterDemoContent,
       }),
     ).not.toThrow();
     expect(() => config(PHASE_PRODUCTION_BUILD)).not.toThrow();
+  });
+
+  describe("demo content (repair batch 2: shop pages, contacts, home texts, trust bar)", () => {
+    function demoFile(content: unknown): string {
+      const file = join(sharedDirectory, `demo-${String(Math.random()).slice(2)}.json`);
+      writeFileSync(file, typeof content === "string" ? content : JSON.stringify(content));
+      return file;
+    }
+
+    function demoFailure(demoContentFile: string): string {
+      const { directory, identityFile } = scratch(withoutMarkers);
+      try {
+        return failureOf({ messagesDir: directory, identityFile, demoContentFile });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+
+    it("refuses master's own demo content, naming every shop page and every flag (texts and identity filled in)", () => {
+      const message = demoFailure(masterDemoContent);
+      const master = JSON.parse(readFileSync(masterDemoContent, "utf8")) as {
+        shopPages: string[];
+      };
+      expect(master.shopPages.length).toBeGreaterThan(0);
+      for (const slug of master.shopPages) expect(message).toContain(`shopPages: ${slug}`);
+      for (const flag of DEMO_CONTENT_FLAGS) expect(message).toContain(`\n${flag}`);
+      expect(message).toContain("demo copy");
+      expect(message).not.toContain("en.json");
+    });
+
+    it("refuses while a single page or a single flag is left, and names only that one", () => {
+      expect(demoFailure(demoFile({ ...clearedDemo, shopPages: ["faq"] }))).toMatch(
+        /\nshopPages: faq$/,
+      );
+      for (const flag of DEMO_CONTENT_FLAGS) {
+        const message = demoFailure(demoFile({ ...clearedDemo, [flag]: true }));
+        expect(message, flag).toMatch(new RegExp(`\\n${flag}$`));
+        expect(message, flag).not.toContain("shopPages:");
+      }
+    });
+
+    it("treats a missing entry as cleared, and false or [] as cleared", () => {
+      expect(demoFailure(demoFile({}))).toBe("");
+      expect(demoFailure(demoFile(clearedDemo))).toBe("");
+    });
+
+    it("fails closed on a missing file, a malformed file, an unknown key or a value of the wrong type", () => {
+      expect(demoFailure(join(sharedDirectory, "missing.json"))).toMatch(/demo content file/);
+      // Malformed JSON names the file (review m6 of PR 232).
+      const malformed = demoFile("{");
+      expect(demoFailure(malformed)).toContain(`${malformed} is not valid JSON`);
+      expect(demoFailure(demoFile([]))).toMatch(/object/);
+      expect(demoFailure(demoFile({ ...clearedDemo, contact: false }))).toMatch(
+        /unknown keys: contact/,
+      );
+      expect(demoFailure(demoFile({ ...clearedDemo, home: "false" }))).toMatch(/"home" must be/);
+      expect(demoFailure(demoFile({ ...clearedDemo, shopPages: "faq" }))).toMatch(/"shopPages"/);
+      expect(demoFailure(demoFile({ ...clearedDemo, shopPages: [1] }))).toMatch(/"shopPages"/);
+    });
+
+    it("lists what is left without the check switched on (the same reader)", () => {
+      expect(demoContentLeft(demoFile(clearedDemo))).toEqual([]);
+      expect(demoContentLeft(demoFile({ shopPages: ["about"], trustBar: true }))).toEqual([
+        "shopPages: about",
+        "trustBar",
+      ]);
+    });
   });
 
   it("fails closed when asked to check and the messages cannot be read", () => {

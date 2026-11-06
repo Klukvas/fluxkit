@@ -391,10 +391,13 @@ describe("catalog seed data", () => {
       }
     });
 
-    it("mark their visible copy as demo text (TODO(fluxkit)) and show each picture once", () => {
-      for (const banner of banners.filter((item) => item.layout === "card")) {
-        expect(banner.text?.uk, banner.id).toContain("TODO(fluxkit)");
-        expect(banner.text?.en, banner.id).toContain("TODO(fluxkit)");
+    it("show no developer note to shoppers (repair batch 2) and show each picture once", () => {
+      for (const banner of banners) {
+        for (const text of [banner.title, banner.text, banner.imageAlt]) {
+          for (const value of Object.values(text ?? {})) {
+            expect(value, banner.id).not.toMatch(/TODO|fluxkit|replace|заміні|демо/i);
+          }
+        }
       }
       const files = banners.flatMap((banner) => [
         banner.image,

@@ -19,6 +19,18 @@ import legalIdentityFile from "./legal-identity.json";
  */
 export const LEGAL_PLACEHOLDER_MARKER = "TODO(fluxkit): replace with the shop's own legal text";
 
+/**
+ * A legal text as the page shows it: without the marker (and the full stop and spaces right after it). The marker stays in the
+ * messages for the release check and the "Template placeholder" box, but a shopper never reads it (repair batch 2: it was an
+ * English developer note on the Ukrainian page).
+ */
+export function withoutLegalMarker(text: string): string {
+  const index = text.indexOf(LEGAL_PLACEHOLDER_MARKER);
+  if (index === -1) return text;
+  const after = text.slice(index + LEGAL_PLACEHOLDER_MARKER.length).replace(/^\.?\s*/, "");
+  return `${text.slice(0, index)}${after}`.trim();
+}
+
 export type LegalPageSlug = "privacy" | "terms" | "cookies";
 
 export interface LegalPageConfig {

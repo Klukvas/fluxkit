@@ -15,6 +15,8 @@ const mustAnswerRealNotFound = [
   "(catalog)/c/[slug]/page.tsx",
   "(catalog)/p/[slug]/page.tsx",
   "(catalog)/search/page.tsx",
+  // The shop pages (`config/shop-pages.ts`): an unknown or switched-off slug.
+  "(pages)/[page]/page.tsx",
   "[...rest]/page.tsx",
 ];
 

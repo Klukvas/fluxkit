@@ -4,6 +4,7 @@ import {
   LEGAL_PLACEHOLDER_MARKER,
   cookieTable,
   legalIdentity,
+  withoutLegalMarker,
   type LegalPageSlug,
 } from "../config/legal";
 import { formatDate } from "../lib/date";
@@ -12,7 +13,7 @@ import { slotValues, splitMessage } from "../lib/rich-message";
 
 /**
  * A legal page of the template (privacy plan step 10): neutral placeholder copy that says the shop must supply its own text,
- * the visible template marker, who runs the shop (from `config/legal.ts`, a visible placeholder while unset) and, on the
+ * the "Template placeholder" box while the text carries the marker (the marker itself is never shown), who runs the shop (from `config/legal.ts`, a visible placeholder while unset) and, on the
  * cookie page, the table of the cookies a shopper can receive. A server component: nothing here needs the browser.
  * TODO(fluxkit): legal review of the cookie statement before an EU launch.
  */
@@ -134,7 +135,7 @@ export function LegalPage({
           <p>{t("legal.placeholder.body")}</p>
         </Alert>
       ) : null}
-      <p className="max-w-prose text-foreground">{intro}</p>
+      <p className="max-w-prose text-foreground">{withoutLegalMarker(intro)}</p>
       <p className="text-muted-foreground">
         {legalIdentity.lastUpdated === null
           ? t("legal.updated.unset")

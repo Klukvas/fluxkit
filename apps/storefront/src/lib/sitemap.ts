@@ -76,13 +76,16 @@ export interface BuildSitemapInput {
   defaultLocale: string;
   categories: readonly CategoryNode[];
   products: readonly SitemapProduct[];
+  /** Locale-less paths of the enabled shop pages (`config/shop-pages.ts`), listed after the catalog. */
+  shopPages?: readonly string[];
 }
 
-/** Home, catalog, categories and products, once per locale, each linking its other-locale variants. */
+/** Home, catalog, the shop pages, categories and products, once per locale, each linking its other-locale variants. */
 export function buildSitemap(input: BuildSitemapInput): SitemapEntry[] {
   const pages: { path: string; lastModified?: string }[] = [
     { path: "" },
     { path: "/catalog" },
+    ...(input.shopPages ?? []).map((path) => ({ path })),
     ...flatten(input.categories).map((slug) => ({ path: `/c/${encodeURIComponent(slug)}` })),
     ...input.products.map((product) => ({
       path: `/p/${encodeURIComponent(product.slug)}`,
