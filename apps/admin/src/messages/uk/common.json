@@ -13,5 +13,7 @@
   "unsaved.description": "Незбережені зміни буде втрачено.",
   "unsaved.leave": "Залишити",
   "unsaved.stay": "Залишитися",
-  "common.dateChosen": "Обрано: {date}"
+  "common.dateChosen": "Обрано: {date}",
+  "common.dateFormat": "Формат: дд.мм.рррр (якщо браузер показує мм/дд/рррр, першим іде місяць).",
+  "common.dateTimeFormat": "Формат: дд.мм.рррр, гг:хх (якщо браузер показує мм/дд/рррр, першим іде місяць)."
 }

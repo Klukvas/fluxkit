@@ -30,13 +30,19 @@ export function dateInputEcho(value: string, locale: string): string | null {
   }).format(instant);
 }
 
-/** The hint of a native date field: "Chosen: 1 грудня 2026 р." while it holds a date; none without a locale or a date. */
+/**
+ * The hint of a native date (or `datetime` for `datetime-local`) field: the expected format in the UI language, which also
+ * says that the browser may draw the month first, then "Chosen: 1 грудня 2026 р." while it holds a date. None without a
+ * locale. The format line cannot name what the field shows: Chromium draws it in the browser's own language, not the page's.
+ */
 export function dateHint(
   t: Translator,
   value: string,
   locale: string | undefined,
+  kind: "date" | "datetime" = "date",
 ): string | undefined {
   if (locale === undefined) return undefined;
+  const format = t(kind === "date" ? "common.dateFormat" : "common.dateTimeFormat");
   const date = dateInputEcho(value, locale);
-  return date === null ? undefined : t("common.dateChosen", { date });
+  return date === null ? format : `${format} ${t("common.dateChosen", { date })}`;
 }

@@ -596,7 +596,7 @@ export function BannerFormView({
               const note = warnings.find(
                 (warning) => warning.kind === "time" && warning.field === field,
               );
-              const chosen = dateHint(t, values[field], uiLocale);
+              const chosen = dateHint(t, values[field], uiLocale, "datetime");
               const base = [
                 t(field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint"),
                 chosen,
