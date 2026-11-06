@@ -77,7 +77,9 @@ test("orders: filter by status and q, detail, mark paid with a reference, fulfil
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await expect(pay).toBeVisible();
-  await expect(pay.getByRole("textbox", { name: "Transfer or receipt number" })).toHaveValue(reference);
+  await expect(pay.getByRole("textbox", { name: "Transfer or receipt number" })).toHaveValue(
+    reference,
+  );
   const answered = page.waitForResponse((response) => response.url().endsWith("/mark-paid"));
   release();
   expect((await answered).status()).toBe(200);
