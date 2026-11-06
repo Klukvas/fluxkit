@@ -337,6 +337,33 @@ describe("catalog seed data", () => {
       }
     });
 
+    it("bring Russian query words to demo products, only for words the demo titles contain, and none for 'gift' (UX round 2)", () => {
+      const russian: [string, string][] = [
+        ["викрутка", "отвертка"],
+        ["худі", "худи"],
+        ["молоток", "молоточек"],
+        ["розвідний", "разводной"],
+        ["лляна", "льняная"],
+        ["електронна", "электронная"],
+      ];
+      const titles = products.map((product) => product.title.uk.toLowerCase()).join(" ");
+      for (const [ukrainian, russianWord] of russian) {
+        expect(titles, ukrainian).toContain(ukrainian);
+        expect(
+          groups.some(
+            (group) =>
+              group.locale === "uk" &&
+              group.terms.includes(ukrainian) &&
+              group.terms.includes(russianWord),
+          ),
+          `${ukrainian} ${russianWord}`,
+        ).toBe(true);
+      }
+      // No product contains these words, so a synonym would only promise results that do not exist.
+      const allTerms = groups.flatMap((group) => group.terms).join(" ");
+      expect(allTerms).not.toMatch(/подар|gift/i);
+    });
+
     it("never share a term within a locale (the runner treats a group as existing when any of its terms is)", () => {
       for (const locale of ["uk", "en"]) {
         const terms = groups
