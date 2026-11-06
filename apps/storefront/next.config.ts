@@ -67,7 +67,7 @@ export function demoContentLeft(file: string): string[] {
   try {
     content = JSON.parse(readFileSync(file, "utf8"));
   } catch (error) {
-    throw new Error(`${file} is not valid JSON: ${(error as Error).message}`);
+    throw new Error(`${file} is not valid JSON: ${(error as Error).message}`, { cause: error });
   }
   if (typeof content !== "object" || content === null || Array.isArray(content)) {
     throw new Error(`${file} must hold an object.`);
