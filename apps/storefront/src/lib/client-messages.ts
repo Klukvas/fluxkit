@@ -30,8 +30,10 @@ export const CLIENT_MESSAGE_PREFIXES = [
   "breadcrumbs.",
   "trust.",
   "funnel.",
-  // UX repairs batch 3A (plan 2026-11-06-ux-repairs-3-storefront.md): the cart's delivery note.
+  // UX repairs batch 3A (plan 2026-11-06-ux-repairs-3-storefront.md): the cart's delivery note, the product page's buy button
+  // before hydration.
   "cartDelivery.",
+  "productReady.",
 ] as const;
 
 export function pickClientMessages(messages: Messages): Messages {

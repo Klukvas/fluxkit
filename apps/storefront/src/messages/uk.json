@@ -127,6 +127,7 @@
   "product.quantity.stockLimit.other": "У кошику вже {inCart} шт. цього товару, а доступно лише {count} шт. Змініть кількість у кошику.",
   "product.quantity.stockShort": "У кошику вже {count} шт. цього товару — більше, ніж є в наявності. Змініть кількість у кошику.",
   "product.addToCart": "Додати до кошика",
+  "productReady.noScript": "Щоб додати товар до кошика, увімкніть JavaScript у браузері.",
   "product.adding": "Додаємо до кошика",
   "product.added": "Додано до кошика.",
   "product.added.dismiss": "Закрити повідомлення",

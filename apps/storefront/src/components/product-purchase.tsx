@@ -118,6 +118,13 @@ export function ProductPurchaseView({
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
+  // False in the server HTML and until this island has hydrated: before that a tap on the buy button cannot reach `submit`
+  // (the browser would post the form and reload the page with nothing added), so the button is disabled and looks it (UX
+  // round 2, batch 3A item 6). Without a script it stays so and a `noscript` line says why (adding always needed one).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   // The "Added" toast is shown until it is dismissed, the choice changes or it times out (the cart badge keeps the count).
   const [toastOpen, setToastOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -377,8 +384,9 @@ export function ProductPurchaseView({
                 <Button
                   ref={addButtonRef}
                   type="submit"
-                  disabled={!purchasable}
+                  disabled={!purchasable || !ready}
                   aria-disabled={pending}
+                  data-ready={ready ? undefined : "false"}
                   className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto lg:min-h-12 lg:flex-1"
                   aria-describedby={
                     atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
@@ -391,6 +399,9 @@ export function ProductPurchaseView({
                       : t("product.addToCart")}
                 </Button>
               </div>
+              <noscript>
+                <p className="text-sm text-muted-foreground">{t("productReady.noScript")}</p>
+              </noscript>
               {atLimit && stock !== null ? (
                 <p id={LIMIT_NOTE_ID} className="flex flex-wrap gap-x-2 text-sm text-foreground">
                   <span>

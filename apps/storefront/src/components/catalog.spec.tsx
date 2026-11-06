@@ -483,7 +483,22 @@ describe("ProductPurchaseView", () => {
     expect(sold).toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
     expect(sold).toContain("§availability.out_of_stock");
     expect(sold).toContain('aria-describedby="product-availability"');
-    expect(view()).not.toMatch(/<button[^>]*type="submit"[^>]*disabled=""/);
+    // The server HTML disables every buy button until the island hydrated (below); a sellable variant is named "add to cart".
+    expect(view()).toMatch(/<button[^>]*type="submit"[^>]*>§product\.addToCart<\/button>/);
+    expect(view()).not.toContain("§availability.out_of_stock</button>");
+  });
+
+  // UX round 2, batch 3A item 6: a tap before hydration posted the form natively and reloaded the page with nothing added.
+  it("renders the buy button disabled and marked not ready in the server HTML, with a no-script line that says why", () => {
+    const html = view();
+    expect(html).toMatch(
+      /<button[^>]*type="submit"[^>]*disabled=""[^>]*data-ready="false"[^>]*>§product\.addToCart<\/button>/,
+    );
+    expect(html).toContain(
+      '<noscript><p class="text-sm text-muted-foreground">§productReady.noScript</p></noscript>',
+    );
+    expect(uk["productReady.noScript"]).toMatch(/JavaScript/);
+    expect(en["productReady.noScript"]).toMatch(/JavaScript/);
   });
 
   it("limits the quantity to 1..999 and labels every control", () => {

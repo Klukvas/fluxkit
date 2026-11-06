@@ -119,6 +119,7 @@
   "product.quantity.stockLimit.other": "Your cart already has {inCart} of this item, and only {count} are available. Change the quantity in the cart.",
   "product.quantity.stockShort": "Your cart already has {count} of this item, more than the shop has in stock. Change the quantity in the cart.",
   "product.addToCart": "Add to cart",
+  "productReady.noScript": "To add this product to the cart, turn on JavaScript in your browser.",
   "product.adding": "Adding to the cart",
   "product.added": "Added to the cart.",
   "product.added.dismiss": "Close the message",
