@@ -3,6 +3,7 @@
   "mail.nav.status": "Status",
   "mail.nav.messages": "Messages",
   "mail.nav.templates": "Templates",
+
   "mail.status.pending": "Waiting to be sent",
   "mail.status.sending": "Being sent",
   "mail.status.sent": "Sent",
@@ -16,6 +17,7 @@
   "mail.recipientKind.customer": "customer",
   "mail.recipientKind.guest": "guest",
   "mail.recipientKind.admin": "admin",
+
   "mail.code.unavailable": "The email service did not answer in time or was unavailable. The shop tries again until the deadline.",
   "mail.code.rate_limited": "The email service asked the shop to slow down. The shop tries again later.",
   "mail.code.rejected": "The email service refused this message. It will not be tried again.",
@@ -29,6 +31,7 @@
   "mail.code.render_failed": "The template could not produce a valid mail.",
   "mail.code.message_invalid": "The finished mail was refused by the shop's own checks.",
   "mail.code.unrecognized": "An error code this version does not know.",
+
   "mail.status.intro": "Whether the shop can send mail, how much was sent in the last 24 hours and what is waiting.",
   "mail.status.deliveryTitle": "Delivery",
   "mail.status.provider": "Provider",
@@ -51,6 +54,7 @@
   "mail.status.errorsCaption": "Error codes of the last 24 hours with their counts",
   "mail.status.noErrorsTitle": "No errors",
   "mail.status.noErrorsBody": "No mail of the last 24 hours has an error code.",
+
   "mail.notConfigured.title": "No email provider is configured",
   "mail.notConfigured.body": "The shop sends no mail. Orders and accounts work as usual; customers get no password reset or order mails.",
   "mail.setup.title": "How to turn email on",
@@ -60,6 +64,7 @@
   "mail.setup.step3": "Set the provider's own key variable named in its README, and STOREFRONT_PUBLIC_URL for the links in mail.",
   "mail.setup.step4": "Restart the API, then come back here and send a test email.",
   "mail.setup.secretNote": "Keys are set on the server only. They are never typed or shown in this panel.",
+
   "mail.test.title": "Test email",
   "mail.test.intro": "Sends a test mail to your own address (the one you sign in with). Up to 5 a hour.",
   "mail.test.locale": "Language",
@@ -72,6 +77,7 @@
   "mail.test.unknownBody": "No answer came, so the test mail may or may not have been queued. Look at the messages list before sending another.",
   "mail.unknown.title": "No answer",
   "mail.unknown.openList": "Open the messages list",
+
   "mail.refusal.rateLimited": "Too many test mails. Try again later.",
   "mail.refusal.rateLimitedWait": "Too many test mails. Try again in {minutes} min.",
   "mail.refusal.email_not_configured": "No email provider is configured, so nothing can be sent.",
@@ -81,6 +87,7 @@
   "mail.refusal.template_unavailable": "The template of this mail is not available any more, so it cannot be resent.",
   "mail.refusal.variables_invalid": "The stored data no longer fits the current template, so the mail cannot be resent.",
   "mail.refusal.not_pending": "This mail is not waiting any more, so it cannot be cancelled.",
+
   "mail.list.intro": "Every mail the shop queued, newest first. Addresses are personal data.",
   "mail.list.filtersLabel": "Filter messages",
   "mail.list.status": "Status",
@@ -117,6 +124,7 @@
   "mail.list.pageRange": "{from} to {to} of {total}",
   "mail.list.previous": "Previous page",
   "mail.list.next": "Next page",
+
   "mail.detail.back": "Back to the messages",
   "mail.detail.factsTitle": "Mail and attempts",
   "mail.detail.status": "Status",
@@ -150,6 +158,7 @@
   "mail.detail.emptyValue": "Empty",
   "mail.detail.noVariables": "This mail has no data.",
   "mail.detail.variablesTruncated": "Only the first values are shown.",
+
   "mail.action.resend": "Resend",
   "mail.action.cancel": "Cancel sending",
   "mail.resend.title": "Resend this mail?",
@@ -166,6 +175,7 @@
   "mail.notice.cancelled": "The mail was cancelled and will not be sent.",
   "mail.notice.lost.resend": "No answer came, so the resend may or may not have been queued. Look at the messages list before resending again.",
   "mail.notice.lost.cancel": "No answer came, so the mail may or may not have been cancelled. The status above shows what the shop has.",
+
   "mail.templates.intro": "The mail templates the shop has, with their versions and languages. Open one to see how it looks.",
   "mail.templates.caption": "Mail templates",
   "mail.templates.columnKey": "Template",
@@ -174,6 +184,7 @@
   "mail.templates.columnLocales": "Languages",
   "mail.templates.emptyTitle": "No templates",
   "mail.templates.emptyBody": "The shop has no mail templates registered.",
+
   "mail.preview.title": "Preview: {key}",
   "mail.preview.back": "Back to the templates",
   "mail.preview.localeLabel": "Preview language",

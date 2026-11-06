@@ -4,6 +4,7 @@
   "payment.card.title": "Оплата на {amount}, розпочата {at}",
   "payment.card.unknownTitle": "Провайдер не відповів",
   "payment.card.unknownBody": "Сторінка оплати в провайдера могла бути створена, а могла й ні. Нову спробу буде відхилено, доки магазин не завершить цю, а оплата ще може надійти. Скористайтеся «Перевірити статус»; не позначайте замовлення оплаченим вручну без перевірки.",
+
   "payment.field.status": "Статус",
   "payment.field.amount": "Сума",
   "payment.field.finalAmount": "Списана сума",
@@ -19,14 +20,17 @@
   "payment.field.created": "Створено",
   "payment.field.updated": "Оновлено",
   "payment.field.nextCheck": "Наступна автоматична перевірка",
+
   "payment.createdBy.customer": "Покупець",
   "payment.createdBy.guest": "Гість",
   "payment.createdBy.admin": "Адміністратор",
+
   "payment.outcome.applied": "Замовлення позначено оплаченим",
   "payment.outcome.already_paid": "Замовлення вже було оплачене цим платежем",
   "payment.outcome.order_not_payable": "Замовлення вже не можна було оплатити (прострочене або скасоване)",
   "payment.outcome.amount_mismatch": "Сума не збіглася із замовленням, тому замовлення не позначено оплаченим",
   "payment.outcome.reference_conflict": "Замовлення вже було оплачене іншим способом",
+
   "payment.status.creating": "Створюється",
   "payment.status.awaiting_customer": "Чекає на покупця",
   "payment.status.processing": "Обробляється",
@@ -35,20 +39,24 @@
   "payment.status.expired": "Прострочено",
   "payment.status.invalidated": "Закрито",
   "payment.status.create_unknown": "Провайдер не відповів",
+
   "payment.refundStatus.requested": "Запрошено",
   "payment.refundStatus.processing": "Обробляється",
   "payment.refundStatus.succeeded": "Повернено",
   "payment.refundStatus.failed": "Відхилено",
   "payment.refundStatus.unknown": "Результат невідомий",
+
   "payment.refundReason.admin": "Адміністратором",
   "payment.refundReason.late_payment": "Автоматично: оплата надійшла запізно",
   "payment.refundReason.duplicate_payment": "Автоматично: оплачено двічі",
   "payment.refundReason.amount_mismatch": "Розбіжність суми",
+
   "payment.source.webhook": "Сповіщення провайдера",
   "payment.source.poll": "Перевірка статусу",
   "payment.source.create": "Оплату розпочато",
   "payment.source.admin": "Адміністратор",
   "payment.source.system": "Система",
+
   "payment.attention.title": "Цей платіж потребує вашої уваги",
   "payment.closedOrder.title": "Замовлення закрите, але магазин досі тримає гроші за нього",
   "payment.closedOrder.refund": "Для скасованого замовлення нічого не повертається автоматично. Поверніть платіж кнопкою «Повернути кошти» нижче (гроші повертаються тим способом, яким платив покупець) або домовтеся з покупцем інакше.",
@@ -76,9 +84,11 @@
   "payment.attention.help.refund_mismatch": "Запис провайдера про повернення відрізняється від запису магазину. Скористайтеся «Перевірити статус» і порівняйте з кабінетом провайдера, перш ніж повертати знову.",
   "payment.attention.help.reconcile_gave_up": "Магазин довго перевіряв цей платіж і припинив. Скористайтеся «Перевірити статус» один раз; якщо статус усе ще незрозумілий, подивіться платіж у кабінеті провайдера.",
   "payment.attention.help.unknown": "Перевірте платіж у кабінеті провайдера, потім закрийте пункт.",
+
   "payment.action.refund": "Повернути кошти",
   "payment.action.resync": "Перевірити статус",
   "payment.action.clearAttention": "Закрити пункт уваги",
+
   "payment.refunds.caption": "Повернення за цим платежем",
   "payment.refunds.at": "Запрошено",
   "payment.refunds.amount": "Сума",
@@ -91,6 +101,7 @@
   "payment.refunds.noCode": "Немає",
   "payment.refunds.empty": "Повернень ще не було.",
   "payment.refunds.waiting": "Повернення чекає на провайдера. Повернення зі статусом «Запрошено» або з невідомим результатом зберігає свою суму зарезервованою і ніколи не надсилається двічі; магазин завершить його за записами провайдера. Скористайтеся «Перевірити статус», щоб подивитися знову.",
+
   "payment.journal.summary": "Журнал ({count})",
   "payment.journal.caption": "Журнал цього платежу",
   "payment.journal.at": "Коли",
@@ -106,6 +117,7 @@
   "payment.journal.noChange": "Без змін",
   "payment.journal.attentionCleared": "Пункт уваги закрито",
   "payment.journal.empty": "Записів у журналі немає.",
+
   "payment.notice.codes": "Код провайдера:",
   "payment.notice.lostTitle": "Відповіді немає",
   "payment.notice.refund.succeeded.title": "Повернення виконано",
@@ -124,6 +136,7 @@
   "payment.notice.resyncLost": "Відповіді не надійшло, тож статус не перевірено. Платіж прочитано знову; спробуйте «Перевірити статус» ще раз.",
   "payment.notice.cleared": "Пункт уваги закрито.",
   "payment.notice.clearLost": "Відповіді не надійшло, тож невідомо, чи пункт закрито. Платіж прочитано знову; подивіться на нього, перш ніж повторювати.",
+
   "payment.unavailable": "Платіжний провайдер зараз недоступний. Нічого не змінено; спробуйте пізніше.",
   "payment.unavailableRetry": "Платіжний провайдер зараз недоступний. Нічого не змінено; спробуйте через {seconds} с.",
   "payment.refusal.refund_not_allowed": "Цей платіж не можна повернути (він не оплачений або ще завершується). Нічого не змінено.",
@@ -135,6 +148,7 @@
   "payment.refusal.keyReused": "Цю форму повернення вже було використано з іншою сумою чи приміткою. Закрийте вікно й відкрийте «Повернути кошти» знову.",
   "payment.fieldError.invalid_amount": "Введіть суму, не меншу за найменшу одиницю валюти.",
   "payment.fieldError.currency_mismatch": "Сума не у валюті платежу.",
+
   "payment.refund.title": "Повернення коштів за замовлення {number}",
   "payment.refund.description": "Повернути гроші на картку покупця. Можна повернути частину суми. Статус замовлення не змінюється.",
   "payment.refund.confirmDescription": "Перевірте суму, перш ніж підтвердити. Гроші буде повернено на картку покупця.",
@@ -165,11 +179,13 @@
   "payment.refund.noteIssue.required": "Вкажіть причину.",
   "payment.refund.noteIssue.too_long": "Причина задовга.",
   "payment.refund.noteIssue.invalid_characters": "У причині є недозволені символи.",
+
   "payment.clear.title": "Закрити цей пункт уваги?",
   "payment.clear.body": "Платіж більше не буде в списку тих, що потребують уваги. Код лишається на платежі, а журнал записує, хто закрив пункт.",
   "payment.clear.note": "Закривайте лише після того, як розібралися. Закриття нічого не змінює в провайдера.",
   "payment.clear.confirm": "Закрити пункт",
   "payment.clear.keep": "Залишити відкритим",
+
   "payment.list.intro": "Платежі, що потребують адміністратора: оплата надійшла запізно, оплачено двічі, неправильна сума, повернення, яке не вдалося або має невідомий результат, чи платіж, який магазин перестав перевіряти. Відкрийте замовлення, щоб перевірити, повернути кошти або закрити пункт.",
   "payment.list.caption": "Платежі, що потребують уваги",
   "payment.list.order": "Замовлення",

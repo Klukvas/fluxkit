@@ -3,6 +3,7 @@
   "mail.nav.status": "Стан",
   "mail.nav.messages": "Листи",
   "mail.nav.templates": "Шаблони",
+
   "mail.status.pending": "Очікує відправлення",
   "mail.status.sending": "Відправляється",
   "mail.status.sent": "Відправлено",
@@ -16,6 +17,7 @@
   "mail.recipientKind.customer": "покупець",
   "mail.recipientKind.guest": "гість",
   "mail.recipientKind.admin": "адміністратор",
+
   "mail.code.unavailable": "Поштова служба не відповіла вчасно або була недоступна. Магазин повторює спробу до кінцевого терміну.",
   "mail.code.rate_limited": "Поштова служба попросила магазин зменшити темп. Магазин повторить спробу пізніше.",
   "mail.code.rejected": "Поштова служба відмовилася приймати цей лист. Повторних спроб не буде.",
@@ -29,6 +31,7 @@
   "mail.code.render_failed": "Шаблон не зміг створити коректний лист.",
   "mail.code.message_invalid": "Готовий лист не пройшов власні перевірки магазину.",
   "mail.code.unrecognized": "Код помилки, якого ця версія не знає.",
+
   "mail.status.intro": "Чи може магазин надсилати пошту, скільки листів відправлено за останні 24 години і що очікує відправлення.",
   "mail.status.deliveryTitle": "Доставка",
   "mail.status.provider": "Постачальник",
@@ -51,6 +54,7 @@
   "mail.status.errorsCaption": "Коди помилок за останні 24 години з кількістю",
   "mail.status.noErrorsTitle": "Помилок немає",
   "mail.status.noErrorsBody": "Жоден лист за останні 24 години не має коду помилки.",
+
   "mail.notConfigured.title": "Поштового постачальника не налаштовано",
   "mail.notConfigured.body": "Магазин не надсилає пошту. Замовлення й облікові записи працюють як зазвичай; покупці не отримують листів про скидання пароля чи замовлення.",
   "mail.setup.title": "Як увімкнути пошту",
@@ -60,6 +64,7 @@
   "mail.setup.step3": "Задайте змінну з ключем постачальника, названу в його README, і STOREFRONT_PUBLIC_URL для посилань у листах.",
   "mail.setup.step4": "Перезапустіть API, поверніться сюди й надішліть тестовий лист.",
   "mail.setup.secretNote": "Ключі задаються лише на сервері. Їх ніколи не вводять і не показують у цій панелі.",
+
   "mail.test.title": "Тестовий лист",
   "mail.test.intro": "Надсилає тестовий лист на вашу власну адресу (ту, з якою ви входите). Не більше 5 на годину.",
   "mail.test.locale": "Мова",
@@ -72,6 +77,7 @@
   "mail.test.unknownBody": "Відповіді не було, тож тестовий лист міг потрапити в чергу, а міг і ні. Перегляньте список листів, перш ніж надсилати ще один.",
   "mail.unknown.title": "Немає відповіді",
   "mail.unknown.openList": "Відкрити список листів",
+
   "mail.refusal.rateLimited": "Забагато тестових листів. Спробуйте пізніше.",
   "mail.refusal.rateLimitedWait": "Забагато тестових листів. Спробуйте за {minutes} хв.",
   "mail.refusal.email_not_configured": "Поштового постачальника не налаштовано, тож нічого не можна надіслати.",
@@ -81,6 +87,7 @@
   "mail.refusal.template_unavailable": "Шаблон цього листа більше недоступний, тож повторно надіслати його не можна.",
   "mail.refusal.variables_invalid": "Збережені дані більше не відповідають чинному шаблону, тож повторно надіслати лист не можна.",
   "mail.refusal.not_pending": "Цей лист більше не очікує відправлення, тож скасувати його не можна.",
+
   "mail.list.intro": "Усі листи, які поставив у чергу магазин, найновіші першими. Адреси — персональні дані.",
   "mail.list.filtersLabel": "Фільтр листів",
   "mail.list.status": "Статус",
@@ -117,6 +124,7 @@
   "mail.list.pageRange": "{from} – {to} з {total}",
   "mail.list.previous": "Попередня сторінка",
   "mail.list.next": "Наступна сторінка",
+
   "mail.detail.back": "Назад до листів",
   "mail.detail.factsTitle": "Лист і спроби",
   "mail.detail.status": "Статус",
@@ -150,6 +158,7 @@
   "mail.detail.emptyValue": "Порожньо",
   "mail.detail.noVariables": "У цього листа немає даних.",
   "mail.detail.variablesTruncated": "Показано лише перші значення.",
+
   "mail.action.resend": "Надіслати повторно",
   "mail.action.cancel": "Скасувати відправлення",
   "mail.resend.title": "Надіслати цей лист повторно?",
@@ -166,6 +175,7 @@
   "mail.notice.cancelled": "Лист скасовано, його не буде відправлено.",
   "mail.notice.lost.resend": "Відповіді не було, тож повторне відправлення могло потрапити в чергу, а могло й ні. Перегляньте список листів, перш ніж надсилати знову.",
   "mail.notice.lost.cancel": "Відповіді не було, тож лист міг бути скасований, а міг і ні. Статус вище показує, що є в магазину.",
+
   "mail.templates.intro": "Шаблони листів магазину з версіями й мовами. Відкрийте шаблон, щоб побачити, як він виглядає.",
   "mail.templates.caption": "Шаблони листів",
   "mail.templates.columnKey": "Шаблон",
@@ -174,6 +184,7 @@
   "mail.templates.columnLocales": "Мови",
   "mail.templates.emptyTitle": "Шаблонів немає",
   "mail.templates.emptyBody": "У магазині не зареєстровано шаблонів листів.",
+
   "mail.preview.title": "Перегляд: {key}",
   "mail.preview.back": "Назад до шаблонів",
   "mail.preview.localeLabel": "Мова перегляду",
