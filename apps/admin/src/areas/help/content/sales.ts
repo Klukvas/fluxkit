@@ -98,6 +98,43 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
           en: "Marking paid cannot be undone: the order does not go back to “Awaiting payment”. The same transfer number a second time never records a second payment. While an online payment of the order is in progress, it cannot be marked paid or cancelled.",
         },
       },
+      {
+        kind: "heading",
+        id: "customer-says-paid",
+        text: {
+          uk: "Клієнт каже, що заплатив, а статус не оплачено",
+          en: "The customer says they paid, but the order is not paid",
+        },
+      },
+      {
+        kind: "steps",
+        items: [
+          {
+            uk: "Знайдіть замовлення: у списку замовлень введіть його номер або точну адресу email клієнта. Можливо, клієнт оформив два замовлення й оплатив інше.",
+            en: "Find the order: in the order list type its number or the customer's exact email address. The customer may have placed two orders and paid the other one.",
+          },
+          {
+            uk: "Якщо клієнт платив карткою онлайн: відкрийте замовлення й подивіться панель «Онлайн-оплата». «Перевірити статус» питає платіжного провайдера зараз; поки оплата обробляється, зачекайте.",
+            en: "If the customer paid by card online: open the order and look at the “Online payment” panel. “Check status” asks the payment provider now; while a payment is processing, wait.",
+          },
+          {
+            uk: "Відкрийте «Платежі на перевірку»: оплата, що прийшла після скасування чи прострочення замовлення або з іншою сумою, буде там із поясненням, що робити.",
+            en: "Open “Payments to review”: a payment that arrived after the order was cancelled or expired, or with another amount, is listed there with what to do.",
+          },
+          {
+            uk: "Якщо клієнт платив переказом або готівкою і ви бачите гроші на своєму рахунку: «Позначити оплаченим» з номером переказу або квитанції.",
+            en: "If the customer paid by transfer or cash and you see the money in your account: “Mark paid” with the transfer or receipt number.",
+          },
+        ],
+      },
+      { kind: "screen", route: "payments" },
+      {
+        kind: "warning",
+        text: {
+          uk: "Не позначайте оплаченим, поки не побачили гроші на своєму рахунку: знімок екрана від клієнта не доказ, а позначку оплати скасувати не можна. Не позначайте оплаченим замовлення, онлайн-оплата якого ще обробляється (адмінка цього й не дозволить). Не просіть клієнта оформити замовлення ще раз, поки не зʼясуєте: товар буде зарезервовано двічі, а оплата могла дійти до першого замовлення.",
+          en: "Do not mark it paid until you see the money in your account: a screenshot from the customer is no proof, and marking paid cannot be undone. Do not mark paid an order whose online payment is still processing (the admin refuses it anyway). Do not ask the customer to order again until you know: the stock would be reserved twice, and the payment may have reached the first order.",
+        },
+      },
       { kind: "heading", id: "fulfil", text: { uk: "Позначити виконаним", en: "Mark fulfilled" } },
       {
         kind: "paragraph",
