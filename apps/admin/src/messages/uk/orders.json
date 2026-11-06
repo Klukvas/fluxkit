@@ -176,7 +176,7 @@
   "shipment.snapshot.noCarrier": "Немає (магазин доставляє сам)",
   "shipment.snapshot.price": "Стягнуто за доставку",
   "shipment.snapshot.payer": "Хто платить за доставку",
-  "shipment.snapshot.payer.shop_charge": "Доставку оплачено разом із замовленням",
+  "shipment.snapshot.payer.shop_charge": "Доставка входить у суму замовлення",
   "shipment.snapshot.payer.recipient_on_delivery": "Одержувач платить перевізнику при отриманні",
   "shipment.snapshot.estimate": "Орієнтовна ціна перевізника (довідково)",
   "shipment.snapshot.destination": "Пункт видачі",

@@ -176,7 +176,7 @@
   "shipment.snapshot.noCarrier": "None (the shop delivers itself)",
   "shipment.snapshot.price": "Charged for delivery",
   "shipment.snapshot.payer": "Who pays for delivery",
-  "shipment.snapshot.payer.shop_charge": "Delivery was paid with the order",
+  "shipment.snapshot.payer.shop_charge": "Delivery is part of the order total",
   "shipment.snapshot.payer.recipient_on_delivery": "The recipient pays the carrier on delivery",
   "shipment.snapshot.estimate": "Carrier's price estimate (informational)",
   "shipment.snapshot.destination": "Pickup point",
