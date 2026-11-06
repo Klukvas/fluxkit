@@ -2,6 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { messagePlaceholders } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
+import { withoutLegalMarker } from "../config/legal";
 import en from "./en.json";
 import uk from "./uk.json";
 
@@ -75,6 +76,20 @@ describe("message files", () => {
           const message = (files[locale] as Record<string, string>)[`${group}.${form}`] as string;
           expect(messagePlaceholders(message), `${locale} ${group}.${form}`).toContain("count");
         }
+      }
+    }
+  });
+});
+
+describe("shopper-visible texts (repair batch 2: the owner's review saw developer notes on the page)", () => {
+  it("carry no TODO marker, source path or bracketed placeholder; the legal marker only starts a legal intro, which the page strips", () => {
+    for (const [locale, messages] of Object.entries(files)) {
+      for (const [key, message] of Object.entries(messages)) {
+        const legalIntro = /^legal\.[a-z]+\.intro$/.test(key);
+        const text = legalIntro ? withoutLegalMarker(message) : message;
+        expect(text, `${locale} ${key}`).not.toMatch(/TODO|FIXME|fluxkit\)/i);
+        expect(text, `${locale} ${key}`).not.toMatch(/\bsrc\/|\.tsx?\b|\.json\b/);
+        expect(text, `${locale} ${key}`).not.toMatch(/\[[^\]]*\]/);
       }
     }
   });

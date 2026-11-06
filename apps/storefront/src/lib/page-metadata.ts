@@ -151,6 +151,36 @@ export function legalMetadata(input: {
 }
 
 /**
+ * Metadata of a shop page (`config/shop-pages.ts`, plan 2026-11-06-storefront-shop-pages.md): title, description, the page's
+ * own canonical and its hreflang alternates. Indexable (no robots opinion): delivery, returns and contacts are what a shopper
+ * searches for.
+ */
+export function shopPageMetadata(input: {
+  origin: string;
+  locale: string;
+  t: Translator;
+  titleKey: string;
+  descriptionKey: string;
+  slug: string;
+}): Metadata {
+  const title = pageTitle(input.t, input.t(input.titleKey));
+  const description = input.t(input.descriptionKey);
+  const alternates = alternatesFor(input.origin, input.locale, `/${input.slug}`);
+  return {
+    title,
+    description,
+    alternates,
+    openGraph: {
+      title,
+      description,
+      url: alternates.canonical,
+      siteName: input.t("site.name"),
+      type: "website",
+    },
+  };
+}
+
+/**
  * Metadata of a page that belongs to one shopper (cart, checkout, account): a title and `noindex, nofollow`. No canonical
  * and no alternates: the page is not a search result in any language. `robots.txt` keeps crawlers out as well
  * (`lib/robots.ts`); this tag covers a crawler that follows a link anyway. `noReferrer` adds the referrer meta tag.

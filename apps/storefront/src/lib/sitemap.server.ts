@@ -1,6 +1,7 @@
 import { defaultLocale, locales } from "@fluxkit/ui";
 import { buildSitemap, collectSitemapProducts, type SitemapEntry } from "./sitemap";
 import { publicOrigin } from "./public-url.server";
+import { shopPagePaths } from "./shop-pages";
 import { SITEMAP_REVALIDATE_SECONDS } from "./store-data";
 import { storeData } from "./store-data.server";
 
@@ -20,5 +21,6 @@ export async function loadSitemap(): Promise<SitemapEntry[]> {
     defaultLocale,
     categories: categories.data.items,
     products,
+    shopPages: shopPagePaths(),
   });
 }

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { JsonLd } from "../../../../../components/json-ld";
 import { ProductDetails } from "../../../../../components/product-details";
+import { ProductPageNote } from "../../../../../components/product-page-note";
 import { ProductPurchase } from "../../../../../components/product-purchase";
 import { attributeRows } from "../../../../../lib/attributes";
 import { getProductPage } from "../../../../../lib/catalog-pages.server";
@@ -86,6 +87,7 @@ export default async function ProductPage(props: ProductProps) {
         gallery={prepareMedia(product.media, imageHosts())}
         preferredSelection={preferredSelection}
         exponent={exponent}
+        note={<ProductPageNote locale={locale} t={t} />}
         brand={
           product.brand === null
             ? null

@@ -17,16 +17,17 @@ const t = sentinelTranslator();
 
 describe("StoreTrustBar (config/trust-bar.ts)", () => {
   it("shows the configured items with decorative icons, in the config's order", () => {
-    const html = renderToStaticMarkup(<StoreTrustBar t={t} />);
+    const html = renderToStaticMarkup(<StoreTrustBar t={t} locale="en" />);
     expect(html).toContain('aria-label="§trust.label"');
     expect(html.match(/<li/g)).toHaveLength(trustBarItems.length);
-    const texts = [...html.matchAll(/<span>(§trust\.[a-z]+)<\/span>/g)].map((match) => match[1]);
+    // A line with a `page` is a link to that shop page (repair batch 2), the others plain text.
+    const texts = [...html.matchAll(/>(§trust\.[a-z]+)<\/(?:span|a)>/g)].map((match) => match[1]);
     expect(texts).toEqual(trustBarItems.map((item) => `§${item.messageKey}`));
     expect(html).toContain('aria-hidden="true"');
   });
 
   it("renders nothing when the config lists no item (a shop without promises to show)", () => {
-    expect(renderToStaticMarkup(<StoreTrustBar t={t} items={[]} />)).toBe("");
+    expect(renderToStaticMarkup(<StoreTrustBar t={t} locale="en" items={[]} />)).toBe("");
   });
 
   it("has a text in both locales for every default item, marked as demo copy in the config", () => {

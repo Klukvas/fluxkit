@@ -82,6 +82,28 @@
   .fk-site-footer {
     @apply mt-12 border-t border-border py-6 text-muted-foreground;
   }
+  /* The footer's link lists (the shop pages, then the legal pages) and its contacts (`components/site-footer.tsx`) carry NO
+     class: the footer is in every page's first HTML, which has a size budget (README, "Keep the header small"; pinned by
+     shell.spec.tsx), and a class on each of a dozen links is about 250 bytes. Scoped to the footer by these selectors; the
+     links look like `.fk-nav-link`. */
+  .fk-site-footer nav {
+    @apply flex flex-col gap-1;
+  }
+  .fk-site-footer ul,
+  .fk-site-footer address {
+    @apply flex flex-wrap gap-x-2 not-italic;
+  }
+  .fk-site-footer ul a,
+  .fk-site-footer address a {
+    @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+  }
+  /* The theme switch's form and button group (`components/theme-switch.tsx`). */
+  .fk-theme-form {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .fk-theme-group {
+    @apply flex flex-wrap gap-1;
+  }
   .fk-header-slot {
     @apply inline-flex min-h-11 min-w-11 items-center justify-center;
   }

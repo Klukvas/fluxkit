@@ -5,6 +5,7 @@
  */
 
 import { legalPages } from "../config/legal";
+import { shopPages } from "../config/shop-pages";
 
 export interface NavigationLink {
   labelKey: string;
@@ -22,13 +23,24 @@ export const headerLinks: readonly NavigationLink[] = [
 /** Most top-level categories shown in the header; the rest are reachable through the catalog. */
 export const HEADER_CATEGORY_LIMIT = 6;
 
-export const footerLinks: readonly NavigationLink[] = [
-  { labelKey: "footer.catalog", href: "/catalog" },
-  { labelKey: "footer.cart", href: "/cart" },
-  { labelKey: "footer.account", href: "/account" },
-  // The legal pages (privacy plan step 10) come from their own config: add or remove a page there, the footer follows.
-  ...legalPages.map((page) => ({ labelKey: page.labelKey, href: `/legal/${page.slug}` })),
-];
+/**
+ * The footer's second list: the legal pages (privacy plan step 10), from their own config: add or remove a page there, the
+ * footer follows. Catalog, cart and account are not repeated here (repair batch 2): the header shows all three on every page,
+ * and the footer's bytes went to the shop pages and the contacts instead (README, "Keep the header small").
+ */
+export const footerLinks: readonly NavigationLink[] = legalPages.map((page) => ({
+  labelKey: page.labelKey,
+  href: `/legal/${page.slug}`,
+}));
+
+/**
+ * The shop pages linked from the footer (repair batch 2): the enabled pages of `config/shop-pages.ts` with `inFooter`, in
+ * config order, as their own short list before `footerLinks`. Remove a page there, or set `inFooter: false`, and the footer
+ * follows.
+ */
+export const footerShopLinks: readonly NavigationLink[] = shopPages
+  .filter((page) => page.inFooter)
+  .map((page) => ({ labelKey: page.titleKey, href: `/${page.slug}` }));
 
 /** Targets of the header's cart and account islands. */
 export const sessionLinks = {

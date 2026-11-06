@@ -216,8 +216,10 @@ const IMAGES = {
   "template-pack": templatePack,
   "banner-season": () => storefrontBanner("banner-1.svg"),
   "banner-gifts": () => storefrontBanner("banner-2.svg"),
-  "banner-collection-uk": () => collectionBanner("Нова колекція", "Демо-банер: замініть його"),
-  "banner-collection-en": () => collectionBanner("New collection", "Demo banner: replace it"),
+  // The words are the banner's alt text in `seeds/src/banners.ts` (repair batch 2: no "replace it" note on the page).
+  "banner-collection-uk": () => collectionBanner("Нова колекція", "Дивіться новинки в каталозі"),
+  "banner-collection-en": () =>
+    collectionBanner("New collection", "See what is new in the catalog"),
 };
 
 /** A drawing is an SVG string (800 x 800) or `{svg, width, height, density?}`; the output is WebP at that size. */
