@@ -13,6 +13,10 @@
  * release build until the fork removed the slug there after writing its own texts). They describe what the template really
  * does (guest checkout, online payment on the order page, tracking on the order page) where they can; delivery times, prices
  * and return periods are examples the shop must replace.
+ *
+ * The delivery and payment page must match the checkout: its rows and texts name only the shipping methods that are ACTIVE
+ * (admin, Shipping) and the payment methods that are enabled (`PAYMENT_PROVIDERS_ENABLED`). Nothing checks this at runtime:
+ * whoever activates or switches off a method edits the page in the same change.
  */
 
 /**
@@ -114,25 +118,21 @@ export const shopPages: readonly ShopPageConfig[] = [
           "shopPages.delivery.methods.column.time",
           "shopPages.delivery.methods.column.cost",
         ],
+        // One row per delivery method the shop REALLY offers at checkout (admin, Shipping: the active methods); a row for a
+        // method the checkout does not offer reads like a broken promise (UX round 2, batch 3A item 2). The template's demo
+        // offers the courier only (`demo_courier` of the seed); a fork adds a row (and its `shopPages.delivery.methods.<id>.*`
+        // messages) for every method it activates, e.g. a carrier branch or store pickup, and removes the ones it switches off.
         rows: [
-          [
-            { key: "shopPages.delivery.methods.branch.method" },
-            { key: "shopPages.delivery.methods.branch.time" },
-            { key: "shopPages.delivery.methods.branch.cost" },
-          ],
           [
             { key: "shopPages.delivery.methods.courier.method" },
             { key: "shopPages.delivery.methods.courier.time" },
             { key: "shopPages.delivery.methods.courier.cost" },
           ],
-          [
-            { key: "shopPages.delivery.methods.pickup.method" },
-            { key: "shopPages.delivery.methods.pickup.time" },
-            { key: "shopPages.delivery.methods.pickup.cost" },
-          ],
         ],
         noteKey: "shopPages.delivery.methods.note",
       },
+      // The payment text names only what the checkout offers: online payment by card on the order page (ADR 0032). A fork with
+      // another method (cash on delivery, a bank transfer) changes `shopPages.delivery.payment.body` with it.
       {
         kind: "text",
         id: "payment",
