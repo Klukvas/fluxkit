@@ -392,6 +392,28 @@ describe("the banner form", () => {
     expect(html).toMatch(/<input[^>]*id="banner-title-en"[^>]*aria-invalid="true"/);
   });
 
+  it("puts a missing main picture ON its slot: the file input invalid and described by the message (UX round 2)", () => {
+    const html = form(
+      { ...card, layout: "image", picture: null, localePictures: { uk: PICTURE, en: PICTURE } },
+      {
+        issues: { imageUploadId: { key: "banners.form.pictureRequired" } },
+        summary: [{ key: "dict.form.checkFields" }],
+      },
+    );
+    const input = /<input[^>]*id="banner-imageUploadId-upload"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(input).toContain('aria-invalid="true"');
+    expect(input).toContain('aria-describedby="banner-imageUploadId-error"');
+    expect(html).toMatch(/<p id="banner-imageUploadId-error"[^>]*>§banners\.form\.pictureRequired/);
+    // Seen too, not only announced: the slot's frame takes the danger colour.
+    expect(html).toMatch(
+      /<div class="[^"]*border-danger[^"]*" role="group" aria-labelledby="banner-imageUploadId-heading"/,
+    );
+    // A language's own picture slot is not marked.
+    expect(/<input[^>]*id="banner-picture-en-upload"[^>]*>/.exec(html)?.[0]).not.toContain(
+      "aria-invalid",
+    );
+  });
+
   it("marks a language required only where the save would be blocked (second review of PR 230, item 4)", () => {
     const requiredInput = (html: string, id: string) =>
       new RegExp(`<input[^>]*id="${id}"[^>]*required=""`).test(html);

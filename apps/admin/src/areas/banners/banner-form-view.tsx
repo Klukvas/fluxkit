@@ -203,7 +203,7 @@ function PictureSlotView({
   const errorId = `${id}-error`;
   return (
     <div
-      className="flex flex-col gap-3 rounded-md border border-border p-4"
+      className={`flex flex-col gap-3 rounded-md border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
       role="group"
       aria-labelledby={`${id}-heading`}
       aria-describedby={error === undefined ? undefined : errorId}
@@ -237,6 +237,7 @@ function PictureSlotView({
               }
               multiple={false}
               controls={controls}
+              errorId={error === undefined ? undefined : errorId}
             />
           ) : null}
           {/* Going back to the main picture needs no upload, so it is offered with uploads switched off too. */}
