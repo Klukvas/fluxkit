@@ -210,12 +210,14 @@ function PictureSlotView({
       : t("banners.picture.localeHeading", { language });
   const controls = upload.controlsFor(slot);
   const errorId = `${id}-error`;
+  // The message is read once: by the upload input when there is one, else by the group (review m9 of PR 235).
+  const hasInput = upload.uploadsEnabled && canWrite;
   return (
     <div
       className={`flex flex-col gap-3 rounded-md border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
       role="group"
       aria-labelledby={`${id}-heading`}
-      aria-describedby={error === undefined ? undefined : errorId}
+      aria-describedby={error === undefined || hasInput ? undefined : errorId}
       // No native field to carry `aria-invalid`: the mark lets a refused save focus this slot's control (`first-invalid.ts`).
       data-invalid={error === undefined ? undefined : "true"}
     >

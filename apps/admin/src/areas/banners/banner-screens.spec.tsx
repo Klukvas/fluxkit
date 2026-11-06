@@ -408,6 +408,8 @@ describe("the banner form", () => {
     const input = /<input[^>]*id="banner-imageUploadId-upload"[^>]*>/.exec(html)?.[0] ?? "";
     expect(input).toContain('aria-invalid="true"');
     expect(input).toContain('aria-describedby="banner-imageUploadId-error"');
+    // Read once: only the input refers to the message (the group would repeat it).
+    expect(html.match(/aria-describedby="banner-imageUploadId-error"/g)).toHaveLength(1);
     expect(html).toMatch(/<p id="banner-imageUploadId-error"[^>]*>§banners\.form\.pictureRequired/);
     // Seen too, not only announced: the slot's frame takes the danger colour.
     expect(html).toMatch(

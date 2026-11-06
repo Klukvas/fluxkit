@@ -48,7 +48,7 @@
   "search.lane.calls": "Запитів до пошукової служби",
   "search.lane.refusedQueueFull": "Відмовлено: черга повна",
   "search.lane.abandoned": "Покинуто під час очікування (з'єднання покупця закрилося раніше)",
-  "search.lane.refusedWaitExceeded": "Відхилено: очікування понад 1 секунду",
+  "search.lane.refusedWaitExceeded": "Відмовлено: очікування понад 1 секунду",
   "search.indexes.title": "Індекси",
   "search.indexes.intro": "Один індекс на мову, побудований з опублікованого каталогу. Зміни потрапляють до нього через чергу; перебудова будує новий індекс і підміняє ним старий.",
   "search.state.building": "Будується",
