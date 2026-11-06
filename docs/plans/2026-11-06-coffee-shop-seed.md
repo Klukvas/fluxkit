@@ -133,4 +133,30 @@ if the services run.
 
 ## Results
 
-(filled in at the end)
+- Datasets: `seeds/src/coffee/` (default of `pnpm seed`, `pnpm demo:up`) and `seeds/src/test-fixture/` (`pnpm seed:test`; files moved with `git mv`,
+  each changed by its import path only), shared `seeds/src/shared/shipping.ts`; `seedDatasets`, `DEFAULT_SEED_DATASET`; `catalogSeed` removed.
+- Coffee dataset: 90 products, 208 variants, 10 product types, 20 attributes, 8 options, 11 invented brands, 35 categories (11 roots, one third
+  level), 16 synonym groups, 3 banners. Products per root: cups and lids 16, straws and stirrers 7, packaging 6, milk and cream 9, ice 3, coffee 11,
+  tea and cocoa 5, syrups and sauces 9, equipment 16, cleaning and filters 6, gift cards and guides 2. Stock: 19 low-stock and 7 sold-out
+  variants (whole products `grinder-blade`, `descaler-liquid`), one backorder, 4 untracked digital variants; 5 compare-at prices.
+- Runner: `--dataset coffee|test` (`datasetOf`, fails on an unknown or missing name before anything is touched), the dataset in the summary line,
+  an explicit `sku` of the data through `VariantsService.update` (with `allowBackorder`). Nothing else changed.
+- Consumers switched to the fixture: `apps/storefront/e2e/prepare-database.ts`, `apps/admin/e2e/prepare-database.ts`, `scripts/feature-matrix.sh`
+  (`search-off`, `search-on`), `apps/api/src/seed/seed.spec.ts`, `apps/api/src/search/store/newest-order.spec.ts`, `apps/api/src/test/seed-rows.ts`
+  (dataset parameter, default fixture). `demo-up.mjs` and `demo-pay.mjs` stay on the coffee default. The README checkout walkthrough uses
+  `barista-guide-pdf` (it used `demo-e-book`).
+- Images: 95 committed WebP files (90 product pictures, one detail picture, 4 banner pictures), 1.3 MB, the largest 22.6 KB; generator
+  `scripts/generate-coffee-images.mjs` with `scripts/coffee-images/` (about 55 s for all). A contact sheet was reviewed and the weak archetypes
+  redrawn (sugar sticks, napkins, cone filters, brush, group close-up, tin and cleaning labels, syrup and sauce scale). Assessment: cups, lids,
+  cold cups, cartons, coffee bags, ice bags, syrups, tins and boxes look like clean vector product illustrations; machines are acceptable front
+  views; napkins, the cone dripper, the brush and the group close-up are the weakest (simple and recognisable, not photographic).
+- Tests: `seeds` 37 (fixture spec unchanged in substance, `coffee/coffee-seed.spec.ts`, `datasets.spec.ts`); API `seed-dataset.spec.ts` (no
+  database: flag parsing, summary line, every picture of both datasets committed and within budget); API integration `seed-coffee.spec.ts` and
+  `search/store/coffee-demo-search.spec.ts` written, NOT run here.
+- Verified here: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:docs`, `check:env`, `pnpm --filter @fluxkit/theme test`,
+  `pnpm --filter @fluxkit/seeds test`, the API specs that need no database (`seed-dataset`, `source-guards`), both image `--check`s.
+- NOT verified here: Postgres could not be started (the sandbox refuses `runuser` for this worktree-isolated agent), so the seed integration
+  specs (fixture and coffee), the coffee search spec, `pnpm seed`/`pnpm seed:test` against a database, the feature matrix and both e2e suites are
+  left to CI.
+- Decision outside the plan: the shipping methods stay all inactive as today (the request mentioned `demo_courier` active; the reviewer's stack
+  had it activated by hand). Product copy promises nothing the template does not do (no "code by e-mail" for the gift card).
