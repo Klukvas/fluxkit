@@ -346,7 +346,7 @@ describe("catalog seed data", () => {
         ["лляна", "льняная"],
         ["електронна", "электронная"],
       ];
-      const titles = products.map((product) => product.title.uk.toLowerCase()).join(" ");
+      const titles = products.map((product) => (product.title.uk ?? "").toLowerCase()).join(" ");
       for (const [ukrainian, russianWord] of russian) {
         expect(titles, ukrainian).toContain(ukrainian);
         expect(
