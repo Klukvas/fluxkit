@@ -97,6 +97,8 @@ export function MarkPaidDialog({
         noValidate
       >
         <DialogError t={t} descriptor={error} innerRef={errorRef} />
+        {/* Nothing moves an order back from paid (docs/api/orders.md): the admin is told before, not after. */}
+        <Alert variant="warning">{t("order.markPaid.irreversible")}</Alert>
         <div className="flex flex-col gap-1">
           <p className="font-medium text-foreground" id="order-mark-paid-amount-label">
             {t("order.markPaid.amount")}

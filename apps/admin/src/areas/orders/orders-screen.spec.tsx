@@ -401,6 +401,8 @@ describe("action dialogs", () => {
     expect(html).not.toMatch(/<form[^>]*action=/);
     expect(html).toContain("§order.refusal.amount_mismatch");
     expect(html).toContain("§order.markPaid.retryHint");
+    // UX round 2: the dialog says before the write that it cannot be undone.
+    expect(html).toContain("§order.markPaid.irreversible");
   });
 
   it("disables everything while the payment is being sent", () => {

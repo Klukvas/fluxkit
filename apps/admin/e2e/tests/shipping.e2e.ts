@@ -298,7 +298,7 @@ test("waybill: only a paid order ships; create, track, print the label, cancel",
     // Pay the order (the existing action).
     await main.getByRole("button", { name: "Mark paid" }).click();
     const pay = page.getByRole("dialog", { name: `Mark order ${placed.number} paid` });
-    await pay.getByRole("textbox", { name: "Payment reference" }).fill(`BANK-${u}`);
+    await pay.getByRole("textbox", { name: "Transfer or receipt number" }).fill(`BANK-${u}`);
     await pay.getByRole("checkbox", { name: /I received this amount/ }).check();
     await pay.getByRole("button", { name: "Mark paid" }).click();
     await expect(main.getByText("The order is marked paid.")).toBeVisible();

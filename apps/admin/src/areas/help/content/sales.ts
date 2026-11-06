@@ -86,16 +86,16 @@ export const SALES_ARTICLES: readonly HelpArticle[] = [
             en: "The amount is the order total and cannot be changed: partial payment is not supported.",
           },
           {
-            uk: "Введіть номер платежу (переказу чи чека), поставте позначку «Я отримав цю суму» і підтвердьте.",
-            en: "Type the payment reference (transfer or receipt number), tick “I received this amount” and confirm.",
+            uk: "Заповніть «Номер переказу або квитанції», поставте позначку «Я отримав(-ла) цю суму» і підтвердьте.",
+            en: "Fill in “Transfer or receipt number”, tick “I received this amount” and confirm.",
           },
         ],
       },
       {
         kind: "note",
         text: {
-          uk: "Той самий номер платежу вдруге не запише другу оплату. Поки триває онлайн-оплата замовлення, позначити його оплаченим чи скасувати не можна.",
-          en: "The same reference a second time never records a second payment. While an online payment of the order is in progress, it cannot be marked paid or cancelled.",
+          uk: "Скасувати позначку оплати не можна: замовлення не повернеться в «Очікує оплати». Той самий номер переказу вдруге не запише другу оплату. Поки триває онлайн-оплата замовлення, позначити його оплаченим чи скасувати не можна.",
+          en: "Marking paid cannot be undone: the order does not go back to “Awaiting payment”. The same transfer number a second time never records a second payment. While an online payment of the order is in progress, it cannot be marked paid or cancelled.",
         },
       },
       { kind: "heading", id: "fulfil", text: { uk: "Позначити виконаним", en: "Mark fulfilled" } },
