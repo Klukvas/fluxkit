@@ -164,14 +164,16 @@ export function focusCheckoutReason(
  * Whether the cart page moves the focus to its heading (UX round 2, batch 3A item 5): the last line was removed (the line
  * count went from some to none) and the focus went with that line's remove button (on the page body). The page's live region
  * still says what happened; the heading only gives the keyboard and the screen reader a place to go on from. `null` counts
- * are a cart that is not read yet.
+ * are a cart that is not read yet. `removedHere`: the shopper pressed a remove button on this page since the last change of
+ * the count; a cart emptied elsewhere (another tab, a sign-out) moves no focus (review m7 of PR 234).
  */
 export function focusCartHeading(
   before: number | null,
   after: number | null,
   focusLost: boolean,
+  removedHere: boolean,
 ): boolean {
-  return before !== null && before > 0 && after === 0 && focusLost;
+  return removedHere && before !== null && before > 0 && after === 0 && focusLost;
 }
 
 /** A whole-cart write (acknowledge, clear) is in flight. */

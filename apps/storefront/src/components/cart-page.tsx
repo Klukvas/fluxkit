@@ -655,15 +655,18 @@ export function CartPage({
 
   // Removing the last line removes its focused button with it, and the empty state has nothing focused: the focus goes to the
   // heading instead of the page body (UX round 2, batch 3A item 5). The live region above still says "removed".
+  // Only after a remove pressed here: a cart another tab emptied moves no focus (review m7 of PR 234).
   const lineCount = state.cart === null ? null : state.cart.lines.length;
   const previousLineCount = useRef(lineCount);
+  const removedHere = useRef(false);
   useEffect(() => {
     const before = previousLineCount.current;
     previousLineCount.current = lineCount;
     const focusLost = document.activeElement === null || document.activeElement === document.body;
-    if (focusCartHeading(before, lineCount, focusLost)) {
+    if (focusCartHeading(before, lineCount, focusLost, removedHere.current)) {
       document.getElementById(CART_HEADING_ID)?.focus();
     }
+    if (before !== lineCount) removedHere.current = false;
   }, [lineCount]);
 
   async function checkoutWhenSaved(): Promise<void> {
@@ -686,6 +689,10 @@ export function CartPage({
       exponent={exponent}
       imageHosts={imageHosts}
       {...handlers}
+      onRemove={(variantId) => {
+        removedHere.current = true;
+        handlers.onRemove(variantId);
+      }}
       registerLine={registry.register}
       leaving={leaving}
       leftFailure={leftFailure}
