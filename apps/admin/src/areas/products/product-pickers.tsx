@@ -1,4 +1,6 @@
 import type { AdminBrand, AdminProductType, AdminResult, LocalizedText } from "@fluxkit/api-client";
+import type { Translator } from "@fluxkit/ui";
+import { Link } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
 import { adminClient } from "../../lib/api";
 import type { MessageDescriptor } from "../../lib/problem-messages";
@@ -6,7 +8,10 @@ import { useResource } from "../../lib/use-resource";
 import { useContentLocales } from "../catalog-dictionaries/config-gate";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import { ServerPicker } from "../catalog-dictionaries/server-picker";
+import { PATHS } from "../../router/paths";
+import { linkClass } from "../catalog-dictionaries/dictionary-frame";
 import { GENERAL_FIELD_IDS } from "./field-ids";
+import { useCan } from "./use-can";
 
 /** A short form of an id, for a reference whose name is not known (support can match it). */
 export function shortId(id: string): string {
@@ -85,6 +90,24 @@ export function BrandPicker({
   );
 }
 
+/**
+ * "No suitable type? Create a product type" under the type field of a new product, for an admin who may create one. The
+ * create screen is another page: the unsaved-changes guard asks before leaving, and the text says the typed values are not
+ * kept (keeping them would need a draft store the admin does not have).
+ */
+export function ProductTypeCreateLinkView({ t, canCreate }: { t: Translator; canCreate: boolean }) {
+  if (!canCreate) return null;
+  return (
+    <p className="text-sm text-muted-foreground">
+      {t("products.form.productTypeMissing")}{" "}
+      <Link to={PATHS.productTypeNew} className={linkClass}>
+        {t("products.form.productTypeCreate")}
+      </Link>{" "}
+      {t("products.form.productTypeCreateNote")}
+    </p>
+  );
+}
+
 /** The product type of a new product (required; it cannot change later). */
 export function ProductTypePicker({
   value,
@@ -97,25 +120,31 @@ export function ProductTypePicker({
 }) {
   const { t, locale } = useI18n();
   const content = useContentLocales();
+  const canCreate = useCan("createProductType");
   return (
-    <ServerPicker<AdminProductType>
-      t={t}
-      id={GENERAL_FIELD_IDS.productType}
-      name="productTypeId"
-      label={t("products.form.productType")}
-      hint={t("products.form.productTypeHint")}
-      value={value}
-      onChange={onChange}
-      fetchPage={(offset, limit, signal) => adminClient.listProductTypes({ offset, limit, signal })}
-      keyOf={(type) => type.id}
-      labelOf={(type) =>
-        t("products.form.productTypeChoice", {
-          name: resolveLocalized(type.name, locale, content.defaultLocale) || type.code,
-          code: type.code,
-        })
-      }
-      required
-      error={error}
-    />
+    <div className="flex flex-col gap-2">
+      <ServerPicker<AdminProductType>
+        t={t}
+        id={GENERAL_FIELD_IDS.productType}
+        name="productTypeId"
+        label={t("products.form.productType")}
+        hint={t("products.form.productTypeHint")}
+        value={value}
+        onChange={onChange}
+        fetchPage={(offset, limit, signal) =>
+          adminClient.listProductTypes({ offset, limit, signal })
+        }
+        keyOf={(type) => type.id}
+        labelOf={(type) =>
+          t("products.form.productTypeChoice", {
+            name: resolveLocalized(type.name, locale, content.defaultLocale) || type.code,
+            code: type.code,
+          })
+        }
+        required
+        error={error}
+      />
+      <ProductTypeCreateLinkView t={t} canCreate={canCreate} />
+    </div>
   );
 }

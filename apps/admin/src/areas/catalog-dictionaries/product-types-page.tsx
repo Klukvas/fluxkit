@@ -42,6 +42,7 @@ import { AttributeAssignmentsSection, OptionAssignmentsSection } from "./product
 import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { useOptionNames } from "./use-option-names";
 
 const DEFAULT_LIMIT = 50;
 
@@ -320,6 +321,7 @@ function ProductTypeEditor({ id }: { id: string }) {
   );
   const editor = useEditorState(resource.reload);
   const productType = resource.data;
+  const optionNames = useOptionNames(productType?.options.map((row) => row.optionId) ?? []);
   const title =
     productType === null
       ? t("page.productTypeDetail.title")
@@ -363,6 +365,7 @@ function ProductTypeEditor({ id }: { id: string }) {
             productTypeId={productType.id}
             canWrite={canWrite}
             rows={productType.options}
+            optionNames={optionNames}
             onChanged={editor.changed}
           />
           <DangerZone

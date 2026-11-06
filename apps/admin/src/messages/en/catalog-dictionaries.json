@@ -230,6 +230,8 @@
   "dict.assignment.option.removeBody": "The option itself stays; it is no longer allowed on this product type.",
   "dict.assignment.option.removeHint": "Products of this type still use this option. Change those products first.",
   "dict.assignment.option.empty": "No options allowed yet.",
+  "dict.assignment.option.choice": "{name} ({code})",
+  "dict.assignment.option.sharedHint": "An option's values are shared by every product type: for weight create its own option instead of reusing “Size”.",
   "dict.brand.name": "Name",
   "dict.brand.description": "Description",
   "dict.brand.slug": "Page address",

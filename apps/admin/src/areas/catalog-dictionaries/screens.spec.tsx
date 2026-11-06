@@ -4,6 +4,7 @@ import {
   AdminProductTypeAttribute,
   AdminProductTypeOptionAssignment,
   AdminCategory,
+  LocalizedText,
 } from "@fluxkit/api-client";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { createTranslator, type DataTableColumn, type Translator } from "@fluxkit/ui";
@@ -617,7 +618,7 @@ describe("product type assignments", () => {
         onChanged={noop}
       />,
     );
-  const options = (canWrite: boolean) =>
+  const options = (canWrite: boolean, optionNames?: ReadonlyMap<string, LocalizedText>) =>
     renderInRouter(
       <OptionAssignmentsSection
         t={t}
@@ -626,6 +627,7 @@ describe("product type assignments", () => {
         productTypeId="t1"
         canWrite={canWrite}
         rows={[optionAssignment]}
+        {...(optionNames === undefined ? {} : { optionNames })}
         onChanged={noop}
       />,
     );
@@ -644,6 +646,14 @@ describe("product type assignments", () => {
     expect(html).toContain('href="/admin-ui/catalog/options/o1"');
     expect(hasButtonLabelled(html, "dict.assignment.option.add")).toBe(true);
     expectTranslated(html, ["color"]);
+    expect(html).toContain("§dict.assignment.option.sharedHint");
+  });
+
+  it("names each allowed option by its name with the code as secondary text (UX round 2: “size 0”)", () => {
+    const html = options(true, new Map([["o1", { uk: "Колір", en: "Colour" }]]));
+    expect(html).toMatch(/href="\/admin-ui\/catalog\/options\/o1"[^>]*>Colour<\/a>/);
+    expect(html).toContain('<small class="text-muted-foreground">color</small>');
+    expectTranslated(html, ["color", "Colour"]);
   });
 
   it("has no assign, change or remove control for a viewer", () => {

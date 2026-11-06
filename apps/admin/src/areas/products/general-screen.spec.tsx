@@ -9,6 +9,7 @@ import {
 import { MESSAGE_FILES } from "./index";
 import { emptyProductForm } from "./product-form";
 import { ProductGeneralView } from "./product-general-view";
+import { ProductTypeCreateLinkView } from "./product-pickers";
 
 const content = { defaultLocale: "uk", locales: ["uk", "en"] };
 const noop = () => undefined;
@@ -111,5 +112,22 @@ describe("product general form screen", () => {
         }
       }
     }
+  });
+});
+
+describe("the type field of a new product (UX round 2)", () => {
+  const view = (canCreate: boolean, t: Translator = sentinelTranslator()) =>
+    renderInRouter(<ProductTypeCreateLinkView t={t} canCreate={canCreate} />);
+
+  it("links the product type create screen and says the typed values are not kept", () => {
+    const html = view(true);
+    expect(html).toContain('href="/admin-ui/catalog/product-types/new"');
+    expect(html).toContain("§products.form.productTypeCreate");
+    expect(html).toContain("§products.form.productTypeCreateNote");
+    expect(leftoverText(html)).toBe("");
+  });
+
+  it("shows no link to an admin who may not create a product type", () => {
+    expect(view(false)).toBe("");
   });
 });

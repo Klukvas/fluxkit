@@ -230,6 +230,8 @@
   "dict.assignment.option.removeBody": "Сама опція лишається; для цього типу товару її більше не дозволено.",
   "dict.assignment.option.removeHint": "Товари цього типу досі використовують цю опцію. Спершу змініть ці товари.",
   "dict.assignment.option.empty": "Опцій ще не дозволено.",
+  "dict.assignment.option.choice": "{name} ({code})",
+  "dict.assignment.option.sharedHint": "Значення опції спільні для всіх типів товарів: для ваги створіть окрему опцію, а не використовуйте «Розмір».",
   "dict.brand.name": "Назва",
   "dict.brand.description": "Опис",
   "dict.brand.slug": "Адреса сторінки",
