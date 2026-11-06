@@ -369,7 +369,7 @@ test("a brand logo is uploaded into the field and survives the save", async ({
   await page.goto(`${SPA}/catalog/brands/new`);
   await main.getByRole("textbox", { name: "Name (Ukrainian)", exact: true }).fill(`Логотип ${u}`);
   await main.getByRole("textbox", { name: "Name (English)", exact: true }).fill(`Logo ${u}`);
-  await main.getByRole("textbox", { name: "Slug (part of the address)" }).fill(`logo-${u}`);
+  await main.getByRole("textbox", { name: "Page address", exact: true }).fill(`logo-${u}`);
 
   await main.getByLabel("Upload logo").setInputFiles(asPayload(logo));
   await expect(uploadStatus(main, logo.name)).toContainText("Uploaded");

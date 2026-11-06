@@ -19,7 +19,7 @@ import {
 import type { UploadControls } from "../catalog-dictionaries/upload-panel";
 import { attributeFieldSpecs, attributeFormFrom } from "./attribute-values-form";
 import { MESSAGE_FILES } from "./index";
-import { mediaRowsFrom, newMediaRow, type MediaRow } from "./media-list";
+import { mediaRowsFrom, newMediaRow, uploadedMediaRow, type MediaRow } from "./media-list";
 import {
   planOptionChange,
   selectionFrom,
@@ -344,6 +344,24 @@ describe("Media tab", () => {
     expect(html).not.toContain("<button");
     expect(tag(html, "product-media-0-url")).toContain('readOnly=""');
     expect(tag(html, "product-media-0-link")).toContain('disabled=""');
+  });
+
+  it("an uploaded, unsaved file: says to save, its address read-only and not required (UX round 2)", () => {
+    const stored = mediaRowsFrom(product().media, content.locales);
+    const uploaded = uploadedMediaRow(
+      "new-1",
+      "https://shop.example/media/new.webp",
+      content.locales,
+    );
+    const html = media(true, [...stored, uploaded]);
+    const index = stored.length;
+    expect(html.match(/§products\.media\.uploadedSaveHint/g)?.length).toBe(1);
+    expect(tag(html, `product-media-${index}-url`)).toContain('readOnly=""');
+    expect(tag(html, `product-media-${index}-url`)).not.toContain('required=""');
+    expect(html).toContain("§products.media.uploadedUrl");
+    // A typed address stays editable and required.
+    expect(tag(html, "product-media-0-url")).toContain('required=""');
+    expect(tag(html, "product-media-0-url")).not.toContain('readOnly=""');
   });
 
   it("shows an empty list and no add button at 100 images", () => {

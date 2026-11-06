@@ -226,6 +226,33 @@ describe("the banner form", () => {
     expect(html).not.toMatch(/<form[^>]*action=/);
   });
 
+  it("offers copying the main language's text into an empty field of another language only (UX round 2)", () => {
+    const values: BannerFormValues = {
+      ...card,
+      title: { uk: "Розпродаж", en: "" },
+      text: { uk: "Знижки", en: "Already translated" },
+    };
+    const html = form(values);
+    // Only the English title: the English text has its own, the alt text has no main-language text, uk is the main one.
+    expect(html.match(/§banners\.form\.copyDefault</g)).toHaveLength(1);
+    const englishTitle = html.indexOf('id="banner-title-en"');
+    const button = html.indexOf("§banners.form.copyDefault<");
+    expect(button).toBeGreaterThan(englishTitle);
+    expect(button).toBeLessThan(html.indexOf('id="banner-text-en"'));
+    // Label in name (WCAG 2.5.3, review m3 of PR 235): no aria-label; the name is the visible text, then the field in a
+    // visually hidden part.
+    const english = form(values, {}, en);
+    const copyButton =
+      /<button[^>]*>Copy from the main language[^]*?<\/button>/.exec(english)?.[0] ?? "";
+    expect(copyButton).not.toContain("aria-label");
+    expect(copyButton.replace(/<[^>]*>/g, "")).toBe(
+      "Copy from the main language (Ukrainian) into “Title (English)”",
+    );
+    expect(copyButton).toMatch(/<span class="sr-only[^"]*"> into “Title \(English\)”<\/span>/);
+    // Nothing to copy for a reader.
+    expect(form(values, { canWrite: false })).not.toContain("§banners.form.copyDefault");
+  });
+
   it("card: one fieldset per content locale with title, text and the optional picture description", () => {
     const html = form(card);
     expect(html.match(/<fieldset class="flex flex-col gap-4">/g)).toHaveLength(2);
@@ -368,6 +395,30 @@ describe("the banner form", () => {
     expect(html).toContain("§dict.form.checkFields");
     expect(html).toContain("§banners.form.endedWarning");
     expect(html).toMatch(/<input[^>]*id="banner-title-en"[^>]*aria-invalid="true"/);
+  });
+
+  it("puts a missing main picture ON its slot: the file input invalid and described by the message (UX round 2)", () => {
+    const html = form(
+      { ...card, layout: "image", picture: null, localePictures: { uk: PICTURE, en: PICTURE } },
+      {
+        issues: { imageUploadId: { key: "banners.form.pictureRequired" } },
+        summary: [{ key: "dict.form.checkFields" }],
+      },
+    );
+    const input = /<input[^>]*id="banner-imageUploadId-upload"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(input).toContain('aria-invalid="true"');
+    expect(input).toContain('aria-describedby="banner-imageUploadId-error"');
+    // Read once: only the input refers to the message (the group would repeat it).
+    expect(html.match(/aria-describedby="banner-imageUploadId-error"/g)).toHaveLength(1);
+    expect(html).toMatch(/<p id="banner-imageUploadId-error"[^>]*>§banners\.form\.pictureRequired/);
+    // Seen too, not only announced: the slot's frame takes the danger colour.
+    expect(html).toMatch(
+      /<div class="[^"]*border-danger[^"]*" role="group" aria-labelledby="banner-imageUploadId-heading"/,
+    );
+    // A language's own picture slot is not marked.
+    expect(/<input[^>]*id="banner-picture-en-upload"[^>]*>/.exec(html)?.[0]).not.toContain(
+      "aria-invalid",
+    );
   });
 
   it("marks a language required only where the save would be blocked (second review of PR 230, item 4)", () => {

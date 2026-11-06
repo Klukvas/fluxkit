@@ -401,6 +401,32 @@ describe("action dialogs", () => {
     expect(html).not.toMatch(/<form[^>]*action=/);
     expect(html).toContain("§order.refusal.amount_mismatch");
     expect(html).toContain("§order.markPaid.retryHint");
+    // UX round 2: the dialog says before the write that it cannot be undone.
+    expect(html).toContain("§order.markPaid.irreversible");
+    expect(html).not.toContain("§order.markPaid.noCardPayment");
+  });
+
+  it("mark paid: says when no card payment has succeeded (UX round 2)", () => {
+    const html = renderInRouter(
+      <MarkPaidDialog
+        t={sentinel}
+        open
+        orderNumber="7K3M-9QX2"
+        amountText="UAH 39.98"
+        currency="UAH"
+        values={{ reference: "", received: false }}
+        onChange={noop}
+        referenceError={null}
+        receivedError={null}
+        error={null}
+        retrying={false}
+        noCardPayment
+        busy={false}
+        onSubmit={noop}
+        onClose={noop}
+      />,
+    );
+    expect(html).toContain("§order.markPaid.noCardPayment");
   });
 
   it("disables everything while the payment is being sent", () => {

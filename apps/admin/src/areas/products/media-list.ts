@@ -33,6 +33,11 @@ export interface MediaRow {
   /** The linked option value, as a pair (the API takes both or neither). */
   optionId: string | null;
   optionValueId: string | null;
+  /**
+   * A file uploaded in this visit and not saved with the product yet: its address came from the server, so the screen shows
+   * it read-only and says that "Save the images" puts it in the shop. Never sent; cleared by a save.
+   */
+  uploaded: boolean;
 }
 
 export interface MediaLink {
@@ -58,6 +63,7 @@ export function mediaRowsFrom(
       alt: localeValuesFrom(entry.alt, locales),
       optionId: entry.optionId,
       optionValueId: entry.optionValueId,
+      uploaded: false,
     }));
 }
 
@@ -68,12 +74,18 @@ export function newMediaRow(key: string, locales: readonly string[]): MediaRow {
     alt: localeValuesFrom(null, locales),
     optionId: null,
     optionValueId: null,
+    uploaded: false,
   };
 }
 
 /** The row of an uploaded file: its URL from the server's answer, no alt text, no option value. Unsaved until the list is saved. */
 export function uploadedMediaRow(key: string, url: string, locales: readonly string[]): MediaRow {
-  return { ...newMediaRow(key, locales), url };
+  return { ...newMediaRow(key, locales), url, uploaded: true };
+}
+
+/** The list as saved: no row is a pending upload any more (the address stays, now stored with the product). */
+export function markMediaSaved(rows: readonly MediaRow[]): readonly MediaRow[] {
+  return rows.map((row) => (row.uploaded ? { ...row, uploaded: false } : row));
 }
 
 /** A new row at the end; the same list when it is full. */

@@ -57,7 +57,7 @@ test("orders: filter by status and q, detail, mark paid with a reference, fulfil
   await expect(pay.getByRole("textbox", { name: /Amount/ })).toHaveCount(0);
   await expect(pay.getByRole("spinbutton")).toHaveCount(0);
   const reference = `BANK-${u}`;
-  await pay.getByRole("textbox", { name: "Payment reference" }).fill(reference);
+  await pay.getByRole("textbox", { name: "Transfer or receipt number" }).fill(reference);
   await pay.getByRole("checkbox", { name: /I received this amount/ }).check();
   // The answer is held back until the dialog has been tried with Escape (step 13 review, G15).
   let release: () => void = () => undefined;
@@ -73,11 +73,13 @@ test("orders: filter by status and q, detail, mark paid with a reference, fulfil
   expect((await paid).postDataJSON()).toEqual({ reference, amount: toPay.total });
   // While the write runs the dialog cannot be closed: its buttons are disabled and Escape does nothing.
   await expect(pay.getByRole("button", { name: "Sending…" })).toBeDisabled();
-  await expect(pay.getByRole("button", { name: "Close" })).toBeDisabled();
+  await expect(pay.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await expect(pay).toBeVisible();
-  await expect(pay.getByRole("textbox", { name: "Payment reference" })).toHaveValue(reference);
+  await expect(pay.getByRole("textbox", { name: "Transfer or receipt number" })).toHaveValue(
+    reference,
+  );
   const answered = page.waitForResponse((response) => response.url().endsWith("/mark-paid"));
   release();
   expect((await answered).status()).toBe(200);

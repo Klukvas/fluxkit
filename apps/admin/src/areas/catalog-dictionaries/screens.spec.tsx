@@ -4,6 +4,7 @@ import {
   AdminProductTypeAttribute,
   AdminProductTypeOptionAssignment,
   AdminCategory,
+  LocalizedText,
 } from "@fluxkit/api-client";
 import { ROLE_PERMISSIONS } from "@fluxkit/core";
 import { createTranslator, type DataTableColumn, type Translator } from "@fluxkit/ui";
@@ -617,7 +618,11 @@ describe("product type assignments", () => {
         onChanged={noop}
       />,
     );
-  const options = (canWrite: boolean) =>
+  const options = (
+    canWrite: boolean,
+    optionNames?: ReadonlyMap<string, { name: LocalizedText }>,
+    namesFailed = false,
+  ) =>
     renderInRouter(
       <OptionAssignmentsSection
         t={t}
@@ -626,6 +631,9 @@ describe("product type assignments", () => {
         productTypeId="t1"
         canWrite={canWrite}
         rows={[optionAssignment]}
+        {...(optionNames === undefined ? {} : { optionNames })}
+        namesFailed={namesFailed}
+        onRetryNames={noop}
         onChanged={noop}
       />,
     );
@@ -644,6 +652,23 @@ describe("product type assignments", () => {
     expect(html).toContain('href="/admin-ui/catalog/options/o1"');
     expect(hasButtonLabelled(html, "dict.assignment.option.add")).toBe(true);
     expectTranslated(html, ["color"]);
+    expect(html).toContain("§dict.assignment.option.sharedHint");
+  });
+
+  it("names each allowed option by its name with the code as secondary text (UX round 2: “size 0”)", () => {
+    const html = options(true, new Map([["o1", { name: { uk: "Колір", en: "Colour" } }]]));
+    expect(html).toMatch(/href="\/admin-ui\/catalog\/options\/o1"[^>]*>Colour<\/a>/);
+    expect(html).toContain('<small class="text-muted-foreground">color</small>');
+    expectTranslated(html, ["color", "Colour"]);
+    expect(html).not.toContain("§dict.assignment.option.namesFailed");
+  });
+
+  it("says so and offers a retry when the option names could not be read (review m4 of PR 235)", () => {
+    const html = options(true, new Map(), true);
+    expect(html).toContain("§dict.assignment.option.namesFailed");
+    expect(hasButtonLabelled(html, "action.retry")).toBe(true);
+    // The codes stay on screen.
+    expect(html).toMatch(/href="\/admin-ui\/catalog\/options\/o1"[^>]*>color<\/a>/);
   });
 
   it("has no assign, change or remove control for a viewer", () => {
@@ -685,6 +710,36 @@ describe("server picker", () => {
     { id: "a", name: "Alpha" },
     { id: "b", name: "Beta" },
   ];
+
+  it("allow an option: enabled as soon as the option list is loaded, each option as “name (code)” (CI e2e of PR 235)", async () => {
+    const en = createTranslator(await messagesForArea("en", MESSAGE_FILES), "en");
+    const html = renderInRouter(
+      <ServerPickerView
+        t={t}
+        id="option"
+        name="optionId"
+        label="§label"
+        value=""
+        onChange={noop}
+        state={{
+          status: "ready",
+          items: [{ id: "o1", code: "finish_1", name: "Finish 1" }],
+          total: 1,
+          loadingMore: false,
+          moreFailed: false,
+        }}
+        keyOf={(item) => item.id}
+        labelOf={(item) =>
+          en("dict.assignment.option.choice", { name: item.name, code: item.code })
+        }
+        onLoadMore={noop}
+        onRetry={noop}
+      />,
+    );
+    expect(html).not.toMatch(/<select[^>]*\sdisabled=""/);
+    expect(html).not.toContain('aria-busy="true"');
+    expect(html).toContain('<option value="o1">Finish 1 (finish_1)</option>');
+  });
 
   it("is disabled and busy while the first page loads", () => {
     const html = picker(initialPickerState);

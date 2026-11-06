@@ -64,12 +64,15 @@ export function UploadPanel({
   label,
   multiple,
   controls,
+  errorId,
 }: {
   t: Translator;
   id: string;
   label: string;
   multiple: boolean;
   controls: UploadControls;
+  /** The id of the error text of a required picture that is missing: the file input is marked invalid and described by it. */
+  errorId?: string;
 }) {
   const { items, running, notice, limits, maxFiles } = controls;
   const summary = summaryMessages(summarizeUploads(items));
@@ -80,7 +83,8 @@ export function UploadPanel({
         <label
           htmlFor={id}
           className={cn(
-            "inline-flex items-center justify-center rounded-md border border-border bg-background px-4 py-2 font-medium text-foreground",
+            "inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 font-medium text-foreground",
+            errorId === undefined ? "border-border" : "border-danger",
             "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
             running ? "cursor-not-allowed opacity-50" : "cursor-pointer",
           )}
@@ -93,6 +97,8 @@ export function UploadPanel({
             multiple={multiple}
             accept={acceptAttribute(limits.contentTypes)}
             aria-disabled={running ? true : undefined}
+            aria-invalid={errorId === undefined ? undefined : true}
+            aria-describedby={errorId}
             onClick={(event) => keepFileDialogClosed(running, event)}
             onChange={(event) => {
               const input = event.currentTarget;

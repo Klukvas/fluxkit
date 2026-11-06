@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AdminOrder } from "@fluxkit/api-client";
+import type { AdminOrder, AdminPayment } from "@fluxkit/api-client";
 import { describe, expect, it } from "vitest";
 import {
   EMPTY_MARK_PAID,
@@ -8,6 +8,7 @@ import {
   isMarkPaidDirty,
   markPaidCheckAfterUnknown,
   planMarkPaid,
+  showNoCardPaymentNote,
   valuesForRetry,
   type MarkPaidValues,
 } from "./mark-paid-form";
@@ -156,5 +157,26 @@ describe("after a lost answer (mark-paid is idempotent by reference)", () => {
       reference: "R-1",
       received: false,
     });
+  });
+});
+
+describe("the note that no card payment has succeeded (UX round 2, review m2 of PR 235)", () => {
+  const attempts = (...statuses: AdminPayment["status"][]) =>
+    statuses.map((status) => ({ status }));
+
+  it("is shown while online payment is on and no attempt succeeded or is under way", () => {
+    expect(showNoCardPaymentNote(true, [])).toBe(true);
+    // Failed, expired or closed attempts: the customer can still pay by card, and mark paid would end that.
+    expect(showNoCardPaymentNote(true, attempts("failed", "expired", "invalidated"))).toBe(true);
+    // An open payment page: mark paid closes it and a late success is refunded automatically.
+    expect(showNoCardPaymentNote(true, attempts("awaiting_customer"))).toBe(true);
+  });
+
+  it("is hidden without online payment, after a success, and while a payment is under way (mark paid is refused then)", () => {
+    expect(showNoCardPaymentNote(false, [])).toBe(false);
+    expect(showNoCardPaymentNote(true, attempts("failed", "succeeded"))).toBe(false);
+    for (const status of ["creating", "processing", "create_unknown"] as const) {
+      expect(showNoCardPaymentNote(true, attempts("failed", status)), status).toBe(false);
+    }
   });
 });

@@ -42,6 +42,7 @@ import { AttributeAssignmentsSection, OptionAssignmentsSection } from "./product
 import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { useOptionDefinitions } from "./use-option-definitions";
 
 const DEFAULT_LIMIT = 50;
 
@@ -320,6 +321,9 @@ function ProductTypeEditor({ id }: { id: string }) {
   );
   const editor = useEditorState(resource.reload);
   const productType = resource.data;
+  const optionDefinitions = useOptionDefinitions(
+    productType?.options.map((row) => row.optionId) ?? [],
+  );
   const title =
     productType === null
       ? t("page.productTypeDetail.title")
@@ -363,6 +367,9 @@ function ProductTypeEditor({ id }: { id: string }) {
             productTypeId={productType.id}
             canWrite={canWrite}
             rows={productType.options}
+            optionNames={optionDefinitions.byId}
+            namesFailed={optionDefinitions.status === "failed"}
+            onRetryNames={optionDefinitions.retry}
             onChanged={editor.changed}
           />
           <DangerZone
@@ -388,7 +395,11 @@ function ProductTypeEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.productType.deleteTitle", { code: productType.code })}
+              title={t("dict.productType.deleteTitle", {
+                name:
+                  resolveLocalized(productType.name, locale, content.defaultLocale) ||
+                  productType.code,
+              })}
               description={t("dict.productType.deleteBody")}
               hint={t("dict.productType.deleteHint")}
               confirmLabel={t("dict.productType.deleteConfirm")}

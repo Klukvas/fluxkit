@@ -123,8 +123,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
             en: "Create the attributes “Material” (one choice) and “Care” (text).",
           },
           {
-            uk: "Створіть тип «Футболка»: додайте обидві опції та обидва атрибути на рівні товару.",
-            en: "Create the type “T-shirt”: add both options and both attributes at product level.",
+            uk: "Створіть тип «Футболка». На його сторінці натисніть «Дозволити опцію» для кожної з двох опцій і «Призначити атрибут» для кожного з двох атрибутів (рівень «товар»).",
+            en: "Create the type “T-shirt”. On its page press “Allow option” for each of the two options and “Assign attribute” for each of the two attributes (level “product”).",
           },
           {
             uk: "Створіть товар цього типу й виберіть розміри та кольори: вийде 6 варіантів (3 розміри × 2 кольори).",
@@ -167,8 +167,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
             en: "Choose the product type (it cannot be changed later) and type the title, at least in the default language.",
           },
           {
-            uk: "Адресу (slug) можна лишити порожньою: її створять із назви. Бренд і опис необовʼязкові.",
-            en: "The address (slug) may stay empty: it is made from the title. Brand and description are optional.",
+            uk: "Адресу сторінки можна лишити порожньою: її створять із назви. Бренд і опис необовʼязкові.",
+            en: "The page address may stay empty: it is made from the title. Brand and description are optional.",
           },
           {
             uk: "Після збереження відкрийте редактор за посиланням. Товар створено як чернетку з одним варіантом за замовчуванням.",
@@ -181,8 +181,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Назва, опис (простий текст, без HTML), адреса і бренд. Зміна адреси міняє посилання на товар; старе посилання не перенаправляється. Окремих полів для SEO немає.",
-          en: "Title, description (plain text, no HTML), address and brand. Changing the address changes the product's link; the old link does not redirect. There are no separate SEO fields.",
+          uk: "Назва, опис (простий текст, без HTML), адреса сторінки і бренд. Зміна адреси сторінки міняє посилання на товар; старе посилання не перенаправляється. Окремих полів для SEO немає.",
+          en: "Title, description (plain text, no HTML), page address and brand. Changing the page address changes the product's link; the old link does not redirect. There are no separate SEO fields.",
         },
       },
       {
@@ -530,13 +530,13 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "heading",
         id: "capacity",
-        text: { uk: "Пропускна здатність пошуку в магазині", en: "Store search capacity" },
+        text: { uk: "Навантаження на пошук", en: "Load on search" },
       },
       {
         kind: "paragraph",
         text: {
-          uk: "Блок показує, скільки пошуків сервер обробляє одночасно, найбільші значення і скільки пошуків відхилено та чому. Лічильники ведуться з останнього запуску сервера. Якщо пошуки часто відхиляються, а в сервера є вільна потужність процесора, розробник може збільшити ліміт у налаштуваннях.",
-          en: "The block shows how many searches the server handles at once, the peaks, and how many searches were turned away and why. The counters run since the server last started. If searches are often turned away and the server has spare processor capacity, your developer can raise the limit in the configuration.",
+          uk: "Блок показує, скільки пошуків пошукова служба обробляє одночасно (ліміт одночасних запитів), найбільші значення і скільки пошуків відхилено та чому. Лічильники ведуться з останнього запуску сервера. Якщо пошуки часто відхиляються, а в сервера є вільна потужність процесора, розробник може збільшити ліміт у налаштуваннях.",
+          en: "The block shows how many searches the search service handles at once (the concurrent request limit), the peaks, and how many searches were turned away and why. The counters run since the server last started. If searches are often turned away and the server has spare processor capacity, your developer can raise the limit in the configuration.",
         },
       },
       {

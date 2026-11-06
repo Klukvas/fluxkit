@@ -42,6 +42,7 @@ import {
   setMediaLink,
   unsavedMedia,
   updateMedia,
+  markMediaSaved,
   uploadedMediaRow,
   validateMedia,
   type MediaRow,
@@ -49,7 +50,11 @@ import {
 import { problemsOnTab, type PublishProblem } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { useCan } from "../use-can";
-import { optionName, useOptionDefinitions, valueLabel } from "../use-option-definitions";
+import {
+  optionName,
+  useOptionDefinitions,
+  valueLabel,
+} from "../../catalog-dictionaries/use-option-definitions";
 
 /** One option value an image can be linked to (one of the values the product chose), with its label. */
 export interface MediaLinkChoice {
@@ -175,16 +180,25 @@ export function MediaListView({
                     alt={alt}
                     failedText={t("products.media.previewFailed")}
                   />
+                  {row.uploaded ? (
+                    <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+                      {t("products.media.uploadedSaveHint")}
+                    </p>
+                  ) : null}
+                  {/* An uploaded file's address comes from the server: shown read-only and not marked required, so it does
+                      not look like something to fill in. A typed row keeps the editable, required address. */}
                   <TextField
                     t={t}
                     id={mediaFieldId(index, "url")}
                     name={`media.${index}.url`}
                     type="url"
-                    label={t("products.media.url")}
-                    hint={t("products.media.urlHint")}
+                    label={t(row.uploaded ? "products.media.uploadedUrl" : "products.media.url")}
+                    hint={t(
+                      row.uploaded ? "products.media.uploadedUrlHint" : "products.media.urlHint",
+                    )}
                     value={row.url}
-                    required
-                    readOnly={!canWrite}
+                    required={!row.uploaded}
+                    readOnly={!canWrite || row.uploaded}
                     maxLength={URL_MAX_LENGTH}
                     error={errorOf(`media.${index}.url`)}
                     onChange={(url) => onChange(updateMedia(rows, index, { url }))}
@@ -416,7 +430,9 @@ export function MediaTab({
       adminClient.putProductMedia(product.id, mediaBody(rows, content.locales)),
     );
     if (outcome.kind === "ok") {
-      setInitial(rows);
+      const saved = markMediaSaved(rows);
+      setRows(saved);
+      setInitial(saved);
       onChanged("saved");
     } else if (outcome.kind === "unknown") onChanged("unknown");
   }

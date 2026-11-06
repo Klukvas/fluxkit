@@ -60,6 +60,8 @@ export interface ShellFrameProps {
 
 /** The id of the navigation panel the small-screen Menu button opens and closes. */
 export const NAVIGATION_PANEL_ID = "admin-navigation";
+/** The id of the header part with the language switch and the user menu, behind the same button below `md`. */
+export const ACCOUNT_PANEL_ID = "admin-account";
 
 /** "Help for this page": the article (and section) of the screen, from `context-help.ts`. */
 export function ContextHelpLink({ t, href }: { t: Translator; href: string }) {
@@ -114,12 +116,26 @@ export function ShellFrame({
             variant="secondary"
             className="md:hidden"
             aria-expanded={menuOpen}
-            aria-controls={NAVIGATION_PANEL_ID}
+            aria-controls={`${ACCOUNT_PANEL_ID} ${NAVIGATION_PANEL_ID}`}
             onClick={() => setMenuOpen((open) => !open)}
           >
             {t(menuOpen ? "shell.menuClose" : "shell.menuOpen")}
           </Button>
-          <div className="flex flex-wrap items-center gap-4">
+          {/* Below `md` the language and the signed-in admin's controls are behind the same Menu button as the navigation
+              (they took a third of a 390 px screen); one instance of each, only shown or hidden. */}
+          <div
+            id={ACCOUNT_PANEL_ID}
+            className={cn(
+              "w-full flex-wrap items-center gap-4 md:flex md:w-auto",
+              menuOpen ? "flex" : "hidden",
+            )}
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && menuOpen) {
+                setMenuOpen(false);
+                menuButton.current?.focus();
+              }
+            }}
+          >
             {languageSwitch}
             {userMenu}
           </div>

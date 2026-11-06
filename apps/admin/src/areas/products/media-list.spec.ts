@@ -15,6 +15,7 @@ import {
   removedMediaCount,
   setMediaLink,
   unsavedMedia,
+  markMediaSaved,
   uploadedMediaRow,
   updateMedia,
   validateMedia,
@@ -81,6 +82,7 @@ describe("editing the list", () => {
       alt: { uk: "", en: "" },
       optionId: null,
       optionValueId: null,
+      uploaded: false,
     });
     const full = Array.from({ length: MAX_MEDIA }, (_, index) => newMediaRow(`n${index}`, locales));
     expect(addMedia(full, newMediaRow("over", locales))).toBe(full);
@@ -256,7 +258,16 @@ describe("an uploaded image's row", () => {
       alt: { uk: "", en: "" },
       optionId: null,
       optionValueId: null,
+      uploaded: true,
     });
+  });
+
+  it("stops being a pending upload once saved; the flag is never sent and never makes the list dirty", () => {
+    const pending = uploadedMediaRow("new-3", "https://shop.example/media/abc.webp", locales);
+    const [saved] = markMediaSaved([pending]);
+    expect(saved).toEqual({ ...pending, uploaded: false });
+    expect(mediaBody([pending], locales)).toEqual(mediaBody([saved as MediaRow], locales));
+    expect(mediaDirty([pending], markMediaSaved([pending]), locales)).toBe(false);
   });
 
   it("is appended at the end of the unsaved list and is part of the save body with the next position", () => {
