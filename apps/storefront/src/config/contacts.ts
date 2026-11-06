@@ -5,7 +5,8 @@
  *
  * Every part is optional: `null`, `""` or `[]` hides that part, and with every part empty the footer and the page show no
  * contacts block at all (never an empty label). `lib/contacts.ts` `contactsView` checks the values and throws on a malformed
- * one (the template's own code: the page fails in development, `config/contacts.spec.ts` in CI):
+ * one (the template's own code). The footer reads them in the root layout, so a malformed value fails EVERY page at request time,
+ * site-wide; `config/contacts.spec.ts` runs the same check in CI, so it never reaches a deployment unnoticed:
  * - a phone's `tel` is E.164 (`+` and 7 to 15 digits, the `tel:` link), `display` is how it is written on the page;
  * - the email is a plain address (it becomes a `mailto:` link, so no `?`, spaces or other parts);
  * - messenger, social and map links are absolute `https://` addresses with a host (the banner link rule, `lib/home-banners.ts`).

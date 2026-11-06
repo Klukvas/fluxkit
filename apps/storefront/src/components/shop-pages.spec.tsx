@@ -158,6 +158,10 @@ describe("the footer", () => {
     }
     expect(html).not.toContain('href="/en/size-guide"');
     expect(html).toContain("<address><a");
+    // Real whitespace between the phone and the email (review m8 of PR 232), none before the first or after the last.
+    expect(html).toMatch(
+      /<address><a href="tel:[^"]+">[^<]+<\/a><br\/><a href="mailto:[^"]+">[^<]+<\/a><\/address>/,
+    );
     expect(html).toContain('href="tel:+380441234567"');
     expect(html).toContain('href="mailto:hello@example.com"');
     // The address, the hours and the messengers live on the contacts page, not in the footer budget.

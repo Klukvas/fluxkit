@@ -1,5 +1,6 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { locales } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { DEMO_CONTENT_FLAGS } from "../../next.config.js";
 import { footerShopLinks } from "../layout/navigation";
@@ -115,6 +116,31 @@ describe("shop pages config (config/shop-pages.ts)", () => {
     expect(() =>
       checkShopPages([page("faq", [{ kind: "faq", id: "f", items: [item, item] }])]),
     ).toThrow(/repeated/);
+  });
+
+  it("refuses a 'See also' link to an unknown slug, and allows a known page that is not enabled (the link is dropped)", () => {
+    const links = (pages: readonly string[]): ShopPageSection => ({
+      kind: "links",
+      id: "l",
+      titleKey: "shopPages.seeAlso",
+      pages: pages as readonly ShopPageConfig["slug"][],
+    });
+    expect(() => checkShopPages([page("faq", [links(["shipping"])])])).toThrow(
+      /"shipping" of "faq" names no known shop page/,
+    );
+    // `returns` is known but not in this list: allowed, and `shopPageLinks` leaves it out.
+    const pages = [page("faq", [links(["returns", "faq"])])];
+    expect(() => checkShopPages(pages)).not.toThrow();
+    expect(shopPageLinks("en", ["returns", "faq"], pages).map((link) => link.slug)).toEqual([
+      "faq",
+    ]);
+  });
+
+  it("reserves the locale codes, so no page is named like a language", () => {
+    for (const locale of locales) {
+      expect(RESERVED_SLUGS).toContain(locale);
+      expect(() => checkShopPages([page(locale)])).toThrow(/another route/);
+    }
   });
 
   it("finds an enabled page, and nothing for an unknown or removed slug", () => {

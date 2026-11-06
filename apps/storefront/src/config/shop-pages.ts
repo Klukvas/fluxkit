@@ -15,9 +15,21 @@
  * and return periods are examples the shop must replace.
  */
 
-/** The pages the template knows. A fork that adds a page adds its slug here (and to `demo-content.json` while it is demo copy). */
-export type ShopPageSlug =
-  "delivery-and-payment" | "returns" | "faq" | "about" | "size-guide" | "contacts";
+/**
+ * The pages the template knows, enabled or not. A fork that adds a page adds its slug here (and to `demo-content.json` while it
+ * is demo copy). A "See also" link must name one of these (`checkShopPages`); a known page that is not in `shopPages` is
+ * simply left out of the links.
+ */
+export const knownShopPageSlugs = [
+  "delivery-and-payment",
+  "returns",
+  "faq",
+  "about",
+  "size-guide",
+  "contacts",
+] as const;
+
+export type ShopPageSlug = (typeof knownShopPageSlugs)[number];
 
 /** Paragraphs: the message is plain text, a blank line starts a new paragraph. No HTML. */
 export interface TextSection {

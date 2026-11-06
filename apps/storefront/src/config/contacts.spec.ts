@@ -99,6 +99,11 @@ describe("shop contacts (config/contacts.ts)", () => {
     for (const email of [
       "shop@example.com?subject=x",
       "shop@example.com&cc=a@b.c",
+      // Injected in the local part (review m1 of PR 232).
+      "shop?subject=x@example.com",
+      "shop&cc=x@example.com",
+      "shop=x@example.com",
+      "shop%3Fsubject%3Dx@example.com",
       "shop example@example.com",
       "shop@localhost",
       "<shop@example.com>",
@@ -106,5 +111,10 @@ describe("shop contacts (config/contacts.ts)", () => {
     ]) {
       expect(() => contactsView({ ...none, email }), email).toThrow(/plain address/);
     }
+    // A plus-address and dots stay valid.
+    expect(contactsView({ ...none, email: "shop+orders.ua@mail.example.com" }).email).toEqual({
+      href: "mailto:shop+orders.ua@mail.example.com",
+      text: "shop+orders.ua@mail.example.com",
+    });
   });
 });

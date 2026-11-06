@@ -21,8 +21,11 @@ export interface ContactsView {
 const E164 = /^\+[1-9]\d{6,14}$/;
 /** Digits, spaces, `+`, `(`, `)`, `-` and `.`: a written phone number, nothing a shopper could mistake for words. */
 const PHONE_DISPLAY = /^[0-9+() .-]+$/;
-/** A plain address only: it becomes `mailto:<address>`, so no `?`, `&`, spaces or quotes can add headers or a body. */
-const EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+/**
+ * A plain address only: it becomes `mailto:<address>`, so no `?`, `&`, `=`, spaces or quotes (in the local part either) can add
+ * headers or a body, and no `%` (some mail handlers decode it). A plus-address (`shop+orders@`) stays valid.
+ */
+const EMAIL = /^[A-Za-z0-9._+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 const ID = /^[a-z][a-z0-9-]*$/;
 
 function blank(value: string | null | undefined): boolean {

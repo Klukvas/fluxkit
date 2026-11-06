@@ -1,6 +1,6 @@
 # Plan: storefront shop pages, contacts, footer and demo copy (repair batch 2)
 
-Status: implemented on `feature/storefront-shop-pages` (from `origin/main` `3760110`), see "Results". No PR opened (orchestrator's call); not independently reviewed.
+Status: implemented on `feature/storefront-shop-pages` (from `origin/main` `3760110`), PR 232, independently reviewed (no blocker; minors fixed, see "Review fixes"; M1 is an owner decision), see "Results".
 Source: the owner's UX review of 2026-11-06 (simulated shopper Iryna: no contacts, no delivery and payment page, no return policy,
 no FAQ, no About, no size guide, placeholders and `TODO` text visible, minimal footer). Storefront and seed data only: no API, schema,
 dependency, environment variable or theme-token change. `apps/admin/**`, `packages/ui/**` and the product card availability belong to
@@ -116,3 +116,19 @@ tests, seeds tests, the API seed spec, the full storefront e2e suite on private 
   master sets none); a real release build with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` (unit-tested only, as before); no independent review yet.
 - **Open:** `@fluxkit/ui` `TrustBar` could take an optional link (then `StoreTrustBar` can use it again); owner to review the demo copy of the shop pages
   and contacts; seeded banner rows of an existing database keep their old texts (the seed never overwrites a row).
+
+## Review fixes (PR 232, independent review: no blocker)
+
+- **m1:** the contact email refuses `?`, `&`, `=` and `%` in the local part too (`%` dropped from the allowed characters; plus-addresses stay valid);
+  spec cases `shop?subject=x@example.com`, `shop&cc=x@example.com`, `shop=x@example.com`, `shop%3Fsubject%3Dx@example.com`.
+- **m2:** `checkShopPages` refuses a "See also" link to a slug outside `knownShopPageSlugs` (new runtime list; `ShopPageSlug` is derived from it); a
+  known page that is not enabled stays allowed and is dropped by `shopPageLinks`. Spec added.
+- **m3:** `config/contacts.ts` and the README say a malformed contacts config fails every page at request time (root layout); the spec catches it in CI.
+- **m4:** the locale codes are in `RESERVED_SLUGS`; spec added.
+- **m6:** docs name the trust-bar item `{icon, messageKey, page?}`; HANDOFF and Status name PR 232 and the review; `demoContentLeft` names the file on
+  malformed JSON (spec asserts the message).
+- **m8:** a `<br>` between the footer's phone and email (and between several phones): real whitespace for reader mode and copied text, no box in the flex
+  row. Footer re-measured: uk 1 453 / en 1 270 real, 1 377 sentinel (pin < 1 400).
+- Failing first: with the fixes reverted and the new specs kept, 5 tests fail (email refusal, malformed-JSON message, footer separator, unknown "See
+  also" slug, reserved locales); all pass with the fixes (storefront unit: 111 files, 2 017 tests).
+- Not changed: M1 (demo copy that reads like promises, guarded by the opt-in release list) is an owner decision; m5, m7, m9 skipped as instructed.

@@ -467,7 +467,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
 
     it("fails closed on a missing file, a malformed file, an unknown key or a value of the wrong type", () => {
       expect(demoFailure(join(sharedDirectory, "missing.json"))).toMatch(/demo content file/);
-      expect(demoFailure(demoFile("{"))).not.toBe("");
+      // Malformed JSON names the file (review m6 of PR 232).
+      const malformed = demoFile("{");
+      expect(demoFailure(malformed)).toContain(`${malformed} is not valid JSON`);
       expect(demoFailure(demoFile([]))).toMatch(/object/);
       expect(demoFailure(demoFile({ ...clearedDemo, contact: false }))).toMatch(
         /unknown keys: contact/,

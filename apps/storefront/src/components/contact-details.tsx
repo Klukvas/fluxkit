@@ -1,5 +1,5 @@
 import { textStyles, type Translator } from "@fluxkit/ui";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { ContactsView } from "../lib/contacts";
 import { focusRing } from "./styles";
 
@@ -113,16 +113,19 @@ export function ContactDetails({
  * header small"). The address, the hours and the messengers are on the contacts page.
  */
 export function FooterContacts({ contacts }: { contacts: ContactsView }) {
-  if (contacts.phones.length === 0 && contacts.email === null) return null;
+  const links = [...contacts.phones, ...(contacts.email === null ? [] : [contacts.email])];
+  if (links.length === 0) return null;
   return (
-    // No class here or on the links: `.fk-site-footer address` styles them (app/globals.css).
+    // No class here or on the links: `.fk-site-footer address` styles them (app/globals.css). A `<br>` separates the links
+    // (review m8 of PR 232): real whitespace for reader mode, copied text and screen readers' text view, so the number and the
+    // address never run together; in the flex row it draws nothing, so the layout is unchanged.
     <address>
-      {contacts.phones.map((phone) => (
-        <a key={phone.href} href={phone.href}>
-          {phone.text}
-        </a>
+      {links.map((link, index) => (
+        <Fragment key={link.href}>
+          {index === 0 ? null : <br />}
+          <a href={link.href}>{link.text}</a>
+        </Fragment>
       ))}
-      {contacts.email === null ? null : <a href={contacts.email.href}>{contacts.email.text}</a>}
     </address>
   );
 }

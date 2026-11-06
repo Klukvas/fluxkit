@@ -63,7 +63,12 @@ export function demoContentLeft(file: string): string[] {
       `STOREFRONT_REQUIRE_LEGAL_TEXT is set but the demo content file was not found (${file}).`,
     );
   }
-  const content = JSON.parse(readFileSync(file, "utf8")) as unknown;
+  let content: unknown;
+  try {
+    content = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`${file} is not valid JSON: ${(error as Error).message}`);
+  }
   if (typeof content !== "object" || content === null || Array.isArray(content)) {
     throw new Error(`${file} must hold an object.`);
   }

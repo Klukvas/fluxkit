@@ -1,5 +1,6 @@
-import type { Locale } from "@fluxkit/ui";
+import { locales, type Locale } from "@fluxkit/ui";
 import {
+  knownShopPageSlugs,
   productPageNote,
   shopPages,
   type ShopPageConfig,
@@ -18,9 +19,11 @@ const ID = /^[a-z][a-z0-9-]*$/;
 
 /**
  * First path segments other routes own (`app/[locale]/...`) or the template reserves. A shop page with one of these slugs would
- * never be reached (a static segment wins over `[page]`) or would shadow a later route.
+ * never be reached (a static segment wins over `[page]`) or would shadow a later route. The locale codes are reserved too
+ * (review m4 of PR 232): `/uk/en` would read like a language switch.
  */
 export const RESERVED_SLUGS: readonly string[] = [
+  ...locales,
   "account",
   "api",
   "c",
@@ -105,6 +108,16 @@ export function checkShopPages(pages: readonly ShopPageConfig[]): void {
             if ("value" in cell && cell.value.trim() === "") {
               throw new RangeError(`Table "${section.id}" of "${page.slug}" has an empty cell.`);
             }
+          }
+        }
+      }
+      if (section.kind === "links") {
+        const known: readonly string[] = knownShopPageSlugs;
+        for (const slug of section.pages) {
+          if (!known.includes(slug)) {
+            throw new RangeError(
+              `"See also" link "${slug}" of "${page.slug}" names no known shop page.`,
+            );
           }
         }
       }
