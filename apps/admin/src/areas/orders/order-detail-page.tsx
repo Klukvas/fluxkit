@@ -33,7 +33,7 @@ import {
   isMarkPaidDirty,
   markPaidCheckAfterUnknown,
   planMarkPaid,
-  showOnlineNotStartedNote,
+  showNoCardPaymentNote,
   valuesForRetry,
   type MarkPaidCheck,
   type MarkPaidValues,
@@ -362,7 +362,7 @@ function OrderDetail({ orderId, config }: { orderId: string; config: AdminConfig
         error={dialog.kind === "markPaid" ? topError : null}
         errorRef={errorRef}
         retrying={lastPaidAttempt !== null}
-        onlineNotStarted={showOnlineNotStartedNote(config.onlinePayment, order.payments)}
+        noCardPayment={showNoCardPaymentNote(config.onlinePayment, order.payments)}
         busy={busy}
         onSubmit={() => void submitMarkPaid()}
         onClose={closeDialog}
