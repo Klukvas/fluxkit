@@ -6,7 +6,7 @@ import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   INTERNAL_SUPPLIER_MARKER,
-  catalogSeed,
+  testCatalogSeed as catalogSeed,
   type SeedCategory,
   type SeedProduct,
   type SeedVariantCommerce,
@@ -35,6 +35,9 @@ import {
   formatSummary,
   runSeedCommand,
 } from "./seed-command.js";
+
+/** This spec seeds the TEST FIXTURE dataset (`pnpm seed:test`); the coffee demo has its own spec (`seed-coffee.spec.ts`). */
+const TEST_DATASET = ["--dataset", "test"] as const;
 
 const {
   attributes,
@@ -234,7 +237,7 @@ describe("catalog seed (real app, real Postgres)", () => {
     env["MEDIA_DIR"] = mediaDir;
     // A crashed earlier run must not leave rows that make the "created" counts lie.
     await removeSeedRows();
-    firstRun = await runSeedCommand([], env);
+    firstRun = await runSeedCommand(TEST_DATASET, env);
     running = await startApp({
       mediaStorageDriver: "local",
       mediaDir,
@@ -786,7 +789,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       );
       await pool.query("delete from banner where id = $1", [first]);
       try {
-        const run = await runSeedCommand([], env);
+        const run = await runSeedCommand(TEST_DATASET, env);
         expect(run.created.banners).toBe(1);
         expect(run.existing.banners).toBe(banners.length - 1);
         expect(run.images.uploaded).toBe(deletedUploads.length);
@@ -819,7 +822,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       });
       const rowsBefore = await demoRows();
       const filesBefore = await filesUnder(mediaDir);
-      const second = await runSeedCommand([], env);
+      const second = await runSeedCommand(TEST_DATASET, env);
       const after = await tableCounts();
 
       // `media_upload` included: no image is uploaded twice, and no file is added to the media directory.
@@ -850,7 +853,7 @@ describe("catalog seed (real app, real Postgres)", () => {
     });
 
     it("review m-9: creates the demo delivery methods INACTIVE (the pickup point one only with its provider loaded), once", async () => {
-      const withCarrier = await runSeedCommand([], env, {
+      const withCarrier = await runSeedCommand(TEST_DATASET, env, {
         extraShippingProviders: testShippingProviders(),
       });
       expect(withCarrier.created.shippingMethods).toBe(1);
@@ -870,7 +873,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         { code: "demo_store_pickup", kind: "store_pickup", is_active: false, currency: "UAH" },
       ]);
       const before = await tableCounts();
-      const again = await runSeedCommand([], env, {
+      const again = await runSeedCommand(TEST_DATASET, env, {
         extraShippingProviders: testShippingProviders(),
       });
       expect(again.created.shippingMethods).toBe(0);
@@ -890,7 +893,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         [slug],
       );
       try {
-        const run = await runSeedCommand([], env);
+        const run = await runSeedCommand(TEST_DATASET, env);
         expect(run.images).toEqual({
           uploadsEnabled: true,
           uploaded: 0,
@@ -916,7 +919,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         `update brand set name = '{"uk":"Змінено","en":"Edited"}'::jsonb where slug = $1`,
         [brands[0]?.slug],
       );
-      await runSeedCommand([], env);
+      await runSeedCommand(TEST_DATASET, env);
       const row = await pool.query<{ name: Record<string, string> }>(
         "select name from brand where slug = $1",
         [brands[0]?.slug],
@@ -930,7 +933,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       await pool.query("delete from search_synonym_group where terms && $1::text[]", [
         demoSynonymTerms,
       ]);
-      const first = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      const first = await runSeedCommand(TEST_DATASET, { ...env, ...SEARCH_ON });
       expect(first.synonymGroups).toEqual({
         searchEnabled: true,
         created: synonymGroups.length,
@@ -947,7 +950,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       );
 
       const before = await tableCounts();
-      const second = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      const second = await runSeedCommand(TEST_DATASET, { ...env, ...SEARCH_ON });
       expect(second.synonymGroups).toEqual({
         searchEnabled: true,
         created: 0,
@@ -960,7 +963,7 @@ describe("catalog seed (real app, real Postgres)", () => {
     it("leaves a group an admin edited alone (found by any of its terms) and re-creates one that was deleted", async () => {
       const [edited, deleted] = synonymGroups;
       if (edited === undefined || deleted === undefined) throw new Error("two demo groups needed");
-      await runSeedCommand([], { ...env, ...SEARCH_ON });
+      await runSeedCommand(TEST_DATASET, { ...env, ...SEARCH_ON });
       // The admin keeps one demo term and adds a term of their own.
       await pool.query(
         "update search_synonym_group set terms = array[$2, 'admin-term'] where locale = $1 and terms && $3::text[]",
@@ -970,7 +973,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         "delete from search_synonym_group where locale = $1 and terms && $2::text[]",
         [deleted.locale, [...deleted.terms]],
       );
-      const again = await runSeedCommand([], { ...env, ...SEARCH_ON });
+      const again = await runSeedCommand(TEST_DATASET, { ...env, ...SEARCH_ON });
       expect(again.synonymGroups.created).toBe(1);
       expect(again.synonymGroups.existing).toBe(synonymGroups.length - 1);
       const rows = await pool.query<{ terms: string[] }>(
@@ -993,7 +996,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         [english.terms[0]],
       );
       try {
-        const run = await runSeedCommand([], { ...env, ...SEARCH_ON });
+        const run = await runSeedCommand(TEST_DATASET, { ...env, ...SEARCH_ON });
         expect(run.synonymGroups.created).toBe(synonymGroups.length);
         expect(run.synonymGroups.existing).toBe(0);
         const rows = await pool.query<{ terms: string[] }>(
@@ -1010,7 +1013,7 @@ describe("catalog seed (real app, real Postgres)", () => {
       await pool.query("delete from search_synonym_group where terms && $1::text[]", [
         demoSynonymTerms,
       ]);
-      const ukOnly = await runSeedCommand([], {
+      const ukOnly = await runSeedCommand(TEST_DATASET, {
         ...env,
         ...SEARCH_ON,
         LOCALES: "uk",
@@ -1045,7 +1048,7 @@ describe("catalog seed (real app, real Postgres)", () => {
           },
         ],
       };
-      const failure = await runSeedCommand([], env, { seed: broken }).then(
+      const failure = await runSeedCommand(TEST_DATASET, env, { seed: broken }).then(
         () => undefined,
         (error: unknown) => error,
       );
@@ -1064,7 +1067,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         ...catalogSeed,
         products: [{ ...template, slug: "demo-broken-reference", brandSlug: "no-such-brand" }],
       };
-      await expect(runSeedCommand([], env, { seed: broken })).rejects.toThrow(
+      await expect(runSeedCommand(TEST_DATASET, env, { seed: broken })).rejects.toThrow(
         'Seed data refers to a brand "no-such-brand" that does not exist.',
       );
     });
@@ -1085,14 +1088,14 @@ describe("catalog seed (real app, real Postgres)", () => {
           },
         ],
       };
-      await expect(runSeedCommand([], env, { seed: broken })).rejects.toThrow(
+      await expect(runSeedCommand(TEST_DATASET, env, { seed: broken })).rejects.toThrow(
         /no-such-image\.webp/,
       );
       expect(await tableCounts()).toEqual(before);
     });
 
     it("does not invent a default for a missing DATABASE_URL", async () => {
-      await expect(runSeedCommand([], {})).rejects.toThrow(/DATABASE_URL/);
+      await expect(runSeedCommand(TEST_DATASET, {})).rejects.toThrow(/DATABASE_URL/);
     });
   });
 
@@ -1152,11 +1155,11 @@ describe("catalog seed (real app, real Postgres)", () => {
 
     it("stops the command before it touches the database", async () => {
       const before = await tableCounts();
-      await expect(runSeedCommand([], { ...env, NODE_ENV: "production" })).rejects.toThrow(
+      await expect(runSeedCommand(TEST_DATASET, { ...env, NODE_ENV: "production" })).rejects.toThrow(
         /Refusing to seed/,
       );
       // A guard that ran too late would fail on the missing DATABASE_URL instead.
-      await expect(runSeedCommand([], { NODE_ENV: "production" })).rejects.toThrow(
+      await expect(runSeedCommand(TEST_DATASET, { NODE_ENV: "production" })).rejects.toThrow(
         /Refusing to seed/,
       );
       expect(await tableCounts()).toEqual(before);
@@ -1171,7 +1174,7 @@ describe("catalog seed (real app, real Postgres)", () => {
         "select count(*)::int as count from media_upload",
       );
       const filesBefore = await filesUnder(mediaDir);
-      const summary = await runSeedCommand([], {
+      const summary = await runSeedCommand(TEST_DATASET, {
         DATABASE_URL: requireTestDatabaseUrl(),
         MEDIA_STORAGE_DRIVER: "none",
       });

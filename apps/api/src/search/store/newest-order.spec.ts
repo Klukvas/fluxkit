@@ -1,6 +1,6 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { catalogSeed, type SeedCategory } from "@fluxkit/seeds";
+import { testCatalogSeed as catalogSeed, type SeedCategory } from "@fluxkit/seeds";
 import type { Page } from "../../common/pagination.js";
 import type { StoreProductListItem } from "../../catalog/store/store.schemas.js";
 import { runSeedCommand } from "../../seed/seed-command.js";
@@ -85,7 +85,7 @@ describe("newest first through search equals the SQL listing (real Postgres, rea
     await ensureMigrated();
     await removeSeedRows(pool);
     // No images: this spec reads the order of the list only, and uploads would write into the default MEDIA_DIR.
-    await runSeedCommand([], {
+    await runSeedCommand(["--dataset", "test"], {
       DATABASE_URL: requireTestDatabaseUrl(),
       MEDIA_STORAGE_DRIVER: "none",
     });

@@ -1,7 +1,7 @@
-// Gives the admin e2e run a fresh database: wipes it, migrates it, seeds the demo catalog and creates the owner. Run by the
+// Gives the admin e2e run a fresh database: wipes it, migrates it, seeds the test fixture catalog and creates the owner. Run by the
 // API's `webServer` entry in `playwright.config.ts` BEFORE the API starts (Playwright starts web servers before
 // `globalSetup`, so a global setup would run against a server that is already up). Uses plain `node` and the API's BUILT
-// output (`pnpm build` first), the same commands as `pnpm db:migrate`, `pnpm seed` and `pnpm admin:create` without their
+// output (`pnpm build` first), the same commands as `pnpm db:migrate`, `pnpm seed:test` and `pnpm admin:create` without their
 // `--env-file`; `pg` is the API's own dependency, resolved from `apps/api`, so the admin package adds nothing.
 // The manager and the viewer need the running API (they are created through the users API with the owner's session, as an
 // owner would): `global-setup.ts` does that once the servers are up.
@@ -68,7 +68,9 @@ const run = (script: string, args: string[] = [], extra: Env = {}) =>
     stdio: "inherit",
   });
 run("database/migrate.js");
-run("seed/seed.js");
+// The TEST FIXTURE dataset (`pnpm seed:test`): the specs rely on its products (T-shirt, hammer, e-book, ...), not on the
+// coffee demo of `pnpm seed`.
+run("seed/seed.js", ["--dataset", "test"]);
 // The seed's catalog writes marked every product in the queue; this builds the indexes of every language, swaps them in and
 // drains the queue, so the Search screens start from a live index (the scheduler is off: nothing else would build it).
 run("search/reindex.js");

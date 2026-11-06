@@ -724,11 +724,15 @@ export class CatalogSeeder {
     );
 
     for (const { variant, commerce } of matched) {
-      if (commerce.allowBackorder === true) {
+      // A systematic SKU of the data replaces the proposed one (same rules as PATCH .../variants/{variantId}).
+      if (commerce.allowBackorder === true || commerce.sku !== undefined) {
         await this.variants.update(
           productId,
           variant.id,
-          parse(updateVariantSchema, { allowBackorder: true }),
+          parse(updateVariantSchema, {
+            ...(commerce.allowBackorder === true ? { allowBackorder: true } : {}),
+            ...(commerce.sku === undefined ? {} : { sku: commerce.sku }),
+          }),
         );
       }
       // A tracked variant with no stock gets no level row and no movement: its absence is the "out of stock" state.
@@ -753,7 +757,7 @@ export class CatalogSeeder {
       return await readFile(join(this.assetsDir, file));
     } catch (error) {
       throw new Error(
-        `Seed image "${file}" could not be read from ${this.assetsDir} (run node scripts/generate-demo-images.mjs).`,
+        `Seed image "${file}" could not be read from ${this.assetsDir} (run node scripts/generate-demo-images.mjs or scripts/generate-coffee-images.mjs).`,
         { cause: error },
       );
     }
