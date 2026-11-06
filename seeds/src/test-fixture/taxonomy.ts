@@ -1,4 +1,4 @@
-import type { SeedBrand, SeedCategory } from "./types.js";
+import type { SeedBrand, SeedCategory } from "../types.js";
 
 export const demoBrands: readonly SeedBrand[] = [
   { slug: "demo-brand", name: { uk: "Демо-бренд", en: "Demo Brand" } },

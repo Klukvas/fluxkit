@@ -1,4 +1,4 @@
-import type { SeedSynonymGroup } from "./types.js";
+import type { SeedSynonymGroup } from "../types.js";
 
 /*
  * Demo synonym groups of catalog search (ADR 0034 decision 8; search plan step 11). Generic words only, no brand or client

@@ -1,4 +1,4 @@
-import type { SeedBanner } from "./types.js";
+import type { SeedBanner } from "../types.js";
 
 /**
  * TODO(fluxkit): demo home banners (plan docs/plans/2026-11-05-admin-home-banners.md, owner decision 2 of 2026-11-05). A shop

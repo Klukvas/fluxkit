@@ -1,5 +1,5 @@
 import type { I18nText } from "@fluxkit/core";
-import type { SeedMedia, SeedProduct, SeedVariantCommerce } from "./types.js";
+import type { SeedMedia, SeedProduct, SeedVariantCommerce } from "../types.js";
 
 // Demo products. Every title, text and image is a placeholder; there are no real products, brands or domains. Images are
 // drawn illustrations in `seeds/assets/` (scripts/generate-demo-images.mjs).

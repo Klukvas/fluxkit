@@ -1,4 +1,4 @@
-import type { SeedAttribute, SeedOption } from "./types.js";
+import type { SeedAttribute, SeedOption } from "../types.js";
 
 // Attributes describe a product; options generate variants (AGENTS.md 2.3). Texts are placeholders.
 

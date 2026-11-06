@@ -1,4 +1,4 @@
-import type { SeedShippingMethod } from "./types.js";
+import type { SeedShippingMethod } from "../types.js";
 
 /*
  * Demo delivery methods (shipping plan documentation list; review m-9). Every method is INACTIVE: a fresh seed keeps the

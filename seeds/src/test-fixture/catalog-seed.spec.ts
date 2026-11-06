@@ -13,8 +13,8 @@ import {
   type I18nText,
 } from "@fluxkit/core";
 import { describe, expect, it } from "vitest";
-import { catalogSeed } from "./index.js";
-import type { SeedCategory } from "./types.js";
+import { testCatalogSeed as catalogSeed } from "./index.js";
+import type { SeedCategory } from "../types.js";
 
 // Data-only checks: they catch a typo in a code or slug before the runner meets it. The rules themselves
 // (codes, slugs, attribute values) come from core; the runner validates again through the admin services.

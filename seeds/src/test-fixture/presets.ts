@@ -1,4 +1,4 @@
-import type { SeedProductType } from "./types.js";
+import type { SeedProductType } from "../types.js";
 
 /**
  * ProductType presets. They are data: a client fork edits or replaces them. Each preset only assigns attributes and
