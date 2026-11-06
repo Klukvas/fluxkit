@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { DataTable, DataTableScrollHint, type DataTableColumn } from "./data-table";
+import {
+  DataTable,
+  DataTableScrollHint,
+  SCROLL_HINT_ATTRIBUTE,
+  isFirstScrollHint,
+  type DataTableColumn,
+} from "./data-table";
 import { DescriptionList } from "./description-list";
 import { LiveRegion } from "./live-region";
 import { StatusBadge } from "./status-badge";
@@ -96,6 +102,7 @@ describe("DataTable", () => {
     );
     const hint = first(markup, "p");
     expect(hint.attributes.class).toContain("md:hidden");
+    expect(hint.attributes[SCROLL_HINT_ATTRIBUTE]).toBe("");
     // Set apart from the page's own grey notes (UX round 2): a bordered callout in body text colour with a decorative arrow (a glyph: an icon would cost the entry budget).
     expect(hint.attributes.class).toContain("border");
     expect(hint.attributes.class).toContain("text-foreground");
@@ -104,6 +111,21 @@ describe("DataTable", () => {
     expect(text(markup)).toContain("Swipe sideways");
     const box = scrollBox(markup);
     expect(box.attributes["aria-describedby"]).toBe(hint.attributes.id);
+  });
+
+  it("shows the callout once per page: only the first marked hint is the first (review m5 of PR 235)", () => {
+    const firstHint = { id: "a" };
+    const secondHint = { id: "b" };
+    const selectors: string[] = [];
+    const page = {
+      querySelector: (selector: string) => {
+        selectors.push(selector);
+        return firstHint;
+      },
+    };
+    expect(isFirstScrollHint(firstHint, page)).toBe(true);
+    expect(isFirstScrollHint(secondHint, page)).toBe(false);
+    expect(selectors).toEqual([`[${SCROLL_HINT_ATTRIBUTE}]`, `[${SCROLL_HINT_ATTRIBUTE}]`]);
   });
 
   it("starts with a caption and gives every column header scope=col", () => {
