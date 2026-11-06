@@ -153,7 +153,7 @@
   "order.markPaid.referenceHint": "As in the bank or on the receipt, at most {max} characters. The same number a second time never records a second payment.",
   "order.markPaid.received": "I received this amount: {amount}",
   "order.fulfil.title": "Mark order {number} fulfilled",
-  "order.fulfil.description": "The stock still held for backordered lines is taken out. If such a line is not in stock yet, the order stays paid and nothing changes.",
+  "order.fulfil.description": "“Fulfilled” is set once the goods are shipped or handed to the customer. Usually the stock was already written off when the order was paid, so the stock does not change. If the order has backordered goods, they are written off now; if they are not in stock yet, the shop refuses and the order stays paid.",
   "order.fulfil.submit": "Mark fulfilled",
   "order.cancel.title": "Cancel order {number}",
   "order.cancel.keep": "Keep the order",
