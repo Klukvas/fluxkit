@@ -255,8 +255,8 @@ export const coffeeEquipmentProducts: readonly SeedProduct[] = [
     sku: "EQ-BLEND",
     title: t("Блендер професійний, 1,5 л", "Commercial blender, 1.5 l"),
     description: t(
-      "Блендер для смузі, фрапе і дробленого льоду: 1500 Вт, чаша з тритану, шість програм.",
-      "Blender for smoothies, frappés and crushed ice: 1500 W, Tritan jar, six programmes.",
+      "Блендер для смузі, фрапе і дробленого льоду: 1500 Вт, чаша з кополіестеру без BPA, шість програм.",
+      "Blender for smoothies, frappés and crushed ice: 1500 W, BPA-free copolyester jar, six programmes.",
     ),
     type: EQ,
     brand: "crema-works",

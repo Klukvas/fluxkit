@@ -107,13 +107,25 @@ describe("coffee demo seed (real app, real Postgres)", () => {
   });
 
   it("lists every product in the store, published and priced, without internal attributes", async () => {
-    const list = await http<Page<StoreProductListItem>>(
-      running.baseUrl,
-      "GET",
-      "/store/products?locale=uk&limit=100",
-    );
-    expect(list.status).toBe(200);
-    expect(list.body.items.map((item) => item.slug).sort()).toEqual([...slugs].sort());
+    // One list per coffee brand (the shared test database may hold other specs' products): every coffee product, each
+    // under its own brand, and nothing else under these brands.
+    const listed: string[] = [];
+    for (const brand of coffeeCatalogSeed.brands) {
+      const expected = products.filter((product) => product.brandSlug === brand.slug);
+      expect(expected.length, brand.slug).toBeLessThanOrEqual(100);
+      const list = await http<Page<StoreProductListItem>>(
+        running.baseUrl,
+        "GET",
+        `/store/products?brand=${brand.slug}&locale=uk&limit=100`,
+      );
+      expect(list.status, brand.slug).toBe(200);
+      expect(list.body.total, brand.slug).toBe(expected.length);
+      expect(list.body.items.map((item) => item.slug).sort(), brand.slug).toEqual(
+        expected.map((product) => product.slug).sort(),
+      );
+      listed.push(...list.body.items.map((item) => item.slug));
+    }
+    expect(listed.sort()).toEqual([...slugs].sort());
     const machine = await http<StoreProductDetail>(
       running.baseUrl,
       "GET",

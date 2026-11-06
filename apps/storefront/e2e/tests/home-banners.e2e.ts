@@ -5,7 +5,7 @@ import { tabTo } from "../support/flows.ts";
 
 /**
  * Home banners managed in the admin (plan `docs/plans/2026-11-05-admin-home-banners.md`, PR 3): the template's `banners`
- * section reads `GET /store/banners` (`source: "admin"`) and `pnpm seed` (run by `prepare-database.ts`) created three demo
+ * section reads `GET /store/banners` (`source: "admin"`) and `pnpm seed:test` (the test fixture, run by `prepare-database.ts`) created three
  * banners: two `card` banners and one `image` banner with an own `en` picture. Each banner is one link; every picture sits
  * in a fixed 2:1 frame; one column on phones, one row from 768 px. The dark contrast walk of the home page, with the
  * banners, is in `design-b.e2e.ts`.

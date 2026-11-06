@@ -263,7 +263,7 @@ export const coffeeFoodProducts: readonly SeedProduct[] = [
     sku: "COF-HOUSE",
     title: t("Кава в зернах «Хаус-бленд» для еспресо", "House blend espresso beans"),
     description: t(
-      "Арабіка з Бразилії та Колумбії з 20 % робусти. Ноти молочного шоколаду й горіха, щільна креми.",
+      "Арабіка з Бразилії та Колумбії з 20 % робусти. Ноти молочного шоколаду й горіха, щільна крема.",
       "Brazilian and Colombian arabica with 20% robusta. Notes of milk chocolate and nuts, thick crema.",
     ),
     type: "coffee",

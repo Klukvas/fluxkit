@@ -15,7 +15,7 @@
 - `product-builder.ts` - `coffeeProduct()`: a compact product spec to a `SeedProduct` (every option combination, systematic SKUs `<STEM>-<VALUE CODES>`, the picture `coffee/<slug>.webp`); a combination without a price fails when the module loads. Must stay pure data building.
 - `products-ware.ts`, `products-food.ts`, `products-equipment.ts` - the 90 products (uk and en texts, prices in minor units, stock, compare-at prices, one backorder, digital goods untracked).
 - `synonyms.ts` - 16 synonym groups, only for words of the coffee titles. `banners.ts` - three home banners with fixed ids and `coffee/banner-*.webp` pictures.
-- `coffee-seed.spec.ts` - data checks: at least 70 products, tree depth, unique valid codes, slugs and SKUs, uk and en texts, no `TODO`/URL, references and required attributes, options a subset of the type's, every picture committed and under 40 KB, variants per combination, positive integer prices, every stock state, synonym groups valid and found in titles, banners valid by core rules and linking existing categories.
+- `coffee-seed.spec.ts` - data checks: at least 70 products, tree depth, unique valid codes, slugs and SKUs, uk and en texts, no `TODO`/URL, references and required attributes, options a subset of the type's, picture paths `coffee/<name>.webp` once per product (that the files exist and stay under 40 KB is checked in `apps/api/src/seed/seed-dataset.spec.ts`), variants per combination, positive integer prices, every stock state, synonym groups valid and found in titles, banners valid by core rules and linking existing categories.
 
 ## `src/test-fixture/` - the test fixture of `pnpm seed:test` (values asserted by tests; change only with them)
 

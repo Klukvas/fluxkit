@@ -45,6 +45,7 @@ describe("search on the coffee demo (real Postgres, real Meilisearch)", () => {
     });
     const result = await app.app.get(SearchIndexer).rebuild(new Date(), UNLIMITED_BUDGET);
     expect(result.failures, JSON.stringify(result)).toEqual([]);
+    expect(result.swapped).toBeGreaterThan(0);
   }, SEED_TIMEOUT);
 
   afterAll(async () => {
@@ -55,8 +56,16 @@ describe("search on the coffee demo (real Postgres, real Meilisearch)", () => {
   }, SEED_TIMEOUT);
 
   it("indexes one document per variant of the coffee catalog in each locale", async () => {
+    // The rebuild indexes every sellable variant of the shared test database: count the coffee products' documents only.
+    const rows = await pool.query<{ id: string }>("select id from product where slug = any($1)", [
+      coffeeCatalogSeed.products.map((product) => product.slug),
+    ]);
+    expect(rows.rows).toHaveLength(coffeeCatalogSeed.products.length);
+    const coffeeIds = new Set(rows.rows.map((row) => row.id));
     for (const locale of ["uk", "en"]) {
-      const documents = await allDocuments(world.liveUid(locale));
+      const documents = (await allDocuments(world.liveUid(locale))).filter((document) =>
+        coffeeIds.has(String(document["productId"])),
+      );
       expect(documents, locale).toHaveLength(variantCount);
     }
   });
