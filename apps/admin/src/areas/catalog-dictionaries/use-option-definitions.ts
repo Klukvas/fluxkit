@@ -4,7 +4,7 @@ import { adminClient } from "../../lib/api";
 import { failureFromError } from "../../lib/failure";
 import { loadByIds } from "../../lib/load-by-ids";
 import { useCrash } from "../../lib/use-crash";
-import { resolveLocalized } from "../catalog-dictionaries/locale-text";
+import { resolveLocalized } from "./locale-text";
 
 export interface OptionDefinitions {
   /** By option id; an option the API did not answer (deleted meanwhile) is missing and shows its code. */

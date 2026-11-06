@@ -50,7 +50,11 @@ import {
 import { problemsOnTab, type PublishProblem } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { useCan } from "../use-can";
-import { optionName, useOptionDefinitions, valueLabel } from "../use-option-definitions";
+import {
+  optionName,
+  useOptionDefinitions,
+  valueLabel,
+} from "../../catalog-dictionaries/use-option-definitions";
 
 /** One option value an image can be linked to (one of the values the product chose), with its label. */
 export interface MediaLinkChoice {

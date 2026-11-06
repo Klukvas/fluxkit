@@ -59,7 +59,7 @@ import {
   useOptionDefinitions,
   valueLabel,
   type OptionDefinitions,
-} from "../use-option-definitions";
+} from "../../catalog-dictionaries/use-option-definitions";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";

@@ -42,7 +42,7 @@ import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { optionValuesText, type VariantNaming } from "../tabs/variants-tab";
 import { useSession } from "../../../session/session-context";
 import { priceControls, savePrices } from "../stock/stock-access";
-import { useOptionDefinitions } from "../use-option-definitions";
+import { useOptionDefinitions } from "../../catalog-dictionaries/use-option-definitions";
 import {
   addColumn,
   canRemoveColumn,

@@ -454,15 +454,20 @@ function OptionAssignmentDialog({
 export function OptionAssignmentsSection({
   rows,
   optionNames = new Map(),
+  namesFailed = false,
+  onRetryNames,
   ...props
 }: AssignmentSectionProps & {
   rows: readonly AdminProductTypeOptionAssignment[];
-  /** The options' names by id (`useOptionNames`); an option without one is shown by its code. */
-  optionNames?: ReadonlyMap<string, LocalizedText>;
+  /** The options by id (`useOptionDefinitions`); an option without one is shown by its code. */
+  optionNames?: ReadonlyMap<string, { name: LocalizedText }>;
+  /** The names could not be read: the codes stay, with a note and a retry. */
+  namesFailed?: boolean;
+  onRetryNames?: () => void;
 }) {
   const { t, content, uiLocale, productTypeId, canWrite, onChanged } = props;
   const nameOf = (row: AdminProductTypeOptionAssignment) =>
-    resolveLocalized(optionNames.get(row.optionId), uiLocale, content.defaultLocale) ||
+    resolveLocalized(optionNames.get(row.optionId)?.name, uiLocale, content.defaultLocale) ||
     row.optionCode;
   const dialog = useDialogTarget<OptionTarget>();
   const removing = useDialogTarget<AdminProductTypeOptionAssignment>();
@@ -482,6 +487,16 @@ export function OptionAssignmentsSection({
         ) : null}
       </div>
       <p className="text-sm text-muted-foreground">{t("dict.assignment.option.sharedHint")}</p>
+      {namesFailed ? (
+        <div role="status" className="flex flex-wrap items-center gap-3 text-sm">
+          <span>{t("dict.assignment.option.namesFailed")}</span>
+          {onRetryNames === undefined ? null : (
+            <Button variant="secondary" onClick={onRetryNames}>
+              {t("action.retry")}
+            </Button>
+          )}
+        </div>
+      ) : null}
       <DataTable
         caption={t("dict.assignment.option.caption")}
         captionHidden

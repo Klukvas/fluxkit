@@ -618,7 +618,11 @@ describe("product type assignments", () => {
         onChanged={noop}
       />,
     );
-  const options = (canWrite: boolean, optionNames?: ReadonlyMap<string, LocalizedText>) =>
+  const options = (
+    canWrite: boolean,
+    optionNames?: ReadonlyMap<string, { name: LocalizedText }>,
+    namesFailed = false,
+  ) =>
     renderInRouter(
       <OptionAssignmentsSection
         t={t}
@@ -628,6 +632,8 @@ describe("product type assignments", () => {
         canWrite={canWrite}
         rows={[optionAssignment]}
         {...(optionNames === undefined ? {} : { optionNames })}
+        namesFailed={namesFailed}
+        onRetryNames={noop}
         onChanged={noop}
       />,
     );
@@ -650,10 +656,19 @@ describe("product type assignments", () => {
   });
 
   it("names each allowed option by its name with the code as secondary text (UX round 2: “size 0”)", () => {
-    const html = options(true, new Map([["o1", { uk: "Колір", en: "Colour" }]]));
+    const html = options(true, new Map([["o1", { name: { uk: "Колір", en: "Colour" } }]]));
     expect(html).toMatch(/href="\/admin-ui\/catalog\/options\/o1"[^>]*>Colour<\/a>/);
     expect(html).toContain('<small class="text-muted-foreground">color</small>');
     expectTranslated(html, ["color", "Colour"]);
+    expect(html).not.toContain("§dict.assignment.option.namesFailed");
+  });
+
+  it("says so and offers a retry when the option names could not be read (review m4 of PR 235)", () => {
+    const html = options(true, new Map(), true);
+    expect(html).toContain("§dict.assignment.option.namesFailed");
+    expect(hasButtonLabelled(html, "action.retry")).toBe(true);
+    // The codes stay on screen.
+    expect(html).toMatch(/href="\/admin-ui\/catalog\/options\/o1"[^>]*>color<\/a>/);
   });
 
   it("has no assign, change or remove control for a viewer", () => {

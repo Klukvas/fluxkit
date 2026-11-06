@@ -49,7 +49,7 @@ import { useFormSubmit } from "../../catalog-dictionaries/use-form-submit";
 import { stockVariantFocusId } from "../field-ids";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { optionValuesText, type VariantNaming } from "../tabs/variants-tab";
-import { useOptionDefinitions } from "../use-option-definitions";
+import { useOptionDefinitions } from "../../catalog-dictionaries/use-option-definitions";
 import {
   ADJUSTMENT_KINDS,
   REASON_MAX_LENGTH,

@@ -232,6 +232,7 @@
   "dict.assignment.option.empty": "No options allowed yet.",
   "dict.assignment.option.choice": "{name} ({code})",
   "dict.assignment.option.sharedHint": "An option's values are shared by every product type: for weight create its own option instead of reusing “Size”.",
+  "dict.assignment.option.namesFailed": "The option names could not be loaded, so their codes are shown.",
   "dict.brand.name": "Name",
   "dict.brand.description": "Description",
   "dict.brand.slug": "Page address",
