@@ -132,3 +132,7 @@ tests, seeds tests, the API seed spec, the full storefront e2e suite on private 
 - Failing first: with the fixes reverted and the new specs kept, 5 tests fail (email refusal, malformed-JSON message, footer separator, unknown "See
   also" slug, reserved locales); all pass with the fixes (storefront unit: 111 files, 2 017 tests).
 - Not changed: M1 (demo copy that reads like promises, guarded by the opt-in release list) is an owner decision; m5, m7, m9 skipped as instructed.
+- Checks after the fixes: lint (one `preserve-caught-error` fixed: the parse error is the `cause`), format, typecheck, check:docs, check:env,
+  check:boundaries, theme tests, storefront unit (2 017) and seeds (20) exit 0. Full storefront e2e on the fixed build: 163 passed, 4 skipped, including
+  `pre-hydration-forms` uk and en. An earlier full run had one failure in `mobile-ux.e2e.ts` (D-04: Escape does not hide the header search row); it
+  failed 2 of 5 repeats on this branch and 1 of 5 on a build of `main`'s storefront (`3760110`): a pre-existing flake, not fixed here.
