@@ -67,4 +67,26 @@ seeds tests, the API seed spec and the storefront e2e if Postgres, Redis and Mei
 
 ## Results
 
-(filled in after the work)
+One commit per item (3 split into banner and synonyms), plus a typecheck fix of the synonym spec and the docs commit.
+
+| # | Done | Failing-first evidence (unit) |
+| - | ---- | ----------------------------- |
+| 1 | Line under the cart total, `cartDelivery.note` (uk "Доставка розраховується при оформленні замовлення", en "Delivery is calculated at checkout"); nothing while empty, loading or failed | `cart-page.spec.tsx` new block failed (2 of 3) before the change |
+| 2 | Courier-only table, card-only payment text, config comment; branch/pickup messages removed; demo flag unchanged (still demo copy) | spec "promises no ... method" and the 1-row table spec |
+| 3 | Banner link `/catalog?price=..50000`, text "Товари до 500 ₴ ..."; 4 new uk groups, `отвертка` and `худи` added to existing groups (a database seeded before gets the new groups, not those two terms) | `catalog-seed.spec.ts`: link spec failed (`/c/demo-clothing`), synonym spec failed (`викрутка отвертка`) |
+| 4 | `orderPaymentSection` in `lib/order-model.ts`, both order pages | with the old behaviour (a stand-in returning `paymentSection`): `cancelled null: expected { action: 'none', status: null, ... } to be null` and the same for `paid` |
+| 5 | `focusCartHeading`, `h1#cart-heading` `tabIndex={-1}` | specs failed (function missing, `h1` without id/tabindex); the focus itself is e2e only |
+| 6 | Button `disabled` + `data-ready="false"` until the island's first effect; `<noscript>` line `productReady.noScript` | `catalog.spec.tsx` new spec failed against the old component |
+| 7 | "Обрано: ..." (`productChoice.selected`/`separator`) above the pickers; `productOptionGuide = "size-guide"`, `optionGuideLink`; rule: every product with options, only while the page is enabled | `catalog.spec.tsx` (2) and `shop-pages.spec.ts` (1) failed before |
+
+Verified (2026-11-06, each exit code read): `pnpm lint` 0, `pnpm format:check` 0, `pnpm typecheck` 0 (22 tasks; failed once on the new
+synonym spec, fixed in its own commit), `pnpm check:boundaries` 0 (2148 modules, 0 violations), `pnpm check:docs` 0, `pnpm check:env` 0,
+`pnpm --filter @fluxkit/theme test` 0 (97), storefront unit tests 112 files / 2034 tests passed, seeds tests 22 passed, `next build` of the
+storefront 0.
+
+NOT verified: the storefront e2e (new `ux-repairs-3.e2e.ts`, the new tests in `pre-hydration-forms`, `shop-pages`, `home-banners`, and the
+full suite) and the API seed spec: the sandbox refused `runuser` for this worktree-isolated agent, so Postgres could not start (no work-around
+tried, as instructed). No screenshots (no running API). Left to CI.
+
+Decisions outside the plan: none beyond the plan's table; `docs/HANDOFF.md` got a bullet but not a new "Last updated" line (batch 3B edits the
+same file in parallel).
