@@ -143,6 +143,7 @@
   "order.markPaid.title": "Mark order {number} paid",
   "order.markPaid.description": "Record a payment received outside the shop (for example a bank transfer). The payment is sent once; nothing is retried by itself.",
   "order.markPaid.irreversible": "This cannot be undone: the order does not go back to “Awaiting payment”, and its reserved stock is written off as sold. If you marked it by mistake, you can only cancel the order and return the money outside the shop.",
+  "order.markPaid.onlineNotStarted": "The customer has not started a card payment in the shop. Mark the order paid only if you already have the money (transfer, cash). After that the customer can no longer pay for this order by card.",
   "order.markPaid.submit": "Mark paid",
   "order.markPaid.amount": "Amount received",
   "order.markPaid.amountValue": "{amount} ({currency})",

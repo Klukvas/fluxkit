@@ -21,6 +21,19 @@ export interface MarkPaidValues {
 
 export const EMPTY_MARK_PAID: MarkPaidValues = { reference: "", received: false };
 
+/**
+ * Whether the dialog says the customer has not paid online yet: the shop takes online payments (`GET /admin/config`
+ * `onlinePayment`) and the order has no payment attempt. After a mark-paid the shop refuses a new card payment for the
+ * order (`order_not_payable`) and refunds a late success of an open attempt automatically (`docs/api/payments.md`), so
+ * the note says to mark paid only with the money in hand and that the customer can no longer pay by card afterwards.
+ */
+export function showOnlineNotStartedNote(
+  onlinePayment: boolean,
+  payments: readonly unknown[],
+): boolean {
+  return onlinePayment && payments.length === 0;
+}
+
 export interface MarkPaidIssues {
   reference?: TextIssue;
   received?: "confirmation_required";

@@ -403,6 +403,30 @@ describe("action dialogs", () => {
     expect(html).toContain("§order.markPaid.retryHint");
     // UX round 2: the dialog says before the write that it cannot be undone.
     expect(html).toContain("§order.markPaid.irreversible");
+    expect(html).not.toContain("§order.markPaid.onlineNotStarted");
+  });
+
+  it("mark paid: says when the customer has not started an online payment (UX round 2)", () => {
+    const html = renderInRouter(
+      <MarkPaidDialog
+        t={sentinel}
+        open
+        orderNumber="7K3M-9QX2"
+        amountText="UAH 39.98"
+        currency="UAH"
+        values={{ reference: "", received: false }}
+        onChange={noop}
+        referenceError={null}
+        receivedError={null}
+        error={null}
+        retrying={false}
+        onlineNotStarted
+        busy={false}
+        onSubmit={noop}
+        onClose={noop}
+      />,
+    );
+    expect(html).toContain("§order.markPaid.onlineNotStarted");
   });
 
   it("disables everything while the payment is being sent", () => {

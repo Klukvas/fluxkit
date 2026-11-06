@@ -8,6 +8,7 @@ import {
   isMarkPaidDirty,
   markPaidCheckAfterUnknown,
   planMarkPaid,
+  showOnlineNotStartedNote,
   valuesForRetry,
   type MarkPaidValues,
 } from "./mark-paid-form";
@@ -156,5 +157,13 @@ describe("after a lost answer (mark-paid is idempotent by reference)", () => {
       reference: "R-1",
       received: false,
     });
+  });
+});
+
+describe("the note that the customer has not paid online yet (UX round 2)", () => {
+  it("is shown only when the shop takes online payments and the order has no payment attempt", () => {
+    expect(showOnlineNotStartedNote(true, [])).toBe(true);
+    expect(showOnlineNotStartedNote(false, [])).toBe(false);
+    expect(showOnlineNotStartedNote(true, [{ id: "p1" }])).toBe(false);
   });
 });
