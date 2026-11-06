@@ -27,12 +27,15 @@ export const demoBanners: readonly SeedBanner[] = [
     layout: "card",
     title: { uk: "Ідеї для подарунків", en: "Gift ideas" },
     text: {
-      uk: "Шукайте подарунок у каталозі за категоріями.",
-      en: "Browse the catalog by category to find a gift.",
+      uk: "Товари до 500 ₴ — на подарунок і для себе.",
+      en: "Products up to UAH 500, for a gift or for yourself.",
     },
     // No alt text: a decorative picture, the card's title names the link.
     image: "banner-gifts.webp",
-    link: "/c/demo-clothing",
+    // The catalog filtered by price up to 500.00 (`price=<min>..<max>` in minor units, the storefront's own filter address);
+    // it linked the clothing category before (UX round 2). A database seeded before keeps its old link: the runner never
+    // overwrites a banner it finds by id, an admin edits it.
+    link: "/catalog?price=..50000",
     tone: "surface",
   },
   {

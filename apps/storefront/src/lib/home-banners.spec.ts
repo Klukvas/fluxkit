@@ -8,6 +8,7 @@ import {
   forgetBannerWarnings,
   storeBannerViews,
 } from "./home-banners";
+import { resolveSearchAddress } from "./search-query";
 
 beforeEach(() => {
   forgetBannerWarnings();
@@ -35,6 +36,18 @@ describe("bannerLink", () => {
       external: false,
     });
     expect(bannerLink("en", "/")).toEqual({ href: "/en", external: false });
+  });
+
+  it("takes the seeded gift banner's price filter as it is: a canonical catalog address up to 500.00 (UX round 2)", () => {
+    const link = "/catalog?price=..50000";
+    expect(bannerLink("uk", link)).toEqual({ href: "/uk/catalog?price=..50000", external: false });
+    const raw = Object.fromEntries(new URLSearchParams(link.split("?")[1]).entries());
+    const address = resolveSearchAddress(raw, 2);
+    expect(address).toEqual({
+      kind: "query",
+      query: { q: "", facets: [], price: { min: null, max: 50_000 }, sort: null, page: 1 },
+      canonical: true,
+    });
   });
 
   it("keeps an https address as a plain external link", () => {

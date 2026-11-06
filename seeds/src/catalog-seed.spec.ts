@@ -406,6 +406,22 @@ describe("catalog seed data", () => {
       expect(unique(files)).toBe(true);
       for (const file of files) expect(file).toMatch(/^banner-[a-z-]+\.webp$/);
     });
+
+    it("link the gift banner to the catalog filtered by price up to 500.00, which lists several demo products (UX round 2)", () => {
+      const gifts = banners[1];
+      expect(gifts?.title?.en).toBe("Gift ideas");
+      // `price=<min>..<max>` in minor units is the catalog's own address of a price filter (storefront `lib/search-query.ts`).
+      expect(gifts?.link).toBe("/catalog?price=..50000");
+      const match = /^\/catalog\?price=\.\.(\d+)$/.exec(gifts?.link ?? "");
+      const max = Number(match?.[1]);
+      const cheap = products.filter((product) =>
+        product.variants.some((variant) => variant.amount <= max),
+      );
+      expect(cheap.length).toBeGreaterThanOrEqual(3);
+      // The text says what the link shows (no "by category" any more).
+      expect(gifts?.text?.uk).toMatch(/500/);
+      expect(gifts?.text?.en).toMatch(/500/);
+    });
   });
 
   it("does not look like client data", () => {
