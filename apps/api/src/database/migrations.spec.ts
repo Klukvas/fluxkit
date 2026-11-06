@@ -419,6 +419,7 @@ describe("migrations", () => {
     }
   });
 
+  // Thirteen migrations applied and rolled back twice with data: it needs about 20 s on a slow runner, which was the default limit (CI "deleted" matrix jobs failed on it).
   it("applies 0000 to 0012, rolls back 0012 (twice, with data), 0011 (twice, with data), 0010, 0009, 0008, 0007, 0006, 0005, 0004, 0003, 0002, 0001 then 0000, applies again and rolls back again", async () => {
     expect(await tableExists("health_check")).toBe(false);
     expect(await existingCatalogTables()).toEqual([]);
@@ -907,7 +908,7 @@ describe("migrations", () => {
       expect(await tableExists("health_check"), `round ${round}: full down`).toBe(false);
       expect(await appliedMigrationCount(), `round ${round}: full down`).toBe(0);
     }
-  });
+  }, 120_000);
 
   it("refuses to drop a table that still has dependents (no CASCADE in the down script)", async () => {
     await migrate(drizzle(pool), { migrationsFolder });
