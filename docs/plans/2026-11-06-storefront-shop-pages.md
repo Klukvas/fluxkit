@@ -1,6 +1,6 @@
 # Plan: storefront shop pages, contacts, footer and demo copy (repair batch 2)
 
-Status: implemented on `feature/storefront-shop-pages` (from `origin/main` `3760110`), see "Results". Not opened as a PR (orchestrator's call).
+Status: implemented on `feature/storefront-shop-pages` (from `origin/main` `3760110`), see "Results". No PR opened (orchestrator's call); not independently reviewed.
 Source: the owner's UX review of 2026-11-06 (simulated shopper Iryna: no contacts, no delivery and payment page, no return policy,
 no FAQ, no About, no size guide, placeholders and `TODO` text visible, minimal footer). Storefront and seed data only: no API, schema,
 dependency, environment variable or theme-token change. `apps/admin/**`, `packages/ui/**` and the product card availability belong to
@@ -93,4 +93,26 @@ tests, seeds tests, the API seed spec, the full storefront e2e suite on private 
 
 ## Results
 
-(filled in after implementation)
+- **Built as designed**, items 1 to 6. Route `/{locale}/<slug>` in the new group `(pages)`; `RESERVED_SLUGS` refuses a slug another route owns
+  (a spec compares it with the route folders). Sitemap lists the enabled pages. The trust bar's delivery line links too (not only the contact line).
+- **Failing first:** the legal-page test `expected '<div class="mx-auto ...' not to contain 'TODO'` (uk privacy) before `withoutLegalMarker`; the
+  messages test `uk home.about.body: expected 'TODO(fluxkit): демонстраційний текст.…' not to match /TODO|FIXME|fluxkit\)/i` before the new copy; the seed
+  test `expected 'TODO(fluxkit): демо-банер. Замініть а…' not to match ...` before the new banner texts. All pass after.
+- **Footer budget (measured):** real messages uk 1 448 bytes / en 1 265 (uk 1 367 before); sentinel 1 372 (pin < 1 400, 1 261 before). Reached by class-less
+  footer lists, links and `<address>` (`.fk-site-footer` selectors), single classes for the theme switch's form and group, and by dropping catalog, cart and
+  account from the footer (the header shows all three). Before that last step the sentinel footer was 1 469 (over the pin) while the e2e still passed.
+  Margin probe (padding `footer.powered` in uk, real build, `pre-hydration-forms` uk register): +350 bytes still inline, +500 outlined (an earlier, heavier
+  version: +100 inline, +250 outlined).
+- **Decisions outside the plan:** (a) catalog, cart and account links removed from the footer and their `footer.*` messages deleted (budget); (b) the
+  delivery trust line also links to its page; (c) the hero subline ("your shop's welcome text will go here") became neutral copy too, covered by
+  `demo-content.json` `home`; (d) `trustBar` added to `demo-content.json`, so the release check now covers the trust bar (PR 217 review m8);
+  (e) the legal marker stays in the messages and is stripped on render (keeps the existing check forcing the texts to be replaced).
+- **Checks (each exit code read):** `pnpm lint` 0, `format:check` 0, `typecheck` 0, `check:boundaries` 0 (2 729 modules, 0 violations), `check:env` 0,
+  `check:docs` 0, `pnpm --filter @fluxkit/theme test` 0 (97), storefront unit 0 (111 files, 2 015 tests), seeds 0 (20), API `src/seed/seed.spec.ts` 0 (51,
+  real Postgres 16). Full storefront e2e, search on, Postgres 16/Redis/Meilisearch 1.55 native: 163 passed, 4 skipped (the search-off file), run twice
+  (before and after a container restart), including `pre-hydration-forms` uk and en and the new `shop-pages.e2e.ts`.
+- **Screenshots** before/after (uk/en, light/dark, 390/1280: home footer, a shop page (before: the privacy page), the product page) in the agent's scratchpad.
+- **Not verified:** `E2E_SEARCH=off`; the admin suites (admin untouched); a screen reader, Safari, Firefox; messenger and map links in a browser (unit only,
+  master sets none); a real release build with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` (unit-tested only, as before); no independent review yet.
+- **Open:** `@fluxkit/ui` `TrustBar` could take an optional link (then `StoreTrustBar` can use it again); owner to review the demo copy of the shop pages
+  and contacts; seeded banner rows of an existing database keep their old texts (the seed never overwrites a row).
