@@ -1155,9 +1155,9 @@ describe("catalog seed (real app, real Postgres)", () => {
 
     it("stops the command before it touches the database", async () => {
       const before = await tableCounts();
-      await expect(runSeedCommand(TEST_DATASET, { ...env, NODE_ENV: "production" })).rejects.toThrow(
-        /Refusing to seed/,
-      );
+      await expect(
+        runSeedCommand(TEST_DATASET, { ...env, NODE_ENV: "production" }),
+      ).rejects.toThrow(/Refusing to seed/);
       // A guard that ran too late would fail on the missing DATABASE_URL instead.
       await expect(runSeedCommand(TEST_DATASET, { NODE_ENV: "production" })).rejects.toThrow(
         /Refusing to seed/,
