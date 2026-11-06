@@ -75,6 +75,11 @@ export interface ProductPurchaseViewProps {
   children?: ReactNode;
   /** Server-rendered note under the trust bar (the delivery and returns note, `components/product-page-note.tsx`). */
   note?: ReactNode;
+  /**
+   * A shop page next to the option pickers (the size guide by default, `productOptionGuide` of `config/shop-pages.ts`): its
+   * localized link and its title, translated on the server. Shown only on a product with options; `null` or absent: no link.
+   */
+  optionGuide?: { href: string; label: string } | null;
   /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
   preferredSelection?: Selection;
   /** Called with every selection the shopper makes (the island keeps it in the address). */
@@ -111,6 +116,7 @@ export function ProductPurchaseView({
   preferredSelection,
   onSelectionChange,
   cartLines = null,
+  optionGuide = null,
 }: ProductPurchaseViewProps) {
   const [selection, setSelection] = useState<Selection>(() =>
     initialSelection(product, preferredSelection),
@@ -167,6 +173,7 @@ export function ProductPurchaseView({
           exponent,
           locale,
         );
+  const chosen = selectionSummary(product, selection, t("productChoice.separator"));
   const barNote = !purchasable
     ? atLimit
       ? t("product.bar.atLimit", { count: inCart })
@@ -334,6 +341,23 @@ export function ProductPurchaseView({
             noValidate
             className="flex flex-col gap-4"
           >
+            {/* The chosen values in words (UX round 2, batch 3A item 7): the page starts from the first sellable variant, and a
+                checked radio alone was easy to miss. API names only, in option order; no plural, so one message fits every count. */}
+            {hasOptionPicker(product) && chosen !== "" ? (
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p id="product-chosen" className="text-sm text-foreground">
+                  {t("productChoice.selected", { values: chosen })}
+                </p>
+                {optionGuide === null ? null : (
+                  <Link
+                    href={optionGuide.href}
+                    className={`inline-flex min-h-6 items-center text-sm text-foreground underline underline-offset-4 ${focusRing}`}
+                  >
+                    {optionGuide.label}
+                  </Link>
+                )}
+              </div>
+            ) : null}
             {hasOptionPicker(product)
               ? product.options.map((option) => (
                   <OptionPicker

@@ -20,6 +20,7 @@ import {
   socialImageUrl,
   trimDescription,
 } from "../../../../../lib/seo";
+import { optionGuideLink } from "../../../../../lib/shop-pages";
 import { selectionFromParams } from "../../../../../lib/variant-matcher";
 import { messagesByLocale } from "../../../../../messages";
 
@@ -59,6 +60,8 @@ export default async function ProductPage(props: ProductProps) {
   const origin = await publicOrigin();
   const url = absoluteUrl(origin, localizedHref(locale, `/p/${encodeURIComponent(product.slug)}`));
   const homeHref = localizedHref(locale, "/");
+  // The size guide (by default) next to the option pickers; the island shows it only on a product with options.
+  const optionGuide = optionGuideLink(locale);
 
   const crumbs = [
     { label: t("breadcrumbs.home"), href: homeHref },
@@ -88,6 +91,9 @@ export default async function ProductPage(props: ProductProps) {
         preferredSelection={preferredSelection}
         exponent={exponent}
         note={<ProductPageNote locale={locale} t={t} />}
+        optionGuide={
+          optionGuide === null ? null : { href: optionGuide.href, label: t(optionGuide.titleKey) }
+        }
         brand={
           product.brand === null
             ? null

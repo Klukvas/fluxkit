@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
-import { waitForHydration } from "../support/flows.ts";
+import { chooseOptions, waitForHydration } from "../support/flows.ts";
 
 /**
  * UX repairs, batch 3A (plan `docs/plans/2026-11-06-ux-repairs-3-storefront.md`), from the second round of the simulated
@@ -90,4 +90,28 @@ test("removing the last cart line by keyboard moves the focus to the cart headin
   // The next Tab goes on from the heading into the page (the empty state's link), not from the top of the document.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Browse the catalog" })).toBeFocused();
+});
+
+test("the product page names the chosen values and links the size guide on a product with options only (item 7)", async ({
+  page,
+}) => {
+  await page.goto("/uk/p/demo-t-shirt");
+  const chosen = page.locator("#product-chosen");
+  // The page starts from the first sellable variant: both values are named, in option order (colour, then size).
+  await expect(chosen).toHaveText(/^Обрано: \S+, \S+$/);
+  const guide = page.getByRole("main").getByRole("link", { name: "Таблиця розмірів", exact: true });
+  await expect(guide).toHaveAttribute("href", "/uk/size-guide");
+
+  // The buy button is enabled by the island's own effect (item 6): the page is alive, a choice now goes through React.
+  await expect(page.getByRole("button", { name: "Додати до кошика", exact: true })).toBeEnabled();
+  await chooseOptions(page, { Колір: "Білий", Розмір: "M" });
+  await expect(chosen).toHaveText("Обрано: Білий, M");
+  await guide.click();
+  await expect(page.getByRole("heading", { level: 1, name: "Таблиця розмірів" })).toBeVisible();
+
+  // A product without options: no chosen line and no guide link.
+  await page.goto("/en/p/demo-screwdriver");
+  await expect(page.getByRole("heading", { level: 1, name: "Demo Screwdriver" })).toBeVisible();
+  await expect(page.locator("#product-chosen")).toHaveCount(0);
+  await expect(page.getByRole("main").getByRole("link", { name: "Size guide" })).toHaveCount(0);
 });

@@ -120,6 +120,8 @@
   "product.quantity.stockShort": "Your cart already has {count} of this item, more than the shop has in stock. Change the quantity in the cart.",
   "product.addToCart": "Add to cart",
   "productReady.noScript": "To add this product to the cart, turn on JavaScript in your browser.",
+  "productChoice.selected": "Selected: {values}",
+  "productChoice.separator": ", ",
   "product.adding": "Adding to the cart",
   "product.added": "Added to the cart.",
   "product.added.dismiss": "Close the message",

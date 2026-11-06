@@ -316,3 +316,11 @@ export const productPageNote: {
   summaryKey: "shopPages.delivery.summary",
   pages: ["delivery-and-payment", "returns"],
 };
+
+/**
+ * The shop page linked next to the option pickers of the product page (UX round 2, batch 3A item 7), with the chosen values.
+ * Rule: every product that has options (a choice between variants) gets the link, whatever its options are called: the
+ * storefront reads no option code (AGENTS 2.3, product structure is data-driven), so a colour-only product gets it too. The
+ * link is left out while the page is not enabled; `null` switches it off.
+ */
+export const productOptionGuide: ShopPageSlug | null = "size-guide";

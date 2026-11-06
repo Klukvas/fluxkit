@@ -614,6 +614,53 @@ describe("ProductPurchaseView", () => {
     expect(html.indexOf("after-content")).toBeGreaterThan(html.indexOf("§product.addToCart"));
   });
 
+  // UX round 2, batch 3A item 7: the pre-selected values (the first sellable variant) were only a checked radio.
+  describe("the chosen values and the option guide link", () => {
+    const real = (
+      locale: "uk" | "en",
+      overrides: Partial<Parameters<typeof ProductPurchaseView>[0]> = {},
+    ) =>
+      renderToStaticMarkup(
+        <ProductPurchaseView
+          onAddToCart={added}
+          product={multi}
+          gallery={gallery}
+          exponent={2}
+          locale={locale}
+          t={createTranslator(locale === "uk" ? uk : en, locale)}
+          brand={null}
+          {...overrides}
+        />,
+      );
+
+    it("names the chosen values in option order, joined by a comma, before the pickers", () => {
+      const html = real("uk");
+      expect(html).toContain(
+        '<p id="product-chosen" class="text-sm text-foreground">Обрано: §mint, §six</p>',
+      );
+      expect(html.indexOf('id="product-chosen"')).toBeLessThan(html.indexOf("<fieldset"));
+      expect(real("en", { preferredSelection: { flavor: "lemon" } })).toContain(
+        ">Selected: §lemon, §twelve</p>",
+      );
+    });
+
+    it("says nothing about a choice on a product without a picker", () => {
+      const single = product({ title: "§title", options: [], variants: [variant("only", {})] });
+      expect(view({ product: single })).not.toContain("§productChoice.");
+    });
+
+    it("links the option guide next to the pickers when the page gives one, and only on a product with options", () => {
+      const guide = { href: "/uk/size-guide", label: "§guide" };
+      const html = view({ optionGuide: guide });
+      expect(html).toMatch(
+        /id="product-chosen"[^>]*>§productChoice\.selected<\/p><a [^>]*href="\/uk\/size-guide"[^>]*>§guide<\/a>/,
+      );
+      expect(view()).not.toContain("size-guide");
+      const single = product({ title: "§title", options: [], variants: [variant("only", {})] });
+      expect(view({ product: single, optionGuide: guide })).not.toContain("size-guide");
+    });
+  });
+
   it("has no hardcoded text", () => {
     const html = withoutMoney(view());
     expect(leftoverText(html)).toBe("");
