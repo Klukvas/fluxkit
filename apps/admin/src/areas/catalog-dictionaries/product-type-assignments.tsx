@@ -521,14 +521,14 @@ export function OptionAssignmentsSection({
                   <span className="inline-flex flex-wrap justify-end gap-2">
                     <Button
                       variant="secondary"
-                      aria-label={t("dict.assignment.option.editLabel", { code: nameOf(row) })}
+                      aria-label={t("dict.assignment.option.editLabel", { name: nameOf(row) })}
                       onClick={() => dialog.open({ mode: "edit", row, name: nameOf(row) })}
                     >
                       {t("dict.form.edit")}
                     </Button>
                     <Button
                       variant="danger"
-                      aria-label={t("dict.assignment.option.removeLabel", { code: nameOf(row) })}
+                      aria-label={t("dict.assignment.option.removeLabel", { name: nameOf(row) })}
                       onClick={() => removing.open(row)}
                     >
                       {t("dict.assignment.remove")}
@@ -568,7 +568,7 @@ export function OptionAssignmentsSection({
             removing.close();
             onChanged("unknown");
           }}
-          title={t("dict.assignment.option.removeTitle", { code: nameOf(toRemove) })}
+          title={t("dict.assignment.option.removeTitle", { name: nameOf(toRemove) })}
           description={t("dict.assignment.option.removeBody")}
           hint={t("dict.assignment.option.removeHint")}
           confirmLabel={t("dict.assignment.remove")}
