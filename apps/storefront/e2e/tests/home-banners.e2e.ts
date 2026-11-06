@@ -26,19 +26,19 @@ const SEEDED = {
   en: [
     {
       name: "New this season",
-      description: "TODO(fluxkit): demo banner. Replace or delete it in the admin.",
+      description: "Fresh arrivals from the catalog in one place.",
       href: "/en/catalog",
       picture: "Shopping bags and a price tag",
     },
     {
       name: "Gift ideas",
-      description: "TODO(fluxkit): demo banner. Browse the catalog by category to find a gift.",
+      description: "Browse the catalog by category to find a gift.",
       href: "/en/c/demo-clothing",
       picture: null,
     },
   ],
-  enImage: { name: "New collection. Demo banner: replace it", href: "/en/catalog" },
-  uk: ["Новинки сезону", "Ідеї для подарунків", "Нова колекція. Демо-банер: замініть його"],
+  enImage: { name: "New collection. See what is new in the catalog", href: "/en/catalog" },
+  uk: ["Новинки сезону", "Ідеї для подарунків", "Нова колекція. Дивіться новинки в каталозі"],
 } as const;
 
 test("the seeded banners sit between the hero and the categories: two cards and one picture banner, each one link", async ({
