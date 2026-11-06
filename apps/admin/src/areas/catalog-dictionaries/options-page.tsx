@@ -323,7 +323,9 @@ function OptionEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.option.deleteTitle", { code: option.code })}
+              title={t("dict.option.deleteTitle", {
+                name: resolveLocalized(option.name, locale, content.defaultLocale) || option.code,
+              })}
               description={t("dict.option.deleteBody")}
               hint={t("dict.option.deleteHint")}
               confirmLabel={t("dict.option.deleteConfirm")}

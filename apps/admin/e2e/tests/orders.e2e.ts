@@ -73,7 +73,7 @@ test("orders: filter by status and q, detail, mark paid with a reference, fulfil
   expect((await paid).postDataJSON()).toEqual({ reference, amount: toPay.total });
   // While the write runs the dialog cannot be closed: its buttons are disabled and Escape does nothing.
   await expect(pay.getByRole("button", { name: "Sending…" })).toBeDisabled();
-  await expect(pay.getByRole("button", { name: "Close" })).toBeDisabled();
+  await expect(pay.getByRole("button", { name: "Cancel", exact: true })).toBeDisabled();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Escape");
   await expect(pay).toBeVisible();

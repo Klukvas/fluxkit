@@ -388,7 +388,11 @@ function ProductTypeEditor({ id }: { id: string }) {
                 editor.setConfirmingDelete(false);
                 editor.changed("unknown");
               }}
-              title={t("dict.productType.deleteTitle", { code: productType.code })}
+              title={t("dict.productType.deleteTitle", {
+                name:
+                  resolveLocalized(productType.name, locale, content.defaultLocale) ||
+                  productType.code,
+              })}
               description={t("dict.productType.deleteBody")}
               hint={t("dict.productType.deleteHint")}
               confirmLabel={t("dict.productType.deleteConfirm")}

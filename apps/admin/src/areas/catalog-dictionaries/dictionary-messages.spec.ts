@@ -3,7 +3,7 @@ import { messagesForArea } from "../../test-helpers";
 import { ATTRIBUTE_FLAGS, ATTRIBUTE_INPUT_TYPES, VALIDATION_FIELDS } from "./attribute-form";
 import { DICTIONARY_SCREENS, NOTICE_KINDS } from "./dictionary-frame";
 import { MESSAGE_FILES } from "./index";
-import { ITEM_MESSAGE_SUFFIXES } from "./items-section";
+import { ITEM_MESSAGE_SUFFIXES, itemName } from "./items-section";
 import { PLAIN_STATE_STATUSES, REJECT_REASONS } from "./upload-queue";
 
 /**
@@ -47,5 +47,34 @@ describe("dictionary message keys built from data", () => {
       const missing = keys.filter((key) => !(key in messages));
       expect(missing, locale).toEqual([]);
     }
+  });
+});
+
+describe("delete dialogs name the item a person knows (UX round 2: “Значення short буде видалено”)", () => {
+  const keys = [
+    "dict.attributeOption.deleteBody",
+    "dict.optionValue.deleteBody",
+    "dict.attribute.deleteTitle",
+    "dict.option.deleteTitle",
+    "dict.productType.deleteTitle",
+    "dict.brand.deleteTitle",
+    "dict.category.deleteTitle",
+  ];
+
+  it("use the label or name ({name}), never the technical code or slug", async () => {
+    for (const locale of ["uk", "en"] as const) {
+      const messages = await messagesForArea(locale, MESSAGE_FILES);
+      for (const key of keys) {
+        expect(messages[key], `${locale} ${key}`).toContain("{name}");
+        expect(messages[key], `${locale} ${key}`).not.toMatch(/\{(code|slug)\}/);
+      }
+    }
+  });
+
+  it("names an option value by its label in the UI language, then the default one, then its code", () => {
+    const row = { id: "v", code: "short", label: { uk: "Olena2 Короткий", en: "" }, position: 0 };
+    expect(itemName(row, "uk", "uk")).toBe("Olena2 Короткий");
+    expect(itemName(row, "en", "uk")).toBe("Olena2 Короткий");
+    expect(itemName({ ...row, label: {} }, "uk", "uk")).toBe("short");
   });
 });

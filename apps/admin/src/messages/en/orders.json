@@ -137,7 +137,7 @@
   "order.notice.unknownPaid.paid_with_other_reference": "No answer arrived. The order was read again: it is paid, but with another reference than {reference}. Check the history before doing anything else.",
   "order.notice.unknownPaid.not_payable": "No answer arrived. The order was read again: it is cancelled or expired, and the payment with reference {reference} was not recorded.",
   "order.notice.unknownPaid.unreadable": "No answer arrived, and the order could not be read again either. Reload the page before trying again; marking it paid again with the same reference {reference} cannot record a second payment.",
-  "order.dialog.cancel": "Close",
+  "order.dialog.cancel": "Cancel",
   "order.dialog.sending": "Sending…",
   "order.dialog.requiredMark": "*",
   "order.markPaid.title": "Mark order {number} paid",
