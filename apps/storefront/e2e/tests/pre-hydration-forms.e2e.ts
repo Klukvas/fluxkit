@@ -132,3 +132,63 @@ test.describe("before hydration, nothing personal reaches a URL (review H1)", ()
     expect(page.url()).toMatch(/\/en\/account\/login$/);
   });
 });
+
+// UX round 2, batch 3A item 6: an early tap on "Add to cart" posted the form natively and reloaded the page with nothing added.
+test.describe("the product page's buy button before hydration", () => {
+  for (const locale of ["en", "uk"] as const) {
+    const add = locale === "en" ? "Add to cart" : "Додати до кошика";
+    const hint =
+      locale === "en"
+        ? "To add this product to the cart, turn on JavaScript in your browser."
+        : "Щоб додати товар до кошика, увімкніть JavaScript у браузері.";
+
+    test(`${locale}: scripts delayed: the button is disabled until the page is alive, then adds`, async ({
+      page,
+    }) => {
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      await page.route("**/_next/static/**/*.js", async (route) => {
+        await gate;
+        await route.continue();
+      });
+      const navigations: string[] = [];
+      page.on("framenavigated", (frame) => {
+        if (frame === page.mainFrame()) navigations.push(frame.url());
+      });
+      await page.goto(`/${locale}/p/demo-screwdriver`, { waitUntil: "domcontentloaded" });
+      const button = page.getByRole("button", { name: add, exact: true });
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveAttribute("data-ready", "false");
+      // A tap now does nothing: no native post, no reload.
+      await button.click({ force: true });
+      expect(navigations).toHaveLength(1);
+
+      release();
+      await page.waitForLoadState("load");
+      // Enabled only by the island's own effect: the signal that it hydrated (the cart badge helper reads English only).
+      await expect(button).toBeEnabled();
+      await expect(button).not.toHaveAttribute("data-ready");
+      await button.click();
+      await expect(
+        page
+          .getByRole("status")
+          .getByText(locale === "en" ? "Added to the cart." : "Додано до кошика."),
+      ).toBeVisible();
+    });
+
+    test(`${locale}: JavaScript off: the page still renders, the button is disabled and a line says why`, async ({
+      browser,
+      baseURL,
+    }) => {
+      const context = await browser.newContext({ javaScriptEnabled: false, baseURL });
+      const page = await context.newPage();
+      await page.goto(`/${locale}/p/demo-screwdriver`);
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await expect(page.getByRole("button", { name: add, exact: true })).toBeDisabled();
+      await expect(page.getByText(hint, { exact: true })).toBeVisible();
+      await context.close();
+    });
+  }
+});

@@ -1,6 +1,7 @@
 import type { Money, Order, OrderStatus } from "@fluxkit/api-client";
 import { MAX_API_OFFSET } from "./catalog-query";
 import { formatMoney } from "./money";
+import { paymentSection, type PaymentSectionModel } from "./payment-model";
 
 /**
  * What the order views derive from an order of the API (plan step 7, "Errors": every status has a translated label). Pure;
@@ -18,6 +19,41 @@ export const ORDER_STATUSES: readonly OrderStatus[] = [
 /** `order.status.<status>`; a status the storefront does not know yet gets a neutral text instead of a broken key. */
 export function orderStatusKey(status: OrderStatus): string {
   return ORDER_STATUSES.includes(status) ? `order.status.${status}` : "order.status.unknown";
+}
+
+/**
+ * The payment block of an order page, by the order's status (UX round 2, batch 3A item 4: a cancelled order said "the
+ * payment link has expired, start a new payment"). `paymentSection` (the payment model) decides what the block offers; this
+ * decides whether the order page shows it at all:
+ *
+ * - `awaiting_payment`: as the payment model decides (pay, continue, check the status, the last attempt's failure);
+ * - `paid`, `fulfilled`: only a `paid` attempt, as the confirmation; an older failed or expired attempt is history, and an
+ *   order paid another way (an admin marked it) shows no payment block;
+ * - `cancelled`, `expired` (and a status the storefront does not know yet): nothing, so no "pay" action or "start a new
+ *   payment" text can appear on a closed order;
+ * - except on every closed order (`cancelled`, `expired`, `paid`, `fulfilled`): a `failed` attempt with the category
+ *   `not_accepted` (core `payments/shopper.ts`: the provider took the money, the order could not take it) keeps its block. Its
+ *   text ("a payment arrived ... it is refunded or settled by the shop") is the shopper's only notice of that money; the
+ *   payment model offers no action on a closed order (review M1 of PR 234).
+ */
+export function orderPaymentSection(
+  order: Pick<Order, "status" | "payment">,
+  onlinePayment: boolean,
+): PaymentSectionModel | null {
+  const { latest } = order.payment;
+  const notAccepted = latest?.status === "failed" && latest.failureCategory === "not_accepted";
+  switch (order.status) {
+    case "awaiting_payment":
+      return paymentSection(order, onlinePayment);
+    case "paid":
+    case "fulfilled":
+      return latest?.status === "paid" || notAccepted ? paymentSection(order, onlinePayment) : null;
+    case "cancelled":
+    case "expired":
+      return notAccepted ? paymentSection(order, onlinePayment) : null;
+    default:
+      return null;
+  }
 }
 
 /** The owner (customer, or guest with the token) may cancel only an unpaid order (`docs/api/orders.md`). */

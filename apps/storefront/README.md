@@ -538,6 +538,32 @@ Plan `docs/plans/2026-11-06-storefront-shop-pages.md` (repair batch 2 of the own
 - **Tests:** `config/shop-pages.spec.ts`, `config/contacts.spec.ts`, `components/shop-pages.spec.tsx` (pages, tables, FAQ, contacts shown and hidden, footer, trust bar link, product note, legal marker hidden, the route's 404 and metadata, the sitemap), `next.config.spec.ts` (the demo-content refusal), `messages.spec.ts` (no developer note in any message), `shell.spec.tsx` (footer pin); e2e `e2e/tests/shop-pages.e2e.ts` (uk and en: footer and "See also" reach every page, one `h1`, title, canonical, breadcrumbs; contacts shown in the footer and on the page, unset parts hidden; FAQ by keyboard; 404s; the trust bar and product note links; 390 and 1280 px without sideways scroll; no developer note on the visited pages), `design-b.e2e.ts` (the dark contrast walk includes the six pages).
 - **Not verified:** a screen reader; Safari and Firefox; real client contacts (messenger and map links are unit-tested only, master sets none).
 
+## UX repairs, batch 3A (2026-11-06)
+
+Plan `docs/plans/2026-11-06-ux-repairs-3-storefront.md` (second round of the simulated shopper's review). Storefront and seed data only.
+
+- **Cart delivery note** (`cart-page.tsx`, `cartDelivery.note`): a line under the total says delivery is calculated at checkout. The cart API has no
+  delivery estimate or free-delivery threshold (a method's `free_over` is known only at checkout, with the address), so no number is shown.
+- **Delivery page matches the checkout** (`config/shop-pages.ts`): one row per shipping method the checkout really offers (the demo: the courier) and a
+  payment text that names only card payment online. Rows are not checked against the API at runtime: whoever activates or switches off a method edits the page.
+- **Order page of a closed order** (`lib/order-model.ts` `orderPaymentSection`, used by the guest and the account order page): the payment block is
+  shown while the order awaits payment (as `paymentSection` decides), on a paid or fulfilled order only for a `paid` attempt, and never on a cancelled or
+  expired order, with one exception on every closed order: a `failed` attempt with the category `not_accepted` (the money arrived, the order could
+  not take it) keeps its block and its "refunded or settled by the shop" text, with no action (review M1 of PR 234). `paymentSection` (payment
+  code) is unchanged.
+- **Focus after the last cart line** (`lib/cart-model.ts` `focusCartHeading`): the cart `h1` has `id="cart-heading"` and `tabIndex={-1}`; when the
+  line count goes from some to none while the focus was lost and a remove was pressed on this page (a cart another tab emptied moves no focus,
+  review m7 of PR 234), the heading takes it. The live region still announces the removal.
+- **Buy button before hydration** (`product-purchase.tsx`): the server HTML renders "Add to cart" `disabled` with `data-ready="false"`; the island's
+  first effect enables it. A tap before that does nothing (before, the browser posted the form and reloaded the page with nothing added). Without a script
+  the button stays disabled and a `<noscript>` line (`productReady.noScript`) says JavaScript is needed; the rest of the page works as before (adding to
+  the cart always needed a script). If the page's scripts never run although scripts are on (a blocked or failed chunk, a hydration crash), the
+  button stays disabled WITHOUT a hint; not a regression (before, a tap reloaded the page with nothing added). Pressing Enter in the quantity box
+  before hydration is blocked too: the form has no enabled submit button, so the browser does not post it.
+- **Chosen values and the size guide** (`product-purchase.tsx`, `productChoice.*`): above the pickers "Обрано: Чорний, S" (the API's value names in
+  option order, joined by `product.bar.separator`, the same separator as the phone's buy bar; no plural). Rule for the guide link: every product with options (a choice between variants) links the
+  page of `productOptionGuide` (`size-guide`) while that page is enabled; no option code is read (AGENTS 2.3), so a colour-only product gets it too.
+
 ## Accessibility baseline (what was checked)
 
 By tests (`components/shell.spec.tsx`, markup assertions) and by `curl` of the running app:

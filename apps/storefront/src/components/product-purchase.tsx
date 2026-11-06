@@ -75,6 +75,11 @@ export interface ProductPurchaseViewProps {
   children?: ReactNode;
   /** Server-rendered note under the trust bar (the delivery and returns note, `components/product-page-note.tsx`). */
   note?: ReactNode;
+  /**
+   * A shop page next to the option pickers (the size guide by default, `productOptionGuide` of `config/shop-pages.ts`): its
+   * localized link and its title, translated on the server. Shown only on a product with options; `null` or absent: no link.
+   */
+  optionGuide?: { href: string; label: string } | null;
   /** Option values the address asks for (`?opt.<code>=<value>`, `selectionFromParams`); the page starts from them. */
   preferredSelection?: Selection;
   /** Called with every selection the shopper makes (the island keeps it in the address). */
@@ -111,6 +116,7 @@ export function ProductPurchaseView({
   preferredSelection,
   onSelectionChange,
   cartLines = null,
+  optionGuide = null,
 }: ProductPurchaseViewProps) {
   const [selection, setSelection] = useState<Selection>(() =>
     initialSelection(product, preferredSelection),
@@ -118,6 +124,13 @@ export function ProductPurchaseView({
   const [quantity, setQuantity] = useState(MIN_LINE_QUANTITY);
   const [activeImage, setActiveImage] = useState(0);
   const [status, setStatus] = useState<AddStatus>({ state: "idle" });
+  // False in the server HTML and until this island has hydrated: before that a tap on the buy button cannot reach `submit`
+  // (the browser would post the form and reload the page with nothing added), so the button is disabled and looks it (UX
+  // round 2, batch 3A item 6). Without a script it stays so and a `noscript` line says why (adding always needed one).
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    setReady(true);
+  }, []);
   // The "Added" toast is shown until it is dismissed, the choice changes or it times out (the cart badge keeps the count).
   const [toastOpen, setToastOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
@@ -160,11 +173,13 @@ export function ProductPurchaseView({
           exponent,
           locale,
         );
+  // One separator for the chosen values above the pickers and in the phone's buy bar (review m6 of PR 234).
+  const chosen = selectionSummary(product, selection, t("product.bar.separator"));
   const barNote = !purchasable
     ? atLimit
       ? t("product.bar.atLimit", { count: inCart })
       : t(availability.messageKey)
-    : selectionSummary(product, selection, t("product.bar.separator"));
+    : chosen;
 
   useEffect(() => {
     // On a phone the toast covers the page: hidden after a while unless the shopper is in it (the cart badge keeps the
@@ -327,6 +342,23 @@ export function ProductPurchaseView({
             noValidate
             className="flex flex-col gap-4"
           >
+            {/* The chosen values in words (UX round 2, batch 3A item 7): the page starts from the first sellable variant, and a
+                checked radio alone was easy to miss. API names only, in option order; no plural, so one message fits every count. */}
+            {hasOptionPicker(product) && chosen !== "" ? (
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p id="product-chosen" className="text-sm text-foreground">
+                  {t("productChoice.selected", { values: chosen })}
+                </p>
+                {optionGuide === null ? null : (
+                  <Link
+                    href={optionGuide.href}
+                    className={`inline-flex min-h-6 items-center text-sm text-foreground underline underline-offset-4 ${focusRing}`}
+                  >
+                    {optionGuide.label}
+                  </Link>
+                )}
+              </div>
+            ) : null}
             {hasOptionPicker(product)
               ? product.options.map((option) => (
                   <OptionPicker
@@ -377,8 +409,9 @@ export function ProductPurchaseView({
                 <Button
                   ref={addButtonRef}
                   type="submit"
-                  disabled={!purchasable}
+                  disabled={!purchasable || !ready}
                   aria-disabled={pending}
+                  data-ready={ready ? undefined : "false"}
                   className="min-h-12 w-full aria-disabled:opacity-50 sm:min-h-11 sm:w-auto lg:min-h-12 lg:flex-1"
                   aria-describedby={
                     atLimit ? `product-availability ${LIMIT_NOTE_ID}` : "product-availability"
@@ -391,6 +424,9 @@ export function ProductPurchaseView({
                       : t("product.addToCart")}
                 </Button>
               </div>
+              <noscript>
+                <p className="text-sm text-muted-foreground">{t("productReady.noScript")}</p>
+              </noscript>
               {atLimit && stock !== null ? (
                 <p id={LIMIT_NOTE_ID} className="flex flex-wrap gap-x-2 text-sm text-foreground">
                   <span>

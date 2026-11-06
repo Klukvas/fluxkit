@@ -292,6 +292,7 @@ test("a signed success for another amount is flagged for attention and never mar
 });
 
 test("a payment that arrives after the shopper cancelled raises the late-payment flag and queues a full refund; the order stays cancelled", async ({
+  page,
   shopper,
   admin,
   provider,
@@ -320,4 +321,13 @@ test("a payment that arrives after the shopper cancelled raises the late-payment
   // The shopper is told the payment could not be accepted, not that it was paid.
   const status = await shopper.guestPaymentStatus(started.order, started.paymentId);
   expect(status).toMatchObject({ status: "failed", failureCategory: "not_accepted" });
+
+  // The cancelled order's page keeps that explanation (review M1 of PR 234), with no pay action and no "start a new payment".
+  await page.goto(`/en/order/${started.order.number}#t=${started.order.accessToken ?? ""}`);
+  const main = page.getByRole("main");
+  await expect(
+    main.getByText(/A payment arrived, but the order could not accept it/),
+  ).toBeVisible();
+  await expect(main.getByRole("button", { name: /^(Pay now|Pay again)$/ })).toHaveCount(0);
+  await expect(main).not.toContainText("Start a new payment");
 });

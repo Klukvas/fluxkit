@@ -17,9 +17,8 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import { failureText } from "../lib/failure";
 import { localizedHref } from "../lib/locale-path";
 import { guestOrderHref, isOrderNumber, tokenFromFragment } from "../lib/order-links";
-import { paymentSection } from "../lib/payment-model";
 import { guestPaySource, type PaySource } from "../lib/payment-store";
-import type { ShopMoney } from "../lib/order-model";
+import { orderPaymentSection, type ShopMoney } from "../lib/order-model";
 import {
   createOrderStore,
   guestOrderSource,
@@ -218,7 +217,7 @@ export function GuestOrderPage({
       </Page>
     );
   }
-  const payment = paymentSection(state.load.order, onlinePayment);
+  const payment = orderPaymentSection(state.load.order, onlinePayment);
   return (
     <Page>
       <OrderDetailsView

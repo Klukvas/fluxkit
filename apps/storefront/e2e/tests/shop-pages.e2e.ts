@@ -159,6 +159,25 @@ test("the trust bar's contact line and the product page's delivery note link to 
   ).toHaveAttribute("href", "/uk/contacts");
 });
 
+test("the delivery page names only what the demo checkout offers: the courier and card payment online (UX round 2, batch 3A item 2)", async ({
+  page,
+}) => {
+  const expected = {
+    en: { method: "By courier to your address", payment: "by card online on the order page" },
+    uk: { method: "Кур’єром за адресою", payment: "карткою онлайн на сторінці замовлення" },
+  } as const;
+  for (const locale of ["en", "uk"] as const) {
+    await page.goto(`/${locale}/delivery-and-payment`);
+    const table = page.getByRole("main").getByRole("table");
+    await expect(table.getByRole("rowheader")).toHaveCount(1);
+    await expect(table.getByRole("rowheader")).toHaveText(expected[locale].method);
+    await expect(page.getByRole("main")).toContainText(expected[locale].payment);
+    await expect(page.getByRole("main")).not.toContainText(
+      /відділен|поштомат|самовивіз|branch|locker|pickup/i,
+    );
+  }
+});
+
 for (const width of [390, 1280] as const) {
   test(`${String(width)} px: no shop page, and no home footer, scrolls sideways`, async ({
     page,
