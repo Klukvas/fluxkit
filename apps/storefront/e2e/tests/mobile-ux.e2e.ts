@@ -147,7 +147,7 @@ test("the product page's buy bar shows while the add button is out of view, adds
   await expect(inline).toHaveCount(1);
   await expect(bar).toHaveAttribute("aria-hidden", "true");
   await expect(bar).toBeVisible();
-  await expect(bar).toContainText("Black · S");
+  await expect(bar).toContainText("Black, S");
   const barAdd = bar.getByText("Add to cart", { exact: true });
   expect((await box(barAdd)).height).toBeGreaterThanOrEqual(44);
   expect((await box(barAdd)).width).toBeGreaterThan(300);

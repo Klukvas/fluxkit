@@ -173,12 +173,13 @@ export function ProductPurchaseView({
           exponent,
           locale,
         );
-  const chosen = selectionSummary(product, selection, t("productChoice.separator"));
+  // One separator for the chosen values above the pickers and in the phone's buy bar (review m6 of PR 234).
+  const chosen = selectionSummary(product, selection, t("product.bar.separator"));
   const barNote = !purchasable
     ? atLimit
       ? t("product.bar.atLimit", { count: inCart })
       : t(availability.messageKey)
-    : selectionSummary(product, selection, t("product.bar.separator"));
+    : chosen;
 
   useEffect(() => {
     // On a phone the toast covers the page: hidden after a while unless the shopper is in it (the cart badge keeps the

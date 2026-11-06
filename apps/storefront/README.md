@@ -556,7 +556,7 @@ Plan `docs/plans/2026-11-06-ux-repairs-3-storefront.md` (second round of the sim
   the button stays disabled and a `<noscript>` line (`productReady.noScript`) says JavaScript is needed; the rest of the page works as before (adding to
   the cart always needed a script).
 - **Chosen values and the size guide** (`product-purchase.tsx`, `productChoice.*`): above the pickers "Обрано: Чорний, S" (the API's value names in
-  option order, joined by `productChoice.separator`; no plural). Rule for the guide link: every product with options (a choice between variants) links the
+  option order, joined by `product.bar.separator`, the same separator as the phone's buy bar; no plural). Rule for the guide link: every product with options (a choice between variants) links the
   page of `productOptionGuide` (`size-guide`) while that page is enabled; no option code is read (AGENTS 2.3), so a colour-only product gets it too.
 
 ## Accessibility baseline (what was checked)

@@ -77,7 +77,7 @@ One commit per item (3 split into banner and synonyms), plus a typecheck fix of 
 | 4 | `orderPaymentSection` in `lib/order-model.ts`, both order pages | with the old behaviour (a stand-in returning `paymentSection`): `cancelled null: expected { action: 'none', status: null, ... } to be null` and the same for `paid` |
 | 5 | `focusCartHeading`, `h1#cart-heading` `tabIndex={-1}` | specs failed (function missing, `h1` without id/tabindex); the focus itself is e2e only |
 | 6 | Button `disabled` + `data-ready="false"` until the island's first effect; `<noscript>` line `productReady.noScript` | `catalog.spec.tsx` new spec failed against the old component |
-| 7 | "Обрано: ..." (`productChoice.selected`/`separator`) above the pickers; `productOptionGuide = "size-guide"`, `optionGuideLink`; rule: every product with options, only while the page is enabled | `catalog.spec.tsx` (2) and `shop-pages.spec.ts` (1) failed before |
+| 7 | "Обрано: ..." (`productChoice.selected`, values joined by `product.bar.separator` ", ", shared with the phone bar since review m6) above the pickers; `productOptionGuide = "size-guide"`, `optionGuideLink`; rule: every product with options, only while the page is enabled | `catalog.spec.tsx` (2) and `shop-pages.spec.ts` (1) failed before |
 
 Verified (2026-11-06, each exit code read): `pnpm lint` 0, `pnpm format:check` 0, `pnpm typecheck` 0 (22 tasks; failed once on the new
 synonym spec, fixed in its own commit), `pnpm check:boundaries` 0 (2148 modules, 0 violations), `pnpm check:docs` 0, `pnpm check:env` 0,

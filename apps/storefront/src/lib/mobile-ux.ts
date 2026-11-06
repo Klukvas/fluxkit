@@ -18,7 +18,7 @@ interface SummaryProduct {
   options: readonly { code: string; values: readonly { code: string; name: string }[] }[];
 }
 
-/** The chosen values' names in the options' order joined by the locale's `separator` ("Blue · M"); unknown choices are left out. */
+/** The chosen values' names in the options' order joined by the locale's `separator` ("Blue, M"); unknown choices are left out. */
 export function selectionSummary(
   product: SummaryProduct,
   selection: Readonly<Record<string, string>>,
