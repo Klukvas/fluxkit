@@ -30,18 +30,27 @@ export function orderStatusKey(status: OrderStatus): string {
  * - `paid`, `fulfilled`: only a `paid` attempt, as the confirmation; an older failed or expired attempt is history, and an
  *   order paid another way (an admin marked it) shows no payment block;
  * - `cancelled`, `expired` (and a status the storefront does not know yet): nothing, so no "pay" action or "start a new
- *   payment" text can appear on a closed order.
+ *   payment" text can appear on a closed order;
+ * - except on every closed order (`cancelled`, `expired`, `paid`, `fulfilled`): a `failed` attempt with the category
+ *   `not_accepted` (core `payments/shopper.ts`: the provider took the money, the order could not take it) keeps its block. Its
+ *   text ("a payment arrived ... it is refunded or settled by the shop") is the shopper's only notice of that money; the
+ *   payment model offers no action on a closed order (review M1 of PR 234).
  */
 export function orderPaymentSection(
   order: Pick<Order, "status" | "payment">,
   onlinePayment: boolean,
 ): PaymentSectionModel | null {
+  const { latest } = order.payment;
+  const notAccepted = latest?.status === "failed" && latest.failureCategory === "not_accepted";
   switch (order.status) {
     case "awaiting_payment":
       return paymentSection(order, onlinePayment);
     case "paid":
     case "fulfilled":
-      return order.payment.latest?.status === "paid" ? paymentSection(order, onlinePayment) : null;
+      return latest?.status === "paid" || notAccepted ? paymentSection(order, onlinePayment) : null;
+    case "cancelled":
+    case "expired":
+      return notAccepted ? paymentSection(order, onlinePayment) : null;
     default:
       return null;
   }
