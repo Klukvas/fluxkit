@@ -65,7 +65,7 @@
   "products.summary.neverPublished": "Ще не публікувався",
   "products.notice.saved": "Збережено.",
   "products.notice.noChanges": "Нічого не змінено, нічого не надіслано.",
-  "products.notice.published": "Товар опубліковано.",
+  "products.notice.published": "Товар опубліковано. Його сторінка в магазині вже працює, а в каталозі й пошуку він з’явиться протягом хвилини-двох.",
   "products.notice.unpublished": "Товар знову чернетка, його більше немає в магазині.",
   "products.notice.archived": "Товар в архіві, його більше немає в магазині.",
   "products.notice.restored": "Товар відновлено як чернетку.",
