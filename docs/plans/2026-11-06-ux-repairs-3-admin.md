@@ -113,3 +113,22 @@ test` 0 (1914, after `pnpm --filter @fluxkit/admin build`), `pnpm check:docs` 0.
 - Item 15 also corrects item 4's first wording (the product page is cached 60 s too).
 - Item 16 also moved the Monobank simulator note of the payments article; the email article's Resend note is unchanged.
 - Brand and category slug labels changed with the product's (item 1) for one word across the admin.
+
+### Review fixes (independent review of PR 235: no blocker) and the first CI e2e run
+
+| Finding | Fix |
+| ------- | --- |
+| M1 the payer text claimed delivery was paid (also on unpaid orders) | "Доставка входить у суму замовлення" / "Delivery is part of the order total" |
+| m1 HANDOFF state | PR 235 entry, "Last updated", the gzip headroom note |
+| m2 the card note hid after failed or expired attempts | `showNoCardPaymentNote`: online payment on and no attempt `succeeded`, `creating`, `processing` or `create_unknown`; "no card payment has succeeded"; spec failed first (function missing, and the old rule hid it after a failed attempt) |
+| m3 copy button name (WCAG 2.5.3) | visible text first, the field in a visually hidden part, no `aria-label`; spec |
+| m4 duplicate option names hook | `use-option-definitions.ts` moved to `catalog-dictionaries/` and used by the product type screen and the product editor; a failed read shows a note and Retry; `use-option-names.ts` deleted |
+| m5 one callout per table | only the first marked hint of the page is shown (`isFirstScrollHint`, a layout effect); 390 px order page: 2 tables, 1 callout |
+| m6 date format texts | "Порядок задає ваш браузер, наприклад мм/дд/рррр: спочатку місяць." / "Dates use your browser's format, for example mm/dd/yyyy (month first)." |
+| m7 docs | `docs/files/admin.md` (`ACCOUNT_PANEL_ID`, the moved hook), e2e README |
+| m8 `{code}` carried names | `{name}` in the three option assignment labels |
+| m9 error read twice | the slot group refers to the message only when it has no upload input; uk "Відмовлено" for both refused-search lines |
+| CI e2e `dictionaries.e2e.ts` | the picker label is now "name (code)" on purpose (item 10): the test selects "Finish <u> (finish_<u>)"; the select was disabled only while its list loaded (as before; spec shows it enabled once loaded) |
+| CI e2e `search.e2e.ts` | "The search service answers" is also in the intro: matched with `exact: true` (two places) |
+
+Admin initial JavaScript after the fixes: 440 712 raw, 131 534 gzip (budgets 445 000 and 135 000).
