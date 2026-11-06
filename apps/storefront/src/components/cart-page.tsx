@@ -593,7 +593,7 @@ export function CartPageView({
               </>
             )}
           </div>
-          <StoreTrustBar t={t} className="max-w-sm max-md:max-w-none" />
+          <StoreTrustBar t={t} locale={locale} className="max-w-sm max-md:max-w-none" />
         </>
       ) : null}
     </Container>

@@ -390,7 +390,7 @@ function ProductRow({
 }
 
 function TrustView({ section, context }: { section: TrustSection; context: HomeContext }) {
-  const { t, trustItems = trustBarItems } = context;
+  const { t, locale, trustItems = trustBarItems } = context;
   if (trustItems.length === 0) return null;
   return (
     <section
@@ -401,7 +401,12 @@ function TrustView({ section, context }: { section: TrustSection; context: HomeC
       <h2 id={headingId(section)} className="sr-only">
         {t(section.titleKey)}
       </h2>
-      <StoreTrustBar t={t} items={trustItems} className="md:flex-row md:justify-around md:py-4" />
+      <StoreTrustBar
+        t={t}
+        locale={locale}
+        items={trustItems}
+        className="md:flex-row md:justify-around md:py-4"
+      />
     </section>
   );
 }

@@ -41,10 +41,10 @@ export function ThemeSwitch({
   }
 
   return (
-    <form method="post" action="/theme" className="flex flex-wrap items-center gap-2">
+    <form method="post" action="/theme" className="fk-theme-form">
       <input type="hidden" name="return" value={pathname} />
       <span id={labelId}>{labels.group}</span>
-      <span role="group" aria-labelledby={labelId} className="flex flex-wrap gap-1">
+      <span role="group" aria-labelledby={labelId} className="fk-theme-group">
         {storefrontThemeModes.map((option) => (
           <button
             key={option}

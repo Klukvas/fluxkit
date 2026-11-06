@@ -572,7 +572,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
             >
               {t("checkout.summary.editCart")}
             </Link>
-            <StoreTrustBar t={t} />
+            <StoreTrustBar t={t} locale={locale} />
           </div>
         </section>
         <form
