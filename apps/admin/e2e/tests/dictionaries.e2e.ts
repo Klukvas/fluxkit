@@ -116,7 +116,7 @@ test("dictionaries: option with values, attribute with options, product type, br
   // Brand.
   await page.goto(`${SPA}/catalog/brands/new`);
   await fillLocales(main, "Name", `Бренд ${u}`, `Brand ${u}`);
-  await main.getByRole("textbox", { name: "Slug (part of the address)" }).fill(`brand-${u}`);
+  await main.getByRole("textbox", { name: "Page address", exact: true }).fill(`brand-${u}`);
   await main.getByRole("button", { name: "Create brand" }).click();
   await expect(page.getByText(`Brand Brand ${u} was created.`, { exact: true })).toBeVisible();
   await page.goto(`${SPA}/catalog/brands`);
@@ -129,7 +129,7 @@ test("dictionaries: option with values, attribute with options, product type, br
   ] as const) {
     await page.goto(`${SPA}/catalog/categories/new`);
     await fillLocales(main, "Name", `${name} uk`, name);
-    await main.getByRole("textbox", { name: "Slug (part of the address)" }).fill(slug);
+    await main.getByRole("textbox", { name: "Page address", exact: true }).fill(slug);
     await main.getByRole("button", { name: "Create category" }).click();
     await expect(page.getByText(`Category ${name} was created.`, { exact: true })).toBeVisible();
   }

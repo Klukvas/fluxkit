@@ -167,8 +167,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
             en: "Choose the product type (it cannot be changed later) and type the title, at least in the default language.",
           },
           {
-            uk: "Адресу (slug) можна лишити порожньою: її створять із назви. Бренд і опис необовʼязкові.",
-            en: "The address (slug) may stay empty: it is made from the title. Brand and description are optional.",
+            uk: "Адресу сторінки можна лишити порожньою: її створять із назви. Бренд і опис необовʼязкові.",
+            en: "The page address may stay empty: it is made from the title. Brand and description are optional.",
           },
           {
             uk: "Після збереження відкрийте редактор за посиланням. Товар створено як чернетку з одним варіантом за замовчуванням.",
@@ -181,8 +181,8 @@ export const CATALOG_ARTICLES: readonly HelpArticle[] = [
       {
         kind: "paragraph",
         text: {
-          uk: "Назва, опис (простий текст, без HTML), адреса і бренд. Зміна адреси міняє посилання на товар; старе посилання не перенаправляється. Окремих полів для SEO немає.",
-          en: "Title, description (plain text, no HTML), address and brand. Changing the address changes the product's link; the old link does not redirect. There are no separate SEO fields.",
+          uk: "Назва, опис (простий текст, без HTML), адреса сторінки і бренд. Зміна адреси сторінки міняє посилання на товар; старе посилання не перенаправляється. Окремих полів для SEO немає.",
+          en: "Title, description (plain text, no HTML), page address and brand. Changing the page address changes the product's link; the old link does not redirect. There are no separate SEO fields.",
         },
       },
       {

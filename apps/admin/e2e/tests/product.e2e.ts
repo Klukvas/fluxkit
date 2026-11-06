@@ -32,7 +32,7 @@ test("product flow: create, generated attributes, options, variants, prices, sto
     .selectOption({ label: "Clothing (clothing)" });
   await main.getByRole("textbox", { name: "Title (Ukrainian)", exact: true }).fill(`Сорочка ${u}`);
   await main.getByRole("textbox", { name: "Title (English)", exact: true }).fill(`Shirt ${u}`);
-  await main.getByRole("textbox", { name: "Slug", exact: true }).fill(slug);
+  await main.getByRole("textbox", { name: "Page address", exact: true }).fill(slug);
   await main.getByRole("button", { name: "Create the product" }).click();
   await expect(main.getByText(`Product “Shirt ${u}” created as a draft.`)).toBeVisible();
   await main.getByRole("link", { name: "Open the product" }).click();
@@ -174,7 +174,7 @@ test("two submits of the create form in one task send one create", async ({
     .selectOption({ label: "Clothing (clothing)" });
   await main.getByRole("textbox", { name: "Title (Ukrainian)", exact: true }).fill(`Раз ${u}`);
   await main.getByRole("textbox", { name: "Title (English)", exact: true }).fill(`Once ${u}`);
-  await main.getByRole("textbox", { name: "Slug", exact: true }).fill(slug);
+  await main.getByRole("textbox", { name: "Page address", exact: true }).fill(slug);
   // Both submits run before React renders the busy state (a script, an extension, a future programmatic submit).
   await main.getByRole("button", { name: "Create the product" }).evaluate((button) => {
     const form = (button as HTMLButtonElement).form;

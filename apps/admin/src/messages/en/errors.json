@@ -48,7 +48,7 @@
   "errors.reason.last_owner_cannot_be_demoted": "The last active owner cannot get another role. Make another user an owner first.",
   "errors.reason.last_owner_cannot_be_deactivated": "The last active owner cannot be deactivated. Make another user an owner first.",
   "errors.reason.title_invalid": "The title is missing or not valid in the default language.",
-  "errors.reason.slug_missing": "The slug is missing.",
+  "errors.reason.slug_missing": "The page address is missing.",
   "errors.reason.default_locale_missing": "The text in the default language is required.",
   "errors.reason.attribute_invalid": "This attribute value is not valid.",
   "errors.reason.attribute_assigned": "The attribute is assigned to a product type. Remove it from the product types first.",
