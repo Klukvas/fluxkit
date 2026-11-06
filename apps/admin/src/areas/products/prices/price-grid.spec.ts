@@ -15,6 +15,7 @@ import {
   pricesRevision,
   removeColumn,
   setCell,
+  zeroPricedVariantIds,
   type PriceGridContext,
 } from "./price-grid";
 
@@ -358,3 +359,16 @@ function decimal(amount: number): string {
   const digits = String(amount).padStart(3, "0");
   return `${digits.slice(0, -2)}.${digits.slice(-2)}`;
 }
+
+describe("zeroPricedVariantIds (a publish or a switch-on that would sell for 0)", () => {
+  const prices = [price("v1", "UAH", 0), price("v2", "UAH", 4990), price("v3", "EUR", 0)];
+
+  it("names the asked variants whose shop-currency price is 0, in the asked order", () => {
+    expect(zeroPricedVariantIds(prices, ["v2", "v1"], "UAH")).toEqual(["v1"]);
+  });
+
+  it("ignores another currency and a variant without a price (the API refuses that one itself)", () => {
+    expect(zeroPricedVariantIds(prices, ["v3", "v4"], "UAH")).toEqual([]);
+    expect(zeroPricedVariantIds(prices, ["v3"], "EUR")).toEqual(["v3"]);
+  });
+});

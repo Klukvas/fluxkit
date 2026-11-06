@@ -34,6 +34,7 @@ import {
   productTitle,
 } from "./editor-views";
 import { LIFECYCLE_CONFIRMATION, permittedActions, type LifecycleAction } from "./lifecycle";
+import { zeroPricedVariantIds } from "./prices/price-grid";
 import { mapPublishProblems, type EditorTabId, type PublishProblem } from "./publish-problems";
 import type { ChangeDetail } from "./tab-props";
 
@@ -101,6 +102,8 @@ function ProductEditor({ id }: { id: string }) {
   const [busy, setBusy] = useState<LifecycleAction | null>(null);
   const [flight] = useState(createSingleFlight);
   const [confirming, setConfirming] = useState<LifecycleAction | null>(null);
+  // Active variants priced 0 in the shop currency, while publishing asks about them.
+  const [zeroOnPublish, setZeroOnPublish] = useState(0);
   const [deleted, setDeleted] = useState(false);
   const [pendingFocus, setPendingFocus] = useState<{ tab: EditorTabId; id: string } | null>(null);
   const reload = resource.reload;
@@ -214,8 +217,36 @@ function ProductEditor({ id }: { id: string }) {
   }
 
   function onAction(action: LifecycleAction, target: AdminProduct) {
-    if (LIFECYCLE_CONFIRMATION[action] === "none" && action !== "delete") void run(action, target);
+    if (action === "publish") void publishAskingForZero(target);
+    else if (LIFECYCLE_CONFIRMATION[action] === "none" && action !== "delete")
+      void run(action, target);
     else setConfirming(action);
+  }
+
+  /**
+   * Publishing sells every active variant: one with a price of 0 in the shop currency would be given away, which the API
+   * allows. Read the prices first and ask when there is one; when the read fails, publish as before (the API decides).
+   */
+  async function publishAskingForZero(target: AdminProduct) {
+    let zero: string[] = [];
+    try {
+      const prices = await adminClient.listProductPrices(target.id);
+      if (prices.ok) {
+        const active = target.variants
+          .filter((variant) => variant.isActive)
+          .map((variant) => variant.id);
+        zero = zeroPricedVariantIds(prices.data.items, active, config.shopCurrency);
+      }
+    } catch (bug) {
+      crash(bug);
+      return;
+    }
+    if (zero.length === 0) {
+      void run("publish", target);
+      return;
+    }
+    setZeroOnPublish(zero.length);
+    setConfirming("publish");
   }
 
   const tabLabel = (tab: EditorTabId) =>
@@ -296,6 +327,18 @@ function ProductEditor({ id }: { id: string }) {
               cancelLabel={t("dict.form.cancel")}
               onClose={() => setConfirming(null)}
               onConfirm={() => void run(confirming, product)}
+            />
+          ) : null}
+          {confirming === "publish" ? (
+            <ConfirmDialog
+              open
+              busy={busy !== null}
+              title={t("products.lifecycle.zeroPublishTitle")}
+              description={t.plural("products.lifecycle.zeroPublishBody", zeroOnPublish)}
+              confirmLabel={t("products.lifecycle.zeroPublishConfirm")}
+              cancelLabel={t("dict.form.cancel")}
+              onClose={() => setConfirming(null)}
+              onConfirm={() => void run("publish", product)}
             />
           ) : null}
           {confirming === "delete" ? (

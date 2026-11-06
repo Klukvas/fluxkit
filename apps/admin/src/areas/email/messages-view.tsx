@@ -15,6 +15,7 @@ import {
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { DayRangeFailure } from "../../lib/date-range";
+import { dateHint } from "../../lib/date-input-echo";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
@@ -48,6 +49,8 @@ export interface MessageFilterFormProps {
   /** Why the date range is not sent, or `null`. */
   rangeError: { field: "from" | "to"; reason: DayRangeFailure } | null;
   onApply: (filters: MessageFilters) => void;
+  /** The UI language: the date fields repeat the chosen day in it (`dateHint`). */
+  uiLocale?: string;
 }
 
 /**
@@ -61,6 +64,7 @@ export function MessageFilterForm({
   templateKeys,
   rangeError,
   onApply,
+  uiLocale,
 }: MessageFilterFormProps) {
   const [status, setStatus] = useState<string>(query.status ?? "");
   const [template, setTemplate] = useState(query.template);
@@ -152,6 +156,7 @@ export function MessageFilterForm({
       <Field
         id="email-filter-from"
         label={t("mail.list.from")}
+        hint={dateHint(t, from, uiLocale)}
         error={rangeError?.field === "from" ? rangeMessage : undefined}
       >
         {(control) => (
@@ -169,6 +174,7 @@ export function MessageFilterForm({
       <Field
         id="email-filter-to"
         label={t("mail.list.to")}
+        hint={dateHint(t, to, uiLocale)}
         error={rangeError?.field === "to" ? rangeMessage : undefined}
       >
         {(control) => (
@@ -207,6 +213,7 @@ export interface MessagesScreenProps {
   formKey: string;
   /** The results (the data component around `MessageResultsView`); ignored while `rangeError` is set. */
   results: ReactNode;
+  uiLocale?: string;
 }
 
 /** The message list screen: heading, filters and the results, or the date-range problem instead of them. */
@@ -218,12 +225,14 @@ export function MessagesScreen({
   onApply,
   formKey,
   results,
+  uiLocale,
 }: MessagesScreenProps) {
   return (
     <>
       <MessageFilterForm
         key={formKey}
         t={t}
+        uiLocale={uiLocale}
         query={query}
         templateKeys={templateKeys}
         rangeError={rangeError}

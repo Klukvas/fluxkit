@@ -86,10 +86,24 @@ describe("the banner list", () => {
     expect(html).toMatch(/<img src="https:\/\/media\.example\.com\/aa\.webp" alt=""/);
   });
 
-  it("marks a live banner beyond the first three as live but not shown", () => {
+  it("marks a live banner beyond the first three as live but not shown, never as plainly 'Live now'", () => {
     const html = list({ banners: [bannerFixture({ id: "d", shownOnStorefront: false })] });
     expect(html).toContain("§banners.list.liveNotShown");
+    expect(html).not.toContain("§banners.state.live");
     expect(html).not.toMatch(/§banners\.list\.shown(?!Rule)/);
+  });
+
+  it("warns that a scheduled or switched-off banner after the first three live ones will not appear", () => {
+    const shown = ["a", "b", "c"].map((id, position) => bannerFixture({ id, position }));
+    const html = list({
+      banners: [
+        ...shown,
+        bannerFixture({ id: "s", state: "scheduled", shownOnStorefront: false, position: 3 }),
+        bannerFixture({ id: "e", state: "expired", shownOnStorefront: false, position: 4 }),
+      ],
+    });
+    expect(html.match(/§banners\.list\.behindShown/g)).toHaveLength(1);
+    expect(html).toContain("§banners.state.scheduled");
   });
 
   it("gives a writer move buttons named with the banner, the ends disabled, and makes rows draggable", () => {

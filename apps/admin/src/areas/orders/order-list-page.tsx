@@ -57,7 +57,7 @@ function OrderResults({
 
 /** `/orders`: the server-driven order list; filters, search and paging live in the URL. */
 export function OrderListPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   const query = readOrderListQuery(params);
   const queryKey = writeOrderListQuery(query);
@@ -106,6 +106,7 @@ export function OrderListPage() {
   return (
     <OrderListView
       t={t}
+      uiLocale={locale}
       query={query}
       rangeError={request.ok ? null : { field: request.field, reason: request.reason }}
       results={

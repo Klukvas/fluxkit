@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DataTable, type DataTableColumn } from "./data-table";
+import { DataTable, DataTableScrollHint, type DataTableColumn } from "./data-table";
 import { DescriptionList } from "./description-list";
 import { LiveRegion } from "./live-region";
 import { StatusBadge } from "./status-badge";
@@ -55,7 +55,52 @@ const table = (options: Options = {}): string =>
     />,
   );
 
+/** The table's scroll box: the `div` with `overflow-x-auto`. */
+function scrollBox(markup: string) {
+  const box = tags(markup, "div").find((tag) =>
+    String(tag.attributes.class ?? "").includes("overflow-x-auto"),
+  );
+  if (box === undefined) throw new Error(`No scroll box in ${markup}`);
+  return box;
+}
+
 describe("DataTable", () => {
+  it("is the containing block of its hidden texts, so a wide table scrolls inside and never widens the page", () => {
+    // `sr-only` texts are absolutely positioned: without a positioned scroll box they escape it and stretch the document.
+    expect(table()).toMatch(/^<div[^>]*><div [^>]*class="relative overflow-x-auto/);
+  });
+
+  it("makes the scroll box a focusable region named by the caption, so a keyboard can scroll it (Firefox, Safari)", () => {
+    const box = scrollBox(table());
+    expect(box.attributes.role).toBe("region");
+    expect(box.attributes.tabindex).toBe("0");
+    expect(box.attributes.class).toContain("focus-visible:");
+    const captionId = first(table(), "caption").attributes.id;
+    expect(captionId).toBeTruthy();
+    expect(box.attributes["aria-labelledby"]).toBe(captionId);
+    expect(box.attributes["aria-describedby"]).toBeUndefined();
+  });
+
+  it("shows the app's scroll hint above the table on small screens only, and none without a provider", () => {
+    expect(text(table())).not.toContain("Swipe");
+    const markup = render(
+      <DataTableScrollHint.Provider value="Swipe sideways">
+        <DataTable
+          caption="Products"
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.id}
+          emptyMessage="No products yet"
+        />
+      </DataTableScrollHint.Provider>,
+    );
+    const hint = first(markup, "p");
+    expect(hint.attributes.class).toContain("md:hidden");
+    expect(text(markup)).toContain("Swipe sideways");
+    const box = scrollBox(markup);
+    expect(box.attributes["aria-describedby"]).toBe(hint.attributes.id);
+  });
+
   it("starts with a caption and gives every column header scope=col", () => {
     const markup = table();
     expect(markup).toMatch(/<table[^>]*><caption[^>]*>Products<\/caption>/);
@@ -135,7 +180,7 @@ describe("DataTable", () => {
   });
 
   it("scrolls horizontally inside a wrapper instead of widening the page", () => {
-    expect(first(table(), "div").attributes.class).toContain("overflow-x-auto");
+    expect(scrollBox(table()).attributes.class).toContain("relative overflow-x-auto");
   });
 });
 

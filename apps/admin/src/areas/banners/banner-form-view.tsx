@@ -1,5 +1,7 @@
 import { Alert, Button, Checkbox, Field, Input, Textarea, type Translator } from "@fluxkit/ui";
 import type { FormEvent, ReactNode, Ref } from "react";
+import { dateHint } from "../../lib/date-input-echo";
+import { firstInvalidControl } from "../../lib/first-invalid";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { safeHttpUrl } from "../../lib/safe-http-url";
 import {
@@ -24,6 +26,7 @@ import {
 } from "./banner-form";
 import type { PictureSlot } from "./banner-picture-upload";
 import { BANNER_LIMITS, codePointLength } from "./banner-rules";
+import type { BannerPlacement } from "./banner-visibility";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -33,6 +36,16 @@ export interface BannerUploadView {
   uploadsEnabled: boolean;
   running: boolean;
   controlsFor: (slot: PictureSlot) => UploadControls;
+}
+
+/** The id of the banner form: a refused save focuses its first invalid field (`firstInvalidBannerField`). */
+export const BANNER_FORM_ID = "banner-form";
+
+/** The first field of the banner form marked invalid, looked up in the commit that marks it. */
+export function firstInvalidBannerField(): HTMLElement | null {
+  const form = document.getElementById(BANNER_FORM_ID);
+  const found = form === null ? null : firstInvalidControl(form);
+  return found instanceof HTMLElement ? found : null;
 }
 
 export interface BannerFormViewProps {
@@ -57,6 +70,11 @@ export interface BannerFormViewProps {
   preview: ReactNode;
   /** The stored values of an edit: the activation rule asks what this save changes. */
   initial?: BannerFormValues;
+  /**
+   * Where the banner stands in the list (`banner-visibility.ts`): `liveNotShown` and `behindShown` of a stored banner,
+   * `newBehindShown` for a new banner that will be appended after 3 live ones; `null` or absent: nothing to say.
+   */
+  placement?: BannerPlacement | null;
 }
 
 function RadioGroup<Value extends string>({
@@ -188,6 +206,8 @@ function PictureSlotView({
       role="group"
       aria-labelledby={`${id}-heading`}
       aria-describedby={error === undefined ? undefined : errorId}
+      // No native field to carry `aria-invalid`: the mark lets a refused save focus this slot's control (`first-invalid.ts`).
+      data-invalid={error === undefined ? undefined : "true"}
     >
       <h3 id={`${id}-heading`} className="font-semibold text-foreground">
         {heading}
@@ -326,6 +346,7 @@ export function BannerFormView({
   warnings,
   preview,
   initial,
+  placement,
 }: BannerFormViewProps) {
   const readOnly = !canWrite;
   const card = values.layout === "card";
@@ -349,7 +370,13 @@ export function BannerFormView({
   return (
     <div className="grid gap-8 xl:grid-cols-2">
       {/* The form checks itself (the picture slots are no native fields): one translated summary, no browser bubble. */}
-      <form method="post" onSubmit={onSubmit} className="flex min-w-0 flex-col gap-8" noValidate>
+      <form
+        id={BANNER_FORM_ID}
+        method="post"
+        onSubmit={onSubmit}
+        className="flex min-w-0 flex-col gap-8"
+        noValidate
+      >
         <FormErrorSummary t={t} summary={summary} summaryRef={summaryRef} />
         <RadioGroup
           id="banner-layout"
@@ -486,7 +513,12 @@ export function BannerFormView({
                     ? t("banners.form.altCard", { language })
                     : t("banners.form.altImage", { language })
                 }
-                extraHint={card ? t("banners.form.altCardHint") : t("banners.form.altImageHint")}
+                extraHint={
+                  card
+                    ? t("banners.form.altCardHint")
+                    : // The API needs it in the main language only; the others only to switch the banner on (plan section 7).
+                      t(isDefault ? "banners.form.altImageHint" : "banners.form.altImageHintOther")
+                }
                 value={values.imageAlt[locale] ?? ""}
                 limit={BANNER_LIMITS.imageAltMaxLength}
                 required={!card && requiredHere}
@@ -564,9 +596,13 @@ export function BannerFormView({
               const note = warnings.find(
                 (warning) => warning.kind === "time" && warning.field === field,
               );
-              const base = t(
-                field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint",
-              );
+              const chosen = dateHint(t, values[field], uiLocale);
+              const base = [
+                t(field === "startsAt" ? "banners.form.startsAtHint" : "banners.form.endsAtHint"),
+                chosen,
+              ]
+                .filter((part) => part !== undefined)
+                .join(" ");
               return (
                 <Field
                   key={field}
@@ -602,6 +638,11 @@ export function BannerFormView({
           {ended ? (
             <p className="text-sm font-medium text-warning">{t("banners.form.endedWarning")}</p>
           ) : null}
+          {placement === undefined || placement === null ? null : (
+            <p className="text-sm font-medium text-warning">
+              {t(`banners.form.placement.${placement}`, { shown: BANNER_LIMITS.maxShown })}
+            </p>
+          )}
         </section>
 
         {canWrite ? (

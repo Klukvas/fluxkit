@@ -58,6 +58,9 @@
   "payment.source.system": "System",
 
   "payment.attention.title": "This payment needs your attention",
+  "payment.closedOrder.title": "The order is closed, but the shop still holds money for it",
+  "payment.closedOrder.refund": "Nothing is returned automatically for a cancelled order. Refund the payment with Refund below (the money goes back the way the customer paid), or settle it with the customer another way.",
+  "payment.closedOrder.automatic": "The customer paid after the order was closed, or paid twice: the shop refunds this payment automatically. Check that the refund below turns Refunded; until then it is also listed under Payments to review.",
   "payment.attention.closed": "An earlier attention item was closed: {code}.",
   "payment.attention.code.late_payment": "Paid after the order could no longer be paid",
   "payment.attention.code.duplicate_payment": "Paid twice",

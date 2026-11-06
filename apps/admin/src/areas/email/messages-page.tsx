@@ -48,7 +48,7 @@ function MessageResults({
 
 /** `/email/messages`: the outbox, server-driven; filters and paging live in the URL. */
 export function EmailMessagesPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [params, setParams] = useSearchParams();
   const query = readMessageListQuery(params);
   const queryKey = writeMessageListQuery(query);
@@ -69,6 +69,7 @@ export function EmailMessagesPage() {
       <p className="max-w-prose text-muted-foreground">{t("mail.list.intro")}</p>
       <MessagesScreen
         t={t}
+        uiLocale={locale}
         query={query}
         rangeError={request.ok ? null : { field: request.field, reason: request.reason }}
         templateKeys={templateKeys}

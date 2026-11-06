@@ -136,6 +136,30 @@ function panel(
   );
 }
 
+describe("the payment panel of a closed order", () => {
+  it("says what to do with money the shop still holds for a cancelled order, and nothing for a paid one", () => {
+    const render = (orderStatus: string) =>
+      renderInRouter(
+        <PaymentPanel
+          t={sentinel}
+          uiLocale="en"
+          money={money}
+          payments={[paymentFixture()]}
+          actionsFor={() => []}
+          onAction={noop}
+          busy={false}
+          meId={ME}
+          emails={null}
+          statusLine={<StatusLine />}
+          orderStatus={orderStatus}
+        />,
+        "/orders/o1",
+      );
+    expect(render("cancelled")).toContain("§payment.closedOrder.refund");
+    expect(render("paid")).not.toContain("§payment.closedOrder");
+  });
+});
+
 describe("the payment panel", () => {
   it("shows the empty state for an order without attempts, with a heading and no table", () => {
     const html = panel([], OWNER);

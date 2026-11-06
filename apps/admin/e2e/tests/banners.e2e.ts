@@ -64,6 +64,18 @@ async function storedIds(api: AdminApi): Promise<string[]> {
   return (await api.get<{ items: StoredBanner[] }>("/admin/banners")).items.map((item) => item.id);
 }
 
+/**
+ * The state text the list shows for a live banner: "Live now" while it is among the first 3 live ones, else the warning
+ * that it is not on the home page (a banner of a test is appended after the seed's live ones and those of earlier tests).
+ */
+async function liveStateText(api: AdminApi, id: string): Promise<string> {
+  const stored = (
+    await api.get<{ items: { id: string; shownOnStorefront: boolean }[] }>("/admin/banners")
+  ).items.find((item) => item.id === id);
+  if (stored === undefined) throw new Error(`Banner ${id} is not stored.`);
+  return stored.shownOnStorefront ? "Live now" : "Live, but not shown: only the first 3 are";
+}
+
 /** The row of a banner in the list, found by its name (the link to its editor). */
 function row(page: Page, name: string): Locator {
   return page
@@ -167,7 +179,9 @@ test("the manager creates a card banner with an uploaded picture: early checks, 
 
   await page.getByRole("link", { name: "Back to the banners" }).first().click();
   const created = row(page, name);
-  await expect(created.getByText("Live now")).toBeVisible();
+  await expect(
+    created.getByText(await liveStateText(api, (stored as StoredBanner).id), { exact: true }),
+  ).toBeVisible();
   // The thumbnail is decorative (`alt=""`, the name is beside it) and really loads from /media.
   const thumbnail = created.locator("img");
   await expect(thumbnail).toHaveAttribute("alt", "");
@@ -292,7 +306,9 @@ test("the manager switches a banner off in its editor, then deletes it from the 
   const banner = await createBanner(api, context, name);
   await signIn("manager");
   await openList(page);
-  await expect(row(page, name).getByText("Live now")).toBeVisible();
+  await expect(
+    row(page, name).getByText(await liveStateText(api, banner.id), { exact: true }),
+  ).toBeVisible();
 
   await row(page, name).getByRole("link", { name, exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();

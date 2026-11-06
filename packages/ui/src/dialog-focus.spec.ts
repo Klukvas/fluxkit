@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { openModal, type DialogLike, type FocusableLike } from "./dialog-focus";
+import { nativeCloseAction, openModal, type DialogLike, type FocusableLike } from "./dialog-focus";
 
 function fakeDialog(options: { initialFocus?: FocusableLike | null; open?: boolean } = {}) {
   const calls: string[] = [];
@@ -82,5 +82,26 @@ describe("openModal", () => {
     dialog.open = false;
     close();
     expect(opener.focused).toBe(1);
+  });
+});
+
+describe("nativeCloseAction", () => {
+  it("ignores a close event while the state says closed (the dialog was closed by state)", () => {
+    expect(nativeCloseAction(false, false, true)).toBe("ignore");
+    expect(nativeCloseAction(false, false, false)).toBe("ignore");
+  });
+
+  it("ignores a stale close event that arrives after the dialog was opened again (StrictMode re-runs the open effect)", () => {
+    // The effect cleanup's dialog.close() queues a `close` event; the second effect run calls showModal() before it fires.
+    expect(nativeCloseAction(true, true, true)).toBe("ignore");
+    expect(nativeCloseAction(true, true, false)).toBe("ignore");
+  });
+
+  it("closes through the state when the dialog really closed natively and may be dismissed", () => {
+    expect(nativeCloseAction(true, false, true)).toBe("close");
+  });
+
+  it("reopens a dialog that closed natively while it may not be dismissed", () => {
+    expect(nativeCloseAction(true, false, false)).toBe("reopen");
   });
 });

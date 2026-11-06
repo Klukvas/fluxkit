@@ -58,6 +58,7 @@
   "mail.notConfigured.title": "No email provider is configured",
   "mail.notConfigured.body": "The shop sends no mail. Orders and accounts work as usual; customers get no password reset or order mails.",
   "mail.setup.title": "How to turn email on",
+  "mail.setup.who": "This is set up by whoever installs the shop (a developer), on the server, not in this panel. Send them these steps:",
   "mail.setup.step1": "Set EMAIL_PROVIDER in the server environment to the code of a provider, for example resend.",
   "mail.setup.step2": "Set EMAIL_FROM to the sender, for example Shop Name <shop@your-domain.example>, on a domain verified with the provider.",
   "mail.setup.step3": "Set the provider's own key variable named in its README, and STOREFRONT_PUBLIC_URL for the links in mail.",

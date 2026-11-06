@@ -311,3 +311,21 @@ export function pricesRevision(prices: readonly AdminPrice[]): string {
   }
   return `${prices.length}-${hash.toString(16)}`;
 }
+
+/**
+ * The variants of `variantIds` (in that order) whose stored price in `currency` is 0: publishing the product or switching
+ * such a variant on would sell it for nothing. The API allows it (a free item is legitimate), so the screen only asks
+ * first. A variant without a price is not listed: publishing refuses it on its own (`price_missing`).
+ */
+export function zeroPricedVariantIds(
+  prices: readonly AdminPrice[],
+  variantIds: readonly string[],
+  currency: string,
+): string[] {
+  const zero = new Set(
+    prices
+      .filter((price) => price.currency === currency && price.amount === 0)
+      .map((price) => price.variantId),
+  );
+  return variantIds.filter((id) => zero.has(id));
+}

@@ -70,6 +70,7 @@ export function LocaleFields({
   readOnly,
   multiline,
   required = true,
+  hint,
 }: {
   t: Translator;
   id: string;
@@ -85,6 +86,8 @@ export function LocaleFields({
   multiline?: boolean;
   /** The default locale is required (`false` for an optional text such as a description). */
   required?: boolean;
+  /** A hint under one locale's field, for example a live length count. */
+  hint?: (locale: string) => string | undefined;
 }) {
   return (
     <LocaleTextField
@@ -104,6 +107,7 @@ export function LocaleFields({
             language: languageName(locale, uiLocale),
           }),
           required: required && locale === content.defaultLocale,
+          hint: hint?.(locale),
           error: error === undefined ? undefined : describe(t, error),
         };
       })}
