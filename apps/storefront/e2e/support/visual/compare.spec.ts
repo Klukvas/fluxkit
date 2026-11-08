@@ -306,5 +306,20 @@ describe("snapshot files and the command line", () => {
     expect(bad.stderr).toMatch(/"selector" must be a non-empty string/);
     expect(cli(before).status).toBe(2);
     expect(cli(before, join(before, "missing")).status).toBe(2);
+    expect(cli(before, before, "--colour").status).toBe(2);
+  });
+
+  it("validates an exceptions file on its own with --check-exceptions", () => {
+    const file = join(temp(), "exceptions.json");
+    writeFileSync(
+      file,
+      JSON.stringify([{ page: "*", selector: "home.hero", property: "screenshot", reason: "B4" }]),
+    );
+    const valid = cli("--check-exceptions", file);
+    expect(valid.status).toBe(0);
+    expect(valid.stdout).toMatch(/1 valid exception/);
+    writeFileSync(file, JSON.stringify([{ page: "*", selector: "home.hero", property: "x" }]));
+    expect(cli("--check-exceptions", file).status).toBe(2);
+    expect(cli("--check-exceptions", file, "extra").status).toBe(2);
   });
 });
