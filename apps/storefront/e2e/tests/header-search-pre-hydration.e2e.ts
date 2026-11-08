@@ -37,6 +37,15 @@ for (const path of ["/uk", "/uk/account/login"]) {
       await box.click();
       await box.pressSequentially("викрут", { delay: 30 });
       expect(await isHydrated(box), "the box hydrated while its scripts were held").toBe(false);
+      // What is still out of place while the shopper types (a segment not yet swapped in, a pending boundary).
+      const pending = await page.evaluate(() => ({
+        segments: [...document.querySelectorAll('div[hidden][id^="S:"]')].map((node) =>
+          node.innerHTML.slice(0, 80),
+        ),
+        boundaries: document.querySelectorAll('template[id^="B:"]').length,
+        boxInHeader: document.querySelector('header input[role="combobox"]') !== null,
+      }));
+      console.log(`SEARCH-PENDING ${JSON.stringify({ path, run, ...pending })}`);
       const held = 1500 - (Date.now() - started);
       if (held > 0) await page.waitForTimeout(held);
       release();

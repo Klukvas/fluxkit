@@ -63,6 +63,8 @@ interface FirstHtml {
   formOffset: number;
   footerEnd: number;
   outlinedSegments: number;
+  /** The start of each hidden segment, to see what was outlined (for the ADR table; the assertions are below). */
+  outlined: string[];
 }
 
 function measure(route: string, status: number, html: string): FirstHtml {
@@ -80,6 +82,10 @@ function measure(route: string, status: number, html: string): FirstHtml {
     formOffset: formInMain < 0 ? -1 : bytes(html.slice(0, mainStart + formInMain)),
     footerEnd: byteOffset(html, "</footer>"),
     outlinedSegments: (html.match(/<div hidden id="S:/g) ?? []).length,
+    outlined: html
+      .split('<div hidden id="S:')
+      .slice(1)
+      .map((segment) => `S:${segment.slice(0, 160)}`),
   };
 }
 
