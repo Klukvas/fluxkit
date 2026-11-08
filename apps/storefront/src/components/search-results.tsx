@@ -32,7 +32,8 @@ import {
   type SearchQuery,
 } from "../lib/search-query";
 import type { SearchOutcome } from "../lib/search-data";
-import { ProductGrid } from "./product-grid";
+import { ListViewToggle } from "./list-view-toggle";
+import { ProductGrid, type ListView } from "./product-grid";
 import { SearchFilters } from "./search-filters";
 import {
   FilterSheet,
@@ -179,6 +180,8 @@ export interface FacetedResultsProps extends Omit<SearchResultsViewProps, "outco
    * the panel and of the chips.
    */
   hiddenFacetKeys?: readonly string[];
+  /** Reshape experiment: grid or list cards; with a value, the Grid / List toggle is shown beside the sort. */
+  view?: ListView;
 }
 
 /**
@@ -202,6 +205,7 @@ export function FacetedResults({
   empty,
   brandPathFor,
   hiddenFacetKeys = [],
+  view,
 }: FacetedResultsProps) {
   const facets = result.facets.filter((facet) => !hiddenFacetKeys.includes(facet.key));
   const chips = selectedFilters({ query, facets, t, currency, exponent });
@@ -269,6 +273,9 @@ export function FacetedResults({
                       label: t(`search.sort.${value}`),
                     }))}
                   />
+                  {view === undefined ? null : (
+                    <ListViewToggle t={t} view={view} href={pageHref(locale, query, basePath)} />
+                  )}
                 </div>
               </div>
 
@@ -316,6 +323,7 @@ export function FacetedResults({
                   brandPathFor={brandPathFor}
                   label={listLabel}
                   offerFor={(item) => cardOffer(item, query)}
+                  view={view}
                 />
               )}
 

@@ -2,6 +2,15 @@ import type { ProductSummary } from "@fluxkit/api-client";
 import type { Locale, Translator } from "@fluxkit/ui";
 import type { CardOffer } from "../lib/search-facets";
 import { ProductCard } from "./product-card";
+import { ProductListCard } from "./product-list-card";
+
+/** How a product list is drawn (reshape experiment, client request 2). */
+export type ListView = "grid" | "list";
+
+/** `?view=list` of a list page; anything else is the grid. */
+export function parseListView(value: string | string[] | undefined): ListView {
+  return value === "list" ? "list" : "grid";
+}
 
 /** Cards whose image loads at once: roughly the first row; the rest are lazy. */
 export const EAGER_IMAGE_COUNT = 4;
@@ -17,7 +26,10 @@ export function ProductGrid<Item extends ProductSummary>({
   label,
   offerFor,
   eagerCount = EAGER_IMAGE_COUNT,
+  view = "grid",
 }: {
+  /** Reshape experiment: `grid` (cards in columns) or `list` (one horizontal card per row). */
+  view?: ListView;
   products: readonly Item[];
   locale: Locale;
   t: Translator;
@@ -33,11 +45,19 @@ export function ProductGrid<Item extends ProductSummary>({
   /** How many leading images load at once (the first row of a list page); 0 below other content (the home page). */
   eagerCount?: number;
 }) {
+  const Card = view === "list" ? ProductListCard : ProductCard;
   return (
-    <ul aria-label={label} className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+    <ul
+      aria-label={label}
+      className={
+        view === "list"
+          ? "flex flex-col gap-3"
+          : "grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+      }
+    >
       {products.map((product, index) => (
         <li key={product.id}>
-          <ProductCard
+          <Card
             product={product}
             locale={locale}
             t={t}

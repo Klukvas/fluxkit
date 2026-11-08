@@ -1,6 +1,7 @@
 import { createTranslator } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { CatalogRouteView } from "../../../../components/catalog-search-view";
+import { parseListView } from "../../../../components/product-grid";
 import {
   isFilteredCatalog,
   loadCatalogList,
@@ -48,8 +49,10 @@ export default async function CatalogPage(props: CatalogProps) {
   const { locale } = route;
   const t = createTranslator(messagesByLocale[locale], locale);
   const list = await loadCatalogList(route, undefined);
+  const view = parseListView((await props.searchParams).view);
   return (
     <CatalogRouteView
+      view={view}
       locale={locale}
       t={t}
       heading={t("catalog.title")}

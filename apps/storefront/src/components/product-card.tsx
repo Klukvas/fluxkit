@@ -47,26 +47,19 @@ export interface ProductCardProps {
   onSale?: boolean;
 }
 
-const PRODUCT_OFFER: CardOffer = { kind: "product" };
+export const PRODUCT_OFFER: CardOffer = { kind: "product" };
 
 /**
- * One product in a list. The whole card is one click target (the title link stretches over it); the brand link sits above
- * that layer so it stays separately clickable. Everything shown comes from the list item: price, availability, brand. The
- * list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (no API change in
- * design batch A).
+ * What any card variant shows of a list item and its search `offer` (reshape experiment: extracted from `ProductCard` so the
+ * list card does not copy it): availability, price text, link and the note.
  */
-export function ProductCard({
-  product,
-  locale,
-  t,
-  exponent,
-  imageHosts,
-  brandPath,
-  headingLevel: Heading,
-  eager = false,
-  offer = PRODUCT_OFFER,
-  onSale = false,
-}: ProductCardProps) {
+export function cardDisplay(
+  product: ProductSummary,
+  offer: CardOffer,
+  locale: Locale,
+  t: Translator,
+  exponent: number,
+) {
   const shown =
     offer.kind === "product"
       ? product.availability
@@ -87,6 +80,40 @@ export function ProductCard({
   // Only an exception earns a visible badge (review D-15): "In stock" on every card was noise. The in-stock state stays in the
   // card's text for assistive technology.
   const badgeShown = availability !== null && shown !== "in_stock";
+  return {
+    availability,
+    badgeShown,
+    priceText: listPriceLabel(price, exponent, locale, t),
+    href,
+    note,
+  };
+}
+
+/**
+ * One product in a list. The whole card is one click target (the title link stretches over it); the brand link sits above
+ * that layer so it stays separately clickable. Everything shown comes from the list item: price, availability, brand. The
+ * list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (no API change in
+ * design batch A).
+ */
+export function ProductCard({
+  product,
+  locale,
+  t,
+  exponent,
+  imageHosts,
+  brandPath,
+  headingLevel: Heading,
+  eager = false,
+  offer = PRODUCT_OFFER,
+  onSale = false,
+}: ProductCardProps) {
+  const { availability, badgeShown, priceText, href, note } = cardDisplay(
+    product,
+    offer,
+    locale,
+    t,
+    exponent,
+  );
   // Reshape experiment (client request 1): a 4:5 portrait frame on top, the price as a pill over its bottom-left corner, the
   // sale badge and a favourite placeholder over its top-right corner. The overlays share the frame's grid cell
   // (`row-start-1 col-start-1`) but come after the title in the markup, so the reading order stays title, then price.
@@ -135,10 +162,7 @@ export function ProductCard({
       ) : null}
       {/* The price pill over the frame's bottom-left corner. */}
       <div className="pointer-events-none col-start-1 row-start-1 m-2 self-end justify-self-start rounded-full bg-background px-3 py-1 shadow-card">
-        <PriceText
-          price={listPriceLabel(price, exponent, locale, t)}
-          priceLabel={t("product.price.label")}
-        />
+        <PriceText price={priceText} priceLabel={t("product.price.label")} />
       </div>
       {/* Top-left: the stock exception; top-right: the sale badge and the favourite placeholder. */}
       {availability !== null && badgeShown ? (

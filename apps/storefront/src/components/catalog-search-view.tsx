@@ -23,6 +23,7 @@ import {
   Subcategories,
   type CategoryBanner,
 } from "./catalog-view";
+import type { ListView } from "./product-grid";
 import { FacetedResults, ProblemState } from "./search-results";
 import { linkButton } from "./styles";
 
@@ -56,6 +57,8 @@ export interface CatalogSearchViewProps {
   currency: string;
   exponent: number;
   imageHosts: readonly string[];
+  /** Reshape experiment: grid or list cards (`?view=list`). */
+  view?: ListView;
 }
 
 function isFiltered(query: SearchQuery): boolean {
@@ -111,6 +114,7 @@ export function CatalogSearchView(props: CatalogSearchViewProps) {
             searchPath({ ...clearFilters(query), facets: [facetEntry("brand", slug)] }, basePath)
           }
           hiddenFacetKeys={isCategory ? ["category"] : []}
+          view={props.view}
         />
       ) : (
         <ProblemState locale={locale} t={t} query={query} outcome={outcome} basePath={basePath} />
@@ -161,6 +165,8 @@ export interface CatalogRouteViewProps {
   isCategory: boolean;
   imageHosts: readonly string[];
   list: CatalogRouteList;
+  /** Reshape experiment: grid or list cards (`?view=list`); absent: grid, no toggle. */
+  view?: ListView;
 }
 
 /** The body of the catalog and category routes (the routes load; this only composes). */

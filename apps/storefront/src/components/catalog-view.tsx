@@ -16,7 +16,8 @@ import type { LocalImage } from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import { LocalPicture } from "./local-picture";
-import { ProductGrid } from "./product-grid";
+import { ListViewToggle } from "./list-view-toggle";
+import { ProductGrid, type ListView } from "./product-grid";
 import { focusRing, linkButton } from "./styles";
 
 /** A category page's banner header (`config/category-page.ts`): the name and description on a token surface. */
@@ -53,6 +54,8 @@ export interface CatalogViewProps {
   notice?: ReactNode;
   /** The link of a later page; by default the SQL listing's address (`?brand=&page=`). */
   hrefForPage?: (page: number) => string;
+  /** Reshape experiment: grid or list cards (`?view=list`); absent: grid, no toggle. */
+  view?: ListView;
 }
 
 export function EmptyList({
@@ -189,6 +192,7 @@ export function CatalogView({
   isCategory,
   notice = null,
   hrefForPage,
+  view,
 }: CatalogViewProps) {
   const brandSlug = brand?.slug ?? null;
   return (
@@ -220,8 +224,18 @@ export function CatalogView({
         />
       ) : (
         <>
-          <p className="text-muted-foreground">{t.plural("catalog.count", products.total)}</p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-muted-foreground">{t.plural("catalog.count", products.total)}</p>
+            {view === undefined ? null : (
+              <ListViewToggle
+                t={t}
+                view={view}
+                href={localizedHref(locale, catalogPath(basePath, { brand: brandSlug, page }))}
+              />
+            )}
+          </div>
           <ProductGrid
+            view={view}
             products={products.items}
             locale={locale}
             t={t}
