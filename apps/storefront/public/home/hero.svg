@@ -1,17 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" width="640" height="480">
   <!-- Fluxkit demo picture (generated, no branding): parcels and a shopping bag on their own neutral background, so it reads on
        the light and the dark theme. TODO(fluxkit): a client fork replaces it (config/home.ts). -->
-  <rect width="640" height="480" rx="24" fill="#e9ebf1"/>
-  <circle cx="500" cy="120" r="64" fill="#d5d9e4"/>
-  <ellipse cx="320" cy="410" rx="230" ry="22" fill="#d3d7e0"/>
+  <rect width="640" height="480" rx="24" fill="#f2ede4"/>
+  <circle cx="500" cy="120" r="64" fill="#e3dccf"/>
+  <ellipse cx="320" cy="410" rx="230" ry="22" fill="#e3dccf"/>
   <rect x="120" y="250" width="170" height="150" rx="10" fill="#c9a77c"/>
   <rect x="120" y="250" width="170" height="34" rx="8" fill="#b8956a"/>
   <rect x="195" y="250" width="20" height="150" fill="#e6d3b5"/>
   <rect x="170" y="170" width="120" height="90" rx="8" fill="#d8bb93"/>
   <rect x="222" y="170" width="16" height="90" fill="#efe0c8"/>
-  <path d="M330 190h170l-14 210H344z" fill="#7c86b8"/>
-  <path d="M330 190h170l-4 40H334z" fill="#6873a6"/>
-  <path d="M380 200v-40a35 35 0 0 1 70 0v40" fill="none" stroke="#4b5482" stroke-width="10" stroke-linecap="round"/>
-  <rect x="365" y="290" width="100" height="10" rx="5" fill="#a9b0d4"/>
-  <rect x="385" y="315" width="60" height="10" rx="5" fill="#a9b0d4"/>
+  <path d="M330 190h170l-14 210H344z" fill="#3f8a6f"/>
+  <path d="M330 190h170l-4 40H334z" fill="#2f7a60"/>
+  <path d="M380 200v-40a35 35 0 0 1 70 0v40" fill="none" stroke="#1f5f4a" stroke-width="10" stroke-linecap="round"/>
+  <rect x="365" y="290" width="100" height="10" rx="5" fill="#9cc3b1"/>
+  <rect x="385" y="315" width="60" height="10" rx="5" fill="#9cc3b1"/>
 </svg>
