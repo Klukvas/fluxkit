@@ -1,0 +1,117 @@
+import { knownPageIds, THEMES } from "./pages.ts";
+import { SELECTOR_NAMES } from "./selectors.ts";
+import { COMPUTED_PROPERTIES } from "./snapshot.ts";
+
+/**
+ * Declared exceptions of ONE pull request (`.visual/exceptions.json`; plan section 3 principle 2): differences the PR
+ * means to make. `scripts/visual-compare.sh` honours the file only when the PR itself changed it (a file inherited from the
+ * base belongs to an earlier PR), so an exception never outlives the PR that declared it.
+ *
+ * The file is a JSON array of entries:
+ *   { "page": "<page id>" | "*", "theme"?: "light" | "dark" | "system", "selector": "<selector name>",
+ *     "property": "<computed property>" | "presence" | "*" | "screenshot", "reason": "<why>" }
+ * - `property: "*"` covers every property and the presence of the element; `"presence"` only found vs absent,
+ * - `property: "screenshot"` masks the element in the screenshots of that page (the computed styles are still compared),
+ * - unknown fields, unknown pages, selectors or properties, an empty reason and duplicates are errors (a typo must not
+ *   silently declare nothing).
+ */
+
+export const PRESENCE = "presence";
+export const ANY_PROPERTY = "*";
+export const SCREENSHOT_MASK = "screenshot";
+export const ANY_PAGE = "*";
+
+export interface VisualException {
+  page: string;
+  theme?: string;
+  selector: string;
+  property: string;
+  reason: string;
+}
+
+const REQUIRED = ["page", "selector", "property", "reason"] as const;
+const ALLOWED = new Set<string>([...REQUIRED, "theme"]);
+
+export class ExceptionsError extends Error {}
+
+export function parseExceptions(value: unknown, source = "exceptions"): VisualException[] {
+  if (!Array.isArray(value)) {
+    throw new ExceptionsError(`${source}: must be a JSON array of exceptions.`);
+  }
+  const pages = knownPageIds();
+  const properties = new Set<string>([
+    ...COMPUTED_PROPERTIES,
+    PRESENCE,
+    ANY_PROPERTY,
+    SCREENSHOT_MASK,
+  ]);
+  const seen = new Set<string>();
+  return value.map((entry: unknown, index) => {
+    const at = `${source}[${String(index)}]`;
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new ExceptionsError(`${at}: must be an object.`);
+    }
+    const record = entry as Record<string, unknown>;
+    for (const key of Object.keys(record)) {
+      if (!ALLOWED.has(key)) {
+        throw new ExceptionsError(
+          `${at}: unknown field "${key}" (allowed: ${[...ALLOWED].join(", ")}).`,
+        );
+      }
+    }
+    for (const key of REQUIRED) {
+      const field = record[key];
+      if (typeof field !== "string" || field.trim() === "") {
+        throw new ExceptionsError(`${at}: "${key}" must be a non-empty string.`);
+      }
+    }
+    const result: VisualException = {
+      page: record["page"] as string,
+      selector: record["selector"] as string,
+      property: record["property"] as string,
+      reason: (record["reason"] as string).trim(),
+    };
+    if (result.page !== ANY_PAGE && !pages.has(result.page)) {
+      throw new ExceptionsError(
+        `${at}: unknown page "${result.page}" (known: ${[...pages].join(", ")}, or "*").`,
+      );
+    }
+    if (!SELECTOR_NAMES.has(result.selector)) {
+      throw new ExceptionsError(
+        `${at}: unknown selector "${result.selector}" (see e2e/support/visual/selectors.ts).`,
+      );
+    }
+    if (!properties.has(result.property)) {
+      throw new ExceptionsError(
+        `${at}: unknown property "${result.property}" (a recorded property, "presence", "*" or "screenshot").`,
+      );
+    }
+    if ("theme" in record) {
+      const theme = record["theme"];
+      if (typeof theme !== "string" || !(THEMES as readonly string[]).includes(theme)) {
+        throw new ExceptionsError(`${at}: "theme" must be one of ${THEMES.join(", ")}.`);
+      }
+      result.theme = theme;
+    }
+    const key = [result.page, result.theme ?? "", result.selector, result.property].join("|");
+    if (seen.has(key)) throw new ExceptionsError(`${at}: duplicate of an earlier exception.`);
+    seen.add(key);
+    return result;
+  });
+}
+
+/** The selectors to mask in the screenshots of one page (`property: "screenshot"` entries for that page or `*`). */
+export function screenshotMasks(
+  exceptions: readonly VisualException[],
+  pageId: string,
+  theme: string,
+): string[] {
+  return exceptions
+    .filter(
+      (entry) =>
+        entry.property === SCREENSHOT_MASK &&
+        (entry.page === ANY_PAGE || entry.page === pageId) &&
+        (entry.theme === undefined || entry.theme === theme),
+    )
+    .map((entry) => entry.selector);
+}
