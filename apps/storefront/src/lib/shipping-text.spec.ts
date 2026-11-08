@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTranslator } from "@fluxkit/ui";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { SHIPMENT_STATUSES, UNAVAILABLE_REASONS } from "./shipping-model";
 import {
   orderShippingPriceText,
@@ -11,6 +10,8 @@ import {
   unavailableText,
 } from "./shipping-text";
 import { sentinelTranslator } from "../components/test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const money = (value: { amount: number }) => `M${String(value.amount)}`;
 const t = sentinelTranslator();

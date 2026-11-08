@@ -32,7 +32,8 @@ export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal te
 /**
  * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
  * production build REFUSES while ANY legal placeholder remains: a `legal.*` message of any language that still carries the
- * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves), or
+ * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves;
+ * read from the MERGED messages, the area files plus the fork's overrides, `readMergedMessages`), or
  * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank, or (repair batch 2)
  * an entry of `src/config/demo-content.json` that still marks a shop page, the contacts, the home texts or the trust bar as the
  * template's demo copy. Each offender is named. The legal marker stays in the messages but is not shown on the page
@@ -89,9 +90,91 @@ export function demoContentLeft(file: string): string[] {
   return left;
 }
 
+function readJsonObject(file: string): Record<string, unknown> {
+  let content: unknown;
+  try {
+    content = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`${file} is not valid JSON: ${(error as Error).message}`, { cause: error });
+  }
+  if (typeof content !== "object" || content === null || Array.isArray(content)) {
+    throw new Error(`${file} must hold an object.`);
+  }
+  return content as Record<string, unknown>;
+}
+
+/** One merged message: its text and the file it came from (`messages/en/legal.json`, `messages-overrides/en.json`). */
+export interface MergedMessage {
+  value: unknown;
+  file: string;
+}
+
+/**
+ * The messages the app renders, per locale, read in plain Node (this file cannot import `src/messages/index.ts`; a spec
+ * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then `<overridesDir>/<locale>.json` merged
+ * last (plan docs/plans/2026-11-08-design-changeability.md, WP3). Fails closed, so the release check can never pass by
+ * reading nothing: no locale folder or an empty one, a flat `*.json` left at the top of `messagesDir` (the pre-split layout;
+ * the app would ignore it), a key in two area files, a missing overrides file and an override key without a base message
+ * all throw.
+ */
+export function readMergedMessages(
+  messagesDir: string,
+  overridesDir: string,
+): Record<string, Record<string, MergedMessage>> {
+  const flat = readdirSync(messagesDir).filter((name) => name.endsWith(".json"));
+  if (flat.length > 0) {
+    throw new Error(
+      `${messagesDir} holds ${flat.join(", ")}: a flat message file of the old layout, which the app no longer reads. ` +
+        "Move its texts into src/messages-overrides/<locale>.json (docs/migrations/2026-11-08-storefront-messages-split.md).",
+    );
+  }
+  const locales = readdirSync(messagesDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  if (locales.length === 0) throw new Error(`${messagesDir} holds no message files.`);
+  const result: Record<string, Record<string, MergedMessage>> = {};
+  for (const locale of locales) {
+    const files = readdirSync(resolve(messagesDir, locale))
+      .filter((name) => name.endsWith(".json"))
+      .sort();
+    if (files.length === 0) throw new Error(`${messagesDir}/${locale} holds no message files.`);
+    const merged: Record<string, MergedMessage> = {};
+    for (const name of files) {
+      const file = `messages/${locale}/${name}`;
+      for (const [key, value] of Object.entries(
+        readJsonObject(resolve(messagesDir, locale, name)),
+      )) {
+        const known = merged[key];
+        if (known !== undefined) {
+          throw new Error(`Message key "${key}" is defined in both ${known.file} and ${file}.`);
+        }
+        merged[key] = { value, file };
+      }
+    }
+    const overridesFile = resolve(overridesDir, `${locale}.json`);
+    if (!existsSync(overridesFile)) {
+      throw new Error(`The message overrides file ${overridesFile} was not found.`);
+    }
+    for (const [key, value] of Object.entries(readJsonObject(overridesFile))) {
+      if (merged[key] === undefined) {
+        throw new Error(
+          `Message override "${key}" in ${overridesFile} has no base message (a typo, or a key upstream renamed or removed).`,
+        );
+      }
+      merged[key] = { value, file: `messages-overrides/${locale}.json` };
+    }
+    result[locale] = merged;
+  }
+  return result;
+}
+
 export function assertNoLegalPlaceholders(options: {
   enabled: boolean;
+  /** `src/messages`: the area files `<locale>/<area>.json`. */
   messagesDir: string;
+  /** `src/messages-overrides`: a fork's `<locale>.json`, merged last. */
+  overridesDir: string;
   identityFile: string;
   /** `src/config/demo-content.json`: the shop pages, contacts, home texts and trust bar that are still demo copy. */
   demoContentFile: string;
@@ -108,15 +191,10 @@ export function assertNoLegalPlaceholders(options: {
     );
   }
   const found: string[] = [];
-  const files = readdirSync(options.messagesDir)
-    .filter((name) => name.endsWith(".json"))
-    .sort();
-  for (const file of files) {
-    const messages = JSON.parse(readFileSync(resolve(options.messagesDir, file), "utf8")) as Record<
-      string,
-      unknown
-    >;
-    for (const [key, value] of Object.entries(messages)) {
+  for (const messages of Object.values(
+    readMergedMessages(options.messagesDir, options.overridesDir),
+  )) {
+    for (const [key, { value, file }] of Object.entries(messages)) {
       if (key.startsWith("legal.") && typeof value === "string" && value.includes(LEGAL_MARKER)) {
         found.push(`${file}: ${key}`);
       }
@@ -167,6 +245,7 @@ export default function config(phase: string): NextConfig {
     assertNoLegalPlaceholders({
       enabled: process.env.STOREFRONT_REQUIRE_LEGAL_TEXT === "true",
       messagesDir: resolve(process.cwd(), "src/messages"),
+      overridesDir: resolve(process.cwd(), "src/messages-overrides"),
       identityFile: resolve(process.cwd(), "src/config/legal-identity.json"),
       demoContentFile: resolve(process.cwd(), "src/config/demo-content.json"),
     });

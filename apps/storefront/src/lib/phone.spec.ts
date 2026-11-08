@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { checkPhone, formatPhoneTyping, phoneFailure, phoneForDisplay } from "./phone";
+
+const { uk, en } = messagesByLocale;
 
 describe("checkout phone (libphonenumber-js, min metadata)", () => {
   it("shows a Ukrainian number in the national format while it is typed", () => {
