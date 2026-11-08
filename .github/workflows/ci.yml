@@ -4,6 +4,13 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Manual run (Actions -> CI -> Run workflow): runs every job, including `visual` against the chosen base branch.
+  workflow_dispatch:
+    inputs:
+      base:
+        description: Base branch of the visual comparison (job `visual`)
+        default: main
+        required: true
 
 permissions:
   contents: read
@@ -270,3 +277,129 @@ jobs:
       # infra/docker-compose.prod.yml with a throwaway env file and a self-signed certificate, checks routing, headers,
       # TLS, the webhook route, an upload and the per-client rate limit through the edge, then removes everything.
       - run: bash scripts/deploy-smoke.sh
+
+  # Visual comparison of the storefront (plan docs/plans/2026-11-08-design-changeability.md, section 7;
+  # apps/storefront/e2e/README.md, "Visual comparison"). Two builds and two runs of the stack: too slow for every PR, so a
+  # cheap gate decides first. It runs for a PR labelled `visual-check` (the label is read at the PR's next push), for a PR that
+  # changes the theme, the UI library, the storefront's source or the harness itself, and on a manual run of this workflow.
+  visual-gate:
+    name: Visual comparison needed?
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'visual-check') }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$LABELLED" = "true" ]; then
+            echo "run=true" | tee -a "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
+          pattern='^(packages/theme/|packages/ui/|apps/storefront/src/|apps/storefront/e2e/visual\.config\.ts$|apps/storefront/e2e/tests/[^/]+\.visual\.ts$|apps/storefront/e2e/support/visual/|scripts/visual-compare\.sh$)'
+          if printf '%s\n' "$changed" | grep -Eq "$pattern"; then run=true; else run=false; fi
+          echo "run=$run" | tee -a "$GITHUB_OUTPUT"
+
+  visual:
+    name: Visual comparison (computed styles, screenshots)
+    needs: visual-gate
+    if: needs.visual-gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Each visual run WIPES this database at its start, like the e2e suite (apps/storefront/e2e/README.md).
+      E2E_DATABASE_URL: postgres://fluxkit:ci-postgres@localhost:5432/fluxkit_e2e_test
+      VISUAL_BASE_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.base || github.base_ref }}
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: fluxkit
+          POSTGRES_PASSWORD: ci-postgres
+          POSTGRES_DB: fluxkit_e2e_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U fluxkit -d fluxkit_e2e_test" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      meilisearch:
+        image: getmeili/meilisearch:v1.55.0
+        env:
+          MEILI_ENV: development
+          MEILI_MASTER_KEY: ci-meili-master-key-0123456789
+          MEILI_NO_ANALYTICS: "true"
+        ports: ["7700:7700"]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Unit tests of the visual harness
+        run: pnpm --filter @fluxkit/storefront exec vitest run -c e2e/support/visual/vitest.config.ts
+      - name: Wait for Meilisearch
+        run: |
+          for _ in $(seq 1 60); do
+            curl -fsS "$MEILI_URL/health" && exit 0
+            sleep 1
+          done
+          echo "Meilisearch did not become healthy" >&2
+          exit 1
+      - name: Install Chromium
+        run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
+      # Builds the merge-base and this tree and records both on this machine; the verdicts are the next two steps. Exit 2
+      # (the harness itself failed: a build, a page that does not render, an invalid exceptions file) fails this step.
+      - name: Compare the base and this tree
+        run: |
+          code=0
+          bash scripts/visual-compare.sh "origin/$VISUAL_BASE_REF" || code=$?
+          echo "visual-compare.sh exited with $code"
+          [ "$code" -ne 2 ]
+      - name: Computed styles (mandatory, zero tolerance, declared exceptions only)
+        if: always()
+        run: |
+          if [ -f .visual/report/computed-styles.txt ]; then cat .visual/report/computed-styles.txt; fi
+          status="$(cat .visual/report/computed-styles.status 2>/dev/null || echo missing)"
+          echo "computed styles: $status"
+          [ "$status" = "pass" ]
+      - name: Screenshots (maxDiffPixels 0; diff images in the visual-report artifact)
+        if: always()
+        run: |
+          status="$(cat .visual/report/screenshots.status 2>/dev/null || echo missing)"
+          echo "screenshots: $status"
+          [ "$status" = "pass" ]
+      - name: Upload the visual report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-report
+          path: .visual/report
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
+      - name: Upload both snapshot sets
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-snapshots
+          path: |
+            .visual/baseline
+            .visual/current
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 7
