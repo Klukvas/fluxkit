@@ -49,7 +49,7 @@ export function SideNav({
         return (
           <div key={group.id}>
             {group.heading ? (
-              <Heading id={headingId} className={cn(textStyles.meta, "px-3 pb-1 font-semibold")}>
+              <Heading id={headingId} className={cn(textStyles.navGroupTitle, "px-3 pb-1")}>
                 {group.heading}
               </Heading>
             ) : null}

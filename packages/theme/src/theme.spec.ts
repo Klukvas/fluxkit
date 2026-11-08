@@ -78,6 +78,7 @@ describe("design tokens", () => {
   it("defaults the display (heading) font to the body font, so adding it changed no pixel", () => {
     // The template's value. A fork that gives headings their own face changes `--fk-font-display` and passes; one that changes
     // only the body face is told to decide the headings too (they would silently stay in the old system stack).
+    // This literal must equal the template's `--fk-font-sans` (and `--fk-font-display`) in tokens.css: change all three together.
     const templateDisplay = "ui-sans-serif, system-ui, sans-serif";
     const display = lightBlock.tokens.get("--fk-font-display");
     const sans = lightBlock.tokens.get("--fk-font-sans");

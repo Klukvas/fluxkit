@@ -28,6 +28,8 @@ export const textStyles = {
   cardTitle: "font-medium text-foreground",
   /** The title of a dialog or of another surface that sets its own text colour (a toned banner card): no colour here. */
   dialogTitle: "text-lg font-semibold",
+  /** A small muted heading over a group of navigation links (`SideNav`). */
+  navGroupTitle: "text-sm font-semibold text-muted-foreground",
   /** Secondary information next to content: hints, meta lines. */
   meta: "text-sm text-muted-foreground",
 } as const;

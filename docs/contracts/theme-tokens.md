@@ -43,13 +43,16 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 | `itemTitle` | `font-semibold text-foreground` | body-size headings: a line item, a short list, a field group's `legend` |
 | `cardTitle` | `font-medium text-foreground` | the product card's name (the card adds `line-clamp-2`), the `OptionPicker` legend |
 | `dialogTitle` | `text-lg font-semibold` | a `Dialog` title and the `BannerCard` title: no colour, the surface (a toned banner) sets it |
-| `meta` | `text-sm text-muted-foreground` | hints and meta lines (the `SideNav` group heading adds `font-semibold`) |
+| `navGroupTitle` | `text-sm font-semibold text-muted-foreground` | the heading over a `SideNav` link group (added after review m1 of PR 242) |
+| `meta` | `text-sm text-muted-foreground` | hints and meta lines |
 
 - `font-display` is on `pageTitle` and `sectionTitle` only: a decorative face in small titles hurts legibility. A fork that wants it on more
   roles edits `textStyles`, nothing else.
 - Guard (`packages/theme/src/design-guard.spec.ts`, "heading roles"): every `<h1>` to `<h6>`, dynamic `<Heading>` and `<legend>` with a
-  `className` in `packages/ui` and `apps/storefront` uses a `textStyles` role (a call site adds layout, focus or visibility classes only); a
-  heading without classes, or with visibility classes only (`sr-only`, `lg:hidden`), passes. **Known limit:** `apps/admin` (71 headings) is
+  `className` in `packages/ui` and `apps/storefront` uses a `textStyles` role written inline (a call site adds layout, focus or visibility
+  classes, or a prefixed size such as `md:text-4xl`; an unprefixed size, weight, family, colour or line height next to a role fails); a
+  heading without classes, or with visibility classes only (`sr-only`, `lg:hidden`), passes. Spread props and dynamic tags not named
+  `Heading` are not inspected. **Known limit:** `apps/admin` (71 headings) is
   not scanned yet. The text logo (`.fk-logo`, CSS) takes `font-display` through `@apply`.
 - The header and footer shell carry no heading role with `font-display` (first-HTML budget, `shell.spec.tsx`); the registration page grew
   by 13 bytes (one `pageTitle`).
@@ -174,7 +177,7 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | Member | Source | Value today |
 |---|---|---|
 | `color.background`, `foreground`, `muted`, `mutedForeground`, `border`, `primary`, `primaryForeground`, `danger`, `success`, `warning` | the light value of `--fk-color-<kebab name>` | 6-digit hex |
-| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` | the token stacks |
+| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` with every `var(--font-*)` entry (a fork's web font) stripped | the token stacks |
 | `radius.sm`, `md`, `lg` | `--fk-radius-*`, rem to px (16px per rem) | `4px`, `8px`, `16px` |
 | `space.xs` to `space.xl` | mail only | `4px`, `8px`, `16px`, `24px`, `32px` |
 | `fontSize.small`, `body`, `heading` | mail only | `13px`, `15px`, `20px` |
@@ -182,4 +185,4 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
 Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
-`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
+`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token (fonts are compared after stripping `var(--font-*)` entries, since mail cannot load a web font) or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.

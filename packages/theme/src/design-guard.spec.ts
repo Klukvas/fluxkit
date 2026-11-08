@@ -214,8 +214,9 @@ describe("design guard, the design kit scales", () => {
 
 // Heading roles (plan 2026-11-08-design-changeability.md, T1): every heading of the shared UI library and the storefront takes its
 // typography from a `textStyles` role of `@fluxkit/ui`, so a redesign (a display font, another size) changes one place. A heading
-// with no class, or with visibility classes only (`sr-only`, `lg:hidden`), has nothing to restyle. Known limit: the admin
-// (`apps/admin`, 71 headings) is not scanned yet.
+// with no class, or with visibility classes only (`sr-only`, `lg:hidden`), has nothing to restyle. Known limits: the admin
+// (`apps/admin`, 71 headings) is not scanned yet; classes passed through spread props (`{...props}`) and dynamic tags with
+// another name than `Heading` (`const Title = level`) are not inspected; a role held in a const is refused, not followed.
 const headingRoots = ["packages/ui/src", "apps/storefront/src"].map((path) => join(repoRoot, path));
 const stylesSource = readFileSync(join(repoRoot, "packages/ui/src/styles.ts"), "utf8");
 const textRoles = new Set(
@@ -297,9 +298,28 @@ function roleProblem({ className }: TagClass): string | null {
   const roles = [...className.matchAll(/\btextStyles\.([a-zA-Z]+)/g)].map(
     (match) => match[1] as string,
   );
-  if (roles.length === 0) return `classes ${className} do not use a textStyles role`;
+  if (roles.length === 0) {
+    return `classes ${className} do not use a role: write inline textStyles.<role> in the className (a role held in a const is not checked)`;
+  }
   const unknown = roles.filter((role) => !textRoles.has(role));
-  return unknown.length === 0 ? null : `unknown textStyles role ${unknown.join(", ")}`;
+  if (unknown.length > 0) return `unknown textStyles role ${unknown.join(", ")}`;
+  const typography = extraClasses(className).filter((name) => unprefixedTypography.test(name));
+  return typography.length === 0
+    ? null
+    : `typography ${typography.join(", ")} next to a role (put it in the role, or prefix it: sm:, md:, hover:)`;
+}
+
+// Extras next to a role may add layout, focus and visibility, and responsive or state-prefixed sizes (`md:text-4xl` on the hero,
+// `sm:text-3xl` on the order page). An unprefixed size, weight, family, colour or line height would override the role.
+const unprefixedTypography =
+  /^(?:text-(?:xs|sm|base|lg|\d?xl|foreground|muted-foreground|primary(?:-foreground)?|accent(?:-foreground)?|danger(?:-foreground)?|success|warning)|font-(?:sans|mono|display|thin|light|normal|medium|semibold|bold|extrabold|black)|leading-\S+|tracking-\S+)$/;
+
+/** The class names written in string and template literals of a className expression (interpolations and roles left out). */
+function extraClasses(expression: string): string[] {
+  const withoutInterpolations = expression.replace(/\$\{[^}]*\}/g, " ");
+  return [...withoutInterpolations.matchAll(/(["'`])([^"'`]*)\1/g)].flatMap((match) =>
+    (match[2] as string).split(/\s+/).filter((name) => name !== ""),
+  );
 }
 
 function roleOffenders(tags: RegExp): string[] {
@@ -344,7 +364,22 @@ describe("design guard, heading roles", () => {
     expect(check('{titleKey === undefined ? "sr-only" : textStyles.sectionTitle}')).toBeNull();
     expect(check('"text-lg font-semibold text-foreground"')).toMatch(/literal classes/);
     expect(check('"sr-only font-bold"')).toMatch(/literal classes/);
-    expect(check("{legend}")).toMatch(/do not use a textStyles role/);
+    expect(check("{legend}")).toMatch(/inline textStyles\.<role>/);
+    // A role plus unprefixed typography would override the role (review m1 of PR 242); layout, focus and prefixed sizes pass.
+    expect(
+      check('{cn(textStyles.pageTitle, headingLevel === "h1" ? "md:text-4xl" : null)}'),
+    ).toBeNull();
+    expect(check("{`${textStyles.pageTitleCompact} sm:text-3xl`}")).toBeNull();
+    expect(check("{`${textStyles.sectionTitle} mb-2 max-lg:hidden line-clamp-2`}")).toBeNull();
+    expect(check("{`${textStyles.pageTitle} text-3xl font-bold`}")).toMatch(
+      /typography text-3xl, font-bold next to a role/,
+    );
+    expect(check('{cn(textStyles.meta, "px-3 font-semibold")}')).toMatch(
+      /typography font-semibold next to a role/,
+    );
+    expect(check("{`${textStyles.itemTitle} text-foreground leading-tight`}")).toMatch(
+      /typography text-foreground, leading-tight/,
+    );
     expect(check("{textStyles.bannerTitle}")).toMatch(/unknown textStyles role bannerTitle/);
   });
 

@@ -176,6 +176,7 @@ describe("textStyles", () => {
     "itemTitle",
     "cardTitle",
     "dialogTitle",
+    "navGroupTitle",
   ] as const;
 
   it("has a role for every kind of heading", () => {

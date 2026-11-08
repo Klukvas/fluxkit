@@ -126,7 +126,8 @@ in its `fonts` list (an example is in the file). The root layout puts their `var
 (`lib/font-classes.ts`; no attribute while the list is empty), and a token names the variable, for example
 `--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;` in the light block of `packages/theme/src/tokens.css`.
 Mail keeps the fallback stack after the `var()` (mail clients load no web font). `config/fonts.spec.ts` checks that `next/font` is imported
-only from that file and that the layout attaches the classes.
+only from that file and that the layout attaches the classes. `fonts.ts` is read as TEXT by that spec and imported by no unit test:
+`localFont(...)` works only under Next's build transform, which Vitest does not have.
 
 - **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
   `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
