@@ -14,15 +14,12 @@ import { expect, test } from "../support/fixtures.ts";
 const LOADING_VIEW_LABEL = { en: "Loading the page", uk: "Завантаження сторінки" } as const;
 
 /** Routes whose first HTML must hold a form of the page itself (not the header's search form). */
-const FORM_ROUTES = [
-  "/account/login",
-  "/account/register",
-  "/account/forgot-password",
-  "/account/reset-password",
-];
+const FORM_ROUTES = ["/account/login", "/account/register", "/account/forgot-password"];
 
 /** The other routes of `route-structure.spec.ts` `mustRenderBeforeHydration`: their server shell must be inline too. */
 const SHELL_ROUTES = [
+  // The reset and verify pages read their token from the fragment: their form or status appears with the script.
+  "/account/reset-password",
   "/account/verify-email",
   "/cart",
   "/checkout",
@@ -49,7 +46,10 @@ function between(html: string, start: string, end: string): string {
   return from < 0 || to < 0 ? "" : html.slice(from, to + end.length);
 }
 
-/** Every form of the page except the header's search form (`role="search"`). */
+/**
+ * A form of the page itself: not the header's search form (`role="search"`). Looked for inside `<main>` only, because the
+ * footer's no-script theme switch is a form too.
+ */
 const PAGE_FORM = /<form(?![^>]*role="search")[\s>]/;
 
 interface FirstHtml {
@@ -67,6 +67,8 @@ interface FirstHtml {
 
 function measure(route: string, status: number, html: string): FirstHtml {
   const mainStart = html.indexOf("<main");
+  const mainEnd = html.indexOf("</main>", mainStart);
+  const formInMain = mainStart < 0 ? -1 : html.slice(mainStart, mainEnd).search(PAGE_FORM);
   return {
     route,
     status,
@@ -75,7 +77,7 @@ function measure(route: string, status: number, html: string): FirstHtml {
     header: bytes(between(html, "<header", "</header>")),
     footer: bytes(between(html, "<footer", "</footer>")),
     mainOffset: byteOffset(html, "<main"),
-    formOffset: mainStart < 0 ? -1 : byteOffset(html, PAGE_FORM, mainStart),
+    formOffset: formInMain < 0 ? -1 : bytes(html.slice(0, mainStart + formInMain)),
     footerEnd: byteOffset(html, "</footer>"),
     outlinedSegments: (html.match(/<div hidden id="S:/g) ?? []).length,
   };
