@@ -21,6 +21,9 @@
   --fk-color-border-input: #64748b;
   --fk-color-primary: #4f46e5;
   --fk-color-primary-foreground: #ffffff;
+  /* Accent: the banner `accent` tone, otherwise reserved for client code. Defaults equal the primary pair (no visual change). */
+  --fk-color-accent: #4f46e5;
+  --fk-color-accent-foreground: #ffffff;
   --fk-color-danger: #b91c1c;
   --fk-color-danger-foreground: #ffffff;
   --fk-color-success: #15803d;
@@ -68,6 +71,8 @@
   --fk-color-border-input: #6b7a99;
   --fk-color-primary: #818cf8;
   --fk-color-primary-foreground: #0b1020;
+  --fk-color-accent: #818cf8;
+  --fk-color-accent-foreground: #0b1020;
   --fk-color-danger: #f87171;
   --fk-color-danger-foreground: #0b1020;
   --fk-color-success: #4ade80;
@@ -93,6 +98,8 @@
     --fk-color-border-input: #6b7a99;
     --fk-color-primary: #818cf8;
     --fk-color-primary-foreground: #0b1020;
+    --fk-color-accent: #818cf8;
+    --fk-color-accent-foreground: #0b1020;
     --fk-color-danger: #f87171;
     --fk-color-danger-foreground: #0b1020;
     --fk-color-success: #4ade80;

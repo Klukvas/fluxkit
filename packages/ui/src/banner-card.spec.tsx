@@ -73,7 +73,7 @@ describe("BannerCard, card layout", () => {
     }
   });
 
-  it("draws the tones with tokens only: surface on the background, accent on the primary fill", () => {
+  it("draws the tones with tokens only: surface on the background, accent on the accent fill (the tone name stays)", () => {
     const surface = classTokens(
       render(
         <BannerCard
@@ -101,7 +101,8 @@ describe("BannerCard, card layout", () => {
         />,
       ),
     );
-    expect(accent).toEqual(expect.arrayContaining(["bg-primary", "text-primary-foreground"]));
+    expect(accent).toEqual(expect.arrayContaining(["bg-accent", "text-accent-foreground"]));
+    expect(accent).not.toContain("bg-primary");
     expect(accent).not.toContain("text-muted-foreground");
   });
 

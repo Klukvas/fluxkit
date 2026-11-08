@@ -73,7 +73,10 @@ export interface RichTextSection {
 /** The most banners one `banners` section shows (one row on desktop); `GET /store/banners` returns at most as many. */
 export const MAX_BANNERS = 3;
 
-/** Colour of a banner card, from existing tokens only: `surface` = background and border, `accent` = the primary colour. */
+/**
+ * Colour of a banner card, from tokens only: `surface` = background and border, `accent` = the `--fk-color-accent` pair (equal to
+ * the primary colour by default). The tone name is not Tailwind's `accent-*` utility (the CSS property of checkbox ticks).
+ */
 export type BannerTone = "surface" | "accent";
 
 export interface Banner {

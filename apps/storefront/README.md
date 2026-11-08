@@ -504,7 +504,7 @@ admin, PR 3: D6, section 7; results and screenshots there). API: `docs/api/banne
   page. Under a visually hidden `h2`, two layouts:
   - `card`: the picture, an `h3` title and an optional short text; the link is named by the title (`aria-labelledby`) and described by the
     text (`aria-describedby`). The picture is decorative (`alt=""`) unless it has its own alt text. Tones from existing tokens: `surface`
-    (page background and border) or `accent` (the `primary` fill).
+    (page background and border) or `accent` (the `--fk-color-accent` fill, equal to `primary` by default; 2026-11-08).
   - `image` (admin only): a finished picture alone, no text over it, no tone; its alt text (required by the API) names the link.
 - **One card, shared with the admin:** every banner, from either source, is drawn by `BannerCard` of `@fluxkit/ui`, the same
   component the admin's live preview uses; `components/home-sections.tsx` only chooses the picture (`LocalPicture` for config

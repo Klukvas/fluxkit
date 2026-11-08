@@ -11,6 +11,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-border` | `border-border` | decorative borders and dividers (cards, badges, buttons); about 1.2:1, NOT for the line that identifies a control |
 | `--fk-color-border-input` | `border-border-input` | the border of inputs, textareas, selects and checkboxes (WCAG 1.4.11, at least 3:1; added after the storefront step 10 review) |
 | `--fk-color-primary` / `-primary-foreground` | `bg-primary` / `text-primary-foreground` | primary actions |
+| `--fk-color-accent` / `-accent-foreground` | `bg-accent`, `border-accent` / `text-accent-foreground` | a second brand colour: the `accent` tone of a home banner card (`BannerCard`), otherwise **reserved for client code**. Defaults equal the primary pair (6-digit hex copies, not `var()`), so nothing moved. Added 2026-11-08 |
 | `--fk-color-danger` | `text-danger`, `bg-danger`, `border-danger` | destructive and error states |
 | `--fk-color-danger-foreground` | `text-danger-foreground` | text on a `danger` fill, such as the header's cart count badge (added 2026-11-02) |
 | `--fk-color-success` | `text-success`, `border-success` | success and availability (added in storefront plan step 4a) |
@@ -143,6 +144,13 @@ The test parses `tokens.css` into its blocks (`packages/theme/src/token-blocks.t
 | `ring` on `muted` | 3:1 (focus inside an alert) |
 | `primary` on `background` and on `muted` | 3:1 (info alert border) |
 | `border-input` on `background` and on `muted` | 3:1 (non-text, WCAG 1.4.11: the border that identifies a text control; `muted` is the alert surface) |
+| `accent-foreground` on `accent` | 4.5:1 (the banner `accent` tone; checked unconditionally, also while no component uses it) |
+| `accent` on `background` and on `muted` | 3:1 (an accent surface or border next to the page or a muted surface; unconditional) |
+
+**Three different "accent"s (2026-11-08):** the banner tone NAME `accent` (stored by the API in `banner.tone`, kept for compatibility),
+the colour TOKEN `--fk-color-accent` that tone uses (`bg-accent text-accent-foreground`; before 2026-11-08 the tone used the primary
+classes, with the same pixels), and Tailwind's own `accent-*` utilities, which set the CSS `accent-color` of checkboxes and radios
+(`accent-primary` in `Checkbox` stays as it is). A fork sets the accent pair in all three theme blocks; the pairs above must pass.
 
 The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
 
@@ -173,5 +181,5 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | `lineHeight` | mail only | `1.5` |
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
-Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
+Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
 `packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.

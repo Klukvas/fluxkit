@@ -46,9 +46,10 @@ const TONES: Record<BannerCardTone, { card: string; text: string | null }> = {
     card: "border-border bg-background text-foreground hover:border-border-input",
     text: "text-muted-foreground",
   },
+  // The tone NAME is stored by the API (`banner.tone`); its colour is the accent token pair, which equals primary by default.
   accent: {
-    card: "border-primary bg-primary text-primary-foreground",
-    // Inherits the card's `primary-foreground` (the muted grey would not read on the primary fill).
+    card: "border-accent bg-accent text-accent-foreground",
+    // Inherits the card's `accent-foreground` (the muted grey would not read on the accent fill).
     text: null,
   },
 };

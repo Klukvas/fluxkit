@@ -32,6 +32,9 @@ const notInMail: Record<string, string> = {
   "--fk-color-border-input": "mail has no form controls",
   "--fk-color-ring": "mail has no keyboard focus to show",
   "--fk-color-danger-foreground": "mail has no count badge or other text on a danger fill",
+  "--fk-color-accent":
+    "mail has no banner card and no other accent surface (adding it to mail would change the `EmailTheme` contract)",
+  "--fk-color-accent-foreground": "mail has no text on an accent fill",
   "--fk-shadow-card": "box-shadow is not supported by common mail clients",
   "--fk-shadow-raised": "box-shadow is not supported by common mail clients",
   "--fk-shadow-overlay": "box-shadow is not supported by common mail clients",

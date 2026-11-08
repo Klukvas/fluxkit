@@ -12,6 +12,8 @@
   --color-border-input: var(--fk-color-border-input);
   --color-primary: var(--fk-color-primary);
   --color-primary-foreground: var(--fk-color-primary-foreground);
+  --color-accent: var(--fk-color-accent);
+  --color-accent-foreground: var(--fk-color-accent-foreground);
   --color-danger: var(--fk-color-danger);
   --color-danger-foreground: var(--fk-color-danger-foreground);
   --color-success: var(--fk-color-success);
