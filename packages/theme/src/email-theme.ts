@@ -18,16 +18,16 @@ function deepFreeze<T extends object>(value: T): T {
 
 export const emailTheme = deepFreeze({
   color: {
-    background: "#ffffff",
-    foreground: "#0f172a",
-    muted: "#f1f5f9",
-    mutedForeground: "#475569",
-    border: "#e2e8f0",
-    primary: "#4f46e5",
+    background: "#fbf8f3",
+    foreground: "#15201b",
+    muted: "#f2ede4",
+    mutedForeground: "#535e58",
+    border: "#e3dccf",
+    primary: "#1f5f4a",
     primaryForeground: "#ffffff",
-    danger: "#b91c1c",
-    success: "#15803d",
-    warning: "#b45309",
+    danger: "#b42318",
+    success: "#1e6b3a",
+    warning: "#9a5b0b",
   },
   font: {
     sans: "ui-sans-serif, system-ui, sans-serif",

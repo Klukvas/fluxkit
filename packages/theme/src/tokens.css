@@ -11,19 +11,19 @@
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --fk-color-background: #ffffff;
-  --fk-color-foreground: #0f172a;
-  --fk-color-muted: #f1f5f9;
-  --fk-color-muted-foreground: #475569;
-  --fk-color-border: #e2e8f0;
-  --fk-color-border-input: #64748b;
-  --fk-color-primary: #4f46e5;
+  --fk-color-background: #fbf8f3;
+  --fk-color-foreground: #15201b;
+  --fk-color-muted: #f2ede4;
+  --fk-color-muted-foreground: #535e58;
+  --fk-color-border: #e3dccf;
+  --fk-color-border-input: #7a766c;
+  --fk-color-primary: #1f5f4a;
   --fk-color-primary-foreground: #ffffff;
-  --fk-color-danger: #b91c1c;
+  --fk-color-danger: #b42318;
   --fk-color-danger-foreground: #ffffff;
-  --fk-color-success: #15803d;
-  --fk-color-warning: #b45309;
-  --fk-color-ring: #4f46e5;
+  --fk-color-success: #1e6b3a;
+  --fk-color-warning: #9a5b0b;
+  --fk-color-ring: #b06f12;
   --fk-radius-sm: 0.25rem;
   --fk-radius-md: 0.5rem;
   --fk-radius-lg: 1rem;
@@ -56,19 +56,19 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --fk-color-background: #0b1020;
-  --fk-color-foreground: #e2e8f0;
-  --fk-color-muted: #172036;
-  --fk-color-muted-foreground: #94a3b8;
-  --fk-color-border: #26314d;
-  --fk-color-border-input: #6b7a99;
-  --fk-color-primary: #818cf8;
-  --fk-color-primary-foreground: #0b1020;
-  --fk-color-danger: #f87171;
-  --fk-color-danger-foreground: #0b1020;
-  --fk-color-success: #4ade80;
-  --fk-color-warning: #fbbf24;
-  --fk-color-ring: #818cf8;
+  --fk-color-background: #0f1a16;
+  --fk-color-foreground: #ebe6dc;
+  --fk-color-muted: #1a2722;
+  --fk-color-muted-foreground: #a5b0a9;
+  --fk-color-border: #2a3a33;
+  --fk-color-border-input: #6f8279;
+  --fk-color-primary: #74c4a1;
+  --fk-color-primary-foreground: #0f1a16;
+  --fk-color-danger: #f28b82;
+  --fk-color-danger-foreground: #0f1a16;
+  --fk-color-success: #80d48e;
+  --fk-color-warning: #f0b556;
+  --fk-color-ring: #f0b556;
   --fk-radius-sm: 0.25rem;
   --fk-radius-md: 0.5rem;
   --fk-radius-lg: 1rem;
@@ -105,19 +105,19 @@
 @media (prefers-color-scheme: dark) {
   [data-theme="system"] {
     color-scheme: dark;
-    --fk-color-background: #0b1020;
-    --fk-color-foreground: #e2e8f0;
-    --fk-color-muted: #172036;
-    --fk-color-muted-foreground: #94a3b8;
-    --fk-color-border: #26314d;
-    --fk-color-border-input: #6b7a99;
-    --fk-color-primary: #818cf8;
-    --fk-color-primary-foreground: #0b1020;
-    --fk-color-danger: #f87171;
-    --fk-color-danger-foreground: #0b1020;
-    --fk-color-success: #4ade80;
-    --fk-color-warning: #fbbf24;
-    --fk-color-ring: #818cf8;
+    --fk-color-background: #0f1a16;
+    --fk-color-foreground: #ebe6dc;
+    --fk-color-muted: #1a2722;
+    --fk-color-muted-foreground: #a5b0a9;
+    --fk-color-border: #2a3a33;
+    --fk-color-border-input: #6f8279;
+    --fk-color-primary: #74c4a1;
+    --fk-color-primary-foreground: #0f1a16;
+    --fk-color-danger: #f28b82;
+    --fk-color-danger-foreground: #0f1a16;
+    --fk-color-success: #80d48e;
+    --fk-color-warning: #f0b556;
+    --fk-color-ring: #f0b556;
     --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
     --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
     --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
