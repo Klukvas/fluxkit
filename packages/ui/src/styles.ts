@@ -12,11 +12,11 @@ export const controlBase =
  */
 export const textStyles = {
   /** The page's `h1`. */
-  pageTitle: "text-3xl font-bold text-foreground",
+  pageTitle: "font-display text-3xl font-bold text-foreground",
   /** A section heading inside a page (`h2`). */
-  sectionTitle: "text-xl font-semibold text-foreground",
+  sectionTitle: "font-display text-xl font-semibold text-foreground",
   /** A smaller heading inside a section or card (`h2`/`h3`). */
-  subsectionTitle: "text-lg font-semibold text-foreground",
+  subsectionTitle: "font-display text-lg font-semibold text-foreground",
   /** Secondary information next to content: hints, meta lines. */
   meta: "text-sm text-muted-foreground",
 } as const;

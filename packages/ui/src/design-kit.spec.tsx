@@ -166,8 +166,8 @@ describe("Disclosure", () => {
 
 describe("textStyles", () => {
   it("uses only scale sizes and colour tokens", () => {
-    expect(textStyles.pageTitle).toBe("text-3xl font-bold text-foreground");
-    expect(textStyles.sectionTitle).toBe("text-xl font-semibold text-foreground");
+    expect(textStyles.pageTitle).toBe("font-display text-3xl font-bold text-foreground");
+    expect(textStyles.sectionTitle).toBe("font-display text-xl font-semibold text-foreground");
   });
 });
 

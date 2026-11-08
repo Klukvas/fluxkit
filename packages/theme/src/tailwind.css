@@ -21,6 +21,7 @@
   --radius-md: var(--fk-radius-md);
   --radius-lg: var(--fk-radius-lg);
   --font-sans: var(--fk-font-sans);
+  --font-display: var(--fk-font-display);
   --font-mono: var(--fk-font-mono);
   --shadow-card: var(--fk-shadow-card);
   --shadow-raised: var(--fk-shadow-raised);

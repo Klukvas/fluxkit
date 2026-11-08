@@ -24,6 +24,8 @@ const notInMail: Record<string, string> = {
   "--fk-shadow-raised": "box-shadow is not supported by common mail clients",
   "--fk-shadow-overlay": "box-shadow is not supported by common mail clients",
   "--fk-space-unit": "mail has its own px spacing (`emailTheme.space`)",
+  "--fk-font-display":
+    "TODO(fluxkit): experiment only; mail headings stay sans, a mail display font needs `font.display` in the `EmailTheme` interface of core",
   ...Object.fromEntries(
     ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"].flatMap((step) => [
       [`--fk-font-size-${step}`, "mail has its own px font sizes (`emailTheme.fontSize`)"],

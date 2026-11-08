@@ -45,7 +45,7 @@
   }
   /* The logo link, with the same focus ring as every other control (review A10: it showed the browser's default ring). */
   .fk-logo {
-    @apply min-h-11 min-w-0 truncate rounded-md text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
+    @apply min-h-11 min-w-0 truncate rounded-md font-display text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
   }
   .fk-header-button {
     @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;

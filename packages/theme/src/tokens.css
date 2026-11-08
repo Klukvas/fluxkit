@@ -28,6 +28,7 @@
   --fk-radius-md: 0.25rem;
   --fk-radius-lg: 0.5rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --fk-font-display: Georgia, Cambria, "DejaVu Serif", ui-serif, serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
   --fk-font-size-xs: 0.75rem;
@@ -73,6 +74,7 @@
   --fk-radius-md: 0.25rem;
   --fk-radius-lg: 0.5rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
+  --fk-font-display: Georgia, Cambria, "DejaVu Serif", ui-serif, serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
   --fk-font-size-xs: 0.75rem;
