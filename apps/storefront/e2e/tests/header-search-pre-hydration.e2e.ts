@@ -4,15 +4,16 @@ import { expect, test } from "../support/fixtures.ts";
 
 /**
  * ADR 0048: text typed into the header search box BEFORE the page's scripts run must survive hydration, on the home page
- * (under its loading view) and on a page rendered inside the shell (the sign-in page). Design batch B found 5 losses in 40
- * runs when the home page left `(site)` (README, "Keep the header small"); this makes it deterministic: the scripts are held
- * until the text is typed, then released.
+ * (under its loading view), on a page rendered inside the shell (the sign-in page) and on a big shell (the catalog). The text
+ * was lost whenever React had moved the box out of place (a hidden segment that the inline `$RC` script swaps in on the next
+ * frame or up to 300 ms later, after the shopper typed into the placeholder): 19 to 26 of 40 runs per page in the spike with
+ * main's layout and a client-sized header and footer. The scripts are held until the text is typed, then released.
  */
 test.skip(!E2E_SEARCH_ENABLED, "needs the API with search on (the header box)");
 test.use({ viewport: { width: 1280, height: 800 } });
 
 /** How many times each page runs; the spike measured 40 in CI (ADR 0048), the suite keeps one. */
-const RUNS = 40; // SCRATCH spike L1
+const RUNS = 40; // SCRATCH spike L1: one more 40-run on the final layout, then 1
 
 const isHydrated = (element: Locator) =>
   element.evaluate((node) => Object.keys(node).some((key) => key.startsWith("__reactProps")));

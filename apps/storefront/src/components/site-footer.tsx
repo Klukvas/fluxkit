@@ -74,33 +74,6 @@ export function SiteFooter({
         <p>{t("footer.copyright", { year, name: t("site.name") })}</p>
         <p>{t("footer.powered")}</p>
       </Container>
-      {/* SCRATCH spike L1: 4-column footer, +2.8 KB */}
-      <div hidden data-scratch="footer">
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-      </div>
     </footer>
   );
 }

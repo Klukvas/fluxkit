@@ -123,7 +123,7 @@ export function createStoreData(dependencies: StoreDataDependencies): StoreData 
       signal: AbortSignal.timeout(dependencies.readTimeoutMs ?? SERVER_READ_TIMEOUT_MS),
       // Next warns when both `cache: "no-store"` and `next.revalidate` are given, so a no-store read carries only the first.
       fetchOptions:
-        read.noStore === true || process.env["NODE_ENV"] === "production" // SCRATCH spike L1: no data cache
+        read.noStore === true
           ? { cache: "no-store" }
           : {
               next: {

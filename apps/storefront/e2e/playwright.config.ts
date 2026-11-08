@@ -40,7 +40,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: process.env["CI"] !== undefined,
-  retries: 0, // SCRATCH spike L1: count every failure
+  retries: process.env["CI"] === undefined ? 0 : 1,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter:
@@ -77,16 +77,6 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
-      name: "delay-proxy", // SCRATCH spike L1: started before the storefront that reads through it
-      command: "node --experimental-strip-types e2e/delay-proxy.ts",
-      cwd: storefrontRoot,
-      env: ports,
-      url: "http://127.0.0.1:3110/health",
-      timeout: 180_000,
-      reuseExistingServer: false,
-      stderr: "pipe",
-    },
-    {
       name: "storefront",
       // `next start` keeps its 60 s data cache ON DISK (`.next/cache/fetch-cache`), so a run that starts within a minute of the
       // last one would render product pages with the variant ids of the PREVIOUS seed (the API answers 404 for them). A
@@ -94,7 +84,7 @@ export default defineConfig({
       command: `rm -rf .next/cache/fetch-cache && pnpm start -p ${String(E2E_STOREFRONT_PORT)} -H 127.0.0.1`,
       cwd: storefrontRoot,
       env: {
-        API_INTERNAL_URL: "http://127.0.0.1:3110", // SCRATCH spike L1: through the 500 ms delay proxy
+        API_INTERNAL_URL: apiOrigin,
         STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
         STOREFRONT_IMAGE_HOSTS: "",
         STOREFRONT_FORWARD_CLIENT_ADDRESS: "true",

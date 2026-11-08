@@ -69,17 +69,18 @@ describe("shop pages config (config/shop-pages.ts)", () => {
   });
 
   it("uses no slug another route owns: every first segment under [locale] is reserved", () => {
-    const owned = readdirSync(localeRoot, { withFileTypes: true })
-      .filter((entry) => entry.isDirectory())
-      .flatMap((entry) =>
-        entry.name.startsWith("(")
-          ? readdirSync(join(localeRoot, entry.name), { withFileTypes: true })
-              .filter((child) => child.isDirectory() && !child.name.startsWith("["))
-              .map((child) => child.name)
-          : entry.name.startsWith("[")
-            ? []
-            : [entry.name],
-      );
+    // A route group (`(site)`, and `(site)/(home)` since ADR 0048) adds no URL segment: look through it, at any depth.
+    const firstSegments = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true })
+        .filter((entry) => entry.isDirectory())
+        .flatMap((entry) =>
+          entry.name.startsWith("(")
+            ? firstSegments(join(directory, entry.name))
+            : entry.name.startsWith("[")
+              ? []
+              : [entry.name],
+        );
+    const owned = firstSegments(localeRoot);
     expect(owned.length).toBeGreaterThan(5);
     for (const segment of owned) expect(RESERVED_SLUGS, segment).toContain(segment);
     for (const entry of shopPages) expect(RESERVED_SLUGS).not.toContain(entry.slug);

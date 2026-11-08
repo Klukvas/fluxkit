@@ -1,6 +1,5 @@
 import { Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import { Suspense } from "react";
 import { HEADER_CATEGORY_LIMIT, headerLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
 import { AccountLink } from "./account-link";
@@ -9,7 +8,7 @@ import { HeaderDisclosure, menuItem } from "./header-menu";
 import { HeaderSearchToggle } from "./header-search-toggle";
 import { MenuIcon } from "./icons";
 import { LocaleSwitcher } from "./locale-switcher";
-import { SearchBox, SearchBoxFallback } from "./search-box";
+import { SearchBox } from "./search-box";
 
 export interface NavigationCategory {
   slug: string;
@@ -94,11 +93,11 @@ export function SiteHeader({
         </nav>
         {searchEnabled ? (
           <HeaderSearchToggle label={t("nav.search")}>
-            {/* `useSearchParams` in the box needs a boundary. On dynamic pages (catalog, product, results) the box streams in
-                after the shell, so the fallback is the same GET form: without a script it is the search (review M2). */}
-            <Suspense fallback={<SearchBoxFallback />}>
-              <SearchBox locale={locale} />
-            </Suspense>
+            {/* No Suspense boundary here (ADR 0048): `useSearchParams` does not suspend in a request render (every page is
+                rendered per request), so a boundary only made React move the finished box out of place once the shell passed
+                12 800 bytes; the browser then swapped it in after the shopper had typed into the placeholder, and the text was
+                lost (catalog pages and big shells). Inside the shell the box is the same GET form without a script. */}
+            <SearchBox locale={locale} />
           </HeaderSearchToggle>
         ) : null}
         <div className="fk-header-end">
@@ -107,22 +106,6 @@ export function SiteHeader({
           <AccountLink />
         </div>
       </Container>
-      {/* SCRATCH spike L1: client-sized header, +1.5 KB */}
-      <div hidden data-scratch="header">
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
-      </div>
     </header>
   );
 }
