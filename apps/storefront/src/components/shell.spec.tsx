@@ -117,13 +117,15 @@ describe("SiteShell landmarks and accessibility", () => {
   });
 });
 
-describe("header size (it is in every page's first HTML)", () => {
-  it("stays small, so the sign-in and registration forms still render before their script runs", () => {
-    // React 19.3 moves a finished page section out of place (to be put back by a script) once the HTML before it plus the
-    // section pass 12 800 bytes (`progressiveChunkSize`); the e2e `pre-hydration-forms` test then sees only the loading
-    // view. The `<head>` counts too, and the loading view even when it is not sent. Measured 2026-11-05 with the real build
-    // and the search box: uk header 5.4 KB and `/uk/account/register` outlined (e2e uk failed); 4.8 KB after more single
-    // classes (`.fk-header-row` and others) and inline (README, "Keep the header small").
+describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
+  // Not the guard of the first HTML any more. Until ADR 0048 the pages that must work without a script sat under a
+  // `loading.tsx`, and React 19.3 moved them out of place (a hidden segment only a script puts back) once the HTML before them
+  // passed 12 800 bytes (`progressiveChunkSize`), so these tests pinned the header under 3 700 and the footer under 1 400
+  // bytes. Those pages now render inside the shell (no loading view above them, `route-structure.spec.ts`), so the size of
+  // the header and footer cannot hide them. The real guards are the e2e tests `pre-hydration-forms` (uk and en) and
+  // `first-html` (the raw HTML: the form is not in a hidden segment and no loading view precedes it). These caps only catch
+  // a runaway header or footer (every page carries them); a client fork may raise them with a reason.
+  it("keeps the header under 8 000 bytes", () => {
     const longNames = Array.from({ length: HEADER_CATEGORY_LIMIT }, (_, index) => ({
       slug: `category-${String(index)}`,
       name: `§Category name ${String(index)}`,
@@ -142,12 +144,10 @@ describe("header size (it is in every page's first HTML)", () => {
       </SiteShell>,
     );
     const header = html.slice(html.indexOf("<header"), html.indexOf("</header>"));
-    expect(new TextEncoder().encode(header).length).toBeLessThan(3700); // 3 427 bytes on 2026-11-05 (six categories, no search box; 3 802 on 2026-11-02)
+    expect(new TextEncoder().encode(header).length).toBeLessThan(8000); // 3 427 bytes on 2026-11-05 (six categories, no search box)
   });
 
-  it("keeps the footer small too: it is flushed with the shell, before a page section that streams later", () => {
-    // Design batch B: the theme switch made the footer 2.3 KB and `/{locale}/account/register` was outlined again (e2e
-    // `pre-hydration-forms`); with one class per link and button it is about 1.6 KB, and the forms render inline.
+  it("keeps the footer under 4 000 bytes", () => {
     const html = renderToStaticMarkup(
       <SiteShell
         themeMode="system"
@@ -163,9 +163,8 @@ describe("header size (it is in every page's first HTML)", () => {
     );
     const footer = html.slice(html.indexOf("<footer"), html.indexOf("</footer>"));
     expect(footer).toContain('class="fk-theme-option"');
-    // 1 261 bytes on 2026-11-05; 1 372 on 2026-11-06 with the shop pages and the contacts (1 377 with the `<br>` between phone and email, review m8 of PR 232) (repair batch 2): the lists, links and
-    // contacts carry no class, and catalog, cart and account (all in the header) left the footer.
-    expect(new TextEncoder().encode(footer).length).toBeLessThan(1400);
+    // 1 377 bytes on 2026-11-06 (shop pages, legal pages, contacts, theme switch).
+    expect(new TextEncoder().encode(footer).length).toBeLessThan(4000);
   });
 });
 
