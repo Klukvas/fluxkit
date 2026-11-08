@@ -17,7 +17,7 @@ const RUNS = 40; // SCRATCH spike L1
 const isHydrated = (element: Locator) =>
   element.evaluate((node) => Object.keys(node).some((key) => key.startsWith("__reactProps")));
 
-for (const path of ["/uk", "/uk/account/login"]) {
+for (const path of ["/uk", "/uk/account/login", "/uk/catalog"]) {
   for (let run = 1; run <= RUNS; run += 1) {
     test(`${path}: text typed before hydration stays and suggests (run ${String(run)})`, async ({
       page,
