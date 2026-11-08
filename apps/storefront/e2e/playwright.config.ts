@@ -40,7 +40,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: process.env["CI"] !== undefined,
-  retries: process.env["CI"] === undefined ? 0 : 1,
+  retries: 0, // SCRATCH spike L1: count every failure
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter:
@@ -84,7 +84,7 @@ export default defineConfig({
       command: `rm -rf .next/cache/fetch-cache && pnpm start -p ${String(E2E_STOREFRONT_PORT)} -H 127.0.0.1`,
       cwd: storefrontRoot,
       env: {
-        API_INTERNAL_URL: apiOrigin,
+        API_INTERNAL_URL: "http://127.0.0.1:3110", // SCRATCH spike L1: through the 500 ms delay proxy
         STOREFRONT_PUBLIC_URL: E2E_ORIGIN,
         STOREFRONT_IMAGE_HOSTS: "",
         STOREFRONT_FORWARD_CLIENT_ADDRESS: "true",
@@ -92,6 +92,16 @@ export default defineConfig({
       },
       // The home page reads the API on the server: this answers 200 only once the API is up too.
       url: `http://127.0.0.1:${String(E2E_STOREFRONT_PORT)}/en`,
+      timeout: 180_000,
+      reuseExistingServer: false,
+      stderr: "pipe",
+    },
+    {
+      name: "delay-proxy", // SCRATCH spike L1
+      command: "node --experimental-strip-types e2e/delay-proxy.ts",
+      cwd: storefrontRoot,
+      env: ports,
+      url: "http://127.0.0.1:3110/health",
       timeout: 180_000,
       reuseExistingServer: false,
       stderr: "pipe",

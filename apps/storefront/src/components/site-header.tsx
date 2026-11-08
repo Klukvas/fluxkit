@@ -107,6 +107,22 @@ export function SiteHeader({
           <AccountLink />
         </div>
       </Container>
+      {/* SCRATCH spike L1: client-sized header, +1.5 KB */}
+      <div hidden data-scratch="header">
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+        <span aria-hidden="true" className="fk-nav-link inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium" />
+      </div>
     </header>
   );
 }

@@ -193,7 +193,8 @@ jobs:
       - name: Install Chromium
         run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
       # The storefront suite, then the admin suite; the first failure stops the step and pnpm names the failing package.
-      - run: pnpm test:e2e
+      # SCRATCH spike L1: only the first-HTML specs, against the delay proxy
+      - run: pnpm --filter @fluxkit/storefront exec playwright test -c e2e/playwright.config.ts first-html header-search-pre-hydration pre-hydration-forms design-b
       - name: Upload the Playwright report and traces
         if: failure()
         uses: actions/upload-artifact@v7
