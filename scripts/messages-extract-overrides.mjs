@@ -8,15 +8,22 @@
 // --messages: the CURRENT upstream area files of the same locale; an override whose key is no longer there (upstream renamed or
 // removed it) is reported and left out, because the storefront refuses an override without a base message.
 // No dependency; plain Node 22.
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 const usage =
   "Usage: node scripts/messages-extract-overrides.mjs --fork <fork-uk.json> --upstream <upstream-uk.json> [--messages <dir>] [--out <file>]";
 
+/** The value after `name`; a missing value or another flag in its place is a usage error, never taken as a path. */
 function option(name) {
   const index = process.argv.indexOf(name);
-  return index > 0 ? process.argv[index + 1] : undefined;
+  if (index < 0) return undefined;
+  const value = process.argv[index + 1];
+  if (value === undefined || value.startsWith("--")) {
+    console.error(`${name} needs a value.\n${usage}`);
+    process.exit(2);
+  }
+  return value;
 }
 
 function readObject(file) {
@@ -80,7 +87,10 @@ try {
   );
   const json = `${JSON.stringify(overrides, null, 2)}\n`;
   if (outFile === undefined) process.stdout.write(json);
-  else writeFileSync(outFile, json);
+  else {
+    mkdirSync(dirname(outFile), { recursive: true });
+    writeFileSync(outFile, json);
+  }
   console.error(
     `${Object.keys(overrides).length} override(s) written${outFile ? ` to ${outFile}` : ""}.`,
   );

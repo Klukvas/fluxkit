@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { locales, type Messages } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { CLIENT_MESSAGE_PREFIXES, pickClientMessages } from "../lib/client-messages";
-import { MESSAGE_AREAS, MESSAGE_NAMESPACES, areaOfKey } from "./areas";
+import { MESSAGE_AREAS, MESSAGE_NAMESPACES, areaOfKey, namespaceOfKey } from "./areas";
 import {
   MESSAGE_FILES,
   applyOverrides,
@@ -95,7 +95,7 @@ describe("message area files (plan 2026-11-08-design-changeability.md, WP3 M1)",
     const used = new Set(
       locales.flatMap((locale) =>
         Object.values(filesOnDisk(locale)).flatMap((messages) =>
-          Object.keys(messages).map((key) => key.slice(0, key.indexOf("."))),
+          Object.keys(messages).map(namespaceOfKey),
         ),
       ),
     );

@@ -114,8 +114,8 @@ export interface MergedMessage {
  * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then `<overridesDir>/<locale>.json` merged
  * last (plan docs/plans/2026-11-08-design-changeability.md, WP3). Fails closed, so the release check can never pass by
  * reading nothing: no locale folder or an empty one, a flat `*.json` left at the top of `messagesDir` (the pre-split layout;
- * the app would ignore it), a key in two area files, a missing overrides file and an override key without a base message
- * all throw.
+ * the app would ignore it), a key in two area files, a missing overrides file, an override key without a base message and
+ * an override value that is not a non-empty string all throw.
  */
 export function readMergedMessages(
   messagesDir: string,
@@ -160,6 +160,12 @@ export function readMergedMessages(
       if (merged[key] === undefined) {
         throw new Error(
           `Message override "${key}" in ${overridesFile} has no base message (a typo, or a key upstream renamed or removed).`,
+        );
+      }
+      // Same rule and message as `applyOverrides` in src/messages/index.ts: the app would refuse this value at load.
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(
+          `Message override "${key}" in ${overridesFile} must be a non-empty string.`,
         );
       }
       merged[key] = { value, file: `messages-overrides/${locale}.json` };

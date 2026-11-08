@@ -109,4 +109,32 @@ describe("messages-extract-overrides script", () => {
     expect(bad.status).toBe(1);
     expect(bad.stderr).toContain("fork-6.json");
   });
+
+  it("refuses a flag where a value belongs (`--fork --upstream x`), naming the option (review m3 of PR 241)", () => {
+    const up = file("up-7.json", upstream);
+    for (const args of [
+      ["--fork", "--upstream", up],
+      ["--fork", file("fork-7.json", upstream), "--upstream", up, "--out"],
+      ["--fork", file("fork-8.json", upstream), "--upstream", up, "--messages", "--out", "x"],
+    ]) {
+      const result = run(...args);
+      expect(result.status, args.join(" ")).toBe(2);
+      expect(result.stderr, args.join(" ")).toMatch(/--(fork|out|messages) needs a value/);
+    }
+  });
+
+  it("creates the missing parent folders of --out", () => {
+    const out = join(directory, "new", "folder", "uk.json");
+    const fork = { ...upstream, "site.name": "Verde" };
+    const result = run(
+      "--fork",
+      file("fork-9.json", fork),
+      "--upstream",
+      file("up-9.json", upstream),
+      "--out",
+      out,
+    );
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({ "site.name": "Verde" });
+  });
 });

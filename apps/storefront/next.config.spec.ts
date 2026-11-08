@@ -419,6 +419,23 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
   });
 
+  it("fails closed on an override value that is not a non-empty string, as the app's loader does (review M1 of PR 241)", () => {
+    for (const bad of [42, null, ["x"], { a: "b" }, "", "   "]) {
+      const { directory, messagesDir, overridesDir, identityFile } = scratch(
+        withoutMarkers,
+        filledIdentity,
+        { en: { "legal.terms.intro": bad }, uk: {} },
+      );
+      try {
+        expect(failureOf({ messagesDir, overridesDir, identityFile }), JSON.stringify(bad)).toMatch(
+          /Message override "legal\.terms\.intro" in .*messages-overrides\/en\.json must be a non-empty string\./,
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
   it("fails closed on a key in two area files, an override of an unknown key, or a missing override file", () => {
     const duplicate = scratch(withoutMarkers);
     writeFileSync(
