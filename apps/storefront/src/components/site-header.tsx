@@ -1,5 +1,6 @@
 import { Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
+import { Suspense } from "react";
 import { HEADER_CATEGORY_LIMIT, headerLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
 import { AccountLink } from "./account-link";
@@ -8,7 +9,7 @@ import { HeaderDisclosure, menuItem } from "./header-menu";
 import { HeaderSearchToggle } from "./header-search-toggle";
 import { MenuIcon } from "./icons";
 import { LocaleSwitcher } from "./locale-switcher";
-import { SearchBox } from "./search-box";
+import { SearchBox, SearchBoxFallback } from "./search-box";
 
 export interface NavigationCategory {
   slug: string;
@@ -93,8 +94,11 @@ export function SiteHeader({
         </nav>
         {searchEnabled ? (
           <HeaderSearchToggle label={t("nav.search")}>
-            {/* SCRATCH spike L1 (a2): no boundary, the box is part of the shell */}
-            <SearchBox locale={locale} />
+            {/* `useSearchParams` in the box needs a boundary. On dynamic pages (catalog, product, results) the box streams in
+                after the shell, so the fallback is the same GET form: without a script it is the search (review M2). */}
+            <Suspense fallback={<SearchBoxFallback />}>
+              <SearchBox locale={locale} />
+            </Suspense>
           </HeaderSearchToggle>
         ) : null}
         <div className="fk-header-end">
