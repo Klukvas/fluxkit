@@ -33,7 +33,7 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 **Migration note for client forks (2026-11-03, not a SemVer break: the tokens are additive):** after merging this upstream change, `pnpm test`
 fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a size, radius or shadow outside the scales (`text-5xl`,
 `rounded-xl`, `shadow-md`, a bare `rounded` or `shadow`). Fix: replace the class with a scale step, or extend the scale in all three places:
-a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
+a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens live only there), its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
 
 ## Themes and modes (design batch B, 2026-11-03)
 
@@ -42,11 +42,13 @@ a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and
 | `data-theme` | Block | `color-scheme` | Who sets it |
 |---|---|---|---|
 | none or `light` | `:root, [data-theme="light"]` (every token) | `light` | the admin (`index.html`, fixed); the storefront when the shopper or the config chose light |
-| `dark` | `[data-theme="dark"]` (every token, same names) | `dark` | the storefront |
+| `dark` | `[data-theme="dark"]` (colours and shadows only, the same names as light's; everything else is inherited from `:root`) | `dark` | the storefront |
 | `system` | light, plus `@media (prefers-color-scheme: dark) { [data-theme="system"] { ... } }` on a dark device | `dark` there | the storefront (default) |
 
-- The `system` block holds the dark value of every token whose dark value differs from light (today: all colours and the three shadows) and
-  nothing else; a test keeps it equal to the dark block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
+- Fonts, radii, the type scale and the spacing unit are defined once, in the light block (single definition since 2026-11-08, plan
+  `docs/plans/2026-11-08-design-changeability.md` T4): the dark block holds only `--fk-color-*` and `--fk-shadow-*`, exactly the names of
+  light's colours and shadows. The `system` block is a byte-for-byte copy of the dark block. `packages/theme/src/theme.spec.ts` enforces all
+  three rules and that every `var(--fk-*)` in `tailwind.css` is defined in the light block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
   `data-theme="system"` (the admin) never follows the device (`apps/admin/src/theme-isolation.spec.ts` checks the admin's built CSS).
 - `color-scheme` makes native controls, scrollbars and select popups follow the theme.
 - Mail stays light (`emailTheme` reads the light block; mail templates set `color-scheme: light`).
@@ -54,10 +56,14 @@ a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and
 - The storefront's choice of mode: `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) and the `fluxkit_theme` cookie
   (ADR 0045); the server renders `data-theme`, so the first paint is right without a script.
 
-**How a fork rebrands both themes:** set the light values in the `:root` block and the dark values in the `[data-theme="dark"]` block (same names;
-the contrast pairs below must pass in both), then copy every dark value that differs from light into the `system` block: `pnpm --filter
+**How a fork rebrands both themes:** set the light values in the `:root` block (fonts, radii and sizes only there) and the dark colours and
+shadows in the `[data-theme="dark"]` block (same names; the contrast pairs below must pass in both), then copy the dark block into the `system` block: `pnpm --filter
 @fluxkit/theme test` names each token that is missing or different there. A shop without a dark theme sets `defaultMode: "light"` and
 `showToggle: false` in the storefront config (the dark blocks then never apply). No component edits.
+
+**Migration note for client forks (2026-11-08, additive: no token renamed or removed):** the non-colour tokens left the dark block. A fork
+that changed a font, radius, size or the spacing unit in BOTH blocks keeps its light value and deletes the dark copy (`pnpm --filter
+@fluxkit/theme test` names each repeat); a fork that set a different value only in dark loses it (dark now inherits from `:root`).
 
 **Migration note for client forks (2026-11-03, additive: no token renamed or removed):** a fork that changed dark values in `tokens.css` must
 copy them into the new `system` block (the test above fails until it does). The storefront now renders `data-theme="system"` by default

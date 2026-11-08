@@ -3,6 +3,8 @@
  * (AGENTS.md section 2.2); they use the semantic names mapped in tailwind.css.
  * Replace the values below (or add a theme preset selector) when delivering a client design; a rebrand sets BOTH themes (and
  * copies the changed dark colours and shadows into the system block at the end; a test keeps it equal to the dark block).
+ * Fonts, radii, the type scale and the spacing unit are defined ONCE, in the light block: the dark and system blocks hold only
+ * colours and shadows and inherit everything else from `:root` (theme.spec.ts refuses a repeat).
  *
  * Themes (`data-theme` on <html>): `light` (also the default without the attribute), `dark`, and `system`, which is light
  * unless the OS asks for dark. `system` is opt-in on purpose: the admin app shares this file and sets `light`, so it never
@@ -69,37 +71,13 @@
   --fk-color-success: #4ade80;
   --fk-color-warning: #fbbf24;
   --fk-color-ring: #818cf8;
-  --fk-radius-sm: 0.25rem;
-  --fk-radius-md: 0.5rem;
-  --fk-radius-lg: 1rem;
-  --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
-  --fk-font-mono: ui-monospace, monospace;
-  /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
-  --fk-font-size-xs: 0.75rem;
-  --fk-line-height-xs: 1rem;
-  --fk-font-size-sm: 0.875rem;
-  --fk-line-height-sm: 1.25rem;
-  --fk-font-size-base: 1rem;
-  --fk-line-height-base: 1.5rem;
-  --fk-font-size-lg: 1.125rem;
-  --fk-line-height-lg: 1.75rem;
-  --fk-font-size-xl: 1.25rem;
-  --fk-line-height-xl: 1.75rem;
-  --fk-font-size-2xl: 1.5rem;
-  --fk-line-height-2xl: 2rem;
-  --fk-font-size-3xl: 1.875rem;
-  --fk-line-height-3xl: 2.25rem;
-  --fk-font-size-4xl: 2.25rem;
-  --fk-line-height-4xl: 2.5rem;
-  /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
-  --fk-space-unit: 0.25rem;
   --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
   --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
   --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
 }
 
 /*
- * System mode on a dark OS: the dark values of every token that differs between the themes (colours and shadows). Scoped to
+ * System mode on a dark OS: a byte-for-byte copy of the dark block (colours and shadows). Scoped to
  * `[data-theme="system"]`, never `:root`, so a page that did not opt in (the admin) is not affected.
  */
 @media (prefers-color-scheme: dark) {
