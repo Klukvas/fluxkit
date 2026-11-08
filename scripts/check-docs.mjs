@@ -14,8 +14,32 @@ function contractConfigProblem(paths) {
   return "A storefront contract config file (apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts or .tsx) changed but nothing under docs/contracts/ did.";
 }
 
+/** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
+function parseNameStatus(output) {
+  return output
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => {
+      const [status, ...rest] = line.split("\t");
+      return { status: status[0], path: rest[rest.length - 1], paths: rest };
+    });
+}
+
+const changedPaths = (entries) => entries.flatMap((entry) => entry.paths);
+
 // The rule's own cases, run on every call before the diff is read (and alone with --self-test): a broken rule fails loudly.
+// `nameStatus` cases go through the parser, so a rename away from (or onto) a contract file is covered too.
 const selfTestCases = [
+  {
+    nameStatus: "R100\tapps/storefront/src/config/brand.ts\tapps/storefront/src/config/branding.ts",
+    fails: true,
+  },
+  {
+    nameStatus:
+      "R100\tapps/storefront/src/config/brand.ts\tapps/storefront/src/config/branding.ts\nM\tdocs/contracts/branding.md",
+    fails: false,
+  },
+  { nameStatus: "M\tapps/storefront/src/config/home.ts", fails: false },
   { paths: [], fails: false },
   {
     paths: ["apps/storefront/src/config/home.ts", "apps/storefront/src/config/theme.ts"],
@@ -38,13 +62,14 @@ const selfTestCases = [
   { paths: ["apps/storefront/src/config/slots.tsx", "docs/contracts/slots.md"], fails: false },
   { paths: ["apps/admin/src/config/brand.ts", "packages/ui/src/config/footer.ts"], fails: false },
 ];
+const casePaths = ({ paths, nameStatus }) => paths ?? changedPaths(parseNameStatus(nameStatus));
 const selfTestFailures = selfTestCases.filter(
-  ({ paths, fails }) => (contractConfigProblem(paths) !== null) !== fails,
+  (testCase) => (contractConfigProblem(casePaths(testCase)) !== null) !== testCase.fails,
 );
 if (selfTestFailures.length > 0) {
   console.error(
     "check:docs self-test failed for: " +
-      selfTestFailures.map(({ paths }) => JSON.stringify(paths)).join(", "),
+      selfTestFailures.map((testCase) => JSON.stringify(casePaths(testCase))).join(", "),
   );
   process.exit(1);
 }
@@ -61,14 +86,7 @@ if (base === undefined) {
 }
 
 const git = (...args) => execFileSync("git", args, { encoding: "utf8" });
-const changed = git("diff", "--name-status", `${base}...HEAD`)
-  .split("\n")
-  .filter(Boolean)
-  .map((line) => {
-    const [status, ...rest] = line.split("\t");
-    // A rename or copy lists the old and the new path: `path` is the new one, `paths` both.
-    return { status: status[0], path: rest[rest.length - 1], paths: rest };
-  });
+const changed = parseNameStatus(git("diff", "--name-status", `${base}...HEAD`));
 
 const touched = (predicate) => changed.some((entry) => predicate(entry.path));
 const problems = [];
@@ -125,7 +143,7 @@ if (touched((path) => path === tokensPath)) {
   }
 }
 
-const contractProblem = contractConfigProblem(changed.flatMap((entry) => entry.paths));
+const contractProblem = contractConfigProblem(changedPaths(changed));
 if (contractProblem !== null) problems.push(contractProblem);
 
 console.log(`changed files: ${changed.length}`);

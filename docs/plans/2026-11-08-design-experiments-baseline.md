@@ -88,7 +88,7 @@ Verified against the code by the plan's reviewers; ids as in plan section 2.
 - E1 no display-font token (`packages/theme/src/tokens.css:30-31`); about 27 headings bypass `textStyles`, for example
   `account-email-parts.tsx:28-31`, `search-results.tsx:247-250,371-374`, `delivery-section.tsx:67`, `checkout-page.tsx:599,654`,
   `packages/ui/src/empty-state.tsx:21`, `disclosure.tsx:37`, `banner-card.tsx:100-102`, `product-card.tsx:108`, `.fk-logo` `globals.css:48`;
-  the admin has 71 headings, none on `textStyles`.
+  the admin has about 70 headings (70 `<h1>`-`<h6>` JSX tags in non-spec `apps/admin/src/**/*.tsx` on `b7d732c`), none on `textStyles`.
 - E2 no accent token; `BannerTone "accent"` (`packages/ui/src/banner-card.tsx:6,49`, `config/home.ts:76`) means the primary colour.
 - E3 radii are a size scale: `rounded-md` 89 uses, `rounded-lg` 17, `rounded-sm` 6; `styles.ts:7`, `button.tsx:39`, `alert.tsx:31`,
   `product-image.tsx:47,62`, `dialog.tsx:79`, `hero.tsx:42`; `cn` does not merge classes.
@@ -105,11 +105,11 @@ Verified against the code by the plan's reviewers; ids as in plan section 2.
 - R3 two URL systems drop an unknown `view` param: `lib/search-query.ts:274-300` (`KNOWN_PARAMS:286`), `lib/catalog-query.ts:95`,
   `catalog-route.server.ts:100-140`, `page-metadata.ts:99`, `search-island.tsx`.
 - R4 first-HTML byte budget: `shell.spec.tsx:145` (header under 3,700), `:168` (footer under 1,400, 1,377 used); the 4-column footer
-  measured 2,809-2,816 bytes.
+  measured 2,816 bytes in the experiment commit `1f3ed5b` (2,809 is an earlier reported figure, not reproduced).
 - R5 data missing in the API (compare-at and default variant id in the list item, `sort=popular`, brands): WP6.
 - R6 tests pin classes and markup: `shell.spec.tsx:66-73,145,168`, `design-a.spec.tsx:117-131`, `home-sections.spec.tsx:212`,
   `config/home.spec.ts:109`, `design-b.e2e.ts:143-160,155`, `ui-polish.e2e.ts:19,37,201-213`.
-- R7 one flat messages file per language, imported by 46 specs; `assertNoLegalPlaceholders` (`next.config.ts:92-140`) reads only
+- R7 one flat messages file per language, imported by 46 import statements in 26 spec files (plus `config/home.ts`, `e2e/support/flows.ts`); `assertNoLegalPlaceholders` (`next.config.ts:92-140`) reads only
   top-level files.
 
 ## 4. File conflicts with upstream
@@ -119,7 +119,7 @@ them would conflict in a client fork that carries the redesign.
 
 | File | Upstream edits in 11 days | Touched by |
 |---|---|---|
-| `apps/storefront/src/messages/uk.json` | about 20 | rebrand name; reshape steps 1-5 |
+| `apps/storefront/src/messages/uk.json` | 18 commits | rebrand name; reshape steps 1-5 |
 | `apps/storefront/src/components/search-results.tsx` | 8 | reshape 2 |
 | `apps/storefront/src/components/home-sections.tsx` | 6 | reshape 1, 4 |
 | `apps/storefront/src/app/globals.css` | 6 | rebrand font; reshape 3, 5 |

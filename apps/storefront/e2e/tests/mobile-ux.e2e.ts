@@ -68,12 +68,13 @@ async function hydrated(page: Page): Promise<void> {
 /**
  * Waits until the header's search box is the real, mounted island (`data-hydrated` on its form, set in the browser only).
  * The cart badge (`hydrated`) is not enough for the search row: on the streamed pages (catalog, product, results) the row
- * first holds `SearchBoxFallback` inside a `Suspense` boundary that is still pending, and React does not hydrate it. Opened
- * then, the row focuses the fallback's input (same role and name, so `toBeFocused` passes); React's root listener stops a
- * keydown aimed into a pending boundary (react-dom 19.3 `dispatchEvent`: `stopPropagation` when the boundary cannot hydrate),
- * so the row never sees Escape, and when the real box replaces the fallback the focused input leaves the document and the
- * focus drops to the body. Either way the row stayed open: the D-04 flake (2 of 5 and 1 of 5 runs). The row is hidden while
- * closed below `lg`, hence `toBeAttached`, not a role query.
+ * first holds `SearchBoxFallback`, and the box's `Suspense` boundary can still be dehydrated (or have fallen back to client
+ * rendering) when the test acts. Opened then, the row focuses the fallback's input (same role and name, so `toBeFocused`
+ * passes); a keydown aimed into a dehydrated boundary may never reach the row's handler (react-dom 19.3 `dispatchEvent`
+ * stops it when the boundary does not hydrate synchronously), and when the real box replaces the fallback the focused input
+ * leaves the document and the focus drops to the body. Either way the row stayed open: the D-04 flake (2 of 5 and 1 of 5
+ * runs). Unverified: which state the boundary is in (`$?` pending vs `$!` client render); QA confirms it with `curl` of the
+ * built `/uk/catalog` during the `--repeat-each 30` run. The row is hidden while closed below `lg`, hence `toBeAttached`.
  */
 async function searchBoxHydrated(page: Page): Promise<void> {
   await expect(
