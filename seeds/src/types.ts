@@ -57,7 +57,7 @@ export interface SeedBrand {
 export interface SeedCategory {
   slug: string;
   name: I18nText;
-  /** One level of children: the demo tree is two levels deep. */
+  /** Child categories (core allows up to five levels; the demo trees use two or three). */
   children?: readonly SeedCategory[];
 }
 
@@ -94,6 +94,11 @@ export interface SeedVariantCommerce {
   stock?: number;
   /** The variant sells beyond its stock; the runner sets the flag through the variant admin service. */
   allowBackorder?: boolean;
+  /**
+   * An explicit SKU (core `validateSku` format), set through the variant admin service. Omitted: the SKU core proposes from
+   * the slug and the value codes stays (the test fixture relies on those).
+   */
+  sku?: string;
 }
 
 export interface SeedProduct {

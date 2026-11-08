@@ -1,7 +1,7 @@
-// Gives the e2e run a fresh database: wipes it, migrates it, seeds the demo catalog and creates one owner. Run by the API's
+// Gives the e2e run a fresh database: wipes it, migrates it, seeds the test fixture catalog and creates one owner. Run by the API's
 // `webServer` entry in `playwright.config.ts` BEFORE the API starts (Playwright starts web servers before `globalSetup`,
 // so a global setup would run against a server that is already up). Uses plain `node` and the API's BUILT output
-// (`pnpm build` first), the same commands as `pnpm db:migrate`, `pnpm seed` and `pnpm admin:create` without their
+// (`pnpm build` first), the same commands as `pnpm db:migrate`, `pnpm seed:test` and `pnpm admin:create` without their
 // `--env-file`; `pg` is the API's own dependency, resolved from `apps/api`, so the storefront package adds nothing.
 import { execFileSync } from "node:child_process";
 import { mkdirSync, rmSync } from "node:fs";
@@ -75,7 +75,9 @@ const run = (script: string, args: string[] = [], extra: Env = {}) =>
     stdio: "inherit",
   });
 run("database/migrate.js");
-run("seed/seed.js");
+// The TEST FIXTURE dataset (`pnpm seed:test`): the specs rely on its products (T-shirt, hammer, e-book, ...), not on the
+// coffee demo of `pnpm seed`.
+run("seed/seed.js", ["--dataset", "test"]);
 run("auth/create-admin.js", ["--email", ADMIN_EMAIL], { ADMIN_PASSWORD });
 // `pnpm search:reindex`: builds the index of every locale from the seeded catalog and swaps it in, so the first page load
 // finds products (the scheduler is off in this suite, nothing else would build it).

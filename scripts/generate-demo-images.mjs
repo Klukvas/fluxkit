@@ -201,7 +201,7 @@ function collectionBanner(headline, subline) {
   };
 }
 
-/** Every file the demo seed names (`seeds/src/products.ts`, `seeds/src/banners.ts`), with its drawing. */
+/** Every file the test fixture dataset names (`seeds/src/test-fixture/products.ts`, `seeds/src/test-fixture/banners.ts`), with its drawing. */
 const IMAGES = {
   "t-shirt-front": () => tShirt("white"),
   "t-shirt-black": () => tShirt("black"),
@@ -216,7 +216,7 @@ const IMAGES = {
   "template-pack": templatePack,
   "banner-season": () => storefrontBanner("banner-1.svg"),
   "banner-gifts": () => storefrontBanner("banner-2.svg"),
-  // The words are the banner's alt text in `seeds/src/banners.ts` (repair batch 2: no "replace it" note on the page).
+  // The words are the banner's alt text in `seeds/src/test-fixture/banners.ts` (repair batch 2: no "replace it" note on the page).
   "banner-collection-uk": () => collectionBanner("Нова колекція", "Дивіться новинки в каталозі"),
   "banner-collection-en": () =>
     collectionBanner("New collection", "See what is new in the catalog"),

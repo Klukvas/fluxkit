@@ -1,6 +1,11 @@
 import { NestFactory } from "@nestjs/core";
 import { loadEnv } from "@fluxkit/config";
-import { catalogSeed, type CatalogSeed } from "@fluxkit/seeds";
+import {
+  DEFAULT_SEED_DATASET,
+  seedDatasets,
+  type CatalogSeed,
+  type SeedDatasetName,
+} from "@fluxkit/seeds";
 import { AppModule } from "../app.module.js";
 import { mediaConfigOf } from "../app.factory.js";
 import { prepareDefaultMediaDirectory } from "../media/media-directory.js";
@@ -14,6 +19,38 @@ import {
 import { CatalogSeeder, SEED_ENTITY_KINDS, type SeedSummary } from "./catalog-seeder.js";
 
 export const ALLOW_PRODUCTION_FLAG = "--allow-production";
+export const DATASET_FLAG = "--dataset";
+
+function isDatasetName(name: string): name is SeedDatasetName {
+  return Object.hasOwn(seedDatasets, name);
+}
+
+/**
+ * The dataset named by `--dataset <name>` (or `--dataset=<name>`): `coffee` (the demo shop, the default of `pnpm seed`) or
+ * `test` (the test fixture of `pnpm seed:test`, the e2e suites and the feature matrix). A missing or unknown name fails
+ * before anything is touched: a typo must not silently seed the other catalog.
+ */
+export function datasetOf(argv: readonly string[]): SeedDatasetName {
+  const names = Object.keys(seedDatasets).join(", ");
+  let chosen: string | undefined;
+  for (const [index, argument] of argv.entries()) {
+    if (argument === DATASET_FLAG) {
+      chosen = argv[index + 1];
+      if (chosen === undefined || chosen.startsWith("--")) {
+        throw new Error(`${DATASET_FLAG} needs a dataset name: one of ${names}.`);
+      }
+    } else if (argument.startsWith(`${DATASET_FLAG}=`)) {
+      chosen = argument.slice(DATASET_FLAG.length + 1);
+    }
+  }
+  if (chosen === undefined) {
+    return DEFAULT_SEED_DATASET;
+  }
+  if (!isDatasetName(chosen)) {
+    throw new Error(`Unknown seed dataset "${chosen}": use one of ${names}.`);
+  }
+  return chosen;
+}
 
 /** Database names the seed accepts without the flag: throwaway databases only. */
 const SEEDABLE_DATABASE_SUFFIXES = ["_test", "_dev", "_demo", "_local"] as const;
@@ -61,13 +98,13 @@ export function assertSeedAllowed(
   }
 }
 
-export function formatSummary(summary: SeedSummary): string {
+export function formatSummary(summary: SeedSummary, dataset?: SeedDatasetName): string {
   const lines = SEED_ENTITY_KINDS.map(
     (kind) =>
       `  ${kind.padEnd(13)} created ${String(summary.created[kind]).padStart(3)}, existing ${String(summary.existing[kind]).padStart(3)}`,
   );
   return [
-    "Seed finished.",
+    dataset === undefined ? "Seed finished." : `Seed finished (dataset ${dataset}).`,
     ...lines,
     `  variants      created ${String(summary.variantsCreated).padStart(3)} (with new products)`,
     "  shipping methods are created inactive; activate them in the admin (Shipping).",
@@ -114,7 +151,7 @@ export function describeError(error: unknown): string {
 }
 
 export interface RunSeedCommandOptions {
-  /** Tests only: replaces the demo catalog. */
+  /** Tests only: replaces the dataset that `--dataset` names. */
   seed?: CatalogSeed;
   /** Tests only: shipping provider modules mounted as if they were enabled (no package on disk is read for them). */
   extraShippingProviders?: LoadedShippingProvider[];
@@ -132,6 +169,7 @@ export async function runSeedCommand(
   options: RunSeedCommandOptions = {},
 ): Promise<SeedSummary> {
   assertSeedAllowed(env, argv);
+  const dataset = datasetOf(argv);
   const config = loadEnv(env);
   // The enabled providers, as the API loads them: a demo method of a provider is created only when it is loaded.
   const shippingProviders = await loadShippingProviders({
@@ -155,7 +193,9 @@ export async function runSeedCommand(
     { logger: ["error", "warn"] },
   );
   try {
-    return await CatalogSeeder.fromContext(app, options.assetsDir).run(options.seed ?? catalogSeed);
+    return await CatalogSeeder.fromContext(app, options.assetsDir).run(
+      options.seed ?? seedDatasets[dataset],
+    );
   } finally {
     await app.close();
   }

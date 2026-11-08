@@ -8,7 +8,7 @@
 //      (`--skip-docker`: the services already run, for example natively).
 //   3. Creates a Meilisearch key scoped to the index prefix (README "Catalog search") when MEILI_API_KEY is still the
 //      placeholder, and writes it into `.env`.
-//   4. Builds, migrates, seeds the demo catalog (with its images), builds the search index.
+//   4. Builds, migrates, seeds the demo catalog (coffee-shop supplies, `pnpm seed`; with its images), builds the search index.
 //   5. Creates the admin owner `owner@example.com` (`--admin-email` to change) with a random password, printed ONCE and
 //      stored nowhere; skipped when that admin exists.
 //   6. Prints the URLs and the commands that start the API, the storefront and the admin.
@@ -207,6 +207,7 @@ async function main() {
   const env = childEnv(values);
   run("pnpm", ["build"], { env });
   run("pnpm", ["--filter", "@fluxkit/api", "db:migrate"], { env });
+  // The coffee-shop demo (the default dataset); the tests use `pnpm seed:test` instead.
   run("pnpm", ["--filter", "@fluxkit/api", "seed"], { env });
   if (searchOn) {
     run("pnpm", ["--filter", "@fluxkit/api", "search:reindex"], { env });
