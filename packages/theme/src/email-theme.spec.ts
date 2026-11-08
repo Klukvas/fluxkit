@@ -13,6 +13,18 @@ function lightTokens(): Map<string, string> {
   return tokenBlock(parseTokenBlocks(tokensCss), themeSelectors.light).tokens;
 }
 
+/**
+ * A token's font stack as mail can use it: a fork's own face is a `var(--font-...)` of `next/font/local`
+ * (`apps/storefront/src/config/fonts.ts`), which only exists on the web page; mail keeps the fallback stack after it.
+ */
+function mailFontStack(stack: string): string {
+  return stack
+    .split(",")
+    .map((family) => family.trim())
+    .filter((family) => family !== "" && !/^var\(--font-[a-z0-9-]+\)$/.test(family))
+    .join(", ");
+}
+
 const kebab = (name: string) => name.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
 
 // Tokens mail does not use, each with its reason; every other light token must be in `emailTheme`.
@@ -49,9 +61,17 @@ describe("emailTheme", () => {
     }
   });
 
-  it("uses the token font stacks", () => {
-    expect(emailTheme.font.sans).toBe(tokens.get("--fk-font-sans"));
-    expect(emailTheme.font.mono).toBe(tokens.get("--fk-font-mono"));
+  it("uses the token font stacks (without a self-hosted web font, which mail clients do not load)", () => {
+    expect(emailTheme.font.sans).toBe(mailFontStack(tokens.get("--fk-font-sans") ?? ""));
+    expect(emailTheme.font.mono).toBe(mailFontStack(tokens.get("--fk-font-mono") ?? ""));
+  });
+
+  it("drops the web font variables of `config/fonts.ts` from a stack, and keeps the fallbacks", () => {
+    expect(mailFontStack("var(--font-body), ui-sans-serif, system-ui, sans-serif")).toBe(
+      "ui-sans-serif, system-ui, sans-serif",
+    );
+    expect(mailFontStack("ui-monospace, monospace")).toBe("ui-monospace, monospace");
+    expect(mailFontStack("var(--font-body)")).toBe("");
   });
 
   it("uses the token radii, resolved from rem to px (16px per rem)", () => {

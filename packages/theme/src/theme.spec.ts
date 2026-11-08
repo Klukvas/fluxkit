@@ -76,10 +76,17 @@ describe("design tokens", () => {
   });
 
   it("defaults the display (heading) font to the body font, so adding it changed no pixel", () => {
-    expect(lightBlock.tokens.get("--fk-font-display")).toBe(
-      lightBlock.tokens.get("--fk-font-sans"),
-    );
-    expect(lightBlock.tokens.get("--fk-font-sans")).toBeDefined();
+    // The template's value. A fork that gives headings their own face changes `--fk-font-display` and passes; one that changes
+    // only the body face is told to decide the headings too (they would silently stay in the old system stack).
+    const templateDisplay = "ui-sans-serif, system-ui, sans-serif";
+    const display = lightBlock.tokens.get("--fk-font-display");
+    const sans = lightBlock.tokens.get("--fk-font-sans");
+    expect(sans).toBeDefined();
+    expect(display).toBeDefined();
+    expect(
+      display !== templateDisplay || display === sans,
+      "--fk-font-sans changed but --fk-font-display is still the template's stack: set it as well",
+    ).toBe(true);
   });
 
   it("defines the status and focus tokens added for the storefront", () => {

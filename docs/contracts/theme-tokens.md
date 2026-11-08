@@ -63,6 +63,32 @@ fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a siz
 `rounded-xl`, `shadow-md`, a bare `rounded` or `shadow`). Fix: replace the class with a scale step, or extend the scale in all three places:
 a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens live only there), its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
 
+## Fonts (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1b)
+
+- A font token may name a web font variable before its fallback stack: `--fk-font-display: var(--font-display-face), ui-sans-serif,
+  system-ui, sans-serif;`. The variable comes from `next/font/local` in the storefront's fork-owned `apps/storefront/src/config/fonts.ts`
+  (empty upstream; the root layout puts each font's `variable` class on `<html>`). `contrast.spec` reads colours only and the block parser
+  accepts any value, so fonts need no hex; `email-theme.spec` compares `emailTheme.font` with the stack WITHOUT `var(--font-*)` entries
+  (mail cannot load web fonts), so `--fk-font-sans` may also take a fork face without touching mail.
+- A fork that changes `--fk-font-sans` but leaves `--fk-font-display` at the template stack fails `theme.spec.ts` (headings would silently
+  stay in the system face): set both.
+- Admin: it imports the same `tokens.css` (`apps/admin/src/styles.css`) and follows `--fk-font-sans`; a web font for the admin needs its own
+  `@font-face` (the admin has no `next/font`). Its place is the admin overrides file planned for a later change (plan, B2/E1); until then a
+  fork declares it in `apps/admin/src/styles.css`. Same rules as below.
+
+- **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
+  `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
+  is refused by `config/fonts.spec.ts`. Check the font's licence allows self-hosting on the web.
+- `display: "swap"` with fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once and
+  barely moves when the face arrives.
+- Coverage: Cyrillic including Ґ Є І Ї (and ґ є і ї), the apostrophe U+2019, ₴ and the Latin set; test with the shop's real copy in `uk`
+  and `en`.
+- Weights: load the ones `textStyles` uses (600 and 700 for headings, plus 500 for `cardTitle` if the body face is replaced) or one
+  variable font; a missing weight is synthesised (fake bold).
+- No preload (`preload: false`) while the first-HTML budget is open (plan 2026-11-08, L1): a preload `<link>` in `<head>` counts toward it.
+- `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
+  holds one) inside a `Suspense` boundary: a hoisted stylesheet there makes React outline the boundary.
+
 ## Themes and modes (design batch B, 2026-11-03)
 
 `data-theme` on `<html>` selects the theme; `tokens.css` has exactly three blocks (a test refuses any other rule):

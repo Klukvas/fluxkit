@@ -118,6 +118,29 @@ Applied to every path: `Content-Security-Policy` (`default-src 'self'`; `script-
 - **The CSP part of `STOREFRONT_IMAGE_HOSTS` is read at build time:** Next evaluates `headers()` during `next build` and stores the result in `.next/routes-manifest.json`. Verified: a build without the variable and a `next start` with it kept `img-src 'self' data:`; a build with it contains the host. Change the variable, rebuild. (The image optimizer and the pages read it again at start, see "Images".)
 - The header code lives in `next.config.ts` itself: Next compiles only that one file for its config, and a relative import of another TypeScript file fails with `MODULE_NOT_FOUND`.
 
+## Fonts (`src/config/fonts.ts`, 2026-11-08)
+
+The template uses the system stacks of the tokens (`--fk-font-sans`, `--fk-font-display`, `--fk-font-mono`). A fork adds its own faces
+in `src/config/fonts.ts`, a fork-owned file (empty upstream; upstream never edits it after creating it): `next/font/local` declarations
+in its `fonts` list (an example is in the file). The root layout puts their `variable` classes on `<html>` once
+(`lib/font-classes.ts`; no attribute while the list is empty), and a token names the variable, for example
+`--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;` in the light block of `packages/theme/src/tokens.css`.
+Mail keeps the fallback stack after the `var()` (mail clients load no web font). `config/fonts.spec.ts` checks that `next/font` is imported
+only from that file and that the layout attaches the classes.
+
+- **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
+  `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
+  is refused by `config/fonts.spec.ts`. Check the font's licence allows self-hosting on the web.
+- `display: "swap"` with fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once and
+  barely moves when the face arrives.
+- Coverage: Cyrillic including Ґ Є І Ї (and ґ є і ї), the apostrophe U+2019, ₴ and the Latin set; test with the shop's real copy in `uk`
+  and `en`.
+- Weights: load the ones `textStyles` uses (600 and 700 for headings, plus 500 for `cardTitle` if the body face is replaced) or one
+  variable font; a missing weight is synthesised (fake bold).
+- No preload (`preload: false`) while the first-HTML budget is open (plan 2026-11-08, L1): a preload `<link>` in `<head>` counts toward it.
+- `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
+  holds one) inside a `Suspense` boundary: a hoisted stylesheet there makes React outline the boundary.
+
 ## Structure
 
 See `docs/files/storefront.md` for one line per file. In short:
