@@ -13,7 +13,7 @@ test.skip(!E2E_SEARCH_ENABLED, "needs the API with search on (the header box)");
 test.use({ viewport: { width: 1280, height: 800 } });
 
 /** How many times each page runs; the spike measured 40 in CI (ADR 0048), the suite keeps one. */
-const RUNS = 40; // SCRATCH spike L1: one more 40-run on the final layout, then 1
+const RUNS = 1;
 
 const isHydrated = (element: Locator) =>
   element.evaluate((node) => Object.keys(node).some((key) => key.startsWith("__reactProps")));
