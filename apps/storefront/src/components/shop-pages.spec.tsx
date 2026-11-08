@@ -187,7 +187,8 @@ describe("the footer", () => {
       <SiteFooter locale="en" t={t} year={2026} themeMode="light" contacts={none} shopLinks={[]} />,
     );
     expect(empty).not.toContain("<address");
-    expect(empty.match(/<ul/g)).toHaveLength(1);
+    // Reshape experiment: the legal list, the social links and the payment badges.
+    expect(empty.match(/<ul/g)).toHaveLength(3);
     expect(empty).toContain('class="fk-theme-option"');
   });
 });

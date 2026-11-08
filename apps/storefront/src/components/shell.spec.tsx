@@ -63,8 +63,8 @@ describe("SiteShell landmarks and accessibility", () => {
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
     // main (twice: inside the menu below `lg`, inline from `lg`; one is always display:none), its second half beside the
-    // icons (reshape experiment), locale switcher, footer
-    expect(navs).toHaveLength(5);
+    // icons (reshape experiment), locale switcher, footer (shop pages and legal pages since the reshape experiment)
+    expect(navs).toHaveLength(6);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
     expect(mains).toHaveLength(2);

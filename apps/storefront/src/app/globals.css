@@ -114,6 +114,34 @@
   .fk-site-footer address a {
     @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
+  /* Reshape experiment (client request 5): the footer's four columns, scoped by element so the markup stays class-free. */
+  .fk-footer-grid {
+    @apply grid gap-6 pb-4 sm:grid-cols-2 lg:grid-cols-4;
+  }
+  .fk-footer-grid h2 {
+    @apply mb-2 font-semibold text-foreground;
+  }
+  .fk-footer-grid ul {
+    @apply flex-col;
+  }
+  .fk-footer-grid ul[aria-label] {
+    @apply mt-2 flex-row;
+  }
+  .fk-footer-grid ul[aria-label] a {
+    @apply min-w-11 justify-center;
+  }
+  .fk-footer-grid input {
+    @apply min-h-11 w-full rounded-md border border-border-input bg-background px-3 text-foreground;
+  }
+  .fk-footer-grid button {
+    @apply mt-2 min-h-11 rounded-md bg-primary px-4 font-medium text-primary-foreground;
+  }
+  .fk-footer-pay {
+    @apply flex flex-wrap gap-2 text-sm;
+  }
+  .fk-footer-pay li {
+    @apply rounded-sm border border-border px-2 py-1;
+  }
   /* The theme switch's form and button group (`components/theme-switch.tsx`). */
   .fk-theme-form {
     @apply flex flex-wrap items-center gap-2;
