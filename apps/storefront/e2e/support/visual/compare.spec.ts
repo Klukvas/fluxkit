@@ -40,8 +40,8 @@ function snapshot(pages: Record<string, Record<string, Record<string, ElementSty
 const base = () =>
   snapshot({
     home: {
-      light: { "main.h1": styles({ "font-size": "30px" }), "feedback.alert": null },
-      dark: { "main.h1": styles({ color: "rgb(255, 255, 255)" }), "feedback.alert": null },
+      light: { "main.h1": styles({ "font-size": "30px" }), "feedback.status": null },
+      dark: { "main.h1": styles({ color: "rgb(255, 255, 255)" }), "feedback.status": null },
     },
     cart: { light: { "button.primary": styles({ "border-top-left-radius": "6px" }) } },
   });
@@ -80,7 +80,7 @@ describe("diffSnapshots", () => {
 
   it("reports an element found on one side only as a presence difference", () => {
     const after = base();
-    (after.pages["home"]?.["light"] as Record<string, ElementStyles>)["feedback.alert"] = styles();
+    (after.pages["home"]?.["light"] as Record<string, ElementStyles>)["feedback.status"] = styles();
     (after.pages["home"]?.["dark"] as Record<string, ElementStyles>)["main.h1"] = null;
     expect(diffSnapshots(base(), after)).toEqual([
       {
@@ -94,7 +94,7 @@ describe("diffSnapshots", () => {
       {
         page: "home",
         theme: "light",
-        selector: "feedback.alert",
+        selector: "feedback.status",
         property: "presence",
         before: "absent",
         after: "present",
@@ -201,8 +201,8 @@ describe("alwaysAbsentSelectors", () => {
   it("lists selectors that found nothing anywhere on either side", () => {
     const after = base();
     (after.pages["cart"]?.["light"] as Record<string, ElementStyles>)["home.hero"] = null;
-    expect(alwaysAbsentSelectors(base(), after)).toEqual(["feedback.alert", "home.hero"]);
-    (after.pages["home"]?.["dark"] as Record<string, ElementStyles>)["feedback.alert"] = styles();
+    expect(alwaysAbsentSelectors(base(), after)).toEqual(["feedback.status", "home.hero"]);
+    (after.pages["home"]?.["dark"] as Record<string, ElementStyles>)["feedback.status"] = styles();
     expect(alwaysAbsentSelectors(base(), after)).toEqual(["home.hero"]);
     expect(formatComparison(applyExceptions([], []), ["home.hero"])).toMatch(
       /Warning: selectors absent on every page, theme and side \(they prove nothing\): home\.hero/,
@@ -338,7 +338,7 @@ describe("snapshot files and the command line", () => {
     const strict = cli(before, before, "--exceptions", exceptions, "--strict");
     expect(strict.status).toBe(1);
     expect(strict.stdout).toMatch(/--strict: 1 declared exception\(s\) matched nothing/);
-    expect(strict.stdout).toMatch(/Warning: selectors absent on every page.*feedback\.alert/);
+    expect(strict.stdout).toMatch(/Warning: selectors absent on every page.*feedback\.status/);
   });
 
   it("writes only the exceptions this tree added with --own-exceptions", () => {

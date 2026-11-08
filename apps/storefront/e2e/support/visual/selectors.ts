@@ -10,15 +10,17 @@
  * - a name is never reused for another element: renaming or removing an entry, or changing what it finds, bumps
  *   `SELECTOR_LIST_VERSION` (both sides of a comparison always run the same harness, so a bump never mixes versions).
  */
-/** 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review). */
-export const SELECTOR_LIST_VERSION = 2;
+/**
+ * 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review).
+ * 3: `feedback.alert` removed (scoped to main it never matched on the compared pages; CI warning of PR 239).
+ */
+export const SELECTOR_LIST_VERSION = 3;
 
 /** Where the search starts: the whole page or one landmark. */
 export type SelectorScope = "page" | "banner" | "main" | "contentinfo";
 
 /** ARIA roles the list uses (a subset of Playwright's `AriaRole`, kept here so this file needs no Playwright import). */
 export type SelectorRole =
-  | "alert"
   | "banner"
   | "button"
   | "checkbox"
@@ -231,13 +233,8 @@ export const SELECTORS: readonly SelectorSpec[] = [
     steps: [{ css: "[data-trust-bar]" }],
   },
   {
-    // Inside the main content only: page-level matches were always-present live regions (Next's route announcer).
-    name: "feedback.alert",
-    description: "the first visible alert of the main content",
-    scope: "main",
-    steps: [{ role: "alert" }],
-  },
-  {
+    // Inside the main content only: page-level matches were always-present live regions (Next's route announcer). An alert
+    // entry was dropped in version 3: no compared page shows one in its default state, so it only ever compared "absent".
     name: "feedback.status",
     description: "the first visible status region of the main content",
     scope: "main",
