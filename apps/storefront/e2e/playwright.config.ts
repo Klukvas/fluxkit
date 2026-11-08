@@ -77,6 +77,16 @@ export default defineConfig({
       stderr: "pipe",
     },
     {
+      name: "delay-proxy", // SCRATCH spike L1: started before the storefront that reads through it
+      command: "node --experimental-strip-types e2e/delay-proxy.ts",
+      cwd: storefrontRoot,
+      env: ports,
+      url: "http://127.0.0.1:3110/health",
+      timeout: 180_000,
+      reuseExistingServer: false,
+      stderr: "pipe",
+    },
+    {
       name: "storefront",
       // `next start` keeps its 60 s data cache ON DISK (`.next/cache/fetch-cache`), so a run that starts within a minute of the
       // last one would render product pages with the variant ids of the PREVIOUS seed (the API answers 404 for them). A
@@ -92,16 +102,6 @@ export default defineConfig({
       },
       // The home page reads the API on the server: this answers 200 only once the API is up too.
       url: `http://127.0.0.1:${String(E2E_STOREFRONT_PORT)}/en`,
-      timeout: 180_000,
-      reuseExistingServer: false,
-      stderr: "pipe",
-    },
-    {
-      name: "delay-proxy", // SCRATCH spike L1
-      command: "node --experimental-strip-types e2e/delay-proxy.ts",
-      cwd: storefrontRoot,
-      env: ports,
-      url: "http://127.0.0.1:3110/health",
       timeout: 180_000,
       reuseExistingServer: false,
       stderr: "pipe",
