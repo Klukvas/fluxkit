@@ -192,7 +192,7 @@ test("one focus ring: the logo, an option value and a gallery thumbnail show the
     return color;
   }, ring);
 
-  const logo = page.getByRole("banner").getByRole("link", { name: "Fluxkit" });
+  const logo = page.getByRole("banner").getByRole("link", { name: "Verde Kopi" });
   await tabTo(page, logo);
   expect(await outline(logo)).toEqual({ style: "solid", width: "2px", color: ringColor });
 

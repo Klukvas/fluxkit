@@ -385,7 +385,7 @@ for (const width of [1024, 1280]) {
       await expect(header.locator('a[href="#site-search"]')).toBeHidden();
       await expect(header.getByRole("link", { name: "Search", exact: true })).toHaveCount(0);
       expect((await stableBox(header)).height).toBeLessThanOrEqual(64);
-      const logo = await stableBox(header.getByRole("link", { name: "Fluxkit", exact: true }));
+      const logo = await stableBox(header.getByRole("link", { name: "Verde Kopi", exact: true }));
       const search = await stableBox(header.getByRole("combobox", { name: "Search products" }));
       const cart = await stableBox(header.getByRole("link", { name: /Cart/ }));
       const middle = (item: { y: number; height: number }) => item.y + item.height / 2;

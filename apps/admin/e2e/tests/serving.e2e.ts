@@ -39,7 +39,7 @@ test("the SPA answers /admin-ui/ and /admin-ui with the strict headers; assets a
   const withoutSlash = await page.goto(SPA);
   expectStrictHeaders(withoutSlash, ADMIN_CACHE_CONTROL.html);
   await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Fluxkit Admin" })).toHaveAttribute("href", SPA);
+  await expect(page.getByRole("link", { name: "Verde Kopi Admin" })).toHaveAttribute("href", SPA);
 
   const script = await page.locator('script[type="module"]').first().getAttribute("src");
   expect(script).toMatch(new RegExp(`^${SPA}/assets/`));

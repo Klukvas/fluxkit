@@ -378,7 +378,7 @@ test("in dark, the text of the home, product, cart, checkout and shop pages keep
   // Focus ring: the ring token on the dark page.
   await page.goto("/en/cart");
   await waitForHydration(page);
-  const link = page.getByRole("link", { name: "Fluxkit" });
+  const link = page.getByRole("link", { name: "Verde Kopi" });
   await link.focus();
   const ring = await link.evaluate((element) => getComputedStyle(element).outlineColor);
   expect(ring).toBe("rgb(129, 140, 248)");

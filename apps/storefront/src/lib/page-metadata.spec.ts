@@ -37,7 +37,7 @@ describe("listingMetadata", () => {
         "x-default": "https://shop.example/uk/catalog",
       },
     });
-    expect(meta.title).toBe("Каталог — Fluxkit");
+    expect(meta.title).toBe("Каталог — Verde Kopi");
     expect(meta.description).toBe("Опис");
   });
 
@@ -53,7 +53,7 @@ describe("listingMetadata", () => {
     const meta = listing({ page: 2, brand: null }, "/c/shoes");
     expect(meta.alternates?.canonical).toBe("https://shop.example/uk/c/shoes?page=2");
     expect(meta.robots).toEqual({ index: false, follow: true });
-    expect(meta.title).toBe("Каталог (Сторінка 2) — Fluxkit");
+    expect(meta.title).toBe("Каталог (Сторінка 2) — Verde Kopi");
   });
 
   it("drops the brand but keeps the page for a filtered later page", () => {
@@ -64,10 +64,10 @@ describe("listingMetadata", () => {
   it("repeats title and description in Open Graph with the canonical URL", () => {
     const meta = listing({ page: 1, brand: null });
     expect(meta.openGraph).toMatchObject({
-      title: "Каталог — Fluxkit",
+      title: "Каталог — Verde Kopi",
       description: "Опис",
       url: "https://shop.example/uk/catalog",
-      siteName: "Fluxkit",
+      siteName: "Verde Kopi",
     });
   });
 
@@ -97,7 +97,7 @@ describe("productMetadata", () => {
         media: [{ url: "https://cdn.example.com/a.jpg", alt: "Front view", optionValueId: null }],
       }),
     });
-    expect(meta.title).toBe("Demo product | Fluxkit");
+    expect(meta.title).toBe("Demo product | Verde Kopi");
     expect(meta.description).toBe("A demo product.");
     expect(meta.alternates).toEqual({
       canonical: "https://shop.example/en/p/demo-product",
@@ -108,7 +108,7 @@ describe("productMetadata", () => {
       },
     });
     expect(meta.openGraph).toMatchObject({
-      title: "Demo product | Fluxkit",
+      title: "Demo product | Verde Kopi",
       url: "https://shop.example/en/p/demo-product",
       images: [{ url: "https://cdn.example.com/a.jpg", alt: "Front view" }],
     });
