@@ -29,8 +29,9 @@ Status: proposed (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.m
   because of `useSearchParams`. In a request render `useSearchParams` does not suspend (`dist/server/app-render/dynamic-rendering-client.js`,
   `useDynamicSearchParams` throws only for `prerender-*` work units; every storefront page renders per request). So the boundary was
   always finished, inline while the shell was small and outlined once it passed 12 800 bytes (the catalog, category and product pages
-  have big shells: the "streams in" of the old comment, and the mobile-ux D-04 flake whose comment in `mobile-ux.e2e.ts` describes
-  the swap).
+  have big shells: the "streams in" of the old comment). Hypothesis, not demonstrated by a repeat run: the mobile-ux D-04 flake
+  (its comment in `mobile-ux.e2e.ts` described the swap) has the same cause; it is supported only by D-04 passing in every (a2)
+  run (runs 5, 7 and 8), not by a `--repeat-each` measurement.
 - **Route groups before this ADR.** `app/[locale]/(site)/loading.tsx` sat above every `(site)` page: home, the account pages, cart,
   checkout, the guest order page, the payment return page and the legal pages. `(catalog)` and `(pages)` have no `loading.tsx` on
   purpose (real 404s, `route-structure.spec.ts`); `[...rest]` is outside every group.
@@ -61,12 +62,13 @@ Bytes are from the raw HTML of `/{locale}/account/register` (head, header, foote
 | Candidate | Run (job) | Register uk: head / header / footer / form | Register en | Forms (login, register, forgot) uk + en | Outlined segments | Search losses (/uk, login, catalog) | CLS (4 pages x 390/1280 x cold/warm) |
 |---|---|---|---|---|---|---|---|
 | main layout, stressed | 6 (128861022492) | 1 275 / 6 518 / 4 518 / out | 1 192 / 6 249 / 4 335 / out | outlined, `pre-hydration-forms` 4 of 4 no-JS tests fail | uk: search form + page; en: page | 19/40, 26/40, 19/40 | 0.0000 |
-| (a) loading only on home, unstressed | 1 (128848778391), 4 (128856481676) | 1 345 / 4 832 / 1 497 / 6 809 | 1 262 / 4 594 / 1 314 / 6 457 | inline | none (24 routes) | 0/40, 0/40, not run | 0.0000 |
+| (a) loading only on home, unstressed (run 1 failed for unrelated reasons: a bug of the new `first-html` test on reset-password, fixed in `c8491b2`, plus the `account-email` and mobile-ux D-04 flakes, both passed on retry; run 4 passed) | 1 (128848778391), 4 (128856481676) | 1 345 / 4 832 / 1 497 / 6 809 | 1 262 / 4 594 / 1 314 / 6 457 | inline | none (24 routes) | 0/40, 0/40, not run | 0.0000 |
 | (a), stressed | 3 (128851932335) | 1 205 / 6 518 / 4 518 / 8 355 | 1 122 / 6 280 / 4 335 / 8 003 | inline | one per page (the header search box) | 25/40, 18/40, not run | 0.0000 |
 | (a2) = (a) + no boundary around the search box, stressed | 5 (128858612236) | 1 205 / 6 470 / 4 518 / 8 307 | 1 122 / 6 232 / 4 335 / 7 955 | inline | none (24 routes) | 0/40, 0/40, 0/40 | 0.0000 |
 | (a2), unstressed, full suite (storefront 324 and admin 61 passed, none flaky) | 7 (128867155370) | 1 345 / 4 815 / 1 497 / 6 792 | 1 262 / 4 577 / 1 314 / 6 440 | inline | none (24 routes) | 0/40, 0/40, 0/40 | 0.0000 |
 
-Notes: every CLS value read 0.0000 with the collector that measured 0.261 in design batch B (now `e2e/support/layout-shift.ts`); the
+Notes: the final commit of the PR passed the full suite again (run 8, job 128871021231: storefront 207 and admin 61 passed).
+Every CLS value read 0.0000 with the collector that measured 0.261 in design batch B (now `e2e/support/layout-shift.ts`); the
 home page's loading view is a screen tall, so replacing it moves nothing on screen. The pages of `(site)` other than home lost their
 loading view; a client-side navigation to them keeps the previous page until the new one is rendered, as the `(catalog)` pages always
 did. Candidate (d) "footer after the content" was not measured: (a2) met every criterion.
@@ -80,7 +82,8 @@ did. Candidate (d) "footer after the content" was not measured: (a2) met every c
    decision recorded here, not a default.
 2. **No Suspense boundary around anything in the shell that a shopper can type into or must use without a script** (today: the
    header search box). `SearchBoxFallback` is removed. Should a page ever be prerendered statically, `useSearchParams` without a
-   boundary fails `next build` loudly (`BailoutToCSRError`), not silently.
+   boundary fails `next build` loudly (`BailoutToCSRError`), not silently: for example a fork that adds a root `app/layout.tsx`
+   rendering `SiteShell` plus an app-level `not-found.tsx` makes `/_not-found` static and the build fails there.
 3. **The byte budget becomes a loose sanity cap**: header under 8 000 and footer under 4 000 bytes in `shell.spec.tsx` (they only catch
    a runaway header or footer, which every page carries). The guards of the first HTML are the e2e tests `pre-hydration-forms` (uk and
    en), `first-html` (raw HTML of the 12 pages in uk and en: the form inside `<main>`, no pending boundary in `<main>`, no loading view,
@@ -98,8 +101,9 @@ did. Candidate (d) "footer after the content" was not measured: (a2) met every c
 - The budget protects progressive enhancement, not security: the `method="post"` guard in `source-guards.spec.ts` (no personal data in a
   URL even when a form posts before hydration) is independent of this ADR and stays.
 - Boundaries that remain in the shell (the language list's `useSearchParams` boundary, small) can still be outlined in a big shell; the
-  language links then appear with the script. No such segment appeared in the measured pages (run 5, stressed); the cause (its size
-  under the 500-byte eligibility limit) is a hypothesis, not checked.
+  language links then appear with the script. Measured: 0 outlined segments on all 24 routes in run 5 (stressed, shells up to
+  about 14.5 KB to the end of the footer, e.g. `/uk/account/login`, and about 17.5 KB on `/uk/legal/cookies`), so the language
+  list was not outlined there; the cause (its size under the 500-byte eligibility limit) is a hypothesis, not checked.
 - New fonts loaded through a stylesheet inside a boundary would make that boundary outlined outside the shell flush; `@font-face` stays
   in global CSS (plan T1b).
 - The pages of `(site)` other than home show no loading view during a client-side navigation; their islands keep their own loading

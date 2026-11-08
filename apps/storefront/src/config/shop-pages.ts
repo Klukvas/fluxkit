@@ -93,7 +93,7 @@ export interface ShopPageConfig {
   titleKey: string;
   /** The meta description and the lead paragraph under the `h1`. */
   descriptionKey: string;
-  /** Linked from the footer of every page (the footer has a size budget: README, "Keep the header small"). */
+  /** Linked from the footer of every page (in every page's first HTML; a loose size cap in `shell.spec.tsx`, ADR 0048). */
   inFooter: boolean;
   sections: readonly ShopPageSection[];
 }

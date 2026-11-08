@@ -32,9 +32,9 @@ async function box(
 }
 
 /**
- * The box of an element once it has stopped changing: two equal reads 100 ms apart, within 5 s. The header's search box is
- * replaced by its hydrated island after its `Suspense` fallback streamed (review M2 of PR 216); a single read can land on the
- * swap and see no box (the flake of the "one row" test, 4 to 5 of 30 runs on `d37bb4d`, fixed in PR 217).
+ * The box of an element once it has stopped changing: two equal reads 100 ms apart, within 5 s. Until ADR 0048 the header's
+ * search box was a `Suspense` fallback swapped for the streamed box (it now renders inside the shell); a single read could
+ * land on the swap and see no box (the flake of the "one row" test, 4 to 5 of 30 runs on `d37bb4d`, fixed in PR 217).
  */
 async function stableBox(
   locator: Locator,

@@ -10,10 +10,11 @@ import { expect, test } from "../support/fixtures.ts";
  * these routes; this file proves the result. Each check also prints the byte sizes (`FIRST-HTML {...}`) for the ADR table.
  */
 
-/** The page-level loading view (`LoadingView`, spinner label `loading.page`); it must not stand in for these pages. */
-const LOADING_VIEW_LABEL = { en: "Loading the page", uk: "Завантаження сторінки" } as const;
-
-/** Routes whose first HTML must hold a form of the page itself (not the header's search form). */
+/**
+ * Routes whose first HTML must hold a form of the page itself (not the header's search form). `route-structure.spec.ts`
+ * reads this list and `SHELL_ROUTES` as text and fails when they drift from its `mustRenderBeforeHydration`: keep both as
+ * plain arrays of string literals.
+ */
 const FORM_ROUTES = ["/account/login", "/account/register", "/account/forgot-password"];
 
 /** The other routes of `route-structure.spec.ts` `mustRenderBeforeHydration`: their server shell must be inline too. */
@@ -52,6 +53,30 @@ function between(html: string, start: string, end: string): string {
  */
 const PAGE_FORM = /<form(?![^>]*role="search")[\s>]/;
 
+/**
+ * The whole content of every hidden segment (`<div hidden id="S:n">...</div>`), up to the `</div>` that closes it (nested
+ * `div`s counted), so a form deep inside a segment is found too.
+ */
+function hiddenSegments(html: string): string[] {
+  const segments: string[] = [];
+  const opening = '<div hidden id="S:';
+  for (let start = html.indexOf(opening); start >= 0; start = html.indexOf(opening, start + 1)) {
+    const tag = /<div[\s>]|<\/div>/g;
+    tag.lastIndex = start + 1;
+    let depth = 1;
+    let end = html.length;
+    for (let match = tag.exec(html); match !== null; match = tag.exec(html)) {
+      depth += match[0] === "</div>" ? -1 : 1;
+      if (depth === 0) {
+        end = match.index;
+        break;
+      }
+    }
+    segments.push(html.slice(start, end));
+  }
+  return segments;
+}
+
 interface FirstHtml {
   route: string;
   status: number;
@@ -81,11 +106,8 @@ function measure(route: string, status: number, html: string): FirstHtml {
     mainOffset: byteOffset(html, "<main"),
     formOffset: formInMain < 0 ? -1 : bytes(html.slice(0, mainStart + formInMain)),
     footerEnd: byteOffset(html, "</footer>"),
-    outlinedSegments: (html.match(/<div hidden id="S:/g) ?? []).length,
-    outlined: html
-      .split('<div hidden id="S:')
-      .slice(1)
-      .map((segment) => `S:${segment.slice(0, 160)}`),
+    outlinedSegments: hiddenSegments(html).length,
+    outlined: hiddenSegments(html).map((segment) => segment.slice('<div hidden id="'.length, 176)),
   };
 }
 
@@ -103,15 +125,13 @@ for (const locale of ["uk", "en"] as const) {
 
       const main = between(html, "<main", "</main>");
       expect(main, "the page has a <main> in the first HTML").not.toBe("");
-      // A pending boundary in main means the page itself streams later; the loading view must never stand in for it.
+      // A pending boundary in main means the page itself streams later. A route-level loading view can only appear as the
+      // fallback of such a boundary, so this also proves no loading view stands in for the page (without depending on its
+      // text); the form routes below also check that nothing `aria-busy` precedes the form.
       expect(main, "a pending Suspense boundary in <main>").not.toContain('<template id="B:');
-      // As markup (`>label<`): the words themselves are also in the serialized client messages of every page.
-      expect(html, "the route-level loading view").not.toContain(`>${LOADING_VIEW_LABEL[locale]}<`);
-      // No hidden segment may carry a page form (the header's search box may stream, it is a GET form anyway).
-      for (const segment of html.split('<div hidden id="S:').slice(1)) {
-        expect(segment.split("</div><script>")[0], "a form inside a hidden segment").not.toMatch(
-          PAGE_FORM,
-        );
+      // No hidden segment may carry a page form.
+      for (const segment of hiddenSegments(html)) {
+        expect(segment, "a form inside a hidden segment").not.toMatch(PAGE_FORM);
       }
       if (FORM_ROUTES.includes(path)) {
         expect(facts.formOffset, "the page's form is inside <main>").toBeGreaterThan(
@@ -137,11 +157,17 @@ const CLS_PAGES = [
 
 for (const width of [390, 1280]) {
   for (const { path, ready } of CLS_PAGES) {
-    test(`${path} at ${width} px: layout shift under 0.05, cold and warm`, async ({ browser }) => {
-      const context = await browser.newContext({ viewport: { width, height: 800 } });
+    test(`${path} at ${width} px: layout shift under 0.05, cold and warm`, async ({
+      browser,
+      extraHTTPHeaders,
+    }) => {
+      // A new context for an empty browser cache; it carries the test's client marker like the `page` fixture would.
+      const context = await browser.newContext({
+        viewport: { width, height: 800 },
+        ...(extraHTTPHeaders === undefined ? {} : { extraHTTPHeaders }),
+      });
       const page = await context.newPage();
       await watchLayoutShifts(page, ready);
-      const results: Record<string, number> = {};
       for (const run of ["cold", "warm"] as const) {
         if (run === "cold") await page.goto(path);
         else await page.reload();
@@ -151,7 +177,6 @@ for (const width of [390, 1280]) {
         await page.waitForTimeout(500);
         const shifts = await readLayoutShifts(page);
         const total = shifts.beforeReady + shifts.afterReady;
-        results[run] = total;
         console.log(
           `CLS ${JSON.stringify({ path, width, run, total: Number(total.toFixed(4)), beforeReady: Number(shifts.beforeReady.toFixed(4)), afterReady: Number(shifts.afterReady.toFixed(4)) })}`,
         );

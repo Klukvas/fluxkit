@@ -11,6 +11,8 @@ import { expect, test } from "../support/fixtures.ts";
  */
 test.skip(!E2E_SEARCH_ENABLED, "needs the API with search on (the header box)");
 test.use({ viewport: { width: 1280, height: 800 } });
+// A loss is the bug itself, not a flake: one lost text must fail CI, never pass on the retry.
+test.describe.configure({ retries: 0 });
 
 /** How many times each page runs; the spike measured 40 in CI (ADR 0048), the suite keeps one. */
 const RUNS = 1;
