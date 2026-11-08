@@ -547,12 +547,10 @@ export function HomeSectionSkeleton({
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: count }, (_, index) => (
             <div key={index} className="flex flex-col gap-2 rounded-lg border border-border p-3">
-              <Skeleton className="aspect-square w-full" />
-              <Skeleton className="h-5 w-1/3" />
+              {/* Mirrors the card's shape (`product-card.tsx`): the 4:5 frame, the brand and the title. */}
+              <Skeleton className="aspect-4/5 w-full rounded-lg" />
+              <Skeleton className="h-4 w-1/3" />
               <Skeleton className="h-6 w-3/4" />
-              <div className="pt-1">
-                <Skeleton className="h-6 w-1/2" />
-              </div>
             </div>
           ))}
         </div>

@@ -118,8 +118,8 @@ describe("ProductCard (review D-07, D-15)", () => {
   });
 
   it("shows a badge over the image corner only for low stock and out of stock", () => {
-    expect(card("low_stock")).toMatch(/absolute[^"]*">§availability\.low_stock</);
-    expect(card("out_of_stock")).toMatch(/absolute[^"]*">§availability\.out_of_stock</);
+    expect(card("low_stock")).toMatch(/row-start-1[^"]*">§availability\.low_stock</);
+    expect(card("out_of_stock")).toMatch(/row-start-1[^"]*">§availability\.out_of_stock</);
   });
 
   it("has a hover elevation, a clamped title, the brand as a meta line and the price at the bottom", () => {
@@ -134,6 +134,8 @@ describe("ProductCard (review D-07, D-15)", () => {
     const brand = (/<a [^>]*class="([^"]*)"[^>]*>§brand/.exec(html)?.[1] ?? "").split(" ");
     expect(brand).toContain("hover:underline");
     expect(brand).not.toContain("underline");
-    expect(html).toMatch(/<div class="mt-auto[^"]*">/);
+    // Reshape experiment: the price is a pill over the picture's bottom-left corner, after the title in reading order.
+    expect(html).toMatch(/<div class="[^"]*self-end justify-self-start rounded-full[^"]*">/);
+    expect(html.indexOf("<h2")).toBeLessThan(html.indexOf("rounded-full"));
   });
 });

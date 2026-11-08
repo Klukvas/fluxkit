@@ -209,7 +209,7 @@ describe("home data sections: empty, error and loading", () => {
     expect(html.match(/aspect-video/g)).toHaveLength(2);
     // A config limit above a row still shows one row of tile skeletons.
     expect(render([{ ...tiles, limit: 6 }], {}).match(/aspect-video/g)).toHaveLength(3);
-    expect(html.match(/aspect-square/g)).toHaveLength(8);
+    expect(html.match(/aspect-4\/5/g)).toHaveLength(8);
   });
 });
 

@@ -105,6 +105,8 @@
   "catalog.pagination.next": "Далі",
   "catalog.pagination.page": "Сторінка {page}",
   "catalog.price.from": "від {price}",
+  "catalog.card.favourite": "Додати {title} в обране",
+  "catalog.card.sale": "Знижка",
   "product.price.label": "Ціна",
   "product.compareAt.label": "Звичайна ціна",
   "product.sku": "Артикул: {sku}",
