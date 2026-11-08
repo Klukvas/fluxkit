@@ -24,9 +24,9 @@
   --fk-color-success: #1e6b3a;
   --fk-color-warning: #9a5b0b;
   --fk-color-ring: #b06f12;
-  --fk-radius-sm: 0.25rem;
-  --fk-radius-md: 0.5rem;
-  --fk-radius-lg: 1rem;
+  --fk-radius-sm: 0.125rem;
+  --fk-radius-md: 0.25rem;
+  --fk-radius-lg: 0.5rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
@@ -49,9 +49,9 @@
   /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
   --fk-space-unit: 0.25rem;
   /* Elevation: resting card, raised (a hovered card), overlay (menus, toasts, bars over the page). */
-  --fk-shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.1);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.12), 0 2px 4px -2px rgb(15 23 42 / 0.08);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(15 23 42 / 0.2), 0 4px 8px -4px rgb(15 23 42 / 0.1);
+  --fk-shadow-card: 0 1px 2px 0 rgb(21 32 27 / 0.06);
+  --fk-shadow-raised: 0 6px 16px -6px rgb(21 32 27 / 0.12), 0 1px 3px 0 rgb(21 32 27 / 0.05);
+  --fk-shadow-overlay: 0 16px 32px -12px rgb(21 32 27 / 0.16), 0 2px 6px -2px rgb(21 32 27 / 0.08);
 }
 
 [data-theme="dark"] {
@@ -69,9 +69,9 @@
   --fk-color-success: #80d48e;
   --fk-color-warning: #f0b556;
   --fk-color-ring: #f0b556;
-  --fk-radius-sm: 0.25rem;
-  --fk-radius-md: 0.5rem;
-  --fk-radius-lg: 1rem;
+  --fk-radius-sm: 0.125rem;
+  --fk-radius-md: 0.25rem;
+  --fk-radius-lg: 0.5rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
@@ -93,9 +93,9 @@
   --fk-line-height-4xl: 2.5rem;
   /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
   --fk-space-unit: 0.25rem;
-  --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+  --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  --fk-shadow-raised: 0 6px 16px -6px rgb(0 0 0 / 0.45), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+  --fk-shadow-overlay: 0 16px 32px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
 }
 
 /*
@@ -118,8 +118,8 @@
     --fk-color-success: #80d48e;
     --fk-color-warning: #f0b556;
     --fk-color-ring: #f0b556;
-    --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-    --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-    --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+    --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+    --fk-shadow-raised: 0 6px 16px -6px rgb(0 0 0 / 0.45), 0 1px 3px 0 rgb(0 0 0 / 0.3);
+    --fk-shadow-overlay: 0 16px 32px -12px rgb(0 0 0 / 0.55), 0 2px 6px -2px rgb(0 0 0 / 0.35);
   }
 }

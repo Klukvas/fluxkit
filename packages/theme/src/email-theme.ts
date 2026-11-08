@@ -33,7 +33,7 @@ export const emailTheme = deepFreeze({
     sans: "ui-sans-serif, system-ui, sans-serif",
     mono: "ui-monospace, monospace",
   },
-  radius: { sm: "4px", md: "8px", lg: "16px" },
+  radius: { sm: "2px", md: "4px", lg: "8px" },
   space: { xs: "4px", sm: "8px", md: "16px", lg: "24px", xl: "32px" },
   fontSize: { small: "13px", body: "15px", heading: "20px" },
   lineHeight: "1.5",
