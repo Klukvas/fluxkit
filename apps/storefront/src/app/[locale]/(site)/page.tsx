@@ -1,4 +1,4 @@
-import { Container, createTranslator, isLocale } from "@fluxkit/ui";
+import { createTranslator, isLocale } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { HomeSections } from "../../../components/home-sections";
@@ -26,13 +26,12 @@ export default async function HomePage({ params }: HomeProps) {
     notFound();
   }
   const t = createTranslator(messagesByLocale[locale], locale);
+  // Reshape experiment: each section places itself in the page width (a full-bleed hero spans the window).
   return (
-    <Container>
-      <HomeSections
-        sections={homeSections}
-        context={{ locale, t, imageHosts: imageHosts() }}
-        load={(section) => getHomeSection(locale, section)}
-      />
-    </Container>
+    <HomeSections
+      sections={homeSections}
+      context={{ locale, t, imageHosts: imageHosts() }}
+      load={(section) => getHomeSection(locale, section)}
+    />
   );
 }

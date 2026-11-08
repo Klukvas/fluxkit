@@ -78,12 +78,18 @@ function messageKeys(section: HomeSection): string[] {
       return [section.titleKey];
     case "richText":
       return [...(section.titleKey === undefined ? [] : [section.titleKey]), section.bodyKey];
+    case "brandStrip":
+      return [
+        section.titleKey,
+        ...section.items.flatMap((item) => (item.image.altKey === null ? [] : [item.image.altKey])),
+      ];
   }
 }
 
 function images(section: HomeSection): LocalImage[] {
   if (section.kind === "hero") return section.image === undefined ? [] : [section.image];
   if (section.kind === "categories") return Object.values(section.images ?? {});
+  if (section.kind === "brandStrip") return section.items.map((item) => item.image);
   if (section.kind === "banners" && section.source === "config") {
     return section.items.map((banner) => banner.image);
   }
@@ -106,12 +112,14 @@ describe("home config", () => {
     ]).toEqual([false, true, false, false, false, false]);
   });
 
-  it("lists the demo composition in order: hero, banners, categories, newest products, trust bar, about text", () => {
+  it("lists the reshaped composition in order: hero, categories, two product rows, banners, brands, trust bar, about text", () => {
     expect(homeSections.map((section) => section.kind)).toEqual([
       "hero",
-      "banners",
       "categories",
       "productRow",
+      "productRow",
+      "banners",
+      "brandStrip",
       "trust",
       "richText",
     ]);

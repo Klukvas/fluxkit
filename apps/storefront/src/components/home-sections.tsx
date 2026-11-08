@@ -2,6 +2,7 @@ import type { CategoryNode, ProductSummary } from "@fluxkit/api-client";
 import {
   BannerCard,
   type BannerCardLinkProps,
+  Container,
   Hero,
   Skeleton,
   textStyles,
@@ -10,12 +11,13 @@ import {
   type Translator,
 } from "@fluxkit/ui";
 import Link from "next/link";
-import { Suspense, type ReactNode } from "react";
+import { Fragment, Suspense, type ReactNode } from "react";
 import { trustBarItems, type TrustBarItemConfig } from "../config/trust-bar";
 import {
   isDataSection,
   type BannersSection,
   type BannerTone,
+  type BrandStripSection,
   type CategoriesSection,
   type ConfigBannersSection,
   type HeroSection,
@@ -112,8 +114,10 @@ function HeroView({
   isPageHeading: boolean;
 }) {
   const { t, locale } = context;
+  const overlay = section.layout === "overlay";
   return (
     <Hero
+      layout={section.layout}
       headingId={headingId(section)}
       headingLevel={isPageHeading ? "h1" : "h2"}
       title={t(section.headlineKey)}
@@ -132,8 +136,8 @@ function HeroView({
             t={t}
             // The first hero is the largest paint above the fold: load it at once.
             eager={isPageHeading}
-            sizes="(min-width: 768px) 50vw, 100vw"
-            className="h-auto w-full rounded-md"
+            sizes={overlay ? "100vw" : "(min-width: 768px) 50vw, 100vw"}
+            className={overlay ? "h-full w-full object-cover" : "h-auto w-full rounded-md"}
           />
         )
       }
@@ -389,6 +393,40 @@ function ProductRow({
   );
 }
 
+/** Reshape experiment (client request 4): brand logos in one wrapping row, each a link to the catalog filtered by it. */
+function BrandStripView({
+  section,
+  context,
+}: {
+  section: BrandStripSection;
+  context: HomeContext;
+}) {
+  const { t, locale } = context;
+  if (section.items.length === 0) return null;
+  return (
+    <SectionShell section={section} title={t(section.titleKey)}>
+      <ul className="flex flex-wrap items-center justify-center gap-4">
+        {section.items.map((item) => (
+          <li key={item.slug}>
+            <Link
+              href={localizedHref(locale, catalogPath("/catalog", { brand: item.slug }))}
+              className={`block rounded-md opacity-80 transition-opacity hover:opacity-100 motion-reduce:transition-none ${focusRing}`}
+            >
+              <LocalPicture
+                image={item.image}
+                t={t}
+                eager={false}
+                sizes="10rem"
+                className="h-16 w-auto"
+              />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </SectionShell>
+  );
+}
+
 function TrustView({ section, context }: { section: TrustSection; context: HomeContext }) {
   const { t, locale, trustItems = trustBarItems } = context;
   if (trustItems.length === 0) return null;
@@ -588,6 +626,8 @@ function StaticSectionView({
       return <TrustView section={section} context={context} />;
     case "richText":
       return <RichTextView section={section} context={context} />;
+    case "brandStrip":
+      return <BrandStripView section={section} context={context} />;
     default: {
       // A kind added to `HomeSection` without a renderer fails here at compile time.
       const unknown: never = section;
@@ -601,7 +641,22 @@ function HiddenPageHeading({ sections, t }: { sections: readonly HomeSection[]; 
   return pageHeadingId(sections) === null ? <h1 className="sr-only">{t("site.name")}</h1> : null;
 }
 
-const sectionStack = "flex flex-col gap-12 py-8";
+const sectionStack = "flex flex-col gap-12 pb-8";
+
+/**
+ * Reshape experiment (client request 4): every section sits in the page width (`Container`), except an `overlay` hero, which
+ * spans the window. The page route no longer wraps the whole stack in one `Container`.
+ */
+function placed(section: HomeSection, node: ReactNode, isFirst: boolean): ReactNode {
+  if (section.kind === "hero" && section.layout === "overlay") {
+    return <Fragment key={section.id}>{node}</Fragment>;
+  }
+  return (
+    <Container key={section.id} className={isFirst ? "pt-8" : undefined}>
+      {node}
+    </Container>
+  );
+}
 
 async function AwaitedSection({
   section,
@@ -646,41 +701,42 @@ export function HomeSections({
   const pending = new Map(
     sections.filter(isDataSection).map((section) => [section.id, load(section)] as const),
   );
+  const render = (section: HomeSection, index: number): ReactNode => {
+    if (!isDataSection(section)) {
+      return (
+        <StaticSectionView
+          key={section.id}
+          section={section}
+          context={context}
+          pageHeading={pageHeading}
+          isFirst={index === 0}
+        />
+      );
+    }
+    const result = pending.get(section.id) as Promise<HomeSectionResult>;
+    const awaited = (
+      <AwaitedSection
+        key={section.id}
+        section={section}
+        result={result}
+        context={context}
+        isFirst={index === 0}
+      />
+    );
+    if (section.kind === "banners") return awaited;
+    return (
+      <Suspense
+        key={section.id}
+        fallback={<HomeSectionSkeleton section={section} context={context} />}
+      >
+        {awaited}
+      </Suspense>
+    );
+  };
   return (
     <div className={sectionStack}>
       <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section, index) => {
-        if (!isDataSection(section)) {
-          return (
-            <StaticSectionView
-              key={section.id}
-              section={section}
-              context={context}
-              pageHeading={pageHeading}
-              isFirst={index === 0}
-            />
-          );
-        }
-        const result = pending.get(section.id) as Promise<HomeSectionResult>;
-        const awaited = (
-          <AwaitedSection
-            key={section.id}
-            section={section}
-            result={result}
-            context={context}
-            isFirst={index === 0}
-          />
-        );
-        if (section.kind === "banners") return awaited;
-        return (
-          <Suspense
-            key={section.id}
-            fallback={<HomeSectionSkeleton section={section} context={context} />}
-          >
-            {awaited}
-          </Suspense>
-        );
-      })}
+      {sections.map((section, index) => placed(section, render(section, index), index === 0))}
     </div>
   );
 }
@@ -697,34 +753,35 @@ export function HomeSectionsView({
   results: Readonly<Record<string, HomeSectionResult>>;
 }) {
   const pageHeading = pageHeadingId(sections);
+  const render = (section: HomeSection, index: number): ReactNode => {
+    if (!isDataSection(section)) {
+      return (
+        <StaticSectionView
+          key={section.id}
+          section={section}
+          context={context}
+          pageHeading={pageHeading}
+          isFirst={index === 0}
+        />
+      );
+    }
+    const result = results[section.id];
+    return result === undefined ? (
+      <HomeSectionSkeleton key={section.id} section={section} context={context} />
+    ) : (
+      <HomeDataSectionView
+        key={section.id}
+        section={section}
+        result={result}
+        context={context}
+        isFirst={index === 0}
+      />
+    );
+  };
   return (
     <div className={sectionStack}>
       <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section, index) => {
-        if (!isDataSection(section)) {
-          return (
-            <StaticSectionView
-              key={section.id}
-              section={section}
-              context={context}
-              pageHeading={pageHeading}
-              isFirst={index === 0}
-            />
-          );
-        }
-        const result = results[section.id];
-        return result === undefined ? (
-          <HomeSectionSkeleton key={section.id} section={section} context={context} />
-        ) : (
-          <HomeDataSectionView
-            key={section.id}
-            section={section}
-            result={result}
-            context={context}
-            isFirst={index === 0}
-          />
-        );
-      })}
+      {sections.map((section, index) => placed(section, render(section, index), index === 0))}
     </div>
   );
 }

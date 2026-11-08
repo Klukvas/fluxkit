@@ -28,6 +28,20 @@ export interface HeroSection {
   sublineKey?: string;
   cta?: { labelKey: string; href: string };
   image?: LocalImage;
+  /**
+   * Reshape experiment (client request 4): `split` (default) text beside the picture inside the page width; `overlay` the
+   * picture full-bleed (the whole window width) with the text on a translucent panel over it.
+   */
+  layout?: "split" | "overlay";
+}
+
+/** Reshape experiment (client request 4): a row of brand logos, each linking to the catalog filtered by that brand. */
+export interface BrandStripSection {
+  kind: "brandStrip";
+  id: string;
+  titleKey: string;
+  /** Brand slug (the catalog's `?brand=` filter) and its logo; the logo's `altKey` names the brand. */
+  items: readonly { slug: string; image: LocalImage }[];
 }
 
 export interface CategoriesSection {
@@ -132,7 +146,8 @@ export type HomeSection =
   | CategoriesSection
   | ProductRowSection
   | TrustSection
-  | RichTextSection;
+  | RichTextSection
+  | BrandStripSection;
 
 export type HomeSectionKind = HomeSection["kind"];
 
@@ -196,6 +211,16 @@ export const demoConfigBanners: BannerList = [
   },
 ];
 
+/** A placeholder logo under `public/home/brands/` (160 x 64, generated wordmark). */
+function brandLogo(slug: string): LocalImage {
+  return {
+    src: `/home/brands/${slug}.svg`,
+    width: 160,
+    height: 64,
+    altKey: `home.brands.${slug}`,
+  };
+}
+
 /**
  * TODO(fluxkit): demo composition and copy. A client fork replaces the hero texts and picture, the "about" text and the
  * section list with its own (the trust lines are `config/trust-bar.ts`). The pictures are neutral generated illustrations.
@@ -212,8 +237,9 @@ export const homeSections: readonly HomeSection[] = [
     sublineKey: "home.hero.description",
     cta: { labelKey: "home.hero.cta", href: "/catalog" },
     image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
+    layout: "overlay",
   },
-  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  // Reshape experiment (client request 4): categories first, then the product rows, then the banners.
   {
     kind: "categories",
     id: "home-categories",
@@ -227,6 +253,28 @@ export const homeSections: readonly HomeSection[] = [
     limit: 8,
     source: { sort: "newest" },
     viewAll: { labelKey: "home.newProducts.all" },
+  },
+  {
+    // TODO(fluxkit): not real bestsellers. The store API has no sales ranking (`GET /store/products` lists only the newest
+    // first, `/store/search` sorts by relevance, newest or price); a stand-in: the newest of one category.
+    kind: "productRow",
+    id: "home-bestsellers",
+    titleKey: "home.bestsellers.title",
+    limit: 4,
+    source: { sort: "newest", category: "coffee" },
+    viewAll: { labelKey: "home.newProducts.all" },
+  },
+  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  {
+    kind: "brandStrip",
+    id: "home-brands",
+    titleKey: "home.brands.title",
+    items: [
+      { slug: "cuplia", image: brandLogo("cuplia") },
+      { slug: "cleanbrew", image: brandLogo("cleanbrew") },
+      { slug: "crema-works", image: brandLogo("crema-works") },
+      { slug: "roast-harbor", image: brandLogo("roast-harbor") },
+    ],
   },
   { kind: "trust", id: "home-trust", titleKey: "home.trust.title" },
   { kind: "richText", id: "home-about", titleKey: "home.about.title", bodyKey: "home.about.body" },

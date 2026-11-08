@@ -117,7 +117,7 @@ describe("home sections from config", () => {
     expect(later).toContain('<h1 class="sr-only">§site.name</h1>');
     expect(later).toMatch(/<h2 id="hero-title"/);
     expect(render([])).toBe(
-      '<div class="flex flex-col gap-12 py-8"><h1 class="sr-only">§site.name</h1></div>',
+      '<div class="flex flex-col gap-12 pb-8"><h1 class="sr-only">§site.name</h1></div>',
     );
   });
 
@@ -484,15 +484,20 @@ describe("the default home config renders", () => {
       },
       "home-categories": loaded.tiles as HomeSectionResult,
       "home-new-products": loaded.row as HomeSectionResult,
+      "home-bestsellers": loaded.row as HomeSectionResult,
     };
     const html = render(homeSections, results);
+    // Reshape experiment: categories, the two product rows, then the banners and the brand strip.
     expect(sectionOrder(html)).toEqual([
-      "home-banners",
       "home-categories",
       "home-new-products",
+      "home-bestsellers",
+      "home-banners",
+      "home-brands",
       "home-trust",
       "home-about",
     ]);
+    expect(html).toContain('data-hero-layout="overlay"');
     expect(html).toContain('src="/home/hero.svg"');
     expect(headings(html)[0]).toBe("h1");
   });

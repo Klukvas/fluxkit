@@ -17,6 +17,12 @@ export interface HeroProps {
    * the `muted` surface, so an image with its own background (a product photo, an illustration) reads in both themes.
    */
   media?: ReactNode;
+  /**
+   * `split` (default): the text beside the picture. `overlay` (reshape experiment): the picture fills the whole section and
+   * the text sits on a translucent `background` panel over it, so it reads on any picture; the app sizes the picture to fill
+   * (`h-full w-full object-cover`).
+   */
+  layout?: "split" | "overlay";
   className?: string;
 }
 
@@ -31,9 +37,37 @@ export function Hero({
   subline,
   action,
   media,
+  layout = "split",
   className,
 }: HeroProps) {
   const Heading = headingLevel;
+  if (layout === "overlay") {
+    return (
+      <section
+        aria-labelledby={headingId}
+        data-hero=""
+        data-hero-layout="overlay"
+        className={cn(
+          "relative isolate grid min-h-96 items-center overflow-hidden bg-muted",
+          className,
+        )}
+      >
+        {media ? <div className="absolute inset-0 -z-10">{media}</div> : null}
+        <div className="m-4 flex max-w-xl flex-col items-start gap-3 rounded-lg bg-background/85 p-6 md:m-10 md:p-8">
+          <Heading
+            id={headingId}
+            className={cn(textStyles.pageTitle, headingLevel === "h1" ? "md:text-4xl" : null)}
+          >
+            {title}
+          </Heading>
+          {subline ? (
+            <p className="text-lg whitespace-pre-line text-muted-foreground">{subline}</p>
+          ) : null}
+          {action ? <div className="mt-3">{action}</div> : null}
+        </div>
+      </section>
+    );
+  }
   return (
     <section
       aria-labelledby={headingId}

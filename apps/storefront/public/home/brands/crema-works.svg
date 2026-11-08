@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" width="160" height="64">
+  <!-- Reshape experiment: a generated placeholder wordmark of a demo seed brand, on its own background (reads in both themes). -->
+  <rect width="160" height="64" rx="8" fill="#f1f2f6"/>
+  <text x="80" y="30" text-anchor="middle" font-family="serif" font-size="18" font-style="italic" fill="#2f3440">Crema</text>
+  <text x="80" y="48" text-anchor="middle" font-family="sans-serif" font-size="11" letter-spacing="4" fill="#5b6170">WORKS</text>
+</svg>

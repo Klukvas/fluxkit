@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" width="160" height="64">
+  <!-- Reshape experiment: a generated placeholder wordmark of a demo seed brand, on its own background (reads in both themes). -->
+  <rect width="160" height="64" rx="8" fill="#f1f2f6"/>
+  <path d="M22 22h20l-4 22H26z" fill="#5b6170"/>
+  <text x="50" y="39" font-family="sans-serif" font-size="18" font-weight="700" fill="#2f3440">Cleanbrew</text>
+</svg>
