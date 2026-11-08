@@ -1,0 +1,307 @@
+import type { SeedAttribute, SeedOption, SeedValue } from "../types.js";
+
+// Attributes describe a product, options generate variants (AGENTS.md 2.3). Every code differs from the test fixture's
+// (`seeds/src/test-fixture/dictionaries.ts`), so both datasets can live in one database without one reusing the other's
+// attribute or option with foreign values.
+
+function value(code: string, uk: string, en: string): SeedValue {
+  return { code, label: { uk, en } };
+}
+
+export const coffeeAttributes: readonly SeedAttribute[] = [
+  {
+    code: "ware_material",
+    name: { uk: "Матеріал", en: "Material" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("paper", "Папір", "Paper"),
+      value("kraft_paper", "Крафт-папір", "Kraft paper"),
+      value("pet", "PET-пластик", "PET plastic"),
+      value("pp", "Поліпропілен", "Polypropylene"),
+      value("ps", "Полістирол", "Polystyrene"),
+      value("pulp", "Формована целюлоза", "Moulded pulp"),
+      value("birch_wood", "Береза", "Birch wood"),
+      value("nitrile", "Нітрил", "Nitrile"),
+    ],
+  },
+  {
+    code: "cup_wall",
+    name: { uk: "Стінка стаканчика", en: "Cup wall" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("single", "Одношарова", "Single wall"),
+      value("double", "Двошарова", "Double wall"),
+      value("ripple", "Гофрована", "Ripple wall"),
+    ],
+  },
+  {
+    code: "ware_color",
+    name: { uk: "Колір", en: "Colour" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("white", "Білий", "White"),
+      value("kraft", "Крафт", "Kraft"),
+      value("black", "Чорний", "Black"),
+      value("clear", "Прозорий", "Clear"),
+      value("printed", "З принтом", "Printed"),
+      value("striped", "Смугастий", "Striped"),
+      value("natural", "Натуральний", "Natural"),
+      value("blue", "Синій", "Blue"),
+    ],
+  },
+  {
+    code: "milk_base",
+    name: { uk: "Основа", en: "Base" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("cow", "Коров'яче молоко", "Cow's milk"),
+      value("lactose_free", "Безлактозне молоко", "Lactose-free milk"),
+      value("oat", "Овес", "Oat"),
+      value("almond", "Мигдаль", "Almond"),
+      value("coconut", "Кокос", "Coconut"),
+      value("soy", "Соя", "Soy"),
+    ],
+  },
+  {
+    code: "fat_content",
+    name: { uk: "Жирність", en: "Fat content" },
+    inputType: "number",
+    unit: "%",
+    validation: { min: 0, max: 100, max_decimals: 1 },
+    isFilterable: true,
+  },
+  {
+    code: "shelf_life_days",
+    name: { uk: "Термін придатності", en: "Shelf life" },
+    inputType: "number",
+    unit: "days",
+    validation: { min: 1, integer: true },
+  },
+  {
+    code: "storage_notes",
+    name: { uk: "Зберігання", en: "Storage" },
+    inputType: "text",
+  },
+  {
+    code: "roast_level",
+    name: { uk: "Ступінь обсмаження", en: "Roast level" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("light", "Світле", "Light"),
+      value("medium", "Середнє", "Medium"),
+      value("dark", "Темне", "Dark"),
+    ],
+  },
+  {
+    code: "coffee_origin",
+    name: { uk: "Походження", en: "Origin" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("blend", "Суміш", "Blend"),
+      value("brazil", "Бразилія", "Brazil"),
+      value("colombia", "Колумбія", "Colombia"),
+      value("ethiopia", "Ефіопія", "Ethiopia"),
+      value("guatemala", "Гватемала", "Guatemala"),
+    ],
+  },
+  {
+    code: "processing",
+    name: { uk: "Обробка", en: "Processing" },
+    inputType: "select",
+    isFilterable: true,
+    options: [value("washed", "Мита", "Washed"), value("natural", "Натуральна", "Natural")],
+  },
+  {
+    code: "arabica_share",
+    name: { uk: "Частка арабіки", en: "Arabica share" },
+    inputType: "number",
+    unit: "%",
+    validation: { min: 0, max: 100, integer: true },
+    isFilterable: true,
+  },
+  {
+    code: "syrup_flavour",
+    name: { uk: "Смак", en: "Flavour" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("vanilla", "Ваніль", "Vanilla"),
+      value("caramel", "Карамель", "Caramel"),
+      value("hazelnut", "Лісовий горіх", "Hazelnut"),
+      value("coconut", "Кокос", "Coconut"),
+      value("salted_caramel", "Солона карамель", "Salted caramel"),
+      value("lavender", "Лаванда", "Lavender"),
+      value("chocolate", "Шоколад", "Chocolate"),
+      value("white_chocolate", "Білий шоколад", "White chocolate"),
+    ],
+  },
+  {
+    code: "machine_kind",
+    name: { uk: "Тип кавомашини", en: "Machine type" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("semi_automatic", "Напівавтоматична", "Semi-automatic"),
+      value("automatic", "Автоматична", "Automatic"),
+      value("capsule", "Капсульна", "Capsule"),
+    ],
+  },
+  {
+    code: "group_count",
+    name: { uk: "Кількість груп", en: "Groups" },
+    inputType: "number",
+    validation: { min: 1, max: 4, integer: true },
+    isFilterable: true,
+  },
+  {
+    code: "power_w",
+    name: { uk: "Потужність", en: "Power" },
+    inputType: "number",
+    unit: "W",
+    validation: { min: 1, integer: true },
+    isFilterable: true,
+    isSortable: true,
+  },
+  {
+    code: "voltage_v",
+    name: { uk: "Напруга", en: "Voltage" },
+    inputType: "number",
+    unit: "V",
+    validation: { min: 1, integer: true },
+    isFilterable: true,
+  },
+  {
+    code: "capacity_ml",
+    name: { uk: "Місткість", en: "Capacity" },
+    inputType: "number",
+    unit: "ml",
+    validation: { min: 1, integer: true },
+    isSortable: true,
+  },
+  {
+    code: "burr_type",
+    name: { uk: "Тип помелу", en: "Grinding mechanism" },
+    inputType: "select",
+    isFilterable: true,
+    options: [
+      value("flat", "Плоскі жорна", "Flat burrs"),
+      value("conical", "Конічні жорна", "Conical burrs"),
+      value("blade", "Ніж", "Blade"),
+    ],
+  },
+  {
+    code: "digital_format",
+    name: { uk: "Формат", en: "Format" },
+    inputType: "select",
+    isFilterable: true,
+    options: [value("pdf", "PDF", "PDF"), value("e_card", "Електронна картка", "E-card")],
+  },
+  {
+    // The leak rules on this dataset too: an internal attribute must never leave the public API.
+    code: "supplier_code",
+    name: { uk: "Код постачальника", en: "Supplier code" },
+    inputType: "text",
+    isLocalized: false,
+    isInternal: true,
+  },
+];
+
+export const coffeeOptions: readonly SeedOption[] = [
+  {
+    code: "volume",
+    name: { uk: "Об'єм", en: "Volume" },
+    values: [
+      value("110ml", "110 мл", "110 ml"),
+      value("250ml", "250 мл", "250 ml"),
+      value("300ml", "300 мл", "300 ml"),
+      value("350ml", "350 мл", "350 ml"),
+      value("400ml", "400 мл", "400 ml"),
+      value("450ml", "450 мл", "450 ml"),
+      value("500ml", "500 мл", "500 ml"),
+      value("600ml", "600 мл", "600 ml"),
+      value("1l", "1 л", "1 l"),
+    ],
+  },
+  {
+    code: "pack_size",
+    name: { uk: "Упаковка", en: "Pack size" },
+    values: [
+      value("1", "1 шт.", "1 pc"),
+      value("6", "6 шт.", "6 pcs"),
+      value("10", "10 шт.", "10 pcs"),
+      value("12", "12 шт.", "12 pcs"),
+      value("25", "25 шт.", "25 pcs"),
+      value("50", "50 шт.", "50 pcs"),
+      value("100", "100 шт.", "100 pcs"),
+      value("250", "250 шт.", "250 pcs"),
+      value("500", "500 шт.", "500 pcs"),
+      value("1000", "1000 шт.", "1000 pcs"),
+    ],
+  },
+  {
+    code: "net_weight",
+    name: { uk: "Вага", en: "Weight" },
+    values: [
+      value("100g", "100 г", "100 g"),
+      value("250g", "250 г", "250 g"),
+      value("500g", "500 г", "500 g"),
+      value("1kg", "1 кг", "1 kg"),
+      value("2kg", "2 кг", "2 kg"),
+      value("5kg", "5 кг", "5 kg"),
+    ],
+  },
+  {
+    code: "grind",
+    name: { uk: "Помел", en: "Grind" },
+    values: [
+      value("beans", "Зерно", "Whole beans"),
+      value("espresso", "Для еспресо", "For espresso"),
+      value("filter", "Для фільтра", "For filter"),
+      value("turkish", "Для турки", "For cezve"),
+    ],
+  },
+  {
+    code: "diameter",
+    name: { uk: "Діаметр", en: "Diameter" },
+    values: [
+      value("6mm", "6 мм", "6 mm"),
+      value("8mm", "8 мм", "8 mm"),
+      value("12mm", "12 мм", "12 mm"),
+      value("53mm", "53 мм", "53 mm"),
+      value("58mm", "58 мм", "58 mm"),
+      value("80mm", "80 мм", "80 mm"),
+      value("90mm", "90 мм", "90 mm"),
+      value("95mm", "95 мм", "95 mm"),
+    ],
+  },
+  {
+    code: "cup_slots",
+    name: { uk: "Місць для стаканчиків", en: "Cup slots" },
+    values: [value("2", "2", "2"), value("4", "4", "4")],
+  },
+  {
+    code: "glove_size",
+    name: { uk: "Розмір рукавичок", en: "Glove size" },
+    values: [
+      value("s", "S", "S"),
+      value("m", "M", "M"),
+      value("l", "L", "L"),
+      value("xl", "XL", "XL"),
+    ],
+  },
+  {
+    code: "card_value",
+    name: { uk: "Номінал", en: "Card value" },
+    values: [
+      value("500", "500 ₴", "UAH 500"),
+      value("1000", "1000 ₴", "UAH 1,000"),
+      value("2000", "2000 ₴", "UAH 2,000"),
+    ],
+  },
+];

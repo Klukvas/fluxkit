@@ -41,13 +41,13 @@
 #                     a *.monobank.ua host, and the log must show the wrapper active and no such request
 # Catalog search (ADR 0034) has the observable "Search: <disabled|enabled (<prefix>)>" and the public flag `search` of
 # GET /store/config:
-#   search-off   migrate and seed with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
+#   search-off   migrate and seed the test fixture with SEARCH_ENABLED=false, start the API the same way: expect "Search: disabled",
 #                search false, 404 on every search route (store and admin), and not one row written to the search tables
 #                by the seed's catalog writes, its demo synonym groups or the scheduler's first tick (no DB side effects)
 #   search-on    start the API with SEARCH_ENABLED=true, an engine that is NOT reachable and an invented key: it must start
 #                (no engine call at startup), report "Search: enabled (<prefix>)", search true, and never print the key.
 #                Then, against the real engine (MEILI_URL, MEILI_MASTER_KEY): create a key scoped to a fresh prefix,
-#                migrate and seed (the catalog writes mark products in the queue, the demo synonym groups are written),
+#                migrate and seed the test fixture (`--dataset test`; the catalog writes mark products in the queue, the demo synonym groups are written),
 #                `search:reindex` (builds, swaps, drains the queue, applies the groups), start the API and find a seeded
 #                product with GET /store/search (also by a partial last word, ADR 0037, and by a demo synonym, `spanner`)
 #                and its suggest.
@@ -357,8 +357,8 @@ GUARD
     node apps/api/dist/database/migrate.js
     before="$(search_rows)"
     echo "search tables before: $before"
-    # The seed writes the demo catalog through the same services as the admin API (marks would happen here).
-    SEARCH_ENABLED=false node apps/api/dist/seed/seed.js
+    # The seed writes the test fixture catalog through the same services as the admin API (marks would happen here).
+    SEARCH_ENABLED=false node apps/api/dist/seed/seed.js --dataset test
     MATRIX_SEARCH_ENABLED=false run_api "" "" "none" ""
     grep -F "Search: disabled" /tmp/fluxkit-matrix-api.log \
       || { echo "expected the search module to report disabled" >&2; cat /tmp/fluxkit-matrix-api.log >&2; exit 1; }
@@ -405,7 +405,8 @@ GUARD
     trap cleanup_search EXIT
     export SEARCH_ENABLED=true MEILI_API_KEY="$scoped_key" MEILI_INDEX_PREFIX="$prefix"
     node apps/api/dist/database/migrate.js
-    node apps/api/dist/seed/seed.js
+    # The test fixture dataset (`pnpm seed:test`): the checks below look for its screwdriver and its wrench/spanner group.
+    node apps/api/dist/seed/seed.js --dataset test
     marked="$(search_rows)"
     echo "search tables after the seed: $marked"
     case "$marked" in
