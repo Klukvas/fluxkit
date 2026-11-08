@@ -31,7 +31,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
   - `src/status-badge.tsx` - `StatusBadge` (tone + visible text, on `Badge`); `src/live-region.tsx` - `LiveRegion` (`role="status"`, `aria-live="polite"`, `aria-atomic`, optional visually hidden; render it before its content changes).
 - `src/button.tsx` also has a `danger` variant (outlined with the danger token; the theme has no on-danger text color).
 - Design kit (design batch A, 2026-11-03, plan `docs/plans/2026-11-03-storefront-design-a.md`):
-  - `src/styles.ts` `textStyles` - text roles as class strings (`pageTitle`, `sectionTitle`, `subsectionTitle`, `meta`), built from the type-scale and colour tokens.
+  - `src/styles.ts` `textStyles` - text roles as class strings (`pageTitle`, `pageTitleCompact`, `sectionTitle`, `subsectionTitle`, `itemTitle`, `cardTitle`, `dialogTitle`, `meta`; 2026-11-08), built from the type-scale and colour tokens; `font-display` only on `pageTitle` and `sectionTitle`. Every heading and legend of ui and the storefront starts from a role (design guard); `design-kit.spec.tsx` checks the roles, not exact strings.
   - `src/button.tsx` - `size` (`md` default, unchanged; `lg` 48 px) and a hover state only while enabled (`enabled:hover:`); no colour transition (it would animate the focus ring).
   - `src/price-text.tsx` - optional `discount` (`{text, label}`: the visible badge is `aria-hidden`, the label is read); only with a compare-at price. Computes nothing.
   - `src/option-picker.tsx` - `soldOut` values: struck through and muted but selectable; `soldOutLabel` is the radio's description (`aria-describedby` to a hidden element outside the label), so the value's name stays the same.

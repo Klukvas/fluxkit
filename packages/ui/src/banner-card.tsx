@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
-import { focusRing } from "./styles";
+import { focusRing, textStyles } from "./styles";
 
 export type BannerCardLayout = "card" | "image";
 export type BannerCardTone = "surface" | "accent";
@@ -99,7 +99,10 @@ export function BannerCard({
         <span className="flex flex-col gap-1 p-4">
           <Heading
             id={titleId}
-            className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
+            className={cn(
+              textStyles.dialogTitle,
+              "group-hover:underline group-hover:underline-offset-4",
+            )}
           >
             {title}
           </Heading>

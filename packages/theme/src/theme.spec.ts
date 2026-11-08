@@ -75,6 +75,13 @@ describe("design tokens", () => {
     }
   });
 
+  it("defaults the display (heading) font to the body font, so adding it changed no pixel", () => {
+    expect(lightBlock.tokens.get("--fk-font-display")).toBe(
+      lightBlock.tokens.get("--fk-font-sans"),
+    );
+    expect(lightBlock.tokens.get("--fk-font-sans")).toBeDefined();
+  });
+
   it("defines the status and focus tokens added for the storefront", () => {
     const defined = definedTokens(lightBlock);
     for (const name of ["--fk-color-success", "--fk-color-warning", "--fk-color-ring"]) {

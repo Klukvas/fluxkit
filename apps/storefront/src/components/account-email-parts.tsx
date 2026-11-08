@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Container, Spinner, type Translator } from "@fluxkit/ui";
+import { Alert, Container, Spinner, textStyles, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { useEffect, useRef, type ReactNode, type Ref } from "react";
 import { failureText, type Failure } from "../lib/failure";
@@ -25,11 +25,7 @@ export function EmailPageFrame({
   return (
     <Container className="py-8">
       <div className="flex max-w-md flex-col gap-4" aria-busy={busy}>
-        <h1
-          ref={headingRef}
-          tabIndex={-1}
-          className="text-3xl font-bold text-foreground focus:outline-none"
-        >
+        <h1 ref={headingRef} tabIndex={-1} className={`${textStyles.pageTitle} focus:outline-none`}>
           {title}
         </h1>
         {children}

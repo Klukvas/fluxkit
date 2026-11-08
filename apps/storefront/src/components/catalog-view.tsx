@@ -147,7 +147,7 @@ export function Subcategories({
   if (subcategories.length === 0) return null;
   return (
     <section aria-labelledby="catalog-subcategories-title" className="flex flex-col gap-2">
-      <h2 id="catalog-subcategories-title" className="text-lg font-semibold text-foreground">
+      <h2 id="catalog-subcategories-title" className={textStyles.subsectionTitle}>
         {t("catalog.subcategories")}
       </h2>
       <ul className="flex flex-wrap gap-2">

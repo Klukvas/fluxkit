@@ -1,7 +1,7 @@
 "use client";
 
 import type { ShippingCity, ShippingOption, ShippingPickupPoint } from "@fluxkit/api-client";
-import { Alert, Button, type Locale, type Translator } from "@fluxkit/ui";
+import { Alert, Button, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import { useState, type ReactNode } from "react";
 import {
   SHIPPING_CITY_FIELD,
@@ -64,7 +64,7 @@ export function DeliverySectionView(props: DeliverySectionViewProps) {
       aria-describedby={methodError === undefined ? undefined : errorId}
       className="flex flex-col gap-4 rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
     >
-      <legend className="mb-2 text-xl font-semibold text-foreground">
+      <legend className={`${textStyles.sectionTitle} mb-2`}>
         <h2>{t("checkout.shipping.title")}</h2>
       </legend>
       {shipping.failure === null ? null : (
@@ -121,7 +121,7 @@ export function DeliverySectionView(props: DeliverySectionViewProps) {
       )}
       {orderable && selected.kind === "store_pickup" ? (
         <section aria-labelledby={`${methodId}-store-heading`} className="flex flex-col gap-1">
-          <h3 id={`${methodId}-store-heading`} className="font-semibold text-foreground">
+          <h3 id={`${methodId}-store-heading`} className={textStyles.itemTitle}>
             {t("checkout.shipping.storePickup.title")}
           </h3>
           <p className="whitespace-pre-line text-foreground">

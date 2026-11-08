@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Field } from "./field";
 import { Input } from "./input";
+import { textStyles } from "./styles";
 import { Textarea } from "./textarea";
 
 export interface LocaleTextFieldLocale {
@@ -43,7 +44,7 @@ export function LocaleTextField({
 }: LocaleTextFieldProps) {
   return (
     <fieldset className="flex flex-col gap-3">
-      <legend className="font-semibold text-foreground">{legend}</legend>
+      <legend className={textStyles.itemTitle}>{legend}</legend>
       {locales.map((entry) => (
         <Field
           key={entry.locale}

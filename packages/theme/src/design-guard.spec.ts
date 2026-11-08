@@ -165,6 +165,10 @@ describe("design guard, the design kit scales", () => {
       expect(tailwindCss).toContain(`--text-${step}--line-height: var(--fk-line-height-${step});`);
     }
     expect(tailwindCss).toContain("--spacing: var(--fk-space-unit);");
+    // `font-display` (headings, plan 2026-11-08 T1) next to the body and code stacks.
+    for (const family of ["sans", "mono", "display"]) {
+      expect(tailwindCss).toContain(`--font-${family}: var(--fk-font-${family});`);
+    }
     for (const step of shadowSteps.filter((name) => name !== "none")) {
       expect(tailwindCss).toContain(`--shadow-${step}: var(--fk-shadow-${step});`);
     }
@@ -205,5 +209,150 @@ describe("design guard, the design kit scales", () => {
       ),
     );
     expect(offenders).toEqual([]);
+  });
+});
+
+// Heading roles (plan 2026-11-08-design-changeability.md, T1): every heading of the shared UI library and the storefront takes its
+// typography from a `textStyles` role of `@fluxkit/ui`, so a redesign (a display font, another size) changes one place. A heading
+// with no class, or with visibility classes only (`sr-only`, `lg:hidden`), has nothing to restyle. Known limit: the admin
+// (`apps/admin`, 71 headings) is not scanned yet.
+const headingRoots = ["packages/ui/src", "apps/storefront/src"].map((path) => join(repoRoot, path));
+const stylesSource = readFileSync(join(repoRoot, "packages/ui/src/styles.ts"), "utf8");
+const textRoles = new Set(
+  [
+    ...(
+      /export const textStyles = \{([\s\S]*?)\} as const;/.exec(stylesSource)?.[1] ?? ""
+    ).matchAll(/^\s+([a-zA-Z]+):/gm),
+  ].map((match) => match[1] as string),
+);
+
+interface TagClass {
+  tag: string;
+  /** The raw `className` value (`"..."` or `{...}`), or null when the tag has none. */
+  className: string | null;
+}
+
+/** Reads a balanced `{...}` or a quoted string starting at `start`; returns its end (exclusive). */
+function skipValue(source: string, start: number): number {
+  const open = source[start];
+  if (open === '"' || open === "'") return source.indexOf(open, start + 1) + 1;
+  let depth = 0;
+  let quote: string | null = null;
+  for (let index = start; index < source.length; index += 1) {
+    const char = source[index] as string;
+    if (quote !== null) {
+      if (char === "\\") index += 1;
+      else if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '"' || char === "'" || char === "`") quote = char;
+    else if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return index + 1;
+    }
+  }
+  throw new Error(`Unbalanced attribute value near "${source.slice(start, start + 40)}"`);
+}
+
+/** The opening tags of `tags` in a JSX source with their `className`. */
+function tagClasses(source: string, tags: RegExp): TagClass[] {
+  const found: TagClass[] = [];
+  for (const match of source.matchAll(new RegExp(`<(${tags.source})(?=[\\s>/])`, "g"))) {
+    let index = (match.index ?? 0) + match[0].length;
+    let className: string | null = null;
+    for (;;) {
+      const char = source[index];
+      if (char === undefined) throw new Error(`Unclosed <${match[1] as string}>`);
+      if (char === ">" || (char === "/" && source[index + 1] === ">")) break;
+      if (char === "{" || char === '"' || char === "'") {
+        index = skipValue(source, index);
+        continue;
+      }
+      if (source.startsWith("className=", index)) {
+        const start = index + "className=".length;
+        index = skipValue(source, start);
+        className = source.slice(start, index);
+        continue;
+      }
+      index += 1;
+    }
+    found.push({ tag: match[1] as string, className });
+  }
+  return found;
+}
+
+const visibilityOnly = /^(?:[a-z0-9-]+:)*(?:sr-only|not-sr-only|hidden)$/;
+
+/** Why a tag's classes bypass the text roles, or null when they are fine. */
+function roleProblem({ className }: TagClass): string | null {
+  if (className === null) return null;
+  const literal = /^["']([^"']*)["']$/.exec(className);
+  if (literal) {
+    const classes = (literal[1] as string).split(/\s+/).filter((name) => name !== "");
+    return classes.every((name) => visibilityOnly.test(name))
+      ? null
+      : `literal classes ${className} (use a textStyles role)`;
+  }
+  const roles = [...className.matchAll(/\btextStyles\.([a-zA-Z]+)/g)].map(
+    (match) => match[1] as string,
+  );
+  if (roles.length === 0) return `classes ${className} do not use a textStyles role`;
+  const unknown = roles.filter((role) => !textRoles.has(role));
+  return unknown.length === 0 ? null : `unknown textStyles role ${unknown.join(", ")}`;
+}
+
+function roleOffenders(tags: RegExp): string[] {
+  return headingRoots
+    .flatMap(files)
+    .filter((file) => /\.tsx$/.test(file) && !/\.spec\.tsx$/.test(file))
+    .flatMap((file) =>
+      tagClasses(readFileSync(file, "utf8"), tags).flatMap((tag) => {
+        const problem = roleProblem(tag);
+        return problem === null ? [] : [`${file.replace(repoRoot, "")}: <${tag.tag}> ${problem}`];
+      }),
+    );
+}
+
+describe("design guard, heading roles", () => {
+  it("knows the text roles of @fluxkit/ui", () => {
+    for (const role of ["pageTitle", "sectionTitle", "subsectionTitle", "meta"]) {
+      expect(textRoles.has(role), role).toBe(true);
+    }
+  });
+
+  it("reads the className of opening tags (the scanner itself)", () => {
+    const source = `<h2 id={x} className="text-lg font-semibold">a</h2><h1 className={cn(textStyles.pageTitle, a > b ? "x" : "y")}>b</h1><h3>c</h3><legend className={legend} />`;
+    expect(tagClasses(source, /h[1-6]|legend/)).toEqual([
+      { tag: "h2", className: '"text-lg font-semibold"' },
+      { tag: "h1", className: '{cn(textStyles.pageTitle, a > b ? "x" : "y")}' },
+      { tag: "h3", className: null },
+      { tag: "legend", className: "{legend}" },
+    ]);
+    expect(tagClasses(`<header className="x"><Headings className="y">`, /h[1-6]|Heading/)).toEqual(
+      [],
+    );
+  });
+
+  it("accepts roles and visibility classes, and rejects anything else", () => {
+    const check = (className: string | null) => roleProblem({ tag: "h2", className });
+    expect(check(null)).toBeNull();
+    expect(check('"sr-only"')).toBeNull();
+    expect(check('"lg:hidden"')).toBeNull();
+    expect(check("{textStyles.sectionTitle}")).toBeNull();
+    expect(check("{`${textStyles.pageTitle} ${focusRing}`}")).toBeNull();
+    expect(check('{titleKey === undefined ? "sr-only" : textStyles.sectionTitle}')).toBeNull();
+    expect(check('"text-lg font-semibold text-foreground"')).toMatch(/literal classes/);
+    expect(check('"sr-only font-bold"')).toMatch(/literal classes/);
+    expect(check("{legend}")).toMatch(/do not use a textStyles role/);
+    expect(check("{textStyles.bannerTitle}")).toMatch(/unknown textStyles role bannerTitle/);
+  });
+
+  it("builds every JSX heading (h1 to h6) of ui and the storefront from a textStyles role", () => {
+    expect(roleOffenders(/h[1-6]/)).toEqual([]);
+  });
+
+  it("builds every dynamic <Heading> and every <legend> of ui and the storefront from a textStyles role", () => {
+    expect(roleOffenders(/Heading|legend/)).toEqual([]);
   });
 });

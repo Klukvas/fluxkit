@@ -247,7 +247,7 @@ export function FacetedResults({
                   <h2
                     id={SEARCH_RESULTS_HEADING_ID}
                     tabIndex={-1}
-                    className="text-lg font-semibold text-foreground focus:outline-none"
+                    className={`${textStyles.subsectionTitle} focus:outline-none`}
                   >
                     {t.plural(countKey, result.total)}
                   </h2>
@@ -371,7 +371,7 @@ function NoResults({
         <h2
           id={SEARCH_RESULTS_HEADING_ID}
           tabIndex={-1}
-          className="text-lg font-semibold text-foreground focus:outline-none"
+          className={`${textStyles.subsectionTitle} focus:outline-none`}
         >
           {t.plural("search.count", 0)}
         </h2>

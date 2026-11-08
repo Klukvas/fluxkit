@@ -31,6 +31,8 @@
   --fk-radius-lg: 1rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
+  /* Headings (`pageTitle`, `sectionTitle`). Defaults to the body stack; a fork's own face comes from `config/fonts.ts`: `var(--font-...)`. */
+  --fk-font-display: ui-sans-serif, system-ui, sans-serif;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
   --fk-font-size-xs: 0.75rem;
   --fk-line-height-xs: 1rem;

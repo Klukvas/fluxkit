@@ -18,6 +18,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | corner radii |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
+| `--fk-font-display` | `font-display` | the heading face of the `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack, so nothing moved (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
 | `--fk-shadow-card` | `shadow-card` | card elevation (resting) |
 | `--fk-shadow-raised` | `shadow-raised` | a raised surface: the hovered product card (added 2026-11-03, design batch A) |
 | `--fk-shadow-overlay` | `shadow-overlay` | surfaces over the page: menus, toasts, bars (added 2026-11-03) |
@@ -27,8 +28,35 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 Design kit rules (review D-19, plan `docs/plans/2026-11-03-storefront-design-a.md`; enforced by `packages/theme/src/design-guard.spec.ts`): font sizes only
 `text-xs` to `text-4xl`, radii only `rounded-sm|md|lg` (plus the shape `rounded-full` and `rounded-none`), shadows only `shadow-card|raised|overlay|none`; a
 step outside a scale (`text-5xl`, `rounded-xl`, `shadow-md`) would use a Tailwind built-in value that a rebrand of `tokens.css` cannot reach. Text roles
-(page title, section title, subsection title, meta) are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
+are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
 so a dark theme only sets values. Controls have no colour transition: it would also animate `outline-color`, so the focus ring would fade in.
+
+**Heading roles (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1; additive):**
+
+| Role | Classes today | Used for |
+|---|---|---|
+| `pageTitle` | `font-display text-3xl font-bold text-foreground` | a page's `h1` (the hero adds `md:text-4xl`) |
+| `pageTitleCompact` | `text-2xl font-bold text-foreground` | the `h1` of the error and not-found views; the order page adds `sm:text-3xl` |
+| `sectionTitle` | `font-display text-xl font-semibold text-foreground` | a section `h2`, a form section's `legend`, the `Disclosure` heading |
+| `subsectionTitle` | `text-lg font-semibold text-foreground` | smaller `h2`/`h3`, the `EmptyState` heading, the result count, the filter sheet title |
+| `itemTitle` | `font-semibold text-foreground` | body-size headings: a line item, a short list, a field group's `legend` |
+| `cardTitle` | `font-medium text-foreground` | the product card's name (the card adds `line-clamp-2`), the `OptionPicker` legend |
+| `dialogTitle` | `text-lg font-semibold` | a `Dialog` title and the `BannerCard` title: no colour, the surface (a toned banner) sets it |
+| `meta` | `text-sm text-muted-foreground` | hints and meta lines (the `SideNav` group heading adds `font-semibold`) |
+
+- `font-display` is on `pageTitle` and `sectionTitle` only: a decorative face in small titles hurts legibility. A fork that wants it on more
+  roles edits `textStyles`, nothing else.
+- Guard (`packages/theme/src/design-guard.spec.ts`, "heading roles"): every `<h1>` to `<h6>`, dynamic `<Heading>` and `<legend>` with a
+  `className` in `packages/ui` and `apps/storefront` uses a `textStyles` role (a call site adds layout, focus or visibility classes only); a
+  heading without classes, or with visibility classes only (`sr-only`, `lg:hidden`), passes. **Known limit:** `apps/admin` (71 headings) is
+  not scanned yet. The text logo (`.fk-logo`, CSS) takes `font-display` through `@apply`.
+- The header and footer shell carry no heading role with `font-display` (first-HTML budget, `shell.spec.tsx`); the registration page grew
+  by 13 bytes (one `pageTitle`).
+
+**Migration note for client forks (2026-11-08, additive):** a fork whose own headings in `packages/ui` or `apps/storefront` carry literal
+typography classes fails the new guard after merging; replace the classes with a `textStyles` role (plus layout classes) or add a role.
+A fork that edited `textStyles` gets one merge conflict in `packages/ui/src/styles.ts`: keep its own strings and take the new roles. No
+raw-radius guard yet (role radii come in a later change).
 
 **Migration note for client forks (2026-11-03, not a SemVer break: the tokens are additive):** after merging this upstream change, `pnpm test`
 fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a size, radius or shadow outside the scales (`text-5xl`,

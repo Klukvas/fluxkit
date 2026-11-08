@@ -253,7 +253,7 @@ export function CartLineView({
             />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <h2 className="text-lg font-semibold text-foreground">
+            <h2 className={textStyles.subsectionTitle}>
               <Link
                 href={localizedHref(locale, `/p/${encodeURIComponent(line.productSlug)}`)}
                 className={`inline-flex min-h-6 items-center underline-offset-4 hover:underline ${focusRing}`}

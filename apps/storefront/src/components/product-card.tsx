@@ -1,5 +1,12 @@
 import type { ProductSummary } from "@fluxkit/api-client";
-import { Badge, PriceText, VisuallyHidden, type Locale, type Translator } from "@fluxkit/ui";
+import {
+  Badge,
+  PriceText,
+  textStyles,
+  VisuallyHidden,
+  type Locale,
+  type Translator,
+} from "@fluxkit/ui";
 import Link from "next/link";
 import { availabilityDisplay } from "../lib/availability";
 import { allowedImageUrl } from "../lib/image-source";
@@ -105,7 +112,7 @@ export function ProductCard({
       )}
       {/* The full title as a tooltip where two lines cut it (review m5 of PR 217); on the heading, not the link, so the
           link's name is not repeated as its description. */}
-      <Heading className="line-clamp-2 font-medium text-foreground" title={product.title}>
+      <Heading className={`${textStyles.cardTitle} line-clamp-2`} title={product.title}>
         <Link
           href={href}
           className="after:absolute after:inset-0 group-hover:underline group-hover:underline-offset-4 focus-visible:outline-none"
