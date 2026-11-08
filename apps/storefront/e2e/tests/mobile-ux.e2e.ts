@@ -65,6 +65,22 @@ async function hydrated(page: Page): Promise<void> {
   );
 }
 
+/**
+ * Waits until the header's search box is the real, mounted island (`data-hydrated` on its form, set in the browser only).
+ * The cart badge (`hydrated`) is not enough for the search row: on the streamed pages (catalog, product, results) the row
+ * first holds `SearchBoxFallback` inside a `Suspense` boundary that is still pending, and React does not hydrate it. Opened
+ * then, the row focuses the fallback's input (same role and name, so `toBeFocused` passes); React's root listener stops a
+ * keydown aimed into a pending boundary (react-dom 19.3 `dispatchEvent`: `stopPropagation` when the boundary cannot hydrate),
+ * so the row never sees Escape, and when the real box replaces the fallback the focused input leaves the document and the
+ * focus drops to the body. Either way the row stayed open: the D-04 flake (2 of 5 and 1 of 5 runs). The row is hidden while
+ * closed below `lg`, hence `toBeAttached`, not a role query.
+ */
+async function searchBoxHydrated(page: Page): Promise<void> {
+  await expect(
+    page.locator('#site-search form[role="search"][data-hydrated="true"]'),
+  ).toBeAttached();
+}
+
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
@@ -89,6 +105,7 @@ test("the header is one sticky row; the search opens behind its icon and Escape 
 
   const toggle = header.getByRole("link", { name: "Пошук", exact: true });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
+  await searchBoxHydrated(page);
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   const searchBox = page.getByRole("combobox", { name: "Пошук товарів" });
@@ -123,6 +140,7 @@ test("the 'added' toast steps aside while the search row is open (review m1 of P
   await hydrated(page);
   await page.getByTestId("buy-bar").getByText("Add to cart", { exact: true }).click();
   await expect(page.getByText("Added to the cart.")).toBeVisible();
+  await searchBoxHydrated(page);
   await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
   const searchBox = page.getByRole("combobox", { name: "Search products" });
   // Well inside the toast's own 8 s on screen: it must step aside at once, not time out.

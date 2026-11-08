@@ -42,6 +42,10 @@ describe("the header's search box and the shop's search setting (availability ga
     expect(html).toContain('action="/uk/search"');
   });
 
+  it("never sends data-hydrated in the server HTML: the box sets it in the browser once mounted (no first-HTML bytes)", () => {
+    expect(shell(true)).not.toContain("data-hydrated");
+  });
+
   it("renders NO search box, form or search link when search is off", () => {
     const html = shell(false);
     expect(html).not.toContain('role="search"');
