@@ -10,7 +10,8 @@
  * - a name is never reused for another element: renaming or removing an entry, or changing what it finds, bumps
  *   `SELECTOR_LIST_VERSION` (both sides of a comparison always run the same harness, so a bump never mixes versions).
  */
-export const SELECTOR_LIST_VERSION = 1;
+/** 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review). */
+export const SELECTOR_LIST_VERSION = 2;
 
 /** Where the search starts: the whole page or one landmark. */
 export type SelectorScope = "page" | "banner" | "main" | "contentinfo";
@@ -23,7 +24,6 @@ export type SelectorRole =
   | "checkbox"
   | "combobox"
   | "contentinfo"
-  | "dialog"
   | "heading"
   | "link"
   | "main"
@@ -231,35 +231,23 @@ export const SELECTORS: readonly SelectorSpec[] = [
     steps: [{ css: "[data-trust-bar]" }],
   },
   {
+    // Inside the main content only: page-level matches were always-present live regions (Next's route announcer).
     name: "feedback.alert",
-    description: "the first visible alert",
-    scope: "page",
+    description: "the first visible alert of the main content",
+    scope: "main",
     steps: [{ role: "alert" }],
   },
   {
     name: "feedback.status",
-    description: "the first visible status region",
-    scope: "page",
+    description: "the first visible status region of the main content",
+    scope: "main",
     steps: [{ role: "status" }],
-  },
-  {
-    name: "overlay.dialog",
-    description:
-      "an open dialog (absent on a freshly loaded page unless the page opens one itself)",
-    scope: "page",
-    steps: [{ role: "dialog" }],
   },
   {
     name: "footer.contentinfo",
     description: "the site footer landmark",
     scope: "page",
     steps: [{ role: "contentinfo" }],
-  },
-  {
-    name: "footer.heading",
-    description: "the first visible heading of the footer",
-    scope: "contentinfo",
-    steps: [{ role: "heading" }],
   },
   {
     name: "footer.link",

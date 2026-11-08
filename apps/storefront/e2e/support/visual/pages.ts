@@ -39,6 +39,59 @@ export const COMPUTED_STYLE_PAGES: readonly VisualPage[] = [
 export const COMPUTED_STYLE_THEMES: readonly Theme[] = ["light", "dark"];
 export const COMPUTED_STYLE_VIEWPORT = { width: 1280, height: 800 } as const;
 
+/**
+ * A phone-width pass of the computed styles (light and dark), limited to the selectors whose look changes most below the
+ * desktop breakpoints (header, hero, banner card, product card); `selectors` keeps the run short.
+ */
+export const COMPUTED_STYLE_MOBILE_VIEWPORT = { width: 390, height: 844 } as const;
+export const COMPUTED_STYLE_MOBILE_SELECTORS: readonly string[] = [
+  "header.banner",
+  "header.first-link",
+  "header.button",
+  "home.hero",
+  "home.banner-card",
+  "card.article",
+  "card.title",
+  "card.badge",
+  "price.text",
+];
+export const COMPUTED_STYLE_MOBILE_PAGES: readonly VisualPage[] = [
+  { id: "home-390", path: "/uk" },
+  { id: "catalog-390", path: "/uk/catalog" },
+];
+
+const ALWAYS_REQUIRED = ["page.body", "header.banner", "main.h1", "footer.contentinfo"];
+const CARDS = ["card.article", "card.title", "price.text"];
+const FORM = ["form.textbox", "button.primary"];
+
+/**
+ * Positive coverage: what each computed-style page MUST find (on both sides). Without it a selector that silently stopped
+ * matching anything would compare as "absent = absent" and hide a refactor. Matches what the first CI run recorded
+ * (PR 239). `computed-styles.visual.ts` fails a page whose required selector is missing.
+ */
+export const REQUIRED_SELECTORS: Readonly<Record<string, readonly string[]>> = {
+  home: [...ALWAYS_REQUIRED, ...CARDS, "home.hero", "home.banner-card"],
+  catalog: [...ALWAYS_REQUIRED, ...CARDS],
+  product: [...ALWAYS_REQUIRED, "product.summary", "product.badge", "price.text", "button.primary"],
+  cart: [...ALWAYS_REQUIRED, "button.secondary", "price.text"],
+  checkout: [...ALWAYS_REQUIRED, ...FORM],
+  login: [...ALWAYS_REQUIRED, ...FORM],
+  register: [...ALWAYS_REQUIRED, ...FORM],
+  "legal-privacy": ALWAYS_REQUIRED,
+  "home-390": ["header.banner", "home.hero", "card.article"],
+  "catalog-390": ["header.banner", "card.article"],
+};
+
+/** The required selectors of a page that were absent (`null`) or not recorded at all. */
+export function missingRequiredSelectors(
+  pageId: string,
+  styles: Readonly<Record<string, unknown>>,
+): string[] {
+  const required = REQUIRED_SELECTORS[pageId];
+  if (required === undefined) throw new Error(`Page "${pageId}" has no required selectors.`);
+  return required.filter((name) => styles[name] === undefined || styles[name] === null);
+}
+
 export const VIEWPORTS = {
   mobile: { width: 390, height: 844 },
   desktop: { width: 1280, height: 800 },
@@ -115,8 +168,12 @@ export function frameName(frame: ScreenshotFrame): string {
 /** Every page id the harness knows (exceptions may name only these, or `*`). */
 export function knownPageIds(): Set<string> {
   return new Set(
-    [...COMPUTED_STYLE_PAGES, ...SCREENSHOT_PAGES, ...ENGLISH_PAGES, ...NO_SCRIPT_PAGES].map(
-      (page) => page.id,
-    ),
+    [
+      ...COMPUTED_STYLE_PAGES,
+      ...COMPUTED_STYLE_MOBILE_PAGES,
+      ...SCREENSHOT_PAGES,
+      ...ENGLISH_PAGES,
+      ...NO_SCRIPT_PAGES,
+    ].map((page) => page.id),
   );
 }

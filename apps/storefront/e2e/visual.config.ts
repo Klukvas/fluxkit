@@ -21,6 +21,8 @@ export default defineConfig({
   // A missing baseline picture is a failure here, never a silently written new one; the base run passes
   // `--update-snapshots=all` on the command line, which takes precedence.
   updateSnapshots: "none",
+  // No retries: a retried recording would hide a nondeterministic page, and the comparison must be deterministic.
+  retries: 0,
   // The HTML report shows expected, actual and diff side by side; the script copies it into `.visual/report/`.
   reporter: [["list"], ["html", { open: "never", outputFolder: "../playwright-report/visual" }]],
   expect: {

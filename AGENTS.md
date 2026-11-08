@@ -344,7 +344,6 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
 - `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch.
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
 - `deploy-smoke` (`scripts/deploy-smoke.sh`): builds the production images and checks `infra/docker-compose.prod.yml` behind the edge proxy.
-- `visual` (`scripts/visual-compare.sh <base-ref>`, behind `visual-gate`; PRs labelled `visual-check` or changing theme/ui/storefront source, or a manual run): base vs PR computed styles (mandatory, zero tolerance, `.visual/exceptions.json`) and screenshots; `apps/storefront/e2e/README.md`.
 - Dependabot (`.github/dependabot.yml`) updates npm, GitHub Actions and Docker images weekly; TypeScript major bumps are ignored until the linters support them.
 - Local equivalents: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `check:env`, `test`, `test:e2e`, `feature-matrix`, `check:licenses`, `audit:prod`, `notices`, `check:docs`.
   There is no script for the `compose` job; run `docker compose --env-file .env -f infra/docker-compose.yml up -d --wait` yourself.

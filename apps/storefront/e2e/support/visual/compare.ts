@@ -175,8 +175,31 @@ const row = (difference: Difference) => [
   difference.after,
 ];
 
+/**
+ * Selectors that found nothing on any page, theme or side (absent or not recorded everywhere): they compare as equal and
+ * prove nothing, so the report warns about them (a dead entry, or every page lost the element).
+ */
+export function alwaysAbsentSelectors(...snapshots: readonly Snapshot[]): string[] {
+  const seen = new Set<string>();
+  const present = new Set<string>();
+  for (const snapshot of snapshots) {
+    for (const themes of Object.values(snapshot.pages)) {
+      for (const styles of Object.values(themes)) {
+        for (const [selector, value] of Object.entries(styles)) {
+          seen.add(selector);
+          if (value !== null) present.add(selector);
+        }
+      }
+    }
+  }
+  return [...seen].filter((selector) => !present.has(selector)).sort();
+}
+
 /** A plain-text report for the console and `.visual/report/computed-styles.txt`. */
-export function formatComparison(comparison: Comparison): string {
+export function formatComparison(
+  comparison: Comparison,
+  alwaysAbsent: readonly string[] = [],
+): string {
   const parts: string[] = [];
   if (comparison.undeclared.length === 0) {
     parts.push("Computed styles: no undeclared difference.");
@@ -208,6 +231,12 @@ export function formatComparison(comparison: Comparison): string {
         (entry) =>
           `- page ${entry.page}${entry.theme === undefined ? "" : ` theme ${entry.theme}`} selector ${entry.selector} property ${entry.property}: ${entry.reason}`,
       ),
+    );
+  }
+  if (alwaysAbsent.length > 0) {
+    parts.push(
+      "",
+      `Warning: selectors absent on every page, theme and side (they prove nothing): ${alwaysAbsent.join(", ")}`,
     );
   }
   return parts.join("\n");

@@ -3,8 +3,13 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyExceptions, diffSnapshots, formatComparison } from "./compare.ts";
-import { ExceptionsError, parseExceptions, screenshotMasks } from "./exceptions.ts";
+import {
+  alwaysAbsentSelectors,
+  applyExceptions,
+  diffSnapshots,
+  formatComparison,
+} from "./compare.ts";
+import { ExceptionsError, ownExceptions, parseExceptions, screenshotMasks } from "./exceptions.ts";
 import {
   COMPUTED_PROPERTIES,
   fragment,
@@ -35,8 +40,8 @@ function snapshot(pages: Record<string, Record<string, Record<string, ElementSty
 const base = () =>
   snapshot({
     home: {
-      light: { "main.h1": styles({ "font-size": "30px" }), "overlay.dialog": null },
-      dark: { "main.h1": styles({ color: "rgb(255, 255, 255)" }), "overlay.dialog": null },
+      light: { "main.h1": styles({ "font-size": "30px" }), "feedback.alert": null },
+      dark: { "main.h1": styles({ color: "rgb(255, 255, 255)" }), "feedback.alert": null },
     },
     cart: { light: { "button.primary": styles({ "border-top-left-radius": "6px" }) } },
   });
@@ -75,7 +80,7 @@ describe("diffSnapshots", () => {
 
   it("reports an element found on one side only as a presence difference", () => {
     const after = base();
-    (after.pages["home"]?.["light"] as Record<string, ElementStyles>)["overlay.dialog"] = styles();
+    (after.pages["home"]?.["light"] as Record<string, ElementStyles>)["feedback.alert"] = styles();
     (after.pages["home"]?.["dark"] as Record<string, ElementStyles>)["main.h1"] = null;
     expect(diffSnapshots(base(), after)).toEqual([
       {
@@ -89,7 +94,7 @@ describe("diffSnapshots", () => {
       {
         page: "home",
         theme: "light",
-        selector: "overlay.dialog",
+        selector: "feedback.alert",
         property: "presence",
         before: "absent",
         after: "present",
@@ -172,6 +177,36 @@ describe("parseExceptions", () => {
       "card.article",
     ]);
     expect(screenshotMasks(exceptions, "catalog", "light")).toEqual(["home.banner-card"]);
+  });
+
+  it("keeps only the entries a PR added (an inherited entry declares nothing, even with a new reason)", () => {
+    const inherited = parseExceptions([
+      { ...valid, reason: "an earlier PR" },
+      { ...valid, selector: "main.h1", property: "color", reason: "an earlier PR" },
+    ]);
+    const current = parseExceptions([
+      { ...valid, reason: "reworded by this PR" },
+      { ...valid, selector: "main.h1", property: "color", theme: "dark", reason: "this PR" },
+      { ...valid, selector: "card.article", property: "screenshot", reason: "this PR" },
+    ]);
+    expect(ownExceptions(current, inherited).map((entry) => entry.selector)).toEqual([
+      "main.h1",
+      "card.article",
+    ]);
+    expect(ownExceptions(current, [])).toHaveLength(3);
+  });
+});
+
+describe("alwaysAbsentSelectors", () => {
+  it("lists selectors that found nothing anywhere on either side", () => {
+    const after = base();
+    (after.pages["cart"]?.["light"] as Record<string, ElementStyles>)["home.hero"] = null;
+    expect(alwaysAbsentSelectors(base(), after)).toEqual(["feedback.alert", "home.hero"]);
+    (after.pages["home"]?.["dark"] as Record<string, ElementStyles>)["feedback.alert"] = styles();
+    expect(alwaysAbsentSelectors(base(), after)).toEqual(["home.hero"]);
+    expect(formatComparison(applyExceptions([], []), ["home.hero"])).toMatch(
+      /Warning: selectors absent on every page, theme and side \(they prove nothing\): home\.hero/,
+    );
   });
 });
 
@@ -294,6 +329,43 @@ describe("snapshot files and the command line", () => {
     const declared = cli(before, after, "--exceptions", exceptions);
     expect(declared.status).toBe(0);
     expect(declared.stdout).toMatch(/Declared differences \(1\)/);
+    expect(cli(before, after, "--exceptions", exceptions, "--strict").status).toBe(0);
+
+    // An exception that matches nothing: a warning without --strict, a failure with it (the CI job passes --strict).
+    const unused = cli(before, before, "--exceptions", exceptions);
+    expect(unused.status).toBe(0);
+    expect(unused.stdout).toMatch(/matched nothing \(1/);
+    const strict = cli(before, before, "--exceptions", exceptions, "--strict");
+    expect(strict.status).toBe(1);
+    expect(strict.stdout).toMatch(/--strict: 1 declared exception\(s\) matched nothing/);
+    expect(strict.stdout).toMatch(/Warning: selectors absent on every page.*feedback\.alert/);
+  });
+
+  it("writes only the exceptions this tree added with --own-exceptions", () => {
+    const directory = temp();
+    const entry = { page: "home", selector: "main.h1", property: "color", reason: "old" };
+    writeFileSync(join(directory, "base.json"), JSON.stringify([entry]));
+    writeFileSync(
+      join(directory, "current.json"),
+      JSON.stringify([entry, { ...entry, property: "font-size", reason: "new" }]),
+    );
+    const out = join(directory, "own.json");
+    const result = cli(
+      "--own-exceptions",
+      join(directory, "current.json"),
+      "--inherited",
+      join(directory, "base.json"),
+      "--write",
+      out,
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/1 exception\(s\) added by this tree, 1 inherited/);
+    expect(JSON.parse(readFileSync(out, "utf8"))).toEqual([
+      { ...entry, property: "font-size", reason: "new" },
+    ]);
+    expect(cli("--own-exceptions", join(directory, "current.json"), "--write", out).status).toBe(0);
+    expect(JSON.parse(readFileSync(out, "utf8"))).toHaveLength(2);
+    expect(cli("--own-exceptions", join(directory, "current.json")).status).toBe(2);
   });
 
   it("exits 2 on bad input", () => {

@@ -4,8 +4,10 @@ import { COMPUTED_PROPERTIES } from "./snapshot.ts";
 
 /**
  * Declared exceptions of ONE pull request (`.visual/exceptions.json`; plan section 3 principle 2): differences the PR
- * means to make. `scripts/visual-compare.sh` honours the file only when the PR itself changed it (a file inherited from the
- * base belongs to an earlier PR), so an exception never outlives the PR that declared it.
+ * means to make. `scripts/visual-compare.sh` honours only the entries this PR ADDED: an entry already in the merge-base's
+ * file belongs to an earlier PR and is ignored (`ownExceptions`, compared by page, theme, selector and property; a changed
+ * reason does not revive it), so an exception never outlives the PR that declared it. Old entries may stay in the file or
+ * be removed by any PR; they declare nothing.
  *
  * The file is a JSON array of entries:
  *   { "page": "<page id>" | "*", "theme"?: "light" | "dark" | "system", "selector": "<selector name>",
@@ -33,6 +35,19 @@ const REQUIRED = ["page", "selector", "property", "reason"] as const;
 const ALLOWED = new Set<string>([...REQUIRED, "theme"]);
 
 export class ExceptionsError extends Error {}
+
+function exceptionKey(entry: VisualException): string {
+  return [entry.page, entry.theme ?? "", entry.selector, entry.property].join("|");
+}
+
+/** The entries of `current` that are not in `inherited` (the merge-base's file): the only ones a PR may use. */
+export function ownExceptions(
+  current: readonly VisualException[],
+  inherited: readonly VisualException[],
+): VisualException[] {
+  const old = new Set(inherited.map(exceptionKey));
+  return current.filter((entry) => !old.has(exceptionKey(entry)));
+}
 
 export function parseExceptions(value: unknown, source = "exceptions"): VisualException[] {
   if (!Array.isArray(value)) {
@@ -93,7 +108,7 @@ export function parseExceptions(value: unknown, source = "exceptions"): VisualEx
       }
       result.theme = theme;
     }
-    const key = [result.page, result.theme ?? "", result.selector, result.property].join("|");
+    const key = exceptionKey(result);
     if (seen.has(key)) throw new ExceptionsError(`${at}: duplicate of an earlier exception.`);
     seen.add(key);
     return result;

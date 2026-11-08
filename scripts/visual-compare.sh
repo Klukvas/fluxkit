@@ -2,7 +2,7 @@
 # Visual comparison of the storefront: base vs this tree, same machine, same run (plan
 # docs/plans/2026-11-08-design-changeability.md, section 7; how to use it: apps/storefront/e2e/README.md, "Visual comparison").
 #
-#   bash scripts/visual-compare.sh <base-ref> [--skip-screenshots] [--keep-base-tree] [--skip-current-build]
+#   bash scripts/visual-compare.sh <base-ref> [--skip-screenshots] [--keep-base-tree] [--skip-current-build] [--strict]
 #
 # 1. The baseline is the merge-base of <base-ref> and HEAD (in CI, HEAD is the PR's merge commit, so this is the base
 #    branch's tip). It is checked out with `git worktree add` into .visual/base-tree, installed (`pnpm install --offline`)
@@ -14,8 +14,9 @@
 # 3. .visual/report/ gets computed-styles.txt/.json (the diff), the Playwright HTML report and diff images of the screenshots,
 #    summary.txt and two status files (computed-styles.status, screenshots.status: pass, fail or error).
 #
-# Declared exceptions: .visual/exceptions.json (e2e/support/visual/exceptions.ts), honoured only when THIS tree changed it
-# against the merge-base; an inherited file belongs to an earlier PR and is ignored (with a notice).
+# Declared exceptions: .visual/exceptions.json (e2e/support/visual/exceptions.ts); only the entries THIS tree added against
+# the merge-base count (an entry already in the base's file belongs to an earlier PR). --strict (CI) also fails the computed
+# styles when a declared exception matched nothing.
 #
 # Needs the e2e stack's variables (E2E_DATABASE_URL ending in _e2e_test, REDIS_URL, MEILI_URL, MEILI_MASTER_KEY) and a
 # Chromium for the pinned @playwright/test. The e2e database is WIPED by each of the runs. Baselines are never committed.
@@ -25,7 +26,7 @@
 set -euo pipefail
 
 usage() {
-  echo "Usage: bash scripts/visual-compare.sh <base-ref> [--skip-screenshots] [--keep-base-tree] [--skip-current-build]" >&2
+  echo "Usage: bash scripts/visual-compare.sh <base-ref> [--skip-screenshots] [--keep-base-tree] [--skip-current-build] [--strict]" >&2
   exit 2
 }
 
@@ -33,11 +34,13 @@ base_ref=""
 screenshots=true
 keep_base_tree=false
 build_current=true
+strict=()
 for argument in "$@"; do
   case "$argument" in
     --skip-screenshots) screenshots=false ;;
     --keep-base-tree) keep_base_tree=true ;;
     --skip-current-build) build_current=false ;;
+    --strict) strict=(--strict) ;;
     -*) usage ;;
     *)
       [ -z "$base_ref" ] || usage
@@ -77,23 +80,21 @@ remove_base_tree() {
 }
 if ! $keep_base_tree; then trap remove_base_tree EXIT; fi
 
-# Effective exceptions: the PR's own file, or nothing.
+# Effective exceptions: only the entries this tree ADDED to .visual/exceptions.json; entries already in the merge-base's
+# file belong to an earlier PR and declare nothing.
 effective="$report/exceptions.effective.json"
 declared="$root/.visual/exceptions.json"
 if [ -f "$declared" ]; then
-  if git -C "$root" cat-file -e "$merge_base:.visual/exceptions.json" 2>/dev/null &&
-    git -C "$root" show "$merge_base:.visual/exceptions.json" | cmp -s - "$declared"; then
-    echo "visual: .visual/exceptions.json is unchanged since the merge-base (an earlier PR's); it is ignored."
-    echo "[]" >"$effective"
-  else
-    cp "$declared" "$effective"
-    echo "visual: using the declared exceptions of this tree (.visual/exceptions.json)"
+  inherited=()
+  if git -C "$root" cat-file -e "$merge_base:.visual/exceptions.json" 2>/dev/null; then
+    git -C "$root" show "$merge_base:.visual/exceptions.json" >"$report/exceptions.inherited.json"
+    inherited=(--inherited "$report/exceptions.inherited.json")
   fi
+  node --experimental-strip-types "$harness_cli" --own-exceptions "$declared" "${inherited[@]}" --write "$effective" ||
+    harness_error "reading .visual/exceptions.json"
 else
   echo "[]" >"$effective"
 fi
-node --experimental-strip-types "$harness_cli" --check-exceptions "$effective" ||
-  harness_error "checking .visual/exceptions.json"
 cp "$effective" "$out/baseline/screenshots/exceptions.json"
 
 run_visual() {
@@ -139,7 +140,7 @@ VISUAL_COMPUTED_DIR="$out/current/computed-styles" VISUAL_SNAPSHOT_DIR="$out/bas
 
 computed_exit=0
 node --experimental-strip-types "$harness_cli" "$out/baseline/computed-styles" "$out/current/computed-styles" \
-  --exceptions "$effective" --report "$report" || computed_exit=$?
+  --exceptions "$effective" --report "$report" "${strict[@]}" || computed_exit=$?
 case "$computed_exit" in
   0) echo "pass" >"$report/computed-styles.status" ;;
   1) echo "fail" >"$report/computed-styles.status" ;;

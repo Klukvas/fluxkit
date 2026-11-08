@@ -4,7 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
-  # Manual run (Actions -> CI -> Run workflow): runs every job, including `visual` against the chosen base branch.
+  # Manual run (Actions -> CI -> Run workflow) for the `visual` job against the chosen base branch. Note: it runs EVERY job of
+  # this workflow (the full feature matrix, e2e, deploy smoke, ...), and the concurrency group below cancels an in-progress
+  # run on the same ref.
   workflow_dispatch:
     inputs:
       base:
@@ -304,7 +306,7 @@ jobs:
             exit 0
           fi
           changed="$(git diff --name-only "origin/$BASE_REF...HEAD")"
-          pattern='^(packages/theme/|packages/ui/|apps/storefront/src/|apps/storefront/e2e/visual\.config\.ts$|apps/storefront/e2e/tests/[^/]+\.visual\.ts$|apps/storefront/e2e/support/visual/|scripts/visual-compare\.sh$)'
+          pattern='^(packages/theme/|packages/ui/|apps/storefront/src/|apps/storefront/public/|apps/storefront/postcss\.config\.mjs$|apps/storefront/next\.config\.ts$|apps/storefront/e2e/support/env\.ts$|\.visual/exceptions\.json$|apps/storefront/e2e/visual\.config\.ts$|apps/storefront/e2e/tests/[^/]+\.visual\.ts$|apps/storefront/e2e/support/visual/|scripts/visual-compare\.sh$)'
           if printf '%s\n' "$changed" | grep -Eq "$pattern"; then run=true; else run=false; fi
           echo "run=$run" | tee -a "$GITHUB_OUTPUT"
 
@@ -367,7 +369,7 @@ jobs:
       - name: Compare the base and this tree
         run: |
           code=0
-          bash scripts/visual-compare.sh "origin/$VISUAL_BASE_REF" || code=$?
+          bash scripts/visual-compare.sh "origin/$VISUAL_BASE_REF" --strict || code=$?
           echo "visual-compare.sh exited with $code"
           [ "$code" -ne 2 ]
       - name: Computed styles (mandatory, zero tolerance, declared exceptions only)

@@ -45,7 +45,7 @@ describe("the visual selector list", () => {
     }
   });
 
-  it("covers what the plan lists (header, nav, search, buttons, inputs, card, price, badges, banner, footer, headings, dialog, alert)", () => {
+  it("covers what the plan lists (header, nav, search, buttons, inputs, card, price, badges, banner, footer, headings, alert)", () => {
     for (const name of [
       "header.banner",
       "header.nav-link",
@@ -65,7 +65,6 @@ describe("the visual selector list", () => {
       "main.h1",
       "main.h2",
       "main.h3",
-      "overlay.dialog",
       "feedback.alert",
       "feedback.status",
       "main.link",

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
+import { E2E_ORIGIN } from "../support/env.ts";
 import { locate, preparePage, setTheme, settle } from "../support/visual/browser.ts";
 import {
   parseExceptions,
@@ -40,6 +41,7 @@ async function open(page: Page, frame: ScreenshotFrame): Promise<void> {
   if (frame.theme === "system") await page.emulateMedia({ colorScheme: "dark" });
   await preparePage(page, frame.page, frame.javaScript);
   await page.goto(frame.page.path);
+  await expect(page).toHaveURL(new URL(frame.page.path, E2E_ORIGIN).href);
   await settle(page, frame.javaScript);
 }
 
