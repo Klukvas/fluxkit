@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** The checkout form's contact fields and, for a cart that ships, the address (labels of `messages/en.json`). */
+/** The checkout form's contact fields and, for a cart that ships, the address (labels of `src/messages/en/checkout.json`). */
 export interface CheckoutDetails {
   email?: string;
   phone?: string;
