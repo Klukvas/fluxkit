@@ -62,15 +62,17 @@ describe("SiteShell landmarks and accessibility", () => {
 
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
-    // main (twice: inside the menu below `xl`, inline from `xl`; one is always display:none), locale switcher, footer
-    expect(navs).toHaveLength(4);
+    // main (twice: inside the menu below `lg`, inline from `lg`; one is always display:none), its second half beside the
+    // icons (reshape experiment), locale switcher, footer
+    expect(navs).toHaveLength(5);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
     expect(mains).toHaveLength(2);
     expect(html).toMatch(
-      /<details class="[^"]*xl:hidden[^"]*"><summary role="button" aria-expanded="false" aria-label="§nav\.menu"/,
+      /<details class="[^"]*lg:hidden[^"]*"><summary role="button" aria-expanded="false" aria-label="§nav\.menu"/,
     );
-    expect(html).toMatch(/<nav aria-label="§nav\.main\.label" class="hidden[^"]*xl:block/);
+    expect(html).toMatch(/<nav aria-label="§nav\.main\.label" class="fk-nav-start/);
+    expect(html).toMatch(/<nav aria-label="§nav\.more\.label" class="fk-nav-split/);
     expect(html).toContain('aria-label="§nav.main.label"');
     expect(html).toContain('aria-label="§footer.nav.label"');
     expect(html).toContain('aria-label="§locale.switcher.label"');

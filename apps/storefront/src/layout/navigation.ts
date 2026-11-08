@@ -21,7 +21,7 @@ export const headerLinks: readonly NavigationLink[] = [
 ];
 
 /** Most top-level categories shown in the header; the rest are reachable through the catalog. */
-export const HEADER_CATEGORY_LIMIT = 6;
+export const HEADER_CATEGORY_LIMIT = 4;
 
 /**
  * The footer's second list: the legal pages (privacy plan step 10), from their own config: add or remove a page there, the

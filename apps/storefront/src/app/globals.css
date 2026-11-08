@@ -45,7 +45,7 @@
   }
   /* The logo link, with the same focus ring as every other control (review A10: it showed the browser's default ring). */
   .fk-logo {
-    @apply min-h-11 min-w-0 truncate rounded-md text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
+    @apply min-h-11 min-w-0 truncate rounded-md text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0 lg:justify-self-center;
   }
   .fk-header-button {
     @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
@@ -77,7 +77,24 @@
     @apply flex flex-nowrap items-center gap-x-1 overflow-x-auto *:shrink-0;
   }
   .fk-header-end {
-    @apply ms-auto flex shrink-0 items-center gap-1;
+    @apply ms-auto flex shrink-0 items-center gap-1 lg:min-w-0 lg:shrink lg:justify-self-end;
+  }
+  /*
+   * Reshape experiment (client request 3): from `lg` the row is a grid of three columns (links | logo | links and icons) and
+   * the search box a full-width row under them. Below `lg` it stays the one-row flex header of the mobile batch.
+   */
+  @media (width >= 64rem) {
+    .fk-header-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+    }
+  }
+  .fk-nav-start,
+  .fk-nav-split {
+    @apply hidden min-w-0 lg:block;
+  }
+  .fk-announcement {
+    @apply bg-primary px-4 py-1 text-center text-sm text-primary-foreground;
   }
   .fk-site-footer {
     @apply mt-12 border-t border-border py-6 text-muted-foreground;
@@ -114,7 +131,7 @@
     @apply max-h-72 overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-card;
   }
   .fk-header-search {
-    @apply order-last hidden w-full lg:order-none lg:block lg:w-auto lg:min-w-72 lg:flex-1;
+    @apply order-last hidden w-full lg:col-span-full lg:block lg:pb-2;
   }
   .fk-header-search:target,
   .fk-header-search.fk-open {

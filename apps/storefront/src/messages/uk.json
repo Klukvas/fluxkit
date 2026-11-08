@@ -107,6 +107,8 @@
   "catalog.price.from": "від {price}",
   "catalog.card.favourite": "Додати {title} в обране",
   "catalog.card.sale": "Знижка",
+  "announcement.text": "Безкоштовна доставка від 1 500 грн",
+  "nav.more.label": "Інші розділи",
   "catalog.card.choose": "До товару",
   "catalog.view.label": "Вигляд",
   "catalog.view.grid": "Плитка",

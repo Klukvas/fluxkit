@@ -8,6 +8,7 @@ import { CartBadge } from "./cart-badge";
 import { HeaderDisclosure, menuItem } from "./header-menu";
 import { HeaderSearchToggle } from "./header-search-toggle";
 import { MenuIcon } from "./icons";
+import { announcementConfig } from "../config/announcement";
 import { LocaleSwitcher } from "./locale-switcher";
 import { SearchBox, SearchBoxFallback } from "./search-box";
 
@@ -57,14 +58,30 @@ export function SiteHeader({
   searchEnabled: boolean;
 }) {
   const links = mainLinks(locale, t, categories);
+  // Reshape experiment (client request 3): from `lg` the logo sits in the middle, the first half of the links on its left,
+  // the second half on its right before the icons, and the search box is a full-width row below (`.fk-header-row` grid).
+  const half = Math.ceil(links.length / 2);
+  const linkList = (part: typeof links) => (
+    <ul className="fk-header-nav">
+      {part.map((link) => (
+        <li key={link.key}>
+          <Link href={link.href} className="fk-nav-link">
+            {link.label}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+  const { messageKey } = announcementConfig;
   return (
     <header className="fk-site-header">
+      {messageKey === null ? null : <p className="fk-announcement">{t(messageKey)}</p>}
       <Container className="fk-header-row">
         <HeaderDisclosure
           label={t("nav.menu")}
           summary={<MenuIcon />}
           align="start"
-          className="shrink-0 xl:hidden"
+          className="shrink-0 lg:hidden"
         >
           <nav aria-label={t("nav.main.label")}>
             <ul className="flex flex-col">
@@ -78,20 +95,12 @@ export function SiteHeader({
             </ul>
           </nav>
         </HeaderDisclosure>
+        <nav aria-label={t("nav.main.label")} className="fk-nav-start">
+          {linkList(links.slice(0, half))}
+        </nav>
         <Link href={localizedHref(locale, "/")} title={t("site.name")} className="fk-logo">
           {t("site.name")}
         </Link>
-        <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">
-          <ul className="fk-header-nav">
-            {links.map((link) => (
-              <li key={link.key}>
-                <Link href={link.href} className="fk-nav-link">
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
         {searchEnabled ? (
           <HeaderSearchToggle label={t("nav.search")}>
             {/* `useSearchParams` in the box needs a boundary. On dynamic pages (catalog, product, results) the box streams in
@@ -102,6 +111,11 @@ export function SiteHeader({
           </HeaderSearchToggle>
         ) : null}
         <div className="fk-header-end">
+          {links.length > half ? (
+            <nav aria-label={t("nav.more.label")} className="fk-nav-split">
+              {linkList(links.slice(half))}
+            </nav>
+          ) : null}
           <LocaleSwitcher />
           <CartBadge />
           <AccountLink />
