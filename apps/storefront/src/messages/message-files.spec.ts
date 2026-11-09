@@ -145,7 +145,7 @@ describe("message area files (plan 2026-11-08-design-changeability.md, WP3 M1)",
 
 describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.json)", () => {
   const base: Messages = {
-    "site.name": "Demo shop",
+    "site.name": "Shopname Fixture",
     "nav.cart": "Cart",
     "home.hero.title": "Welcome",
   };
@@ -172,15 +172,15 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
   });
 
   it("replace the base text of the same flat key and keep every other key", () => {
-    expect(applyOverrides(base, { "site.name": "Verde" }, "uk")).toEqual({
+    expect(applyOverrides(base, { "site.name": "Forkname Fixture" }, "uk")).toEqual({
       ...base,
-      "site.name": "Verde",
+      "site.name": "Forkname Fixture",
     });
     expect(applyOverrides(base, {}, "uk")).toEqual(base);
   });
 
   it("refuse a key the base does not have (a typo would otherwise change nothing), naming the key and the file", () => {
-    expect(() => applyOverrides(base, { "site.nmae": "Verde" }, "uk")).toThrow(
+    expect(() => applyOverrides(base, { "site.nmae": "Forkname Fixture" }, "uk")).toThrow(
       /site\.nmae.*messages-overrides\/uk\.json/,
     );
   });
@@ -195,18 +195,18 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
 
   it("apply before the client subset is picked, so the browser receives the overridden text (non-empty fixture)", () => {
     const files = {
-      shell: { "site.name": "Demo shop", "footer.copyright": "c" },
+      shell: { "site.name": "Shopname Fixture", "footer.copyright": "c" },
       home: { "home.hero.title": "w" },
     };
     const merged = buildLocaleMessages(
       files,
       {},
-      { "site.name": "Verde Kopi", "home.hero.title": "Hi" },
+      { "site.name": "Forkname Fixture", "home.hero.title": "Hi" },
       "uk",
     );
-    expect(merged["site.name"]).toBe("Verde Kopi");
+    expect(merged["site.name"]).toBe("Forkname Fixture");
     expect(merged["home.hero.title"]).toBe("Hi");
-    expect(pickClientMessages(merged)["site.name"]).toBe("Verde Kopi");
+    expect(pickClientMessages(merged)["site.name"]).toBe("Forkname Fixture");
     expect(() => buildLocaleMessages(files, {}, { "home.hero.titel": "x" }, "uk")).toThrow(
       /home\.hero\.titel/,
     );
@@ -214,7 +214,7 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
 });
 
 describe("message extras (owner decision 2026-11-09: fork-owned src/messages-extra/{uk,en}.json, keys under custom.)", () => {
-  const base: Messages = { "site.name": "Demo shop", "nav.cart": "Cart" };
+  const base: Messages = { "site.name": "Shopname Fixture", "nav.cart": "Cart" };
 
   it("exist for every locale and hold a JSON object", () => {
     for (const locale of locales) {
@@ -276,7 +276,7 @@ describe("message extras (owner decision 2026-11-09: fork-owned src/messages-ext
   });
 
   it("merge after the base and before the overrides: an override may replace an extra, the browser gets it", () => {
-    const files = { shell: { "site.name": "Demo shop", "footer.copyright": "c" } };
+    const files = { shell: { "site.name": "Shopname Fixture", "footer.copyright": "c" } };
     const merged = buildLocaleMessages(
       files,
       { "custom.deliveryKyiv": "Kyiv delivery", "custom.note": "Note" },
@@ -321,7 +321,7 @@ describe("messagesByLocale wiring with non-empty fork files (review of PR 244: t
       },
       {
         uk: { "custom.deliveryKyiv": "Кур'єр по Києву", "site.name": "Верде" },
-        en: { "site.name": "Verde" },
+        en: { "site.name": "Forkname Fixture" },
       },
     );
     expect(loaded.uk["custom.note"]).toBe("Примітка");
@@ -331,7 +331,7 @@ describe("messagesByLocale wiring with non-empty fork files (review of PR 244: t
     expect(loaded.en["custom.deliveryKyiv"]).toBe("Delivery in Kyiv");
     // ... and a base key.
     expect(loaded.uk["site.name"]).toBe("Верде");
-    expect(loaded.en["site.name"]).toBe("Verde");
+    expect(loaded.en["site.name"]).toBe("Forkname Fixture");
     // Every other base key is kept as it is.
     for (const locale of locales) {
       for (const [key, value] of Object.entries(baseMessagesByLocale[locale])) {

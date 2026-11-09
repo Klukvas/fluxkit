@@ -1,14 +1,20 @@
 import type { Locale, Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { brand } from "../config/brand";
-import type { BrandLogo as BrandLogoConfig, BrandPicture } from "../lib/brand";
+import {
+  isPublicFilePath,
+  type BrandLogo as BrandLogoConfig,
+  type BrandPicture,
+} from "../lib/brand";
 import { localizedHref } from "../lib/locale-path";
 
 /**
  * One logo picture: a plain img element, not `next/image`. The header is on every page, and importing `next/image` here would put
  * its client component into the JavaScript of every page (sign-in and registration included) for a picture that needs no
- * optimisation (a logo is small, SVG recommended). Like `LocalPicture`, only a file under `public/` is accepted, so no remote
- * host comes in through the brand config (`source-guards.spec.ts`). `fetchpriority="low"`: React adds no `<link rel="preload">`
+ * optimisation (a logo is small, SVG recommended). Only a file under `public/` is accepted, by the same rule as the config
+ * check (`isPublicFilePath` of `lib/brand.ts`: no `//`, no `..`), so no remote host comes in through the brand config
+ * (`source-guards.spec.ts`). Both pictures of a light/dark pair are fetched: the hidden one is `display: none`, which does not
+ * stop the download. `fetchpriority="low"`: React adds no `<link rel="preload">`
  * to the head (it does for an eager picture otherwise), and the logo never competes with the page's main picture.
  */
 function LogoPicture({
@@ -20,7 +26,7 @@ function LogoPicture({
   alt: string;
   className: string;
 }) {
-  if (!/^\/[A-Za-z0-9._-]/.test(picture.src)) {
+  if (!isPublicFilePath(picture.src)) {
     throw new Error(`A logo picture must be a file under public/, not "${picture.src}".`);
   }
   return (

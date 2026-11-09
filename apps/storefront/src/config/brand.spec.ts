@@ -8,6 +8,7 @@ import {
   brandIconsMetadata,
   brandOpenGraphImages,
   brandThemeColor,
+  isPublicFilePath,
   type BrandConfig,
 } from "../lib/brand";
 import { messagesByLocale } from "../messages";
@@ -43,10 +44,41 @@ describe("config/brand.ts (fork-owned; contract docs/contracts/branding.md)", ()
     ];
     for (const path of paths) expect(existsSync(`${publicDir}${path}`), path).toBe(true);
   });
+
+  // TEMPLATE-DEFAULT CHECK: upstream's values must render exactly the pre-brand-config output (plan principle 2). A fork that
+  // fills `config/brand.ts` deletes or replaces this one test; every other spec passes with a filled config
+  // (`vitest.brand-fork.config.ts`, part of `pnpm test`).
+  it("template default: text logo, no icon, no theme-color, no og:image", () => {
+    expect(brand).toEqual({
+      logo: { kind: "text" },
+      icons: [],
+      appleIcon: null,
+      themeColor: false,
+      ogImage: null,
+    });
+  });
 });
 
 describe("lib/brand.ts", () => {
   const t = createTranslator(messagesByLocale.en, "en");
+
+  it("isPublicFilePath: one rule for the config check and the logo render (a file under public/ only)", () => {
+    for (const ok of ["/brand/logo.svg", "/logo.png", "/a.b-c_d/e.svg"]) {
+      expect(isPublicFilePath(ok), ok).toBe(true);
+    }
+    for (const bad of [
+      "//cdn.example/logo.svg",
+      "https://cdn.example/logo.svg",
+      "brand/logo.svg",
+      "/",
+      "/../secret.svg",
+      "/brand/../../x.svg",
+      "/brand//logo.svg",
+      "/ logo.svg",
+    ]) {
+      expect(isPublicFilePath(bad), bad).toBe(false);
+    }
+  });
 
   it("renders nothing for the template's defaults (no icon link, no theme-color, no og:image)", () => {
     const defaults: BrandConfig = {

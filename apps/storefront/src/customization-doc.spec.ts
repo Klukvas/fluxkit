@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const doc = readFileSync(join(repoRoot, "docs", "customization.md"), "utf8");
 
-/** Folders the guide tells a fork to create; they do not exist in the template. */
+/** Folders the guide tells a fork to create: missing in the template, present in a fork that followed step 10. */
 const FORK_CREATES = new Set(["apps/admin/public/"]);
 
 function repositoryPaths(text: string): string[] {
@@ -44,10 +44,7 @@ describe("docs/customization.md (plan B5)", () => {
     expect(missing).toEqual([]);
   });
 
-  it("keeps its fork-created exceptions honest: they really are missing in the template", () => {
-    for (const path of FORK_CREATES) {
-      expect(paths, path).toContain(path);
-      expect(existsSync(join(repoRoot, path)), path).toBe(false);
-    }
+  it("lists as fork-created only paths the guide names (they may exist in a fork that followed it)", () => {
+    for (const path of FORK_CREATES) expect(paths, path).toContain(path);
   });
 });

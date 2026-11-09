@@ -15,7 +15,7 @@ Do these in order. Each step names the file, whether the fork owns it (section 2
 | 4 | Colours, radii, shadows, type scale (storefront and, by default, admin) | `packages/theme/src/tokens.css`: the light block, the dark block and the `system` block (colours and shadows in all three; every other token in the light block only). Names and roles: `docs/contracts/theme-tokens.md` | **no** (upstream edits this file: expect a merge conflict on update; a storefront overrides file is not yet available) | `pnpm --filter @fluxkit/theme test` (contrast pairs in all three modes, mail colours equal the tokens) |
 | 5 | Mail colours and the browser theme colour | `packages/theme/src/email-theme.ts` and, for a changed `--fk-color-background`, `packages/theme/src/theme-color.ts` (literal copies: mail and `<meta name="theme-color">` cannot read CSS variables; `email-theme.spec.ts` and `theme-color.spec.ts` fail until they equal the tokens) | **no** | `pnpm --filter @fluxkit/theme test` |
 | 6 | Web fonts | `apps/storefront/src/config/fonts.ts` (self-hosted `next/font/local`, woff2 next to it), then `--fk-font-display` or `--fk-font-sans` in the light block of `tokens.css`; rules in `apps/storefront/README.md` "Fonts" and `docs/contracts/theme-tokens.md` "Fonts" | yes (`fonts.ts`) | `pnpm --filter @fluxkit/storefront test` (`config/fonts.spec.ts`) |
-| 7 | Logo, browser icons, theme colour, default social picture | `apps/storefront/src/config/brand.ts` with the files in `apps/storefront/public/` (for example a new `public/brand/` folder); contract `docs/contracts/branding.md`. Defaults: text logo, no icon, no `theme-color`, no `og:image` | yes | `pnpm --filter @fluxkit/storefront test` (`config/brand.spec.ts`: the named files exist) |
+| 7 | Logo, browser icons, theme colour, default social picture | `apps/storefront/src/config/brand.ts` with the files in `apps/storefront/public/` (for example a new `public/brand/` folder); contract `docs/contracts/branding.md`. Defaults: text logo, no icon, no `theme-color`, no `og:image` | yes | `pnpm --filter @fluxkit/storefront test` (`config/brand.spec.ts`: the named files exist; its one test marked TEMPLATE-DEFAULT CHECK pins upstream's empty values: delete it in the fork. Every other spec already runs once with a filled config, `vitest.brand-fork.config.ts`) |
 | 8 | Light/dark default and the theme switch | `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) | **no** | - |
 | 9 | Admin colours, radii or font different from the shop | `packages/theme/src/admin-overrides.css` (ADR 0047); empty = the admin follows the shop | yes | `pnpm --filter @fluxkit/admin test` |
 | 10 | Admin name and favicon | `app.name`, `app.documentTitle` in `apps/admin/src/messages/uk/common.json` and `apps/admin/src/messages/en/common.json`; a new `favicon.svg` (or `.png`, `.ico`) in a new `apps/admin/public/` folder | name **no**, favicon yes | `pnpm --filter @fluxkit/admin test` (`build-output.spec.ts`) |
@@ -59,7 +59,11 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 - Mail has no logo; mail buttons keep the scale radius (`emailTheme.radius`).
 - Admin headings do not follow the heading roles; the admin shows its name as text (no image logo).
 - `theme-color` follows the theme of the rendered page: after the footer switch changes the theme in the browser, the colour updates on the next page.
-- The image logo is not verified in forced-colours mode with a raster picture (SVG recommended).
+- Forced-colours mode: an image logo keeps its own colours, but the page behind it becomes the system canvas (often black or white); a
+  transparent logo whose marks vanish on that canvas disappears. Choose a logo that reads on both black and white, or use the light/dark pair.
+  Not verified in a browser.
+- Both pictures of a light/dark logo pair are downloaded on every page; a React SVG logo component (`currentColor`) is not offered.
+- The `<head>` budget: the brand tags may add at most 300 bytes (`docs/contracts/branding.md`, "Head budget"); keep icon paths short.
 
 ## 5. Updating from upstream
 

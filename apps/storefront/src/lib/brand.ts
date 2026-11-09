@@ -21,7 +21,10 @@ export interface BrandPicture {
  * The header logo. `text` (the template's default) is the shop name from `site.name` in the display face. `image` is a picture:
  * one for the light theme and one for the dark theme (switched by CSS on `<html data-theme>`, `app/globals.css`), or one picture
  * that reads on both backgrounds, which the fork must state with `darkSafe: true`. Its alternative text is the shop name.
- * SVG is recommended (sharp at every size, and a `currentColor`-free SVG keeps its colours in forced-colours mode).
+ * SVG is recommended (sharp at every size). In forced-colours mode an img element keeps its own colours, but the page behind it
+ * becomes the system canvas (often black or white): a logo with a transparent background whose marks vanish on that canvas
+ * disappears, so choose a logo that reads on both black and white, or use the light/dark pair. A fork-supplied React SVG
+ * component with `currentColor` is not offered (the logo is a file under `public/`).
  */
 export type BrandLogo =
   | { kind: "text" }
@@ -66,19 +69,24 @@ export function brandConfigProblems(config: BrandConfig): string[] {
   }
   if (config.ogImage !== null) pictures.push(["ogImage", config.ogImage]);
   for (const [name, picture] of pictures) {
-    if (!isPublicPath(picture.src)) problems.push(`${name}.src must be a file under public/`);
+    if (!isPublicFilePath(picture.src)) problems.push(`${name}.src must be a file under public/`);
     if (!isPositiveInteger(picture.width) || !isPositiveInteger(picture.height)) {
       problems.push(`${name} needs its width and height in whole pixels`);
     }
   }
   const icons = [...config.icons, ...(config.appleIcon === null ? [] : [config.appleIcon])];
   for (const icon of icons) {
-    if (!isPublicPath(icon.src)) problems.push(`icon ${icon.src} must be a file under public/`);
+    if (!isPublicFilePath(icon.src)) problems.push(`icon ${icon.src} must be a file under public/`);
   }
   return problems;
 }
 
-function isPublicPath(src: string): boolean {
+/**
+ * The ONE path rule of the brand config, used by `brandConfigProblems` and at render time by `components/brand-logo.tsx`: a
+ * site-relative file under `public/` (one leading `/` and a plain first character), never a dot segment (`..`) or a doubled
+ * slash anywhere, so no remote host (`//host/...`) and no path outside `public/` comes in through the brand config.
+ */
+export function isPublicFilePath(src: string): boolean {
   return /^\/[A-Za-z0-9._-]/.test(src) && !src.includes("..") && !src.includes("//");
 }
 

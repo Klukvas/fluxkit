@@ -30,15 +30,19 @@ function run(...args: string[]) {
 }
 
 const upstream = {
-  "site.name": "Demo shop",
-  "site.title": "Demo shop — online store",
+  "site.name": "Shopname Fixture",
+  "site.title": "Shopname Fixture — online store",
   "nav.cart": "Cart",
   "home.hero.title": "Welcome",
 };
 
 describe("messages-extract-overrides script", () => {
   it("writes exactly the keys whose fork text differs from upstream's, as a JSON object", () => {
-    const fork = { ...upstream, "site.name": "Verde Kopi", "home.hero.title": "Fresh coffee" };
+    const fork = {
+      ...upstream,
+      "site.name": "Forkname Fixture",
+      "home.hero.title": "Fresh coffee",
+    };
     const out = join(directory, "overrides-1.json");
     const result = run(
       "--fork",
@@ -50,7 +54,7 @@ describe("messages-extract-overrides script", () => {
     );
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({
-      "site.name": "Verde Kopi",
+      "site.name": "Forkname Fixture",
       "home.hero.title": "Fresh coffee",
     });
   });
@@ -69,7 +73,7 @@ describe("messages-extract-overrides script", () => {
   it("reports keys the fork added (no override possible) and keys it removed, and leaves them out", () => {
     const fork: Record<string, string> = {
       ...upstream,
-      "site.name": "Verde",
+      "site.name": "Forkname Fixture",
       "promo.banner": "Sale",
     };
     delete fork["nav.cart"];
@@ -80,7 +84,7 @@ describe("messages-extract-overrides script", () => {
       file("up-3.json", upstream),
     );
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ "site.name": "Verde" });
+    expect(JSON.parse(result.stdout)).toEqual({ "site.name": "Forkname Fixture" });
     expect(result.stderr).toMatch(/not in upstream.*\n.*promo\.banner/);
     expect(result.stderr).toMatch(/removed.*\n.*nav\.cart/);
   });
@@ -88,8 +92,12 @@ describe("messages-extract-overrides script", () => {
   it("with --messages, leaves out and reports overrides whose key the current upstream area files no longer have", () => {
     const current = join(directory, "current-uk");
     mkdirSync(current);
-    file("current-uk/shell.json", { "site.name": "Demo shop", "nav.cart": "Cart" });
-    const fork = { ...upstream, "site.name": "Verde", "site.title": "Verde shop" };
+    file("current-uk/shell.json", { "site.name": "Shopname Fixture", "nav.cart": "Cart" });
+    const fork = {
+      ...upstream,
+      "site.name": "Forkname Fixture",
+      "site.title": "Forkname Fixture title",
+    };
     const result = run(
       "--fork",
       file("fork-4.json", fork),
@@ -99,7 +107,7 @@ describe("messages-extract-overrides script", () => {
       current,
     );
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(result.stdout)).toEqual({ "site.name": "Verde" });
+    expect(JSON.parse(result.stdout)).toEqual({ "site.name": "Forkname Fixture" });
     expect(result.stderr).toMatch(/no longer.*\n.*site\.title/);
   });
 
@@ -125,7 +133,7 @@ describe("messages-extract-overrides script", () => {
 
   it("creates the missing parent folders of --out", () => {
     const out = join(directory, "new", "folder", "uk.json");
-    const fork = { ...upstream, "site.name": "Verde" };
+    const fork = { ...upstream, "site.name": "Forkname Fixture" };
     const result = run(
       "--fork",
       file("fork-9.json", fork),
@@ -135,6 +143,6 @@ describe("messages-extract-overrides script", () => {
       out,
     );
     expect(result.status, result.stderr).toBe(0);
-    expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({ "site.name": "Verde" });
+    expect(JSON.parse(readFileSync(out, "utf8"))).toEqual({ "site.name": "Forkname Fixture" });
   });
 });

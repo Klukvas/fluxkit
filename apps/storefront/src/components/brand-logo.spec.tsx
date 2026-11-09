@@ -12,9 +12,10 @@ const dark = { src: "/brand/logo-dark.svg", width: 120, height: 32 } as const;
 const images = (html: string) => html.match(/<img[^>]*>/g) ?? [];
 
 describe("BrandLogo (config/brand.ts logo, plan B1)", () => {
-  it("renders the template's text logo exactly as the header did before the brand config", () => {
-    // The markup of `site-header.tsx` before PR-E2, byte for byte: the default must not change the first HTML.
-    expect(renderToStaticMarkup(<BrandLogo locale="uk" t={t} />)).toBe(
+  it("renders the text logo exactly as the header did before the brand config", () => {
+    // The markup of `site-header.tsx` before PR-E2, byte for byte. The logo is passed explicitly: a fork's `config/brand.ts`
+    // may hold an image logo, and this spec must stay green there (`vitest.brand-fork.config.ts`).
+    expect(renderToStaticMarkup(<BrandLogo locale="uk" t={t} logo={{ kind: "text" }} />)).toBe(
       `<a title="${shopName}" class="fk-logo" href="/uk">${shopName}</a>`,
     );
   });
@@ -53,19 +54,23 @@ describe("BrandLogo (config/brand.ts logo, plan B1)", () => {
     expect(html).not.toContain("fk-logo-dark");
   });
 
-  it("refuses a picture that is not a file under public/ (no remote host through the brand config)", () => {
-    expect(() =>
-      renderToStaticMarkup(
-        <BrandLogo
-          locale="uk"
-          t={t}
-          logo={{
-            kind: "image",
-            light: { src: "//evil.example/logo.svg" as `/${string}`, width: 1, height: 1 },
-            darkSafe: true,
-          }}
-        />,
-      ),
-    ).toThrow(/under public/);
+  it("refuses at render what the config check refuses: a remote host, a dot segment, a doubled slash", () => {
+    for (const src of [
+      "//evil.example/logo.svg",
+      "/brand/../../secret.svg",
+      "/brand//logo.svg",
+    ] as const) {
+      expect(
+        () =>
+          renderToStaticMarkup(
+            <BrandLogo
+              locale="uk"
+              t={t}
+              logo={{ kind: "image", light: { src, width: 1, height: 1 }, darkSafe: true }}
+            />,
+          ),
+        src,
+      ).toThrow(/under public/);
+    }
   });
 });

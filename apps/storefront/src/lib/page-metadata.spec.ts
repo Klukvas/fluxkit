@@ -17,6 +17,11 @@ const shopName = uk["site.name"] as string;
 
 const t = createTranslator(uk, "uk");
 const origin = "https://shop.example";
+/**
+ * No brand picture: these specs state it instead of reading `config/brand.ts`, which a fork fills (they stay green there,
+ * `vitest.brand-fork.config.ts`). The real file's defaults are checked in `config/brand.spec.ts`.
+ */
+const ogImage = null;
 
 function listing(query: { page: number; brand: string | null }, basePath = "/catalog") {
   return listingMetadata({
@@ -27,6 +32,7 @@ function listing(query: { page: number; brand: string | null }, basePath = "/cat
     query,
     title: "Каталог",
     description: "Опис",
+    ogImage,
   });
 }
 
@@ -85,6 +91,7 @@ describe("listingMetadata", () => {
       query: { page: 1, brand: null },
       title: "Каталог",
       description: undefined,
+      ogImage,
     });
     expect(meta).not.toHaveProperty("description");
   });
@@ -125,6 +132,7 @@ describe("productMetadata", () => {
       origin,
       locale: "uk",
       t,
+      ogImage,
       product: product({
         title: "Назва",
         description: null,
@@ -160,11 +168,14 @@ describe("the brand's default social picture (config/brand.ts ogImage, plan B1)"
     { url: "https://shop.example/brand/og.png", width: 1200, height: 630, alt: shopName },
   ];
 
-  it("adds nothing with the template's default config (no og:image, the home page keeps no openGraph)", () => {
-    expect(homeMetadata({ origin, locale: "uk", t })).not.toHaveProperty("openGraph");
+  it("adds nothing without a brand picture (no og:image, the home page keeps no openGraph)", () => {
+    expect(homeMetadata({ origin, locale: "uk", t, ogImage: null })).not.toHaveProperty(
+      "openGraph",
+    );
     expect(listing({ page: 1, brand: null }).openGraph).not.toHaveProperty("images");
     expect(
-      productMetadata({ origin, locale: "uk", t, product: product({ media: [] }) }).openGraph,
+      productMetadata({ origin, locale: "uk", t, ogImage: null, product: product({ media: [] }) })
+        .openGraph,
     ).not.toHaveProperty("images");
   });
 

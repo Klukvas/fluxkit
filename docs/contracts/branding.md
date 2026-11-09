@@ -21,8 +21,15 @@ change in a minor release; the fields below may not). `check:docs` fails a PR th
 | `ogImage` | `BrandPicture \| null` | `null` | the default `og:image` (absolute from `STOREFRONT_PUBLIC_URL`, `alt` = `site.name`) of the home page, the catalog and category lists, the shop pages and a product without its own picture. Pages without `openGraph` (cart, account, legal, search) get none |
 
 `BrandPicture` = `{ src: "/<path under public/>"; width: number; height: number }` (intrinsic size in whole pixels). `BrandIcon` = `{ src: "/<path under
-public/>"; type: string; sizes: string }`. Paths must be site-relative files under `apps/storefront/public/` (remote hosts are refused by `LocalPicture`
-and by `brandConfigProblems`; `config/brand.spec.ts` checks that every named file exists).
+public/>"; type: string; sizes: string }`. Paths must be site-relative files under `apps/storefront/public/`: one rule, `isPublicFilePath` of `lib/brand.ts` (one leading `/`, no `//`
+and no `..` anywhere), applied by `brandConfigProblems` and again at render by `components/brand-logo.tsx`, so no remote host comes in
+(`config/brand.spec.ts` checks that every named file exists).
+
+Logo notes: both pictures of a light/dark pair are downloaded on every page (the hidden one is `display: none`, which does not stop the
+fetch); keep them small (SVG). A fork-supplied React SVG component (with `currentColor` fills) is NOT offered: the logo is a file under
+`public/`. In forced-colours mode an `<img>` keeps its own colours while the page behind it becomes the system canvas (often black or
+white): a transparent logo whose marks vanish on that canvas disappears, so choose a logo that reads on both black and white, or use the
+light/dark pair.
 
 ## Not in this file
 
@@ -38,6 +45,13 @@ The template's values render exactly what the storefront rendered before the fil
 
 ## Head budget
 
-Every tag here is in the first HTML of every page. Measured on `next dev` (2026-11-09, `/uk|en/account/register`): the defaults add 0 bytes; the
-example of the file's comment (one SVG icon, an apple icon, both theme colours) adds 177 bytes with a `light` or `dark` cookie and 296 bytes with
-`system` (the two `media` tags). Plan B1 caps the growth at 300 bytes: keep paths short and add no further icon sizes (one SVG icon covers every size).
+Every tag here is in the first HTML of every page. Plan B1 caps the growth of the `<head>` at 300 bytes.
+
+- Defaults: 0 bytes. On `next start` (CI e2e `first-html`, which prints `FIRST-HTML {... "head": ...}` per route) the total, head and header
+  bytes of all 24 measured routes equal those of `main` (2026-11-09; e.g. `/uk/account/register` head 1,345, `/en/account/register` 1,262).
+- The example of the file's comment, measured on `next dev` only (2026-11-09, `/uk|en/account/register`; not yet on `next start`): the brand
+  tags are `<link rel="icon" ...>` 74 bytes, `<link rel="apple-touch-icon" ...>` 59 bytes and the `theme-color` meta: 44 bytes for a `light` or
+  `dark` cookie (74 + 59 + 44 = 177), 82 + 81 with `media` for `system` (74 + 59 + 163 = 296, the worst case, 4 bytes under the cap).
+- Every extra character of a path counts once per tag: longer paths than `/brand/icon.svg` and `/brand/apple-icon.png`, or a second icon size,
+  exceed the cap in `system` mode. One SVG icon covers every size. `og:image` tags are only on the pages listed above (not on the
+  registration and sign-in pages).
