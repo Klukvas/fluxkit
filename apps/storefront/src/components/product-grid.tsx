@@ -2,7 +2,7 @@ import type { ProductSummary } from "@fluxkit/api-client";
 import type { Locale, Translator } from "@fluxkit/ui";
 import { cardDisplay } from "../lib/product-card-model";
 import type { CardOffer } from "../lib/search-facets";
-import { resolveCard } from "./cards/registry";
+import { resolveCard, type builtInCards } from "./cards/registry";
 
 /** Cards whose image loads at once: roughly the first row; the rest are lazy (a kind may allow fewer, `maxEagerImages`). */
 export const EAGER_IMAGE_COUNT = 4;
@@ -26,7 +26,7 @@ export function ProductGrid<Item extends ProductSummary>({
 }: {
   products: readonly Item[];
   /** The card kind of the registry; an unknown kind renders the grid card and logs an error. */
-  kind?: string;
+  kind?: keyof typeof builtInCards | (string & {});
   locale: Locale;
   t: Translator;
   exponent: number;

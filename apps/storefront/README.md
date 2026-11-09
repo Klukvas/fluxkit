@@ -478,8 +478,10 @@ Plan `docs/plans/2026-11-08-design-changeability.md` (L2, L5); contract `docs/co
   `grid` (`grid-card.tsx`, the card of before, markup compared byte for byte with a frozen copy in `registry.spec.tsx`) and
   `list` (`list-card.tsx`: image beside the text, same accessibility contract, at most two eager images). `ProductGrid` renders by
   `kind` (default `grid`); an unknown kind renders the grid card and logs `console.error`.
-- **Fork:** add a card in a new file and register it in `components/cards/custom.ts` (fork-owned, empty upstream); the same name as
-  a built-in kind replaces it. A card is a server component (`client-boundary.spec.ts` keeps `'use client'` files away from
+- **Fork:** add a card in a new file and register it in `components/cards/custom.ts` (fork-owned, empty upstream) under `grid`
+  or `list` to replace that kind. Today only these overrides take effect: the lists choose the kind from `?view=` only, so a
+  NEW kind name is registered but never selected; choosing a kind by name arrives with `config/catalog.ts` (plan L2, not yet
+  available). A card is a server component (`client-boundary.spec.ts` keeps `'use client'` files away from
   `cards/` and `product-grid`).
 - **`?view=list`:** catalog, category and search result pages (`lib/card-view.ts`; parsed by `search-query.ts` and
   `catalog-query.ts`). Default grid, never written; `view=grid` or an unknown value redirects to the address without it. Every
@@ -487,7 +489,8 @@ Plan `docs/plans/2026-11-08-design-changeability.md` (L2, L5); contract `docs/co
   shared search cache key, the canonical URL, hreflang or the sitemap.
 - **Switch:** `components/view-toggle.tsx`, two plain links in a group labelled `catalog.view.label`, the current one
   `aria-current="true"`, 44 px targets; in the results toolbar after the count (the links overhang by `-my-2`, so the toolbar
-  keeps its height) and next to the count of the SQL listing (search off). Server markup only: +618 bytes of HTML on `/uk/catalog`
+  keeps its height) and next to the count of the SQL listing (search off). The overhang means the 44 px hit boxes reach 8 px
+  into the gaps above and below (12 px each); anything placed closer to the toolbar must keep that space free, or the targets overlap. Server markup only: +618 bytes of HTML on `/uk/catalog`
   at the default view (measured by rendering the page body with 12 products before and after; the inline RSC payload repeats it).
 - **Tests:** `lib/product-card-model.spec.ts`, `components/cards/registry.spec.tsx`, `cards/custom.spec.tsx`,
   `components/view-toggle.spec.tsx`, additions to `search-query.spec.ts`, `catalog-query.spec.ts`, `page-metadata.spec.ts`,
