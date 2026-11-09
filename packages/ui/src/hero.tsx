@@ -39,7 +39,7 @@ export function Hero({
       aria-labelledby={headingId}
       data-hero=""
       className={cn(
-        "grid items-center gap-6 rounded-lg bg-muted p-6 md:p-10",
+        "grid items-center gap-6 rounded-card bg-muted p-6 md:p-10",
         media ? "md:grid-cols-2" : null,
         className,
       )}

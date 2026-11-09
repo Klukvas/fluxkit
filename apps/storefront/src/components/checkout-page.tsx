@@ -440,7 +440,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
               aria-expanded={summaryShown}
               aria-controls={SUMMARY_DETAILS_ID}
               onClick={() => props.onSummaryOpenChange?.(!summaryShown)}
-              className={`flex min-h-11 w-full items-center gap-3 rounded-md border border-border bg-muted px-4 py-2 text-start text-foreground ${focusRing}`}
+              className={`flex min-h-11 w-full items-center gap-3 rounded-control border border-border bg-muted px-4 py-2 text-start text-foreground ${focusRing}`}
             >
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="font-semibold">{t("checkout.summary.title")}</span>

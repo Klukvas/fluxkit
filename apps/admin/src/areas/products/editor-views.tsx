@@ -50,7 +50,7 @@ export function TabProblemsView({
       id={id}
       tabIndex={-1}
       aria-labelledby={`${id}-heading`}
-      className={`flex flex-col gap-2 rounded-md border border-danger p-4 ${focusClass}`}
+      className={`flex flex-col gap-2 rounded-panel border border-danger p-4 ${focusClass}`}
     >
       <h2 id={`${id}-heading`} className="font-semibold">
         {t("products.problems.onTab")}
@@ -206,7 +206,7 @@ export function PublishProblemsView({
       ref={innerRef}
       tabIndex={-1}
       role="alert"
-      className={`flex flex-col gap-3 rounded-md border border-danger p-4 ${focusClass}`}
+      className={`flex flex-col gap-3 rounded-panel border border-danger p-4 ${focusClass}`}
     >
       <p className="font-semibold">{t("products.problems.title")}</p>
       <ul className="flex flex-col gap-2">

@@ -130,7 +130,7 @@ export function LookupComboboxView(props: LookupComboboxViewProps) {
               role="listbox"
               aria-label={props.label}
               hidden={!showList}
-              className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-card"
+              className="absolute z-10 mt-1 max-h-72 w-full overflow-auto rounded-control border border-border bg-background py-1 text-foreground shadow-card"
             >
               {options.map((option, index) => (
                 <li

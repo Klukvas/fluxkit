@@ -63,7 +63,7 @@ export function SideNav({
                     href: item.href,
                     ...(item.current ? { "aria-current": "page" as const } : {}),
                     className: cn(
-                      "flex min-h-11 items-center rounded-md px-3 py-2 font-medium",
+                      "flex min-h-11 items-center rounded-control px-3 py-2 font-medium",
                       focusRing,
                       item.current
                         ? "bg-primary text-primary-foreground"

@@ -155,7 +155,7 @@ export function OrderDetailsView({
         aria-atomic="true"
         id={CANCEL_FOCUS_IDS.status}
         tabIndex={-1}
-        className="min-h-6 rounded-md empty:-mt-6 empty:min-h-0 text-muted-foreground outline-offset-2 focus:outline-2 focus:outline-ring"
+        className="min-h-6 rounded-control empty:-mt-6 empty:min-h-0 text-muted-foreground outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         {cancel.done ? t("order.cancel.done") : ""}
       </div>

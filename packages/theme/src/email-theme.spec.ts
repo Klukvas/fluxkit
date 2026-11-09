@@ -39,6 +39,12 @@ const notInMail: Record<string, string> = {
   "--fk-shadow-raised": "box-shadow is not supported by common mail clients",
   "--fk-shadow-overlay": "box-shadow is not supported by common mail clients",
   "--fk-space-unit": "mail has its own px spacing (`emailTheme.space`)",
+  ...Object.fromEntries(
+    ["control", "card", "panel", "overlay", "media"].map((role) => [
+      `--fk-radius-${role}`,
+      "mail keeps the scale radii of `emailTheme.radius` (known limit: adding roles would change the `EmailTheme` contract)",
+    ]),
+  ),
   "--fk-font-display":
     "mail headings use `emailTheme.font.sans`: a fork's display face is a self-hosted web font that mail clients would not load (the `EmailTheme` contract stays unchanged)",
   ...Object.fromEntries(

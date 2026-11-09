@@ -46,7 +46,7 @@ export function BrandLogoPreview({
       referrerPolicy="no-referrer"
       width={96}
       height={96}
-      className="size-24 rounded-md border border-border object-contain"
+      className="size-24 rounded-media border border-border object-contain"
       onError={() => setFailedFor(safe)}
     />
   );

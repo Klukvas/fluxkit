@@ -48,7 +48,7 @@ export function EditorNoticeBar({
         {notice === null ? null : notice.kind === "unknown" ? (
           <UnknownResultNotice t={t} />
         ) : (
-          <p className="rounded-md border border-success p-3 text-foreground">
+          <p className="rounded-panel border border-success p-3 text-foreground">
             {t(`products.notice.${notice.kind}`, notice.values)}
           </p>
         )}

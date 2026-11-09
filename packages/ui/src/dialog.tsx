@@ -77,7 +77,7 @@ export function Dialog({
         }
       }}
       className={cn(
-        "m-auto w-full max-w-lg rounded-lg border border-border bg-background p-6 text-foreground shadow-card",
+        "m-auto w-full max-w-lg rounded-overlay border border-border bg-background p-6 text-foreground shadow-card",
         backdrop,
         className,
       )}

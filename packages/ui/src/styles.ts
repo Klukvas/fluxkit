@@ -4,7 +4,7 @@ export const focusRing =
 
 /** Shared look of form controls that hold text. The invalid state follows aria-invalid, so it cannot drift from it. */
 export const controlBase =
-  "min-h-11 w-full rounded-md border border-border-input bg-background px-3 py-2 text-foreground disabled:opacity-50 aria-invalid:border-danger";
+  "min-h-11 w-full rounded-control border border-border-input bg-background px-3 py-2 text-foreground disabled:opacity-50 aria-invalid:border-danger";
 
 /**
  * Text roles of the design kit (review D-19): one class string per role, so a redesign changes a heading style in one place.

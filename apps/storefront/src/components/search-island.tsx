@@ -146,7 +146,7 @@ export function FloatingApplyView({
         tabIndex={-1}
         aria-hidden="true"
         hidden={!visible}
-        className="absolute end-2 z-20 inline-flex min-h-11 items-center whitespace-nowrap rounded-md bg-primary px-4 font-medium text-primary-foreground shadow-card lg:end-auto lg:start-full lg:ms-3"
+        className="absolute end-2 z-20 inline-flex min-h-11 items-center whitespace-nowrap rounded-control bg-primary px-4 font-medium text-primary-foreground shadow-card lg:end-auto lg:start-full lg:ms-3"
       >
         {label}
       </button>
@@ -331,7 +331,7 @@ export function FiltersButton({ label }: { label: string }) {
         event.preventDefault();
         setSheetOpen(true);
       }}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-md border border-border-input bg-background px-4 font-medium text-foreground lg:hidden ${focusRing}`}
+      className={`inline-flex min-h-11 items-center gap-2 rounded-control border border-border-input bg-background px-4 font-medium text-foreground lg:hidden ${focusRing}`}
     >
       {label}
     </a>
@@ -432,7 +432,7 @@ export function FilterSheet({
             type="button"
             aria-label={closeLabel}
             onClick={() => setSheetOpen(false)}
-            className={`inline-flex size-11 items-center justify-center rounded-md hover:bg-muted ${focusRing}`}
+            className={`inline-flex size-11 items-center justify-center rounded-control hover:bg-muted ${focusRing}`}
           >
             <CloseIcon />
           </button>

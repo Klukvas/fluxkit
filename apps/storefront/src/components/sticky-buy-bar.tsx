@@ -62,7 +62,7 @@ export interface StickyBuyBarProps {
 }
 
 const stepButton =
-  "inline-flex size-11 items-center justify-center rounded-md border border-border bg-background text-foreground disabled:opacity-50";
+  "inline-flex size-11 items-center justify-center rounded-control border border-border bg-background text-foreground disabled:opacity-50";
 
 /**
  * The product page's buy bar on phones (review D-02): fixed to the bottom below `md`, shown only while the inline "Add to
@@ -118,7 +118,7 @@ export function StickyBuyBar(props: StickyBuyBarProps) {
         tabIndex={-1}
         disabled={!props.canAdd}
         onClick={props.onAdd}
-        className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-md bg-primary px-4 font-medium text-primary-foreground disabled:opacity-50"
+        className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-control bg-primary px-4 font-medium text-primary-foreground disabled:opacity-50"
       >
         {props.addLabel}
       </button>

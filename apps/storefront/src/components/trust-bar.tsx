@@ -39,7 +39,7 @@ export function StoreTrustBar({
       aria-label={t("trust.label")}
       data-trust-bar=""
       className={cn(
-        "flex flex-col gap-2 rounded-md border border-border bg-background p-3 text-sm text-foreground",
+        "flex flex-col gap-2 rounded-panel border border-border bg-background p-3 text-sm text-foreground",
         className,
       )}
     >

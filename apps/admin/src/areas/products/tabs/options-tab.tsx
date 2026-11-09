@@ -135,7 +135,7 @@ export function CurrentOptionsView({
                 key={option.optionId}
                 id={optionFocusId(option.optionCode)}
                 tabIndex={-1}
-                className={`flex flex-col gap-2 rounded-md border border-border p-4 ${focusClass}`}
+                className={`flex flex-col gap-2 rounded-panel border border-border p-4 ${focusClass}`}
               >
                 <h3 className="font-semibold">
                   {t("products.options.optionName", {
@@ -282,7 +282,7 @@ export function ReplaceOptionsView({
           return (
             <fieldset
               key={optionId}
-              className="flex flex-col gap-2 rounded-md border border-border p-4"
+              className="flex flex-col gap-2 rounded-panel border border-border p-4"
               aria-describedby={error === undefined ? undefined : errorId}
             >
               <legend className="px-1 font-medium">

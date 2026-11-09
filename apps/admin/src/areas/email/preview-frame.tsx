@@ -16,7 +16,7 @@ export function SandboxedMailFrame({ title, html }: { title: string; html: strin
       srcDoc={html}
       referrerPolicy="no-referrer"
       loading="eager"
-      className="h-160 w-full rounded-md border border-border bg-background"
+      className="h-160 w-full rounded-panel border border-border bg-background"
     />
   );
 }

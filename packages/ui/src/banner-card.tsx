@@ -75,7 +75,7 @@ export function BannerCard({
   if (layout === "image") {
     return renderLink({
       className: cn(
-        "group block overflow-hidden rounded-lg border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none",
+        "group block overflow-hidden rounded-card border border-border transition-shadow hover:border-border-input hover:shadow-raised motion-reduce:transition-none",
         focusRing,
       ),
       children: <span className={FRAME}>{picture}</span>,
@@ -88,7 +88,7 @@ export function BannerCard({
   const hasText = text !== null && text !== undefined && text !== "";
   return renderLink({
     className: cn(
-      "group flex h-full flex-col overflow-hidden rounded-lg border transition-shadow hover:shadow-raised motion-reduce:transition-none",
+      "group flex h-full flex-col overflow-hidden rounded-card border transition-shadow hover:shadow-raised motion-reduce:transition-none",
       colours.card,
       focusRing,
     ),

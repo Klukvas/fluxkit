@@ -130,27 +130,109 @@ describe("design guard, patterns catch known violations", () => {
 // The design kit (review D-19, plan 2026-11-03-storefront-design-a.md): sizes, radii and elevation come from tokens. tailwind.css
 // maps the type scale, the spacing unit and the shadows to `--fk-*` tokens; a class outside those scales (`text-5xl`,
 // `rounded-xl`, `shadow-md`) would use one of Tailwind's built-in values, which a rebrand of tokens.css cannot reach.
-// `rounded-full` is a shape (a pill or a circle), not a brand value, so it is allowed without a token.
+// Radii are ROLES (plan 2026-11-08-design-changeability.md, T3): `rounded-control`, `rounded-card`, `rounded-panel`,
+// `rounded-overlay`, `rounded-media`, so a rebrand changes one role in tokens.css instead of a size step shared by unrelated parts. The scale classes
+// (`rounded-sm|md|lg`) stay mapped for forks (additive contract) but the template's own code uses them only through
+// `radiusExceptions` below. `rounded-full` is a shape (a pill or a circle) and `rounded-none` no radius: neither is a brand value.
 const typeSteps = ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"];
-const radiusSteps = ["sm", "md", "lg", "full", "none"];
+const radiusRoles = ["control", "card", "panel", "overlay", "media"];
+const radiusSteps = [...radiusRoles, "full", "none"];
 const shadowSteps = ["card", "raised", "overlay", "none"];
+
+interface RadiusException {
+  /** Repository-relative path. */
+  file: string;
+  /** The scale class kept (`rounded-sm|md|lg`, variants stripped). */
+  className: string;
+  /** Exact number of uses in the file: one more (a new button with `rounded-md`) fails the guard. */
+  count: number;
+  reason: string;
+}
+
+/**
+ * Raw scale radii the template still uses on purpose, each with its count and reason (plan 2026-11-08 T3). Only the 0.25rem
+ * parts are left (owner decision 2026-11-09: inline panels got the `panel` role, these stay): moving one to a role would change
+ * pixels at the default tokens. Keep the list short; a new entry needs a reason a reviewer can check.
+ */
+// The 0.25rem step has no role: a native checkbox and the focus ring of a text link are smaller than a control, a count or
+// discount badge is a mark inside text, a flag or a 48px thumbnail is smaller than media.
+const SMALL_CONTROL =
+  "0.25rem: smaller than the control role (0.5rem); no role for this step (owner, 2026-11-09)";
+const SMALL_MARK = "0.25rem badge inside text: no role covers marks (owner decision 2026-11-09)";
+const SMALL_MEDIA = "0.25rem small picture (flag, 48px thumbnail): the media role is 0.5rem";
+
+const radiusExceptions: RadiusException[] = [
+  { file: "packages/ui/src/badge.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
+  { file: "packages/ui/src/price-text.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
+  {
+    file: "packages/ui/src/checkbox.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_CONTROL,
+  },
+  {
+    file: "apps/storefront/src/app/globals.css",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_MEDIA,
+  },
+  {
+    file: "apps/storefront/src/components/product-card.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_CONTROL,
+  },
+  {
+    file: "apps/admin/src/areas/orders/order-detail-view.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_MEDIA,
+  },
+];
+
+/** A class name without its variants: the part after the last colon outside brackets and parentheses. */
+function withoutVariants(name: string): string {
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < name.length; index += 1) {
+    const char = name[index];
+    if (char === "[" || char === "(") depth += 1;
+    else if (char === "]" || char === ")") depth -= 1;
+    else if (char === ":" && depth === 0) start = index + 1;
+  }
+  return name.slice(start);
+}
 
 /** Class names of every quoted string in a source, without their variants (`md:hover:shadow-raised` -> `shadow-raised`). */
 function quotedClasses(source: string): string[] {
   return [...source.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.)*)\1/g)].flatMap((match) =>
     (match[2] as string)
       .split(/\s+/)
-      .map((name) => name.split(":").pop() as string)
+      .map(withoutVariants)
       .filter((name) => name !== ""),
   );
 }
 
-/** The classes of a source that leave the token scales. */
+/** Class names of the `@apply` rules of a stylesheet, without their variants (the `.fk-*` classes of globals.css). */
+function appliedClasses(source: string): string[] {
+  return [...source.matchAll(/@apply\s+([^;]+);/g)].flatMap((match) =>
+    (match[1] as string)
+      .split(/\s+/)
+      .map(withoutVariants)
+      .filter((name) => name !== ""),
+  );
+}
+
+/** The classes of a source that leave the token scales (quoted class lists, and `@apply` rules of a stylesheet). */
 function offScaleClasses(source: string): string[] {
-  return quotedClasses(source).filter((name) => {
+  return [...quotedClasses(source), ...appliedClasses(source)].filter((name) => {
     const size = /^text-(xs|sm|base|lg|\d?xl)$/.exec(name);
     if (size) return !typeSteps.includes(size[1] as string);
-    const radius = /^rounded(?:-(?:[trblse]|[trbl][lr]|s[se]|e[se]))?(?:-([a-z0-9]+))?$/.exec(name);
+    // Tailwind v4 also takes `rounded-(--var)`, `rounded-(length:--var)` and the important marker (`rounded-md!`, `!rounded-md`).
+    const radius =
+      /^!?rounded(?:-(?:[trblse]|[trbl][lr]|s[se]|e[se]))?(?:-([a-z0-9]+|\[[^\]]*\]|\([^)]*\)))?!?$/.exec(
+        name,
+      );
     if (radius) return !radiusSteps.includes(radius[1] ?? "");
     const shadow = /^shadow(?:-([a-z0-9]+))?$/.exec(name);
     if (shadow) return !shadowSteps.includes(shadow[1] ?? "");
@@ -172,7 +254,11 @@ describe("design guard, the design kit scales", () => {
     for (const step of shadowSteps.filter((name) => name !== "none")) {
       expect(tailwindCss).toContain(`--shadow-${step}: var(--fk-shadow-${step});`);
     }
-    for (const step of radiusSteps.filter((name) => name !== "none" && name !== "full")) {
+    for (const role of radiusRoles) {
+      expect(tailwindCss).toContain(`--radius-${role}: var(--fk-radius-${role});`);
+    }
+    // The scale steps stay mapped (additive contract): a fork's own `rounded-md` keeps working.
+    for (const step of ["sm", "md", "lg"]) {
       expect(tailwindCss).toContain(`--radius-${step}: var(--fk-radius-${step});`);
     }
   });
@@ -194,21 +280,69 @@ describe("design guard, the design kit scales", () => {
     ]);
     expect(
       offScaleClasses(
-        `"text-sm lg:text-4xl text-foreground rounded-md rounded-t-lg rounded-full hover:shadow-raised shadow-overlay shadow-none"`,
+        `"text-sm lg:text-4xl text-foreground rounded-control rounded-t-card rounded-panel md:rounded-overlay rounded-media rounded-full rounded-none hover:shadow-raised shadow-overlay shadow-none"`,
       ),
     ).toEqual([]);
   });
 
-  it("finds no size, radius or shadow outside the token scales in components or apps", () => {
+  it("flags the radius size steps (roles only) and arbitrary radii, in class lists and in @apply", () => {
+    expect(
+      offScaleClasses(
+        `"rounded-sm focus:rounded-md lg:rounded-lg rounded-e-md rounded-2xl rounded-3xl rounded-[3px] rounded-(--radius-md) md:rounded-(length:--x) rounded-md! !rounded-lg hover:rounded-t-(--y)!"`,
+      ),
+    ).toEqual([
+      "rounded-sm",
+      "rounded-md",
+      "rounded-lg",
+      "rounded-e-md",
+      "rounded-2xl",
+      "rounded-3xl",
+      "rounded-[3px]",
+      "rounded-(--radius-md)",
+      "rounded-(length:--x)",
+      "rounded-md!",
+      "!rounded-lg",
+      "rounded-t-(--y)!",
+    ]);
+    expect(offScaleClasses(`"rounded-panel! md:rounded-card rounded-full!"`)).toEqual([]);
+    expect(
+      offScaleClasses(
+        `.fk-x {\n  @apply flex rounded-md px-2 hover:bg-muted;\n}\n.fk-y {\n  @apply rounded-control rounded-panel text-sm;\n}`,
+      ),
+    ).toEqual(["rounded-md"]);
+  });
+
+  it("finds no size, radius or shadow outside the token scales in components or apps (radius exceptions listed)", () => {
     // Specs are left out: their test names are prose ("is rounded down"), not class lists.
     const styled = sources.filter((file) => !/\.spec\.tsx?$/.test(file));
     expect(styled.length).toBeGreaterThan(5);
-    const offenders = styled.flatMap((file) =>
-      offScaleClasses(readFileSync(file, "utf8")).map(
-        (name) => `${file.replace(repoRoot, "")}: ${name}`,
-      ),
+    const found = new Map<string, number>();
+    for (const file of styled) {
+      for (const name of offScaleClasses(readFileSync(file, "utf8"))) {
+        const key = `${file.replace(repoRoot, "")}: ${name}`;
+        found.set(key, (found.get(key) ?? 0) + 1);
+      }
+    }
+    const allowed = new Map(
+      radiusExceptions.map(({ file, className, count }) => [`${file}: ${className}`, count]),
     );
+    const offenders = [...found]
+      .filter(([key, count]) => allowed.get(key) !== count)
+      .map(([key, count]) => `${key} (${String(count)}x)`);
     expect(offenders).toEqual([]);
+    // An exception with no use left (or a changed count) is stale: remove or correct it.
+    const stale = radiusExceptions
+      .filter(({ file, className, count }) => found.get(`${file}: ${className}`) !== count)
+      .map(({ file, className }) => `${file}: ${className}`);
+    expect(stale).toEqual([]);
+  });
+
+  it("keeps every radius exception explained and limited to a scale step", () => {
+    for (const { file, className, count, reason } of radiusExceptions) {
+      expect(className, file).toMatch(/^rounded-(?:sm|md|lg)$/);
+      expect(count, file).toBeGreaterThan(0);
+      expect(reason.length, `${file}: ${className} needs a reason`).toBeGreaterThan(20);
+    }
   });
 });
 

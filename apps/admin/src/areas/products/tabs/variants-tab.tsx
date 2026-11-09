@@ -968,7 +968,7 @@ export function VariantsTab({
         ) : null}
       </div>
       {needsOptions ? (
-        <div className="flex flex-col gap-2 rounded-md border border-border p-4">
+        <div className="flex flex-col gap-2 rounded-panel border border-border p-4">
           <p>{t("products.variants.needsOptions")}</p>
           <p>
             <Link

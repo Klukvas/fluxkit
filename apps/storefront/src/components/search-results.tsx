@@ -71,7 +71,7 @@ export interface SearchResultsViewProps {
   categories?: readonly NavigationCategory[] | null;
 }
 
-const chipLink = `inline-flex min-h-11 items-center gap-1 rounded-md border border-border px-3 text-foreground ${focusRing}`;
+const chipLink = `inline-flex min-h-11 items-center gap-1 rounded-control border border-border px-3 text-foreground ${focusRing}`;
 
 const SEARCH_BASE_PATH = "/search";
 
@@ -157,7 +157,7 @@ function EmptyResults({
         </a>
       }
       headingAs="h3"
-      className="rounded-md border border-border"
+      className="rounded-panel border border-border"
     />
   );
 }

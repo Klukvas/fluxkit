@@ -90,6 +90,14 @@ describe("design tokens", () => {
     ).toBe(true);
   });
 
+  it("defines the radius roles as literal rem values, not as a var() of the size steps", () => {
+    // Plan 2026-11-08 T3: a literal per role, so a rebrand of one role (`--fk-radius-card: 0`) restyles only that role, and mail
+    // and the parsers keep reading plain values.
+    for (const role of ["control", "card", "panel", "overlay", "media"]) {
+      expect(lightBlock.tokens.get(`--fk-radius-${role}`), role).toMatch(/^[0-9.]+rem$/);
+    }
+  });
+
   it("defines the status and focus tokens added for the storefront", () => {
     const defined = definedTokens(lightBlock);
     for (const name of ["--fk-color-success", "--fk-color-warning", "--fk-color-ring"]) {

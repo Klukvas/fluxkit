@@ -37,8 +37,8 @@ export function AccountNavView({
                 {...(isCurrent ? { "aria-current": "page" as const } : {})}
                 className={`flex min-h-11 items-center whitespace-nowrap px-3 font-medium ${focusRing} ${
                   isCurrent
-                    ? "border-b-2 border-primary text-foreground lg:rounded-md lg:border-b-0 lg:bg-muted"
-                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground lg:rounded-md lg:border-b-0 lg:hover:bg-muted"
+                    ? "border-b-2 border-primary text-foreground lg:rounded-control lg:border-b-0 lg:bg-muted"
+                    : "border-b-2 border-transparent text-muted-foreground hover:text-foreground lg:rounded-control lg:border-b-0 lg:hover:bg-muted"
                 }`}
               >
                 {t(link.labelKey)}

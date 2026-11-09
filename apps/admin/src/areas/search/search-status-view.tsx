@@ -245,7 +245,7 @@ function LocaleCard({
   return (
     <section
       aria-labelledby={headingId}
-      className="flex flex-col gap-3 rounded-lg border border-border p-4"
+      className="flex flex-col gap-3 rounded-card border border-border p-4"
     >
       <div className="flex flex-wrap items-center gap-3">
         <h3 id={headingId} className="text-base font-semibold text-foreground">

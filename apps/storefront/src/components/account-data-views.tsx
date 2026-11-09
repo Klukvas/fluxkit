@@ -70,7 +70,7 @@ export function ExportSection({
         ref={statusRef}
         tabIndex={-1}
         role="status"
-        className="rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
+        className="rounded-control outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         {state.status === "done" ? (
           <Alert variant="success">
@@ -122,7 +122,7 @@ export function BlockedView({
     <div
       ref={innerRef}
       tabIndex={-1}
-      className="rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
+      className="rounded-control outline-offset-2 focus:outline-2 focus:outline-ring"
     >
       <Alert variant="warning" title={t("account.data.blocked.title")}>
         <p>{t("account.data.blocked.intro")}</p>

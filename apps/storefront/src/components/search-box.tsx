@@ -149,7 +149,7 @@ export function SearchBoxView(props: SearchBoxViewProps) {
             ))}
           </ul>
           {showStatus ? (
-            <p className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground shadow-card">
+            <p className="rounded-control border border-border bg-background px-3 py-2 text-sm text-muted-foreground shadow-card">
               {status === "loading" ? t("searchBox.loading") : null}
               {status === "ready" ? t("searchBox.empty") : null}
               {status === "error" && props.failure !== null ? failureText(t, props.failure) : null}

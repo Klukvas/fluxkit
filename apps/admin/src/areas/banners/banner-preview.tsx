@@ -173,15 +173,15 @@ export function BannerPreviewView({
         data-theme={theme}
         data-preview-device={device}
         lang={locale}
-        className={`overflow-x-auto rounded-lg border border-border bg-background p-4 text-foreground ${focusClass}`}
+        className={`overflow-x-auto rounded-card border border-border bg-background p-4 text-foreground ${focusClass}`}
       >
         {device === "phone" ? (
           <div className="mx-auto max-w-xs">{card}</div>
         ) : (
           <div className="grid min-w-3xl grid-cols-3 gap-4">
             {card}
-            <div aria-hidden="true" className="rounded-lg bg-muted" />
-            <div aria-hidden="true" className="rounded-lg bg-muted" />
+            <div aria-hidden="true" className="rounded-card bg-muted" />
+            <div aria-hidden="true" className="rounded-card bg-muted" />
           </div>
         )}
       </div>

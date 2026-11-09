@@ -30,13 +30,13 @@ export function clampQuantity(value: number, min: number, max: number | undefine
 
 // One height for the three parts (44 px, the touch target), so the number sits on the buttons' centre line.
 const buttonClasses = cn(
-  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-border bg-background text-lg leading-none text-foreground disabled:opacity-50",
+  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-control border border-border bg-background text-lg leading-none text-foreground disabled:opacity-50",
   focusRing,
 );
 
 // The number is centred in its box: no native spin buttons (they take room on one side), tabular digits, no padding.
 const inputClasses =
-  "h-11 w-16 rounded-md border border-border-input bg-background p-0 text-center leading-none tabular-nums text-foreground [appearance:textfield] disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
+  "h-11 w-16 rounded-control border border-border-input bg-background p-0 text-center leading-none tabular-nums text-foreground [appearance:textfield] disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none";
 
 export function QuantityInput({
   value,

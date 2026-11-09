@@ -166,7 +166,7 @@ function PictureFacts({ t, picture }: { t: Translator; picture: BannerPicture })
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="aspect-2/1 w-40 rounded-md border border-border bg-muted object-cover"
+          className="aspect-2/1 w-40 rounded-media border border-border bg-muted object-cover"
         />
       )}
       <div className="flex flex-col gap-1 text-sm">
@@ -214,7 +214,7 @@ function PictureSlotView({
   const hasInput = upload.uploadsEnabled && canWrite;
   return (
     <div
-      className={`flex flex-col gap-3 rounded-md border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
+      className={`flex flex-col gap-3 rounded-panel border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
       role="group"
       aria-labelledby={`${id}-heading`}
       aria-describedby={error === undefined || hasInput ? undefined : errorId}

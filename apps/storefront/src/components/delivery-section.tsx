@@ -62,7 +62,7 @@ export function DeliverySectionView(props: DeliverySectionViewProps) {
       id={methodId}
       tabIndex={-1}
       aria-describedby={methodError === undefined ? undefined : errorId}
-      className="flex flex-col gap-4 rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
+      className="flex flex-col gap-4 rounded-control outline-offset-2 focus:outline-2 focus:outline-ring"
     >
       <legend className={`${textStyles.sectionTitle} mb-2`}>
         <h2>{t("checkout.shipping.title")}</h2>
@@ -87,7 +87,7 @@ export function DeliverySectionView(props: DeliverySectionViewProps) {
           return (
             <label
               key={option.methodCode}
-              className="flex cursor-pointer gap-3 rounded-md border border-border p-3 has-checked:border-primary has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
+              className="flex cursor-pointer gap-3 rounded-control border border-border p-3 has-checked:border-primary has-disabled:cursor-not-allowed has-disabled:opacity-60 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-ring"
             >
               <input
                 type="radio"

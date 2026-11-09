@@ -102,10 +102,10 @@ export function PaymentReturnView({
         aria-atomic="true"
         aria-busy={view.busy}
         tabIndex={-1}
-        className="min-h-48 rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
+        className="min-h-48 rounded-control outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         <div
-          className={`rounded-md border border-s-4 border-border bg-muted p-4 text-foreground ${TONE_BORDER[view.tone]}`}
+          className={`rounded-panel border border-s-4 border-border bg-muted p-4 text-foreground ${TONE_BORDER[view.tone]}`}
         >
           <h2 className={`${textStyles.itemTitle} flex items-center gap-3`}>
             {view.busy ? (

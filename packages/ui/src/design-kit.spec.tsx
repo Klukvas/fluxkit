@@ -250,6 +250,6 @@ describe("Hero (design batch B)", () => {
       first(render(<Hero headingId="h" headingLevel="h2" title="T" />), "section").attributes.class,
     );
     expect(classes).toContain("bg-muted");
-    expect(classes).toContain("rounded-lg");
+    expect(classes).toContain("rounded-card");
   });
 });

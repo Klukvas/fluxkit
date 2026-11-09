@@ -99,7 +99,7 @@ const focusClass =
  * A link that looks like the primary button (the create actions). The focus outline is its own string, as in the UI library:
  * it sits two pixels outside the box, on the page background, so the contrast scan must not pair it with the button fill.
  */
-export const primaryLinkClass = `inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 font-medium text-primary-foreground ${focusClass}`;
+export const primaryLinkClass = `inline-flex items-center justify-center rounded-control bg-primary px-4 py-2 font-medium text-primary-foreground ${focusClass}`;
 
 /**
  * The status line of a screen: always in the page (a live region announces changes of a region that was already there), and
@@ -121,7 +121,7 @@ export function NoticeBar({
         {notice === null ? null : notice.kind === "unknown" ? (
           <UnknownResultNotice t={t} />
         ) : (
-          <p className="rounded-md border border-success p-3 text-foreground">
+          <p className="rounded-panel border border-success p-3 text-foreground">
             {t(`dict.notice.${notice.kind}`)}
           </p>
         )}
@@ -137,7 +137,9 @@ export function FocusedPanel({ title, children }: { title: string; children?: Re
   return (
     <div ref={ref} tabIndex={-1} className={`flex flex-col gap-3 ${focusClass}`}>
       <LiveRegion>
-        <p className="rounded-md border border-success p-3 font-medium text-foreground">{title}</p>
+        <p className="rounded-panel border border-success p-3 font-medium text-foreground">
+          {title}
+        </p>
       </LiveRegion>
       {children}
     </div>
@@ -196,7 +198,7 @@ export function DeletedPanel({
 /** A create that got no answer: the admin looks at the list before trying again (nothing is sent twice by the screen). */
 export function CreateUnknown({ t, listTo }: { t: Translator; listTo: string }) {
   return (
-    <div role="alert" className="rounded-md border border-warning p-4">
+    <div role="alert" className="rounded-panel border border-warning p-4">
       <p className="font-semibold">{t("dict.unknown.title")}</p>
       <p>{t("dict.unknown.createBody")}</p>
       <p className="mt-2">

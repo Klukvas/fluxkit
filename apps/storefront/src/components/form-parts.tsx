@@ -28,7 +28,7 @@ export function FormErrorSummary({
     <div
       ref={summaryRef}
       tabIndex={-1}
-      className={`rounded-md outline-offset-2 focus:outline-2 focus:outline-ring`}
+      className={`rounded-control outline-offset-2 focus:outline-2 focus:outline-ring`}
     >
       <Alert variant="danger" title={t("account.form.errorTitle")}>
         {listed.length === 0 ? (

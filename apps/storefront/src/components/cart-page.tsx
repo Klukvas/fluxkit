@@ -449,7 +449,7 @@ export function CartPageView({
           <Spinner label={t("cart.loading")} />
           {/* Shaped like a line (image, text rows, the stepper), so the lines take the same room when they arrive. */}
           {[0, 1].map((index) => (
-            <div key={index} className="flex gap-4 rounded-lg border border-border p-4">
+            <div key={index} className="flex gap-4 rounded-card border border-border p-4">
               <Skeleton className="h-24 w-24 shrink-0" />
               <div className="flex flex-1 flex-col gap-2">
                 <Skeleton className="h-6 w-1/2" />

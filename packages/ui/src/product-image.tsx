@@ -44,7 +44,7 @@ export function ProductImage({
       : { "aria-hidden": true as const };
     return (
       <div
-        className={cn("aspect-square w-full rounded-md bg-muted", className)}
+        className={cn("aspect-square w-full rounded-media bg-muted", className)}
         {...accessibility}
       />
     );
@@ -59,7 +59,7 @@ export function ProductImage({
       height={height}
       loading="lazy"
       decoding="async"
-      className={cn("rounded-md object-cover", className)}
+      className={cn("rounded-media object-cover", className)}
       onError={(event) => {
         setFailedSrc(src);
         onError?.(event);

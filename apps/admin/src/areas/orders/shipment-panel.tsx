@@ -385,7 +385,7 @@ function ShipmentCard({
   return (
     <article
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-md border border-border p-4"
+      className="flex flex-col gap-4 rounded-panel border border-border p-4"
     >
       <h3 id={headingId} className="text-base font-semibold text-foreground">
         {tracking === null ? t("shipment.card.noNumber") : t("shipment.card.title", { tracking })}

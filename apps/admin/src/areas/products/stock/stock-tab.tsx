@@ -1000,7 +1000,7 @@ function VariantStock({
       id={stockVariantFocusId(variant.id)}
       tabIndex={-1}
       aria-labelledby={`${stockVariantFocusId(variant.id)}-heading`}
-      className={`flex flex-col gap-6 rounded-md border border-border p-4 ${focusClass}`}
+      className={`flex flex-col gap-6 rounded-panel border border-border p-4 ${focusClass}`}
     >
       <h2 id={`${stockVariantFocusId(variant.id)}-heading`} className="text-lg font-semibold">
         {t("products.stock.variantTitle", { sku: variant.sku })}
