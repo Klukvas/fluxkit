@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { describe, expect, it } from "vitest";
+import { adminBrand, FAVICON_FILES } from "./brand-html";
 import { ADMIN_SECURITY_HEADERS } from "./security-headers";
 import { LOCALE_STORAGE_KEY } from "./src/i18n/locale-preference";
 import { LAZY_FILES, eagerMessages } from "./src/messages";
@@ -117,8 +118,10 @@ describe("built index.html (strict CSP: script-src 'self', no external resources
   it("loads every file from the SPA's own assets under the base path, nothing external", () => {
     const urls = [...html.matchAll(/\s(?:src|href)="([^"]*)"/g)].map((match) => match[1] as string);
     expect(urls.length).toBeGreaterThanOrEqual(2);
+    // A fork's favicon (`apps/admin/public/favicon.*`, ADR 0047) is the one file outside `assets/`.
+    const favicon = `${ADMIN_BASE_PATH}/(?:${FAVICON_FILES.join("|").replace(/\./g, "\\.")})`;
     for (const url of urls)
-      expect(url, url).toMatch(new RegExp(`^${ADMIN_BASE_PATH}/assets/[\\w.-]+$`));
+      expect(url, url).toMatch(new RegExp(`^(?:${ADMIN_BASE_PATH}/assets/[\\w.-]+|${favicon})$`));
     expect(html).not.toMatch(/https?:|\/\/[a-z]/i);
   });
 
@@ -131,6 +134,16 @@ describe("built index.html (strict CSP: script-src 'self', no external resources
         expect(match[1], name).not.toMatch(/https?:|^["']?\/\//);
       }
     }
+  });
+
+  it("has the admin's name as its one document title, from the messages (ADR 0047), and a favicon only from public/", () => {
+    expect([...html.matchAll(/<title>([^<]*)<\/title>/g)].map((match) => match[1])).toEqual([
+      eagerMessages.en["app.name"],
+    ]);
+    const brand = adminBrand(join(import.meta.dirname, "public"));
+    const icons = [...html.matchAll(/<link rel="icon" href="([^"]*)"/g)].map((match) => match[1]);
+    expect(icons).toEqual(brand.favicon === null ? [] : [`${ADMIN_BASE_PATH}/${brand.favicon}`]);
+    if (brand.favicon !== null) expect(existsSync(join(dist, brand.favicon))).toBe(true);
   });
 
   it("is meant to be served with the policy of security-headers.ts", () => {

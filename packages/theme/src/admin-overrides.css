@@ -1,0 +1,27 @@
+/*
+ * Admin overrides: FORK-OWNED, empty upstream (ADR 0047). Upstream never edits this file after creating it, so a client
+ * fork can keep its own content here without merge conflicts.
+ *
+ * The admin follows the shop's design tokens (tokens.css). This file is imported by apps/admin/src/styles.css LAST, after
+ * tokens.css and tailwind.css. apps/admin/src/theme-isolation.spec.ts checks that import order and that no shipped source
+ * of the storefront, packages/ui or the other theme files mentions this file (tests may read it).
+ * Use it to give the admin alone different values, for example a neutral palette while the shop is rebranded. Use the
+ * selector below: a lower-specificity one such as `html { ... }` loses to the `:root` block of tokens.css.
+ *
+ *   :root,
+ *   [data-theme="light"] {
+ *     --fk-color-primary: #1f2937;
+ *     --fk-color-primary-foreground: #ffffff;
+ *   }
+ *
+ * Rules:
+ * - Override existing `--fk-*` tokens only (names: docs/contracts/theme-tokens.md); use 6-digit hex colours and keep the
+ *   contrast pairs listed in packages/theme/src/contrast.spec.ts (text 4.5:1, controls 3:1).
+ * - The admin renders data-theme="light": no `[data-theme="dark"]`, `[data-theme="system"]` or `prefers-color-scheme`
+ *   rule here. Two checks catch the usual spellings: a source check of this file (any letter case and spacing) and a check
+ *   of the built admin CSS (a colour-scheme media rule only for `[data-theme=system]`). They are pattern checks, not a
+ *   CSS parser: an unusual construct can slip past them.
+ * - Contrast: packages/theme/src/contrast.spec.ts does not read this file yet; check the pairs yourself.
+ * - A client font for the admin: an `@font-face` rule here with a self-hosted woff2 file (the CSP allows same-origin
+ *   fonts only), then `--fk-font-sans` / `--fk-font-display` in the block above.
+ */

@@ -21,7 +21,8 @@
       "default": "./dist/index.js"
     },
     "./tokens.css": "./src/tokens.css",
-    "./tailwind.css": "./src/tailwind.css"
+    "./tailwind.css": "./src/tailwind.css",
+    "./admin-overrides.css": "./src/admin-overrides.css"
   },
   "files": [
     "dist",

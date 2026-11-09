@@ -77,8 +77,8 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 - A fork that changes `--fk-font-sans` but leaves `--fk-font-display` at the template stack fails `theme.spec.ts` (headings would silently
   stay in the system face): set both.
 - Admin: it imports the same `tokens.css` (`apps/admin/src/styles.css`) and follows `--fk-font-sans`; a web font for the admin needs its own
-  `@font-face` (the admin has no `next/font`). Its place is the admin overrides file planned for a later change (plan, B2/E1); until then a
-  fork declares it in `apps/admin/src/styles.css`. Same rules as below.
+  `@font-face` (the admin has no `next/font`), declared in the fork-owned `packages/theme/src/admin-overrides.css` (see "Admin" below).
+  Same rules as below.
 
 - **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
   `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
@@ -92,6 +92,23 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 - No preload (`preload: false`) while the first-HTML budget is open (plan 2026-11-08, L1): a preload `<link>` in `<head>` counts toward it.
 - `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
   holds one) inside a `Suspense` boundary: a hoisted stylesheet there makes React outline the boundary.
+
+## Admin (ADR 0047, 2026-11-08)
+
+- The admin follows these tokens by default (the same `tokens.css` and `tailwind.css`, `data-theme="light"` fixed): a rebrand reaches it.
+- `packages/theme/src/admin-overrides.css` (exported as `@fluxkit/theme/admin-overrides.css`) is **fork-owned**: empty upstream, never
+  edited upstream after its creation, imported LAST by `apps/admin/src/styles.css`. No shipped source of the storefront, `packages/ui` or
+  the other theme files may import or name it (tests may read it); `apps/admin/src/theme-isolation.spec.ts` checks this and the import
+  order. It is additive: it overrides existing `--fk-*` tokens for the admin alone under `:root, [data-theme="light"]` (a later rule of
+  equal specificity wins; a lower-specificity selector such as `html { ... }` loses to the `:root` block of `tokens.css`), and may hold a
+  client `@font-face`. It must not add tokens the components do not read, nor a `[data-theme="dark"]`, `[data-theme="system"]` or
+  `prefers-color-scheme` rule (a source check in any letter case and spacing, plus the built-CSS check; pattern checks, not a parser).
+- The file's location and its import order are part of this contract; its content is the fork's. `contrast.spec.ts` checks `tokens.css`
+  only: a fork that changes admin colours keeps the pairs of "Contrast" below itself (not checked by CI yet).
+- **Known limit:** the admin's headings (71) do not use `textStyles` roles and are not scanned by the heading-role guard; `font-display`
+  does not reach them.
+- The admin's name is in its messages (`app.name`, `app.documentTitle` in `apps/admin/src/messages/{uk,en}/common.json`), its favicon a
+  fork-supplied `apps/admin/public/favicon.{svg,png,ico}` (`apps/admin/brand-html.ts`); neither is a token.
 
 ## Themes and modes (design batch B, 2026-11-03)
 
