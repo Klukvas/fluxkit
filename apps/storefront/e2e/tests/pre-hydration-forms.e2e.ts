@@ -69,7 +69,7 @@ test.describe("before hydration, nothing personal reaches a URL (review H1)", ()
       });
 
       // In uk the header and the form are longer (two bytes per Cyrillic letter): the form must still be in the first HTML,
-      // not outlined behind the loading view (README, "Keep the header small").
+      // not outlined behind a loading view (ADR 0048; `first-html.e2e.ts` checks the raw HTML of every such page).
       test(`${locale}: the register form posts too (email, password, name and phone stay out of the URL)`, async ({
         page,
       }, testInfo) => {

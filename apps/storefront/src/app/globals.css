@@ -84,8 +84,8 @@
     @apply mt-12 border-t border-border py-6 text-muted-foreground;
   }
   /* The footer's link lists (the shop pages, then the legal pages) and its contacts (`components/site-footer.tsx`) carry NO
-     class: the footer is in every page's first HTML, which has a size budget (README, "Keep the header small"; pinned by
-     shell.spec.tsx), and a class on each of a dozen links is about 250 bytes. Scoped to the footer by these selectors; the
+     class: the footer is in every page's first HTML (a loose size cap in shell.spec.tsx since ADR 0048), and a class on
+     each of a dozen links is about 250 bytes. Scoped to the footer by these selectors; the
      links look like `.fk-nav-link`. */
   .fk-site-footer nav {
     @apply flex flex-col gap-1;

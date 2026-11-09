@@ -20,6 +20,64 @@ const mustAnswerRealNotFound = [
   "[...rest]/page.tsx",
 ];
 
+/**
+ * ADR 0048: the pages that must work before (or without) their script. With a `loading.tsx` above them React streams the
+ * loading view in the shell and the page as a separate segment that only a script puts in place, whenever the page is not
+ * finished when the shell flushes (a race) or the HTML before it passes 12 800 bytes (`progressiveChunkSize`). Without a
+ * `loading.tsx` the page is part of the shell, so its form is always in the first HTML. The e2e `pre-hydration-forms` and
+ * `first-html` tests check the result in a browser and in the raw HTML; a test below fails when this list and the paths of
+ * `first-html.e2e.ts` drift apart.
+ */
+const mustRenderBeforeHydration = [
+  "(site)/account/login/page.tsx",
+  "(site)/account/register/page.tsx",
+  "(site)/account/forgot-password/page.tsx",
+  "(site)/account/reset-password/page.tsx",
+  "(site)/account/verify-email/page.tsx",
+  "(site)/cart/page.tsx",
+  "(site)/checkout/page.tsx",
+  "(site)/legal/privacy/page.tsx",
+  "(site)/legal/terms/page.tsx",
+  "(site)/legal/cookies/page.tsx",
+  "(site)/payment/return/page.tsx",
+  "(site)/order/[number]/page.tsx",
+];
+
+/** Next accepts a loading view in any of these extensions. */
+const LOADING_FILES = ["loading.tsx", "loading.ts", "loading.jsx", "loading.js"];
+
+function loadingFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap((name) => {
+    const path = join(directory, name);
+    if (statSync(path).isDirectory()) return loadingFiles(path);
+    return LOADING_FILES.includes(name) ? [relative(appRoot, path)] : [];
+  });
+}
+
+/** `(site)/order/[number]/page.tsx` -> a pattern of its URL path below the locale (`/order/<any segment>`). */
+function urlPattern(route: string): RegExp {
+  const segments = route
+    .split("/")
+    .slice(0, -1)
+    .filter((segment) => !segment.startsWith("("))
+    .map((segment) => (segment.startsWith("[") ? "[^/]+" : segment));
+  return new RegExp(`^/${segments.join("/")}$`);
+}
+
+/** The paths `first-html.e2e.ts` checks (`FORM_ROUTES` and `SHELL_ROUTES`); the e2e suite may not import `src`, so read it. */
+function firstHtmlE2ePaths(): string[] {
+  const source = readFileSync(
+    join(import.meta.dirname, "..", "e2e", "tests", "first-html.e2e.ts"),
+    "utf8",
+  );
+  const list = (name: string): string[] => {
+    const body = new RegExp(`const ${name} = \\[([^\\]]*)\\]`).exec(source)?.[1];
+    if (body === undefined) throw new Error(`${name} not found in first-html.e2e.ts`);
+    return [...body.matchAll(/"([^"]+)"/g)].map((match) => match[1] ?? "");
+  };
+  return [...list("FORM_ROUTES"), ...list("SHELL_ROUTES")];
+}
+
 function pagesCallingNotFound(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
@@ -35,7 +93,9 @@ function loadingFilesAbove(page: string): string[] {
     directory.startsWith(appRoot);
     directory = dirname(directory)
   ) {
-    if (existsSync(join(directory, "loading.tsx"))) found.push(relative(appRoot, directory));
+    if (LOADING_FILES.some((name) => existsSync(join(directory, name)))) {
+      found.push(relative(appRoot, directory));
+    }
   }
   return found;
 }
@@ -48,11 +108,53 @@ describe("route structure", () => {
   });
 
   it("keeps a loading.tsx only on pages that never call notFound() for missing content", () => {
-    // The home page checks the locale (already checked by the layout) and is the one page under (site)/loading.tsx.
+    // The home page checks the locale (already checked by the layout) and is the one page under a loading.tsx.
     const offenders = pagesCallingNotFound(localeRoot)
       .filter((page) => loadingFilesAbove(page).length > 0)
       .map((page) => relative(localeRoot, page));
-    expect(offenders).toEqual(["(site)/page.tsx"]);
+    expect(offenders).toEqual(["(site)/(home)/page.tsx"]);
+  });
+
+  it.each(mustRenderBeforeHydration)(
+    "%s exists and has no loading.tsx above it (it must render before hydration, ADR 0048)",
+    (route) => {
+      const page = join(localeRoot, route);
+      expect(existsSync(page), route).toBe(true);
+      expect(loadingFilesAbove(page), `loading.tsx above ${route}`).toEqual([]);
+    },
+  );
+
+  it("has exactly one loading view: the home page's own group (ADR 0048)", () => {
+    // Home needs its script anyway (streamed sections); every other page renders inside the shell. A new loading.tsx is a
+    // decision for ADR 0048 (it hides the page from a browser without a script), not a default.
+    expect(loadingFiles(appRoot)).toEqual(["[locale]/(site)/(home)/loading.tsx"]);
+    const home = readdirSync(join(localeRoot, "(site)", "(home)")).sort();
+    expect(home).toEqual(["loading.tsx", "page.tsx"]);
+  });
+
+  it("wraps no page in a Suspense boundary of its own in the layouts and the shell (ADR 0048)", () => {
+    // A `<Suspense>` around `{children}` would be a loading view by another name: the page would stream as a hidden segment.
+    for (const file of [
+      join(localeRoot, "layout.tsx"),
+      join(localeRoot, "(site)", "layout.tsx"),
+      join(import.meta.dirname, "components", "site-shell.tsx"),
+    ]) {
+      expect(readFileSync(file, "utf8"), relative(import.meta.dirname, file)).not.toMatch(
+        /Suspense/,
+      );
+    }
+  });
+
+  it("checks in e2e first-html exactly the pages that must render before hydration (no drift)", () => {
+    const e2ePaths = firstHtmlE2ePaths();
+    const patterns = mustRenderBeforeHydration.map(urlPattern);
+    expect(e2ePaths).toHaveLength(mustRenderBeforeHydration.length);
+    for (const pattern of patterns) {
+      expect(
+        e2ePaths.filter((path) => pattern.test(path)),
+        `e2e paths for ${pattern.source}`,
+      ).toHaveLength(1);
+    }
   });
 
   it("gives every personal page (cart, checkout, account, order) the noindex metadata of privateMetadata", () => {

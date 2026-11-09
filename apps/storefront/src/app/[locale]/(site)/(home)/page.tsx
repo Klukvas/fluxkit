@@ -1,13 +1,13 @@
 import { Container, createTranslator, isLocale } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { HomeSections } from "../../../components/home-sections";
-import { homeSections } from "../../../config/home";
-import { getHomeSection } from "../../../lib/catalog-pages.server";
-import { imageHosts } from "../../../lib/image-hosts.server";
-import { homeMetadata } from "../../../lib/page-metadata";
-import { publicOrigin } from "../../../lib/public-url.server";
-import { messagesByLocale } from "../../../messages";
+import { HomeSections } from "../../../../components/home-sections";
+import { homeSections } from "../../../../config/home";
+import { getHomeSection } from "../../../../lib/catalog-pages.server";
+import { imageHosts } from "../../../../lib/image-hosts.server";
+import { homeMetadata } from "../../../../lib/page-metadata";
+import { publicOrigin } from "../../../../lib/public-url.server";
+import { messagesByLocale } from "../../../../messages";
 
 interface HomeProps {
   params: Promise<{ locale: string }>;

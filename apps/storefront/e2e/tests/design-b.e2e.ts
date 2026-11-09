@@ -2,6 +2,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { E2E_ORIGIN } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { tabTo, waitForHydration } from "../support/flows.ts";
+import { readLayoutShifts, watchLayoutShifts } from "../support/layout-shift.ts";
 
 /**
  * Desktop design, batch B (plan `docs/plans/2026-11-03-storefront-design-b.md`): the home page from `config/home.ts`, the
@@ -32,50 +33,9 @@ const sectionIds = (page: Page) =>
 test("the home page shows the configured sections in order, one h1, the hero picture and no layout shift", async ({
   page,
 }) => {
-  // Layout shifts before and after the page itself is on screen (its hero is visible). Before it, the `(site)` loading view may
+  // Layout shifts before and after the page itself is on screen (its hero is visible). Before it, the home loading view may
   // be painted first and then replaced by the page (it moved the footer by 0.26 before `LoadingView` got a screen's height).
-  await page.addInitScript(() => {
-    const record = window as unknown as {
-      shift: number;
-      loadingViewShift: number;
-      shiftSources: string[];
-      heroAt: number | null;
-    };
-    record.shift = 0;
-    record.loadingViewShift = 0;
-    record.shiftSources = [];
-    record.heroAt = null;
-    const watch = () => {
-      const hero = document.querySelector("main [data-hero]");
-      if (hero !== null && hero.getBoundingClientRect().height > 0) {
-        record.heroAt = performance.now();
-        return;
-      }
-      requestAnimationFrame(watch);
-    };
-    requestAnimationFrame(watch);
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries() as unknown as {
-        value: number;
-        startTime: number;
-        hadRecentInput: boolean;
-        sources?: { node: Node | null }[];
-      }[]) {
-        if (entry.hadRecentInput) continue;
-        if (record.heroAt === null || entry.startTime <= record.heroAt) {
-          record.loadingViewShift += entry.value;
-          continue;
-        }
-        record.shift += entry.value;
-        for (const source of entry.sources ?? []) {
-          const node = source.node;
-          record.shiftSources.push(
-            `${entry.value.toFixed(3)} ${node instanceof Element ? `${node.tagName} ${node.className}`.slice(0, 80) : String(node?.nodeName)}`,
-          );
-        }
-      }
-    }).observe({ type: "layout-shift", buffered: true });
-  });
+  await watchLayoutShifts(page, "main [data-hero]");
   await page.goto("/en");
   const main = page.getByRole("main");
   await expect(main.getByRole("heading", { level: 1, name: "Welcome" })).toBeVisible();
@@ -121,18 +81,11 @@ test("the home page shows the configured sections in order, one h1, the hero pic
 
   await page.mouse.wheel(0, 3000);
   await page.waitForTimeout(500);
-  const { shift, shiftSources, loadingViewShift } = await page.evaluate(() => {
-    const record = window as unknown as {
-      shift: number;
-      shiftSources: string[];
-      loadingViewShift: number;
-    };
-    return {
-      shift: record.shift,
-      shiftSources: record.shiftSources,
-      loadingViewShift: record.loadingViewShift,
-    };
-  });
+  const {
+    afterReady: shift,
+    sources: shiftSources,
+    beforeReady: loadingViewShift,
+  } = await readLayoutShifts(page);
   expect(shift, `layout shift after the page appeared: ${shiftSources.join(" | ")}`).toBeLessThan(
     0.05,
   );

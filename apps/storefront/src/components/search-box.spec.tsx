@@ -37,12 +37,6 @@ const render = (overrides: Partial<SearchBoxViewProps> = {}) =>
   renderToStaticMarkup(<SearchBoxView {...props(overrides)} />);
 
 describe("search box markup (WAI-ARIA combobox with a listbox popup, inside a search form)", () => {
-  it("marks the form data-hydrated only when the mounted box says so (the e2e readiness signal of the D-04 test)", () => {
-    expect(render()).not.toContain("data-hydrated");
-    expect(render({ hydrated: false })).not.toContain("data-hydrated");
-    expect(render({ hydrated: true })).toMatch(/^<form role="search"[^>]* data-hydrated="true"/);
-  });
-
   it("is a search landmark, a GET form to the locale's results page that works without a script", () => {
     const html = render();
     expect(html).toMatch(

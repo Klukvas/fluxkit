@@ -56,12 +56,6 @@ export interface SearchBoxViewProps {
   onHighlight: (index: number) => void;
   onChoose: (index: number) => void;
   onSubmit: () => void;
-  /**
-   * True once the real box has mounted in the browser: its handlers then run. Rendered as `data-hydrated` on the form, never
-   * in the server HTML (no first-HTML bytes) and never on `SearchBoxFallback`. The e2e tests wait for it before they open
-   * and close the header's search row (the D-04 flake: until then the row may still hold the fallback).
-   */
-  hydrated?: boolean;
 }
 
 /** The sentence a screen reader hears when the suggestions change; empty while nothing has happened. */
@@ -102,7 +96,6 @@ export function SearchBoxView(props: SearchBoxViewProps) {
       method="get"
       action={`/${locale}/search`}
       aria-label={t("searchBox.label")}
-      data-hydrated={props.hydrated === true ? "true" : undefined}
       onSubmit={props.onSubmit}
       className="flex w-full items-center gap-2"
     >
@@ -182,11 +175,6 @@ function SearchBoxInner({ locale, initialText }: { locale: Locale; initialText: 
   const [combo, dispatch] = useReducer(comboboxReducer, closedCombobox);
   const [text, setText] = useState(initialText);
   const options = lookup.items;
-  // False in the server HTML and on the first browser render (they must match), true after this box has mounted.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   // A strict-mode remount disposes and uses the same source again: dispose only cancels what is pending.
   useEffect(() => () => source.dispose(), [source]);
@@ -221,7 +209,6 @@ function SearchBoxInner({ locale, initialText }: { locale: Locale; initialText: 
       options={options}
       status={lookup.status}
       failure={lookup.failure}
-      hydrated={hydrated}
       onTextChange={(next) => {
         setText(next);
         source.setQuery(next);
@@ -255,37 +242,4 @@ export function SearchBox({ locale }: { locale: Locale }) {
   // Only the results page's own `?q=` is the shopper's words; another page that happens to carry a `q` is not.
   const fromAddress = pathname?.endsWith("/search") === true ? (params?.get("q") ?? "") : "";
   return <SearchBoxInner key={fromAddress} locale={locale} initialText={fromAddress} />;
-}
-
-const noop = () => {};
-
-/**
- * What the header shows until `SearchBox` arrives: the same GET form with an empty box and no suggestions. On the pages
- * whose header box is streamed (catalog, product and results pages: `useSearchParams` suspends there), only a script can
- * swap the streamed box in, so without a script this form IS the search (review M2 of PR 216). Same markup as the box, so
- * nothing moves when the real one replaces it.
- */
-export function SearchBoxFallback() {
-  const { locale, t } = useI18n();
-  const id = `search-box-${useId().replace(/:/g, "")}`;
-  const [text, setText] = useState("");
-  return (
-    <SearchBoxView
-      t={t}
-      locale={locale}
-      id={id}
-      text={text}
-      combo={closedCombobox}
-      options={[]}
-      status="idle"
-      failure={null}
-      onTextChange={setText}
-      onKeyDown={noop}
-      onFocus={noop}
-      onBlur={noop}
-      onHighlight={noop}
-      onChoose={noop}
-      onSubmit={noop}
-    />
-  );
 }
