@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Design batch B (plan 2026-11-03-storefront-design-b.md): `@fluxkit/theme` gained a system mode that follows the OS dark
@@ -9,6 +9,8 @@ import { describe, expect, it } from "vitest";
 
 const appRoot = join(import.meta.dirname, "..");
 const dist = join(appRoot, "dist");
+const repoRoot = join(appRoot, "..", "..");
+const themeSource = join(repoRoot, "packages", "theme", "src");
 
 function builtCss(): string {
   const assets = join(dist, "assets");
@@ -74,5 +76,87 @@ describe("the admin is not affected by the storefront's dark and system themes",
       "@media (prefers-color-scheme:dark){:root{--a:1}[data-theme=system]{--a:2}}",
     );
     expect(blocks).toEqual([":root{--a:1}[data-theme=system]{--a:2}"]);
+  });
+});
+
+// ADR 0047 (plan 2026-11-08-design-changeability.md, B2): the admin follows the shop's tokens; a fork themes the admin
+// alone in `packages/theme/src/admin-overrides.css` (fork-owned, empty upstream). It comes after the shared tokens and the
+// Tailwind mapping (a later rule of equal specificity wins), and the storefront never receives it.
+
+const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+/** The `@import` targets of a stylesheet, in source order (comments removed). */
+function cssImports(css: string): string[] {
+  return [...withoutComments(css).matchAll(/@import\s+["']([^"']+)["']/g)].map(
+    (match) => match[1] as string,
+  );
+}
+
+const skippedFolders = new Set([
+  "node_modules",
+  ".next",
+  "dist",
+  ".turbo",
+  "test-results",
+  "playwright-report",
+  "blob-report",
+]);
+
+/** Every file under `dir`, without dependencies and build or test output. */
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    if (skippedFolders.has(entry.name)) return [];
+    const full = join(dir, entry.name);
+    return entry.isDirectory() ? sourceFiles(full) : [full];
+  });
+}
+
+describe("the fork-owned admin overrides (ADR 0047)", () => {
+  it("imports admin-overrides.css last, after the shared tokens and the Tailwind mapping", () => {
+    expect(cssImports(readFileSync(join(appRoot, "src", "styles.css"), "utf8"))).toEqual([
+      "tailwindcss",
+      "@fluxkit/theme/tokens.css",
+      "@fluxkit/theme/tailwind.css",
+      "@fluxkit/theme/admin-overrides.css",
+    ]);
+  });
+
+  it("is a file of @fluxkit/theme that adds no dark or OS-following rule", () => {
+    const pkg = JSON.parse(readFileSync(join(themeSource, "..", "package.json"), "utf8")) as {
+      exports: Record<string, unknown>;
+    };
+    expect(pkg.exports["./admin-overrides.css"]).toBe("./src/admin-overrides.css");
+    const overrides = withoutComments(
+      readFileSync(join(themeSource, "admin-overrides.css"), "utf8"),
+    );
+    // The admin renders data-theme="light": a dark block would never apply, and an OS-following block would leak the OS
+    // setting into the admin (the built-CSS check above fails on that too).
+    expect(overrides).not.toMatch(/prefers-color-scheme/);
+    expect(overrides).not.toMatch(/data-theme=["']?(dark|system)/);
+  });
+
+  it("never reaches the storefront, the UI library or the shared theme files", () => {
+    const roots = [
+      join(repoRoot, "apps", "storefront"),
+      join(repoRoot, "packages", "ui"),
+      themeSource,
+    ];
+    const offenders = roots
+      .flatMap(sourceFiles)
+      .filter((file) => !file.endsWith("admin-overrides.css"))
+      .filter((file) => /\.(css|ts|tsx|mjs|js|json)$/.test(file))
+      .filter((file) => readFileSync(file, "utf8").includes("admin-overrides"))
+      .map((file) => relative(repoRoot, file));
+    expect(offenders).toEqual([]);
+  });
+
+  it("reads imports in order and walks the storefront (the scanners themselves)", () => {
+    expect(cssImports('/* @import "x.css"; */ @import "a.css";\n@import \'b.css\';')).toEqual([
+      "a.css",
+      "b.css",
+    ]);
+    const storefront = sourceFiles(join(repoRoot, "apps", "storefront"));
+    expect(storefront.some((file) => file.endsWith("globals.css"))).toBe(true);
+    expect(storefront.some((file) => file.includes("node_modules"))).toBe(false);
   });
 });

@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type ProxyOptions } from "vite";
+import { adminBrandHtml } from "./brand-html.ts";
 import { adminSecurityHeaders } from "./security-headers.ts";
 import { ADMIN_BASE_PATH } from "./src/router/base-path.ts";
 
@@ -58,7 +59,8 @@ export default defineConfig(({ command, mode }) => {
     : DEFAULT_API_URL;
   return {
     base: `${ADMIN_BASE_PATH}/`,
-    plugins: [react(), tailwindcss()],
+    // `adminBrandHtml`: the document title and favicon of index.html, from one place (ADR 0047, `brand-html.ts`).
+    plugins: [react(), tailwindcss(), adminBrandHtml()],
     build: {
       // `build-output.spec.ts` reads the manifest: route chunks, entry budget.
       manifest: true,

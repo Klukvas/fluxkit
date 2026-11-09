@@ -13,6 +13,15 @@ describe("vite config", () => {
     expect(build.build?.manifest).toBe(true);
   });
 
+  it("writes the document title and favicon through the brand plugin (ADR 0047)", () => {
+    const names = (build.plugins ?? [])
+      .flat()
+      .map((plugin) =>
+        plugin && typeof plugin === "object" && "name" in plugin ? plugin.name : null,
+      );
+    expect(names).toContain("fluxkit-admin-brand-html");
+  });
+
   it("proxies the API prefixes in development, and never the SPA's own /admin-ui", () => {
     const proxy = serve.server?.proxy ?? {};
     const keys = Object.keys(proxy);
