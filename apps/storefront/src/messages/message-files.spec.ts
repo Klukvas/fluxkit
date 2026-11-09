@@ -145,7 +145,7 @@ describe("message area files (plan 2026-11-08-design-changeability.md, WP3 M1)",
 
 describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.json)", () => {
   const base: Messages = {
-    "site.name": "Fluxkit",
+    "site.name": "Demo shop",
     "nav.cart": "Cart",
     "home.hero.title": "Welcome",
   };
@@ -195,7 +195,7 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
 
   it("apply before the client subset is picked, so the browser receives the overridden text (non-empty fixture)", () => {
     const files = {
-      shell: { "site.name": "Fluxkit", "footer.copyright": "c" },
+      shell: { "site.name": "Demo shop", "footer.copyright": "c" },
       home: { "home.hero.title": "w" },
     };
     const merged = buildLocaleMessages(
@@ -214,7 +214,7 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
 });
 
 describe("message extras (owner decision 2026-11-09: fork-owned src/messages-extra/{uk,en}.json, keys under custom.)", () => {
-  const base: Messages = { "site.name": "Fluxkit", "nav.cart": "Cart" };
+  const base: Messages = { "site.name": "Demo shop", "nav.cart": "Cart" };
 
   it("exist for every locale and hold a JSON object", () => {
     for (const locale of locales) {
@@ -276,7 +276,7 @@ describe("message extras (owner decision 2026-11-09: fork-owned src/messages-ext
   });
 
   it("merge after the base and before the overrides: an override may replace an extra, the browser gets it", () => {
-    const files = { shell: { "site.name": "Fluxkit", "footer.copyright": "c" } };
+    const files = { shell: { "site.name": "Demo shop", "footer.copyright": "c" } };
     const merged = buildLocaleMessages(
       files,
       { "custom.deliveryKyiv": "Kyiv delivery", "custom.note": "Note" },

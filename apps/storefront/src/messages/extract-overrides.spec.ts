@@ -30,8 +30,8 @@ function run(...args: string[]) {
 }
 
 const upstream = {
-  "site.name": "Fluxkit",
-  "site.title": "Fluxkit — online store template",
+  "site.name": "Demo shop",
+  "site.title": "Demo shop — online store",
   "nav.cart": "Cart",
   "home.hero.title": "Welcome",
 };
@@ -88,7 +88,7 @@ describe("messages-extract-overrides script", () => {
   it("with --messages, leaves out and reports overrides whose key the current upstream area files no longer have", () => {
     const current = join(directory, "current-uk");
     mkdirSync(current);
-    file("current-uk/shell.json", { "site.name": "Fluxkit", "nav.cart": "Cart" });
+    file("current-uk/shell.json", { "site.name": "Demo shop", "nav.cart": "Cart" });
     const fork = { ...upstream, "site.name": "Verde", "site.title": "Verde shop" };
     const result = run(
       "--fork",
