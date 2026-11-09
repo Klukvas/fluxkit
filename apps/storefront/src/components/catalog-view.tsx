@@ -72,7 +72,7 @@ export function EmptyList({
             {t("catalog.filter.clear")}
           </Link>
         }
-        className="rounded-md border border-border"
+        className="rounded-panel border border-border"
       />
     );
   }
@@ -86,7 +86,7 @@ export function EmptyList({
             {t("catalog.all")}
           </Link>
         }
-        className="rounded-md border border-border"
+        className="rounded-panel border border-border"
       />
     );
   }
@@ -94,7 +94,7 @@ export function EmptyList({
     <EmptyState
       title={t("catalog.empty.title")}
       description={t("catalog.empty.description")}
-      className="rounded-md border border-border"
+      className="rounded-panel border border-border"
     />
   );
 }

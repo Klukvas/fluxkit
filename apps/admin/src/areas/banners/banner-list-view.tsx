@@ -168,7 +168,7 @@ export function BannerListView({
               }
               onDrop={draggable ? drop : undefined}
               className={cn(
-                "flex flex-col gap-4 rounded-md border bg-background p-4 sm:flex-row sm:items-center",
+                "flex flex-col gap-4 rounded-panel border bg-background p-4 sm:flex-row sm:items-center",
                 // The drop target while a row is dragged over it (a pointer hint; the text of the rows does not change).
                 over === index && dragging !== null && dragging !== index
                   ? "border-primary"

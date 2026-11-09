@@ -90,12 +90,12 @@ export function PricingFields({
   const groupIssue = issues["pricing"] ?? issues["pricing.tiers"];
 
   return (
-    <fieldset className="flex flex-col gap-4 rounded-md border border-border p-4">
+    <fieldset className="flex flex-col gap-4 rounded-panel border border-border p-4">
       <legend className="px-1 text-lg font-semibold text-foreground">
         {t("ship.pricing.legend")}
       </legend>
       {notice === undefined ? null : (
-        <p role="note" className="rounded-md border border-warning p-3 text-foreground">
+        <p role="note" className="rounded-panel border border-warning p-3 text-foreground">
           {notice}
         </p>
       )}

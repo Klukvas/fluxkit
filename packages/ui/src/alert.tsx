@@ -28,7 +28,7 @@ export function Alert({ variant = "info", title, className, children, ...props }
     <div
       role={variantRole[variant]}
       className={cn(
-        "rounded-md border border-s-4 border-border bg-muted p-4 text-foreground",
+        "rounded-panel border border-s-4 border-border bg-muted p-4 text-foreground",
         variantClasses[variant],
         className,
       )}

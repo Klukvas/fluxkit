@@ -93,7 +93,7 @@ describe("design tokens", () => {
   it("defines the radius roles as literal rem values, not as a var() of the size steps", () => {
     // Plan 2026-11-08 T3: a literal per role, so a rebrand of one role (`--fk-radius-card: 0`) restyles only that role, and mail
     // and the parsers keep reading plain values.
-    for (const role of ["control", "card", "overlay", "media"]) {
+    for (const role of ["control", "card", "panel", "overlay", "media"]) {
       expect(lightBlock.tokens.get(`--fk-radius-${role}`), role).toMatch(/^[0-9.]+rem$/);
     }
   });

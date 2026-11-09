@@ -115,7 +115,7 @@ export function DataTable<Row>({
           ref={hintRef}
           {...{ [SCROLL_HINT_ATTRIBUTE]: "" }}
           className={cn(
-            "mb-2 items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground",
+            "mb-2 items-center gap-2 rounded-panel border border-border bg-muted px-3 py-2 text-sm font-medium text-foreground",
             repeated ? "hidden" : "flex md:hidden",
           )}
         >

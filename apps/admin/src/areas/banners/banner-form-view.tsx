@@ -214,7 +214,7 @@ function PictureSlotView({
   const hasInput = upload.uploadsEnabled && canWrite;
   return (
     <div
-      className={`flex flex-col gap-3 rounded-md border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
+      className={`flex flex-col gap-3 rounded-panel border p-4 ${error === undefined ? "border-border" : "border-danger"}`}
       role="group"
       aria-labelledby={`${id}-heading`}
       aria-describedby={error === undefined || hasInput ? undefined : errorId}

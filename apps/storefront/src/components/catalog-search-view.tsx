@@ -77,7 +77,7 @@ export function CatalogSearchView(props: CatalogSearchViewProps) {
         </a>
       }
       headingAs="h3"
-      className="rounded-md border border-border"
+      className="rounded-panel border border-border"
     />
   ) : (
     <EmptyList t={t} locale={locale} basePath={basePath} brand={null} isCategory={isCategory} />

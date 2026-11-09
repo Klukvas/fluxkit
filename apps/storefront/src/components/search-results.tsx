@@ -157,7 +157,7 @@ function EmptyResults({
         </a>
       }
       headingAs="h3"
-      className="rounded-md border border-border"
+      className="rounded-panel border border-border"
     />
   );
 }

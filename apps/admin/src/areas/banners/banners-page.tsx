@@ -47,7 +47,7 @@ export function ListStatusView({
         {status === null ? null : status.kind === "unknown" ? (
           <UnknownResultNotice t={t} />
         ) : (
-          <p className="rounded-md border border-success p-3 text-foreground">
+          <p className="rounded-panel border border-success p-3 text-foreground">
             {status.kind === "moved"
               ? t("banners.list.moved", {
                   name: status.name,

@@ -40,7 +40,7 @@ const notInMail: Record<string, string> = {
   "--fk-shadow-overlay": "box-shadow is not supported by common mail clients",
   "--fk-space-unit": "mail has its own px spacing (`emailTheme.space`)",
   ...Object.fromEntries(
-    ["control", "card", "overlay", "media"].map((role) => [
+    ["control", "card", "panel", "overlay", "media"].map((role) => [
       `--fk-radius-${role}`,
       "mail keeps the scale radii of `emailTheme.radius` (known limit: adding roles would change the `EmailTheme` contract)",
     ]),

@@ -121,7 +121,7 @@ export function NoticeBar({
         {notice === null ? null : notice.kind === "unknown" ? (
           <UnknownResultNotice t={t} />
         ) : (
-          <p className="rounded-md border border-success p-3 text-foreground">
+          <p className="rounded-panel border border-success p-3 text-foreground">
             {t(`dict.notice.${notice.kind}`)}
           </p>
         )}
@@ -137,7 +137,7 @@ export function FocusedPanel({ title, children }: { title: string; children?: Re
   return (
     <div ref={ref} tabIndex={-1} className={`flex flex-col gap-3 ${focusClass}`}>
       <LiveRegion>
-        <p className="rounded-md border border-success p-3 font-medium text-foreground">{title}</p>
+        <p className="rounded-panel border border-success p-3 font-medium text-foreground">{title}</p>
       </LiveRegion>
       {children}
     </div>
@@ -196,7 +196,7 @@ export function DeletedPanel({
 /** A create that got no answer: the admin looks at the list before trying again (nothing is sent twice by the screen). */
 export function CreateUnknown({ t, listTo }: { t: Translator; listTo: string }) {
   return (
-    <div role="alert" className="rounded-md border border-warning p-4">
+    <div role="alert" className="rounded-panel border border-warning p-4">
       <p className="font-semibold">{t("dict.unknown.title")}</p>
       <p>{t("dict.unknown.createBody")}</p>
       <p className="mt-2">

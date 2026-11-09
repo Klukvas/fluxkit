@@ -163,7 +163,7 @@ export function DropZone({
   if (onDrop === undefined) return <>{children}</>;
   return (
     <div
-      className="flex flex-col gap-6 rounded-md border border-dashed border-border p-2"
+      className="flex flex-col gap-6 rounded-panel border border-dashed border-border p-2"
       onDragOver={(event: DragEvent<HTMLDivElement>) => {
         if (!overTextField(event.target)) event.preventDefault();
       }}

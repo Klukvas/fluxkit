@@ -452,7 +452,7 @@ function SectionError({
   return (
     <SectionShell section={section} title={t(section.titleKey)}>
       <p
-        className="rounded-md border border-border p-4 text-muted-foreground"
+        className="rounded-panel border border-border p-4 text-muted-foreground"
         data-home-section-error=""
       >
         {t("home.section.error")}

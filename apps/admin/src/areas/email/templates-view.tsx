@@ -167,7 +167,7 @@ export function PreviewBody({ t, preview }: { t: Translator; preview: AdminEmail
         <h2 id="email-preview-text" className="text-lg font-semibold text-foreground">
           {t("mail.preview.textTitle")}
         </h2>
-        <pre className="max-w-3xl overflow-x-auto whitespace-pre-wrap break-words rounded-md border border-border bg-muted p-4 text-foreground">
+        <pre className="max-w-3xl overflow-x-auto whitespace-pre-wrap break-words rounded-panel border border-border bg-muted p-4 text-foreground">
           {preview.text}
         </pre>
       </section>

@@ -24,6 +24,7 @@
   --radius-lg: var(--fk-radius-lg);
   --radius-control: var(--fk-radius-control);
   --radius-card: var(--fk-radius-card);
+  --radius-panel: var(--fk-radius-panel);
   --radius-overlay: var(--fk-radius-overlay);
   --radius-media: var(--fk-radius-media);
   --font-sans: var(--fk-font-sans);

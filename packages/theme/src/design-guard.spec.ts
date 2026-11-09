@@ -130,12 +130,12 @@ describe("design guard, patterns catch known violations", () => {
 // The design kit (review D-19, plan 2026-11-03-storefront-design-a.md): sizes, radii and elevation come from tokens. tailwind.css
 // maps the type scale, the spacing unit and the shadows to `--fk-*` tokens; a class outside those scales (`text-5xl`,
 // `rounded-xl`, `shadow-md`) would use one of Tailwind's built-in values, which a rebrand of tokens.css cannot reach.
-// Radii are ROLES (plan 2026-11-08-design-changeability.md, T3): `rounded-control`, `rounded-card`, `rounded-overlay`,
-// `rounded-media`, so a rebrand changes one role in tokens.css instead of a size step shared by unrelated parts. The scale classes
+// Radii are ROLES (plan 2026-11-08-design-changeability.md, T3): `rounded-control`, `rounded-card`, `rounded-panel`,
+// `rounded-overlay`, `rounded-media`, so a rebrand changes one role in tokens.css instead of a size step shared by unrelated parts. The scale classes
 // (`rounded-sm|md|lg`) stay mapped for forks (additive contract) but the template's own code uses them only through
 // `radiusExceptions` below. `rounded-full` is a shape (a pill or a circle) and `rounded-none` no radius: neither is a brand value.
 const typeSteps = ["xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl"];
-const radiusRoles = ["control", "card", "overlay", "media"];
+const radiusRoles = ["control", "card", "panel", "overlay", "media"];
 const radiusSteps = [...radiusRoles, "full", "none"];
 const shadowSteps = ["card", "raised", "overlay", "none"];
 
@@ -150,174 +150,18 @@ interface RadiusException {
 }
 
 /**
- * Raw scale radii the template still uses on purpose, each with its count and reason (plan 2026-11-08 T3). Every entry is a part
- * whose ROLE has a different default radius today: moving it to the role would change pixels at the default tokens, which T3
- * must not do. Keep the list short; a new entry needs a reason a reviewer can check.
+ * Raw scale radii the template still uses on purpose, each with its count and reason (plan 2026-11-08 T3). Only the 0.25rem
+ * parts are left (owner decision 2026-11-09: inline panels got the `panel` role, these stay): moving one to a role would change
+ * pixels at the default tokens. Keep the list short; a new entry needs a reason a reviewer can check.
  */
-// An inline panel (a notice, an empty result box, a fieldset or section frame inside a page) is drawn at 0.5rem, a card at 1rem:
-// moving it to `rounded-card` would double its radius. Open decision for the owner: a `panel` role, or one radius for both.
-const INLINE_PANEL =
-  "inline panel at the 0.5rem step; the card role is 1rem (no visual change in T3)";
 // The 0.25rem step has no role: a native checkbox and the focus ring of a text link are smaller than a control, a count or
 // discount badge is a mark inside text, a flag or a 48px thumbnail is smaller than media.
 const SMALL_CONTROL =
-  "0.25rem: smaller than the control role (0.5rem), kept until a role is decided";
-const SMALL_MARK =
-  "0.25rem badge inside text: no role covers marks yet, kept until a role is decided";
+  "0.25rem: smaller than the control role (0.5rem); no role for this step (owner, 2026-11-09)";
+const SMALL_MARK = "0.25rem badge inside text: no role covers marks (owner decision 2026-11-09)";
 const SMALL_MEDIA = "0.25rem small picture (flag, 48px thumbnail): the media role is 0.5rem";
 
 const radiusExceptions: RadiusException[] = [
-  { file: "packages/ui/src/alert.tsx", className: "rounded-md", count: 1, reason: INLINE_PANEL },
-  {
-    file: "packages/ui/src/data-table.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "packages/ui/src/trust-bar.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/catalog-search-view.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/catalog-view.tsx",
-    className: "rounded-md",
-    count: 3,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/home-sections.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/payment-return-page.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/search-results.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/storefront/src/components/trust-bar.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/banners/banner-form-view.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/banners/banner-list-view.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/banners/banners-page.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/catalog-dictionaries/dictionary-frame.tsx",
-    className: "rounded-md",
-    count: 3,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/catalog-dictionaries/upload-panel.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/email/preview-frame.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/email/templates-view.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/help/article-view.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/orders/shipment-panel.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/payments/payment-panel.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/editor-notice.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/editor-views.tsx",
-    className: "rounded-md",
-    count: 2,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/stock/stock-tab.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/tabs/media-tab.tsx",
-    className: "rounded-md",
-    count: 2,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/tabs/options-tab.tsx",
-    className: "rounded-md",
-    count: 2,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/products/tabs/variants-tab.tsx",
-    className: "rounded-md",
-    count: 1,
-    reason: INLINE_PANEL,
-  },
-  {
-    file: "apps/admin/src/areas/shipping/pricing-fields.tsx",
-    className: "rounded-md",
-    count: 2,
-    reason: INLINE_PANEL,
-  },
   { file: "packages/ui/src/badge.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
   { file: "packages/ui/src/price-text.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
   {
@@ -346,12 +190,25 @@ const radiusExceptions: RadiusException[] = [
   },
 ];
 
+/** A class name without its variants: the part after the last colon outside brackets and parentheses. */
+function withoutVariants(name: string): string {
+  let depth = 0;
+  let start = 0;
+  for (let index = 0; index < name.length; index += 1) {
+    const char = name[index];
+    if (char === "[" || char === "(") depth += 1;
+    else if (char === "]" || char === ")") depth -= 1;
+    else if (char === ":" && depth === 0) start = index + 1;
+  }
+  return name.slice(start);
+}
+
 /** Class names of every quoted string in a source, without their variants (`md:hover:shadow-raised` -> `shadow-raised`). */
 function quotedClasses(source: string): string[] {
   return [...source.matchAll(/(["'`])((?:(?!\1)[^\\\n]|\\.)*)\1/g)].flatMap((match) =>
     (match[2] as string)
       .split(/\s+/)
-      .map((name) => name.split(":").pop() as string)
+      .map(withoutVariants)
       .filter((name) => name !== ""),
   );
 }
@@ -361,7 +218,7 @@ function appliedClasses(source: string): string[] {
   return [...source.matchAll(/@apply\s+([^;]+);/g)].flatMap((match) =>
     (match[1] as string)
       .split(/\s+/)
-      .map((name) => name.split(":").pop() as string)
+      .map(withoutVariants)
       .filter((name) => name !== ""),
   );
 }
@@ -371,8 +228,11 @@ function offScaleClasses(source: string): string[] {
   return [...quotedClasses(source), ...appliedClasses(source)].filter((name) => {
     const size = /^text-(xs|sm|base|lg|\d?xl)$/.exec(name);
     if (size) return !typeSteps.includes(size[1] as string);
+    // Tailwind v4 also takes `rounded-(--var)`, `rounded-(length:--var)` and the important marker (`rounded-md!`, `!rounded-md`).
     const radius =
-      /^rounded(?:-(?:[trblse]|[trbl][lr]|s[se]|e[se]))?(?:-([a-z0-9]+|\[[^\]]*\]))?$/.exec(name);
+      /^!?rounded(?:-(?:[trblse]|[trbl][lr]|s[se]|e[se]))?(?:-([a-z0-9]+|\[[^\]]*\]|\([^)]*\)))?!?$/.exec(
+        name,
+      );
     if (radius) return !radiusSteps.includes(radius[1] ?? "");
     const shadow = /^shadow(?:-([a-z0-9]+))?$/.exec(name);
     if (shadow) return !shadowSteps.includes(shadow[1] ?? "");
@@ -420,7 +280,7 @@ describe("design guard, the design kit scales", () => {
     ]);
     expect(
       offScaleClasses(
-        `"text-sm lg:text-4xl text-foreground rounded-control rounded-t-card md:rounded-overlay rounded-media rounded-full rounded-none hover:shadow-raised shadow-overlay shadow-none"`,
+        `"text-sm lg:text-4xl text-foreground rounded-control rounded-t-card rounded-panel md:rounded-overlay rounded-media rounded-full rounded-none hover:shadow-raised shadow-overlay shadow-none"`,
       ),
     ).toEqual([]);
   });
@@ -428,7 +288,7 @@ describe("design guard, the design kit scales", () => {
   it("flags the radius size steps (roles only) and arbitrary radii, in class lists and in @apply", () => {
     expect(
       offScaleClasses(
-        `"rounded-sm focus:rounded-md lg:rounded-lg rounded-e-md rounded-2xl rounded-3xl rounded-[3px]"`,
+        `"rounded-sm focus:rounded-md lg:rounded-lg rounded-e-md rounded-2xl rounded-3xl rounded-[3px] rounded-(--radius-md) md:rounded-(length:--x) rounded-md! !rounded-lg hover:rounded-t-(--y)!"`,
       ),
     ).toEqual([
       "rounded-sm",
@@ -438,10 +298,16 @@ describe("design guard, the design kit scales", () => {
       "rounded-2xl",
       "rounded-3xl",
       "rounded-[3px]",
+      "rounded-(--radius-md)",
+      "rounded-(length:--x)",
+      "rounded-md!",
+      "!rounded-lg",
+      "rounded-t-(--y)!",
     ]);
+    expect(offScaleClasses(`"rounded-panel! md:rounded-card rounded-full!"`)).toEqual([]);
     expect(
       offScaleClasses(
-        `.fk-x {\n  @apply flex rounded-md px-2 hover:bg-muted;\n}\n.fk-y {\n  @apply rounded-control text-sm;\n}`,
+        `.fk-x {\n  @apply flex rounded-md px-2 hover:bg-muted;\n}\n.fk-y {\n  @apply rounded-control rounded-panel text-sm;\n}`,
       ),
     ).toEqual(["rounded-md"]);
   });

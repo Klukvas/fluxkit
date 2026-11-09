@@ -172,7 +172,7 @@ export function MediaListView({
               return (
                 <li
                   key={row.key}
-                  className="flex flex-col gap-3 rounded-md border border-border p-4"
+                  className="flex flex-col gap-3 rounded-panel border border-border p-4"
                 >
                   <h3 className="font-semibold">{t("products.media.item", { number })}</h3>
                   <BrandLogoPreview
@@ -181,7 +181,7 @@ export function MediaListView({
                     failedText={t("products.media.previewFailed")}
                   />
                   {row.uploaded ? (
-                    <p className="rounded-md border border-border bg-muted p-3 text-sm text-foreground">
+                    <p className="rounded-panel border border-border bg-muted p-3 text-sm text-foreground">
                       {t("products.media.uploadedSaveHint")}
                     </p>
                   ) : null}

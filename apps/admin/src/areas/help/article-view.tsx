@@ -22,7 +22,7 @@ import {
 export const helpLinkClass = "font-medium text-foreground underline underline-offset-4";
 
 const calloutBase =
-  "max-w-prose rounded-md border border-s-4 border-border bg-muted p-4 text-foreground";
+  "max-w-prose rounded-panel border border-s-4 border-border bg-muted p-4 text-foreground";
 const calloutTone = { note: "border-primary", warning: "border-warning" } as const;
 
 export interface BlockViewProps {
