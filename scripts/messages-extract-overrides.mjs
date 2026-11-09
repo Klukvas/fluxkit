@@ -74,7 +74,7 @@ try {
     overrides[key] = text;
   }
   report(
-    "Keys the fork added that are not in upstream (an override cannot add a key; add them to the area file of their namespace, apps/storefront/src/messages/<locale>/<area>.json, see messages/areas.ts)",
+    "Keys the fork added that are not in upstream (an override cannot add a key; add them as custom.<name> keys to apps/storefront/src/messages-extra/<locale>.json and use the new names in the fork's code)",
     Object.keys(fork).filter((key) => !Object.hasOwn(upstream, key)),
   );
   report(

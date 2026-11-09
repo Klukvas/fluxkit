@@ -58,7 +58,8 @@ Root scripts (always check `package.json` before using; do not invent commands):
   `STOREFRONT_PUBLIC_URL`, `RESEND_API_KEY`; payments `PAYMENT_PROVIDERS_ENABLED`, `MONOBANK_TOKEN`; privacy `ORDER_CONTACT_RETENTION_DAYS`; search `SEARCH_ENABLED`, `MEILI_URL` (also read by the API),
   `MEILI_API_KEY`, `MEILI_INDEX_PREFIX`; storefront `STOREFRONT_FORWARD_CLIENT_ADDRESS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` (build time only); admin dev server `ADMIN_DEV_API_URL`.
   Test only (fake providers): `FAKE_EMAIL_CAPTURE_FILE`, `FAKE_PAYMENT_ADOPT_WEBHOOKS`. E2E only: `E2E_DATABASE_URL`, `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`,
-  `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`.
+  `E2E_STOREFRONT_UNFORWARDED_PORT`, `E2E_SEARCH`, `ADMIN_E2E_PORT`, `ADMIN_E2E_API_PORT`; visual comparison only (`scripts/visual-compare.sh` sets the two directories itself):
+  `VISUAL_SNAPSHOT_DIR`, `VISUAL_COMPUTED_DIR`, `VISUAL_TOLERANCE` (`exact` or `ratio`).
 - Prettier covers code and config files, not Markdown. `check:boundaries` also fails if dependency-cruiser cruises zero modules.
 
 Versions: Node 22 (`.nvmrc`), pnpm 10.28.0 (`packageManager`), **TypeScript pinned to 6.0.3** (see below), exact dependency versions pinned in `package.json` and `pnpm-lock.yaml`.
@@ -343,6 +344,8 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
   Changes to `apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts` or `.tsx` need a change under `docs/contracts/` (rule self-tested on every run, `--self-test`).
 - `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch.
+- `visual` (behind `visual-gate`; runs for a PR labelled `visual-check`, a PR touching the theme, the UI library, the storefront source or the harness, and on manual runs): `bash scripts/visual-compare.sh <base-ref>`
+  compares computed styles (zero tolerance, per-PR `.visual/exceptions.json`) and screenshots of the storefront against the merge-base (`apps/storefront/e2e/README.md`, "Visual comparison").
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
 - `deploy-smoke` (`scripts/deploy-smoke.sh`): builds the production images and checks `infra/docker-compose.prod.yml` behind the edge proxy.
 - Dependabot (`.github/dependabot.yml`) updates npm, GitHub Actions and Docker images weekly; TypeScript major bumps are ignored until the linters support them.

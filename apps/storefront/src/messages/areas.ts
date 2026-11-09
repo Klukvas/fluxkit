@@ -1,7 +1,8 @@
 /**
  * The ONE map of message namespaces (plan docs/plans/2026-11-08-design-changeability.md, WP3 M1). A key's namespace is the
  * text before its first dot (`site.name` -> `site`). For every namespace it says:
- * - `area`: the file the key lives in, `src/messages/<locale>/<area>.json` (`message-files.spec.ts` checks every key);
+ * - `area`: the file the key lives in, `src/messages/<locale>/<area>.json` (`message-files.spec.ts` checks every key), or
+ *   `null` for the one namespace upstream ships no file for: `custom`, a fork's own keys in `src/messages-extra/<locale>.json`;
  * - `client`: whether client components use it, so its keys are serialized into the page for the browser
  *   (`CLIENT_MESSAGE_PREFIXES` in `lib/client-messages.ts` is derived from this flag; server-only namespaces such as home
  *   sections and the footer stay out of the client payload).
@@ -25,9 +26,16 @@ export const MESSAGE_AREAS = [
 export type MessageArea = (typeof MESSAGE_AREAS)[number];
 
 export interface MessageNamespace {
-  readonly area: MessageArea;
+  readonly area: MessageArea | null;
   readonly client: boolean;
 }
+
+/**
+ * The reserved namespace of a client fork's OWN keys (owner decision 2026-11-09): `custom.<name>` in the fork-owned
+ * `src/messages-extra/<locale>.json` (upstream ships `{}` and never adds a `custom.` key). A key outside it there is refused,
+ * so an extra can never shadow an upstream key. `next.config.ts` repeats the name for the release check (a spec keeps them equal).
+ */
+export const CUSTOM_NAMESPACE = "custom";
 
 export const MESSAGE_NAMESPACES = {
   // The page frame: name and title, skip link, header and footer navigation, language and theme switches, the loading,
@@ -73,6 +81,9 @@ export const MESSAGE_NAMESPACES = {
   notice: { area: "legal", client: true },
   shopPages: { area: "pages", client: false },
   contacts: { area: "pages", client: false },
+  // A fork's own keys (`src/messages-extra`, no upstream area file). Client, so a fork's client component can use them; every
+  // `custom.` key is then serialized into each page for the browser: that payload is the fork's to keep small.
+  custom: { area: null, client: true },
 } as const satisfies Record<string, MessageNamespace>;
 
 /** The namespace of a key: the text before its first dot. */
@@ -81,8 +92,11 @@ export function namespaceOfKey(key: string): string {
   return dot < 0 ? key : key.slice(0, dot);
 }
 
-/** The area file a key belongs in, or `undefined` for a namespace the map does not name. */
-export function areaOfKey(key: string): MessageArea | undefined {
+/**
+ * The area file a key belongs in, `null` for a `custom.` key (no upstream area file: a fork's extras), or `undefined` for a
+ * namespace the map does not name.
+ */
+export function areaOfKey(key: string): MessageArea | null | undefined {
   const namespaces: Readonly<Record<string, MessageNamespace>> = MESSAGE_NAMESPACES;
   return Object.hasOwn(namespaces, namespaceOfKey(key))
     ? namespaces[namespaceOfKey(key)]?.area
