@@ -1,7 +1,8 @@
 # 0048. First HTML: no loading view above the pages that must work before hydration, no boundary around the header search box
 
-Status: proposed (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md`, work package L1, PR-B; spike branch
-`spike/l1-first-html`, draft PR 238). Replaces the first-HTML byte budget recorded in `apps/storefront/README.md`
+Status: accepted (owner decision 2026-11-09, together with the header search box change: no `Suspense`, `SearchBoxFallback`
+removed). Proposed 2026-11-08 (plan `docs/plans/2026-11-08-design-changeability.md`, work package L1, PR-B; branch
+`spike/l1-first-html`, PR 238). Replaces the first-HTML byte budget recorded in `apps/storefront/README.md`
 ("Keep the header small") and pinned by `shell.spec.tsx` (header under 3 700, footer under 1 400 bytes). No public contract changes
 (URLs, API, config, tokens and messages are unchanged).
 
@@ -29,9 +30,10 @@ Status: proposed (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.m
   because of `useSearchParams`. In a request render `useSearchParams` does not suspend (`dist/server/app-render/dynamic-rendering-client.js`,
   `useDynamicSearchParams` throws only for `prerender-*` work units; every storefront page renders per request). So the boundary was
   always finished, inline while the shell was small and outlined once it passed 12 800 bytes (the catalog, category and product pages
-  have big shells: the "streams in" of the old comment). Hypothesis, not demonstrated by a repeat run: the mobile-ux D-04 flake
-  (its comment in `mobile-ux.e2e.ts` described the swap) has the same cause; it is supported only by D-04 passing in every (a2)
-  run (runs 5, 7 and 8), not by a `--repeat-each` measurement.
+  have big shells: the "streams in" of the old comment). The mobile-ux D-04 flake had the same cause (PR 240 found it: a row
+  opened while the box's boundary was still dehydrated); with the boundary removed and PR 240's `data-hydrated` wait removed too,
+  D-04 and the toast test passed 30 of 30 each with `--repeat-each 30` and no retries (CI run 42600373471, job 129103174576,
+  2026-11-09).
 - **Route groups before this ADR.** `app/[locale]/(site)/loading.tsx` sat above every `(site)` page: home, the account pages, cart,
   checkout, the guest order page, the payment return page and the legal pages. `(catalog)` and `(pages)` have no `loading.tsx` on
   purpose (real 404s, `route-structure.spec.ts`); `[...rest]` is outside every group.
