@@ -88,7 +88,7 @@ export function ProductCard({
   // card's text for assistive technology.
   const badgeShown = availability !== null && shown !== "in_stock";
   return (
-    <article className="group relative flex h-full flex-col gap-2 rounded-lg border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
+    <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       <StoreImage
         src={allowedImageUrl(product.image?.url, imageHosts)}
         alt={product.image?.alt ?? product.title}

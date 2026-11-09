@@ -264,7 +264,7 @@ export function ProductPurchaseView({
                     })}
                     aria-pressed={index === activeImage}
                     onClick={() => setActiveImage(index)}
-                    className={`block w-16 rounded-md border-2 ${index === activeImage ? "border-primary" : "border-border"} ${focusRing}`}
+                    className={`block w-16 rounded-media border-2 ${index === activeImage ? "border-primary" : "border-border"} ${focusRing}`}
                   >
                     <StoreImage src={item.src} alt="" width={96} height={96} sizes="64px" />
                   </button>
@@ -465,7 +465,7 @@ export function ProductPurchaseView({
                   <div
                     ref={toastRef}
                     hidden={!toastOpen}
-                    className="fk-toast z-40 items-center gap-3 rounded-lg border border-border bg-background p-3 text-foreground shadow-overlay max-md:fixed max-md:inset-x-4 max-md:top-20"
+                    className="fk-toast z-40 items-center gap-3 rounded-overlay border border-border bg-background p-3 text-foreground shadow-overlay max-md:fixed max-md:inset-x-4 max-md:top-20"
                   >
                     <span className="flex-1">{t("product.added")}</span>
                     <Link
@@ -478,7 +478,7 @@ export function ProductPurchaseView({
                       type="button"
                       aria-label={t("product.added.dismiss")}
                       onClick={() => setToastOpen(false)}
-                      className={`inline-flex size-11 items-center justify-center rounded-md hover:bg-muted ${focusRing}`}
+                      className={`inline-flex size-11 items-center justify-center rounded-control hover:bg-muted ${focusRing}`}
                     >
                       <CloseIcon />
                     </button>

@@ -36,7 +36,7 @@ export function Button({
     <button
       type={type}
       className={cn(
-        "inline-flex items-center justify-center rounded-md font-medium disabled:opacity-50",
+        "inline-flex items-center justify-center rounded-control font-medium disabled:opacity-50",
         sizeClasses[size],
         focusRing,
         variantClasses[variant],

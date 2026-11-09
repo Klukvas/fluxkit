@@ -36,7 +36,7 @@ export function pageItems(currentPage: number, pageCount: number): (number | "ga
 }
 
 const itemClasses = cn(
-  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-border px-3 text-foreground",
+  "inline-flex min-h-11 min-w-11 items-center justify-center rounded-control border border-border px-3 text-foreground",
   focusRing,
 );
 

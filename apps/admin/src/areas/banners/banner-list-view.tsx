@@ -180,7 +180,7 @@ export function BannerListView({
                 {t("banners.list.position", { position: index + 1 })}
               </span>
               {thumbnail === null ? (
-                <span className="block aspect-2/1 w-32 shrink-0 rounded-md bg-muted" />
+                <span className="block aspect-2/1 w-32 shrink-0 rounded-media bg-muted" />
               ) : (
                 <img
                   src={thumbnail}
@@ -191,7 +191,7 @@ export function BannerListView({
                   decoding="async"
                   referrerPolicy="no-referrer"
                   draggable={false}
-                  className="aspect-2/1 w-32 shrink-0 rounded-md border border-border bg-muted object-cover"
+                  className="aspect-2/1 w-32 shrink-0 rounded-media border border-border bg-muted object-cover"
                 />
               )}
               <div className="flex min-w-0 flex-1 flex-col gap-2">

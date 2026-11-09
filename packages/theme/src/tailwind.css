@@ -1,6 +1,6 @@
 /*
  * Maps design tokens (tokens.css) to Tailwind semantic utilities: bg-background, text-foreground, bg-primary, text-success, text-warning,
- * ring-ring, outline-ring, rounded-md, shadow-raised, ... The type scale (text-xs to text-4xl) and the spacing unit (p-4, gap-2, ...) also
+ * ring-ring, outline-ring, rounded-control, rounded-card, shadow-raised, ... The type scale (text-xs to text-4xl) and the spacing unit (p-4, gap-2, ...) also
  * come from tokens, so the stock utilities follow a rebrand; steps outside the scale are refused by design-guard.spec.ts.
  */
 @theme inline {
@@ -22,6 +22,10 @@
   --radius-sm: var(--fk-radius-sm);
   --radius-md: var(--fk-radius-md);
   --radius-lg: var(--fk-radius-lg);
+  --radius-control: var(--fk-radius-control);
+  --radius-card: var(--fk-radius-card);
+  --radius-overlay: var(--fk-radius-overlay);
+  --radius-media: var(--fk-radius-media);
   --font-sans: var(--fk-font-sans);
   --font-mono: var(--fk-font-mono);
   --font-display: var(--fk-font-display);

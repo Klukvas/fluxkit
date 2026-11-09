@@ -56,7 +56,7 @@ export function OptionPicker({
                 />
                 <span
                   className={cn(
-                    "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md border border-border bg-background px-3 text-foreground peer-not-checked:hover:border-border-input",
+                    "inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-control border border-border bg-background px-3 text-foreground peer-not-checked:hover:border-border-input",
                     "peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground",
                     "peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ring",
                     "peer-disabled:cursor-not-allowed peer-disabled:line-through peer-disabled:opacity-50",

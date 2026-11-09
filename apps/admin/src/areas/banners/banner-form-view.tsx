@@ -166,7 +166,7 @@ function PictureFacts({ t, picture }: { t: Translator; picture: BannerPicture })
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          className="aspect-2/1 w-40 rounded-md border border-border bg-muted object-cover"
+          className="aspect-2/1 w-40 rounded-media border border-border bg-muted object-cover"
         />
       )}
       <div className="flex flex-col gap-1 text-sm">

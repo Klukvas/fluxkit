@@ -163,7 +163,7 @@ export function PaymentSectionView(props: PaymentSectionViewProps) {
       <div
         id={PAYMENT_FOCUS_IDS.message}
         tabIndex={-1}
-        className="flex flex-col gap-2 rounded-md outline-offset-2 focus:outline-2 focus:outline-ring"
+        className="flex flex-col gap-2 rounded-control outline-offset-2 focus:outline-2 focus:outline-ring"
       >
         {showOutcome && outcome !== null ? (
           <Alert

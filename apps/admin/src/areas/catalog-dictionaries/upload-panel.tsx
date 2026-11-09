@@ -83,7 +83,7 @@ export function UploadPanel({
         <label
           htmlFor={id}
           className={cn(
-            "inline-flex items-center justify-center rounded-md border bg-background px-4 py-2 font-medium text-foreground",
+            "inline-flex items-center justify-center rounded-control border bg-background px-4 py-2 font-medium text-foreground",
             errorId === undefined ? "border-border" : "border-danger",
             "focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring",
             running ? "cursor-not-allowed opacity-50" : "cursor-pointer",

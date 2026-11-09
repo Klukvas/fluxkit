@@ -81,7 +81,7 @@ export function StepIndicator({
                   <a
                     href={step.href}
                     className={cn(
-                      "inline-flex min-h-6 items-center gap-2 rounded-md underline-offset-4 hover:underline max-md:hidden",
+                      "inline-flex min-h-6 items-center gap-2 rounded-control underline-offset-4 hover:underline max-md:hidden",
                       focusRing,
                     )}
                   >

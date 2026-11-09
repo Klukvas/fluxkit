@@ -191,7 +191,7 @@ export function OrderListView({
       <p className="text-sm text-muted-foreground">{t("order.list.timeZoneHint")}</p>
       {query.customerId === undefined ? null : (
         <p className="flex flex-wrap items-center gap-3">
-          <span className="rounded-md border border-border px-3 py-1 text-foreground">
+          <span className="rounded-control border border-border px-3 py-1 text-foreground">
             {t("order.list.customerChip", { id: query.customerId.slice(0, 8) })}
           </span>
           <Link to={hrefWithoutCustomer} className={linkClass}>

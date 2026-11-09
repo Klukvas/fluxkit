@@ -154,7 +154,197 @@ interface RadiusException {
  * whose ROLE has a different default radius today: moving it to the role would change pixels at the default tokens, which T3
  * must not do. Keep the list short; a new entry needs a reason a reviewer can check.
  */
-const radiusExceptions: RadiusException[] = [];
+// An inline panel (a notice, an empty result box, a fieldset or section frame inside a page) is drawn at 0.5rem, a card at 1rem:
+// moving it to `rounded-card` would double its radius. Open decision for the owner: a `panel` role, or one radius for both.
+const INLINE_PANEL =
+  "inline panel at the 0.5rem step; the card role is 1rem (no visual change in T3)";
+// The 0.25rem step has no role: a native checkbox and the focus ring of a text link are smaller than a control, a count or
+// discount badge is a mark inside text, a flag or a 48px thumbnail is smaller than media.
+const SMALL_CONTROL =
+  "0.25rem: smaller than the control role (0.5rem), kept until a role is decided";
+const SMALL_MARK =
+  "0.25rem badge inside text: no role covers marks yet, kept until a role is decided";
+const SMALL_MEDIA = "0.25rem small picture (flag, 48px thumbnail): the media role is 0.5rem";
+
+const radiusExceptions: RadiusException[] = [
+  { file: "packages/ui/src/alert.tsx", className: "rounded-md", count: 1, reason: INLINE_PANEL },
+  {
+    file: "packages/ui/src/data-table.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "packages/ui/src/trust-bar.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/catalog-search-view.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/catalog-view.tsx",
+    className: "rounded-md",
+    count: 3,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/home-sections.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/payment-return-page.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/search-results.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/storefront/src/components/trust-bar.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/banners/banner-form-view.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/banners/banner-list-view.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/banners/banners-page.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/catalog-dictionaries/dictionary-frame.tsx",
+    className: "rounded-md",
+    count: 3,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/catalog-dictionaries/upload-panel.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/email/preview-frame.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/email/templates-view.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/help/article-view.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/orders/shipment-panel.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/payments/payment-panel.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/editor-notice.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/editor-views.tsx",
+    className: "rounded-md",
+    count: 2,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/stock/stock-tab.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/tabs/media-tab.tsx",
+    className: "rounded-md",
+    count: 2,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/tabs/options-tab.tsx",
+    className: "rounded-md",
+    count: 2,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/products/tabs/variants-tab.tsx",
+    className: "rounded-md",
+    count: 1,
+    reason: INLINE_PANEL,
+  },
+  {
+    file: "apps/admin/src/areas/shipping/pricing-fields.tsx",
+    className: "rounded-md",
+    count: 2,
+    reason: INLINE_PANEL,
+  },
+  { file: "packages/ui/src/badge.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
+  { file: "packages/ui/src/price-text.tsx", className: "rounded-sm", count: 1, reason: SMALL_MARK },
+  {
+    file: "packages/ui/src/checkbox.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_CONTROL,
+  },
+  {
+    file: "apps/storefront/src/app/globals.css",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_MEDIA,
+  },
+  {
+    file: "apps/storefront/src/components/product-card.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_CONTROL,
+  },
+  {
+    file: "apps/admin/src/areas/orders/order-detail-view.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_MEDIA,
+  },
+];
 
 /** Class names of every quoted string in a source, without their variants (`md:hover:shadow-raised` -> `shadow-raised`). */
 function quotedClasses(source: string): string[] {

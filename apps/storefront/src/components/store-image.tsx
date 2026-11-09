@@ -72,7 +72,9 @@ export function StoreImage({
       loading={eager ? "eager" : "lazy"}
       fetchPriority={eager ? "high" : "auto"}
       className={cn(
-        fill ? "h-full w-full object-cover" : "aspect-square h-auto w-full rounded-md object-cover",
+        fill
+          ? "h-full w-full object-cover"
+          : "aspect-square h-auto w-full rounded-media object-cover",
         className,
       )}
       onError={() => setFailedSrc(src)}

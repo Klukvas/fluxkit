@@ -121,7 +121,7 @@ export function CatalogHeader({
               t={t}
               eager
               sizes="(min-width: 768px) 50vw, 100vw"
-              className="h-auto w-full rounded-md"
+              className="h-auto w-full rounded-media"
             />
           )
         }
@@ -155,7 +155,7 @@ export function Subcategories({
           <li key={child.id}>
             <Link
               href={localizedHref(locale, `/c/${encodeURIComponent(child.slug)}`)}
-              className={`inline-flex min-h-11 items-center rounded-md border border-border px-3 text-foreground ${focusRing}`}
+              className={`inline-flex min-h-11 items-center rounded-control border border-border px-3 text-foreground ${focusRing}`}
             >
               {child.name}
             </Link>

@@ -30,7 +30,7 @@ export function Disclosure({
     <details open={defaultOpen} className={cn("group border-b border-border", className)}>
       <summary
         className={cn(
-          "flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-md py-2 [&::-webkit-details-marker]:hidden",
+          "flex min-h-12 cursor-pointer list-none items-center justify-between gap-4 rounded-control py-2 [&::-webkit-details-marker]:hidden",
           focusRing,
         )}
       >

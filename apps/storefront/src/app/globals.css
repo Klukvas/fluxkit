@@ -38,24 +38,24 @@
    * menu entry cost about 3 KB of that budget (2026-11-02). Keep the header markup small.
    */
   .fk-menu-item {
-    @apply flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-start whitespace-nowrap text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    @apply flex min-h-11 w-full items-center gap-2 rounded-control px-3 text-start whitespace-nowrap text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   .fk-nav-link {
-    @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    @apply inline-flex min-h-11 items-center rounded-control px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   /* The logo link, with the same focus ring as every other control (review A10: it showed the browser's default ring). A text
      logo is a brand mark: it takes the display face (`--fk-font-display`) like the page titles, at no markup cost. */
   .fk-logo {
-    @apply min-h-11 min-w-0 truncate rounded-md font-display text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
+    @apply min-h-11 min-w-0 truncate rounded-control font-display text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
   }
   .fk-header-button {
-    @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-md px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-control px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   .fk-header-button::-webkit-details-marker {
     display: none;
   }
   .fk-menu-panel {
-    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-md border border-border bg-background p-1 shadow-overlay;
+    @apply absolute top-full z-30 mt-1 w-max min-w-48 rounded-control border border-border bg-background p-1 shadow-overlay;
   }
   /*
    * Mobile batch (plan 2026-11-03-storefront-mobile-ux.md). Below `lg` the header is one sticky row; its search row opens behind
@@ -96,7 +96,7 @@
   }
   .fk-site-footer ul a,
   .fk-site-footer address a {
-    @apply inline-flex min-h-11 items-center rounded-md px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
+    @apply inline-flex min-h-11 items-center rounded-control px-2 whitespace-nowrap text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }
   /* The theme switch's form and button group (`components/theme-switch.tsx`). */
   .fk-theme-form {
@@ -112,7 +112,7 @@
     @apply transition-transform group-open:rotate-180 motion-reduce:transition-none;
   }
   .fk-suggest-list {
-    @apply max-h-72 overflow-auto rounded-md border border-border bg-background py-1 text-foreground shadow-card;
+    @apply max-h-72 overflow-auto rounded-control border border-border bg-background py-1 text-foreground shadow-card;
   }
   .fk-header-search {
     @apply order-last hidden w-full lg:order-none lg:block lg:w-auto lg:min-w-72 lg:flex-1;
@@ -156,7 +156,7 @@
   }
   /* The title of a collapsible filter group (`search-filters.tsx`): a 44 px row, no native marker (a chevron shows the state). */
   .fk-facet-summary {
-    @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-md font-semibold text-foreground;
+    @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-control font-semibold text-foreground;
   }
   .fk-facet-summary::-webkit-details-marker {
     display: none;
@@ -184,7 +184,7 @@
    * The pressed state follows `aria-pressed`, so it cannot drift from what assistive technology hears.
    */
   .fk-theme-option {
-    @apply inline-flex min-h-11 cursor-pointer items-center rounded-md border border-border bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
+    @apply inline-flex min-h-11 cursor-pointer items-center rounded-control border border-border bg-background px-3 text-sm text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
   }
   /* The icon components (`components/icons.tsx`) carry no presentation attributes: fewer bytes in every page's header. */
   .fk-icon {

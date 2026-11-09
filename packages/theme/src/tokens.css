@@ -32,6 +32,16 @@
   --fk-radius-sm: 0.25rem;
   --fk-radius-md: 0.5rem;
   --fk-radius-lg: 1rem;
+  /*
+   * Radius ROLES (rounded-control, rounded-card, rounded-overlay, rounded-media): what components use. Literal values, not
+   * var(--fk-radius-md): changing one role restyles only that role. Defaults equal the scale values these parts had before.
+   * control: buttons, fields, chips, menu entries, focus targets and popups anchored to a field (menus, suggestion lists);
+   * card: product, banner and order cards, the hero, large panels; overlay: dialogs and toasts; media: images and thumbnails.
+   */
+  --fk-radius-control: 0.5rem;
+  --fk-radius-card: 1rem;
+  --fk-radius-overlay: 1rem;
+  --fk-radius-media: 0.5rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Headings (`pageTitle`, `sectionTitle`). Defaults to the body stack; a fork's own face comes from `config/fonts.ts`: `var(--font-...)`. */

@@ -14,7 +14,7 @@ export function SkipLink({ targetId, children }: SkipLinkProps) {
     <a
       href={`#${targetId}`}
       className={cn(
-        "sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground",
+        "sr-only focus:not-sr-only focus:fixed focus:start-4 focus:top-4 focus:z-50 focus:rounded-control focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground",
         focusRing,
       )}
     >
