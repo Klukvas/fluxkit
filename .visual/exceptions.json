@@ -1,0 +1,8 @@
+[
+  {
+    "page": "*",
+    "selector": "results.toolbar",
+    "property": "screenshot",
+    "reason": "PR-F (plan 2026-11-08 L2/L5, principle 2): the catalog and search toolbar gains the list/grid switch; only that row is masked, its height is unchanged and the card grid stays pixel-identical"
+  }
+]

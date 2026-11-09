@@ -8,12 +8,14 @@ import {
   type Locale,
   type Translator,
 } from "@fluxkit/ui";
+import type { CardView } from "../lib/card-view";
 import { localizedHref } from "../lib/locale-path";
 import {
   clearFilters,
   facetEntry,
   searchPath,
   setPage,
+  setView,
   type SearchQuery,
 } from "../lib/search-query";
 import {
@@ -121,8 +123,8 @@ export function CatalogSearchView(props: CatalogSearchViewProps) {
 
 /** What a catalog or category route shows besides its own header: the list in one of its three forms. */
 export type CatalogRouteList =
-  /** Search off: the SQL listing exactly as before. */
-  | { kind: "sql"; listing: SqlListing; brandSlug: string | null }
+  /** Search off: the SQL listing exactly as before; `view` is the list's `?view=` (absent: the grid). */
+  | { kind: "sql"; listing: SqlListing; brandSlug: string | null; view?: CardView }
   /** Search on and answering (or refusing the selection). */
   | {
       kind: "search";
@@ -190,6 +192,7 @@ export function CatalogRouteView({ list, ...common }: CatalogRouteViewProps) {
       pageCount={listing.pageCount}
       exponent={listing.exponent}
       brand={brand}
+      {...(list.kind === "sql" && list.view !== undefined ? { view: list.view } : {})}
       {...(list.kind === "fallback"
         ? {
             notice: (
@@ -204,6 +207,9 @@ export function CatalogRouteView({ list, ...common }: CatalogRouteViewProps) {
                 common.locale,
                 searchPath(setPage(list.query, target), common.basePath),
               ),
+            ...(list.query.view === undefined ? {} : { view: list.query.view }),
+            hrefForView: (view: CardView) =>
+              localizedHref(common.locale, searchPath(setView(list.query, view), common.basePath)),
           }
         : {})}
     />

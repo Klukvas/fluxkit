@@ -12,6 +12,7 @@ import {
 } from "@fluxkit/ui";
 import type { NavigationCategory } from "./site-header";
 import type { ReactNode } from "react";
+import { DEFAULT_CARD_VIEW } from "../lib/card-view";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import {
@@ -29,6 +30,7 @@ import {
   clearFilters,
   searchPath,
   setPage,
+  setView,
   type SearchQuery,
 } from "../lib/search-query";
 import type { SearchOutcome } from "../lib/search-data";
@@ -43,6 +45,7 @@ import {
   SortSelect,
 } from "./search-island";
 import { focusRing, linkButton } from "./styles";
+import { ViewToggle } from "./view-toggle";
 
 /**
  * The results page (plan 2026-10-29-search.md, section 9), server markup from data: the words and every filter are the
@@ -252,6 +255,16 @@ export function FacetedResults({
                     {t.plural(countKey, result.total)}
                   </h2>
                 </LiveRegion>
+                {/* The list/grid switch (plan 2026-11-08 L2/L5). Its 44 px links overhang by `-my-2` so the row keeps the
+                    count's line height: the toolbar and the list below do not move. */}
+                {result.items.length === 0 ? null : (
+                  <ViewToggle
+                    t={t}
+                    view={query.view ?? DEFAULT_CARD_VIEW}
+                    hrefFor={(view) => pageHref(locale, setView(query, view), basePath)}
+                    className="-my-2 ms-auto"
+                  />
+                )}
                 {/* Below `lg`: "Filters (N)" next to the sort; the sheet opens from it. */}
                 <div className="flex w-full items-end gap-3 lg:w-auto lg:items-center">
                   <FiltersButton
@@ -308,6 +321,7 @@ export function FacetedResults({
               ) : (
                 <ProductGrid
                   products={result.items}
+                  kind={query.view ?? DEFAULT_CARD_VIEW}
                   locale={locale}
                   t={t}
                   exponent={exponent}
@@ -427,7 +441,7 @@ export function SearchResultsView(props: SearchResultsViewProps) {
           listLabel={t("search.list.label")}
           paginationLabel={t("search.pagination.label")}
           empty={<EmptyResults locale={locale} t={t} query={query} />}
-          brandPathFor={(slug) => catalogPath("/catalog", { brand: slug })}
+          brandPathFor={(slug) => catalogPath("/catalog", { brand: slug, view: query.view })}
         />
       ) : (
         <>

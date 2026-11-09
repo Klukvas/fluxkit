@@ -24,5 +24,8 @@
   "catalog.pagination.previous": "Previous",
   "catalog.pagination.next": "Next",
   "catalog.pagination.page": "Page {page}",
-  "catalog.price.from": "from {price}"
+  "catalog.price.from": "from {price}",
+  "catalog.view.label": "Product list view",
+  "catalog.view.grid": "Grid",
+  "catalog.view.list": "List"
 }

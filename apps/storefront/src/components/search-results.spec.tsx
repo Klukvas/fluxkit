@@ -551,3 +551,48 @@ describe("no hardcoded words and both locales", () => {
     }
   });
 });
+
+// Presentation URL parameters (plan 2026-11-08-design-changeability.md, L2/L5): the list/grid switch of the results.
+describe("the list/grid view (?view=)", () => {
+  const listQuery: SearchQuery = { ...query, facets: ["brand:zeta"], view: "list" };
+  const many = ok({ page: 2, pageCount: 3, total: 50 });
+
+  it("offers the switch in the results toolbar, grid current by default, and renders grid cards", () => {
+    const html = render(many, { query: { ...query, page: 2 } });
+    const group =
+      /<div role="group" aria-label="§catalog\.view\.label"[^>]*>.*?<\/div>/.exec(html)?.[0] ?? "";
+    expect(group).toMatch(
+      /<a [^>]*href="\/uk\/search\?q=lamp&amp;page=2"[^>]*aria-current="true"[^>]*>§catalog\.view\.grid</,
+    );
+    expect(group).toMatch(
+      /<a [^>]*href="\/uk\/search\?q=lamp&amp;page=2&amp;view=list"[^>]*>§catalog\.view\.list</,
+    );
+    // Reading order: the count, the view, the sort.
+    expect(html.indexOf("search-results-heading")).toBeLessThan(
+      html.indexOf("§catalog.view.label"),
+    );
+    expect(html.indexOf("§catalog.view.label")).toBeLessThan(html.indexOf("§search.sort.label"));
+    expect(html).toContain('class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"');
+    expect(html).not.toContain('name="view"');
+  });
+
+  it("with view=list: list cards, the switch on list, and every filter, chip and page link keeps the view", () => {
+    const html = render(many, { query: { ...listQuery, page: 2 } });
+    expect(html).toMatch(/<a [^>]*aria-current="true"[^>]*>§catalog\.view\.list</);
+    expect(html).toContain('<ul aria-label="§search.list.label" class="grid grid-cols-1 gap-4">');
+    // The filter form sends the view along (a hidden field), so applying filters keeps it, with or without a script.
+    expect(html).toContain('<input type="hidden" name="view" value="list"/>');
+    const hrefs = [...html.matchAll(/href="(\/uk\/search[^"]*)"/g)].map((match) => match[1] ?? "");
+    // Every link of the results keeps the view, but the switch's own "grid" link.
+    expect(hrefs.filter((href) => !href.includes("view=list"))).toEqual([
+      "/uk/search?q=lamp&amp;f=brand%3Azeta&amp;page=2",
+    ]);
+    expect(hrefs.length).toBeGreaterThan(4);
+  });
+
+  it("shows no switch when nothing is found", () => {
+    expect(render(ok({ items: [], total: 0 }), { query: listQuery })).not.toContain(
+      "§catalog.view.label",
+    );
+  });
+});

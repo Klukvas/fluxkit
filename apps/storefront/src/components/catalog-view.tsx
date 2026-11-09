@@ -13,11 +13,13 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import type { LocalImage } from "../config/home";
+import { DEFAULT_CARD_VIEW, type CardView } from "../lib/card-view";
 import { catalogPath } from "../lib/catalog-query";
 import { localizedHref } from "../lib/locale-path";
 import { LocalPicture } from "./local-picture";
 import { ProductGrid } from "./product-grid";
 import { focusRing, linkButton } from "./styles";
+import { ViewToggle } from "./view-toggle";
 
 /** A category page's banner header (`config/category-page.ts`): the name and description on a token surface. */
 export interface CategoryBanner {
@@ -51,8 +53,12 @@ export interface CatalogViewProps {
    * shopper is never shown fewer filters than the address asks for without being told.
    */
   notice?: ReactNode;
-  /** The link of a later page; by default the SQL listing's address (`?brand=&page=`). */
+  /** The link of a later page; by default the SQL listing's address (`?brand=&page=&view=`). */
   hrefForPage?: (page: number) => string;
+  /** How the list is shown (`?view=`, plan 2026-11-08 L5); the grid by default. */
+  view?: CardView;
+  /** The link of this list in another view; by default the SQL listing's address. */
+  hrefForView?: (view: CardView) => string;
 }
 
 export function EmptyList({
@@ -189,6 +195,8 @@ export function CatalogView({
   isCategory,
   notice = null,
   hrefForPage,
+  view = DEFAULT_CARD_VIEW,
+  hrefForView,
 }: CatalogViewProps) {
   const brandSlug = brand?.slug ?? null;
   return (
@@ -202,7 +210,7 @@ export function CatalogView({
         <p className="flex flex-wrap items-center gap-3 text-foreground">
           <span>{t("catalog.filter.brand", { brand: brand.name })}</span>
           <Link
-            href={localizedHref(locale, catalogPath(basePath, {}))}
+            href={localizedHref(locale, catalogPath(basePath, { view }))}
             className={`inline-flex min-h-11 items-center underline underline-offset-4 ${focusRing}`}
           >
             {t("catalog.filter.clear")}
@@ -220,15 +228,32 @@ export function CatalogView({
         />
       ) : (
         <>
-          <p className="text-muted-foreground">{t.plural("catalog.count", products.total)}</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-muted-foreground">{t.plural("catalog.count", products.total)}</p>
+            {/* The list/grid switch (plan 2026-11-08 L2/L5); its 44 px links overhang the count's line (`-my-2.5`). */}
+            <ViewToggle
+              t={t}
+              view={view}
+              hrefFor={
+                hrefForView ??
+                ((target) =>
+                  localizedHref(
+                    locale,
+                    catalogPath(basePath, { brand: brandSlug, page, view: target }),
+                  ))
+              }
+              className="-my-2.5 ms-auto"
+            />
+          </div>
           <ProductGrid
             products={products.items}
+            kind={view}
             locale={locale}
             t={t}
             exponent={exponent}
             imageHosts={imageHosts}
             headingLevel="h2"
-            brandPathFor={(slug) => catalogPath(basePath, { brand: slug })}
+            brandPathFor={(slug) => catalogPath(basePath, { brand: slug, view })}
             label={t("catalog.list.label")}
           />
         </>
@@ -241,7 +266,7 @@ export function CatalogView({
         hrefForPage={
           hrefForPage ??
           ((target) =>
-            localizedHref(locale, catalogPath(basePath, { brand: brandSlug, page: target })))
+            localizedHref(locale, catalogPath(basePath, { brand: brandSlug, page: target, view })))
         }
         previousLabel={t("catalog.pagination.previous")}
         nextLabel={t("catalog.pagination.next")}
