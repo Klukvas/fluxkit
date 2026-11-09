@@ -201,6 +201,9 @@ jobs:
       # version, so this one browser serves both suites.
       - name: Install Chromium
         run: pnpm --filter @fluxkit/storefront exec playwright install --with-deps chromium
+      # SCRATCH (PR 238, remove before merge): D-04 and the toast test without data-hydrated, 30 runs each, no retries.
+      - name: SCRATCH D-04 repeat-each 30
+        run: pnpm --filter @fluxkit/storefront exec playwright test -c e2e/playwright.config.ts tests/mobile-ux.e2e.ts --grep "D-04|toast steps aside" --repeat-each 30 --retries 0 --reporter list
       # The storefront suite, then the admin suite; the first failure stops the step and pnpm names the failing package.
       - run: pnpm test:e2e
       - name: Upload the Playwright report and traces
