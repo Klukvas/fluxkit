@@ -111,6 +111,31 @@ function sourceFiles(dir: string): string[] {
   });
 }
 
+/** A test file: a spec, an e2e scenario or e2e support code. Tests never ship, so they may read the overrides. */
+const isTestFile = (path: string) =>
+  /\.(spec|test|e2e)\.[cm]?[jt]sx?$/.test(path) || /(^|\/)e2e\//.test(path);
+
+/**
+ * The shipped source files (repository-relative path, content) that mention the admin overrides: an import, a URL or a
+ * name would bring the admin's values to the storefront. Tests are skipped (see `isTestFile`).
+ */
+function overridesOffenders(files: readonly (readonly [string, string])[]): string[] {
+  return files
+    .filter(([path]) => !path.endsWith("admin-overrides.css") && !isTestFile(path))
+    .filter(([path]) => /\.(css|ts|tsx|mjs|js|json)$/.test(path))
+    .filter(([, text]) => text.includes("admin-overrides"))
+    .map(([path]) => path);
+}
+
+/** Dark, system or OS-following rules in an overrides stylesheet (comments removed). */
+function forbiddenOverrideRules(css: string): string[] {
+  const source = withoutComments(css);
+  return [
+    ...source.matchAll(/prefers-color-scheme/gi),
+    ...source.matchAll(/data-theme\s*[~|^$*]?=\s*["']?\s*(dark|system)/gi),
+  ].map((match) => match[0]);
+}
+
 describe("the fork-owned admin overrides (ADR 0047)", () => {
   it("imports admin-overrides.css last, after the shared tokens and the Tailwind mapping", () => {
     expect(cssImports(readFileSync(join(appRoot, "src", "styles.css"), "utf8"))).toEqual([
@@ -126,13 +151,29 @@ describe("the fork-owned admin overrides (ADR 0047)", () => {
       exports: Record<string, unknown>;
     };
     expect(pkg.exports["./admin-overrides.css"]).toBe("./src/admin-overrides.css");
-    const overrides = withoutComments(
-      readFileSync(join(themeSource, "admin-overrides.css"), "utf8"),
-    );
     // The admin renders data-theme="light": a dark block would never apply, and an OS-following block would leak the OS
-    // setting into the admin (the built-CSS check above fails on that too).
-    expect(overrides).not.toMatch(/prefers-color-scheme/);
-    expect(overrides).not.toMatch(/data-theme=["']?(dark|system)/);
+    // setting into the admin (the built-CSS check above fails on a prefers-color-scheme rule too).
+    expect(
+      forbiddenOverrideRules(readFileSync(join(themeSource, "admin-overrides.css"), "utf8")),
+    ).toEqual([]);
+  });
+
+  it("finds dark, system and OS-following rules in any letter case and spacing (the source check itself)", () => {
+    for (const css of [
+      "[data-theme=dark]{--fk-radius-md:0}",
+      "[DATA-THEME=dark]{--fk-radius-md:0}",
+      '[data-theme = "dark"]{--fk-radius-md:0}',
+      "[ data-theme='System' i ]{--fk-radius-md:0}",
+      "@media (PREFERS-COLOR-SCHEME: dark){:root{--fk-radius-md:0}}",
+    ]) {
+      expect(forbiddenOverrideRules(css), css).not.toEqual([]);
+    }
+    for (const css of [
+      ':root, [data-theme="light"] {--fk-radius-md:0}',
+      '/* no [data-theme="dark"] and no prefers-color-scheme here */ :root{}',
+    ]) {
+      expect(forbiddenOverrideRules(css), css).toEqual([]);
+    }
   });
 
   it("never reaches the storefront, the UI library or the shared theme files", () => {
@@ -141,13 +182,38 @@ describe("the fork-owned admin overrides (ADR 0047)", () => {
       join(repoRoot, "packages", "ui"),
       themeSource,
     ];
-    const offenders = roots
+    const files = roots
       .flatMap(sourceFiles)
-      .filter((file) => !file.endsWith("admin-overrides.css"))
-      .filter((file) => /\.(css|ts|tsx|mjs|js|json)$/.test(file))
-      .filter((file) => readFileSync(file, "utf8").includes("admin-overrides"))
-      .map((file) => relative(repoRoot, file));
-    expect(offenders).toEqual([]);
+      .map((file) => [relative(repoRoot, file), readFileSync(file, "utf8")] as const);
+    expect(overridesOffenders(files)).toEqual([]);
+  });
+
+  it("refuses a mention in shipped code and allows one in a test (the source scan itself)", () => {
+    const mention = '@import "@fluxkit/theme/admin-overrides.css";';
+    expect(
+      overridesOffenders([
+        ["apps/storefront/src/app/globals.css", mention],
+        ["apps/storefront/src/app/layout.tsx", 'import "@fluxkit/theme/admin-overrides.css";'],
+        ["packages/ui/src/button.tsx", "// admin-overrides"],
+        ["packages/theme/src/tokens.css", mention],
+        ["packages/theme/src/index.ts", 'export const x = "admin-overrides.css";'],
+      ]),
+    ).toEqual([
+      "apps/storefront/src/app/globals.css",
+      "apps/storefront/src/app/layout.tsx",
+      "packages/ui/src/button.tsx",
+      "packages/theme/src/tokens.css",
+      "packages/theme/src/index.ts",
+    ]);
+    // A spec may read the overrides (the planned contrast check of the effective admin values, plan B2).
+    expect(
+      overridesOffenders([
+        ["packages/theme/src/contrast.spec.ts", 'read("admin-overrides.css")'],
+        ["packages/ui/src/button.spec.tsx", "// admin-overrides"],
+        ["apps/storefront/e2e/tests/theme.e2e.ts", "// admin-overrides"],
+        ["apps/storefront/e2e/support/pages.ts", "// admin-overrides"],
+      ]),
+    ).toEqual([]);
   });
 
   it("reads imports in order and walks the storefront (the scanners themselves)", () => {

@@ -19,12 +19,16 @@ PR-E1). Builds on ADR 0002 (one UI library and one token set for the storefront 
 1. **The admin follows the shop's tokens by default.** No separate admin token set, no admin `brand.ts` (plan B2).
 2. **Fork-owned `packages/theme/src/admin-overrides.css`.** Empty upstream (a comment only) and never edited upstream after its creation.
    Exported as `@fluxkit/theme/admin-overrides.css` and imported by `apps/admin/src/styles.css` LAST, after `tokens.css` and
-   `tailwind.css`, so a rule of equal specificity (`:root, [data-theme="light"]`) wins for the admin alone. It holds token overrides (the
-   names of `docs/contracts/theme-tokens.md`, 6-digit hex colours) and, for a client font, `@font-face` with a self-hosted woff2 file. It
-   must not hold a dark, `system` or `prefers-color-scheme` rule (the admin is light only).
+   `tailwind.css`, so a rule of equal specificity (`:root, [data-theme="light"]`) wins for the admin alone; a rule of lower specificity
+   (`html { ... }`) loses to the `:root` block of `tokens.css`. It holds token overrides (the names of `docs/contracts/theme-tokens.md`,
+   6-digit hex colours) and, for a client font, `@font-face` with a self-hosted woff2 file. It must not hold a dark, `system` or
+   `prefers-color-scheme` rule (the admin is light only). What is checked: a source check of the file (those selectors and the media
+   feature in any letter case and spacing) and the existing check of the built admin CSS (a colour-scheme media rule only for
+   `[data-theme=system]`). Both are pattern checks, not a CSS parser.
 3. **The storefront never receives it.** `apps/admin/src/theme-isolation.spec.ts` checks the import order of the admin stylesheet, the
-   package export, that the file adds no dark or OS-following rule, and that no file of `apps/storefront`, `packages/ui` or the other
-   files of `packages/theme/src` mentions it. The design guard does not scan `packages/theme/src`, so the file may hold hex values.
+   package export, and that no shipped source file (CSS, TypeScript, JavaScript, JSON) of `apps/storefront`, `packages/ui` or the other
+   files of `packages/theme/src` mentions it. Tests (specs, e2e scenarios and e2e support) may read it, so a theme spec can check the
+   admin's effective values. The design guard does not scan `packages/theme/src`, so the file may hold hex values.
 4. **The admin's document title and favicon come from one build-time place.** `apps/admin/brand-html.ts`, a Vite `transformIndexHtml`
    plugin (built-in hook, no dependency, no environment variable), writes `index.html`'s one `<title>` from the English `app.name` (the
    static title shown before the SPA picks the UI language, unchanged: `Fluxkit Admin`) and, when a fork drops `favicon.svg`, `favicon.png`
@@ -48,7 +52,7 @@ PR-E1). Builds on ADR 0002 (one UI library and one token set for the storefront 
 
 - A fork themes the admin without a core edit and without merge conflicts (the overrides file and the favicon are fork-owned).
 - The admin's colour pairs are only as safe as the overrides: `packages/theme/src/contrast.spec.ts` checks `tokens.css` alone. Reading the
-  overrides there (effective admin values = light block plus overrides) is planned (plan B2) but not part of this change; until then a fork
+  overrides there (effective admin values = light block plus overrides) is planned (plan B2; the isolation guard allows a spec to read the file) but not part of this change; until then a fork
   that sets admin colours checks the pairs of `docs/contracts/theme-tokens.md` itself.
 - Changing the name in the messages changes the static title at the next build; `apps/admin/build-output.spec.ts` pins the built title to
   `app.name` and the favicon link to the file in `public/`.

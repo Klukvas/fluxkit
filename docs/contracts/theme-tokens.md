@@ -97,10 +97,12 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 
 - The admin follows these tokens by default (the same `tokens.css` and `tailwind.css`, `data-theme="light"` fixed): a rebrand reaches it.
 - `packages/theme/src/admin-overrides.css` (exported as `@fluxkit/theme/admin-overrides.css`) is **fork-owned**: empty upstream, never
-  edited upstream after its creation, imported LAST by `apps/admin/src/styles.css` and by nothing else (the storefront never receives it;
-  `apps/admin/src/theme-isolation.spec.ts`). It is additive: it overrides existing `--fk-*` tokens for the admin alone, for example under
-  `:root, [data-theme="light"]` (a later rule of equal specificity wins), and may hold a client `@font-face`. It must not add tokens the
-  components do not read, nor a `[data-theme="dark"]`, `[data-theme="system"]` or `prefers-color-scheme` rule.
+  edited upstream after its creation, imported LAST by `apps/admin/src/styles.css`. No shipped source of the storefront, `packages/ui` or
+  the other theme files may import or name it (tests may read it); `apps/admin/src/theme-isolation.spec.ts` checks this and the import
+  order. It is additive: it overrides existing `--fk-*` tokens for the admin alone under `:root, [data-theme="light"]` (a later rule of
+  equal specificity wins; a lower-specificity selector such as `html { ... }` loses to the `:root` block of `tokens.css`), and may hold a
+  client `@font-face`. It must not add tokens the components do not read, nor a `[data-theme="dark"]`, `[data-theme="system"]` or
+  `prefers-color-scheme` rule (a source check in any letter case and spacing, plus the built-CSS check; pattern checks, not a parser).
 - The file's location and its import order are part of this contract; its content is the fork's. `contrast.spec.ts` checks `tokens.css`
   only: a fork that changes admin colours keeps the pairs of "Contrast" below itself (not checked by CI yet).
 - **Known limit:** the admin's headings (71) do not use `textStyles` roles and are not scanned by the heading-role guard; `font-display`

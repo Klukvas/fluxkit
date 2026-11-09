@@ -163,7 +163,9 @@ async function serveSpa(incoming: IncomingMessage, outgoing: ServerResponse, url
   }
   const served = file ?? indexFile;
   const type = CONTENT_TYPES[extname(served)] ?? "application/octet-stream";
-  const cache = served === indexFile ? ADMIN_CACHE_CONTROL.html : ADMIN_CACHE_CONTROL.assets;
+  // Only the hashed files under /assets/ are immutable; a root file (a fork's favicon, ADR 0047) is revalidated like the
+  // HTML, as nginx and Caddy serve it.
+  const cache = isAsset ? ADMIN_CACHE_CONTROL.assets : ADMIN_CACHE_CONTROL.html;
   outgoing.writeHead(200, { ...security, "content-type": type, "cache-control": cache });
   if (incoming.method === "HEAD") {
     outgoing.end();

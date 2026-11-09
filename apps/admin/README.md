@@ -44,8 +44,9 @@ Checked after every build (`build-output.spec.ts`): `index.html` has no inline s
 - The admin follows the shop's design tokens: `src/styles.css` imports `@fluxkit/theme/tokens.css` and `tailwind.css`, and `index.html`
   fixes `data-theme="light"`. A rebrand of `packages/theme/src/tokens.css` reaches the admin too.
 - To give the admin alone other values (a neutral palette, its own font), a fork writes them into `packages/theme/src/admin-overrides.css`
-  (fork-owned, empty upstream, imported LAST by `src/styles.css` and by nothing else; examples and rules in the file). No dark, `system`
-  or `prefers-color-scheme` rule there. `src/theme-isolation.spec.ts` checks the import order and that the storefront never receives it.
+  (fork-owned, empty upstream, imported LAST by `src/styles.css`; examples and rules in the file), under `:root, [data-theme="light"]`
+  (`html { ... }` would lose to `tokens.css`). No dark, `system` or `prefers-color-scheme` rule there. `src/theme-isolation.spec.ts`
+  checks the import order, those rules (pattern checks) and that no shipped storefront, UI or other theme source names the file (tests may).
 - Name: `app.name` (header, static tab title) and `app.documentTitle` (`"{page} · <name>"`, the tab title on every screen) in
   `src/messages/{uk,en}/common.json`; a fork changes those four values. `index.html` has an empty `<title>`: the Vite plugin of
   `brand-html.ts` (`transformIndexHtml`) fills it at build and in `vite dev` with the English `app.name` (shown before the SPA picks the
