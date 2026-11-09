@@ -18,7 +18,7 @@
  *     },
  *     icons: [{ src: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
  *     appleIcon: { src: "/brand/apple-icon.png" },
- *     themeColor: { light: "#ffffff", dark: "#0b1020" },
+ *     themeColor: true,
  *     ogImage: { src: "/brand/og.png", width: 1200, height: 630 },
  *   };
  */
@@ -28,6 +28,6 @@ export const brand: BrandConfig = {
   logo: { kind: "text" },
   icons: [],
   appleIcon: null,
-  themeColor: null,
+  themeColor: false,
   ogImage: null,
 };

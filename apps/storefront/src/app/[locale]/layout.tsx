@@ -58,8 +58,8 @@ async function requestThemeMode(): Promise<ThemeMode> {
  * is read and Next renders its default viewport tag only (the head of the template is unchanged).
  */
 export async function generateViewport(): Promise<Viewport> {
-  if (brand.themeColor === null) return {};
-  return { themeColor: brandThemeColor(brand.themeColor, await requestThemeMode()) };
+  if (!brand.themeColor) return {};
+  return { themeColor: brandThemeColor(true, await requestThemeMode()) };
 }
 
 export default async function LocaleLayout({

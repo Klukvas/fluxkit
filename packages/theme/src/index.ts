@@ -2,6 +2,7 @@ export const themeNames = ["light", "dark"] as const;
 export type ThemeName = (typeof themeNames)[number];
 export const defaultTheme: ThemeName = "light";
 export { emailTheme, type EmailThemeValues } from "./email-theme.js";
+export { themeColors } from "./theme-color.js";
 
 /**
  * What a page may put into `<html data-theme>`: a fixed theme, or `system`, which follows the OS setting through the

@@ -1,5 +1,6 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { themeColors } from "@fluxkit/theme";
 import { createTranslator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import {
@@ -13,20 +14,6 @@ import { messagesByLocale } from "../messages";
 import { brand } from "./brand";
 
 const publicDir = fileURLToPath(new URL("../../public", import.meta.url));
-const tokensCss = readFileSync(
-  fileURLToPath(new URL("../../../../packages/theme/src/tokens.css", import.meta.url)),
-  "utf8",
-);
-
-/** `--fk-color-background` of one theme block of tokens.css (the effective value: the storefront has no overrides file). */
-function background(selector: string): string {
-  const start = tokensCss.indexOf(`${selector} {`);
-  expect(start, `${selector} block in tokens.css`).toBeGreaterThanOrEqual(0);
-  const block = tokensCss.slice(start, tokensCss.indexOf("}", start));
-  const value = /--fk-color-background:\s*(#[0-9a-fA-F]{6});/.exec(block)?.[1];
-  expect(value, `--fk-color-background in ${selector}`).toBeDefined();
-  return (value as string).toLowerCase();
-}
 
 const filled: BrandConfig = {
   logo: {
@@ -36,7 +23,7 @@ const filled: BrandConfig = {
   },
   icons: [{ src: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
   appleIcon: { src: "/brand/apple-icon.png" },
-  themeColor: { light: "#ffffff", dark: "#0b1020" },
+  themeColor: true,
   ogImage: { src: "/brand/og.png", width: 1200, height: 630 },
 };
 
@@ -56,17 +43,6 @@ describe("config/brand.ts (fork-owned; contract docs/contracts/branding.md)", ()
     ];
     for (const path of paths) expect(existsSync(`${publicDir}${path}`), path).toBe(true);
   });
-
-  it("keeps theme-color equal to the page background of each theme (--fk-color-background, light and dark)", () => {
-    if (brand.themeColor === null) return;
-    expect(brand.themeColor.light.toLowerCase()).toBe(background(':root,\n[data-theme="light"]'));
-    expect(brand.themeColor.dark.toLowerCase()).toBe(background('[data-theme="dark"]'));
-  });
-
-  it("the guard above reads the real backgrounds (the example colours of the file's comment are today's tokens)", () => {
-    expect(background(':root,\n[data-theme="light"]')).toBe(filled.themeColor?.light);
-    expect(background('[data-theme="dark"]')).toBe(filled.themeColor?.dark);
-  });
 });
 
 describe("lib/brand.ts", () => {
@@ -77,7 +53,7 @@ describe("lib/brand.ts", () => {
       logo: { kind: "text" },
       icons: [],
       appleIcon: null,
-      themeColor: null,
+      themeColor: false,
       ogImage: null,
     };
     expect(brandIconsMetadata(defaults)).toBeUndefined();
@@ -95,12 +71,12 @@ describe("lib/brand.ts", () => {
     });
   });
 
-  it("gives one theme-color for a fixed theme and the media pair for system", () => {
-    expect(brandThemeColor(filled.themeColor, "light")).toBe("#ffffff");
-    expect(brandThemeColor(filled.themeColor, "dark")).toBe("#0b1020");
-    expect(brandThemeColor(filled.themeColor, "system")).toEqual([
-      { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-      { media: "(prefers-color-scheme: dark)", color: "#0b1020" },
+  it("gives the page background of the theme (themeColors, equal to the tokens by the theme spec): one for a fixed theme, the media pair for system", () => {
+    expect(brandThemeColor(true, "light")).toBe(themeColors.light);
+    expect(brandThemeColor(true, "dark")).toBe(themeColors.dark);
+    expect(brandThemeColor(true, "system")).toEqual([
+      { media: "(prefers-color-scheme: light)", color: themeColors.light },
+      { media: "(prefers-color-scheme: dark)", color: themeColors.dark },
     ]);
   });
 
@@ -115,8 +91,8 @@ describe("lib/brand.ts", () => {
     ]);
   });
 
-  it("reports remote or odd paths, sizes that are not whole pixels and colours that are not 6-digit hex", () => {
-    const bad = {
+  it("reports remote or odd paths and sizes that are not whole pixels", () => {
+    const bad: BrandConfig = {
       ...filled,
       logo: {
         kind: "image",
@@ -124,15 +100,13 @@ describe("lib/brand.ts", () => {
         darkSafe: true,
       },
       icons: [{ src: "//cdn.example/icon.svg", type: "image/svg+xml", sizes: "any" }],
-      themeColor: { light: "white", dark: "#0b1020" },
       ogImage: { src: "/brand/og.png", width: 1200.5, height: 630 },
-    } as unknown as BrandConfig;
+    };
     expect(brandConfigProblems(bad)).toEqual([
       "logo.light.src must be a file under public/",
       "logo.light needs its width and height in whole pixels",
       "ogImage needs its width and height in whole pixels",
       "icon //cdn.example/icon.svg must be a file under public/",
-      "themeColor.light must be a 6-digit hex",
     ]);
     expect(brandConfigProblems(filled)).toEqual([]);
   });

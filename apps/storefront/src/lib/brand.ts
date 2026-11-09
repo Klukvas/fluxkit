@@ -1,4 +1,4 @@
-import type { ThemeMode } from "@fluxkit/theme";
+import { themeColors, type ThemeMode } from "@fluxkit/theme";
 import type { Translator } from "@fluxkit/ui";
 import type { Metadata, Viewport } from "next";
 import { absoluteUrl } from "./seo";
@@ -35,12 +35,6 @@ export interface BrandIcon {
   sizes: string;
 }
 
-/** `<meta name="theme-color">` per theme: the page background of each (`--fk-color-background`; `brand.spec.ts` checks it). */
-export interface BrandThemeColor {
-  light: `#${string}`;
-  dark: `#${string}`;
-}
-
 export interface BrandConfig {
   logo: BrandLogo;
   /** Browser tab icons. Empty: no icon link (the browser then asks for `/favicon.ico` itself). */
@@ -50,8 +44,11 @@ export interface BrandConfig {
    * no type or dimensions, and every byte of the head counts on every page (plan B1: at most 300 bytes for the whole config).
    */
   appleIcon: { src: `/${string}` } | null;
-  /** The browser UI colour; `null` for no `theme-color` meta. */
-  themeColor: BrandThemeColor | null;
+  /**
+   * `true`: `<meta name="theme-color">` with the page background of the rendered theme (`themeColors` of `@fluxkit/theme`,
+   * kept equal to `--fk-color-background` by its spec), so the browser UI matches the page. `false`: no tag.
+   */
+  themeColor: boolean;
   /**
    * The social preview picture (`og:image`) of pages that have none of their own (home, catalog and category lists, shop
    * pages, a product without a picture). Usually 1200 x 630 PNG or JPEG (social sites do not show SVG); `null` for none.
@@ -78,11 +75,6 @@ export function brandConfigProblems(config: BrandConfig): string[] {
   for (const icon of icons) {
     if (!isPublicPath(icon.src)) problems.push(`icon ${icon.src} must be a file under public/`);
   }
-  if (config.themeColor !== null) {
-    for (const [mode, color] of Object.entries(config.themeColor)) {
-      if (!/^#[0-9a-f]{6}$/i.test(color)) problems.push(`themeColor.${mode} must be a 6-digit hex`);
-    }
-  }
   return problems;
 }
 
@@ -106,20 +98,17 @@ export function brandIconsMetadata(config: BrandConfig): Metadata["icons"] {
 
 /**
  * `theme-color` for the theme the page is rendered in (the layout reads the cookie as it does for `<html data-theme>`): one
- * colour for `light` or `dark`, the pair with media queries for `system`. Empty without a configured colour.
+ * colour for `light` or `dark`, the pair with media queries for `system`. Nothing when the config turns it off.
  */
-export function brandThemeColor(
-  themeColor: BrandThemeColor | null,
-  mode: ThemeMode,
-): Viewport["themeColor"] {
-  if (themeColor === null) return undefined;
+export function brandThemeColor(enabled: boolean, mode: ThemeMode): Viewport["themeColor"] {
+  if (!enabled) return undefined;
   if (mode === "system") {
     return [
-      { media: "(prefers-color-scheme: light)", color: themeColor.light },
-      { media: "(prefers-color-scheme: dark)", color: themeColor.dark },
+      { media: "(prefers-color-scheme: light)", color: themeColors.light },
+      { media: "(prefers-color-scheme: dark)", color: themeColors.dark },
     ];
   }
-  return themeColor[mode];
+  return themeColors[mode];
 }
 
 /**
