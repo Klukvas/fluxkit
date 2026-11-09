@@ -1,6 +1,6 @@
 # packages/ui
 
-Dumb, token-styled components: props in, markup out. No fetching, no API types, no hardcoded user-facing strings (labels and aria texts come from props), semantic Tailwind utilities only (guarded by `packages/theme/src/design-guard.spec.ts`). Radii are roles since 2026-11-09: `rounded-control` (`button.tsx`, `controlBase` in `styles.ts`, fields, chips), `rounded-card`, `rounded-overlay` (`dialog.tsx`), `rounded-media` (`product-image.tsx`, `skeleton.tsx`); `alert.tsx`, `trust-bar.tsx`, the `data-table.tsx` scroll hint, `checkbox.tsx`, `badge.tsx` and `price-text.tsx` keep a size step as listed guard exceptions (`docs/contracts/theme-tokens.md`, "Radius roles").
+Dumb, token-styled components: props in, markup out. No fetching, no API types, no hardcoded user-facing strings (labels and aria texts come from props), semantic Tailwind utilities only (guarded by `packages/theme/src/design-guard.spec.ts`). Radii are roles since 2026-11-09: `rounded-control` (`button.tsx`, `controlBase` in `styles.ts`, fields, chips), `rounded-card`, `rounded-panel` (`alert.tsx`, `trust-bar.tsx`, the `data-table.tsx` scroll hint), `rounded-overlay` (`dialog.tsx`), `rounded-media` (`product-image.tsx`, `skeleton.tsx`); `checkbox.tsx`, `badge.tsx` and `price-text.tsx` keep `rounded-sm` (0.25rem) as listed guard exceptions (`docs/contracts/theme-tokens.md`, "Radius roles").
 
 - `src/index.ts` - public entry point; other packages import only from here.
 - `src/cn.ts`, `src/styles.ts` - class joiner; shared focus ring (`outline-ring`) and form-control classes.

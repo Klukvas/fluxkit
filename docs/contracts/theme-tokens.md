@@ -20,6 +20,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | the radius size steps. Kept for forks' own components (additive); the template's code uses the role radii below and these steps only through the guard's exception list |
 | `--fk-radius-control` | `rounded-control` | buttons, fields, selects, chips, pagination, menu entries and header links, focus targets (a focused section's outline), and popups anchored to a field (menus, suggestion and combobox lists, the search hint). Default `0.5rem`. Added 2026-11-09 |
 | `--fk-radius-card` | `rounded-card` | product, banner and order cards (and their skeletons), `Card`, the hero, large admin preview frames. Default `1rem`. Added 2026-11-09 |
+| `--fk-radius-panel` | `rounded-panel` | inline panels inside a page: notices, empty-result boxes, `Alert`, the `TrustBar` items, the `DataTable` scroll hint, admin sections and fieldsets. Default `0.5rem`. Added 2026-11-09 (owner decision on the review of PR 246) |
 | `--fk-radius-overlay` | `rounded-overlay` | free-floating surfaces over the page: `Dialog`, the add-to-cart toast. Default `1rem`. Added 2026-11-09 |
 | `--fk-radius-media` | `rounded-media` | product and banner pictures, gallery thumbnails, `ProductImage`, `StoreImage`, `Skeleton` (it stands in for loading content). Default `0.5rem`. Added 2026-11-09 |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
@@ -31,7 +32,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-space-unit` | every spacing utility (`p-4` = 4 units, `gap-2`, `m-6`, `size-11`, ...) | the spacing unit, 0.25rem (added 2026-11-03) |
 
 Design kit rules (review D-19, plan `docs/plans/2026-11-03-storefront-design-a.md`; enforced by `packages/theme/src/design-guard.spec.ts`): font sizes only
-`text-xs` to `text-4xl`, radii only the roles `rounded-control|card|overlay|media` (plus the shape `rounded-full` and `rounded-none`; the steps
+`text-xs` to `text-4xl`, radii only the roles `rounded-control|card|panel|overlay|media` (plus the shape `rounded-full` and `rounded-none`; the steps
 `rounded-sm|md|lg` only through the exception list, since 2026-11-09), shadows only `shadow-card|raised|overlay|none`; a
 step outside a scale (`text-5xl`, `rounded-xl`, `shadow-md`) would use a Tailwind built-in value that a rebrand of `tokens.css` cannot reach. Text roles
 are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
@@ -43,17 +44,26 @@ so a dark theme only sets values. Controls have no colour transition: it would a
   literal rem value (not `var(--fk-radius-md)`; `theme.spec.ts` checks it), equal to the step its parts used before, so the default look
   did not change (computed styles and screenshots compared by the CI job `visual`).
 - Which role: `control` for anything you press or type into and the popups anchored to it (a menu belongs to its button, a suggestion list
-  to its field); `card` for cards and large surfaces in the page flow; `overlay` for free-floating surfaces (dialogs, toasts); `media` for
-  pictures. `rounded-full` stays the shape of pills, avatars, spinners and count badges (not a role); `rounded-none` removes a radius.
+  to its field); `card` for cards and large surfaces in the page flow; `panel` for inline frames inside a page (a notice, an empty result,
+  an alert, an admin section or fieldset); `overlay` for free-floating surfaces (dialogs, toasts); `media` for pictures. `rounded-full` stays the shape of pills, avatars, spinners and count badges (not a role); `rounded-none` removes a radius.
 - Mail keeps the size steps (`emailTheme.radius`, no role: the `EmailTheme` contract is unchanged; known limit: mail buttons do not follow
   `--fk-radius-control`).
-- **Known limit, exception list (40 uses in 32 files, `radiusExceptions` in `packages/theme/src/design-guard.spec.ts`, each with its exact
-  count and reason):** parts whose role has another default today keep their step, because moving them would change pixels: inline panels
-  (notices, empty-result boxes, the trust bar's items, `Alert`, admin sections and fieldsets) are `rounded-md` (0.5rem) while the card role
-  is 1rem, and six 0.25rem parts (`Checkbox`, `Badge`, the discount badge of `PriceText`, the product card's brand link focus shape, the
-  language flags `.fk-flag`, the admin order line thumbnail) have no role. A rebrand of `--fk-radius-card` therefore does not reach inline
-  panels; a fork changes `--fk-radius-md` (or `-sm`) for them. Open decision (owner): a `panel` role, or one radius for cards and panels
-  (a declared visual change).
+- **Known limit, exception list (6 uses in 6 files, `radiusExceptions` in `packages/theme/src/design-guard.spec.ts`, each with its exact
+  count and reason):** the 0.25rem parts have no role (owner decision 2026-11-09) and keep `rounded-sm`: `Checkbox`, `Badge`, the discount
+  badge of `PriceText`, the product card's brand link focus shape, the language flags `.fk-flag`, the admin order line thumbnail. A fork
+  restyles them with `--fk-radius-sm`.
+- The guard also refuses the Tailwind v4 forms `rounded-(--var)` and `rounded-(length:--var)`, arbitrary `rounded-[...]`, and a step with the
+  important marker (`rounded-md!`, `!rounded-lg`); `@apply` rules in CSS files are scanned like class lists.
+- Role notes (review of PR 246), what a fork should know before changing a role:
+  - The plan's line "`media` defaults to the `card` value" was overridden: pictures used `rounded-md` (0.5rem) and cards `rounded-lg` (1rem),
+    so `media` = 0.5rem keeps the pixels. A fork that wants pictures as round as cards sets both.
+  - `Skeleton` is `media`: it also stands in for text lines, so a fork that sets `--fk-radius-media: 0` gets square text-line skeletons too.
+  - Focus-only targets (a block that takes the focus after an action: the delivery and payment sections, the form error summary, the
+    order and payment-return status, the account data views) are `control`, because their radius only shapes the focus outline: a fork with pill controls
+    (`--fk-radius-control: 9999px`) gets pill-shaped focus outlines around those sections; give them `panel` in a fork if that looks wrong.
+  - Admin search status: each per-language `LocaleCard` (`apps/admin/src/areas/search/search-status-view.tsx`) is `card` (it was
+    `rounded-lg`, 1rem: a repeated card in a list, like order cards), while the admin's sections and fieldsets that were `rounded-md` are all
+    `panel`. Making the `LocaleCard` a panel would be a visual change (1rem to 0.5rem) and was not made.
 
 **Heading roles (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1; additive):**
 
@@ -82,10 +92,10 @@ so a dark theme only sets values. Controls have no colour transition: it would a
 
 **Migration note for client forks (2026-11-09, additive: no token renamed or removed):** after merging, `pnpm --filter @fluxkit/theme test`
 fails in a fork whose `packages/ui`, `apps/storefront` (including `@apply` in its CSS) or `apps/admin` use `rounded-sm|md|lg` outside the
-exception list. Fix: use the role (`rounded-control|card|overlay|media`; same pixels when the class was `rounded-md` on a control or picture
-or `rounded-lg` on a card or dialog), or add a `radiusExceptions` entry with its count and a reason. A fork that changed `--fk-radius-md` or
+exception list. Fix: use the role (`rounded-control|card|panel|overlay|media`; same pixels when the class was `rounded-md` on a control, an
+inline panel or a picture, or `rounded-lg` on a card or dialog), or add a `radiusExceptions` entry with its count and a reason. A fork that changed `--fk-radius-md` or
 `-lg` to rebrand also sets the role tokens (the template's components no longer read the steps, except the listed exceptions). A fork that
-edited one of the 50 moved files gets a merge conflict on the class name only.
+edited one of the 63 moved files gets a merge conflict on the class name only.
 
 **Migration note for client forks (2026-11-08, additive):** a fork whose own headings in `packages/ui` or `apps/storefront` carry literal
 typography classes fails the new guard after merging; replace the classes with a `textStyles` role (plus layout classes) or add a role.
