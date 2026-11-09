@@ -4,11 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
+import { cardDisplay, type CardDisplayInput } from "../lib/product-card-model";
 import { option, product, summary, variant, category } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
 import { CatalogView } from "./catalog-view";
 import { JsonLd } from "./json-ld";
-import { ProductCard } from "./product-card";
+import { GridCard } from "./cards/grid-card";
 import { ProductDetails } from "./product-details";
 import { ProductGrid } from "./product-grid";
 import { ProductPurchaseView } from "./product-purchase";
@@ -83,7 +84,20 @@ describe("StoreImage", () => {
   });
 });
 
-describe("ProductCard", () => {
+/** The default (`grid`) card of one list item, as `ProductGrid` renders it. */
+function ProductCard(props: CardDisplayInput & { headingLevel: "h2" | "h3" }) {
+  return (
+    <GridCard
+      card={cardDisplay(props)}
+      headingLevel={props.headingLevel}
+      eager={false}
+      locale={props.locale}
+      t={props.t}
+    />
+  );
+}
+
+describe("ProductCard (the grid card)", () => {
   const base = {
     locale: "uk" as const,
     t,

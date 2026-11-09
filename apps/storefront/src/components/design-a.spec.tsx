@@ -2,11 +2,12 @@ import { createTranslator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { trustBarItems } from "../config/trust-bar";
+import { cardDisplay } from "../lib/product-card-model";
 import { summary } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
 import { AccountBreadcrumbsView } from "./account-nav";
 import { CheckoutSteps } from "./checkout-steps";
-import { ProductCard } from "./product-card";
+import { GridCard } from "./cards/grid-card";
 import { sentinelTranslator } from "./test-helpers";
 import { StoreTrustBar } from "./trust-bar";
 
@@ -93,14 +94,19 @@ describe("AccountBreadcrumbsView", () => {
 describe("ProductCard (review D-07, D-15)", () => {
   const card = (availability: "in_stock" | "low_stock" | "out_of_stock") =>
     renderToStaticMarkup(
-      <ProductCard
-        product={summary("lamp", { title: "§lamp", availability })}
+      <GridCard
+        card={cardDisplay({
+          product: summary("lamp", { title: "§lamp", availability }),
+          locale: "uk",
+          t,
+          exponent: 2,
+          imageHosts: [],
+          brandPath: "/catalog?brand=demo-brand",
+        })}
+        headingLevel="h2"
+        eager={false}
         locale="uk"
         t={t}
-        exponent={2}
-        imageHosts={[]}
-        brandPath="/catalog?brand=demo-brand"
-        headingLevel="h2"
       />,
     );
 

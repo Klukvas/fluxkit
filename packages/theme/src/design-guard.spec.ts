@@ -177,7 +177,13 @@ const radiusExceptions: RadiusException[] = [
     reason: SMALL_MEDIA,
   },
   {
-    file: "apps/storefront/src/components/product-card.tsx",
+    file: "apps/storefront/src/components/cards/grid-card.tsx",
+    className: "rounded-sm",
+    count: 1,
+    reason: SMALL_CONTROL,
+  },
+  {
+    file: "apps/storefront/src/components/cards/list-card.tsx",
     className: "rounded-sm",
     count: 1,
     reason: SMALL_CONTROL,
