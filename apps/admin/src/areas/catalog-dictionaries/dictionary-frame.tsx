@@ -137,7 +137,9 @@ export function FocusedPanel({ title, children }: { title: string; children?: Re
   return (
     <div ref={ref} tabIndex={-1} className={`flex flex-col gap-3 ${focusClass}`}>
       <LiveRegion>
-        <p className="rounded-panel border border-success p-3 font-medium text-foreground">{title}</p>
+        <p className="rounded-panel border border-success p-3 font-medium text-foreground">
+          {title}
+        </p>
       </LiveRegion>
       {children}
     </div>
