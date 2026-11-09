@@ -28,8 +28,8 @@ searchForm), `cart` (cart, cartDelivery), `checkout`, `order`, `payment`, `accou
 3. Write the changed texts as overrides (after the merge, so `--messages` sees the new area files):
    `node scripts/messages-extract-overrides.mjs --fork /tmp/fork-uk.json --upstream /tmp/upstream-uk.json --messages apps/storefront/src/messages/uk --out apps/storefront/src/messages-overrides/uk.json`
    (same for `en`). The script reports on stderr, and leaves out:
-   - keys the fork ADDED: an override cannot add a key; add them to the area file of their namespace (and a namespace the map
-     does not know to `messages/areas.ts`);
+   - keys the fork ADDED: an override cannot add a key; since 2026-11-09 they go in `src/messages-extra/<locale>.json` under
+     `custom.` (see "Adding keys" below), not in an upstream area file;
    - keys the fork REMOVED: an override cannot remove a key; upstream's text stays;
    - changed keys upstream renamed or removed since: port them by hand.
 4. Run `pnpm --filter @fluxkit/storefront test`: `message-files.spec.ts` (key in the file of its namespace, no duplicate, parity
@@ -46,3 +46,26 @@ searchForm), `cart` (cart, cartDelivery), `checkout`, `order`, `payment`, `accou
 - The release check reads the MERGED messages: a legal text replaced through an override counts as replaced; an override that
   still carries the placeholder marker is named as `messages-overrides/<locale>.json: <key>`.
 - A fork that added a client namespace to `CLIENT_MESSAGE_PREFIXES` now sets `client: true` for it in `messages/areas.ts`.
+
+## Adding keys (2026-11-09)
+
+Owner decision 2026-11-09: a fork adds its own message keys without editing an upstream file. Storefront only; no API, schema,
+configuration variable or dependency change.
+
+- New fork-owned `apps/storefront/src/messages-extra/uk.json` and `en.json` (`{}` upstream, never edited by upstream), flat key
+  -> text. Every key is in the reserved namespace `custom.` (`custom.deliveryKyiv`); upstream never ships a `custom.` key.
+- Merge order: area files, then extras, then overrides. An override may replace a `custom.` key too.
+- Refused, naming the key and the file (`next build` and every page fail; the release check refuses the same): a key outside
+  `custom.` (it could shadow an upstream key), a key the base already has (replace texts with an override), a value that is
+  not a non-empty string. A missing extras file fails the release check.
+- uk and en need the same keys (plural groups by group), the same `{placeholders}` and complete plural forms, like the base
+  (`messages.spec.ts`).
+- `custom` is a client namespace: a fork's client component can use the keys through `useI18n()`; every `custom.` text is
+  serialized into each page for the browser, so keep the extras small.
+
+How to migrate a fork that put its own keys into upstream area files (or into `messages/areas.ts`):
+
+1. Move each own key to `src/messages-extra/<locale>.json` with a `custom.` name (`promo.kyiv` -> `custom.promo.kyiv`) and
+   rename its uses in the fork's code.
+2. Take upstream's side for the area files and `areas.ts` (drop the fork's namespace entries there).
+3. Run `pnpm --filter @fluxkit/storefront test`.
