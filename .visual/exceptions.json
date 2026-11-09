@@ -1,0 +1,14 @@
+[
+  {
+    "page": "home",
+    "selector": "home.hero-picture",
+    "property": "screenshot",
+    "reason": "PR-E2 B4: neutral grey hero picture replaces the old demo picture (same file name and size); only the picture is masked, computed styles stay identical"
+  },
+  {
+    "page": "en-home",
+    "selector": "home.hero-picture",
+    "property": "screenshot",
+    "reason": "PR-E2 B4: neutral grey hero picture replaces the old demo picture (same file name and size); only the picture is masked, computed styles stay identical"
+  }
+]
