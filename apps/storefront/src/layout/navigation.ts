@@ -26,7 +26,7 @@ export const HEADER_CATEGORY_LIMIT = 6;
 /**
  * The footer's second list: the legal pages (privacy plan step 10), from their own config: add or remove a page there, the
  * footer follows. Catalog, cart and account are not repeated here (repair batch 2): the header shows all three on every page,
- * and the footer's bytes went to the shop pages and the contacts instead (README, "Keep the header small").
+ * and the footer's bytes went to the shop pages and the contacts instead (then under a byte budget; since ADR 0048 a loose cap).
  */
 export const footerLinks: readonly NavigationLink[] = legalPages.map((page) => ({
   labelKey: page.labelKey,

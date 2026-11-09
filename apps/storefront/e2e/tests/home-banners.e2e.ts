@@ -120,8 +120,8 @@ test("each locale gets its texts, and the picture banner its own en picture (the
   ]);
 });
 
-// Not tested without a script: the home page is outlined by React's streaming (its content needs the script; storefront
-// README, "Keep the header small"), before and after this change.
+// Not tested without a script: the home page streams behind its loading view and its content needs the script (ADR 0048:
+// accepted for home only), before and after this change.
 test("a banner opens by keyboard, with a visible focus ring", async ({ page }) => {
   await page.goto("/uk");
   const image = banners(page).getByRole("link", { name: SEEDED.uk[2] });

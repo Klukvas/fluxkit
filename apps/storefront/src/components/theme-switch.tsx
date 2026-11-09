@@ -19,7 +19,7 @@ export interface ThemeSwitchLabels {
  * (`app/theme/route.ts`), which stores it and sends the shopper back to this path. With a script the choice applies in
  * place: the cookie is written here (one of the two places in the storefront that write a cookie, guarded by a spec) and
  * `<html data-theme>` changes at once, so the next page the server renders matches. Text buttons and one class
- * (`.fk-theme-option`): the footer is part of every page's first HTML, which has a size budget (README, "Keep the header small").
+ * (`.fk-theme-option`): the footer is part of every page's first HTML (a loose size cap since ADR 0048, `shell.spec.tsx`).
  */
 export function ThemeSwitch({
   initialMode,

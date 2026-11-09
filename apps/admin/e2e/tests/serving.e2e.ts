@@ -4,6 +4,13 @@ import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../../security-head
 import { SPA } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 
+/** The admin's name in the English UI (ADR 0047: a fork renames it in the messages), read as data, not imported from `src`. */
+const ADMIN_NAME = (
+  JSON.parse(
+    readFileSync(resolve(import.meta.dirname, "../../src/messages/en/common.json"), "utf8"),
+  ) as Record<string, string>
+)["app.name"] as string;
+
 /** A page response or an API response: only the headers are read. */
 function expectStrictHeaders(
   response: { headers(): Record<string, string> } | null,
@@ -39,7 +46,7 @@ test("the SPA answers /admin-ui/ and /admin-ui with the strict headers; assets a
   const withoutSlash = await page.goto(SPA);
   expectStrictHeaders(withoutSlash, ADMIN_CACHE_CONTROL.html);
   await expect(page.getByRole("heading", { level: 1, name: "Start" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Fluxkit Admin" })).toHaveAttribute("href", SPA);
+  await expect(page.getByRole("link", { name: ADMIN_NAME })).toHaveAttribute("href", SPA);
 
   const script = await page.locator('script[type="module"]').first().getAttribute("src");
   expect(script).toMatch(new RegExp(`^${SPA}/assets/`));

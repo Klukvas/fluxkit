@@ -39,6 +39,24 @@ Image hosts: the same list as `STOREFRONT_IMAGE_HOSTS` (a static SPA has no runt
 
 Checked after every build (`build-output.spec.ts`): `index.html` has no inline script, style or handler and no external URL, every asset is under `/admin-ui/assets/`, each area is its own lazy chunk, each lazy message file is its own chunk per language and none of its texts is in the initial JavaScript, the initial JavaScript stays within its budget (440 000 bytes raw, 135 000 gzip; measured 392 050 and 120 027 on 2026-10-19 for the shell; 439 481 and 129 557 on 2026-10-20 with the catalog dictionaries when their messages were merged into the entry; 398 093 and 121 328 after the area messages became lazy, and 398 881 and 121 484 with the products area of step 6a; unchanged by steps 6b and 7, whose code and messages are in the products chunks: 398 881 raw and 121 481 gzip after step 7; 399 489 raw and 121 606 gzip after step 8, whose code and messages are in the orders chunks (the entry gained one route row, one path and two message loaders): 399 489 raw and 121 606 gzip is the step 8 figure; 400 159 raw and 121 952 gzip after step 9, whose code and messages are in the customers chunks (the entry gained one route row, one path and two message loaders and one route title): the budget is about 10 % above that; 400 678 raw and 120 320 gzip after step 10, measured the same way on 2026-10-20, whose code and messages are in the users chunks (the entry gained two route rows, two paths, two message loaders and two route titles)), no zod, `localStorage` once (the one accessor in `i18n-context.tsx`: the UI language, and since the knowledge base the help checklist's preferences).
 
+## Theme, name and favicon (ADR 0047)
+
+- The admin follows the shop's design tokens: `src/styles.css` imports `@fluxkit/theme/tokens.css` and `tailwind.css`, and `index.html`
+  fixes `data-theme="light"`. A rebrand of `packages/theme/src/tokens.css` reaches the admin too.
+- To give the admin alone other values (a neutral palette, its own font), a fork writes them into `packages/theme/src/admin-overrides.css`
+  (fork-owned, empty upstream, imported LAST by `src/styles.css`; examples and rules in the file), under `:root, [data-theme="light"]`
+  (`html { ... }` would lose to `tokens.css`). No dark, `system` or `prefers-color-scheme` rule there. `src/theme-isolation.spec.ts`
+  checks the import order, those rules (pattern checks) and that no shipped storefront, UI or other theme source names the file (tests may).
+- Name: `app.name` (header, static tab title) and `app.documentTitle` (`"{page} · <name>"`, the tab title on every screen) in
+  `src/messages/{uk,en}/common.json`; a fork changes those four values. `index.html` has an empty `<title>`: the Vite plugin of
+  `brand-html.ts` (`transformIndexHtml`) fills it at build and in `vite dev` with the English `app.name` (shown before the SPA picks the
+  UI language); `build-output.spec.ts` pins it.
+- Favicon: none upstream. A fork adds `public/favicon.svg` (or `favicon.png`, `favicon.ico`; the first one found wins); the build copies it
+  to `dist/` and the plugin links it as `/admin-ui/<file>`, the one file of `index.html` outside `/admin-ui/assets/` (served by the
+  proxy's `try_files`, same origin, so the CSP allows it).
+- Known limit: the admin's headings do not use the `textStyles` roles and are not covered by the heading-role guard; a display font set
+  in the overrides does not reach them.
+
 ## Structure and conventions
 
 - `src/routes.ts` is the route table: path (relative to `/admin-ui`), the API operation whose permission guards it (from `ADMIN_OPERATIONS`, tested against `x-fluxkit-permission` in `docs/api/openapi.json`), title key, page (eager or lazy). Only `/login` is public; no route may start with `/admin`. A new screen adds one row and, for the navigation, one entry in `src/layout/navigation.ts`.

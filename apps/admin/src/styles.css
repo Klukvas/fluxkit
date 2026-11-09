@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@fluxkit/theme/tokens.css";
 @import "@fluxkit/theme/tailwind.css";
+/* Fork-owned, empty upstream, LAST so a fork can give the admin alone other token values (ADR 0047). */
+@import "@fluxkit/theme/admin-overrides.css";
 /* Tailwind must also scan the shared UI library for class names. */
 @source "../../../packages/ui/src";
 

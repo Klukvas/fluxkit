@@ -53,8 +53,8 @@ export function SiteFooter({
     <footer className="fk-site-footer">
       <Container className="flex flex-col gap-2">
         {/* No class on the lists, links and contacts (`.fk-site-footer ul`, `nav`, `address` in app/globals.css) and a compact
-            switch: the footer is part of every page's first HTML, which has the same size budget as the header (README, "Keep
-            the header small"; spec in shell.spec.tsx). */}
+            switch: the footer is in every page's first HTML. Since ADR 0048 its size no longer hides a page (only a loose cap in
+            shell.spec.tsx), but small stays cheaper for every page. */}
         <nav aria-label={t("footer.nav.label")}>
           {shopLinks.length === 0 ? null : <LinkList links={shopLinks} locale={locale} t={t} />}
           <LinkList links={footerLinks} locale={locale} t={t} />
