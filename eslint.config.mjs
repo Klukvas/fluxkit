@@ -10,6 +10,8 @@ export default tseslint.config(
       "**/.next/**",
       "**/test-results/**",
       "**/playwright-report/**",
+      // scripts/visual-compare.sh: the base tree (`.visual/base-tree`, a whole checkout) and reports.
+      "**/.visual/**",
       "pnpm-lock.yaml",
     ],
   },

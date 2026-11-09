@@ -4,7 +4,7 @@ import {
   PHASE_PRODUCTION_SERVER,
 } from "next/constants.js";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import config, {
@@ -13,8 +13,10 @@ import config, {
   assertNoLegalPlaceholders,
   demoContentLeft,
   loadRootEnvFile,
+  readMergedMessages,
 } from "./next.config.js";
 import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
+import { messagesByLocale } from "./src/messages";
 
 // `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
 // real .env cannot change what these tests see.
@@ -234,6 +236,7 @@ describe("next.config development media rule", () => {
 
 describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   const masterMessages = join(import.meta.dirname, "src", "messages");
+  const masterOverrides = join(import.meta.dirname, "src", "messages-overrides");
   const masterIdentity = join(import.meta.dirname, "src", "config", "legal-identity.json");
   const placeholderTextKeys = ["legal.privacy.intro", "legal.terms.intro", "legal.cookies.intro"];
   const filledIdentity = {
@@ -251,31 +254,64 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   writeFileSync(clearedDemoFile, JSON.stringify(clearedDemo));
   afterAll(() => rmSync(sharedDirectory, { recursive: true, force: true }));
 
-  /** A scratch copy of master's messages plus an identity file, for a case that edits some of them. */
+  /**
+   * A scratch copy of master's messages (the area files `<locale>/<area>.json`, plan 2026-11-08-design-changeability.md
+   * WP3), an overrides folder and an identity file. `edit` changes the merged base of each locale; every key is written
+   * back to the area file it came from (a new key to `extra.json`). `overrides` are the override files' contents.
+   */
   function scratch(
     edit: (messages: Record<string, string>) => void,
     identity: Record<string, unknown> = filledIdentity,
+    overrides: Record<string, Record<string, unknown>> = { en: {}, uk: {} },
   ) {
     const directory = mkdtempSync(join(tmpdir(), "storefront-legal-"));
+    const messagesDir = join(directory, "messages");
+    const overridesDir = join(directory, "messages-overrides");
+    mkdirSync(overridesDir, { recursive: true });
     for (const language of ["en", "uk"]) {
-      const messages = JSON.parse(
-        readFileSync(join(masterMessages, `${language}.json`), "utf8"),
-      ) as Record<string, string>;
+      const origin = new Map<string, string>();
+      const messages: Record<string, string> = {};
+      for (const file of readdirSync(join(masterMessages, language))) {
+        const area = JSON.parse(
+          readFileSync(join(masterMessages, language, file), "utf8"),
+        ) as Record<string, string>;
+        for (const [key, value] of Object.entries(area)) {
+          messages[key] = value;
+          origin.set(key, file);
+        }
+      }
       edit(messages);
-      writeFileSync(join(directory, `${language}.json`), JSON.stringify(messages));
+      const byFile: Record<string, Record<string, string>> = {};
+      for (const [key, value] of Object.entries(messages)) {
+        const file = origin.get(key) ?? "extra.json";
+        (byFile[file] ??= {})[key] = value;
+      }
+      mkdirSync(join(messagesDir, language), { recursive: true });
+      for (const [file, content] of Object.entries(byFile)) {
+        writeFileSync(join(messagesDir, language, file), JSON.stringify(content));
+      }
+    }
+    for (const [language, content] of Object.entries(overrides)) {
+      writeFileSync(join(overridesDir, `${language}.json`), JSON.stringify(content));
     }
     const identityFile = join(directory, "legal-identity.json");
     writeFileSync(identityFile, JSON.stringify(identity));
-    return { directory, identityFile };
+    return { directory, messagesDir, overridesDir, identityFile };
   }
 
   function failureOf(options: {
     messagesDir: string;
+    overridesDir?: string;
     identityFile: string;
     demoContentFile?: string;
   }): string {
     try {
-      assertNoLegalPlaceholders({ enabled: true, demoContentFile: clearedDemoFile, ...options });
+      assertNoLegalPlaceholders({
+        enabled: true,
+        demoContentFile: clearedDemoFile,
+        overridesDir: masterOverrides,
+        ...options,
+      });
     } catch (error) {
       return (error as Error).message;
     }
@@ -292,8 +328,133 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   it("uses the marker the legal config names, and master carries it in the intro of every legal page in both languages", () => {
     expect(LEGAL_MARKER).toBe(LEGAL_PLACEHOLDER_MARKER);
     const message = failureOf({ messagesDir: masterMessages, identityFile: masterIdentity });
-    for (const file of ["en.json", "uk.json"]) {
-      for (const key of placeholderTextKeys) expect(message).toContain(`${file}: ${key}`);
+    for (const language of ["en", "uk"]) {
+      for (const key of placeholderTextKeys) {
+        expect(message).toContain(`messages/${language}/legal.json: ${key}`);
+      }
+    }
+  });
+
+  it("reads the merged messages the app uses: the same texts as messagesByLocale (area files plus overrides)", () => {
+    const merged = readMergedMessages(masterMessages, masterOverrides);
+    expect(Object.keys(merged).sort()).toEqual(Object.keys(messagesByLocale).sort());
+    for (const [language, messages] of Object.entries(merged)) {
+      const values = Object.fromEntries(
+        Object.entries(messages).map(([key, entry]) => [key, entry.value]),
+      );
+      expect(values, language).toEqual(messagesByLocale[language as keyof typeof messagesByLocale]);
+    }
+  });
+
+  it("refuses a marker inside an area file of a locale folder (the split files are read, not only top-level files)", () => {
+    const { directory, messagesDir, overridesDir, identityFile } = scratch((messages) => {
+      withoutMarkers(messages);
+      messages["legal.terms.intro"] = `${LEGAL_MARKER} ${messages["legal.terms.intro"]}`;
+    });
+    try {
+      const message = failureOf({ messagesDir, overridesDir, identityFile });
+      expect(message).toContain("messages/en/legal.json: legal.terms.intro");
+      expect(message).toContain("messages/uk/legal.json: legal.terms.intro");
+      expect(message).not.toContain("legal.privacy.intro");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("passes when an override replaces every marked text (a fork's own texts in messages-overrides)", () => {
+    const replaced = Object.fromEntries(placeholderTextKeys.map((key) => [key, `Our own ${key}`]));
+    const { directory, messagesDir, overridesDir, identityFile } = scratch(
+      () => {},
+      filledIdentity,
+      { en: replaced, uk: replaced },
+    );
+    try {
+      expect(failureOf({ messagesDir, overridesDir, identityFile })).toBe("");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("refuses while one locale's override leaves a marked text, naming the override file that carries it", () => {
+    const replaced = Object.fromEntries(placeholderTextKeys.map((key) => [key, `Our own ${key}`]));
+    const { directory, messagesDir, overridesDir, identityFile } = scratch(
+      () => {},
+      filledIdentity,
+      { en: replaced, uk: { ...replaced, "legal.cookies.intro": `${LEGAL_MARKER} copied` } },
+    );
+    try {
+      const message = failureOf({ messagesDir, overridesDir, identityFile });
+      expect(message).toContain("messages-overrides/uk.json: legal.cookies.intro");
+      expect(message).not.toContain("legal.json");
+      expect(message).not.toContain("legal.privacy.intro");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed on a messages folder without area files (the check must never pass by finding nothing)", () => {
+    const { directory, overridesDir, identityFile } = scratch(withoutMarkers);
+    const empty = join(directory, "empty-messages");
+    mkdirSync(empty);
+    try {
+      expect(failureOf({ messagesDir: empty, overridesDir, identityFile })).toMatch(
+        /no message files/,
+      );
+      mkdirSync(join(empty, "en"));
+      expect(failureOf({ messagesDir: empty, overridesDir, identityFile })).toMatch(
+        /no message files/,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed on an old flat message file left at the top of the messages folder (the app would ignore it)", () => {
+    const { directory, messagesDir, overridesDir, identityFile } = scratch(withoutMarkers);
+    writeFileSync(join(messagesDir, "uk.json"), JSON.stringify({ "legal.terms.intro": "x" }));
+    try {
+      expect(failureOf({ messagesDir, overridesDir, identityFile })).toMatch(/uk\.json.*flat/s);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("fails closed on an override value that is not a non-empty string, as the app's loader does (review M1 of PR 241)", () => {
+    for (const bad of [42, null, ["x"], { a: "b" }, "", "   "]) {
+      const { directory, messagesDir, overridesDir, identityFile } = scratch(
+        withoutMarkers,
+        filledIdentity,
+        { en: { "legal.terms.intro": bad }, uk: {} },
+      );
+      try {
+        expect(failureOf({ messagesDir, overridesDir, identityFile }), JSON.stringify(bad)).toMatch(
+          /Message override "legal\.terms\.intro" in .*messages-overrides\/en\.json must be a non-empty string\./,
+        );
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("fails closed on a key in two area files, an override of an unknown key, or a missing override file", () => {
+    const duplicate = scratch(withoutMarkers);
+    writeFileSync(
+      join(duplicate.messagesDir, "en", "zz.json"),
+      JSON.stringify({ "legal.terms.intro": "again" }),
+    );
+    const unknown = scratch(withoutMarkers, filledIdentity, {
+      en: { "legal.trems.intro": "x" },
+      uk: {},
+    });
+    const missing = scratch(withoutMarkers, filledIdentity, { en: {} });
+    try {
+      expect(failureOf(duplicate)).toMatch(/legal\.terms\.intro.*legal\.json.*zz\.json/s);
+      expect(failureOf(unknown)).toMatch(/legal\.trems\.intro/);
+      expect(failureOf(missing)).toMatch(/uk\.json/);
+    } finally {
+      for (const { directory } of [duplicate, unknown, missing]) {
+        rmSync(directory, { recursive: true, force: true });
+      }
     }
   });
 
@@ -305,14 +466,14 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
 
   it("refuses while one legal text still carries the marker, however the placeholder box messages were edited", () => {
     for (const key of placeholderTextKeys) {
-      const { directory, identityFile } = scratch((messages) => {
+      const { directory, messagesDir, overridesDir, identityFile } = scratch((messages) => {
         withoutMarkers(messages);
         messages[key] = `${LEGAL_MARKER} ${messages[key]}`;
         for (const box of ["legal.placeholder.title", "legal.placeholder.body"]) messages[box] = "";
       });
       try {
-        expect(failureOf({ messagesDir: directory, identityFile }), key).toContain(
-          `en.json: ${key}`,
+        expect(failureOf({ messagesDir, overridesDir, identityFile }), key).toContain(
+          `messages/en/legal.json: ${key}`,
         );
       } finally {
         rmSync(directory, { recursive: true, force: true });
@@ -323,14 +484,14 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   it("refuses a controller identity that is unset, empty or blank, naming the field", () => {
     for (const field of Object.keys(filledIdentity)) {
       for (const bad of [null, "", "   "]) {
-        const { directory, identityFile } = scratch(withoutMarkers, {
+        const { directory, messagesDir, overridesDir, identityFile } = scratch(withoutMarkers, {
           ...filledIdentity,
           [field]: bad,
         });
         try {
-          const message = failureOf({ messagesDir: directory, identityFile });
+          const message = failureOf({ messagesDir, overridesDir, identityFile });
           expect(message, `${field}=${JSON.stringify(bad)}`).toContain(field);
-          expect(message).not.toContain("en.json");
+          expect(message).not.toContain("legal.json");
         } finally {
           rmSync(directory, { recursive: true, force: true });
         }
@@ -339,9 +500,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("refuses an identity file that lacks a field", () => {
-    const { directory, identityFile } = scratch(withoutMarkers, {});
+    const { directory, messagesDir, overridesDir, identityFile } = scratch(withoutMarkers, {});
     try {
-      const message = failureOf({ messagesDir: directory, identityFile });
+      const message = failureOf({ messagesDir, overridesDir, identityFile });
       for (const field of Object.keys(filledIdentity)) expect(message).toContain(field);
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -349,9 +510,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("refuses master's own identity file, where every field is unset", () => {
-    const { directory } = scratch(withoutMarkers);
+    const { directory, messagesDir, overridesDir } = scratch(withoutMarkers);
     try {
-      const message = failureOf({ messagesDir: directory, identityFile: masterIdentity });
+      const message = failureOf({ messagesDir, overridesDir, identityFile: masterIdentity });
       for (const field of Object.keys(filledIdentity)) expect(message).toContain(field);
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -359,12 +520,13 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("fails closed when the identity file cannot be read", () => {
-    const { directory } = scratch(withoutMarkers);
+    const { directory, messagesDir, overridesDir } = scratch(withoutMarkers);
     try {
       expect(() =>
         assertNoLegalPlaceholders({
           enabled: true,
-          messagesDir: directory,
+          messagesDir,
+          overridesDir,
           identityFile: join(directory, "missing.json"),
           demoContentFile: clearedDemoFile,
         }),
@@ -375,12 +537,13 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("passes for a fully filled-in set: no marker in any legal text, a complete identity and no demo content left", () => {
-    const { directory, identityFile } = scratch(withoutMarkers);
+    const { directory, messagesDir, overridesDir, identityFile } = scratch(withoutMarkers);
     try {
       expect(() =>
         assertNoLegalPlaceholders({
           enabled: true,
-          messagesDir: directory,
+          messagesDir,
+          overridesDir,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -391,7 +554,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   });
 
   it("looks only at legal messages for the marker", () => {
-    const { directory, identityFile } = scratch((messages) => {
+    const { directory, messagesDir, overridesDir, identityFile } = scratch((messages) => {
       withoutMarkers(messages);
       messages["site.note"] = `x ${LEGAL_MARKER} y`;
     });
@@ -399,7 +562,8 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
       expect(() =>
         assertNoLegalPlaceholders({
           enabled: true,
-          messagesDir: directory,
+          messagesDir,
+          overridesDir,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -414,6 +578,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
       assertNoLegalPlaceholders({
         enabled: false,
         messagesDir: masterMessages,
+        overridesDir: masterOverrides,
         identityFile: masterIdentity,
         demoContentFile: masterDemoContent,
       }),
@@ -429,9 +594,9 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
 
     function demoFailure(demoContentFile: string): string {
-      const { directory, identityFile } = scratch(withoutMarkers);
+      const { directory, messagesDir, overridesDir, identityFile } = scratch(withoutMarkers);
       try {
-        return failureOf({ messagesDir: directory, identityFile, demoContentFile });
+        return failureOf({ messagesDir, overridesDir, identityFile, demoContentFile });
       } finally {
         rmSync(directory, { recursive: true, force: true });
       }
@@ -446,7 +611,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
       for (const slug of master.shopPages) expect(message).toContain(`shopPages: ${slug}`);
       for (const flag of DEMO_CONTENT_FLAGS) expect(message).toContain(`\n${flag}`);
       expect(message).toContain("demo copy");
-      expect(message).not.toContain("en.json");
+      expect(message).not.toContain("legal.json");
     });
 
     it("refuses while a single page or a single flag is left, and names only that one", () => {

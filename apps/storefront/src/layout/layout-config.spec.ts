@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { checkoutConfig } from "../config/checkout";
-import en from "../messages/en.json";
+import { messagesByLocale } from "../messages";
 import { footerLinks, headerLinks, sessionLinks } from "./navigation";
 import { localizedHref } from "../lib/locale-path";
+
+const { en } = messagesByLocale;
 
 const messageKeys = new Set(Object.keys(en));
 

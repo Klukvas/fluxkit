@@ -1,6 +1,6 @@
 import { createTranslator } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import {
   homeMetadata,
   listingMetadata,
@@ -9,6 +9,8 @@ import {
   searchMetadata,
 } from "./page-metadata";
 import { product } from "./test-fixtures";
+
+const { uk } = messagesByLocale;
 
 const t = createTranslator(uk, "uk");
 const origin = "https://shop.example";

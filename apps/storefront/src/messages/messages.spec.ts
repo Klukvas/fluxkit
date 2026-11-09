@@ -3,9 +3,11 @@ import { join, relative } from "node:path";
 import { messagePlaceholders } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { withoutLegalMarker } from "../config/legal";
-import en from "./en.json";
-import uk from "./uk.json";
+import { messagesByLocale } from "./index";
 
+// Every check runs on the MERGED messages the app renders: the area files plus the fork's overrides (plan
+// 2026-11-08-design-changeability.md, WP3), so an override that breaks parity, a plural group or a placeholder fails here.
+const { uk, en } = messagesByLocale;
 const files = { uk, en } as const;
 const pluralForms = { uk: ["one", "few", "many", "other"], en: ["one", "other"] } as const;
 const allCategories = ["zero", "one", "two", "few", "many", "other"];
@@ -125,7 +127,7 @@ describe("message keys used in the source", () => {
         const messages = files[locale] as Record<string, string>;
         const exists =
           key in messages || pluralForms[locale].every((form) => `${key}.${form}` in messages);
-        expect(exists, `${file} uses "${key}", missing in ${locale}.json`).toBe(true);
+        expect(exists, `${file} uses "${key}", missing in the ${locale} messages`).toBe(true);
       }
     }
   });

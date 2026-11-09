@@ -5,14 +5,15 @@ import { LEGAL_PLACEHOLDER_MARKER, legalPages, withoutLegalMarker } from "../con
 import { shopPages, type ShopPageConfig } from "../config/shop-pages";
 import { contactsView, type ContactsView } from "../lib/contacts";
 import { buildSitemap } from "../lib/sitemap";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { LegalPage } from "./legal-page";
 import { ProductPageNote } from "./product-page-note";
 import { ShopPage } from "./shop-page";
 import { SiteFooter } from "./site-footer";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 import { StoreTrustBar } from "./trust-bar";
+
+const { uk, en } = messagesByLocale;
 
 // The route module reads the public origin and calls Next's `notFound`; both are stubs here.
 vi.mock("next/navigation", () => ({
@@ -278,7 +279,10 @@ describe("the shop page route", () => {
     const metadata = await route.generateMetadata(params("en", "faq"));
     const english = createTranslator(en, "en");
     expect(metadata.title).toBe(
-      english("seo.pageTitle", { title: en["shopPages.faq.title"], site: en["site.name"] }),
+      english("seo.pageTitle", {
+        title: english("shopPages.faq.title"),
+        site: english("site.name"),
+      }),
     );
     expect(metadata.description).toBe(en["shopPages.faq.description"]);
     expect(metadata.robots).toBeUndefined();

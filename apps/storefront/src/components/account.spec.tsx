@@ -4,8 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { formatDate } from "../lib/date";
 import { clientFailure, failureFromResult, missingRequired, type Failure } from "../lib/failure";
 import { customer } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { currentAccountLink } from "../layout/navigation";
 import { AccountGateView } from "./account-gate";
 import { AccountNavView } from "./account-nav";
@@ -21,6 +20,8 @@ import {
   textAttributes,
   textOf,
 } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 

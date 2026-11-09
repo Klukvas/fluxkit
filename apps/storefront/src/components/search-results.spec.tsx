@@ -6,11 +6,12 @@ import { describe, expect, it, vi } from "vitest";
 import { formatMoney } from "../lib/money";
 import type { SearchQuery } from "../lib/search-query";
 import { summary } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { I18nProvider } from "./i18n-provider";
 import { SearchResultsView, type SearchPageOutcome } from "./search-results";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),

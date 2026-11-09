@@ -3,8 +3,7 @@ import { join } from "node:path";
 import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { HEADER_CATEGORY_LIMIT, MAIN_CONTENT_ID } from "../layout/navigation";
 import { AccountLinkView, SignOutItemView } from "./account-link";
 import { CartBadgeView } from "./cart-badge";
@@ -13,6 +12,8 @@ import { SiteShell } from "./site-shell";
 import { ErrorView, LoadingView, NotFoundView } from "./status-views";
 import { customer } from "../lib/test-fixtures";
 import { findElements, leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 /** What the client islands read through the provider: every message is its own sentinel. */

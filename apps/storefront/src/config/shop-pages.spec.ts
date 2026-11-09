@@ -4,8 +4,7 @@ import { locales } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { DEMO_CONTENT_FLAGS } from "../../next.config.js";
 import { footerShopLinks } from "../layout/navigation";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import {
   RESERVED_SLUGS,
   checkShopPages,
@@ -27,6 +26,8 @@ import {
   type ShopPageConfig,
   type ShopPageSection,
 } from "./shop-pages";
+
+const { uk, en } = messagesByLocale;
 
 const localeRoot = join(import.meta.dirname, "..", "app", "[locale]");
 

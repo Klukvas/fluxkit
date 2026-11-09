@@ -5,8 +5,7 @@ import { describe, expect, it } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
 import { option, product, summary, variant, category } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { CatalogView } from "./catalog-view";
 import { JsonLd } from "./json-ld";
 import { ProductCard } from "./product-card";
@@ -15,6 +14,8 @@ import { ProductGrid } from "./product-grid";
 import { ProductPurchaseView } from "./product-purchase";
 import { StoreImage } from "./store-image";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];

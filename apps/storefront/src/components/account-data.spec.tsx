@@ -3,8 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { clientFailure, type Failure } from "../lib/failure";
 import { mapDeleteFailure } from "../lib/personal-data";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { AccountDeletedView } from "./account-deleted";
 import {
   BlockedView,
@@ -17,6 +16,8 @@ import {
 } from "./account-data-views";
 import { LegalNotice, noticeLinks } from "./legal-notice";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 

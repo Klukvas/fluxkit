@@ -4,9 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { loadSearchEnabled } from "../lib/catalog-data";
 import type { CatalogOutcome, StoreData } from "../lib/store-data";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { SiteShell } from "./site-shell";
 import { sentinelTranslator } from "./test-helpers";
+
+const { uk } = messagesByLocale;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -40,6 +42,10 @@ describe("the header's search box and the shop's search setting (availability ga
     expect(html.indexOf('role="search"')).toBeGreaterThan(html.indexOf("<header"));
     expect(html.indexOf('role="search"')).toBeLessThan(html.indexOf("</header>"));
     expect(html).toContain('action="/uk/search"');
+  });
+
+  it("never sends data-hydrated in the server HTML: the box sets it in the browser once mounted (no first-HTML bytes)", () => {
+    expect(shell(true)).not.toContain("data-hydrated");
   });
 
   it("renders NO search box, form or search link when search is off", () => {
