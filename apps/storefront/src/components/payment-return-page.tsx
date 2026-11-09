@@ -107,7 +107,7 @@ export function PaymentReturnView({
         <div
           className={`rounded-md border border-s-4 border-border bg-muted p-4 text-foreground ${TONE_BORDER[view.tone]}`}
         >
-          <h2 className="flex items-center gap-3 font-semibold">
+          <h2 className={`${textStyles.itemTitle} flex items-center gap-3`}>
             {view.busy ? (
               <span
                 aria-hidden="true"

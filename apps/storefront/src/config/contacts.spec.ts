@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { contactsView } from "../lib/contacts";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { shopContacts, type ShopContacts } from "./contacts";
+
+const { uk, en } = messagesByLocale;
 
 const none: ShopContacts = {
   phones: [],

@@ -2,8 +2,7 @@ import { InvalidResponseError, NetworkError, type StoreFailure } from "@fluxkit/
 import { describe, expect, it } from "vitest";
 import { createTranslator } from "@fluxkit/ui";
 import { vi } from "vitest";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import {
   clientFailure,
   failureFromResult,
@@ -15,6 +14,8 @@ import {
   missingRequired,
   retryAfterSeconds,
 } from "./failure";
+
+const { uk, en } = messagesByLocale;
 
 function failed(
   status: number,

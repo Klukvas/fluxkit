@@ -11,6 +11,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-border` | `border-border` | decorative borders and dividers (cards, badges, buttons); about 1.2:1, NOT for the line that identifies a control |
 | `--fk-color-border-input` | `border-border-input` | the border of inputs, textareas, selects and checkboxes (WCAG 1.4.11, at least 3:1; added after the storefront step 10 review) |
 | `--fk-color-primary` / `-primary-foreground` | `bg-primary` / `text-primary-foreground` | primary actions |
+| `--fk-color-accent` / `-accent-foreground` | `bg-accent`, `border-accent` / `text-accent-foreground` | a second brand colour: the `accent` tone of a home banner card (`BannerCard`), otherwise **reserved for client code**. Defaults equal the primary pair (6-digit hex copies, not `var()`), so nothing moved. Added 2026-11-08 |
 | `--fk-color-danger` | `text-danger`, `bg-danger`, `border-danger` | destructive and error states |
 | `--fk-color-danger-foreground` | `text-danger-foreground` | text on a `danger` fill, such as the header's cart count badge (added 2026-11-02) |
 | `--fk-color-success` | `text-success`, `border-success` | success and availability (added in storefront plan step 4a) |
@@ -18,6 +19,7 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | corner radii |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
+| `--fk-font-display` | `font-display` | the heading face of the `pageTitle` and `sectionTitle` roles and the text logo (`.fk-logo`); default = the `--fk-font-sans` stack, so nothing moved (a test asserts the equality). May be `var(--font-...)` from `apps/storefront/src/config/fonts.ts` (section "Fonts"). Added 2026-11-08 |
 | `--fk-shadow-card` | `shadow-card` | card elevation (resting) |
 | `--fk-shadow-raised` | `shadow-raised` | a raised surface: the hovered product card (added 2026-11-03, design batch A) |
 | `--fk-shadow-overlay` | `shadow-overlay` | surfaces over the page: menus, toasts, bars (added 2026-11-03) |
@@ -27,13 +29,69 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 Design kit rules (review D-19, plan `docs/plans/2026-11-03-storefront-design-a.md`; enforced by `packages/theme/src/design-guard.spec.ts`): font sizes only
 `text-xs` to `text-4xl`, radii only `rounded-sm|md|lg` (plus the shape `rounded-full` and `rounded-none`), shadows only `shadow-card|raised|overlay|none`; a
 step outside a scale (`text-5xl`, `rounded-xl`, `shadow-md`) would use a Tailwind built-in value that a rebrand of `tokens.css` cannot reach. Text roles
-(page title, section title, subsection title, meta) are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
+are class strings in `@fluxkit/ui` (`textStyles`), built from these tokens. Names are roles, not looks,
 so a dark theme only sets values. Controls have no colour transition: it would also animate `outline-color`, so the focus ring would fade in.
+
+**Heading roles (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1; additive):**
+
+| Role | Classes today | Used for |
+|---|---|---|
+| `pageTitle` | `font-display text-3xl font-bold text-foreground` | a page's `h1` (the hero adds `md:text-4xl`) |
+| `pageTitleCompact` | `text-2xl font-bold text-foreground` | the `h1` of the error and not-found views; the order page adds `sm:text-3xl` |
+| `sectionTitle` | `font-display text-xl font-semibold text-foreground` | a section `h2`, a form section's `legend`, the `Disclosure` heading |
+| `subsectionTitle` | `text-lg font-semibold text-foreground` | smaller `h2`/`h3`, the `EmptyState` heading, the result count, the filter sheet title |
+| `itemTitle` | `font-semibold text-foreground` | body-size headings: a line item, a short list, a field group's `legend` |
+| `cardTitle` | `font-medium text-foreground` | the product card's name (the card adds `line-clamp-2`), the `OptionPicker` legend |
+| `dialogTitle` | `text-lg font-semibold` | a `Dialog` title and the `BannerCard` title: no colour, the surface (a toned banner) sets it |
+| `navGroupTitle` | `text-sm font-semibold text-muted-foreground` | the heading over a `SideNav` link group (added after review m1 of PR 242) |
+| `meta` | `text-sm text-muted-foreground` | hints and meta lines |
+
+- `font-display` is on `pageTitle` and `sectionTitle` only: a decorative face in small titles hurts legibility. A fork that wants it on more
+  roles edits `textStyles`, nothing else.
+- Guard (`packages/theme/src/design-guard.spec.ts`, "heading roles"): every `<h1>` to `<h6>`, dynamic `<Heading>` and `<legend>` with a
+  `className` in `packages/ui` and `apps/storefront` uses a `textStyles` role written inline (a call site adds layout, focus or visibility
+  classes, or a prefixed size such as `md:text-4xl`; an unprefixed size, weight, family, colour or line height next to a role fails); a
+  heading without classes, or with visibility classes only (`sr-only`, `lg:hidden`), passes. Spread props and dynamic tags not named
+  `Heading` are not inspected. **Known limit:** `apps/admin` (71 headings) is
+  not scanned yet. The text logo (`.fk-logo`, CSS) takes `font-display` through `@apply`.
+- The header and footer shell carry no heading role with `font-display` (first-HTML budget, `shell.spec.tsx`); the registration page grew
+  by 13 bytes (one `pageTitle`).
+
+**Migration note for client forks (2026-11-08, additive):** a fork whose own headings in `packages/ui` or `apps/storefront` carry literal
+typography classes fails the new guard after merging; replace the classes with a `textStyles` role (plus layout classes) or add a role.
+A fork that edited `textStyles` gets one merge conflict in `packages/ui/src/styles.ts`: keep its own strings and take the new roles. No
+raw-radius guard yet (role radii come in a later change).
 
 **Migration note for client forks (2026-11-03, not a SemVer break: the tokens are additive):** after merging this upstream change, `pnpm test`
 fails in a fork whose `packages/ui`, `apps/storefront` or `apps/admin` use a size, radius or shadow outside the scales (`text-5xl`,
 `rounded-xl`, `shadow-md`, a bare `rounded` or `shadow`). Fix: replace the class with a scale step, or extend the scale in all three places:
-a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
+a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens live only there), its mapping in `tailwind.css`, and the step list in `design-guard.spec.ts`.
+
+## Fonts (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1b)
+
+- A font token may name a web font variable before its fallback stack: `--fk-font-display: var(--font-display-face), ui-sans-serif,
+  system-ui, sans-serif;`. The variable comes from `next/font/local` in the storefront's fork-owned `apps/storefront/src/config/fonts.ts`
+  (empty upstream; the root layout puts each font's `variable` class on `<html>`). `contrast.spec` reads colours only and the block parser
+  accepts any value, so fonts need no hex; `email-theme.spec` compares `emailTheme.font` with the stack WITHOUT `var(--font-*)` entries
+  (mail cannot load web fonts), so `--fk-font-sans` may also take a fork face without touching mail.
+- A fork that changes `--fk-font-sans` but leaves `--fk-font-display` at the template stack fails `theme.spec.ts` (headings would silently
+  stay in the system face): set both.
+- Admin: it imports the same `tokens.css` (`apps/admin/src/styles.css`) and follows `--fk-font-sans`; a web font for the admin needs its own
+  `@font-face` (the admin has no `next/font`). Its place is the admin overrides file planned for a later change (plan, B2/E1); until then a
+  fork declares it in `apps/admin/src/styles.css`. Same rules as below.
+
+- **Self-hosted woff2 only.** The CSP has no `font-src`, so `default-src 'self'` applies: same origin only (`next.config.ts`,
+  `buildContentSecurityPolicy`). Google Fonts and other font CDNs are blocked on purpose (no third-party request, AGENTS.md 3); `next/font/google`
+  is refused by `config/fonts.spec.ts`. Check the font's licence allows self-hosting on the web.
+- `display: "swap"` with fallback metrics (`adjustFontFallback`, which writes a `size-adjust` fallback face), so text shows at once and
+  barely moves when the face arrives.
+- Coverage: Cyrillic including Ґ Є І Ї (and ґ є і ї), the apostrophe U+2019, ₴ and the Latin set; test with the shop's real copy in `uk`
+  and `en`.
+- Weights: load the ones `textStyles` uses (600 and 700 for headings, plus 500 for `cardTitle` if the body face is replaced) or one
+  variable font; a missing weight is synthesised (fake bold).
+- No preload (`preload: false`) while the first-HTML budget is open (plan 2026-11-08, L1): a preload `<link>` in `<head>` counts toward it.
+- `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
+  holds one) inside a `Suspense` boundary: a hoisted stylesheet there makes React outline the boundary.
 
 ## Themes and modes (design batch B, 2026-11-03)
 
@@ -42,11 +100,13 @@ a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and
 | `data-theme` | Block | `color-scheme` | Who sets it |
 |---|---|---|---|
 | none or `light` | `:root, [data-theme="light"]` (every token) | `light` | the admin (`index.html`, fixed); the storefront when the shopper or the config chose light |
-| `dark` | `[data-theme="dark"]` (every token, same names) | `dark` | the storefront |
+| `dark` | `[data-theme="dark"]` (colours and shadows only, the same names as light's; everything else is inherited from `:root`) | `dark` | the storefront |
 | `system` | light, plus `@media (prefers-color-scheme: dark) { [data-theme="system"] { ... } }` on a dark device | `dark` there | the storefront (default) |
 
-- The `system` block holds the dark value of every token whose dark value differs from light (today: all colours and the three shadows) and
-  nothing else; a test keeps it equal to the dark block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
+- Fonts, radii, the type scale and the spacing unit are defined once, in the light block (single definition since 2026-11-08, plan
+  `docs/plans/2026-11-08-design-changeability.md` T4): the dark block holds only `--fk-color-*` and `--fk-shadow-*`, exactly the names of
+  light's colours and shadows. The `system` block is a byte-for-byte copy of the dark block. `packages/theme/src/theme.spec.ts` enforces all
+  three rules and that every `var(--fk-*)` in `tailwind.css` is defined in the light block. It is **opt-in**: no rule under the media query matches `:root`, so a page without
   `data-theme="system"` (the admin) never follows the device (`apps/admin/src/theme-isolation.spec.ts` checks the admin's built CSS).
 - `color-scheme` makes native controls, scrollbars and select popups follow the theme.
 - Mail stays light (`emailTheme` reads the light block; mail templates set `color-scheme: light`).
@@ -54,10 +114,14 @@ a token in both theme blocks of `tokens.css`, its mapping in `tailwind.css`, and
 - The storefront's choice of mode: `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) and the `fluxkit_theme` cookie
   (ADR 0045); the server renders `data-theme`, so the first paint is right without a script.
 
-**How a fork rebrands both themes:** set the light values in the `:root` block and the dark values in the `[data-theme="dark"]` block (same names;
-the contrast pairs below must pass in both), then copy every dark value that differs from light into the `system` block: `pnpm --filter
+**How a fork rebrands both themes:** set the light values in the `:root` block (fonts, radii and sizes only there) and the dark colours and
+shadows in the `[data-theme="dark"]` block (same names; the contrast pairs below must pass in both), then copy the dark block into the `system` block: `pnpm --filter
 @fluxkit/theme test` names each token that is missing or different there. A shop without a dark theme sets `defaultMode: "light"` and
 `showToggle: false` in the storefront config (the dark blocks then never apply). No component edits.
+
+**Migration note for client forks (2026-11-08, additive: no token renamed or removed):** the non-colour tokens left the dark block. A fork
+that changed a font, radius, size or the spacing unit in BOTH blocks keeps its light value and deletes the dark copy (`pnpm --filter
+@fluxkit/theme test` names each repeat); a fork that set a different value only in dark loses it (dark now inherits from `:root`).
 
 **Migration note for client forks (2026-11-03, additive: no token renamed or removed):** a fork that changed dark values in `tokens.css` must
 copy them into the new `system` block (the test above fails until it does). The storefront now renders `data-theme="system"` by default
@@ -83,6 +147,13 @@ The test parses `tokens.css` into its blocks (`packages/theme/src/token-blocks.t
 | `ring` on `muted` | 3:1 (focus inside an alert) |
 | `primary` on `background` and on `muted` | 3:1 (info alert border) |
 | `border-input` on `background` and on `muted` | 3:1 (non-text, WCAG 1.4.11: the border that identifies a text control; `muted` is the alert surface) |
+| `accent-foreground` on `accent` | 4.5:1 (the banner `accent` tone; checked unconditionally, also while no component uses it) |
+| `accent` on `background` and on `muted` | 3:1 (an accent surface or border next to the page or a muted surface; unconditional) |
+
+**Three different "accent"s (2026-11-08):** the banner tone NAME `accent` (stored by the API in `banner.tone`, kept for compatibility),
+the colour TOKEN `--fk-color-accent` that tone uses (`bg-accent text-accent-foreground`; before 2026-11-08 the tone used the primary
+classes, with the same pixels), and Tailwind's own `accent-*` utilities, which set the CSS `accent-color` of checkboxes and radios
+(`accent-primary` in `Checkbox` stays as it is). A fork sets the accent pair in all three theme blocks; the pairs above must pass.
 
 The test also reads the class strings of `packages/ui` and `apps/storefront` and fails when a component uses a text, border, outline or ring token on a background that is neither in this table nor declared decorative in the test (`border` on `background` and on `muted`: outlines of cards, badges, buttons and dividers, whose content is identified by its text).
 
@@ -106,12 +177,12 @@ Mail clients do not support CSS variables, so mail templates (`EmailTemplate`, `
 | Member | Source | Value today |
 |---|---|---|
 | `color.background`, `foreground`, `muted`, `mutedForeground`, `border`, `primary`, `primaryForeground`, `danger`, `success`, `warning` | the light value of `--fk-color-<kebab name>` | 6-digit hex |
-| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` | the token stacks |
+| `font.sans`, `font.mono` | `--fk-font-sans`, `--fk-font-mono` with every `var(--font-*)` entry (a fork's web font) stripped | the token stacks |
 | `radius.sm`, `md`, `lg` | `--fk-radius-*`, rem to px (16px per rem) | `4px`, `8px`, `16px` |
 | `space.xs` to `space.xl` | mail only | `4px`, `8px`, `16px`, `24px`, `32px` |
 | `fontSize.small`, `body`, `heading` | mail only | `13px`, `15px`, `20px` |
 | `lineHeight` | mail only | `1.5` |
 | `contentWidth` | mail only (pixels, the content table's `width`) | `600` |
 
-Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
-`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.
+Not used in mail: `--fk-color-border-input` (no form controls), `--fk-color-danger-foreground` (no text on a danger fill), `--fk-color-accent` and `-accent-foreground` (no banner or other accent surface in mail; 2026-11-08), `--fk-font-display` (mail headings use `font.sans`; a fork's display face is a web font mail cannot load; 2026-11-08), `--fk-color-ring` (no keyboard focus), `--fk-shadow-card`, `--fk-shadow-raised`, `--fk-shadow-overlay` (box-shadow is poorly supported), `--fk-font-size-*`, `--fk-line-height-*` and `--fk-space-unit` (mail keeps its own px groups `fontSize`, `lineHeight`, `space`). Dark mode is not attempted in mail.
+`packages/theme/src/email-theme.spec.ts` fails when a color, font or radius differs from its light token (fonts are compared after stripping `var(--font-*)` entries, since mail cannot load a web font) or when a light token is neither in `emailTheme` nor in that list. Rebranding mail = changing `tokens.css` and the matching `emailTheme` values (the guard names each one), never a template.

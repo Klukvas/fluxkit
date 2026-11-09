@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
-import { focusRing } from "./styles";
+import { focusRing, textStyles } from "./styles";
 
 export interface SideNavItem {
   id: string;
@@ -49,10 +49,7 @@ export function SideNav({
         return (
           <div key={group.id}>
             {group.heading ? (
-              <Heading
-                id={headingId}
-                className="px-3 pb-1 text-sm font-semibold text-muted-foreground"
-              >
+              <Heading id={headingId} className={cn(textStyles.navGroupTitle, "px-3 pb-1")}>
                 {group.heading}
               </Heading>
             ) : null}

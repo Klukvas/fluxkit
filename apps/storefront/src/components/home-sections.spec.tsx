@@ -264,9 +264,9 @@ describe("home banners", () => {
     expect(cards[2]).toContain('href="/uk/account/register"');
   });
 
-  it("colours a card from tokens only: accent is the primary colour, surface (the default) the page background", () => {
+  it("colours a card from tokens only: accent is the accent pair (primary by default), surface (the default) the page background", () => {
     const [accent, plain, surface] = items(html) as [string, string, string];
-    expect(accent).toContain("bg-primary text-primary-foreground");
+    expect(accent).toContain("bg-accent text-accent-foreground");
     expect(plain).toContain("bg-background text-foreground");
     expect(surface).toContain("bg-background text-foreground");
   });
@@ -379,7 +379,7 @@ describe("home banners of the admin (source admin)", () => {
     expect(one).toContain('data-banner-layout="card"');
     expect(one).toContain(`aria-labelledby="promo-${ids.one}-title"`);
     expect(one).toContain(`aria-describedby="promo-${ids.one}-text"`);
-    expect(one).toContain("bg-primary text-primary-foreground");
+    expect(one).toContain("bg-accent text-accent-foreground");
     expect(one).toContain('href="/uk/catalog"');
     expect(one).toContain('alt="§one.alt"');
     expect(two).toContain('href="https://example.com/sale"');

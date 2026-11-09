@@ -1,8 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { localizedHref } from "../lib/locale-path";
 import { bannerLink, checkBannersSection } from "../lib/home-banners";
 import { categoryPageConfig } from "./category-page";
@@ -19,6 +18,8 @@ import {
   type HomeSection,
   type LocalImage,
 } from "./home";
+
+const { uk, en } = messagesByLocale;
 
 // Compile-time checks (`pnpm typecheck` fails if they break): a fourth banner, an unknown section kind, a banners section
 // without its source and a source with the other source's fields are type errors.

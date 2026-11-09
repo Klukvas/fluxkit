@@ -95,7 +95,7 @@ export function headingParts(text: string, number: string): [string, string, str
 function OrderHeading({ text, number }: { text: string; number: string }) {
   const [before, kept, after] = headingParts(text, number);
   return (
-    <h1 className="text-2xl font-bold text-foreground sm:text-3xl">
+    <h1 className={`${textStyles.pageTitleCompact} sm:text-3xl`}>
       {before}
       {kept === "" ? null : <span className="whitespace-nowrap">{kept}</span>}
       {after}
@@ -234,7 +234,7 @@ export function OrderDetailsView({
             <li key={`${item.sku}-${String(index)}`}>
               <Card className="flex flex-wrap justify-between gap-4 p-4">
                 <div className="flex min-w-0 flex-col gap-1">
-                  <h3 className="font-semibold text-foreground">{item.productTitle}</h3>
+                  <h3 className={textStyles.itemTitle}>{item.productTitle}</h3>
                   {item.variantTitle === null ? null : (
                     <p className="text-sm text-muted-foreground">{item.variantTitle}</p>
                   )}
@@ -318,7 +318,7 @@ export function OrderDetailsView({
           </dl>
           {order.shipments.length === 0 ? null : (
             <section aria-labelledby="order-shipments-heading" className="flex flex-col gap-2">
-              <h3 id="order-shipments-heading" className="font-semibold text-foreground">
+              <h3 id="order-shipments-heading" className={textStyles.itemTitle}>
                 {t("order.shipments.title")}
               </h3>
               <ul aria-label={t("order.shipments.label")} className="flex flex-col gap-2">

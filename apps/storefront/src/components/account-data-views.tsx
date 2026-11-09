@@ -92,7 +92,7 @@ function DeleteExplanation({ t }: { t: Translator }) {
     <div className="flex flex-col gap-3 text-foreground">
       <p>{t("account.data.delete.intro")}</p>
       <div>
-        <h3 className="font-semibold">{t("account.data.delete.deletesTitle")}</h3>
+        <h3 className={textStyles.itemTitle}>{t("account.data.delete.deletesTitle")}</h3>
         <ul className="mt-1 list-disc ps-5">
           <li>{t("account.data.delete.deletesAccount")}</li>
           <li>{t("account.data.delete.deletesCart")}</li>
@@ -100,7 +100,7 @@ function DeleteExplanation({ t }: { t: Translator }) {
         </ul>
       </div>
       <div>
-        <h3 className="font-semibold">{t("account.data.delete.keepsTitle")}</h3>
+        <h3 className={textStyles.itemTitle}>{t("account.data.delete.keepsTitle")}</h3>
         <p className="mt-1">{t("account.data.delete.keeps")}</p>
       </div>
       <p className="text-muted-foreground">{t("account.data.delete.limits")}</p>

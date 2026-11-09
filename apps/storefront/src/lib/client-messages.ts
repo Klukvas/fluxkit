@@ -1,41 +1,15 @@
 import type { Messages } from "@fluxkit/ui";
+import { MESSAGE_NAMESPACES } from "../messages/areas";
 
 /**
  * Namespaces of message keys that client components use. Only these are serialized into the page for the browser, so the
- * client payload stays small as server-only namespaces (home sections, footer) grow. Add a prefix here when a client
- * component starts using a new namespace (README, "How to add a message").
+ * client payload stays small as server-only namespaces (home sections, footer) grow. Derived from the one namespace map,
+ * `MESSAGE_NAMESPACES` in `messages/areas.ts`: set `client: true` there when a client component starts using a namespace
+ * (README, "i18n").
  */
-export const CLIENT_MESSAGE_PREFIXES = [
-  "nav.",
-  "site.",
-  "seo.",
-  "locale.",
-  "error.",
-  "errors.",
-  "notFound.",
-  "loading.",
-  "product.",
-  "availability.",
-  "cart.",
-  "account.",
-  "checkout.",
-  "order.",
-  "payment.",
-  "notice.",
-  // The header search box and the filter form of the results page (the page's own words stay server-side under "search.").
-  "searchBox.",
-  "searchForm.",
-  // Design batch A (plan 2026-11-03-storefront-design-a.md): the account pages' breadcrumbs, the trust bar and the funnel steps
-  // are rendered by client islands (account layout, product page, cart, checkout, order pages).
-  "breadcrumbs.",
-  "trust.",
-  "funnel.",
-  // UX repairs batch 3A (plan 2026-11-06-ux-repairs-3-storefront.md): the cart's delivery note, the product page's buy button
-  // before hydration and its chosen values.
-  "cartDelivery.",
-  "productReady.",
-  "productChoice.",
-] as const;
+export const CLIENT_MESSAGE_PREFIXES: readonly string[] = Object.entries(MESSAGE_NAMESPACES)
+  .filter(([, namespace]) => namespace.client)
+  .map(([name]) => `${name}.`);
 
 export function pickClientMessages(messages: Messages): Messages {
   return Object.fromEntries(

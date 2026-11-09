@@ -341,6 +341,7 @@ CI (`.github/workflows/ci.yml`) runs on every PR and on pushes to `main`; all jo
   and `pnpm notices` (uploads `THIRD_PARTY_NOTICES.md` as an artifact; ship it with client deliveries).
 - `docs` (PRs only, `scripts/check-docs.mjs`): changed controllers need `docs/api/` updates, schema/migration changes need `CHANGELOG.md`, new packages need `docs/files/`,
   renamed design tokens need `docs/contracts/theme-tokens.md`. `openapi.json` freshness is enforced by a test.
+  Changes to `apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts` or `.tsx` need a change under `docs/contracts/` (rule self-tested on every run, `--self-test`).
 - `e2e`: `pnpm test:e2e` (Playwright, Chromium) against real Postgres, Redis and Meilisearch.
 - `compose`: `infra/docker-compose.yml` starts and every service becomes healthy.
 - `deploy-smoke` (`scripts/deploy-smoke.sh`): builds the production images and checks `infra/docker-compose.prod.yml` behind the edge proxy.

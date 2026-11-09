@@ -5,8 +5,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import SearchPage from "../app/[locale]/(catalog)/search/page";
 import type { SearchOutcome } from "../lib/search-data";
 import { summary } from "../lib/test-fixtures";
-import en from "../messages/en.json";
+import { messagesByLocale } from "../messages";
 import { I18nProvider } from "./i18n-provider";
+
+const { en } = messagesByLocale;
 
 /*
  * The results ROUTE (`app/[locale]/(catalog)/search/page.tsx`) run as a function, with Next's `notFound` and `redirect`

@@ -32,3 +32,8 @@ infra/production.env
 infra/meilisearch.env
 infra/certs/
 infra/.smoke/
+
+# Visual comparison (scripts/visual-compare.sh): baselines, the base tree and reports are never committed; a PR's declared
+# exceptions file is (apps/storefront/e2e/README.md, "Visual comparison")
+/.visual/*
+!/.visual/exceptions.json

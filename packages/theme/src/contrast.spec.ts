@@ -70,6 +70,11 @@ const pairs: [string, string, number][] = [
   // WCAG 1.4.11: the border that identifies an input, textarea, select or checkbox. `border` stays decorative.
   ["border-input", "background", nonTextMinimum],
   ["border-input", "muted", nonTextMinimum],
+  // The accent pair (plan 2026-11-08-design-changeability.md, T2): checked unconditionally, not only when the class scan below
+  // finds a use, because the token is reserved for client code a fork adds (the banner `accent` tone is its one use upstream).
+  ["accent-foreground", "accent", textMinimum],
+  ["accent", "background", nonTextMinimum],
+  ["accent", "muted", nonTextMinimum],
 ];
 
 // Pairs components use on purpose WITHOUT a contrast requirement, each with its reason.

@@ -23,10 +23,32 @@ function definedTokens(block: TokenBlock): string[] {
   return [...block.tokens.keys()].sort();
 }
 
+/** Colours and shadows differ between the themes; every other token (fonts, radii, type scale, spacing) is the same in both. */
+const themedToken = /^--fk-(color|shadow)-/;
+const nonColourPrefixes = ["--fk-font-", "--fk-radius-", "--fk-space-", "--fk-line-height-"];
+
 describe("design tokens", () => {
-  it("defines the same token names in the light and dark themes", () => {
-    expect(definedTokens(darkBlock)).toEqual(definedTokens(lightBlock));
-    expect(definedTokens(lightBlock).length).toBeGreaterThan(5);
+  it("defines every non-colour token once, in the light block only (dark and system inherit it from :root)", () => {
+    const nonColour = definedTokens(lightBlock).filter((name) => !themedToken.test(name));
+    expect(nonColour.length).toBeGreaterThan(10);
+    for (const name of nonColour) {
+      expect(
+        nonColourPrefixes.some((prefix) => name.startsWith(prefix)),
+        `${name} is neither a colour, a shadow nor a known non-colour token`,
+      ).toBe(true);
+    }
+    for (const block of blocks.filter((candidate) => candidate !== lightBlock)) {
+      const repeated = definedTokens(block).filter((name) => !themedToken.test(name));
+      expect(repeated, `${block.selector} repeats non-colour tokens of the light block`).toEqual(
+        [],
+      );
+    }
+  });
+
+  it("gives the dark block exactly the colour and shadow names of the light block", () => {
+    const lightThemed = definedTokens(lightBlock).filter((name) => themedToken.test(name));
+    expect(lightThemed.length).toBeGreaterThan(10);
+    expect(definedTokens(darkBlock)).toEqual(lightThemed);
   });
 
   it("maps only tokens that exist (no dangling var() in tailwind.css)", () => {
@@ -51,6 +73,21 @@ describe("design tokens", () => {
         `${utility}: var(${name});`,
       );
     }
+  });
+
+  it("defaults the display (heading) font to the body font, so adding it changed no pixel", () => {
+    // The template's value. A fork that gives headings their own face changes `--fk-font-display` and passes; one that changes
+    // only the body face is told to decide the headings too (they would silently stay in the old system stack).
+    // This literal must equal the template's `--fk-font-sans` (and `--fk-font-display`) in tokens.css: change all three together.
+    const templateDisplay = "ui-sans-serif, system-ui, sans-serif";
+    const display = lightBlock.tokens.get("--fk-font-display");
+    const sans = lightBlock.tokens.get("--fk-font-sans");
+    expect(sans).toBeDefined();
+    expect(display).toBeDefined();
+    expect(
+      display !== templateDisplay || display === sans,
+      "--fk-font-sans changed but --fk-font-display is still the template's stack: set it as well",
+    ).toBe(true);
   });
 
   it("defines the status and focus tokens added for the storefront", () => {
@@ -80,12 +117,24 @@ describe("theme modes (design batch B)", () => {
     expect(tokensCss).not.toMatch(/@media[^{]*\{\s*:root/);
   });
 
-  it("gives the system block the dark value of every token whose dark value differs from light, and nothing else", () => {
-    const differing = [...darkBlock.tokens].filter(
-      ([name, value]) => lightBlock.tokens.get(name) !== value,
+  it("gives the system block exactly the dark block (same names, values and order)", () => {
+    expect(darkBlock.tokens.size).toBeGreaterThan(10);
+    expect([...systemBlock.tokens]).toEqual([...darkBlock.tokens]);
+  });
+
+  it("writes the system block byte for byte like the dark block (a rebrand copies it)", () => {
+    const body = (pattern: RegExp): string => {
+      const match = pattern.exec(tokensCss);
+      expect(match, String(pattern)).not.toBeNull();
+      return (match?.[1] as string)
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "")
+        .join("\n");
+    };
+    expect(body(/\[data-theme="system"\] \{([^}]*)\}/)).toBe(
+      body(/^\[data-theme="dark"\] \{([^}]*)\}/m),
     );
-    expect(differing.length).toBeGreaterThan(10);
-    expect([...systemBlock.tokens]).toEqual(differing);
   });
 
   it("sets color-scheme, so native controls, scrollbars and select popups follow the theme", () => {

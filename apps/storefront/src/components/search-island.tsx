@@ -1,6 +1,6 @@
 "use client";
 
-import { Alert, Select, Spinner, VisuallyHidden, type Locale } from "@fluxkit/ui";
+import { Alert, Select, Spinner, textStyles, VisuallyHidden, type Locale } from "@fluxkit/ui";
 import { useRouter } from "next/navigation";
 import {
   createContext,
@@ -424,7 +424,7 @@ export function FilterSheet({
     >
       {sheetOpen ? (
         <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2">
-          <h2 id={SHEET_TITLE_ID} className="text-lg font-semibold text-foreground">
+          <h2 id={SHEET_TITLE_ID} className={textStyles.subsectionTitle}>
             {title}
           </h2>
           <button

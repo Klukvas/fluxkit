@@ -85,6 +85,45 @@ Ports can be changed with `E2E_PORT`, `E2E_API_PORT`, `E2E_STOREFRONT_PORT`, `E2
 - A test hangs in `request.allHeaders()` until its timeout: that promise settles only for a request that got its response (Chromium reports the raw headers then). Read it in `requestfinished`, never in `request` (`token-hygiene.e2e.ts` shows how; it showed up under load, several workers).
 - One Playwright run at a time per database (the schema is wiped at the start).
 
+## Visual comparison (`*.visual.ts`, `scripts/visual-compare.sh`)
+
+Proves "identical at default settings" for design refactors (plan `docs/plans/2026-11-08-design-changeability.md`, section 7). It runs the same stack and test fixture as the suite above (`e2e/visual.config.ts` reuses `playwright.config.ts`), twice: the base (the merge-base of the base branch and `HEAD`) and this tree, on one machine. Two checks:
+
+| Check | Status | What |
+|---|---|---|
+| Computed styles (`tests/computed-styles.visual.ts`) | MANDATORY, zero tolerance | 8 pages (`/uk`, `/uk/catalog`, `/uk/p/demo-t-shirt`, `/uk/cart` and `/uk/checkout` with one cart line, `/uk/account/login`, `/uk/account/register`, `/uk/legal/privacy`) x light/dark (`fluxkit_theme` cookie) at 1280 x 800, plus home and catalog at 390 x 844 for the header, hero, banner card and product card selectors. For every entry of the fixed selector list (`support/visual/selectors.ts`, versioned; roles, `data-*`, element selectors and text, never classes) the first visible match's `getComputedStyle`: four corner radii, font family, size, weight, line height, letter spacing, text transform, text decoration line, colour, background, four border colours, widths and styles, box shadow, outline (colour, style, width, offset), four paddings, aspect ratio. An element missing on one side is a `presence` difference. Positive coverage: each page must stay on its address and find its `REQUIRED_SELECTORS` (`support/visual/pages.ts`: body, header, h1, footer everywhere; cards and prices on home and catalog; the secondary button in the cart; field and submit button on login, register and checkout; summary and badge on the product page), or the recording fails; the report warns about selectors absent on every page and side. |
+| Screenshots (`tests/screenshots.visual.ts`) | secondary | full-page frames of `/uk`, catalog, product, cart, checkout, `/uk/search?q=футболка`, login, register, privacy, `/uk/nonexistent` at 390 x 844 and 1280 x 800 in light and dark, plus `system` with a dark colour scheme on home and product; `/en` and `/en/catalog` at 1280; element shots (header, footer, first card, hero) on home; `/uk` and `/en` register without JavaScript. `toHaveScreenshot` with `animations: "disabled"`, `caret: "hide"`, `scale: "css"`, `maxDiffPixels: 0`. |
+
+Both freeze what they can: `reducedMotion: "reduce"`, `page.clock.install({ time: "2026-11-08T12:00:00Z" })` before the visit (scripts on), the seeded fixture, `STOREFRONT_IMAGE_HOSTS` empty (placeholder pictures), then wait for the load, the network to go quiet, hydration (React attached to `<main>`), no pending streamed boundary, no `[aria-busy="true"]`, fonts ready; the focus is dropped before reading.
+
+Run it (the suite's variables of "Run it locally" exported, Chromium installed, the base branch fetched with history):
+
+```bash
+bash scripts/visual-compare.sh origin/main                     # both checks; exit 0 identical, 1 computed styles differ, 3 screenshots only, 2 harness failed
+bash scripts/visual-compare.sh origin/main --skip-screenshots  # computed styles only (about half the time)
+```
+
+Options: `--keep-base-tree` keeps `.visual/base-tree` (the base's worktree, otherwise removed), `--skip-current-build` when this tree is already built, `--strict` (used by CI) also fails the computed styles when a declared exception matched nothing. Each run wipes the e2e database. Nothing under `.visual/` is committed except a PR's own `exceptions.json`.
+
+Read the report (`.visual/report/`; in CI the `visual-report` artifact, and `visual-snapshots` with `baseline/` and `current/`, 7 days):
+- `summary.txt` and `computed-styles.status` / `screenshots.status` (`pass`, `fail`, `error`, `skipped`),
+- `computed-styles.txt`: one row per difference, `page | theme | selector | property | before | after` (`before` is the base), then the declared ones with their reasons, the exceptions that matched nothing and the selectors absent everywhere; `computed-styles.json` the same as data,
+- `screenshots-html/index.html`: Playwright's report with expected, actual and diff side by side; `screenshots-results/` the raw diff images.
+
+Declared exceptions (plan principle 2: any undeclared difference is a defect): commit `.visual/exceptions.json` in the PR that means to change something, a JSON array of
+`{ "page": "<page id>" | "*", "theme"?: "light" | "dark" | "system", "selector": "<selector name>", "property": "<recorded property>" | "presence" | "*" | "screenshot", "reason": "<why>" }`.
+`"*"` covers every property and the presence; `"screenshot"` masks the element in that page's screenshots (both sides). Page ids are in `support/visual/pages.ts` (`home`, `catalog`, `product`, `cart`, `checkout`, `login`, `register`, `legal-privacy`, `search`, `not-found`, `en-home`, `en-catalog`, `en-register`, and the phone pass `home-390`, `catalog-390`). A reason is required; an unknown field, page, selector or property or a duplicate is an error (exit 2, also checked before the runs: `node --experimental-strip-types apps/storefront/e2e/support/visual/compare-cli.ts --check-exceptions .visual/exceptions.json`). Only the entries this tree ADDED count: an entry already in the merge-base's file (same page, theme, selector and property, whatever its reason) belongs to an earlier PR and declares nothing, so exceptions never outlive their PR. Old entries may stay or be removed by any PR. In CI (`--strict`) an added entry that matches no difference fails the job. Example (B4, neutral demo pictures):
+
+```json
+[{ "page": "home", "selector": "home.hero", "property": "screenshot", "reason": "B4: neutral hero picture, before/after shown to the owner" }]
+```
+
+Tolerance: the default is exact (`maxDiffPixels: 0`). Only when a frame differs by anti-aliasing and the PR attaches that frame's diff image from an exact run, `VISUAL_TOLERANCE=ratio bash scripts/visual-compare.sh ...` uses `maxDiffPixelRatio: 0.005` with `threshold: 0.2`. The computed styles never have a tolerance.
+
+The selector list and frames are a contract of this harness only: a PR that changes what an entry finds bumps `SELECTOR_LIST_VERSION`; both sides always run this tree's harness (the script copies `visual.config.ts`, `tests/*.visual.ts` and `support/visual/` into the base tree), so they never mix versions. The harness imports only `support/env.ts` of the other e2e files for that reason. Unit tests of its pure parts (selector rules, frames, snapshot merge, exceptions, diff, report, CLI exit codes): `pnpm --filter @fluxkit/storefront exec vitest run -c e2e/support/visual/vitest.config.ts` (not part of `pnpm test`; the `visual` CI job runs them).
+
+CI: job `visual` (`.github/workflows/ci.yml`), after the cheap `visual-gate`, on a PR labelled `visual-check` (the label counts from the next push), on a PR that changes `packages/theme/**`, `packages/ui/**`, `apps/storefront/src/**`, `apps/storefront/public/**`, the storefront's `next.config.ts` or `postcss.config.mjs`, `e2e/support/env.ts`, `.visual/exceptions.json` or the harness, and on a manual run of the CI workflow (Actions, "Run workflow", base branch; it runs every job of the workflow and cancels an in-progress run on the same ref). The visual project runs without retries. Its "Computed styles" step fails on any undeclared difference, its "Screenshots" step on any frame over the tolerance.
+
 ## Not covered
 
 Automated accessibility checks (`@axe-core/playwright`, MPL-2.0, not approved yet), other browsers and viewports, a payment page of a real provider or a real card (the fake provider only), real email delivery (the fake provider only), the `emailDelivery=false` pages, the admin app, `next dev`.

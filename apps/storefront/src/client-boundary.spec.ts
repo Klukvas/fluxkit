@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, expect, it } from "vitest";
-import en from "./messages/en.json";
+import { messagesByLocale } from "./messages";
 import { CLIENT_MESSAGE_PREFIXES } from "./lib/client-messages";
+
+const { en } = messagesByLocale;
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {

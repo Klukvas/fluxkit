@@ -73,7 +73,10 @@ export interface RichTextSection {
 /** The most banners one `banners` section shows (one row on desktop); `GET /store/banners` returns at most as many. */
 export const MAX_BANNERS = 3;
 
-/** Colour of a banner card, from existing tokens only: `surface` = background and border, `accent` = the primary colour. */
+/**
+ * Colour of a banner card, from tokens only: `surface` = background and border, `accent` = the `--fk-color-accent` pair (equal to
+ * the primary colour by default). The tone name is not Tailwind's `accent-*` utility (the CSS property of checkbox ticks).
+ */
 export type BannerTone = "surface" | "accent";
 
 export interface Banner {
@@ -154,7 +157,7 @@ export function isDataSection(section: HomeSection): section is HomeDataSection 
  *
  * Replacing them: 0 to 3 items (each `href` a storefront path without the locale or an `https://` address; `tone` `surface`
  * or `accent`), pictures under `public/home/` with their real `width`/`height` (each with its own background, so it reads on
- * the dark theme too) and the `home.banners.*` texts in BOTH `src/messages/uk.json` and `en.json`.
+ * the dark theme too) and the `home.banners.*` texts in BOTH `src/messages/uk/home.json` and `en/home.json`.
  */
 export const demoConfigBanners: BannerList = [
   {

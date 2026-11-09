@@ -229,7 +229,7 @@ function SummaryLine({
     <li aria-describedby={refusal === null ? undefined : refusalId}>
       <Card className="flex flex-col gap-1 p-3">
         <div className="flex justify-between gap-4">
-          <h3 className="font-semibold text-foreground">{line.title}</h3>
+          <h3 className={textStyles.itemTitle}>{line.title}</h3>
           {line.lineTotal === null ? null : (
             <p className="shrink-0 text-foreground">
               {formatMoney(line.lineTotal, exponent, locale)}
@@ -431,10 +431,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           aria-labelledby="checkout-summary-heading"
           className="flex flex-col gap-4 lg:col-start-3 lg:row-start-1"
         >
-          <h2
-            id="checkout-summary-heading"
-            className="text-xl font-semibold text-foreground max-lg:hidden"
-          >
+          <h2 id="checkout-summary-heading" className={`${textStyles.sectionTitle} max-lg:hidden`}>
             {t("checkout.summary.title")}
           </h2>
           <h2 className="lg:hidden">
@@ -596,7 +593,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           )}
 
           <fieldset className="flex flex-col gap-4">
-            <legend className="mb-2 text-xl font-semibold text-foreground">
+            <legend className={`${textStyles.sectionTitle} mb-2`}>
               <h2>{t("checkout.contact.title")}</h2>
             </legend>
             <TextField
@@ -651,7 +648,7 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
           ) : null}
           {requiresShipping && !deliveryUnknown && (mode === "none" || mode === "address") ? (
             <fieldset className="flex flex-col gap-4">
-              <legend className="mb-2 text-xl font-semibold text-foreground">
+              <legend className={`${textStyles.sectionTitle} mb-2`}>
                 <h2>{t("checkout.address.title")}</h2>
               </legend>
               <Field
