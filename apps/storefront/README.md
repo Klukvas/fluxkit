@@ -460,12 +460,39 @@ Plan `docs/plans/2026-11-03-storefront-mobile-ux.md` (before/after numbers there
 Plan `docs/plans/2026-11-03-storefront-design-a.md` (before/after measurements and screenshots there). Batch B: the next section.
 
 - **Design kit** (`@fluxkit/theme`, `@fluxkit/ui`): the type scale, the spacing unit and the elevations are tokens (`docs/contracts/theme-tokens.md`), mapped to the stock utilities, so `text-sm` or `p-4` follow a rebrand; sizes, radii and shadows outside the scales fail `design-guard.spec.ts`. Repeated headings use `textStyles` (`pageTitle`, `sectionTitle`, ...). No colour transitions on controls (they animate the focus ring's colour too).
-- **Product card** (`product-card.tsx`): `shadow-raised` and the `border-input` border on hover (no transition with reduced motion); brand as a muted meta line above the title (still its own link for keyboards); title clamped to two lines; the note and the price in a bottom group (`mt-auto`), so a row's prices share one line; a badge only for `low_stock` and `out_of_stock`, over the image corner (in stock is visually hidden text). The list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (an API change, not done).
+- **Product card** (`components/cards/grid-card.tsx`, the `grid` kind of the card registry since PR-F; was `product-card.tsx`): `shadow-raised` and the `border-input` border on hover (no transition with reduced motion); brand as a muted meta line above the title (still its own link for keyboards); title clamped to two lines; the note and the price in a bottom group (`mt-auto`), so a row's prices share one line; a badge only for `low_stock` and `out_of_stock`, over the image corner (in stock is visually hidden text). The list item has no compare-at price and no variant count, so a card shows no discount and no swatch hint (an API change, not done).
 - **Product page** (`product-purchase.tsx`, `product-details.tsx`, `selected-sku.tsx`): from `lg` a 12-column grid, gallery and details left (7), the summary right (5, `sticky top-6`, `self-start`); phones and `md` keep the order gallery, summary, details. The summary shows `PriceText` with the discount from `lib/discount.ts` (whole percent rounded DOWN; none when compare-at <= price or the floor is 0 %). The SKU is the first specification: `SelectedSku` is a client leaf inside the server-rendered specifications that reads the island's selected variant through context. Description and specifications are `Disclosure` sections (`<details open>`, `h2` in the summary). A value whose variant is out of stock (`isValueSoldOut` in `lib/variant-matcher.ts`, following `selectValue`'s repairs) is struck and dashed but selectable, described "out of stock"; the button then reads "Out of stock" and a hint suggests another option when one can be bought. No "notify me" or "similar products" (no data or endpoint).
 - **Trust bar** (`src/config/trust-bar.ts`, `components/trust-bar.tsx`, `@fluxkit/ui` `TrustBar`): items `{icon, messageKey, page?}` (`page` since 2026-11-06, see "Shop pages, contacts and footer"); the defaults are demo copy (`TODO(fluxkit)`), not promises. An empty list hides the bar on the product page, the cart and the checkout. **Change it:** edit the list (icons: `delivery`, `payment`, `contact`, `returns`) and the `trust.*` messages in both files.
 - **Funnel and breadcrumbs** (`checkout-steps.tsx`, `@fluxkit/ui` `StepIndicator`, `lib/account-trail.ts`): cart (step 1, once it has lines), checkout (step 2, links back to the cart), order page (step 3 while the order awaits payment, guest and account pages); `aria-current="step"`; below `md` "Step 2 of 3: Checkout" with the list kept for assistive technology. Account pages have breadcrumbs (Home / My account / section / order number; no JSON-LD, the pages are `noindex`).
 - **Search** (`search-results.tsx` `NoResults`, search route): nothing found for words without filters shows the empty state (spelling and other-language hints kept) and the header's top-level categories ("Browse categories"; there is no popularity data), with no filter panel or sort. With filters the faceted layout stays. Suggestions still show titles only: `GET /store/search/suggest` answers `{slug, title}` (thumbnail and price need an API change).
 - **Tests:** `components/design-a.spec.tsx`, additions to `catalog.spec.tsx`, `search-results.spec.tsx`, `search-page.spec.tsx`, `lib/discount.spec.ts`, `lib/account-trail.spec.ts`, `lib/variant-matcher.spec.ts`; e2e `e2e/tests/design-a.e2e.ts` (1280 and 1024, one test at 390).
+
+## Product card registry and the list view (PR-F, 2026-11-09)
+
+Plan `docs/plans/2026-11-08-design-changeability.md` (L2, L5); contract `docs/contracts/card-registry.md` (draft).
+
+- **View model:** `lib/product-card-model.ts` `cardDisplay` turns a list item (and a search hit's `cardOffer`) into a plain
+  `ProductCardModel`: localized links, allowed image or `null`, brand link or text, price text ("from" for ranges), the search
+  note, availability text with `badge` only for an exception. Cards never see the API's objects.
+- **Registry:** `components/cards/registry.ts` (server-only) maps kind names to `{ Card, listClassName, maxEagerImages }`:
+  `grid` (`grid-card.tsx`, the card of before, markup compared byte for byte with a frozen copy in `registry.spec.tsx`) and
+  `list` (`list-card.tsx`: image beside the text, same accessibility contract, at most two eager images). `ProductGrid` renders by
+  `kind` (default `grid`); an unknown kind renders the grid card and logs `console.error`.
+- **Fork:** add a card in a new file and register it in `components/cards/custom.ts` (fork-owned, empty upstream); the same name as
+  a built-in kind replaces it. A card is a server component (`client-boundary.spec.ts` keeps `'use client'` files away from
+  `cards/` and `product-grid`).
+- **`?view=list`:** catalog, category and search result pages (`lib/card-view.ts`; parsed by `search-query.ts` and
+  `catalog-query.ts`). Default grid, never written; `view=grid` or an unknown value redirects to the address without it. Every
+  filter, chip, sort, page and brand link and the filter form (a hidden field) keep it; it is never sent to the API, never in the
+  shared search cache key, the canonical URL, hreflang or the sitemap.
+- **Switch:** `components/view-toggle.tsx`, two plain links in a group labelled `catalog.view.label`, the current one
+  `aria-current="true"`, 44 px targets; in the results toolbar after the count (the links overhang by `-my-2`, so the toolbar
+  keeps its height) and next to the count of the SQL listing (search off). Server markup only: +618 bytes of HTML on `/uk/catalog`
+  at the default view (measured by rendering the page body with 12 products before and after; the inline RSC payload repeats it).
+- **Tests:** `lib/product-card-model.spec.ts`, `components/cards/registry.spec.tsx`, `cards/custom.spec.tsx`,
+  `components/view-toggle.spec.tsx`, additions to `search-query.spec.ts`, `catalog-query.spec.ts`, `page-metadata.spec.ts`,
+  `search-data.spec.ts`, `search-results.spec.tsx`, `catalog.spec.tsx`; e2e `e2e/tests/catalog-view-toggle.e2e.ts` (switch, facet,
+  sort, language, unknown value, 390 px without overflow and without scripts).
 
 ## Desktop design, batch B (2026-11-03)
 
