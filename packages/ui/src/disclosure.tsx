@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
-import { focusRing } from "./styles";
+import { focusRing, textStyles } from "./styles";
 
 export interface DisclosureProps {
   /** The heading text; it stays a real heading (`headingAs`) inside the summary, so the page outline keeps it. */
@@ -34,7 +34,7 @@ export function Disclosure({
           focusRing,
         )}
       >
-        <Heading id={headingId} className="text-xl font-semibold text-foreground">
+        <Heading id={headingId} className={textStyles.sectionTitle}>
           {title}
         </Heading>
         <svg

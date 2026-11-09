@@ -1,5 +1,5 @@
 import type { SearchFacet } from "@fluxkit/api-client";
-import { Button, Checkbox, Input, VisuallyHidden, type Translator } from "@fluxkit/ui";
+import { Button, Checkbox, Input, textStyles, VisuallyHidden, type Translator } from "@fluxkit/ui";
 import type { ReactNode } from "react";
 import { openFacetKeys } from "../lib/mobile-ux";
 import { facetTitle, facetValueLabel, priceBoxHints } from "../lib/search-facets";
@@ -25,7 +25,6 @@ import { focusRing } from "./styles";
  */
 
 const group = "flex min-w-0 flex-col gap-1 border-0 p-0";
-const legend = "mb-1 p-0 font-semibold text-foreground";
 
 /** A collapsible facet group: the summary shows the title; the fieldset keeps its legend for assistive technology. */
 function FacetGroup({
@@ -146,7 +145,9 @@ export function SearchFilters({
       {/* The words go along, so a filter keeps them. The sort select (outside the form's box) joins by its `form` attribute. */}
       <input type="hidden" name="q" value={query.q} />
       <fieldset className={group}>
-        <legend className={legend}>{t("search.facet.price", { currency })}</legend>
+        <legend className={`${textStyles.itemTitle} mb-1 p-0`}>
+          {t("search.facet.price", { currency })}
+        </legend>
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1 text-sm text-foreground">
             <span>{t("search.facet.min")}</span>

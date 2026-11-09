@@ -1,4 +1,4 @@
-import { Button, Container, Skeleton, Spinner, type Translator } from "@fluxkit/ui";
+import { Button, Container, Skeleton, Spinner, textStyles, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import { linkButton } from "./styles";
 
@@ -16,7 +16,7 @@ export function ErrorView({
 }) {
   return (
     <Container className="flex flex-col items-start gap-3 py-12">
-      <h1 className="text-2xl font-bold text-foreground">{t("error.title")}</h1>
+      <h1 className={textStyles.pageTitleCompact}>{t("error.title")}</h1>
       <p className="text-muted-foreground">{t("error.description")}</p>
       {digest === undefined ? null : (
         <p className="text-sm text-muted-foreground">{t("error.reference", { digest })}</p>
@@ -36,7 +36,7 @@ export function NotFoundView({ t, homeHref }: { t: Translator; homeHref: string 
     <Container className="flex flex-col items-start gap-3 py-12">
       {/* A client-rendered not-found cannot export metadata, so it names itself: React hoists <title> into the head. */}
       <title>{t("seo.pageTitle", { title: t("notFound.title"), site: t("site.name") })}</title>
-      <h1 className="text-2xl font-bold text-foreground">{t("notFound.title")}</h1>
+      <h1 className={textStyles.pageTitleCompact}>{t("notFound.title")}</h1>
       <p className="text-muted-foreground">{t("notFound.description")}</p>
       <Link href={homeHref} className={`${linkButton} mt-2`}>
         {t("notFound.home")}

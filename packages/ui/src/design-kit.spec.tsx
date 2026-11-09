@@ -165,9 +165,53 @@ describe("Disclosure", () => {
 });
 
 describe("textStyles", () => {
-  it("uses only scale sizes and colour tokens", () => {
-    expect(textStyles.pageTitle).toBe("text-3xl font-bold text-foreground");
-    expect(textStyles.sectionTitle).toBe("text-xl font-semibold text-foreground");
+  // Roles, not exact strings (plan 2026-11-08-design-changeability.md, T1): a redesign may change a role's classes. That every class
+  // stays on the token scales is the design guard's job (`offScaleClasses` in packages/theme/src/design-guard.spec.ts).
+  const classesOf = (role: keyof typeof textStyles): string[] => textStyles[role].split(" ");
+  const headingRoles = [
+    "pageTitle",
+    "pageTitleCompact",
+    "sectionTitle",
+    "subsectionTitle",
+    "itemTitle",
+    "cardTitle",
+    "dialogTitle",
+    "navGroupTitle",
+  ] as const;
+
+  it("has a role for every kind of heading", () => {
+    expect(Object.keys(textStyles).sort()).toEqual([...headingRoles, "meta"].sort());
+  });
+
+  it("puts the display face on the page and section titles only (small titles stay in the body face)", () => {
+    expect(classesOf("pageTitle")).toContain("font-display");
+    expect(classesOf("sectionTitle")).toContain("font-display");
+    for (const role of headingRoles.filter(
+      (name) => name !== "pageTitle" && name !== "sectionTitle",
+    )) {
+      expect(classesOf(role), role).not.toContain("font-display");
+    }
+  });
+
+  it("gives every heading role a weight, and takes sizes from the scale and colours from tokens (no raw values)", () => {
+    for (const role of headingRoles) {
+      const classes = classesOf(role);
+      expect(
+        classes.some((name) => /^font-(medium|semibold|bold)$/.test(name)),
+        role,
+      ).toBe(true);
+      for (const name of classes) {
+        expect(name, role).toMatch(
+          /^(font-(display|medium|semibold|bold)|text-(xs|sm|base|lg|xl|[234]xl)|text-(foreground|muted-foreground))$/,
+        );
+      }
+    }
+    expect(classesOf("pageTitle")).toContain("text-3xl");
+    expect(classesOf("sectionTitle")).toContain("text-xl");
+  });
+
+  it("leaves the colour of a dialog title to its surface (a toned banner card sets its own)", () => {
+    expect(textStyles.dialogTitle).not.toMatch(/\btext-(foreground|muted-foreground)\b/);
   });
 });
 

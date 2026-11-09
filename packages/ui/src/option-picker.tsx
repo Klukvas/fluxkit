@@ -1,5 +1,6 @@
 import { Fragment } from "react";
 import { cn } from "./cn";
+import { textStyles } from "./styles";
 
 export interface OptionPickerValue {
   value: string;
@@ -34,7 +35,7 @@ export function OptionPicker({
 }: OptionPickerProps) {
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="font-medium text-foreground">{legend}</legend>
+      <legend className={textStyles.cardTitle}>{legend}</legend>
       <div className="flex flex-wrap gap-2">
         {values.map((item) => {
           const soldOut = item.soldOut === true && item.disabled !== true;

@@ -64,7 +64,7 @@ function OrderSummaryCard({
     <li>
       <Card className="flex flex-wrap items-center justify-between gap-4 p-4">
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="text-lg font-semibold text-foreground">
+          <h2 className={textStyles.subsectionTitle}>
             <Link
               href={accountOrderHref(locale, order.number)}
               className={`underline-offset-4 hover:underline ${focusRing}`}

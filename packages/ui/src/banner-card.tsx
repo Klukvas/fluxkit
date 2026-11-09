@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "./cn";
-import { focusRing } from "./styles";
+import { focusRing, textStyles } from "./styles";
 
 export type BannerCardLayout = "card" | "image";
 export type BannerCardTone = "surface" | "accent";
@@ -46,9 +46,10 @@ const TONES: Record<BannerCardTone, { card: string; text: string | null }> = {
     card: "border-border bg-background text-foreground hover:border-border-input",
     text: "text-muted-foreground",
   },
+  // The tone NAME is stored by the API (`banner.tone`); its colour is the accent token pair, which equals primary by default.
   accent: {
-    card: "border-primary bg-primary text-primary-foreground",
-    // Inherits the card's `primary-foreground` (the muted grey would not read on the primary fill).
+    card: "border-accent bg-accent text-accent-foreground",
+    // Inherits the card's `accent-foreground` (the muted grey would not read on the accent fill).
     text: null,
   },
 };
@@ -99,7 +100,10 @@ export function BannerCard({
         <span className="flex flex-col gap-1 p-4">
           <Heading
             id={titleId}
-            className="text-lg font-semibold group-hover:underline group-hover:underline-offset-4"
+            className={cn(
+              textStyles.dialogTitle,
+              "group-hover:underline group-hover:underline-offset-4",
+            )}
           >
             {title}
           </Heading>

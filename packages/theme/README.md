@@ -2,7 +2,7 @@
 
 Design tokens (`tokens.css`, `light` and `dark`, plus the opt-in `system` mode block that follows the device only for `data-theme="system"`), their Tailwind mapping (`tailwind.css`) and `emailTheme` (resolved light values for inline styles in mail, guarded against drift). Rebranding = changing token values.
 
-- Contract and contrast rules: `docs/contracts/theme-tokens.md`. `pnpm --filter @fluxkit/theme test` checks identical token names across themes, the Tailwind mapping, WCAG contrast of the documented pairs and the design guard.
+- Contract and contrast rules: `docs/contracts/theme-tokens.md`. `pnpm --filter @fluxkit/theme test` checks that non-colour tokens are defined once (light block), that dark and system hold the same colour and shadow names, the Tailwind mapping, WCAG contrast of the documented pairs and the design guard.
 - Use hex colors in `tokens.css`; the contrast test fails on any other format.
 
 File map: `docs/files/theme.md`.

@@ -4,7 +4,9 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SiteShell } from "../../components/site-shell";
+import { fonts } from "../../config/fonts";
 import { themeConfig } from "../../config/theme";
+import { fontVariableClasses } from "../../lib/font-classes";
 import { headerSearchEnabled } from "../../lib/search-data.server";
 import { navigationCategories } from "../../lib/store-data.server";
 import { resolveThemeMode, THEME_COOKIE } from "../../lib/theme-mode";
@@ -49,7 +51,8 @@ export default async function LocaleLayout({
   const themeMode = resolveThemeMode((await cookies()).get(THEME_COOKIE)?.value, themeConfig);
 
   return (
-    <html lang={locale} data-theme={themeMode}>
+    // The fonts' `variable` classes (`config/fonts.ts`; none in the template, then no attribute) sit on <html>, where the tokens are.
+    <html lang={locale} data-theme={themeMode} className={fontVariableClasses(fonts)}>
       <body className="flex min-h-screen flex-col bg-background text-foreground">
         <SiteShell
           locale={locale}

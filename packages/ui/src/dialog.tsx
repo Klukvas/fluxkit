@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, type DialogHTMLAttributes, type ReactNode } from "react";
 import { cn } from "./cn";
 import { nativeCloseAction, openModal } from "./dialog-focus";
+import { textStyles } from "./styles";
 
 export interface DialogProps extends Omit<
   DialogHTMLAttributes<HTMLDialogElement>,
@@ -82,7 +83,7 @@ export function Dialog({
       )}
       {...props}
     >
-      <h2 id={titleId} className="text-lg font-semibold">
+      <h2 id={titleId} className={textStyles.dialogTitle}>
         {title}
       </h2>
       {description ? (
