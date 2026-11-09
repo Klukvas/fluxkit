@@ -58,28 +58,16 @@ async function stableBox(
   throw new Error("the element has no stable box within 5 s");
 }
 
-/** Waits until the header's cart badge read the cart (the islands are hydrated). */
+/**
+ * Waits until the header's cart badge read the cart (the islands are hydrated). Enough for the header's search row too: since
+ * ADR 0048 the search box, its row and the cart badge are in the shell with no `Suspense` boundary between them, so they
+ * hydrate in one commit. Before, the box's own boundary could still be dehydrated when the badge was ready (the D-04 flake,
+ * PR 240 waited for a `data-hydrated` marker on the box; removed with the boundary).
+ */
 async function hydrated(page: Page): Promise<void> {
   await expect(page.getByRole("banner").getByRole("link", { name: /Cart|Кошик/ })).toContainText(
     /in the cart|у кошику/,
   );
-}
-
-/**
- * Waits until the header's search box is the real, mounted island (`data-hydrated` on its form, set in the browser only).
- * The cart badge (`hydrated`) is not enough for the search row: on the streamed pages (catalog, product, results) the row
- * first holds `SearchBoxFallback`, and the box's `Suspense` boundary can still be dehydrated (or have fallen back to client
- * rendering) when the test acts. Opened then, the row focuses the fallback's input (same role and name, so `toBeFocused`
- * passes); a keydown aimed into a dehydrated boundary may never reach the row's handler (react-dom 19.3 `dispatchEvent`
- * stops it when the boundary does not hydrate synchronously), and when the real box replaces the fallback the focused input
- * leaves the document and the focus drops to the body. Either way the row stayed open: the D-04 flake (2 of 5 and 1 of 5
- * runs). Unverified: which state the boundary is in (`$?` pending vs `$!` client render); QA confirms it with `curl` of the
- * built `/uk/catalog` during the `--repeat-each 30` run. The row is hidden while closed below `lg`, hence `toBeAttached`.
- */
-async function searchBoxHydrated(page: Page): Promise<void> {
-  await expect(
-    page.locator('#site-search form[role="search"][data-hydrated="true"]'),
-  ).toBeAttached();
 }
 
 async function horizontalOverflow(page: Page): Promise<number> {
@@ -106,7 +94,6 @@ test("the header is one sticky row; the search opens behind its icon and Escape 
 
   const toggle = header.getByRole("link", { name: "Пошук", exact: true });
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
-  await searchBoxHydrated(page);
   await toggle.click();
   await expect(toggle).toHaveAttribute("aria-expanded", "true");
   const searchBox = page.getByRole("combobox", { name: "Пошук товарів" });
@@ -123,7 +110,7 @@ test("without a script the search icon shows the search row (:target), and the b
 }) => {
   const context = await browser.newContext({ ...PHONE, javaScriptEnabled: false, baseURL });
   const page = await context.newPage();
-  // The catalog, product and results pages stream the header's box: without a script the fallback form must be there.
+  // The catalog, product and results pages streamed the header's box until ADR 0048: without a script the form must be there.
   for (const path of ["/en", "/en/catalog", "/en/p/demo-hoodie", "/en/search?q=demo"]) {
     await page.goto(path);
     await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
@@ -141,7 +128,6 @@ test("the 'added' toast steps aside while the search row is open (review m1 of P
   await hydrated(page);
   await page.getByTestId("buy-bar").getByText("Add to cart", { exact: true }).click();
   await expect(page.getByText("Added to the cart.")).toBeVisible();
-  await searchBoxHydrated(page);
   await page.getByRole("banner").getByRole("link", { name: "Search", exact: true }).click();
   const searchBox = page.getByRole("combobox", { name: "Search products" });
   // Well inside the toast's own 8 s on screen: it must step aside at once, not time out.

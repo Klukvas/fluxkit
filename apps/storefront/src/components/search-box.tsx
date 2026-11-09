@@ -56,12 +56,6 @@ export interface SearchBoxViewProps {
   onHighlight: (index: number) => void;
   onChoose: (index: number) => void;
   onSubmit: () => void;
-  /**
-   * True once the real box has mounted in the browser: its handlers then run. Rendered as `data-hydrated` on the form, never
-   * in the server HTML (no first-HTML bytes) and never on `SearchBoxFallback`. The e2e tests wait for it before they open
-   * and close the header's search row (the D-04 flake: until then the row may still hold the fallback).
-   */
-  hydrated?: boolean;
 }
 
 /** The sentence a screen reader hears when the suggestions change; empty while nothing has happened. */
@@ -102,7 +96,6 @@ export function SearchBoxView(props: SearchBoxViewProps) {
       method="get"
       action={`/${locale}/search`}
       aria-label={t("searchBox.label")}
-      data-hydrated={props.hydrated === true ? "true" : undefined}
       onSubmit={props.onSubmit}
       className="flex w-full items-center gap-2"
     >
@@ -182,11 +175,6 @@ function SearchBoxInner({ locale, initialText }: { locale: Locale; initialText: 
   const [combo, dispatch] = useReducer(comboboxReducer, closedCombobox);
   const [text, setText] = useState(initialText);
   const options = lookup.items;
-  // False in the server HTML and on the first browser render (they must match), true after this box has mounted.
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
 
   // A strict-mode remount disposes and uses the same source again: dispose only cancels what is pending.
   useEffect(() => () => source.dispose(), [source]);
@@ -221,7 +209,6 @@ function SearchBoxInner({ locale, initialText }: { locale: Locale; initialText: 
       options={options}
       status={lookup.status}
       failure={lookup.failure}
-      hydrated={hydrated}
       onTextChange={(next) => {
         setText(next);
         source.setQuery(next);
