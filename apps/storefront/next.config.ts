@@ -33,7 +33,7 @@ export const LEGAL_MARKER = "TODO(fluxkit): replace with the shop's own legal te
  * The release check of a client fork (privacy plan step 10, owner answer 10): with `STOREFRONT_REQUIRE_LEGAL_TEXT=true` a
  * production build REFUSES while ANY legal placeholder remains: a `legal.*` message of any language that still carries the
  * placeholder marker (the intro of every legal page does, so the shop cannot pass without replacing the texts themselves;
- * read from the MERGED messages, the area files plus the fork's overrides, `readMergedMessages`), or
+ * read from the MERGED messages, the area files plus the fork's extras and overrides, `readMergedMessages`), or
  * a controller identity value (`src/config/legal-identity.json`) that is missing, `null`, empty or blank, or (repair batch 2)
  * an entry of `src/config/demo-content.json` that still marks a shop page, the contacts, the home texts or the trust bar as the
  * template's demo copy. Each offender is named. The legal marker stays in the messages but is not shown on the page
@@ -103,7 +103,16 @@ function readJsonObject(file: string): Record<string, unknown> {
   return content as Record<string, unknown>;
 }
 
-/** One merged message: its text and the file it came from (`messages/en/legal.json`, `messages-overrides/en.json`). */
+/**
+ * The reserved namespace of a fork's own keys in `src/messages-extra` (`CUSTOM_NAMESPACE` in `src/messages/areas.ts`; a spec
+ * keeps the two equal: this file runs in plain Node and cannot import the app's source).
+ */
+export const CUSTOM_MESSAGE_NAMESPACE = "custom";
+
+/**
+ * One merged message: its text and the file it came from (`messages/en/legal.json`, `messages-extra/en.json`,
+ * `messages-overrides/en.json`).
+ */
 export interface MergedMessage {
   value: unknown;
   file: string;
@@ -111,14 +120,17 @@ export interface MergedMessage {
 
 /**
  * The messages the app renders, per locale, read in plain Node (this file cannot import `src/messages/index.ts`; a spec
- * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then `<overridesDir>/<locale>.json` merged
- * last (plan docs/plans/2026-11-08-design-changeability.md, WP3). Fails closed, so the release check can never pass by
- * reading nothing: no locale folder or an empty one, a flat `*.json` left at the top of `messagesDir` (the pre-split layout;
- * the app would ignore it), a key in two area files, a missing overrides file, an override key without a base message and
- * an override value that is not a non-empty string all throw.
+ * keeps the two equal): every area file `<messagesDir>/<locale>/<area>.json`, then the fork's own `custom.` keys from
+ * `<extrasDir>/<locale>.json`, then `<overridesDir>/<locale>.json` merged last (plan
+ * docs/plans/2026-11-08-design-changeability.md, WP3; extras: owner decision 2026-11-09). Fails closed, so the release check
+ * can never pass by reading nothing: no locale folder or an empty one, a flat `*.json` left at the top of `messagesDir` (the
+ * pre-split layout; the app would ignore it), a key in two area files, a missing extras or overrides file, an extra key
+ * outside `custom.` or one the base already has, an override key without a base message and an extra or override value that
+ * is not a non-empty string all throw.
  */
 export function readMergedMessages(
   messagesDir: string,
+  extrasDir: string,
   overridesDir: string,
 ): Record<string, Record<string, MergedMessage>> {
   const flat = readdirSync(messagesDir).filter((name) => name.endsWith(".json"));
@@ -152,6 +164,29 @@ export function readMergedMessages(
         merged[key] = { value, file };
       }
     }
+    // Same rules and messages as `applyExtras` in src/messages/index.ts: the app would refuse these extras at load.
+    const extrasFile = resolve(extrasDir, `${locale}.json`);
+    if (!existsSync(extrasFile)) {
+      throw new Error(`The message extras file ${extrasFile} was not found.`);
+    }
+    const customPrefix = `${CUSTOM_MESSAGE_NAMESPACE}.`;
+    for (const [key, value] of Object.entries(readJsonObject(extrasFile))) {
+      if (!key.startsWith(customPrefix) || key.length === customPrefix.length) {
+        throw new Error(
+          `Message extra "${key}" in ${extrasFile} is outside the reserved namespace "${customPrefix}" (a fork's own keys are "${customPrefix}<name>"; to change an upstream text use src/messages-overrides).`,
+        );
+      }
+      const known = merged[key];
+      if (known !== undefined) {
+        throw new Error(
+          `Message extra "${key}" in ${extrasFile} already has a base message in ${known.file} (extras add keys; to replace a text use src/messages-overrides).`,
+        );
+      }
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`Message extra "${key}" in ${extrasFile} must be a non-empty string.`);
+      }
+      merged[key] = { value, file: `messages-extra/${locale}.json` };
+    }
     const overridesFile = resolve(overridesDir, `${locale}.json`);
     if (!existsSync(overridesFile)) {
       throw new Error(`The message overrides file ${overridesFile} was not found.`);
@@ -179,6 +214,8 @@ export function assertNoLegalPlaceholders(options: {
   enabled: boolean;
   /** `src/messages`: the area files `<locale>/<area>.json`. */
   messagesDir: string;
+  /** `src/messages-extra`: a fork's own `custom.` keys, `<locale>.json`, merged after the area files. */
+  extrasDir: string;
   /** `src/messages-overrides`: a fork's `<locale>.json`, merged last. */
   overridesDir: string;
   identityFile: string;
@@ -198,7 +235,7 @@ export function assertNoLegalPlaceholders(options: {
   }
   const found: string[] = [];
   for (const messages of Object.values(
-    readMergedMessages(options.messagesDir, options.overridesDir),
+    readMergedMessages(options.messagesDir, options.extrasDir, options.overridesDir),
   )) {
     for (const [key, { value, file }] of Object.entries(messages)) {
       if (key.startsWith("legal.") && typeof value === "string" && value.includes(LEGAL_MARKER)) {
@@ -251,6 +288,7 @@ export default function config(phase: string): NextConfig {
     assertNoLegalPlaceholders({
       enabled: process.env.STOREFRONT_REQUIRE_LEGAL_TEXT === "true",
       messagesDir: resolve(process.cwd(), "src/messages"),
+      extrasDir: resolve(process.cwd(), "src/messages-extra"),
       overridesDir: resolve(process.cwd(), "src/messages-overrides"),
       identityFile: resolve(process.cwd(), "src/config/legal-identity.json"),
       demoContentFile: resolve(process.cwd(), "src/config/demo-content.json"),
