@@ -35,7 +35,7 @@ const filled: BrandConfig = {
     dark: { src: "/brand/logo-dark.svg", width: 120, height: 32 },
   },
   icons: [{ src: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
-  appleIcon: { src: "/brand/apple-icon.png", type: "image/png", sizes: "180x180" },
+  appleIcon: { src: "/brand/apple-icon.png" },
   themeColor: { light: "#ffffff", dark: "#0b1020" },
   ogImage: { src: "/brand/og.png", width: 1200, height: 630 },
 };
@@ -88,7 +88,7 @@ describe("lib/brand.ts", () => {
   it("builds the icon links of a filled config", () => {
     expect(brandIconsMetadata(filled)).toEqual({
       icon: [{ url: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
-      apple: [{ url: "/brand/apple-icon.png", type: "image/png", sizes: "180x180" }],
+      apple: [{ url: "/brand/apple-icon.png" }],
     });
     expect(brandIconsMetadata({ ...filled, appleIcon: null })).toEqual({
       icon: [{ url: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],

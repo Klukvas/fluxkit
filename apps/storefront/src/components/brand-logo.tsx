@@ -3,23 +3,35 @@ import Link from "next/link";
 import { brand } from "../config/brand";
 import type { BrandLogo as BrandLogoConfig, BrandPicture } from "../lib/brand";
 import { localizedHref } from "../lib/locale-path";
-import { LocalPicture } from "./local-picture";
 
+/**
+ * One logo picture: a plain img element, not `next/image`. The header is on every page, and importing `next/image` here would put
+ * its client component into the JavaScript of every page (sign-in and registration included) for a picture that needs no
+ * optimisation (a logo is small, SVG recommended). Like `LocalPicture`, only a file under `public/` is accepted, so no remote
+ * host comes in through the brand config (`source-guards.spec.ts`). `fetchpriority="low"`: React adds no `<link rel="preload">`
+ * to the head (it does for an eager picture otherwise), and the logo never competes with the page's main picture.
+ */
 function LogoPicture({
   picture,
-  t,
+  alt,
   className,
 }: {
   picture: BrandPicture;
-  t: Translator;
+  alt: string;
   className: string;
 }) {
+  if (!/^\/[A-Za-z0-9._-]/.test(picture.src)) {
+    throw new Error(`A logo picture must be a file under public/, not "${picture.src}".`);
+  }
   return (
-    <LocalPicture
-      image={{ ...picture, altKey: "site.name" }}
-      t={t}
-      eager
-      lowPriority
+    <img
+      src={picture.src}
+      width={picture.width}
+      height={picture.height}
+      alt={alt}
+      loading="eager"
+      fetchPriority="low"
+      decoding="async"
       className={className}
     />
   );
@@ -30,8 +42,7 @@ function LogoPicture({
  * shop name with a `title` (a long name is truncated on a phone). An `image` logo is the picture alone, its alternative text the
  * shop name and no `title`; a light/dark pair renders both pictures and `app/globals.css` (`.fk-logo-light`, `.fk-logo-dark`)
  * hides the one that does not match `<html data-theme>` (the theme comes from the cookie on the server, ADR 0045, so a
- * `<picture media>` would follow the device instead). Pictures load eagerly with `fetchpriority="low"`, so React adds no
- * `<link rel="preload">` to the head (it does for an eager `high` picture) and the logo never competes with the page's main picture.
+ * `<picture media>` would follow the device instead).
  */
 export function BrandLogo({
   locale,
@@ -44,24 +55,25 @@ export function BrandLogo({
   logo?: BrandLogoConfig;
 }) {
   const href = localizedHref(locale, "/");
+  const name = t("site.name");
   if (logo.kind === "text") {
     return (
-      <Link href={href} title={t("site.name")} className="fk-logo">
-        {t("site.name")}
+      <Link href={href} title={name} className="fk-logo">
+        {name}
       </Link>
     );
   }
   if ("darkSafe" in logo) {
     return (
       <Link href={href} className="fk-logo">
-        <LogoPicture picture={logo.light} t={t} className="fk-logo-image" />
+        <LogoPicture picture={logo.light} alt={name} className="fk-logo-image" />
       </Link>
     );
   }
   return (
     <Link href={href} className="fk-logo">
-      <LogoPicture picture={logo.light} t={t} className="fk-logo-image fk-logo-light" />
-      <LogoPicture picture={logo.dark} t={t} className="fk-logo-image fk-logo-dark" />
+      <LogoPicture picture={logo.light} alt={name} className="fk-logo-image fk-logo-light" />
+      <LogoPicture picture={logo.dark} alt={name} className="fk-logo-image fk-logo-dark" />
     </Link>
   );
 }

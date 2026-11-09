@@ -14,9 +14,9 @@ change in a minor release; the fields below may not). `check:docs` fails a PR th
 
 | Field | Type | Default | Rendered as |
 |---|---|---|---|
-| `logo` | `{ kind: "text" }` or `{ kind: "image"; light: BrandPicture; dark: BrandPicture }` or `{ kind: "image"; light: BrandPicture; darkSafe: true }` | `{ kind: "text" }` | the header's home link: `text` = `site.name` in the display face with a `title`; `image` = the picture(s) with `alt` = `site.name`, no `title`, `loading="eager"`, `fetchpriority="low"` (no preload), height `h-8`. A light/dark pair is switched by CSS on `<html data-theme>` (`.fk-logo-light`, `.fk-logo-dark` in `app/globals.css`, including `system`). One picture must be declared `darkSafe: true` |
+| `logo` | `{ kind: "text" }` or `{ kind: "image"; light: BrandPicture; dark: BrandPicture }` or `{ kind: "image"; light: BrandPicture; darkSafe: true }` | `{ kind: "text" }` | the header's home link: `text` = `site.name` in the display face with a `title`; `image` = the picture(s) as plain `<img>` (no `next/image` client code in the shell of every page) with `alt` = `site.name`, no `title`, `loading="eager"`, `fetchpriority="low"` (React adds no preload), height `h-8`, width from the ratio. A light/dark pair is switched by CSS on `<html data-theme>` (`.fk-logo-light`, `.fk-logo-dark` in `app/globals.css`, including `system`). One picture must be declared `darkSafe: true` |
 | `icons` | `readonly BrandIcon[]` | `[]` | one `<link rel="icon" href type sizes>` each (root layout `metadata.icons`); none = no tag |
-| `appleIcon` | `BrandIcon \| null` | `null` | `<link rel="apple-touch-icon">` |
+| `appleIcon` | `{ src: "/<path under public/>" } \| null` | `null` | `<link rel="apple-touch-icon" href>` (180 x 180 PNG; no type or dimensions, to save head bytes) |
 | `themeColor` | `{ light: "#rrggbb"; dark: "#rrggbb" } \| null` | `null` | `<meta name="theme-color">` from the root layout's `generateViewport`: one tag for the `light` or `dark` theme of the `fluxkit_theme` cookie, two with `media` for `system`. Must equal `--fk-color-background` of each theme (`config/brand.spec.ts`) |
 | `ogImage` | `BrandPicture \| null` | `null` | the default `og:image` (absolute from `STOREFRONT_PUBLIC_URL`, `alt` = `site.name`) of the home page, the catalog and category lists, the shop pages and a product without its own picture. Pages without `openGraph` (cart, account, legal, search) get none |
 
@@ -35,3 +35,9 @@ and by `brandConfigProblems`; `config/brand.spec.ts` checks that every named fil
 
 The template's values render exactly what the storefront rendered before the file existed: the text logo, no icon link, no `theme-color`, no `og:image`
 (head growth 0 bytes).
+
+## Head budget
+
+Every tag here is in the first HTML of every page. Measured on `next dev` (2026-11-09, `/uk|en/account/register`): the defaults add 0 bytes; the
+example of the file's comment (one SVG icon, an apple icon, both theme colours) adds 177 bytes with a `light` or `dark` cookie and 296 bytes with
+`system` (the two `media` tags). Plan B1 caps the growth at 300 bytes: keep paths short and add no further icon sizes (one SVG icon covers every size).

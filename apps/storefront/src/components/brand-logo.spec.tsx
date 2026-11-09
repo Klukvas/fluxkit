@@ -38,6 +38,7 @@ describe("BrandLogo (config/brand.ts logo, plan B1)", () => {
       expect(img).toContain('loading="eager"');
       expect(img).toMatch(/fetchpriority="low"/i);
     }
+    expect(html).not.toContain("/_next/image");
     expect(first).toContain('class="fk-logo-image fk-logo-light"');
     expect(second).toContain('class="fk-logo-image fk-logo-dark"');
     expect(html).not.toContain("<link");

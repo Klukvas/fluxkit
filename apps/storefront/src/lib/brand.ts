@@ -45,8 +45,11 @@ export interface BrandConfig {
   logo: BrandLogo;
   /** Browser tab icons. Empty: no icon link (the browser then asks for `/favicon.ico` itself). */
   icons: readonly BrandIcon[];
-  /** The home-screen icon of iOS (`<link rel="apple-touch-icon">`), usually 180 x 180 PNG; `null` for none. */
-  appleIcon: BrandIcon | null;
+  /**
+   * The home-screen icon of iOS (`<link rel="apple-touch-icon">`), a 180 x 180 PNG; `null` for none. Only the path: iOS needs
+   * no type or dimensions, and every byte of the head counts on every page (plan B1: at most 300 bytes for the whole config).
+   */
+  appleIcon: { src: `/${string}` } | null;
   /** The browser UI colour; `null` for no `theme-color` meta. */
   themeColor: BrandThemeColor | null;
   /**
@@ -97,7 +100,7 @@ export function brandIconsMetadata(config: BrandConfig): Metadata["icons"] {
   const link = (icon: BrandIcon) => ({ url: icon.src, type: icon.type, sizes: icon.sizes });
   return {
     icon: config.icons.map(link),
-    ...(config.appleIcon === null ? {} : { apple: [link(config.appleIcon)] }),
+    ...(config.appleIcon === null ? {} : { apple: [{ url: config.appleIcon.src }] }),
   };
 }
 
