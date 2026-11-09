@@ -17,7 +17,7 @@ import config, {
   readMergedMessages,
 } from "./next.config.js";
 import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
-import { messagesByLocale } from "./src/messages";
+import { buildLocaleMessages, messagesByLocale } from "./src/messages";
 import { CUSTOM_NAMESPACE } from "./src/messages/areas";
 
 // `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
@@ -593,6 +593,124 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
 
     it("names the same reserved namespace as the app's message map", () => {
       expect(CUSTOM_MESSAGE_NAMESPACE).toBe(CUSTOM_NAMESPACE);
+    });
+
+    /** The area files of one locale of a scratch folder, keyed by area, as the app's loader takes them. */
+    function areaFilesOf(
+      messagesDir: string,
+      language: string,
+    ): Record<string, Record<string, string>> {
+      return Object.fromEntries(
+        readdirSync(join(messagesDir, language)).map((name) => [
+          name.replace(/\.json$/, ""),
+          JSON.parse(readFileSync(join(messagesDir, language, name), "utf8")) as Record<
+            string,
+            string
+          >,
+        ]),
+      );
+    }
+
+    /** What the app's loader (`buildLocaleMessages`) and the guard (`readMergedMessages`) make of one scratch set. */
+    function bothOf(
+      edit: (messages: Record<string, string>) => void,
+      overrides: Record<string, Record<string, unknown>>,
+      extras: Record<string, Record<string, unknown>>,
+    ) {
+      const fixture = scratch(edit, filledIdentity, overrides, extras);
+      try {
+        const loader = (language: "en" | "uk") =>
+          buildLocaleMessages(
+            areaFilesOf(fixture.messagesDir, language),
+            extras[language] ?? {},
+            overrides[language] ?? {},
+            language,
+          );
+        let loaded: Record<string, Record<string, string>> | Error;
+        try {
+          loaded = { en: loader("en"), uk: loader("uk") };
+        } catch (error) {
+          loaded = error as Error;
+        }
+        let guarded: Record<string, Record<string, unknown>> | Error;
+        try {
+          const merged = readMergedMessages(
+            fixture.messagesDir,
+            fixture.extrasDir,
+            fixture.overridesDir,
+          );
+          guarded = Object.fromEntries(
+            Object.entries(merged).map(([language, messages]) => [
+              language,
+              Object.fromEntries(
+                Object.entries(messages).map(([key, entry]) => [key, entry.value]),
+              ),
+            ]),
+          );
+        } catch (error) {
+          guarded = error as Error;
+        }
+        return { loaded, guarded };
+      } finally {
+        rmSync(fixture.directory, { recursive: true, force: true });
+      }
+    }
+
+    it("agrees with the app's loader on a non-empty fixture: the same texts (review of PR 244)", () => {
+      const { loaded, guarded } = bothOf(
+        withoutMarkers,
+        {
+          en: { "site.name": "Verde" },
+          uk: { "custom.deliveryKyiv": "Kyiv, own text", "site.name": "Verde UA" },
+        },
+        {
+          en: { ...deliveryKyiv, "custom.note": "Note" },
+          uk: { ...deliveryKyiv, "custom.note": "Note UA" },
+        },
+      );
+      expect(loaded).not.toBeInstanceOf(Error);
+      expect(guarded).toEqual(loaded);
+      const texts = loaded as Record<string, Record<string, string>>;
+      expect(texts["uk"]?.["custom.deliveryKyiv"]).toBe("Kyiv, own text");
+      expect(texts["en"]?.["custom.deliveryKyiv"]).toBe("Kyiv delivery");
+      expect(texts["uk"]?.["custom.note"]).toBe("Note UA");
+      expect(texts["en"]?.["site.name"]).toBe("Verde");
+    });
+
+    it("refuses exactly what the app's loader refuses (review of PR 244)", () => {
+      const none = { en: {}, uk: {} };
+      const cases: [
+        string,
+        (messages: Record<string, string>) => void,
+        Record<string, Record<string, unknown>>,
+        Record<string, Record<string, unknown>>,
+      ][] = [
+        ["extra outside custom.", withoutMarkers, none, { en: { "site.name": "x" }, uk: {} }],
+        ["bare custom.", withoutMarkers, none, { en: { "custom.": "x" }, uk: {} }],
+        ["blank extra", withoutMarkers, none, { en: { "custom.a": "  " }, uk: {} }],
+        ["non-string extra", withoutMarkers, none, { en: { "custom.a": 3 }, uk: {} }],
+        [
+          "extra already in the base",
+          (messages) => {
+            withoutMarkers(messages);
+            messages["custom.a"] = "base";
+          },
+          none,
+          { en: { "custom.a": "x" }, uk: {} },
+        ],
+        ["override of an unknown key", withoutMarkers, { en: { "custom.a": "x" }, uk: {} }, none],
+        [
+          "blank override of an extra",
+          withoutMarkers,
+          { en: { "custom.a": "" }, uk: {} },
+          { en: { "custom.a": "x" }, uk: { "custom.a": "y" } },
+        ],
+      ];
+      for (const [name, edit, overrides, extras] of cases) {
+        const { loaded, guarded } = bothOf(edit, overrides, extras);
+        expect(loaded, name).toBeInstanceOf(Error);
+        expect(guarded, name).toBeInstanceOf(Error);
+      }
     });
 
     it("merges the extras after the area files, naming their file, and lets an override replace them", () => {

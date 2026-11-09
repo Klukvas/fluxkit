@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { locales, type Messages } from "@fluxkit/ui";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CLIENT_MESSAGE_PREFIXES, pickClientMessages } from "../lib/client-messages";
 import {
   CUSTOM_NAMESPACE,
@@ -289,5 +289,66 @@ describe("message extras (owner decision 2026-11-09: fork-owned src/messages-ext
     expect(() => buildLocaleMessages(files, {}, { "custom.deliveryKyiv": "x" }, "uk")).toThrow(
       /custom\.deliveryKyiv.*no base message/,
     );
+  });
+});
+
+describe("messagesByLocale wiring with non-empty fork files (review of PR 244: the {} files made the order untestable)", () => {
+  afterEach(() => {
+    vi.doUnmock("../messages-extra/uk.json");
+    vi.doUnmock("../messages-extra/en.json");
+    vi.doUnmock("../messages-overrides/uk.json");
+    vi.doUnmock("../messages-overrides/en.json");
+    vi.resetModules();
+  });
+
+  async function loadWith(
+    extras: Record<string, Record<string, string>>,
+    overrides: Record<string, Record<string, string>>,
+  ) {
+    vi.resetModules();
+    vi.doMock("../messages-extra/uk.json", () => ({ default: extras["uk"] ?? {} }));
+    vi.doMock("../messages-extra/en.json", () => ({ default: extras["en"] ?? {} }));
+    vi.doMock("../messages-overrides/uk.json", () => ({ default: overrides["uk"] ?? {} }));
+    vi.doMock("../messages-overrides/en.json", () => ({ default: overrides["en"] ?? {} }));
+    return (await import("./index")).messagesByLocale;
+  }
+
+  it("applies base, then extras, then overrides: an extra is added, an override replaces an extra and a base key", async () => {
+    const loaded = await loadWith(
+      {
+        uk: { "custom.deliveryKyiv": "Доставка по Києву", "custom.note": "Примітка" },
+        en: { "custom.deliveryKyiv": "Delivery in Kyiv", "custom.note": "Note" },
+      },
+      {
+        uk: { "custom.deliveryKyiv": "Кур'єр по Києву", "site.name": "Верде" },
+        en: { "site.name": "Verde" },
+      },
+    );
+    expect(loaded.uk["custom.note"]).toBe("Примітка");
+    expect(loaded.en["custom.note"]).toBe("Note");
+    // An override replaces an extra (overrides come after extras) ...
+    expect(loaded.uk["custom.deliveryKyiv"]).toBe("Кур'єр по Києву");
+    expect(loaded.en["custom.deliveryKyiv"]).toBe("Delivery in Kyiv");
+    // ... and a base key.
+    expect(loaded.uk["site.name"]).toBe("Верде");
+    expect(loaded.en["site.name"]).toBe("Verde");
+    // Every other base key is kept as it is.
+    for (const locale of locales) {
+      for (const [key, value] of Object.entries(baseMessagesByLocale[locale])) {
+        if (key !== "site.name") expect(loaded[locale][key], key).toBe(value);
+      }
+    }
+  });
+
+  it("checks the fork files at load: an extra outside custom. throws, an override of an extra key loads", async () => {
+    await expect(loadWith({ uk: { "site.name": "x" } }, {})).rejects.toThrow(
+      /Message extra "site\.name" in src\/messages-extra\/uk\.json/,
+    );
+    await expect(
+      loadWith(
+        { en: { "custom.deliveryKyiv": "Delivery in Kyiv" } },
+        { en: { "custom.deliveryKyiv": "Courier" } },
+      ),
+    ).resolves.toMatchObject({ en: { "custom.deliveryKyiv": "Courier" } });
   });
 });
