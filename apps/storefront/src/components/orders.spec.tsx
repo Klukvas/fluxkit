@@ -7,8 +7,7 @@ import { clientFailure } from "../lib/failure";
 import { formatMoney } from "../lib/money";
 import { ORDER_STATUSES } from "../lib/order-model";
 import { initialOrderState, type CancelState } from "../lib/order-store";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { AccountOrdersView } from "./account-orders";
 import { GuestOrderPage, OrderStatusView, SaveLinkView, copyLink } from "./guest-order-page";
 import { OrderDetailsView, addressLines, headingParts } from "./order-details";
@@ -20,6 +19,8 @@ import {
   textAttributes,
   textOf,
 } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 const shop = { currency: "UAH", exponent: 2 };

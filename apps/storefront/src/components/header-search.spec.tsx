@@ -4,9 +4,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { loadSearchEnabled } from "../lib/catalog-data";
 import type { CatalogOutcome, StoreData } from "../lib/store-data";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { SiteShell } from "./site-shell";
 import { sentinelTranslator } from "./test-helpers";
+
+const { uk } = messagesByLocale;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),

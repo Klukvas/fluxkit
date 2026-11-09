@@ -6,8 +6,7 @@ import { clientFailure, failureFromResult, type Failure } from "../lib/failure";
 import { checkNewPasswords } from "../lib/reset-password-form";
 import { immediateClient, json } from "../lib/test-fetch";
 import { customer } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { EmailUnavailableView } from "./account-email-parts";
 import {
   FORGOT_IDS,
@@ -42,6 +41,8 @@ import { I18nProvider } from "./i18n-provider";
 import { LoginFormView, type LoginFormViewProps } from "./login-form";
 import { AccountStoreContext, StoreClientContext } from "./session-provider";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 /** Every message key a rendered page names (`§key`), to compare with the message files. */

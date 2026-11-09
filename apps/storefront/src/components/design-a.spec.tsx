@@ -3,13 +3,14 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { trustBarItems } from "../config/trust-bar";
 import { summary } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { AccountBreadcrumbsView } from "./account-nav";
 import { CheckoutSteps } from "./checkout-steps";
 import { ProductCard } from "./product-card";
 import { sentinelTranslator } from "./test-helpers";
 import { StoreTrustBar } from "./trust-bar";
+
+const { uk, en } = messagesByLocale;
 
 // Design batch A (plan 2026-11-03-storefront-design-a.md): the trust bar, the funnel steps, the account breadcrumbs and the
 // product card's badges and alignment.

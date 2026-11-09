@@ -11,8 +11,7 @@ import { initialCheckoutState, type CheckoutState } from "../lib/checkout-store"
 import { formatMoney } from "../lib/money";
 import { initialShippingState, type ShippingState } from "../lib/shipping-model";
 import { cartLine, cartOf, shippingOption, shippingOptionsOf } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { CheckoutPageView, type CheckoutPageViewProps } from "./checkout-page";
 import { DeliverySectionView, type DeliverySectionViewProps } from "./delivery-section";
 import {
@@ -27,6 +26,8 @@ import {
   textAttributes,
   textOf,
 } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 const UAH = (amount: number) => ({ amount, currency: "UAH" });

@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { CLIENT_MESSAGE_PREFIXES, pickClientMessages } from "./client-messages";
+
+const { uk, en } = messagesByLocale;
 
 describe("pickClientMessages", () => {
   it("keeps client namespaces and drops the rest", () => {

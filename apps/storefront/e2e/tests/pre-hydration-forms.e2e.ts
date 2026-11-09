@@ -3,7 +3,7 @@ import { waitForHydration } from "../support/flows.ts";
 
 const SECRET = "S3cret-Passw0rd!";
 
-/** The form labels per locale (`messages/*.json`, `account.field.*`). */
+/** The form labels per locale (`src/messages/<locale>/account.json`, `account.field.*`). */
 const LABELS = {
   en: {
     email: "Email",

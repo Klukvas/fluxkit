@@ -5,8 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { initialCartState, type CartState } from "../lib/cart-store";
 import { formatMoney } from "../lib/money";
 import { cartLine, cartOf } from "../lib/test-fixtures";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { CartLineView, CartPageView, LineQuantityView, type CartPageViewProps } from "./cart-page";
 import { idleAutosave } from "../lib/quantity-autosave";
 import {
@@ -16,6 +15,8 @@ import {
   textAttributes,
   textOf,
 } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];

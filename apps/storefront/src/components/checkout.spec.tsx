@@ -2,8 +2,7 @@ import { Button } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { checkoutConfig } from "../config/checkout";
-import uk from "../messages/uk.json";
-import en from "../messages/en.json";
+import { messagesByLocale } from "../messages";
 import { createTranslator } from "@fluxkit/ui";
 import { initialCartState, type CartState } from "../lib/cart-store";
 import { initialShippingState, type ShippingState } from "../lib/shipping-model";
@@ -20,6 +19,8 @@ import {
   textAttributes,
   textOf,
 } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 

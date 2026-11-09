@@ -12,10 +12,11 @@ import {
   termsPageSlug,
 } from "../config/legal";
 import { footerLinks } from "../layout/navigation";
-import en from "../messages/en.json";
-import uk from "../messages/uk.json";
+import { messagesByLocale } from "../messages";
 import { LegalPage } from "./legal-page";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+const { uk, en } = messagesByLocale;
 
 const t = sentinelTranslator();
 const srcRoot = join(import.meta.dirname, "..");

@@ -1,4 +1,5 @@
 import type { SearchResult } from "@fluxkit/api-client";
+import { createTranslator } from "@fluxkit/ui";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -11,8 +12,10 @@ import CatalogPage, {
 import type { SearchOutcome, SearchReadOptions } from "../lib/search-data";
 import type { SearchQuery } from "../lib/search-query";
 import { category, summary } from "../lib/test-fixtures";
-import en from "../messages/en.json";
+import { messagesByLocale } from "../messages";
 import { I18nProvider } from "./i18n-provider";
+
+const { en } = messagesByLocale;
 
 /*
  * The catalog and category ROUTES run as functions (search plan step 10a, rest: facets and sort through the index with the
@@ -343,7 +346,7 @@ describe("the catalog route with search on", () => {
       expect(reads.sqlListings).toEqual([["en", { limit: 24, offset: 0, brand: "demo-brand" }]]);
       // The brand's name comes from a listed product that carries it (`§brand` in the fixtures).
       expect(html).toContain(
-        `<span>${en["catalog.filter.brand"].replace("{brand}", "§brand")}</span>`,
+        `<span>${createTranslator(en, "en")("catalog.filter.brand", { brand: "§brand" })}</span>`,
       );
       expect(html).toMatch(
         new RegExp(`<a[^>]*href="/en/catalog"[^>]*>${en["catalog.filter.clear"]}</a>`),
