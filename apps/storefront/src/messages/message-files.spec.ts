@@ -3,9 +3,16 @@ import { join } from "node:path";
 import { locales, type Messages } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { CLIENT_MESSAGE_PREFIXES, pickClientMessages } from "../lib/client-messages";
-import { MESSAGE_AREAS, MESSAGE_NAMESPACES, areaOfKey, namespaceOfKey } from "./areas";
+import {
+  CUSTOM_NAMESPACE,
+  MESSAGE_AREAS,
+  MESSAGE_NAMESPACES,
+  areaOfKey,
+  namespaceOfKey,
+} from "./areas";
 import {
   MESSAGE_FILES,
+  applyExtras,
   applyOverrides,
   baseMessagesByLocale,
   buildLocaleMessages,
@@ -15,6 +22,7 @@ import {
 
 const messagesDir = import.meta.dirname;
 const overridesDir = join(import.meta.dirname, "..", "messages-overrides");
+const extrasDir = join(import.meta.dirname, "..", "messages-extra");
 
 function readJson(file: string): Record<string, unknown> {
   return JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
@@ -91,7 +99,7 @@ describe("message area files (plan 2026-11-08-design-changeability.md, WP3 M1)",
     }
   });
 
-  it("names no unused namespace and no namespace whose area has no file", () => {
+  it("names no unused namespace and no namespace whose area has no file (custom. has none: a fork's extras)", () => {
     const used = new Set(
       locales.flatMap((locale) =>
         Object.values(filesOnDisk(locale)).flatMap((messages) =>
@@ -99,7 +107,11 @@ describe("message area files (plan 2026-11-08-design-changeability.md, WP3 M1)",
         ),
       ),
     );
-    expect([...used].sort()).toEqual(Object.keys(MESSAGE_NAMESPACES).sort());
+    const withAreaFile = Object.entries(MESSAGE_NAMESPACES)
+      .filter(([, entry]) => entry.area !== null)
+      .map(([namespace]) => namespace);
+    expect([...used].sort()).toEqual(withAreaFile.sort());
+    expect(used.has(CUSTOM_NAMESPACE)).toBe(false);
   });
 
   it("imports exactly the files on disk in index.ts, merged without loss", () => {
@@ -147,10 +159,15 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
     }
   });
 
-  it("are merged last into what the app uses: messagesByLocale equals the base plus the override file", () => {
+  it("are merged last into what the app uses: messagesByLocale equals the base, then the extras, then the overrides", () => {
     for (const locale of locales) {
+      const extras = readJson(join(extrasDir, `${locale}.json`));
       const overrides = readJson(join(overridesDir, `${locale}.json`));
-      expect(messagesByLocale[locale]).toEqual({ ...baseMessagesByLocale[locale], ...overrides });
+      expect(messagesByLocale[locale]).toEqual({
+        ...baseMessagesByLocale[locale],
+        ...extras,
+        ...overrides,
+      });
     }
   });
 
@@ -183,14 +200,94 @@ describe("message overrides (WP3 M2: fork-owned src/messages-overrides/{uk,en}.j
     };
     const merged = buildLocaleMessages(
       files,
+      {},
       { "site.name": "Verde Kopi", "home.hero.title": "Hi" },
       "uk",
     );
     expect(merged["site.name"]).toBe("Verde Kopi");
     expect(merged["home.hero.title"]).toBe("Hi");
     expect(pickClientMessages(merged)["site.name"]).toBe("Verde Kopi");
-    expect(() => buildLocaleMessages(files, { "home.hero.titel": "x" }, "uk")).toThrow(
+    expect(() => buildLocaleMessages(files, {}, { "home.hero.titel": "x" }, "uk")).toThrow(
       /home\.hero\.titel/,
+    );
+  });
+});
+
+describe("message extras (owner decision 2026-11-09: fork-owned src/messages-extra/{uk,en}.json, keys under custom.)", () => {
+  const base: Messages = { "site.name": "Fluxkit", "nav.cart": "Cart" };
+
+  it("exist for every locale and hold a JSON object", () => {
+    for (const locale of locales) {
+      const file = join(extrasDir, `${locale}.json`);
+      expect(existsSync(file), file).toBe(true);
+      const content = JSON.parse(readFileSync(file, "utf8")) as unknown;
+      expect(typeof content === "object" && content !== null && !Array.isArray(content)).toBe(true);
+    }
+  });
+
+  it("on disk: hold only custom. keys, none of them in the base, the same keys in uk and en", () => {
+    for (const locale of locales) {
+      for (const key of Object.keys(readJson(join(extrasDir, `${locale}.json`)))) {
+        expect(namespaceOfKey(key), `${locale}: ${key}`).toBe(CUSTOM_NAMESPACE);
+        expect(Object.hasOwn(baseMessagesByLocale[locale], key), `${locale}: ${key}`).toBe(false);
+      }
+    }
+    expect(comparableKeys(readJson(join(extrasDir, "uk.json")))).toEqual(
+      comparableKeys(readJson(join(extrasDir, "en.json"))),
+    );
+  });
+
+  it("make custom a client namespace without an upstream area file", () => {
+    expect(CUSTOM_NAMESPACE).toBe("custom");
+    expect(MESSAGE_NAMESPACES[CUSTOM_NAMESPACE]).toEqual({ area: null, client: true });
+    expect(areaOfKey("custom.deliveryKyiv")).toBeNull();
+    expect(CLIENT_MESSAGE_PREFIXES).toContain("custom.");
+  });
+
+  it("add a custom. key and keep every base key", () => {
+    expect(applyExtras(base, { "custom.deliveryKyiv": "Kyiv delivery" }, "uk")).toEqual({
+      ...base,
+      "custom.deliveryKyiv": "Kyiv delivery",
+    });
+    expect(applyExtras(base, {}, "uk")).toEqual(base);
+  });
+
+  it("refuse a key outside custom. (a core key must not be shadowed), naming the key and the file", () => {
+    for (const key of ["site.name", "promo.banner", "custom", "custom.", "customs.x"]) {
+      expect(() => applyExtras(base, { [key]: "x" }, "uk"), key).toThrow(
+        `Message extra "${key}" in src/messages-extra/uk.json is outside the reserved namespace "custom."`,
+      );
+    }
+  });
+
+  it("refuse a key the base already has (extras add, overrides replace)", () => {
+    expect(() =>
+      applyExtras({ ...base, "custom.deliveryKyiv": "a" }, { "custom.deliveryKyiv": "b" }, "en"),
+    ).toThrow(/custom\.deliveryKyiv.*messages-extra\/en\.json.*already has a base message/);
+  });
+
+  it("refuse a value that is not a non-empty string", () => {
+    for (const bad of [1, null, ["x"], { a: "b" }, "", "  "]) {
+      expect(
+        () => applyExtras(base, { "custom.deliveryKyiv": bad }, "en"),
+        JSON.stringify(bad),
+      ).toThrow(/custom\.deliveryKyiv.*must be a non-empty string/);
+    }
+  });
+
+  it("merge after the base and before the overrides: an override may replace an extra, the browser gets it", () => {
+    const files = { shell: { "site.name": "Fluxkit", "footer.copyright": "c" } };
+    const merged = buildLocaleMessages(
+      files,
+      { "custom.deliveryKyiv": "Kyiv delivery", "custom.note": "Note" },
+      { "custom.deliveryKyiv": "Kyiv, by courier" },
+      "uk",
+    );
+    expect(merged["custom.deliveryKyiv"]).toBe("Kyiv, by courier");
+    expect(merged["custom.note"]).toBe("Note");
+    expect(pickClientMessages(merged)["custom.note"]).toBe("Note");
+    expect(() => buildLocaleMessages(files, {}, { "custom.deliveryKyiv": "x" }, "uk")).toThrow(
+      /custom\.deliveryKyiv.*no base message/,
     );
   });
 });

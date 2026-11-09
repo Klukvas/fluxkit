@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSyn
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import config, {
+  CUSTOM_MESSAGE_NAMESPACE,
   DEMO_CONTENT_FLAGS,
   LEGAL_MARKER,
   assertNoLegalPlaceholders,
@@ -17,6 +18,7 @@ import config, {
 } from "./next.config.js";
 import { LEGAL_PLACEHOLDER_MARKER } from "./src/config/legal";
 import { messagesByLocale } from "./src/messages";
+import { CUSTOM_NAMESPACE } from "./src/messages/areas";
 
 // `config()` looks for ../../.env relative to the working directory; point it at an empty directory so a developer's
 // real .env cannot change what these tests see.
@@ -237,6 +239,7 @@ describe("next.config development media rule", () => {
 describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   const masterMessages = join(import.meta.dirname, "src", "messages");
   const masterOverrides = join(import.meta.dirname, "src", "messages-overrides");
+  const masterExtras = join(import.meta.dirname, "src", "messages-extra");
   const masterIdentity = join(import.meta.dirname, "src", "config", "legal-identity.json");
   const placeholderTextKeys = ["legal.privacy.intro", "legal.terms.intro", "legal.cookies.intro"];
   const filledIdentity = {
@@ -257,17 +260,24 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
   /**
    * A scratch copy of master's messages (the area files `<locale>/<area>.json`, plan 2026-11-08-design-changeability.md
    * WP3), an overrides folder and an identity file. `edit` changes the merged base of each locale; every key is written
-   * back to the area file it came from (a new key to `extra.json`). `overrides` are the override files' contents.
+   * back to the area file it came from (a new key to `extra.json`). `overrides` and `extras` are the contents of the
+   * override and extras files (a fork's `messages-overrides` and `messages-extra`).
    */
   function scratch(
     edit: (messages: Record<string, string>) => void,
     identity: Record<string, unknown> = filledIdentity,
     overrides: Record<string, Record<string, unknown>> = { en: {}, uk: {} },
+    extras: Record<string, unknown> = { en: {}, uk: {} },
   ) {
     const directory = mkdtempSync(join(tmpdir(), "storefront-legal-"));
     const messagesDir = join(directory, "messages");
     const overridesDir = join(directory, "messages-overrides");
+    const extrasDir = join(directory, "messages-extra");
     mkdirSync(overridesDir, { recursive: true });
+    mkdirSync(extrasDir, { recursive: true });
+    for (const [language, content] of Object.entries(extras)) {
+      writeFileSync(join(extrasDir, `${language}.json`), JSON.stringify(content));
+    }
     for (const language of ["en", "uk"]) {
       const origin = new Map<string, string>();
       const messages: Record<string, string> = {};
@@ -296,12 +306,13 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
     const identityFile = join(directory, "legal-identity.json");
     writeFileSync(identityFile, JSON.stringify(identity));
-    return { directory, messagesDir, overridesDir, identityFile };
+    return { directory, messagesDir, overridesDir, extrasDir, identityFile };
   }
 
   function failureOf(options: {
     messagesDir: string;
     overridesDir?: string;
+    extrasDir?: string;
     identityFile: string;
     demoContentFile?: string;
   }): string {
@@ -310,6 +321,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
         enabled: true,
         demoContentFile: clearedDemoFile,
         overridesDir: masterOverrides,
+        extrasDir: masterExtras,
         ...options,
       });
     } catch (error) {
@@ -335,8 +347,8 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
   });
 
-  it("reads the merged messages the app uses: the same texts as messagesByLocale (area files plus overrides)", () => {
-    const merged = readMergedMessages(masterMessages, masterOverrides);
+  it("reads the merged messages the app uses: the same texts as messagesByLocale (area files, extras, overrides)", () => {
+    const merged = readMergedMessages(masterMessages, masterExtras, masterOverrides);
     expect(Object.keys(merged).sort()).toEqual(Object.keys(messagesByLocale).sort());
     for (const [language, messages] of Object.entries(merged)) {
       const values = Object.fromEntries(
@@ -527,6 +539,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           enabled: true,
           messagesDir,
           overridesDir,
+          extrasDir: masterExtras,
           identityFile: join(directory, "missing.json"),
           demoContentFile: clearedDemoFile,
         }),
@@ -544,6 +557,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           enabled: true,
           messagesDir,
           overridesDir,
+          extrasDir: masterExtras,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -564,6 +578,7 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
           enabled: true,
           messagesDir,
           overridesDir,
+          extrasDir: masterExtras,
           identityFile,
           demoContentFile: clearedDemoFile,
         }),
@@ -573,12 +588,132 @@ describe("next.config legal placeholder guard (privacy plan step 10)", () => {
     }
   });
 
+  describe("fork extras (owner decision 2026-11-09: src/messages-extra, keys under custom.)", () => {
+    const deliveryKyiv = { "custom.deliveryKyiv": "Kyiv delivery" };
+
+    it("names the same reserved namespace as the app's message map", () => {
+      expect(CUSTOM_MESSAGE_NAMESPACE).toBe(CUSTOM_NAMESPACE);
+    });
+
+    it("merges the extras after the area files, naming their file, and lets an override replace them", () => {
+      const { directory, messagesDir, overridesDir, extrasDir } = scratch(
+        withoutMarkers,
+        filledIdentity,
+        { en: {}, uk: { "custom.deliveryKyiv": "Kyiv, own text" } },
+        { en: deliveryKyiv, uk: deliveryKyiv },
+      );
+      try {
+        const merged = readMergedMessages(messagesDir, extrasDir, overridesDir);
+        expect(merged["en"]?.["custom.deliveryKyiv"]).toEqual({
+          value: "Kyiv delivery",
+          file: "messages-extra/en.json",
+        });
+        expect(merged["uk"]?.["custom.deliveryKyiv"]).toEqual({
+          value: "Kyiv, own text",
+          file: "messages-overrides/uk.json",
+        });
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("passes the release check with extras in place (texts, identity and demo content cleared)", () => {
+      const { directory, messagesDir, overridesDir, extrasDir, identityFile } = scratch(
+        withoutMarkers,
+        filledIdentity,
+        { en: {}, uk: {} },
+        { en: deliveryKyiv, uk: deliveryKyiv },
+      );
+      try {
+        expect(failureOf({ messagesDir, overridesDir, extrasDir, identityFile })).toBe("");
+      } finally {
+        rmSync(directory, { recursive: true, force: true });
+      }
+    });
+
+    it("fails closed on a missing extras file or one that is not an object", () => {
+      const missing = scratch(withoutMarkers, filledIdentity, { en: {}, uk: {} }, { en: {} });
+      const list = scratch(withoutMarkers, filledIdentity, { en: {}, uk: {} }, { en: {}, uk: [] });
+      try {
+        expect(failureOf(missing)).toMatch(/messages-extra.*uk\.json.*not found/s);
+        expect(failureOf(list)).toMatch(/uk\.json must hold an object/);
+      } finally {
+        for (const { directory } of [missing, list]) {
+          rmSync(directory, { recursive: true, force: true });
+        }
+      }
+    });
+
+    it("fails closed on an extra value that is not a non-empty string, as the app's loader does", () => {
+      for (const bad of [42, null, ["x"], { a: "b" }, "", "   "]) {
+        const { directory, messagesDir, overridesDir, extrasDir, identityFile } = scratch(
+          withoutMarkers,
+          filledIdentity,
+          { en: {}, uk: {} },
+          { en: { "custom.deliveryKyiv": bad }, uk: {} },
+        );
+        try {
+          expect(
+            failureOf({ messagesDir, overridesDir, extrasDir, identityFile }),
+            JSON.stringify(bad),
+          ).toMatch(
+            /Message extra "custom\.deliveryKyiv" in .*messages-extra\/en\.json must be a non-empty string\./,
+          );
+        } finally {
+          rmSync(directory, { recursive: true, force: true });
+        }
+      }
+    });
+
+    it("fails closed on an extra key outside custom. (a core key cannot be shadowed) or one the base already has", () => {
+      for (const key of [
+        "legal.terms.intro",
+        "site.name",
+        "promo.banner",
+        "custom",
+        "custom.",
+        "customs.x",
+      ]) {
+        const { directory, messagesDir, overridesDir, extrasDir, identityFile } = scratch(
+          withoutMarkers,
+          filledIdentity,
+          { en: {}, uk: {} },
+          { en: {}, uk: { [key]: "Our own text" } },
+        );
+        try {
+          expect(failureOf({ messagesDir, overridesDir, extrasDir, identityFile }), key).toContain(
+            `Message extra "${key}" in ${join(extrasDir, "uk.json")} is outside the reserved namespace "custom."`,
+          );
+        } finally {
+          rmSync(directory, { recursive: true, force: true });
+        }
+      }
+      const duplicate = scratch(
+        (messages) => {
+          withoutMarkers(messages);
+          messages["custom.deliveryKyiv"] = "from an area file";
+        },
+        filledIdentity,
+        { en: {}, uk: {} },
+        { en: deliveryKyiv, uk: {} },
+      );
+      try {
+        expect(failureOf(duplicate)).toMatch(
+          /Message extra "custom\.deliveryKyiv" in .*messages-extra\/en\.json already has a base message/,
+        );
+      } finally {
+        rmSync(duplicate.directory, { recursive: true, force: true });
+      }
+    });
+  });
+
   it("does nothing while the check is off (master builds with its placeholders)", () => {
     expect(() =>
       assertNoLegalPlaceholders({
         enabled: false,
         messagesDir: masterMessages,
         overridesDir: masterOverrides,
+        extrasDir: masterExtras,
         identityFile: masterIdentity,
         demoContentFile: masterDemoContent,
       }),
