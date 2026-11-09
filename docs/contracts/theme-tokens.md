@@ -19,8 +19,8 @@ Source of truth: `packages/theme/src/tokens.css`. Components use semantic Tailwi
 | `--fk-color-ring` | `outline-ring`, `ring-ring` | visible keyboard focus (added in step 4a) |
 | `--fk-radius-sm` / `-md` / `-lg` | `rounded-sm` / `rounded-md` / `rounded-lg` | the radius size steps. Kept for forks' own components (additive); the template's code uses the role radii below and these steps only through the guard's exception list |
 | `--fk-radius-control` | `rounded-control` | buttons, fields, selects, chips, pagination, menu entries and header links, focus targets (a focused section's outline), and popups anchored to a field (menus, suggestion and combobox lists, the search hint). Default `0.5rem`. Added 2026-11-09 |
-| `--fk-radius-card` | `rounded-card` | product, banner and order cards (and their skeletons), `Card`, the hero, large admin preview frames. Default `1rem`. Added 2026-11-09 |
-| `--fk-radius-panel` | `rounded-panel` | inline panels inside a page: notices, empty-result boxes, `Alert`, the `TrustBar` items, the `DataTable` scroll hint, admin sections and fieldsets. Default `0.5rem`. Added 2026-11-09 (owner decision on the review of PR 246) |
+| `--fk-radius-card` | `rounded-card` | product, banner and order cards (and their skeletons), `Card`, the hero, the admin banner preview frame, the admin search `LocaleCard`. Default `1rem`. Added 2026-11-09 |
+| `--fk-radius-panel` | `rounded-panel` | inline panels inside a page: notices, empty-result boxes, `Alert`, the `TrustBar` list container (the `<ul>` frame, not its items), the `DataTable` scroll hint, admin sections, fieldsets, list rows and the mail preview frame. Default `0.5rem`. Added 2026-11-09 (owner decision on the review of PR 246) |
 | `--fk-radius-overlay` | `rounded-overlay` | free-floating surfaces over the page: `Dialog`, the add-to-cart toast. Default `1rem`. Added 2026-11-09 |
 | `--fk-radius-media` | `rounded-media` | product and banner pictures, gallery thumbnails, `ProductImage`, `StoreImage`, `Skeleton` (it stands in for loading content). Default `0.5rem`. Added 2026-11-09 |
 | `--fk-font-sans` / `-mono` | `font-sans` / `font-mono` | font stacks |
@@ -61,9 +61,9 @@ so a dark theme only sets values. Controls have no colour transition: it would a
   - Focus-only targets (a block that takes the focus after an action: the delivery and payment sections, the form error summary, the
     order and payment-return status, the account data views) are `control`, because their radius only shapes the focus outline: a fork with pill controls
     (`--fk-radius-control: 9999px`) gets pill-shaped focus outlines around those sections; give them `panel` in a fork if that looks wrong.
-  - Admin search status: each per-language `LocaleCard` (`apps/admin/src/areas/search/search-status-view.tsx`) is `card` (it was
-    `rounded-lg`, 1rem: a repeated card in a list, like order cards), while the admin's sections and fieldsets that were `rounded-md` are all
-    `panel`. Making the `LocaleCard` a panel would be a visual change (1rem to 0.5rem) and was not made.
+  - Admin repeated list items are mostly `panel` (they were `rounded-md`): `ShipmentCard`, `PaymentCard`, the media rows of a product,
+    the banner rows and option blocks. The per-language `LocaleCard` of the search status (`apps/admin/src/areas/search/search-status-view.tsx`)
+    is the odd one: it was `rounded-lg` (1rem) and stays `card`; making it a panel would be a visual change (1rem to 0.5rem) and was not made.
 
 **Heading roles (2026-11-08, plan `docs/plans/2026-11-08-design-changeability.md` T1; additive):**
 
