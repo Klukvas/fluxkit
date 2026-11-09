@@ -1,6 +1,6 @@
 # packages/ui
 
-Dumb, token-styled components: props in, markup out. No fetching, no API types, no hardcoded user-facing strings (labels and aria texts come from props), semantic Tailwind utilities only (guarded by `packages/theme/src/design-guard.spec.ts`).
+Dumb, token-styled components: props in, markup out. No fetching, no API types, no hardcoded user-facing strings (labels and aria texts come from props), semantic Tailwind utilities only (guarded by `packages/theme/src/design-guard.spec.ts`). Radii are roles since 2026-11-09: `rounded-control` (`button.tsx`, `controlBase` in `styles.ts`, fields, chips), `rounded-card`, `rounded-overlay` (`dialog.tsx`), `rounded-media` (`product-image.tsx`, `skeleton.tsx`); `alert.tsx`, `trust-bar.tsx`, the `data-table.tsx` scroll hint, `checkbox.tsx`, `badge.tsx` and `price-text.tsx` keep a size step as listed guard exceptions (`docs/contracts/theme-tokens.md`, "Radius roles").
 
 - `src/index.ts` - public entry point; other packages import only from here.
 - `src/cn.ts`, `src/styles.ts` - class joiner; shared focus ring (`outline-ring`) and form-control classes.
@@ -14,7 +14,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
 - `src/quantity-input.tsx` - number input with labelled minus/plus buttons, `min`/`max`, optional `stepMax` (where the buttons stop, e.g. a stock hint; a typed number is clamped to `max` only), `clampQuantity`.
 - `src/pagination.tsx` (`aria-current`, disabled previous/next, `pageItems`), `src/breadcrumbs.tsx` (last item is `aria-current="page"`; links at least 24 px high, 44 px on `pointer: coarse`).
 - `src/checkbox.tsx` `fullWidth` (2026-11-03): the label, the hit area, takes the whole row; `src/button.tsx` takes `ref` as a prop (React 19, `ComponentPropsWithRef<"button">`).
-- `src/product-image.tsx` - lazy image with a token-styled placeholder when `src` is missing or fails. A client component (`"use client"`): the failing-image fallback needs state and `onError`. `Dialog` and `Tabs` are the other two.
+- `src/product-image.tsx` - lazy image with a token-styled placeholder when `src` is missing or fails. Image and placeholder use `rounded-media`. A client component (`"use client"`): the failing-image fallback needs state and `onError`. `Dialog` and `Tabs` are the other two.
 - `src/option-picker.tsx` - radio group per product option in a `fieldset`/`legend`; disabled values are struck through, not only dimmed.
 - `src/skip-link.tsx`, `src/visually-hidden.tsx` - accessibility helpers.
 - Admin components (admin UI plan step 4a; props in, markup out, no fetching, labels and aria texts from props):

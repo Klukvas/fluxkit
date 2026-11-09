@@ -3,6 +3,7 @@
 Token-based component library shared by storefront and admin. Components are presentational: props in, markup out; every visible or spoken text (labels, `aria-label`s, `alt`) is a prop, so apps pass translated strings.
 
 - Colors, radii and shadows come only from the design tokens (`@fluxkit/theme`); the design guard fails the build otherwise.
+- Radii name a role: `rounded-control` (buttons, fields, chips, `Pagination`, `OptionPicker`, `QuantityInput`, `SideNav`, `Disclosure`), `rounded-card` (`Card`, `BannerCard`, `Hero`), `rounded-overlay` (`Dialog`), `rounded-media` (`ProductImage`, `Skeleton`); `rounded-full` for round shapes (`Spinner`, step numbers). `Alert`, the `TrustBar` items and the `DataTable` scroll hint (inline panels, 0.5rem), `Checkbox`, `Badge` and the `PriceText` discount badge (0.25rem) keep a size step: listed exceptions of the design guard.
 - `createTranslator(messages, locale)` returns `t(key, { name })` and `t.plural(key, count)`. Plural forms are separate flat keys (`cart.items.one`, `.few`, `.many`, `.other`; English needs `one` and `other`). A missing key, plural form or placeholder value throws.
 - `Field` links label, hint and error to a control: `<Field id="email" label=... error=...>{(control) => <Input {...control} />}</Field>`.
 - `ProductImage`, `Dialog` and `Tabs` are the client components (failing-image fallback; `showModal()` and focus return; roving tabindex keys); the rest render on the server or the client.

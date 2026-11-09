@@ -36,7 +36,8 @@
    * Radius ROLES (rounded-control, rounded-card, rounded-overlay, rounded-media): what components use. Literal values, not
    * var(--fk-radius-md): changing one role restyles only that role. Defaults equal the scale values these parts had before.
    * control: buttons, fields, chips, menu entries, focus targets and popups anchored to a field (menus, suggestion lists);
-   * card: product, banner and order cards, the hero, large panels; overlay: dialogs and toasts; media: images and thumbnails.
+   * card: product, banner and order cards, the hero; overlay: dialogs and toasts; media: images, thumbnails, skeletons.
+   * Inline panels (0.5rem) and 0.25rem marks still use the steps above: the guard's `radiusExceptions` lists them.
    */
   --fk-radius-control: 0.5rem;
   --fk-radius-card: 1rem;
