@@ -1,1 +1,4 @@
-{}
+{
+  "custom.card.sale": "Sale",
+  "custom.card.favourite": "Add {title} to favourites"
+}
