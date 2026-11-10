@@ -147,7 +147,7 @@ minutes are the agents' reports. Hygiene was checked in the agents' transcripts:
 | Diff | 21 files, +105/-202 | 21 files, +140/-203 | 33 files, +827/-225 | 44 files, +1372/-220 |
 | Commits | 5 | 6 | 11 | 10 |
 | Tool calls, minutes (reported) | about 55, 12 min | about 46, 9 min | about 100, 22 min | about 150, 20 min |
-| Core edits (existing upstream file, protocol classifier) | 2: `email-theme.ts`, `theme-color.ts` | the same 2 | 3: `site-shell.tsx`, `shell.spec.tsx`, `config/home.ts` | 7: `site-header.tsx`, `header-layout.ts`, `globals.css`, `slots.fork.spec.tsx`, `config/home.ts` and the two config files `header.ts`, `footer.ts` count as fork config |
+| Core edits (existing upstream file, protocol classifier) | 2: `email-theme.ts`, `theme-color.ts` | the same 2 | 3: `site-shell.tsx`, `shell.spec.tsx`, `config/home.ts` | 5: `site-header.tsx`, `layout/header-layout.ts`, `app/globals.css`, `slots.fork.spec.tsx`, `config/home.ts` |
 | Undocumented test edits | 0 | 0 | 1 (`shell.spec.tsx`: 5 `<nav>` landmarks) | 1 (`slots.fork.spec.tsx`: one `vi.mock`) |
 | Prescribed test work | marker spec, `brand-overrides.upstream.spec.ts`, `header-footer-defaults` spec and folder deleted; one test removed in `brand.spec.ts` | the same | marker, `cards/custom`, `slots`, `home-template-default`, `header-footer-defaults` specs deleted | the same set |
 | Expert estimate, tokens / "client is happy" | 1 h / 1-2 days | 30-45 min / 1-2 days | 3-4 h / 1.5-3 days | 2-3 days to "happy" |
