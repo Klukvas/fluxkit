@@ -38,18 +38,20 @@ describe("the overrides files a theme run reads", () => {
     );
   });
 
-  it("sees the fork's palette only in the fork run (and the admin overrides only in the admin)", () => {
-    const fork = themeRun === "brand-fork";
-    expect(background(storefrontTokens.light) !== template.get("--fk-color-background")).toBe(fork);
-    expect(
-      storefrontTokens.dark.get("--fk-color-primary") !==
-        storefrontTokens.light.get("--fk-color-primary"),
-    ).toBe(true);
-    expect(adminTokens.get("--fk-color-primary") !== template.get("--fk-color-primary")).toBe(fork);
-    // The admin never receives the storefront overrides, and the storefront never the admin's.
-    expect(background(adminTokens)).toBe(template.get("--fk-color-background"));
-    expect(storefrontTokens.light.get("--fk-font-sans")).toBe(template.get("--fk-font-sans"));
-  });
+  // Only about the fixtures' content: the upstream run reads the REAL files, which a fork fills, so nothing here may depend on
+  // what they hold (a fork's own run must stay green).
+  it.runIf(themeRun === "brand-fork")(
+    "sees the fixtures' values in the fork run, each overrides file only in its own app",
+    () => {
+      expect(background(storefrontTokens.light)).toBe("#fbf8f3");
+      expect(background(storefrontTokens.dark)).toBe("#0f1713");
+      expect(adminTokens.get("--fk-color-primary")).toBe("#1f2937");
+      // The admin never receives the storefront overrides (its background stays the template's), and the storefront never
+      // the admin's (the fixture's client font is the admin's only).
+      expect(background(adminTokens)).toBe(template.get("--fk-color-background"));
+      expect(storefrontTokens.light.get("--fk-font-sans")).toBe(template.get("--fk-font-sans"));
+    },
+  );
 });
 
 describe("the literal copies a theme run reads", () => {
