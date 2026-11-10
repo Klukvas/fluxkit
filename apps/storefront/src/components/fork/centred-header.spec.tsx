@@ -105,7 +105,9 @@ describe("AnnouncementBar (fork, reshape R3)", () => {
       textKey: "custom.announcement.text",
       link: { labelKey: "custom.announcement.link", href: "/delivery-and-payment" },
     });
-    expect(html).toMatch(/^<div data-announcement-bar="" class="bg-primary text-primary-foreground">/);
+    expect(html).toMatch(
+      /^<div data-announcement-bar="" class="bg-primary text-primary-foreground">/,
+    );
     expect(html).toContain("§custom.announcement.text");
     expect(html).toMatch(/href="\/uk\/delivery-and-payment"[^>]*>§custom\.announcement\.link</);
     expect(leftoverText(html)).toBe("");
@@ -113,7 +115,9 @@ describe("AnnouncementBar (fork, reshape R3)", () => {
 
   it("renders nothing while disabled, and no link for a missing or external target", () => {
     expect(bar({ enabled: false, textKey: "custom.announcement.text", link: null })).toBe("");
-    expect(bar({ enabled: true, textKey: "custom.announcement.text", link: null })).not.toContain("<a");
+    expect(bar({ enabled: true, textKey: "custom.announcement.text", link: null })).not.toContain(
+      "<a",
+    );
     expect(
       bar({
         enabled: true,

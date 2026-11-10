@@ -32,7 +32,9 @@ describe("FullBleedHero (fork, reshape R4)", () => {
   });
 
   it("fills the band with a decorative picture loaded at once, the text on its own surface over it", () => {
-    expect(html).toMatch(/<img alt=""[^>]*loading="eager"[^>]*class="absolute inset-0[^"]*object-cover"/);
+    expect(html).toMatch(
+      /<img alt=""[^>]*loading="eager"[^>]*class="absolute inset-0[^"]*object-cover"/,
+    );
     expect(html).toContain("bg-background/90");
     const lazy = renderToStaticMarkup(<FullBleedHero {...props} isFirst={false} />);
     expect(lazy).toContain('loading="lazy"');
@@ -62,7 +64,10 @@ describe("BrandStrip (fork, reshape R4)", () => {
 
   it("names pictures that exist under public/ with their real size, and each brand once", () => {
     expect(new Set(brandStrip.map((brand) => brand.name)).size).toBe(brandStrip.length);
-    for (const { image } of [...brandStrip, { image: { src: "/fork/hero-wide.svg", width: 1600, height: 640 } }]) {
+    for (const { image } of [
+      ...brandStrip,
+      { image: { src: "/fork/hero-wide.svg", width: 1600, height: 640 } },
+    ]) {
       const file = join(publicRoot, image.src);
       expect(existsSync(file), image.src).toBe(true);
       expect(readFileSync(file, "utf8")).toContain(

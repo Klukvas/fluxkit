@@ -34,7 +34,7 @@ export function CardBrand({ brand }: { brand: ProductCardModel["brand"] }) {
   return (
     <Link
       href={brand.href}
-      className={`relative z-10 inline-flex min-h-6 w-fit items-center rounded-sm underline-offset-4 hover:text-foreground hover:underline pointer-coarse:pointer-events-none ${look} ${focusRing}`}
+      className={`relative z-10 inline-flex min-h-6 w-fit items-center rounded-control underline-offset-4 hover:text-foreground hover:underline pointer-coarse:pointer-events-none ${look} ${focusRing}`}
     >
       {brand.name}
     </Link>

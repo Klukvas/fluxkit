@@ -24,10 +24,7 @@ export function HorizontalListCard({ card, headingLevel: Heading, eager, t }: Ca
           fill
           className="transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
         />
-        <SaleBadge
-          t={t}
-          className="pointer-events-none absolute top-2 right-2 w-fit shadow-card"
-        />
+        <SaleBadge t={t} className="pointer-events-none absolute top-2 right-2 w-fit shadow-card" />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <CardBrand brand={card.brand} />

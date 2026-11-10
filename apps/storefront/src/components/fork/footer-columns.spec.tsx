@@ -36,7 +36,9 @@ const props: FooterColumnsSlotProps = {
 describe("the footer columns (fork, reshape R5)", () => {
   it("renders the shop and legal pages as two labelled navigations with stacked, wrapping links", () => {
     const shop = renderToStaticMarkup(<FooterShopColumn {...props} />);
-    expect(shop).toMatch(/^<nav aria-label="§custom\.footer\.shop"><h2 [^>]*>§custom\.footer\.shop<\/h2>/);
+    expect(shop).toMatch(
+      /^<nav aria-label="§custom\.footer\.shop"><h2 [^>]*>§custom\.footer\.shop<\/h2>/,
+    );
     expect(shop).toContain('<ul class="flex-col">');
     expect(shop.match(/<a class="whitespace-normal" href="\/uk\//g)).toHaveLength(2);
     const legal = renderToStaticMarkup(<FooterLegalColumn {...props} />);

@@ -30,7 +30,7 @@ export function AnnouncementBar({
               {" "}
               <Link
                 href={localizedHref(locale, link.href)}
-                className="rounded-sm font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-foreground"
+                className="rounded-control font-semibold underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2"
               >
                 {t(link.labelKey)}
               </Link>

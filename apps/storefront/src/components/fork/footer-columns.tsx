@@ -21,12 +21,10 @@ import { LocalPicture } from "../local-picture";
  * row of 44 px links): a link list stacks with `flex-col` and lets long names wrap with `whitespace-normal`.
  */
 
-const columnTitle = `${textStyles.navGroupTitle} px-2`;
-
 function LinkColumn({ label, links }: { label: string; links: readonly SlotLink[] }) {
   return (
     <nav aria-label={label}>
-      <h2 className={columnTitle}>{label}</h2>
+      <h2 className={`${textStyles.navGroupTitle} px-2`}>{label}</h2>
       <ul className="flex-col">
         {links.map((link) => (
           <li key={link.href}>
@@ -93,7 +91,7 @@ export function FooterContactsColumn({
   const links = social.filter((link) => isHttpsAddress(link.href));
   return (
     <section aria-labelledby="footer-contacts-title" className="flex flex-col gap-1">
-      <h2 id="footer-contacts-title" className={columnTitle}>
+      <h2 id="footer-contacts-title" className={`${textStyles.navGroupTitle} px-2`}>
         {t("custom.footer.contacts")}
       </h2>
       <FooterContacts contacts={contacts} />
@@ -127,13 +125,15 @@ export function FooterNewsletterColumn({ t }: FooterColumnsSlotProps) {
       data-newsletter-placeholder=""
       className="flex flex-col gap-1"
     >
-      <h2 id="footer-newsletter-title" className={columnTitle}>
+      <h2 id="footer-newsletter-title" className={`${textStyles.navGroupTitle} px-2`}>
         {t("custom.footer.newsletter.title")}
       </h2>
       <p className="px-2">{t("custom.footer.newsletter.soon")}</p>
       {payIcons.length === 0 ? null : (
         <>
-          <h2 className={`${columnTitle} mt-3`}>{t("custom.footer.pay.title")}</h2>
+          <h2 className={`${textStyles.navGroupTitle} mt-3 px-2`}>
+            {t("custom.footer.pay.title")}
+          </h2>
           <ul className="items-center gap-2 px-2 py-1">
             {payIcons.map((image) => (
               <li key={image.src}>

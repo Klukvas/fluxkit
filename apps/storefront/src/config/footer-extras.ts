@@ -46,6 +46,11 @@ export const socialLinks: readonly SocialLink[] = [
 /** The accepted ways to pay, as pictures under `public/fork/` (each with its own background, so it reads on both themes). */
 export const payIcons: readonly LocalImage[] = [
   { src: "/fork/pay-bank-card.svg", width: 64, height: 40, altKey: "custom.footer.pay.bankCard" },
-  { src: "/fork/pay-on-delivery.svg", width: 64, height: 40, altKey: "custom.footer.pay.onDelivery" },
+  {
+    src: "/fork/pay-on-delivery.svg",
+    width: 64,
+    height: 40,
+    altKey: "custom.footer.pay.onDelivery",
+  },
   { src: "/fork/pay-transfer.svg", width: 64, height: 40, altKey: "custom.footer.pay.transfer" },
 ];

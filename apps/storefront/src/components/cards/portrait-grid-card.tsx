@@ -37,10 +37,7 @@ export function PortraitGridCard({ card, headingLevel: Heading, eager, t }: Card
             {availability.text}
           </Badge>
         ) : null}
-        <SaleBadge
-          t={t}
-          className="pointer-events-none absolute top-2 right-2 w-fit shadow-card"
-        />
+        <SaleBadge t={t} className="pointer-events-none absolute top-2 right-2 w-fit shadow-card" />
         <PriceText
           price={card.price}
           priceLabel={card.priceLabel}
