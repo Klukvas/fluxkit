@@ -128,7 +128,12 @@ export async function loadCatalogList(
   categorySlug: string | undefined,
 ): Promise<CatalogRouteList> {
   if (route.mode === "sql") {
-    return { kind: "sql", listing: route.listing, brandSlug: route.query.brand };
+    return {
+      kind: "sql",
+      listing: route.listing,
+      brandSlug: route.query.brand,
+      ...(route.query.view === undefined ? {} : { view: route.query.view }),
+    };
   }
   const page: CatalogSearchPage = await loadCatalogSearchPage(storeData, searchData, route.locale, {
     ...(categorySlug === undefined ? {} : { categorySlug }),

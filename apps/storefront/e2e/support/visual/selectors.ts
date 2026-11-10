@@ -249,6 +249,14 @@ export const SELECTORS: readonly SelectorSpec[] = [
     steps: [{ role: "status" }],
   },
   {
+    // The row of the result count, the list/grid switch (PR-F, plan L2/L5) and the sort: the region PR-F masks in the
+    // screenshots of the catalog and search pages (`.visual/exceptions.json`). Same element on both sides of a comparison.
+    name: "results.toolbar",
+    description: "the toolbar row of a faceted list (result count, view switch, sort)",
+    scope: "main",
+    steps: [{ css: 'div:has(> [role="status"] > #search-results-heading)' }],
+  },
+  {
     name: "footer.contentinfo",
     description: "the site footer landmark",
     scope: "page",

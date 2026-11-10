@@ -5,6 +5,7 @@ import {
   catalogPath,
   isPageInRange,
   maxPage,
+  normalizeCatalogQuery,
   offsetForPage,
   pageCountFor,
   parseCatalogQuery,
@@ -93,5 +94,29 @@ describe("catalogPath", () => {
   it("refuses a page below 1 or not whole", () => {
     expect(() => catalogPath("/catalog", { page: 0 })).toThrow(RangeError);
     expect(() => catalogPath("/catalog", { page: 1.5 })).toThrow(RangeError);
+  });
+});
+
+// Presentation URL parameters (plan 2026-11-08-design-changeability.md, L5), the SQL listing's side (search off).
+describe("the view parameter of the SQL listing (?view=grid|list)", () => {
+  it("is written as `view=list` only, after brand and page", () => {
+    expect(catalogPath("/catalog", { view: "list" })).toBe("/catalog?view=list");
+    expect(catalogPath("/c/shoes", { brand: "acme", page: 2, view: "list" })).toBe(
+      "/c/shoes?brand=acme&page=2&view=list",
+    );
+    expect(catalogPath("/catalog", { page: 2, view: "grid" })).toBe("/catalog?page=2");
+  });
+
+  it("reads `list`, and repairs an unknown or default value by a redirect to the address without it", () => {
+    expect(normalizeCatalogQuery({ view: "list", page: "2" })).toEqual({
+      query: { page: 2, brand: null, view: "list" },
+      canonical: true,
+    });
+    for (const view of ["tiles", "", "grid", ["list", "list"]]) {
+      const result = normalizeCatalogQuery({ view });
+      expect(result.canonical, String(view)).toBe(false);
+      expect(result.query.view ?? "grid").toBe(view instanceof Array ? "list" : "grid");
+    }
+    expect(normalizeCatalogQuery({})).toEqual({ query: { page: 1, brand: null }, canonical: true });
   });
 });
