@@ -57,7 +57,7 @@ Checked after every build (`build-output.spec.ts`): `index.html` has no inline s
   `{ "app.name": "Shop Admin", "app.documentTitle": "{page} · Shop Admin" }`. Applied LAST to the eager files and to every lazily
   loaded area file (`src/messages/overrides.ts`, `src/messages/index.ts`), with the storefront's rules: a value that is not a non-empty
   string throws, and a key no message file has (a typo, or a key upstream renamed) stops `vite build` and `vite dev`, naming the key and
-  the file (`brand-html.ts` checks every file at once: the SPA loads area files lazily). The parity, placeholder and "no hard-coded text"
+  the file (`brand-html.ts` checks every file at once: the SPA loads area files lazily). That check runs when `vite build` or `vite dev` starts and in `src/messages/overrides.spec.ts`, not in the running app: a typo in a key of a lazily loaded area changes nothing on screen, so restart `vite dev` after editing the overrides. The parity, placeholder and "no hard-coded text"
   specs run on the merged result (`src/messages/overrides.spec.ts`).
 - Favicon: none upstream. A fork adds `public/favicon.svg` (or `favicon.png`, `favicon.ico`; the first one found wins); the build copies it
   to `dist/` and the plugin links it as `/admin-ui/<file>`, the one file of `index.html` outside `/admin-ui/assets/` (served by the

@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import enCommon from "./src/messages/en/common.json";
-import enOverrides from "./src/messages-overrides/en.json";
 import { applyOverrides, overrideProblems } from "./src/messages/overrides.ts";
 
 /**
@@ -47,7 +47,11 @@ export function adminName(
 export function adminBrand(publicDir: string): AdminBrand {
   const favicon =
     publicDir === "" ? undefined : FAVICON_FILES.find((file) => existsSync(join(publicDir, file)));
-  return { name: adminName(enCommon, enOverrides), favicon: favicon ?? null };
+  // Read from disk, not imported: one JSON import less in the Vite config (its native loader warns on each).
+  const overrides = readJson(
+    fileURLToPath(new URL("./src/messages-overrides/en.json", import.meta.url)),
+  );
+  return { name: adminName(enCommon, overrides), favicon: favicon ?? null };
 }
 
 function readJson(path: string): Record<string, unknown> {

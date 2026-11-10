@@ -5,11 +5,15 @@ marked **not yet available**. Rules behind it: `AGENTS.md` sections 2.2, 15 and 
 
 ## 0. Before you start (once per fork)
 
-1. Create an empty file `.fluxkit-fork` at the repository root, commit it, and delete `apps/storefront/src/fork-marker.upstream.spec.ts`
-   in the same commit (it fails while the marker exists: the template must never contain it). The marker tells `pnpm check:docs`
-   (CI job `docs`) that this is a fork: the storefront config files the fork fills (`brand`, `catalog`, `header`, `footer`, `slots`, `custom-sections` and `home` in
-   `apps/storefront/src/config/`, and `apps/storefront/src/components/cards/custom.ts`) then need no change under `docs/contracts/`. Without it, the first PR that fills one
-   of them fails that job. Rule and the files that keep it: `docs/contracts/README.md`.
+1. In a commit (and PR) of its own, FIRST, before any other change: create an empty file `.fluxkit-fork` at the repository root and
+   delete `apps/storefront/src/fork-marker.upstream.spec.ts` (it fails while the marker exists: the template must never contain it).
+   The marker tells `pnpm check:docs` (CI job `docs`) that this is a fork: the storefront config files the fork fills (`brand`,
+   `catalog`, `header`, `footer`, `slots`, `custom-sections` and `home` in `apps/storefront/src/config/`, and
+   `apps/storefront/src/components/cards/custom.ts`) then need no change under `docs/contracts/`. The check reads the marker from the
+   PR's BASE branch, so no PR relaxes its own check: the marker PR itself is still checked with the template's rule and passes, because
+   it touches no contract file; every later PR (based on a branch that has the marker) runs in fork mode. Mixing config changes into
+   the marker PR fails its `docs` job. A tree with both the marker and that spec fails the check too (it names the file to delete).
+   Without the marker, the first PR that fills a config file fails that job. Rule and the files that keep it: `docs/contracts/README.md`.
 2. Build before any test command in this guide: `pnpm install`, then `pnpm build` (the specs import the built workspace packages,
    `@fluxkit/ui`, `@fluxkit/theme` and the others, and the admin's `apps/admin/build-output.spec.ts` reads `apps/admin/dist`). Rebuild what
    you changed before its tests: `pnpm --filter @fluxkit/admin build` after an admin change (name, favicon, `admin-overrides.css`),
@@ -23,10 +27,11 @@ marked **not yet available**. Rules behind it: `AGENTS.md` sections 2.2, 15 and 
    - `apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
      once `config/header.ts`, `config/footer.ts` or `config/brand.ts` changes (section 3).
    - `apps/storefront/src/config/slots.upstream.spec.ts`: once a slot is filled (section 3).
+   - `apps/storefront/src/components/cards/custom.upstream.spec.ts`: once `cards/custom.ts` registers a card (section 3, product cards).
    - Not a file: the one test marked TEMPLATE-DEFAULT CHECK in `apps/storefront/src/config/brand.spec.ts`, once `config/brand.ts` is filled
      (section 1, step 7).
 
-   Overriding a card in `cards/custom.ts`, a four-column footer and renaming the shop or the admin need no test edit: the specs that pin the
+   Overriding a card in `cards/custom.ts`, a four-column footer and renaming the shop or the admin need no other test edit than the deletions above: the specs that pin the
    template's own markup read its defaults from `apps/storefront/src/test-support/template-defaults.ts`.
 
 ## 1. Rebrand checklist (target: under 2 hours)
@@ -156,7 +161,7 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   `apps/storefront/src/config/category-page.ts`.
 - Product cards and the list/grid view (L2, L5): a fork overrides the `grid` or `list` card in the fork-owned
   `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
-  Tests in the fork (after `pnpm build`, section 0): no edit. The specs that pin the built-in cards render them with the template's defaults
+  Tests in the fork (after `pnpm build`, section 0): delete the upstream-only `apps/storefront/src/components/cards/custom.upstream.spec.ts` (it pins the empty registry); nothing else. The specs that pin the built-in cards render them with the template's defaults
   (`apps/storefront/src/test-support/template-defaults.ts`), and upstream runs the suite with both cards overridden (`apps/storefront/vitest.brand-fork.config.ts` and `apps/storefront/vitest.home-fork.config.ts`).
 - **Not yet available**: a storefront tokens overrides file (colours are still edited in the upstream `tokens.css`, section 1 step 4).
 

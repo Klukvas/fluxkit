@@ -13,10 +13,12 @@ import type { SlotRegistry } from "../lib/slots";
  *   vi.mock("../config/footer", () => import("../test-support/template-defaults"));
  *
  * (The factory imports this module itself: a `vi.mock` call is hoisted above the spec's imports, so it cannot use an import.)
- * Upstream-owned; the copies here equal the files upstream ships, which upstream never edits after creating them: the
- * UPSTREAM-ONLY `components/header-footer-defaults.upstream.spec.tsx` and `config/slots.upstream.spec.ts` compare them with
- * the real files (a fork deletes those once it changes the files). `vitest.brand-fork.config.ts` runs every spec with filled
- * copies of these files, so a spec that pins template output without this mock fails upstream instead of in a fork.
+ * Upstream-owned; the copies here equal the files upstream ships, which upstream never edits after creating them. Each copy is
+ * compared with its real file by an UPSTREAM-ONLY spec (a fork deletes it once it changes that file, `docs/customization.md`
+ * step 0): `headerConfig` and `footerConfig` by `components/header-footer-defaults.upstream.spec.tsx`, `slots` by
+ * `config/slots.upstream.spec.ts`, `customCards` by `components/cards/custom.upstream.spec.ts`. Both fork runs
+ * (`vitest.brand-fork.config.ts`, `vitest.home-fork.config.ts`) run the specs with filled copies of some of these files, so a
+ * spec that pins template output without this mock fails upstream instead of in a fork.
  */
 
 /** `config/header.ts` as the template ships it. */

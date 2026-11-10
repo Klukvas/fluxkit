@@ -37,7 +37,9 @@ key fails the fork's build, naming it). The admin's name is `app.name` and `app.
 for the template, where such a change may change a contract.
 
 A client fork fills the config files among them itself (`docs/customization.md`), which changes no contract. It marks itself with
-an empty file `.fluxkit-fork` at the repository root (checked in, no environment variable): with the marker, the config files
+an empty file `.fluxkit-fork` at the repository root (checked in, no environment variable), in a commit or PR of its own. The check reads
+the marker from the PR's BASE ref, so no PR relaxes its own check; a tree with both the marker and the upstream-only spec below fails.
+With the marker in the base, the config files
 (`config/*.ts(x)` above and `components/cards/custom.ts`) are left out of the rule; the files that define the contract
 (`components/cards/types.ts`, `lib/custom-sections.ts`, `lib/slots.ts`) keep it. The template never contains the marker:
 `apps/storefront/src/fork-marker.upstream.spec.ts` (upstream-only, deleted by the fork in the same step) fails if it does.

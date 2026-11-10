@@ -47,9 +47,11 @@ export default defineConfig({
       ...configDefaults.exclude,
       "e2e/**",
       "src/config/brand.spec.ts",
-      // TEMPLATE-DEFAULT CHECKS: the default header and footer markup (the text logo included), the empty slots registry.
+      // TEMPLATE-DEFAULT CHECKS: the default header and footer markup (the text logo included), the empty slots registry,
+      // the empty card registry.
       "src/components/header-footer-defaults.upstream.spec.tsx",
       "src/config/slots.upstream.spec.ts",
+      "src/components/cards/custom.upstream.spec.ts",
       "src/messages/message-files.spec.ts",
       "next.config.spec.ts",
       "src/**/*.fork.spec.{ts,tsx}",

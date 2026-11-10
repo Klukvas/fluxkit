@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -22,6 +22,7 @@ const FORK_DELETES = new Set([
   "apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx",
   "apps/storefront/src/components/header-footer-defaults/",
   "apps/storefront/src/config/slots.upstream.spec.ts",
+  "apps/storefront/src/components/cards/custom.upstream.spec.ts",
   "apps/storefront/src/lib/home-template-default.upstream.spec.ts",
   // Deleted with the creation of the fork marker `.fluxkit-fork` (the guide's step 0).
   "apps/storefront/src/fork-marker.upstream.spec.ts",
@@ -65,4 +66,27 @@ describe("docs/customization.md (plan B5)", () => {
   it("lists as fork-created only paths the guide names (they may exist in a fork that followed it)", () => {
     for (const path of FORK_CREATES) expect(paths, path).toContain(path);
   });
+
+  it("names every upstream-only spec in the list of section 0, step 3, and nothing else there (the list cannot go stale)", () => {
+    const step = doc.slice(doc.indexOf("## 0."), doc.indexOf("## 1."));
+    const listed = repositoryPaths(step).filter(isUpstreamSpec).sort();
+    // On disk: every one must be listed (in a fork that followed the guide, some are gone: still listed, never unlisted).
+    for (const path of upstreamSpecsOnDisk()) expect(listed, path).toContain(path);
+    // The list and FORK_DELETES name the same upstream-only specs.
+    expect(listed).toEqual([...FORK_DELETES].filter(isUpstreamSpec).sort());
+  });
 });
+
+function isUpstreamSpec(path: string): boolean {
+  return /\.upstream\.spec\.[cm]?[jt]sx?$/.test(path);
+}
+
+/** Every `*.upstream.spec.*` file under `apps/` and `packages/` (no dependencies or build output). */
+function upstreamSpecsOnDisk(): string[] {
+  return ["apps", "packages"].flatMap((top) =>
+    readdirSync(join(repoRoot, top), { recursive: true, encoding: "utf8" })
+      .map((path) => `${top}/${path.split(sep).join("/")}`)
+      .filter((path) => !/\/(node_modules|dist|\.next|\.turbo)\//.test(path))
+      .filter(isUpstreamSpec),
+  );
+}
