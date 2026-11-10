@@ -38,6 +38,7 @@ Upstream creates these once and never edits them again, so merging upstream neve
 - `apps/storefront/src/messages-extra/uk.json`, `apps/storefront/src/messages-extra/en.json` (`{}`)
 - `apps/storefront/src/config/fonts.ts` (no fonts)
 - `apps/storefront/src/config/brand.ts` (text logo, nothing else)
+- `apps/storefront/src/config/custom-sections.ts` (no custom home section)
 - `packages/theme/src/admin-overrides.css` (no rules)
 - files a fork adds: its pictures under `apps/storefront/public/`, the admin favicon in `apps/admin/public/`
 
@@ -47,11 +48,20 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 ## 3. Layout and composition (what exists today)
 
 - Home page sections and their order: `apps/storefront/src/config/home.ts` (upstream-owned; `apps/storefront/README.md` "Layout composition is configuration").
+  Contract: `docs/contracts/home-sections.md`.
+  - Width per section: `width: "full"` puts a section on a full-bleed band of the `muted` token surface, its content still in the content width (a hero
+    in such a band is a full-bleed hero); `contained` is the default. No hero text overlay.
+  - A section of the fork's own (for example a brand strip): write a SERVER component in a new file (it receives `CustomSectionProps` from
+    `apps/storefront/src/lib/custom-sections.ts`: id, heading id, locale, translator, first-on-page), register it by name in the fork-owned
+    `apps/storefront/src/config/custom-sections.ts`, add `{ kind: "custom", id: "home-brands", name: "brandStrip" }` to `home.ts` and its texts under
+    `custom.` in `apps/storefront/src/messages-extra/uk.json` and `en.json`. A typo in the name fails `next dev` and the tests (in production the section is
+    left out and logged). Check: `pnpm --filter @fluxkit/storefront test` (the unit suite also runs once with a filled registry,
+    `apps/storefront/vitest.home-fork.config.ts`).
 - Header and footer links: `apps/storefront/src/layout/navigation.ts`; shop pages and contacts: `apps/storefront/src/config/shop-pages.ts`,
   `apps/storefront/src/config/contacts.ts`; trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
-- **Not yet available** (plan WP4 and WP5): product card variants and the list/grid toggle (L2, L5), header and footer block configuration (L3), full-width
-  and custom home sections (L4), slots for cards, header and footer (S1). Until they land, those changes are core edits.
+- **Not yet available** (plan WP4 and WP5): product card variants and the list/grid toggle (L2, L5), header and footer block configuration (L3), slots for cards,
+  header and footer (S1). Until they land, those changes are core edits.
 
 ## 4. Known limits
 
@@ -77,5 +87,6 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 ## 6. Contracts
 
 What a fork may rely on across minor releases: `docs/contracts/README.md`, in particular `docs/contracts/branding.md` (this brand config),
+`docs/contracts/home-sections.md` (home section width and custom sections),
 `docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md` (environment and features) and `docs/contracts/email-templates.md`.
 Anything not listed there is internal.

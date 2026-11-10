@@ -7,6 +7,7 @@ Existing:
 - `branding.md` - the storefront brand config `apps/storefront/src/config/brand.ts` (fork-owned): logo, icons, theme colour, default social picture.
 - `card-registry.md` - storefront product card registry (fork-owned `cards/custom.ts`, `ProductCardModel`) and the `view` URL parameter (draft).
 - `config.md` - environment variables and the feature package contract.
+- `home-sections.md` - storefront home sections: the per-section `width` and the `custom` kind with the fork-owned `config/custom-sections.ts` (draft).
 - `events.md` - domain events (the outbox), the handler metadata key, the delivery rules and the order ports.
 - `email-templates.md` - mail templates: the template contract, the registration metadata, the override rule and the built-in keys.
 - `personal-data-export.md` - the personal data export document `fluxkit.personal-data-export/v1` (builder only; no route yet).
