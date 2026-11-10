@@ -8,16 +8,22 @@
  *
  * NOT here: which shop pages are linked (`inFooter` in `config/shop-pages.ts`), the legal pages (`config/legal.ts`), the
  * contacts (`config/contacts.ts`), whether the theme switch exists at all (`showToggle` in `config/theme.ts`), the texts
- * (`messages-overrides`), columns side by side, headings, social or payment icons (a code edit of `components/site-footer.tsx`).
- * The "powered by" line is not a block: it always closes the footer (the template's attribution; changing it is an owner decision).
+ * (`messages-overrides`), columns side by side, social links (external URLs are not allowed here) or payment icons (a code
+ * edit of `components/site-footer.tsx`). The "powered by" line is not a block: it always closes the footer (the template's
+ * attribution; changing it is an owner decision).
  *
- * Example: the copyright on top, the legal pages first, then the shop pages and the fork's own links:
+ * Besides the named blocks, `{ kind: "text", textKey }` adds a plain line of text (for example the accepted payment methods), and
+ * a link group may carry a `headingKey` (a small heading above its list). New texts go into `src/messages-extra/{uk,en}.json`
+ * under `custom.`; changed template texts into `src/messages-overrides/{uk,en}.json`.
+ *
+ * Example: the copyright on top, the legal pages first (with a heading), then the shop pages and the fork's own links, a
+ * payments line (both `custom.` keys in `messages-extra`):
  *
  *   export const footerConfig: FooterConfig = {
- *     blocks: ["copyright", "navigation", "contacts", "themeSwitch"],
+ *     blocks: ["copyright", "navigation", { kind: "text", textKey: "custom.footer.payments" }, "contacts", "themeSwitch"],
  *     navigation: {
  *       groups: [
- *         { kind: "legal" },
+ *         { kind: "legal", headingKey: "custom.footer.legal" },
  *         { kind: "shopPages" },
  *         { kind: "links", links: [{ labelKey: "nav.catalog", href: "/catalog" }] },
  *       ],

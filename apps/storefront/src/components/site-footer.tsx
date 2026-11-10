@@ -1,7 +1,7 @@
 import type { ThemeMode } from "@fluxkit/theme";
-import { Container, type Locale, type Translator } from "@fluxkit/ui";
+import { Container, textStyles, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { footerConfig } from "../config/footer";
 import { themeConfig } from "../config/theme";
 import { footerView, type FooterBlockView, type FooterConfig } from "../layout/footer-layout";
@@ -42,9 +42,16 @@ function block(
     case "navigation":
       return (
         <nav key={view.kind} aria-label={t("footer.nav.label")}>
-          {view.groups.map((links, index) => (
-            <LinkList key={index} links={links} locale={locale} t={t} />
-          ))}
+          {view.groups.map((group, index) =>
+            group.headingKey === null ? (
+              <LinkList key={index} links={group.links} locale={locale} t={t} />
+            ) : (
+              <Fragment key={index}>
+                <h2 className={`${textStyles.navGroupTitle} px-2`}>{t(group.headingKey)}</h2>
+                <LinkList links={group.links} locale={locale} t={t} />
+              </Fragment>
+            ),
+          )}
         </nav>
       );
     case "contacts":
@@ -64,6 +71,8 @@ function block(
       );
     case "copyright":
       return <p key={view.kind}>{t("footer.copyright", { year, name: t("site.name") })}</p>;
+    case "text":
+      return <p key={`text:${view.textKey}`}>{t(view.textKey)}</p>;
     default: {
       const unknown: never = view;
       throw new RangeError(`Unknown footer block ${JSON.stringify(unknown)}`);

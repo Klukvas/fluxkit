@@ -4,8 +4,10 @@ import { messagesByLocale } from "../messages";
 import { sentinelTranslator } from "../components/test-helpers";
 import {
   HEADER_CATEGORY_LIMIT_MAX,
+  assertHeaderConfig,
   headerConfigProblems,
   headerView,
+  menuPanelAlign,
   type HeaderConfig,
 } from "./header-layout";
 
@@ -45,29 +47,54 @@ describe("headerView", () => {
       { key: "c:a b/c", href: "/uk/c/a%20b%2Fc", label: "Odd" },
       { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
     ];
-    expect(view[0]).toEqual({ kind: "menu", links });
+    expect(view[0]).toEqual({ kind: "menu", links, align: "start" });
     expect(view[2]).toEqual({ kind: "navigation", links });
     expect(view[4]).toEqual({ kind: "controls", controls: ["language", "cart", "account"] });
   });
 
   it("follows another order, leaves out blocks that are not listed, and orders the controls", () => {
     const view = headerView(
-      { ...base, blocks: ["logo", "controls", "search"], controls: ["cart", "language"] },
+      { ...base, blocks: ["search", "logo", "controls"], controls: ["cart", "language"] },
       { locale: "en", t, categories, searchEnabled: true },
     );
     expect(view).toEqual([
+      { kind: "search" },
       { kind: "logo" },
       { kind: "controls", controls: ["cart", "language"] },
-      { kind: "search" },
     ]);
   });
 
-  it("drops the search block when the shop has no search, and a control group with no controls", () => {
-    const view = headerView(
-      { ...base, controls: [] },
-      { locale: "en", t, categories, searchEnabled: false },
-    );
-    expect(view.map((block) => block.kind)).toEqual(["menu", "logo", "navigation"]);
+  it("drops the search block when the shop has no search", () => {
+    const view = headerView(base, { locale: "en", t, categories, searchEnabled: false });
+    expect(view.map((block) => block.kind)).toEqual(["menu", "logo", "navigation", "controls"]);
+  });
+
+  it("aligns the menu's panel with the start in the first half of the row and with the end in the second half", () => {
+    const align = (blocks: HeaderConfig["blocks"]) =>
+      headerView({ ...base, blocks }, { locale: "en", t, categories, searchEnabled: true }).find(
+        (block) => block.kind === "menu",
+      );
+    expect(align(["menu", "logo", "navigation", "search", "controls"])).toMatchObject({
+      align: "start",
+    });
+    expect(align(["logo", "menu", "navigation", "search", "controls"])).toMatchObject({
+      align: "start",
+    });
+    expect(align(["logo", "navigation", "search", "menu", "controls"])).toMatchObject({
+      align: "end",
+    });
+    expect(align(["logo", "navigation", "menu"])).toMatchObject({ align: "end" });
+    expect(menuPanelAlign(base)).toBe("start");
+  });
+
+  it("throws on a structural problem at render, so a fork that skipped the tests fails loudly", () => {
+    expect(() =>
+      headerView(
+        { ...base, blocks: ["controls", "logo"] },
+        { locale: "en", t, categories, searchEnabled: true },
+      ),
+    ).toThrow(/config\/header\.ts is invalid: header block "controls" must be the last block/);
+    expect(() => assertHeaderConfig(base)).not.toThrow();
   });
 
   it("shows only the configured links when the categories could not be read, and no empty navigation", () => {
@@ -75,6 +102,7 @@ describe("headerView", () => {
     expect(degraded[0]).toEqual({
       kind: "menu",
       links: [{ key: "/catalog", href: "/en/catalog", label: "§nav.catalog" }],
+      align: "start",
     });
     const nothing = headerView(
       { ...base, navigation: { categoryLimit: 0, links: [] } },
@@ -132,5 +160,38 @@ describe("headerConfigProblems", () => {
         { labelKey: "nav.catalog", href: "/catalog" },
       ]),
     ).toEqual(['header link "/catalog" is listed more than once']);
+  });
+});
+
+describe("headerConfigProblems: required and supported shapes", () => {
+  const problems = (config: HeaderConfig) => headerConfigProblems(config, keysOf("en"));
+
+  it("refuses an empty block list and a header without the logo", () => {
+    expect(problems({ ...base, blocks: [] })).toEqual([
+      "header lists no blocks",
+      'header block "logo" is required (the link to the home page)',
+    ]);
+    expect(problems({ ...base, blocks: ["menu", "navigation", "controls"] })).toEqual([
+      'header block "logo" is required (the link to the home page)',
+    ]);
+  });
+
+  it("refuses the controls block anywhere but last, and listed with no controls", () => {
+    expect(problems({ ...base, blocks: ["controls", "logo"] })).toEqual([
+      'header block "controls" must be the last block (the row pushes it to the end and its dropdowns open towards the start)',
+    ]);
+    expect(problems({ ...base, controls: [] })).toEqual([
+      'header block "controls" is listed but `controls` is empty: leave the block out instead',
+    ]);
+    expect(problems({ ...base, blocks: ["logo", "search"], controls: [] })).toEqual([]);
+  });
+
+  it("checks message keys only when it gets them (at render the translator throws on an unknown key)", () => {
+    const unknownKey: HeaderConfig = {
+      ...base,
+      navigation: { categoryLimit: 1, links: [{ labelKey: "nav.nope", href: "/catalog" }] },
+    };
+    expect(headerConfigProblems(unknownKey, null)).toEqual([]);
+    expect(problems(unknownKey)).toHaveLength(1);
   });
 });

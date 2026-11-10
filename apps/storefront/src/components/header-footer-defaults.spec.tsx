@@ -2,8 +2,11 @@
 // markup byte for byte. A client fork that edits `config/header.ts`, `config/footer.ts` or `config/brand.ts` deletes this file
 // (`docs/customization.md`); it is left out of the fork run (`vitest.brand-fork.config.ts`), whose filled configs render other
 // markup on purpose.
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+//
+// The frozen files pin the WHOLE markup, @fluxkit/ui classes (`Container`) and the islands' markup included: an intended
+// change there (a ui class, a header island) needs them regenerated, after checking the diff is the intended one:
+//   pnpm --filter @fluxkit/storefront exec vitest run src/components/header-footer-defaults.spec.tsx -u
+// A change to the header or footer composition itself must NOT be regenerated away: defaults stay byte for byte.
 import type { Locale } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -80,20 +83,19 @@ function renderFrame(locale: Locale): { header: string; footer: string } {
   return { header: html.slice(0, footerStart), footer: html.slice(footerStart) };
 }
 
-const frozenDirectory = join(import.meta.dirname, "header-footer-defaults");
-const frozen = (name: string) => readFileSync(join(frozenDirectory, name), "utf8").trimEnd();
-const bytes = (text: string) => new TextEncoder().encode(text).length;
-
 describe("default header and footer markup (frozen before the L3 config, byte for byte)", () => {
   for (const locale of ["uk", "en"] as const) {
-    it(`renders the frozen header and footer in ${locale}`, () => {
+    it(`renders the frozen header and footer in ${locale}`, async () => {
       const { header, footer } = renderFrame(locale);
       expect(header.startsWith("<header")).toBe(true);
       expect(footer.endsWith("</footer>")).toBe(true);
-      expect(header).toBe(frozen(`header.${locale}.txt`));
-      expect(footer).toBe(frozen(`footer.${locale}.txt`));
-      expect(bytes(header)).toBe(bytes(frozen(`header.${locale}.txt`)));
-      expect(bytes(footer)).toBe(bytes(frozen(`footer.${locale}.txt`)));
+      // Exact file contents (plus one newline at the end): a missing or different file fails, also in CI.
+      await expect(`${header}\n`).toMatchFileSnapshot(
+        `header-footer-defaults/header.${locale}.txt`,
+      );
+      await expect(`${footer}\n`).toMatchFileSnapshot(
+        `header-footer-defaults/footer.${locale}.txt`,
+      );
     });
   }
 });

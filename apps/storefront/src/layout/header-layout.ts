@@ -1,9 +1,9 @@
 /**
  * The header as data (plan 2026-11-08-design-changeability.md, L3; contract `docs/contracts/header-footer.md`): the types of
  * the fork-owned `config/header.ts`, the pure view `components/site-header.tsx` renders, and the checks its spec runs. Only
- * what needs no change of the header's CSS structure is configurable: which blocks, in which order, the order of the controls
- * at the end, the number of categories and the links after them. A centred header, a second row or an announcement bar is a
- * code edit of `site-header.tsx`.
+ * what needs no change of the header's CSS structure is configurable: which blocks, in which order (with `controls` last), the
+ * order of the controls, the number of categories and the links after them. A centred header, a second row or an announcement
+ * bar is a code edit of `site-header.tsx`.
  */
 import type { Locale, Translator } from "@fluxkit/ui";
 import { isPlainStorefrontPath, localizedHref } from "../lib/locale-path";
@@ -17,8 +17,9 @@ export interface NavigationCategory {
 
 /**
  * The parts of the header row. `menu` is the navigation below `xl` (a disclosure button), `navigation` the same links inline
- * from `xl`: the two go together. `search` shows only when the shop has search on (`GET /store/config`). `controls` is the
- * group at the end of the row (`.fk-header-end`, pushed to the end), holding the `controls` in their order.
+ * from `xl`: the two go together. `logo` is the link to the home page (required). `search` shows only when the shop has
+ * search on (`GET /store/config`). `controls` is the group at the end of the row (`.fk-header-end`, pushed to the end by
+ * `ms-auto`, its dropdowns open towards the start), holding the `controls` in their order: it must be the LAST block.
  */
 export type HeaderBlockName = "menu" | "logo" | "navigation" | "search" | "controls";
 
@@ -28,7 +29,7 @@ export type HeaderControlName = "language" | "cart" | "account";
 export interface HeaderConfig {
   /** The blocks of the header row, in order; a block that is not listed is not rendered. Each at most once. */
   blocks: readonly HeaderBlockName[];
-  /** The controls of the `controls` block, in order; each at most once. An empty list renders no group. */
+  /** The controls of the `controls` block, in order; each at most once; not empty while `controls` is listed. */
   controls: readonly HeaderControlName[];
   navigation: {
     /** Most top-level categories in the navigation, 0 to `HEADER_CATEGORY_LIMIT_MAX`; the rest are reachable through the catalog. */
@@ -48,17 +49,30 @@ export interface HeaderLink {
   label: string;
 }
 
+/** The side of its button a dropdown panel is aligned with (`HeaderDisclosure`). */
+export type PanelAlign = "start" | "end";
+
 export type HeaderBlockView =
-  | { kind: "menu"; links: readonly HeaderLink[] }
+  | { kind: "menu"; links: readonly HeaderLink[]; align: PanelAlign }
   | { kind: "logo" }
   | { kind: "navigation"; links: readonly HeaderLink[] }
   | { kind: "search" }
   | { kind: "controls"; controls: readonly HeaderControlName[] };
 
 /**
+ * Where the menu's panel opens: from a button in the first half of the configured row it extends towards the end
+ * (`start`-aligned, the default: the menu is the first block), from one in the second half towards the start (`end`-aligned),
+ * so the panel (`w-max min-w-48`) stays inside a phone's width either way.
+ */
+export function menuPanelAlign(config: HeaderConfig): PanelAlign {
+  return config.blocks.indexOf("menu") < config.blocks.length / 2 ? "start" : "end";
+}
+
+/**
  * The header's blocks as `SiteHeader` renders them, in config order. Left out: `search` when the shop has no search, `menu`
- * and `navigation` when there is no link at all (no empty landmark), `controls` when it holds none. `categories` is `null`
- * when the API could not be read: the configured links still show.
+ * and `navigation` when there is no link at all (no empty landmark). `categories` is `null` when the API could not be read:
+ * the configured links still show. A config with a structural problem throws here (`assertHeaderConfig`), so a fork that
+ * skipped the tests still fails loudly on the first page instead of rendering a broken header.
  */
 export function headerView(
   config: HeaderConfig,
@@ -69,6 +83,7 @@ export function headerView(
     searchEnabled: boolean;
   },
 ): HeaderBlockView[] {
+  assertHeaderConfig(config);
   const { locale, t } = input;
   const links: HeaderLink[] = [
     ...(input.categories ?? []).slice(0, config.navigation.categoryLimit).map((category) => ({
@@ -86,8 +101,10 @@ export function headerView(
   for (const name of config.blocks) {
     switch (name) {
       case "menu":
+        if (links.length > 0) blocks.push({ kind: "menu", links, align: menuPanelAlign(config) });
+        break;
       case "navigation":
-        if (links.length > 0) blocks.push({ kind: name, links });
+        if (links.length > 0) blocks.push({ kind: "navigation", links });
         break;
       case "logo":
         blocks.push({ kind: "logo" });
@@ -96,8 +113,7 @@ export function headerView(
         if (input.searchEnabled) blocks.push({ kind: "search" });
         break;
       case "controls":
-        if (config.controls.length > 0)
-          blocks.push({ kind: "controls", controls: config.controls });
+        blocks.push({ kind: "controls", controls: config.controls });
         break;
       default: {
         const unknown: never = name;
@@ -113,12 +129,20 @@ export function repeatedValues<T>(values: readonly T[]): T[] {
   return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))];
 }
 
-/** What is wrong with a header config (empty when nothing is): run by `layout/header-layout.spec.ts` on `config/header.ts`. */
+/**
+ * What is wrong with a header config (empty when nothing is): run by `layout/header-layout.spec.ts` on `config/header.ts`
+ * with the message keys of each locale, and at render without them (`messageKeys` `null`: the translator already throws on
+ * an unknown key).
+ */
 export function headerConfigProblems(
   config: HeaderConfig,
-  messageKeys: ReadonlySet<string>,
+  messageKeys: ReadonlySet<string> | null,
 ): string[] {
   const problems: string[] = [];
+  if (config.blocks.length === 0) problems.push("header lists no blocks");
+  if (!config.blocks.includes("logo")) {
+    problems.push('header block "logo" is required (the link to the home page)');
+  }
   for (const block of repeatedValues(config.blocks)) {
     problems.push(`header block "${block}" is listed more than once`);
   }
@@ -130,6 +154,18 @@ export function headerConfigProblems(
       'header blocks "menu" and "navigation" go together: the menu is the navigation below `xl`, the inline list from `xl`',
     );
   }
+  if (config.blocks.includes("controls")) {
+    if (config.controls.length === 0) {
+      problems.push(
+        'header block "controls" is listed but `controls` is empty: leave the block out instead',
+      );
+    }
+    if (config.blocks.at(-1) !== "controls") {
+      problems.push(
+        'header block "controls" must be the last block (the row pushes it to the end and its dropdowns open towards the start)',
+      );
+    }
+  }
   const limit = config.navigation.categoryLimit;
   if (!Number.isInteger(limit) || limit < 0 || limit > HEADER_CATEGORY_LIMIT_MAX) {
     problems.push(
@@ -140,7 +176,7 @@ export function headerConfigProblems(
     if (!isPlainStorefrontPath(link.href)) {
       problems.push(`header link "${link.href}" is not a plain storefront path`);
     }
-    if (!messageKeys.has(link.labelKey)) {
+    if (messageKeys !== null && !messageKeys.has(link.labelKey)) {
       problems.push(`header link "${link.href}": message key "${link.labelKey}" does not exist`);
     }
   }
@@ -148,4 +184,12 @@ export function headerConfigProblems(
     problems.push(`header link "${href}" is listed more than once`);
   }
   return problems;
+}
+
+/** Throws with every structural problem of a header config (see `headerConfigProblems`). */
+export function assertHeaderConfig(config: HeaderConfig): void {
+  const problems = headerConfigProblems(config, null);
+  if (problems.length > 0) {
+    throw new Error(`config/header.ts is invalid: ${problems.join("; ")}`);
+  }
 }

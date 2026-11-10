@@ -53,6 +53,7 @@ function header(config: HeaderConfig, searchEnabled = true): string {
 function footer(
   config: FooterConfig,
   shopLinks = [{ labelKey: "shopPages.faq.title", href: "/faq" }],
+  showThemeSwitch = true,
 ) {
   return renderToStaticMarkup(
     <SiteFooter
@@ -60,7 +61,7 @@ function footer(
       t={t}
       year={2026}
       themeMode="light"
-      showThemeSwitch
+      showThemeSwitch={showThemeSwitch}
       shopLinks={shopLinks}
       contacts={contacts}
       config={config}
@@ -121,7 +122,7 @@ describe("SiteHeader follows config/header.ts", () => {
     expect(html).not.toContain(markers.account);
     expect(html).toContain(markers.cart);
     const noControls = header({
-      blocks: ["logo", "controls"],
+      blocks: ["logo"],
       controls: [],
       navigation: { categoryLimit: 0, links: [] },
     });
@@ -152,6 +153,33 @@ describe("SiteHeader follows config/header.ts", () => {
     expect(html.match(/<nav aria-label="§nav\.main\.label"/g)).toHaveLength(2);
   });
 
+  it("opens the menu's panel towards the end from the first half of the row and towards the start from the second half; the controls' panels always towards the start", () => {
+    const panelOf = (html: string, marker: string) =>
+      /class="fk-menu-panel (start|end)-0/.exec(html.slice(html.indexOf(marker)))?.[1];
+    const navigation = { categoryLimit: 2, links: [] };
+    const orders: [HeaderConfig["blocks"], "start" | "end"][] = [
+      [["menu", "logo", "navigation", "search", "controls"], "start"],
+      [["logo", "menu", "navigation", "search", "controls"], "start"],
+      [["logo", "navigation", "search", "menu", "controls"], "end"],
+      [["logo", "search", "navigation", "menu", "controls"], "end"],
+    ];
+    for (const [blocks, expected] of orders) {
+      const html = header({ blocks, controls: ["language", "account", "cart"], navigation });
+      expect(panelOf(html, markers.menu), blocks.join()).toBe(expected);
+      expect(panelOf(html, markers.language), blocks.join()).toBe("end");
+    }
+  });
+
+  it("refuses a config with a structural problem at render (a fork that skipped the tests)", () => {
+    expect(() =>
+      header({
+        blocks: ["controls", "logo"],
+        controls: ["cart"],
+        navigation: { categoryLimit: 0, links: [] },
+      }),
+    ).toThrow(/config\/header\.ts is invalid/);
+  });
+
   it("shows no search box when the shop has search off, whatever the config lists", () => {
     const html = header(
       { blocks: ["logo", "search"], controls: [], navigation: { categoryLimit: 0, links: [] } },
@@ -163,7 +191,7 @@ describe("SiteHeader follows config/header.ts", () => {
 
   it("keeps every text a message", () => {
     const html = header({
-      blocks: ["controls", "navigation", "logo", "menu", "search"],
+      blocks: ["navigation", "logo", "search", "menu", "controls"],
       controls: ["language", "account", "cart"],
       navigation: { categoryLimit: 3, links: [{ labelKey: "nav.catalog", href: "/catalog" }] },
     });
@@ -207,6 +235,7 @@ describe("SiteFooter follows config/footer.ts", () => {
     const html = footer(
       { blocks: ["copyright", "navigation"], navigation: { groups: [{ kind: "shopPages" }] } },
       [],
+      false,
     );
     expect(html).not.toContain("<nav");
     expect(html).not.toContain("<ul");
@@ -223,5 +252,27 @@ describe("SiteFooter follows config/footer.ts", () => {
     });
     expect(leftoverText(html)).toBe("");
     for (const value of textAttributes(html)) expect(value.startsWith("§"), value).toBe(true);
+  });
+
+  it("renders text lines from messages in their place and a heading above a link group, a heading only where configured", () => {
+    const html = footer({
+      blocks: [
+        "navigation",
+        { kind: "text", textKey: "footer.nav.label" },
+        "themeSwitch",
+        "copyright",
+      ],
+      navigation: {
+        groups: [{ kind: "legal", headingKey: "legal.privacy.title" }, { kind: "shopPages" }],
+      },
+    });
+    expect(html).toMatch(
+      /<nav aria-label="§footer\.nav\.label"><h2 class="[^"]*text-sm[^"]*px-2">§legal\.privacy\.title<\/h2><ul><li><a href="\/en\/legal\/privacy">/,
+    );
+    expect(html.match(/<h2/g)).toHaveLength(1);
+    expect(html).toContain("</nav><p>§footer.nav.label</p><form");
+    expect(() => footer({ blocks: ["copyright"], navigation: { groups: [] } })).toThrow(
+      /config\/footer\.ts is invalid: footer block "themeSwitch" is missing/,
+    );
   });
 });

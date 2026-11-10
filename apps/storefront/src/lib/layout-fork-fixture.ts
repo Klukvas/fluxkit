@@ -21,10 +21,16 @@ export const headerConfig: HeaderConfig = {
 };
 
 export const footerConfig: FooterConfig = {
-  blocks: ["copyright", "navigation", "themeSwitch", "contacts"],
+  blocks: [
+    "copyright",
+    "navigation",
+    { kind: "text", textKey: "site.description" },
+    "themeSwitch",
+    "contacts",
+  ],
   navigation: {
     groups: [
-      { kind: "legal" },
+      { kind: "legal", headingKey: "footer.nav.label" },
       { kind: "shopPages" },
       { kind: "links", links: [{ labelKey: "nav.catalog", href: "/catalog" }] },
     ],

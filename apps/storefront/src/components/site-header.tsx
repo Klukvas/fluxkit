@@ -9,6 +9,7 @@ import {
   type HeaderControlName,
   type HeaderLink,
   type NavigationCategory,
+  type PanelAlign,
 } from "../layout/header-layout";
 import { AccountLink } from "./account-link";
 import { BrandLogo } from "./brand-logo";
@@ -21,12 +22,20 @@ import { SearchBox } from "./search-box";
 
 export type { NavigationCategory };
 
-function MenuBlock({ links, t }: { links: readonly HeaderLink[]; t: Translator }) {
+function MenuBlock({
+  links,
+  align,
+  t,
+}: {
+  links: readonly HeaderLink[];
+  align: PanelAlign;
+  t: Translator;
+}) {
   return (
     <HeaderDisclosure
       label={t("nav.menu")}
       summary={<MenuIcon />}
-      align="start"
+      align={align}
       className="shrink-0 xl:hidden"
     >
       <nav aria-label={t("nav.main.label")}>
@@ -78,7 +87,7 @@ function control(name: HeaderControlName): ReactNode {
 function block(view: HeaderBlockView, locale: Locale, t: Translator): ReactNode {
   switch (view.kind) {
     case "menu":
-      return <MenuBlock key={view.kind} links={view.links} t={t} />;
+      return <MenuBlock key={view.kind} links={view.links} align={view.align} t={t} />;
     case "logo":
       return <BrandLogo key={view.kind} locale={locale} t={t} />;
     case "navigation":
