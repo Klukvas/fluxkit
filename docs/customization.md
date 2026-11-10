@@ -52,8 +52,12 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   reorder or leave out the blocks of the one header row (menu button, logo, navigation, search box, controls), reorder or leave out the
   controls at the end (language, cart, account), set how many top-level categories show (0 to 12) and which links follow them
   (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`).
+  Supported orders: the logo is required, `controls` (when listed) is the last block, menu and navigation go together; the menu's dropdown
+  opens towards the end from the first half of the row and towards the start from the second half (for example logo left, menu right).
+  Checked by unit tests on the rendered classes, not in a real browser: look at a reordered header on a phone before shipping it.
 - Footer: `apps/storefront/src/config/footer.ts` (fork-owned, same contract): reorder or leave out the blocks (navigation, contacts,
-  theme switch, copyright) and the link groups of the navigation (shop pages, legal pages, the fork's own lists). Which shop pages are
+  theme switch, copyright), add plain text lines from messages (for example the accepted payment methods), and order the link groups of
+  the navigation (shop pages, legal pages, the fork's own lists of internal paths), each with an optional small heading. Which shop pages are
   linked stays `inFooter` in `apps/storefront/src/config/shop-pages.ts`; the contacts are `apps/storefront/src/config/contacts.ts`; whether
   the theme switch exists is `showToggle` in `apps/storefront/src/config/theme.ts` (the footer must list `themeSwitch` while it is true).
 - Check: `pnpm --filter @fluxkit/storefront test` (`config/header` and `config/footer` are checked by `apps/storefront/src/layout/header-layout.spec.ts`
@@ -61,8 +65,9 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   delete `apps/storefront/src/components/header-footer-defaults.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
   a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled configs (`apps/storefront/vitest.brand-fork.config.ts`).
 - **Needs a code edit** (core files `apps/storefront/src/components/site-header.tsx`, `apps/storefront/src/components/site-footer.tsx`, `apps/storefront/src/app/globals.css`):
-  a centred header, a second header row or an announcement bar (plan target 3 is NOT reached by design), footer columns side by side,
-  headings in the footer, social or payment icons, the "powered by" line (always last). The `header.top` and `footer.columns` slots are planned (plan WP5), **not yet available**.
+  a centred header, a second header row or an announcement bar (plan target 3 is NOT reached by design), footer columns side by side
+  (plan target 5, the four-column footer, waits for the `footer.columns` slot or a CSS edit), social links (external URLs are refused
+  by design), payment icons (pictures), the "powered by" line (always last). The `header.top` and `footer.columns` slots are planned (plan WP5), **not yet available**.
 - Header and footer link sources besides the configs: the legal pages in `apps/storefront/src/config/legal.ts`; account and cart targets in
   `apps/storefront/src/layout/navigation.ts` (upstream-owned); trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
