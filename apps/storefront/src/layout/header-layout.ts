@@ -26,7 +26,20 @@ export type HeaderBlockName = "menu" | "logo" | "navigation" | "search" | "contr
 /** The client islands of the controls group: the language list, the cart icon with its count, the account menu. */
 export type HeaderControlName = "language" | "cart" | "account";
 
+/**
+ * FORK (CORE-EDIT R3, not in the upstream contract): the shape of the header from `lg`. `row` (the default, also when the
+ * field is absent) is the template's one row. `centred` puts the logo in the middle with the inline navigation split around
+ * it (first half before the logo, second half after it, then the controls) and the search box in a second, always visible row
+ * below; below `lg` it stays the template's one sticky row, with the search icon after the controls. `centred` places the
+ * blocks itself: the order of `blocks` only says which blocks exist (and must still be an accepted order).
+ */
+export const HEADER_LAYOUTS = ["row", "centred"] as const;
+
+export type HeaderLayoutName = (typeof HEADER_LAYOUTS)[number];
+
 export interface HeaderConfig {
+  /** FORK (CORE-EDIT R3): default `row`; see `HEADER_LAYOUTS`. */
+  layout?: HeaderLayoutName;
   /** The blocks of the header row, in order; a block that is not listed is not rendered. Each at most once. */
   blocks: readonly HeaderBlockName[];
   /** The controls of the `controls` block, in order; each at most once; not empty while `controls` is listed. */
@@ -155,6 +168,10 @@ export function headerConfigProblems(
   messageKeys: ReadonlySet<string> | null,
 ): string[] {
   const problems: string[] = [];
+  const layout: unknown = config.layout;
+  if (layout !== undefined && !(HEADER_LAYOUTS as readonly unknown[]).includes(layout)) {
+    problems.push(`header layout must be one of ${HEADER_LAYOUTS.join(", ")}`);
+  }
   if (config.blocks.length === 0) problems.push("header lists no blocks");
   if (!config.blocks.includes("logo")) {
     problems.push('header block "logo" is required (the link to the home page)');

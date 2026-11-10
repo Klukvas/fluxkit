@@ -144,10 +144,37 @@
   .fk-header-search.fk-open {
     @apply block;
   }
+  /*
+   * FORK (CORE-EDIT R3): the centred header (`layout: "centred"` in config/header.ts, `centredRow` in
+   * components/site-header.tsx). From `lg` the row is a grid of three columns with the logo in the middle; the two side groups
+   * are flex rows (below `lg` they are `display: contents`, so the header stays the one sticky row of the mobile batch); the
+   * first half of the navigation sits against the logo; the search box is a second row over the whole width, always shown.
+   * After the rules of `.fk-header-row` and `.fk-header-search` on purpose: same layer, so the later rule wins.
+   */
+  .fk-header-side {
+    @apply contents lg:flex lg:min-w-0 lg:items-center lg:gap-x-4;
+  }
+  .fk-header-side-start nav {
+    @apply lg:ms-auto;
+  }
+  @media (width >= 64rem) {
+    .fk-header-centred {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    }
+  }
+  .fk-header-centred .fk-header-search {
+    @apply lg:col-span-full lg:mx-auto lg:w-full lg:max-w-3xl lg:min-w-0 lg:flex-none;
+  }
   /* Anchors and focused fields stop below the sticky header, and above a sticky bottom bar while one is on the page. */
   @media (width < 64rem) {
     html {
       scroll-padding-top: 5rem;
+    }
+    /* FORK (CORE-EDIT R3): an announcement bar in the `header.top` slot (`components/fork/announcement-bar.tsx`) makes the
+       sticky header taller: room for the row (61 px) and a bar of up to two lines. */
+    html:has([data-announcement-bar]) {
+      scroll-padding-top: 7rem;
     }
     html:has(.fk-sticky-bottom) {
       scroll-padding-bottom: 9rem;

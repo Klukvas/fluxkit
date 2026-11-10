@@ -1,4 +1,7 @@
 {
   "custom.card.sale": "Sale",
-  "custom.card.favourite": "Add {title} to favourites"
+  "custom.card.favourite": "Add {title} to favourites",
+  "custom.header.navigationMore": "More sections",
+  "custom.announcement.text": "Free delivery for orders over 2 000 ₴.",
+  "custom.announcement.link": "Delivery terms"
 }
