@@ -39,6 +39,7 @@ Upstream creates these once and never edits them again, so merging upstream neve
 - `apps/storefront/src/config/fonts.ts` (no fonts)
 - `apps/storefront/src/config/brand.ts` (text logo, nothing else)
 - `apps/storefront/src/config/custom-sections.ts` (no custom home section)
+- `apps/storefront/src/components/cards/custom.ts` (no card of the fork's own; `docs/contracts/card-registry.md`)
 - `packages/theme/src/admin-overrides.css` (no rules)
 - files a fork adds: its pictures under `apps/storefront/public/`, the admin favicon in `apps/admin/public/`
 
@@ -49,19 +50,26 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 
 - Home page sections and their order: `apps/storefront/src/config/home.ts` (upstream-owned; `apps/storefront/README.md` "Layout composition is configuration").
   Contract: `docs/contracts/home-sections.md`.
-  - Width per section: `width: "full"` puts a section on a full-bleed band of the `muted` token surface, its content still in the content width (a hero
-    in such a band is a full-bleed hero); `contained` is the default. No hero text overlay.
-  - A section of the fork's own (for example a brand strip): write a SERVER component in a new file (it receives `CustomSectionProps` from
-    `apps/storefront/src/lib/custom-sections.ts`: id, heading id, locale, translator, first-on-page), register it by name in the fork-owned
-    `apps/storefront/src/config/custom-sections.ts`, add `{ kind: "custom", id: "home-brands", name: "brandStrip" }` to `home.ts` and its texts under
-    `custom.` in `apps/storefront/src/messages-extra/uk.json` and `en.json`. A typo in the name fails `next dev` and the tests (in production the section is
-    left out and logged). Check: `pnpm --filter @fluxkit/storefront test` (the unit suite also runs once with a filled registry,
-    `apps/storefront/vitest.home-fork.config.ts`).
+  - A section of the fork's own (for example a brand strip or a full-bleed hero): write a SERVER component in a new file (it receives
+    `CustomSectionProps` from `apps/storefront/src/lib/custom-sections.ts`: id, heading id, locale, translator, first-on-page, width), register it by
+    name in the fork-owned `apps/storefront/src/config/custom-sections.ts`, add `{ kind: "custom", id: "home-brands", name: "brandStrip" }` to `home.ts`
+    and its texts under `custom.` in `apps/storefront/src/messages-extra/uk.json` and `en.json`.
+  - Width: `width: "full"` (custom sections only) renders the section edge to edge WITHOUT a container: the component draws its own surface with token
+    classes and keeps its content readable (for example `Container` of `@fluxkit/ui` inside a `bg-muted` band). `contained` is the default. The built-in
+    sections are contained only (no edge-to-edge layout yet); no hero text overlay. A component that throws takes the home page down (no per-section
+    error boundary): handle a failed read inside the component.
+  - Tests in the fork: run `pnpm --filter @fluxkit/storefront test`. `apps/storefront/src/components/home-config.spec.ts` checks the fork's real
+    `home.ts` against its real registry (a typo in a name fails it; `next dev` fails too, production logs and leaves the section out). The specs that pin
+    the template's default home page (`apps/storefront/src/lib/home-template-default.ts`) skip themselves once `home.ts` or the text overrides differ,
+    with the reason in their names: nothing to edit or delete. The upstream fork run (`apps/storefront/vitest.home-fork.config.ts`) uses upstream's
+    own fixture, not the fork's files: it proves upstream's specs survive such a fork; a fork neither needs nor edits it.
 - Header and footer links: `apps/storefront/src/layout/navigation.ts`; shop pages and contacts: `apps/storefront/src/config/shop-pages.ts`,
   `apps/storefront/src/config/contacts.ts`; trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
-- **Not yet available** (plan WP4 and WP5): product card variants and the list/grid toggle (L2, L5), header and footer block configuration (L3), slots for cards,
-  header and footer (S1). Until they land, those changes are core edits.
+- Product cards and the list/grid view (L2, L5): a fork overrides the `grid` or `list` card in the fork-owned
+  `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
+- **Not yet available** (plan WP4 and WP5): header and footer block configuration (L3; PR 249 is in review, not merged), slots for cards, header and footer (S1), a storefront tokens
+  overrides file. Until they land, those changes are core edits.
 
 ## 4. Known limits
 
@@ -87,6 +95,6 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 ## 6. Contracts
 
 What a fork may rely on across minor releases: `docs/contracts/README.md`, in particular `docs/contracts/branding.md` (this brand config),
-`docs/contracts/home-sections.md` (home section width and custom sections),
+`docs/contracts/home-sections.md` (home section width and custom sections), `docs/contracts/card-registry.md` (product cards and `?view=`),
 `docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md` (environment and features) and `docs/contracts/email-templates.md`.
 Anything not listed there is internal.
