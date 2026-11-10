@@ -1,3 +1,5 @@
+import { HorizontalListCard } from "./horizontal-list-card";
+import { PortraitGridCard } from "./portrait-grid-card";
 import type { CardRegistry } from "./types";
 
 /**
@@ -15,4 +17,11 @@ import type { CardRegistry } from "./types";
  *
  * A card is a server component that receives `CardProps` (a plain view model); it must not be a `'use client'` file.
  */
-export const customCards: CardRegistry = {};
+export const customCards: CardRegistry = {
+  // Reshape R1: the portrait card with the price pill, sale badge and favourite heart over the picture.
+  grid: {
+    Card: PortraitGridCard,
+    listClassName: "grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4",
+    maxEagerImages: 4,
+  },
+};

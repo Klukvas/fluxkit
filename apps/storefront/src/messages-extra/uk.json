@@ -1,1 +1,4 @@
-{}
+{
+  "custom.card.sale": "Знижка",
+  "custom.card.favourite": "Додати {title} до обраного"
+}
