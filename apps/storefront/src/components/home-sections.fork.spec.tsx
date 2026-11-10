@@ -40,9 +40,9 @@ describe("a fork's reshaped home page (full-width custom section first, a contai
   it("renders the full section edge to edge, flush under the header, with the surface it chose", () => {
     expect(
       html.startsWith(
-        '<div class="flex flex-col gap-12 pb-8"><h1 class="sr-only">' +
+        '<div class="flex flex-col gap-12 py-8"><h1 class="sr-only">' +
           messagesByLocale.en["site.name"] +
-          '</h1><div class="empty:hidden" data-home-width="full"><section aria-labelledby="home-brands-title" data-fork-brand-strip="" class="bg-muted py-8"><div class="mx-auto w-full max-w-6xl px-4">',
+          '</h1><div class="empty:hidden [[data-home-width=full]:not(:empty)+&amp;]:-mt-12 -mt-8" data-home-width="full"><section aria-labelledby="home-brands-title" data-fork-brand-strip="" class="bg-muted py-8"><div class="mx-auto w-full max-w-6xl px-4">',
       ),
     ).toBe(true);
     expect(html).not.toContain('<div class="mx-auto w-full max-w-6xl px-4"><div class="flex');

@@ -64,8 +64,10 @@ const container = '<div class="mx-auto w-full max-w-6xl px-4">';
 const stack = '<div class="flex flex-col gap-12 py-8">';
 const contained =
   '<div class="mx-auto w-full max-w-6xl px-4 empty:hidden" data-home-width="contained">';
-const full = '<div class="empty:hidden" data-home-width="full">';
-const fullAfterFull = '<div class="-mt-12 empty:hidden" data-home-width="full">';
+const pullUp = "[[data-home-width=full]:not(:empty)+&amp;]:-mt-12";
+const full = `<div class="empty:hidden ${pullUp}" data-home-width="full">`;
+const fullFirst = `<div class="empty:hidden ${pullUp} -mt-8" data-home-width="full">`;
+const fullLast = `<div class="empty:hidden ${pullUp} -mb-8" data-home-width="full">`;
 const wide: CustomSection = { ...strip, width: "full" };
 
 afterEach(() => {
@@ -107,12 +109,29 @@ describe("home section width", () => {
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
   });
 
-  it("puts a full section first flush under the header, and lets adjacent full sections touch (no strip between)", () => {
-    const html = render([wide, { ...wide, id: "strip-2" }, hero]);
-    expect(html.startsWith('<div class="flex flex-col gap-12 pb-8">')).toBe(true);
-    expect(html).toContain(`${full}<section aria-labelledby="strip-title"`);
-    expect(html).toContain(`${fullAfterFull}<section aria-labelledby="strip-2-title"`);
+  it("puts a full section first flush under the header, last flush on the footer, and lets adjacent ones touch", () => {
+    const html = render([wide, { ...wide, id: "strip-2" }, hero, { ...wide, id: "strip-3" }]);
+    // The stack keeps its padding; the first and last full frames pull over it.
+    expect(html.startsWith(stack)).toBe(true);
+    expect(html).toContain(`${fullFirst}<section aria-labelledby="strip-title"`);
+    // Every full frame carries the pull-up rule; it applies only after a full frame that rendered something.
+    expect(html).toContain(`${full}<section aria-labelledby="strip-2-title"`);
     expect(html).toContain(`${contained}<section aria-labelledby="hero-title"`);
+    expect(html).toContain(`${fullLast}<section aria-labelledby="strip-3-title"`);
+  });
+
+  it("ties the full frames' pulls to the stack's gap and padding (gap-12 / -mt-12, py-8 / -mt-8 and -mb-8)", () => {
+    const stackClasses = /^<div class="([^"]+)">/.exec(stack)?.[1]?.split(" ") ?? [];
+    const spacing = (prefix: string) =>
+      stackClasses.find((name) => name.startsWith(prefix))?.slice(prefix.length);
+    expect(spacing("gap-")).toBe("12");
+    expect(spacing("py-")).toBe("8");
+    expect(pullUp.endsWith(`:-mt-${spacing("gap-") ?? ""}`)).toBe(true);
+    expect(fullFirst).toContain(` -mt-${spacing("py-") ?? ""}"`);
+    expect(fullLast).toContain(` -mb-${spacing("py-") ?? ""}"`);
+    // The rendered stack is that class list, with and without full sections.
+    expect(render([hero, wide]).startsWith(stack)).toBe(true);
+    expect(render([hero]).startsWith(`${container}${stack}`)).toBe(true);
   });
 
   it("frames a skeleton, an error and an empty contained section; an empty frame hides itself (no extra gap)", () => {
@@ -178,7 +197,19 @@ describe("custom home sections", () => {
 
   it("hides the frame of a custom section that renders nothing", () => {
     const html = render([hero, { kind: "custom", id: "none", name: "nothing", width: "full" }]);
-    expect(html).toContain(`${full}</div>`);
+    expect(html).toContain(`${fullLast}</div>`);
+  });
+
+  it("pulls nothing over the header when a first full section renders nothing (the pull-up is a rendered-state rule)", () => {
+    const html = render([
+      { kind: "custom", id: "none", name: "nothing", width: "full" },
+      { ...wide, id: "strip-2" },
+      hero,
+    ]);
+    expect(html).toContain(`${fullFirst}</div>`);
+    // The next full frame has no unconditional pull: only the sibling rule, which needs a non-empty full frame before it.
+    expect(html).toContain(`${full}<section aria-labelledby="strip-2-title"`);
+    expect(html).not.toMatch(/class="(?:[^"]*\s)?-mt-12[\s"]/);
   });
 
   it("fails loudly in development and tests on a name the registry does not know", () => {

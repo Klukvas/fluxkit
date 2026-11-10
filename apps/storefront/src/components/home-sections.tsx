@@ -643,35 +643,50 @@ const sectionStack = "flex flex-col gap-12 py-8";
 /**
  * The frame of one section when the sections do not share one container (some section is `full`):
  * - `contained`: the same `Container` as the shared one (same content width and gutter, whatever the tokens).
- * - `full`: NO container: the section spans the window and decides its own inner width and surface. A full section right
- *   after another full one pulls up over the stack's gap (`-mt-12` = `gap-12`), so adjacent bands touch instead of showing a
- *   strip of page background between them.
- * `empty:hidden`: a section that renders nothing (no data, an empty custom section) leaves no frame and no extra gap.
+ * - `full`: NO container: the section spans the window and decides its own inner width and surface.
+ * The spacing of a `full` frame is tied to `sectionStack` (`gap-12 py-8`; `home-sections-layout.spec.tsx` checks the pair):
+ * - right after a full section that RENDERED something it pulls up over the stack's gap (`-mt-12`), so adjacent bands touch.
+ *   A sibling selector on the rendered frames decides it, so after an empty full section nothing is pulled up;
+ * - first on the page it pulls up over the stack's top padding (`-mt-8`): flush under the header;
+ * - last on the page it pulls down over the stack's bottom padding (`-mb-8`): flush on the footer.
+ * `empty:hidden`: a section that renders nothing (no data, an empty custom section) leaves no frame, no gap and no pull.
  */
 function SectionFrame({
   section,
-  afterFull,
+  first,
+  last,
   children,
 }: {
   section: HomeSection;
-  afterFull: boolean;
+  first: boolean;
+  last: boolean;
   children: ReactNode;
 }) {
-  return section.width === "full" ? (
-    <div className={afterFull ? "-mt-12 empty:hidden" : "empty:hidden"} data-home-width="full">
+  if (section.width !== "full") {
+    return (
+      <Container className="empty:hidden" data-home-width="contained">
+        {children}
+      </Container>
+    );
+  }
+  const className = [
+    "empty:hidden [[data-home-width=full]:not(:empty)+&]:-mt-12",
+    first ? "-mt-8" : null,
+    last ? "-mb-8" : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" ");
+  return (
+    <div className={className} data-home-width="full">
       {children}
     </div>
-  ) : (
-    <Container className="empty:hidden" data-home-width="contained">
-      {children}
-    </Container>
   );
 }
 
 /**
  * The page around its sections. Every section contained: one `Container` around the stack (the markup from before `width`
  * existed, byte for byte; frozen copies in `home-sections-default.spec.tsx`). Otherwise the stack spans the window and every
- * section has its own `SectionFrame`; a full section first sits flush under the header (no top padding).
+ * section has its own `SectionFrame`.
  */
 function SectionsLayout({
   sections,
@@ -684,16 +699,16 @@ function SectionsLayout({
 }) {
   checkHomeSections(sections);
   const ownFrames = sections.some((section) => section.width === "full");
-  const firstFull = sections[0]?.width === "full";
   const stack = (
-    <div className={firstFull ? "flex flex-col gap-12 pb-8" : sectionStack}>
+    <div className={sectionStack}>
       <HiddenPageHeading sections={sections} t={t} />
       {sections.map((section, index) =>
         ownFrames ? (
           <SectionFrame
             key={section.id}
             section={section}
-            afterFull={section.width === "full" && sections[index - 1]?.width === "full"}
+            first={index === 0}
+            last={index === sections.length - 1}
           >
             {renderSection(section, index)}
           </SectionFrame>
