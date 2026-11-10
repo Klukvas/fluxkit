@@ -1,3 +1,4 @@
+import { HorizontalCard } from "./horizontal-card";
 import { PortraitCard } from "./portrait-card";
 import type { CardRegistry } from "./types";
 
@@ -21,5 +22,10 @@ export const customCards: CardRegistry = {
     Card: PortraitCard,
     listClassName: "grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4",
     maxEagerImages: 4,
+  },
+  list: {
+    Card: HorizontalCard,
+    listClassName: "grid grid-cols-1 gap-4 xl:grid-cols-2",
+    maxEagerImages: 2,
   },
 };
