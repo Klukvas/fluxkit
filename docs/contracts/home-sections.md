@@ -15,13 +15,16 @@ texts and pictures are not. Changes to `config/home.ts` need a change under `doc
 | `width` on the built-in kinds (`hero`, `banners`, `categories`, `productRow`, `trust`, `richText`) | `"contained"`, optional | The only value (and the default) for now: these sections have no edge-to-edge layout (their cards, grids and the hero's rounded surface would touch the window's edges). Allowing `full` for one of them later is additive. |
 | `width` on `custom` | `"contained" \| "full"`, optional | Default `contained`. `HOME_SECTION_WIDTHS` lists the values. |
 | `contained` | - | The section sits in the page's content width (`Container` of `@fluxkit/ui`). With every section contained the page keeps ONE container around all sections: the markup from before `width` existed, byte for byte. |
-| `full` | - | The section renders WITHOUT a container: it spans the window edge to edge and chooses its own inner width and surface (for example a `bg-muted` band with `Container` inside; see `width` in `CustomSectionProps`). Once one section is `full`, every other section gets its own `Container`. A `full` section first on the page sits flush under the header; two adjacent `full` sections touch (no gap between them); every other pair keeps the stack's gap. |
+| `full` | - | The section renders WITHOUT a container: it spans the window edge to edge and chooses its own inner width and surface (for example a `bg-muted` band with `Container` inside; see `width` in `CustomSectionProps`). Once one section is `full`, every other section gets its own `Container`. A `full` section first on the page sits flush under the header, one last on the page sits flush on the footer (no strip of page background), and a `full` section right after a `full` section that rendered something touches it (no gap); every other pair keeps the stack's gap. |
 | `checkHomeSections(sections)` | `(sections: readonly HomeSection[]) => void` | Runs on every render of the home page. Throws on an unknown `width`, `full` on a built-in kind, a duplicate `id`, or a `custom` section whose `name` is not letters, digits and `-` starting with a letter. TypeScript refuses the same at compile time; the check covers casts and plain JavaScript. |
 
-A section that renders nothing (no data, a custom section returning `null`) leaves no frame and no gap. Known limits (spacing is decided from the
-config, not from what rendered): a `full` section right after a `full` section that rendered nothing still pulls up over the gap, and
-when a first `full` section renders nothing the next section starts without the stack's top padding. No hero text overlay, no other widths; a full-bleed
-hero today is a custom section (its own markup, `Hero` of `@fluxkit/ui` is a rounded card).
+A section that renders nothing (no data, a custom section returning `null`) leaves no frame, no gap and no pull: touching adjacent `full`
+sections is a rule on the rendered frames, so nothing is ever pulled over the header. Known limits (first and last are decided from the
+config): when the first `full` section renders nothing and a `full` section follows, that one starts below the stack's top padding (a
+strip of page background under the header); likewise a strip stays above the footer when the last `full` section renders nothing. No
+hero text overlay, no other widths; a full-bleed hero today is a custom section (its own markup, `Hero` of `@fluxkit/ui` is a rounded
+card). Such a hero's heading is an `h2` (`headingId`), and the page then gets a visually hidden `h1` with the shop name, as for any
+page whose first section is not the built-in hero.
 
 ## Custom sections
 

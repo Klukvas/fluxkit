@@ -61,8 +61,10 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   - Tests in the fork: run `pnpm --filter @fluxkit/storefront test`. `apps/storefront/src/components/home-config.spec.ts` checks the fork's real
     `home.ts` against its real registry (a typo in a name fails it; `next dev` fails too, production logs and leaves the section out). The specs that pin
     the template's default home page (`apps/storefront/src/lib/home-template-default.ts`) skip themselves once `home.ts` or the text overrides differ,
-    with the reason in their names: nothing to edit or delete. The upstream fork run (`apps/storefront/vitest.home-fork.config.ts`) uses upstream's
-    own fixture, not the fork's files: it proves upstream's specs survive such a fork; a fork neither needs nor edits it.
+    with the reason in their names. One spec is upstream-only and FORK-DELETABLE: `apps/storefront/src/lib/home-template-default.upstream.spec.ts`
+    (it fails once `home.ts` differs from the copy, telling upstream to update the copy): a fork that changed `home.ts` deletes it. The upstream fork
+    run (`apps/storefront/vitest.home-fork.config.ts`) uses upstream's fixture config and registry, and the fork's REAL message extras with the
+    fixture's texts merged over them, so the fork's own `custom.` keys still resolve there: a fork neither needs nor edits it.
 - Header and footer links: `apps/storefront/src/layout/navigation.ts`; shop pages and contacts: `apps/storefront/src/config/shop-pages.ts`,
   `apps/storefront/src/config/contacts.ts`; trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
