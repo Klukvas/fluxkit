@@ -3,5 +3,7 @@
   "custom.card.favourite": "Додати {title} до обраного",
   "custom.header.navigationMore": "Інші розділи",
   "custom.announcement.text": "Безкоштовна доставка для замовлень від 2 000 ₴.",
-  "custom.announcement.link": "Умови доставки"
+  "custom.announcement.link": "Умови доставки",
+  "custom.home.bestsellers.title": "Хіти продажу",
+  "custom.brandStrip.title": "Наші бренди"
 }

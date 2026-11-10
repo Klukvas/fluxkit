@@ -3,5 +3,7 @@
   "custom.card.favourite": "Add {title} to favourites",
   "custom.header.navigationMore": "More sections",
   "custom.announcement.text": "Free delivery for orders over 2 000 ₴.",
-  "custom.announcement.link": "Delivery terms"
+  "custom.announcement.link": "Delivery terms",
+  "custom.home.bestsellers.title": "Bestsellers",
+  "custom.brandStrip.title": "Our brands"
 }

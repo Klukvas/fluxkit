@@ -1,3 +1,5 @@
+import { BrandStrip } from "../components/fork/brand-strip";
+import { FullBleedHero } from "../components/fork/full-bleed-hero";
 import type { CustomSectionRegistry } from "../lib/custom-sections";
 
 /**
@@ -16,4 +18,8 @@ import type { CustomSectionRegistry } from "../lib/custom-sections";
  * namespace (`src/messages-extra/{uk,en}.json`). An interactive part is a client component the server component renders with
  * plain, already translated props. A component that throws takes the home page down: handle a failed read inside it.
  */
-export const customSections: CustomSectionRegistry = {};
+export const customSections: CustomSectionRegistry = {
+  // Reshape R4: the full-bleed hero and the brand-logos strip of the home page (`config/home.ts`).
+  fullBleedHero: FullBleedHero,
+  brandStrip: BrandStrip,
+};

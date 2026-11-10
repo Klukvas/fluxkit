@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 64" width="160" height="64">
+  <!-- FORK placeholder of a brand logo (neutral, no real brand): a mark and two lines in mid greys that read on the light and
+       the dark theme. TODO(fluxkit): the store API has no brand pictures; a client puts its brands' logos here
+       (config/brand-strip.ts). -->
+  <rect width="160" height="64" rx="8" fill="#a7abb3"/>
+  <circle cx="34" cy="32" r="16" fill="#7a7f88"/>
+  <rect x="62" y="20" width="78" height="10" rx="5" fill="#7a7f88"/>
+  <rect x="62" y="36" width="52" height="8" rx="4" fill="#8e939c"/>
+</svg>
