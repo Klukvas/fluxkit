@@ -160,3 +160,30 @@ Open (owner):
 - Host hardening not done: pending reboot (new kernel), `PasswordAuthentication yes`, ufw inactive (check the Hetzner Cloud Firewall).
 - Self-signed certificate expires 2026-12-10; there is no renewal for it (Let's Encrypt comes with the domain).
 - Separate application database role (`docs/deployment.md`, "Database roles") not created.
+
+## 14. Host name and Let's Encrypt certificate (2026-11-10, owner's "yes, run 1–7")
+
+Why: `/_next/image` answered 500 for every product picture (the optimizer's hairpin fetch refused the self-signed certificate),
+while `/media/*` itself answered 200. Fix chosen by the owner: the free wildcard DNS name `178-104-79-222.sslip.io` (resolves to
+the server's IP, no registration) with a Let's Encrypt certificate. `sslip.io` is not on the Public Suffix List, so all its users
+share one Let's Encrypt rate limit; issuance worked on the first try.
+
+| Step | Result | Undo |
+|---|---|---|
+| 1 | `fluxkit-backup` before any change: `db-2026-11-10T222437Z.dump`, `media-2026-11-10T222437Z.tgz` | - |
+| 2 | `certbot/certbot` image (Docker, `certonly --webroot` on the `fluxkit_acme-webroot` volume, `--agree-tos --register-unsafely-without-email`): staging dry run, then the real certificate for `178-104-79-222.sslip.io`, issuer `YE1`, valid until 2027-02-08. State in `/etc/letsencrypt` | `rm -rf /etc/letsencrypt /var/lib/letsencrypt` |
+| 3 | `/usr/local/sbin/fluxkit-install-cert` copies the live certificate into `/etc/fluxkit/certs` (`root:101`, 640) when it changed and reloads the edge. The self-signed pair is kept as `*.pem.selfsigned`; `production.env` copied to `production.env.bak-ip`, then `FLUXKIT_DOMAIN` and `STOREFRONT_IMAGE_HOSTS` set to `178-104-79-222.sslip.io` | restore the `.selfsigned` pair and `production.env.bak-ip` |
+| 4 | Stored image URLs are absolute and keep their old prefix when the domain changes (`docs/contracts/config.md`, `MEDIA_PUBLIC_BASE_URL`). One transaction rewrote `media.url` from `https://178.104.79.222/media/` to `https://178-104-79-222.sslip.io/media/`: 91 of 91 rows. `brand.logo_url` and `order_item.image_url` were empty, banners reference upload ids, search documents hold no image URL (no reindex) | the reverse `UPDATE`, or restore the dump of step 1 |
+| 5 | Old storefront image tagged `fluxkit-storefront:7349a1b-ip`; storefront rebuilt on the host (`STOREFRONT_IMAGE_HOSTS` is a build argument), then `fk up -d --wait`: all healthy | `docker tag fluxkit-storefront:7349a1b-ip fluxkit-storefront:7349a1b` with the env of step 3 restored, `fk up -d --wait` |
+| 6 | `/usr/local/sbin/fluxkit-cert-renew` (`certbot renew` in Docker, then `fluxkit-install-cert`) as `fluxkit-cert-renew.service` + `.timer` (04:17 and 16:17 UTC, up to 1 h random delay); `certbot renew --dry-run` succeeded | `systemctl disable --now fluxkit-cert-renew.timer`, remove the unit files and the two scripts |
+
+Verified from outside, without skipping certificate checks: `/uk`, `/uk/catalog`, `/admin-ui/`, `/store/config` 200 with a trusted
+certificate; `http://178.104.79.222/uk` 301 to `https://178-104-79-222.sslip.io/uk`; HSTS present; CSP `img-src` names the new host;
+no old IP left in the catalog HTML; every optimized picture of `/uk` (11) and `/uk/catalog` (24) answers 200; the catalog shows its
+pictures in Chrome.
+
+Still open:
+- `https://178.104.79.222` now shows a certificate name warning (the certificate is for the host name): use the sslip.io address.
+- No expiry mail (account without email): the renewal timer is the only safeguard; check `systemctl status fluxkit-cert-renew` after its first runs.
+- `fluxkit-storefront:7349a1b-ip` (903 MB) is kept for rollback; remove it once the new image has run for a while.
+- A real domain later means the same steps 2 to 5 again (new certificate, `FLUXKIT_DOMAIN`, `STOREFRONT_IMAGE_HOSTS`, URL rewrite, storefront rebuild).
