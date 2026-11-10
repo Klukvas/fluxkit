@@ -30,7 +30,7 @@ function contractConfigProblem(paths, { fork }) {
   const relevant = fork ? paths.filter((path) => !forkFilledConfig.test(path)) : paths;
   if (!relevant.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
-  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did.";
+  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did. A client fork filling its own config files creates the marker .fluxkit-fork at the repository root (docs/customization.md, step 0).";
 }
 
 /** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
