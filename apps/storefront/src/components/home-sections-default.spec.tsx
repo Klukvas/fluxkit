@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { createTranslator, type Locale } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerenderToNodeStream } from "react-dom/static";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { homeSections } from "../config/home";
 import { storeBannerViews } from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
@@ -13,6 +13,11 @@ import enOverrides from "../messages-overrides/en.json";
 import ukOverrides from "../messages-overrides/uk.json";
 import { customSections } from "../config/custom-sections";
 import { HomeSections, HomeSectionsView } from "./home-sections";
+
+// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): the frozen copy is the template's own home markup
+// (its product cards included). Where the card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`;
+// filled slots with this default home, the brand fork run (`vitest.brand-fork.config.ts`).
+vi.mock("../config/slots", () => ({ slots: {} }));
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings

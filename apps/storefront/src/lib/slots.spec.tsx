@@ -119,7 +119,7 @@ describe("renderSlot", () => {
     }
   });
 
-  it("resolves own entries only: a name such as toString is unknown, not an Object.prototype member", () => {
+  it("counts own entries only: a slot inherited through the prototype renders nothing", () => {
     const registry = Object.create({ "header.top": [First] }) as SlotRegistry;
     expect(renderSlot("header.top", headerProps, registry)).toBeNull();
   });

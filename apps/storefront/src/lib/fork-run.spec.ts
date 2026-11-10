@@ -15,7 +15,7 @@ declare module "vitest" {
   export interface ProvidedContext {
     /**
      * Which fork-owned configs this run replaces with fixtures: `none` (`vitest.config.ts`), `brand-layout`
-     * (`vitest.brand-fork.config.ts`: brand, header, footer) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
+     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
      */
     forkRun: "none" | "brand-layout" | "home";
   }
@@ -46,7 +46,7 @@ describe("the fork-owned configs a run reads", () => {
     expect(customSections === homeRegistryFixture.customSections).toBe(expected);
   });
 
-  it("reads the filled UI slots fixture exactly in the home run", () => {
-    expect(slots === slotsFixture.slots).toBe(forkRun === "home");
+  it("reads the filled UI slots fixture exactly in the two fork runs", () => {
+    expect(slots === slotsFixture.slots).toBe(forkRun !== "none");
   });
 });
