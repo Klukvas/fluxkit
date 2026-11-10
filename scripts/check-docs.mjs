@@ -7,15 +7,16 @@ import { existsSync, readFileSync } from "node:fs";
 // principle 7). Most do not exist yet: the rule applies from the PR that adds one, and a change that touches none passes.
 // The fork-facing files of the product card registry (`docs/contracts/card-registry.md`, PR-F) are contract files too, and
 // so are those of the home sections (`docs/contracts/home-sections.md`, PR-G2): `config/home.ts` (its section types), the
-// fork-owned registry and its types.
+// fork-owned registry and its types; and so are those of the UI slots (`docs/contracts/slots.md`, PR-H): the fork-owned
+// `config/slots.tsx` and `lib/slots.ts` (slot names, view models, registry type).
 const contractConfig =
-  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/(custom|types)|lib\/custom-sections)\.tsx?$/;
+  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/(custom|types)|lib\/(custom-sections|slots))\.tsx?$/;
 
 /** The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/. */
 function contractConfigProblem(paths) {
   if (!paths.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
-  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/custom-sections.ts(x)) changed but nothing under docs/contracts/ did.";
+  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did.";
 }
 
 /** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
@@ -104,6 +105,30 @@ const selfTestCases = [
       "apps/storefront/src/config/custom-sections.spec.ts",
       "apps/storefront/src/lib/custom-sections-model.ts",
       "apps/storefront/src/components/home-sections.tsx",
+    ],
+    fails: false,
+  },
+  // The UI slots (`docs/contracts/slots.md`, PR-H): the fork-owned registry and the module with its types and names.
+  { paths: ["apps/storefront/src/lib/slots.ts"], fails: true },
+  {
+    nameStatus:
+      "R100\tapps/storefront/src/config/slots.tsx\tapps/storefront/src/config/ui-slots.tsx",
+    fails: true,
+  },
+  {
+    paths: [
+      "apps/storefront/src/config/slots.tsx",
+      "apps/storefront/src/lib/slots.ts",
+      "docs/contracts/slots.md",
+    ],
+    fails: false,
+  },
+  {
+    paths: [
+      "apps/storefront/src/lib/slots.spec.tsx",
+      "apps/storefront/src/lib/slots-fork-fixture.tsx",
+      "apps/storefront/src/config/slots.upstream.spec.ts",
+      "apps/storefront/src/components/site-footer.tsx",
     ],
     fails: false,
   },
