@@ -123,7 +123,7 @@ Applied to every path: `Content-Security-Policy` (`default-src 'self'`; `script-
 
 `src/app/globals.css` imports `@fluxkit/theme/tokens.css`, `tailwind.css` and then, LAST, the fork-owned `@fluxkit/theme/brand-overrides.css`
 (empty upstream). A fork sets its colours, shadows, radii and fonts there under the three theme rules of `tokens.css` (light, dark, system,
-in that order; colours and shadows in all three), so its rebrand needs no edit of `tokens.css`. The admin does not import it. Rules,
+in that order; colours and shadows in all three), so its rebrand needs no edit of `tokens.css`. The admin imports it too (light rule only, before its own `admin-overrides.css`). Rules,
 cascade and checks: `docs/contracts/theme-tokens.md` "Storefront overrides"; steps: `docs/customization.md` section 1, steps 4 and 5.
 
 ## Fonts (`src/config/fonts.ts`, 2026-11-08)

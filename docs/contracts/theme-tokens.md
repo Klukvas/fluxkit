@@ -3,7 +3,8 @@
 Status: draft (introduced in plan step 7). Covered by SemVer; renaming or removing a token is a breaking change. Adding a token is additive (minor).
 
 Source of truth: `packages/theme/src/tokens.css` (the template's values). A client fork sets its own values in the fork-owned
-`packages/theme/src/brand-overrides.css` (storefront) and `packages/theme/src/admin-overrides.css` (admin), see "Storefront overrides" and
+`packages/theme/src/brand-overrides.css` (the shop: storefront, and its light rule for the admin) and `packages/theme/src/admin-overrides.css`
+(the admin alone), see "Storefront overrides" and
 "Admin" below. Components use semantic Tailwind utilities mapped in `packages/theme/src/tailwind.css`; never raw values.
 
 | Token | Tailwind utility | Purpose |
@@ -138,9 +139,19 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 
 ## Admin (ADR 0047, 2026-11-08)
 
-- The admin follows `tokens.css` by default (the same `tokens.css` and `tailwind.css`, `data-theme="light"` fixed): a rebrand of `tokens.css`
-  reaches it. The storefront's `brand-overrides.css` does NOT (it is imported by the storefront only, see "Storefront overrides"): a fork
-  that rebrands there and wants the admin in the shop's colours copies its light rule into `admin-overrides.css`.
+- The admin follows the shop by default (decision 1 of ADR 0047): `apps/admin/src/styles.css` imports `tokens.css`, `tailwind.css`, the
+  shop's fork-owned `brand-overrides.css` and then `admin-overrides.css` (since PR-I2a, 2026-11-10), with `data-theme="light"` fixed. So a
+  rebrand in `brand-overrides.css` reaches the admin through its light rule; its dark and system rules never match the admin's page (the
+  built-CSS check allows the system media rule because it only matches `[data-theme=system]`). Effective admin values = `tokens.css` light
+  block, then the light rule of `brand-overrides.css`, then `admin-overrides.css`.
+- **Web fonts and the admin.** A `var(--font-...)` in a font token of `brand-overrides.css` comes from `next/font` in the storefront and
+  does not exist in the admin: there the whole `font-family` is invalid and the browser shows its default serif (Times New Roman), not the
+  stack after the `var()`. `theme.spec.ts` fails in that case and names the token: restate that `--fk-font-*` in `admin-overrides.css`
+  without the variable (the fallback stack, or a self-hosted `@font-face` there).
+- **A neutral admin next to a rebranded shop:** restate in `admin-overrides.css` the template's value (from `tokens.css`, light block) of
+  every token the shop overrides in its light rule (about 27 for the A1 rebrand: 15 colours, 8 radii, 3 shadows and the display face), or
+  only the ones the admin should not take. A filled `brand-overrides.css` also adds its rules to the admin's CSS (measured with the A1
+  fixture: +2,282 bytes raw, +356 gzip on a 28,939-byte stylesheet; the admin's JavaScript budget is not affected).
 - `packages/theme/src/admin-overrides.css` (exported as `@fluxkit/theme/admin-overrides.css`) is **fork-owned**: empty upstream, never
   edited upstream after its creation, imported LAST by `apps/admin/src/styles.css`. No shipped source of the storefront, `packages/ui` or
   the other theme files may import or name it (tests may read it); `apps/admin/src/theme-isolation.spec.ts` checks this and the import
@@ -149,8 +160,11 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   client `@font-face`. It must not add tokens the components do not read, nor a `[data-theme="dark"]`, `[data-theme="system"]` or
   `prefers-color-scheme` rule (a source check in any letter case and spacing, plus the built-CSS check; pattern checks, not a parser).
 - The file's location and its import order are part of this contract; its content is the fork's. Since PR-I2a (2026-11-10) `contrast.spec.ts`
-  checks the pairs of "Contrast" below on the admin's EFFECTIVE values (the light block of `tokens.css`, then this file; a `@font-face`
-  rule is skipped), so a fork's admin colours are checked by CI (the ADR 0047 follow-up).
+  checks the pairs of "Contrast" below on the admin's EFFECTIVE values (the light block of `tokens.css`, the light rule of `brand-overrides.css`,
+  then this file; a `@font-face` rule is skipped), and `brand-overrides.spec.ts` checks its token values (6-digit hex colours, lengths,
+  shadows, font lists, no `!important`), so a fork's admin colours are checked by CI (the ADR 0047 follow-up). Note for
+  `apps/admin/README.md` (not edited in PR-I2a, a parallel change owns it): it says "a rebrand of `tokens.css` reaches the admin"; a rebrand
+  in `brand-overrides.css` reaches it too.
 - **Known limit:** the admin's headings (71) do not use `textStyles` roles and are not scanned by the heading-role guard; `font-display`
   does not reach them.
 - The admin's name is in its messages (`app.name`, `app.documentTitle` in `apps/admin/src/messages/{uk,en}/common.json`), its favicon a
@@ -160,8 +174,9 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
 
 - `packages/theme/src/brand-overrides.css` (exported as `@fluxkit/theme/brand-overrides.css`) is **fork-owned**: empty upstream (a comment
   with an example), never edited upstream after its creation. `apps/storefront/src/app/globals.css` imports it LAST, after `tokens.css` and
-  `tailwind.css`; the admin never imports it, and no shipped source of the admin, `packages/ui` or the other theme files names it (tests
-  may read it). `packages/theme/src/brand-overrides.spec.ts` checks the import order of both apps, the export and that scan.
+  `tailwind.css`; `apps/admin/src/styles.css` imports it too, after `tailwind.css` and before `admin-overrides.css` (see "Admin"). No other
+  shipped source of the admin, `packages/ui` or the other theme files names it (tests may read it). `packages/theme/src/brand-overrides.spec.ts`
+  checks the import order of both apps, the export and that scan.
 - The file's location, its import order and the rules below are part of this contract (additive: no token renamed or removed); its content
   is the fork's.
 - **Cascade.** It uses exactly the three rules of `tokens.css`, in their order: `:root, [data-theme="light"]`, then `[data-theme="dark"]`,
@@ -178,9 +193,10 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   So a colour or shadow set in the overrides' light rule ALSO wins on dark pages unless the overrides' dark and system rules set it too.
   The rules: a colour or shadow set for light is also set for dark; the system rule holds exactly the dark rule's tokens and values;
   fonts, radii, the type scale and the spacing unit only in the light rule (all modes inherit them); existing `--fk-*` tokens only, 6-digit
-  hex colours, no `!important`, no other selector (`html { ... }` would lose to `:root`, `html[data-theme="dark"]` would win by
-  specificity; both are refused) and no other at-rule. Unlike `admin-overrides.css`, dark and system rules are allowed (the storefront
-  renders all three modes). `brand-overrides.spec.ts` refuses everything else with a message naming the token or rule.
+  hex colours and valid values (lengths, shadows, font lists; an empty value fails), no `!important` (any spacing), no other selector (`html { ... }` would lose to `:root`, `html[data-theme="dark"]` would win by
+  specificity; both are refused; a selector that differs only in spaces or quotes is told the exact spelling) and no other at-rule. Unlike
+  `admin-overrides.css`, dark and system rules are allowed (the storefront renders all three modes). `brand-overrides.spec.ts` refuses
+  everything else with a message naming the token or rule; a parse error names the overrides file.
 - **Checks on the effective values.** `effectiveTokens` (`packages/theme/src/token-blocks.ts`) applies the matching rules of `tokens.css`
   and the overrides in this order for each page state. `contrast.spec.ts` (every pair below, the four page states of the table),
   `theme.spec.ts` (display font), `email-theme.spec.ts` and `theme-color.spec.ts` read these effective values.
@@ -190,15 +206,19 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   `EmailTheme` interface of `@fluxkit/core` is unchanged. Generating them from the CSS was not chosen: it needs a build step that runs
   before every consumer of `@fluxkit/theme` (API, storefront, specs) for two small objects.
 - **Fork run.** `packages/theme/vitest.brand-fork.config.ts` (part of `pnpm --filter @fluxkit/theme test`) runs the theme specs once more
-  with filled fixtures in `packages/theme/src/fork-fixture/`: the A1 "Verde Kopi" palette, radii, shadows and display face as storefront
-  overrides, a neutral admin with a client font, and the updated literal copies. `fork-run.spec.ts` is its canary. The upstream-only
+  with filled fixtures in `packages/theme/src/fork-fixture/`: the A1 "Verde Kopi" palette, radii, shadows and a `var(--font-...)` display
+  face as storefront overrides, an admin that follows them with a neutral primary and a client font (the display face restated), and the
+  updated literal copies. `fork-run.spec.ts` is its canary. It reads the fork's own `tokens.css` under the fixtures: green for a fork that
+  rebrands in `brand-overrides.css` as documented; in that run a literal-copy failure names the fixture file it compared, so a fork that
+  still edits `tokens.css` sees which file the message is about. The upstream-only
   `packages/theme/src/brand-overrides.upstream.spec.ts` pins the empty upstream file; a fork that fills the file deletes it.
 
 **Migration note for client forks (2026-11-10, additive: no token renamed or removed):** a fork that rebranded by editing `tokens.css` may
 keep doing so, but every upstream change of `tokens.css` then conflicts. To move: put the changed values into
 `packages/theme/src/brand-overrides.css` under the three rules above (colours and shadows in all three, everything else in light), reset
-`tokens.css` to upstream's, and run `pnpm --filter @fluxkit/theme test`. The admin then keeps the template's values: copy the light rule into
-`packages/theme/src/admin-overrides.css` to give the admin the shop's colours (a dark or system rule is refused there).
+`tokens.css` to upstream's, and run `pnpm --filter @fluxkit/theme test`. The admin follows the light rule as it followed `tokens.css`; a
+fork whose admin overrides restated template values for a neutral admin keeps them, and a font token with `var(--font-...)` is restated
+there (see "Admin").
 
 ## Themes and modes (design batch B, 2026-11-03)
 
@@ -238,7 +258,7 @@ dark, or sets `defaultMode: "light"`.
 
 ## Contrast (enforced by `packages/theme/src/contrast.spec.ts`)
 
-The test parses `tokens.css` and the overrides files into their blocks (`packages/theme/src/token-blocks.ts`; 6-digit hex values only; another color format fails the test) and computes the WCAG 2.x contrast ratio on the EFFECTIVE values (since 2026-11-10): the storefront's `tokens.css` plus `brand-overrides.css` in light, dark and the system mode on a light and on a dark device, and the admin's `tokens.css` plus `admin-overrides.css` in light. A rebrand must keep these pairs passing:
+The test parses `tokens.css` and the overrides files into their blocks (`packages/theme/src/token-blocks.ts`; 6-digit hex values only; another color format fails the test) and computes the WCAG 2.x contrast ratio on the EFFECTIVE values (since 2026-11-10): the storefront's `tokens.css` plus `brand-overrides.css` in light, dark and the system mode on a light and on a dark device, and the admin's `tokens.css`, the light rule of `brand-overrides.css` and `admin-overrides.css` in light. A rebrand must keep these pairs passing:
 
 | Foreground on background | Minimum |
 |---|---|
