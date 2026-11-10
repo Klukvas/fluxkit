@@ -38,6 +38,7 @@ Upstream creates these once and never edits them again, so merging upstream neve
 - `apps/storefront/src/messages-extra/uk.json`, `apps/storefront/src/messages-extra/en.json` (`{}`)
 - `apps/storefront/src/config/fonts.ts` (no fonts)
 - `apps/storefront/src/config/brand.ts` (text logo, nothing else)
+- `apps/storefront/src/config/header.ts`, `apps/storefront/src/config/footer.ts` (the template's header and footer, section 3)
 - `packages/theme/src/admin-overrides.css` (no rules)
 - files a fork adds: its pictures under `apps/storefront/public/`, the admin favicon in `apps/admin/public/`
 
@@ -47,11 +48,26 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 ## 3. Layout and composition (what exists today)
 
 - Home page sections and their order: `apps/storefront/src/config/home.ts` (upstream-owned; `apps/storefront/README.md` "Layout composition is configuration").
-- Header and footer links: `apps/storefront/src/layout/navigation.ts`; shop pages and contacts: `apps/storefront/src/config/shop-pages.ts`,
-  `apps/storefront/src/config/contacts.ts`; trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
+- Header: `apps/storefront/src/config/header.ts` (fork-owned; contract `docs/contracts/header-footer.md`). Without a code edit a fork can:
+  reorder or leave out the blocks of the one header row (menu button, logo, navigation, search box, controls), reorder or leave out the
+  controls at the end (language, cart, account), set how many top-level categories show (0 to 12) and which links follow them
+  (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`).
+- Footer: `apps/storefront/src/config/footer.ts` (fork-owned, same contract): reorder or leave out the blocks (navigation, contacts,
+  theme switch, copyright) and the link groups of the navigation (shop pages, legal pages, the fork's own lists). Which shop pages are
+  linked stays `inFooter` in `apps/storefront/src/config/shop-pages.ts`; the contacts are `apps/storefront/src/config/contacts.ts`; whether
+  the theme switch exists is `showToggle` in `apps/storefront/src/config/theme.ts` (the footer must list `themeSwitch` while it is true).
+- Check: `pnpm --filter @fluxkit/storefront test` (`config/header` and `config/footer` are checked by `apps/storefront/src/layout/header-layout.spec.ts`
+  and `apps/storefront/src/layout/footer-layout.spec.ts`; an unknown block name fails `pnpm typecheck`). After changing either file (or `config/brand.ts`),
+  delete `apps/storefront/src/components/header-footer-defaults.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
+  a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled configs (`apps/storefront/vitest.brand-fork.config.ts`).
+- **Needs a code edit** (core files `apps/storefront/src/components/site-header.tsx`, `apps/storefront/src/components/site-footer.tsx`, `apps/storefront/src/app/globals.css`):
+  a centred header, a second header row or an announcement bar (plan target 3 is NOT reached by design), footer columns side by side,
+  headings in the footer, social or payment icons, the "powered by" line (always last). The `header.top` and `footer.columns` slots are planned (plan WP5), **not yet available**.
+- Header and footer link sources besides the configs: the legal pages in `apps/storefront/src/config/legal.ts`; account and cart targets in
+  `apps/storefront/src/layout/navigation.ts` (upstream-owned); trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
-- **Not yet available** (plan WP4 and WP5): product card variants and the list/grid toggle (L2, L5), header and footer block configuration (L3), full-width
-  and custom home sections (L4), slots for cards, header and footer (S1). Until they land, those changes are core edits.
+- Product card variants and the list/grid toggle (L2, L5): `docs/contracts/card-registry.md`.
+- **Not yet available** (plan WP4 and WP5): full-width and custom home sections (L4), slots for cards, header and footer (S1).
 
 ## 4. Known limits
 
@@ -77,5 +93,5 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 ## 6. Contracts
 
 What a fork may rely on across minor releases: `docs/contracts/README.md`, in particular `docs/contracts/branding.md` (this brand config),
-`docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md` (environment and features) and `docs/contracts/email-templates.md`.
+`docs/contracts/header-footer.md` (header and footer composition), `docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md` (environment and features) and `docs/contracts/email-templates.md`.
 Anything not listed there is internal.
