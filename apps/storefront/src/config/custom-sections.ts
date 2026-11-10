@@ -1,3 +1,5 @@
+import { BrandStrip } from "../components/brand-strip";
+import { HeroOverlay } from "../components/hero-overlay";
 import type { CustomSectionRegistry } from "../lib/custom-sections";
 
 /**
@@ -16,4 +18,7 @@ import type { CustomSectionRegistry } from "../lib/custom-sections";
  * namespace (`src/messages-extra/{uk,en}.json`). An interactive part is a client component the server component renders with
  * plain, already translated props. A component that throws takes the home page down: handle a failed read inside it.
  */
-export const customSections: CustomSectionRegistry = {};
+export const customSections: CustomSectionRegistry = {
+  heroOverlay: HeroOverlay,
+  brandStrip: BrandStrip,
+};

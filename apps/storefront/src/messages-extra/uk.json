@@ -3,5 +3,7 @@
   "custom.announcement.text": "Безкоштовна доставка для замовлень від 1000.",
   "custom.card.favourite": "Додати «{title}» до обраного",
   "custom.card.sale": "Знижка",
-  "custom.header.moreNav": "Додаткова навігація"
+  "custom.header.moreNav": "Додаткова навігація",
+  "custom.home.bestsellers.title": "Бестселери (заглушка: найновіші товари)",
+  "custom.home.brands.title": "Наші бренди"
 }
