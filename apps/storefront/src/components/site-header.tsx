@@ -2,6 +2,7 @@ import { Container, type Locale, type Translator } from "@fluxkit/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { headerConfig } from "../config/header";
+import { slots } from "../config/slots";
 import {
   headerView,
   type HeaderBlockView,
@@ -11,6 +12,7 @@ import {
   type NavigationCategory,
   type PanelAlign,
 } from "../layout/header-layout";
+import { renderSlot } from "../lib/slots";
 import { AccountLink } from "./account-link";
 import { BrandLogo } from "./brand-logo";
 import { CartBadge } from "./cart-badge";
@@ -124,7 +126,8 @@ function block(view: HeaderBlockView, locale: Locale, t: Translator): ReactNode 
  * while scrolling; `scroll-padding-top` keeps anchors and focused fields out from under it). The main navigation exists twice in the markup (inline and inside the menu); one of them is always
  * `display: none`, so assistive technology meets one. `categories` is `null` when the API could not be read (the page still
  * renders, without the category links; the failure is logged where it happened). The cart, account, language and search
- * parts are client islands; `searchEnabled` false means NO search box (and no results page). Needs an `I18nProvider`.
+ * parts are client islands; `searchEnabled` false means NO search box (and no results page). The `header.top` slot's components
+ * (`config/slots.tsx`, `docs/contracts/slots.md`) render above the row, inside the header. Needs an `I18nProvider`.
  */
 export function SiteHeader({
   locale,
@@ -141,11 +144,22 @@ export function SiteHeader({
   config?: HeaderConfig;
 }) {
   const blocks = headerView(config, { locale, t, categories, searchEnabled });
+  const row = (
+    <Container className="fk-header-row">{blocks.map((view) => block(view, locale, t))}</Container>
+  );
+  // The `header.top` slot (`config/slots.tsx`) before the row. Empty, the header's only child stays the row: the same markup
+  // and the same React payload as without slots (no `null` child).
+  const top = renderSlot("header.top", { locale, t }, slots);
   return (
     <header className="fk-site-header">
-      <Container className="fk-header-row">
-        {blocks.map((view) => block(view, locale, t))}
-      </Container>
+      {top === null ? (
+        row
+      ) : (
+        <>
+          {top}
+          {row}
+        </>
+      )}
     </header>
   );
 }

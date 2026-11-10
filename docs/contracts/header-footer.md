@@ -69,10 +69,11 @@ a fork that changes either file deletes it.
 ## Not contract, not configurable (cut from plan L3, with the reason)
 
 - The header and footer CSS (`.fk-site-header`, `.fk-header-*`, `.fk-site-footer` in `app/globals.css`) and the markup inside a block.
-- A centred header, a second header row, an announcement bar: plan target 3 is not targeted (code edit of `components/site-header.tsx`;
-  the `header.top` slot is planned in WP5, not yet available).
-- Footer columns side by side: the footer is one column; the plan's four-column footer (target 5) needs a CSS layout change or the
-  planned `footer.columns` slot (WP5, not yet available). What L3 gives towards it: ordered link groups with headings and text lines.
-- Social links: external URLs are refused by design (link targets are plain storefront paths); a fork adds them in code or, later, a slot.
+- A centred header, a second header row: plan target 3 is not targeted (code edit of `components/site-header.tsx`). An announcement
+  bar above the header row is the `header.top` slot (`docs/contracts/slots.md`, since PR-H).
+- Footer columns side by side: the configured blocks stay one column. Columns are the `footer.columns` slot (`docs/contracts/slots.md`,
+  since PR-H): a four-column footer (plan target 5) is four column components plus `navigation` and `contacts` left out of `blocks`.
+- Social links: external URLs are refused by design here (link targets are plain storefront paths); a fork renders them in a
+  `footer.columns` column (its own component) or in code.
 - Payment icons: only as text here (a text line); pictures need a code edit (local images only, CSP `img-src 'self'`).
 - The "powered by" line: always last, not a block (the template's attribution; an owner decision to change).

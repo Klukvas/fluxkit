@@ -6,13 +6,24 @@ import { describe, expect, it } from "vitest";
 /**
  * `docs/customization.md` is the fork author's only guide (plan 2026-11-08-design-changeability.md B5): every repository path it
  * names in backticks must exist, so a move or rename upstream fails here instead of misleading a fork. Paths a fork creates
- * itself are the only exception.
+ * itself, and the upstream-only files the guide tells a fork to delete, are the only exceptions.
  */
 const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
 const doc = readFileSync(join(repoRoot, "docs", "customization.md"), "utf8");
 
 /** Folders the guide tells a fork to create: missing in the template, present in a fork that followed step 10. */
 const FORK_CREATES = new Set(["apps/admin/public/"]);
+
+/**
+ * Upstream-only checks the guide tells a fork to DELETE once it changes the matching config: present in the template, missing in
+ * a fork that followed the guide (this spec must stay green there).
+ */
+const FORK_DELETES = new Set([
+  "apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx",
+  "apps/storefront/src/components/header-footer-defaults/",
+  "apps/storefront/src/config/slots.upstream.spec.ts",
+  "apps/storefront/src/lib/home-template-default.upstream.spec.ts",
+]);
 
 function repositoryPaths(text: string): string[] {
   const paths = [...text.matchAll(/`((?:apps|packages|docs|scripts)\/[^`\s]+)`/g)].map(
@@ -37,11 +48,16 @@ describe("docs/customization.md (plan B5)", () => {
     }
   });
 
-  it("names only paths that exist (or that a fork creates, listed here)", () => {
+  it("names only paths that exist (or that a fork creates or deletes, listed here)", () => {
     const missing = paths.filter(
-      (path) => !FORK_CREATES.has(path) && !existsSync(join(repoRoot, path)),
+      (path) =>
+        !FORK_CREATES.has(path) && !FORK_DELETES.has(path) && !existsSync(join(repoRoot, path)),
     );
     expect(missing).toEqual([]);
+  });
+
+  it("lists as fork-deleted only paths the guide names", () => {
+    for (const path of FORK_DELETES) expect(paths, path).toContain(path);
   });
 
   it("lists as fork-created only paths the guide names (they may exist in a fork that followed it)", () => {

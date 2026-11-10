@@ -41,6 +41,7 @@ Upstream creates these once and never edits them again, so merging upstream neve
 - `apps/storefront/src/config/header.ts`, `apps/storefront/src/config/footer.ts` (the template's header and footer, section 3)
 - `apps/storefront/src/config/custom-sections.ts` (no custom home section)
 - `apps/storefront/src/components/cards/custom.ts` (no card of the fork's own; `docs/contracts/card-registry.md`)
+- `apps/storefront/src/config/slots.tsx` (no slot component; `docs/contracts/slots.md`)
 - `packages/theme/src/admin-overrides.css` (no rules)
 - files a fork adds: its pictures under `apps/storefront/public/`, the admin favicon in `apps/admin/public/`
 
@@ -83,17 +84,43 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   and `apps/storefront/src/layout/footer-layout.spec.ts`; an unknown block name fails `pnpm typecheck`). After changing either file (or `config/brand.ts`),
   delete the upstream-only, FORK-DELETABLE `apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
   a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled brand, header and footer configs (`apps/storefront/vitest.brand-fork.config.ts`).
+- UI slots (S1; fork-owned `apps/storefront/src/config/slots.tsx`, contract `docs/contracts/slots.md`): SERVER components in the fork's new
+  files, listed per slot, rendered in order with a plain view model (locale, translator, the slot's data); empty slots render nothing.
+  - `header.top`: an announcement bar inside the header, above its row. Below `lg` it is sticky with the header, which grows by the bar's
+    height, while `scroll-padding-top` (80 px, `apps/storefront/src/app/globals.css`) does not: keep the bar short, show it only from `lg`
+    (`max-lg:hidden`), or raise `scroll-padding-top` there (a core edit; no storefront overrides stylesheet yet).
+  - `product-card.badges`, `product-card.actions`: badges in a row above the brand and title, actions in the image's bottom right corner
+    (`grid`; the availability badge keeps the top left) or at the end of the price row (`list`) of the built-in cards. An action is a control
+    of its own (a client island's button, not a second link to the product), with an opaque background, an accessible name with the title and
+    a 44 px target; on `grid` it comes before the title in the focus order, and the card's focus outline shows while it has the focus. A
+    fork's own card kind gets no slots unless it calls `renderSlot` of `apps/storefront/src/lib/slots.ts`.
+  - `footer.columns`: columns at the top of the footer (side by side from `sm`, up to four per row from `lg`). A four-column footer (plan
+    target 5): four column components, and `navigation` and `contacts` left out of `blocks` in `config/footer.ts`; the columns render the
+    links and contacts from their props. Example: `apps/storefront/src/lib/slots-fork-fixture.tsx` (shop pages, legal pages, contacts, a
+    newsletter placeholder). The footer's own rules in `apps/storefront/src/app/globals.css` style column content too (`ul` a wrapping row,
+    links `whitespace-nowrap`): put `flex-col` on a column's list and `whitespace-normal` on its links, or long names (uk legal pages) run past
+    the column. Register only columns that render: the grid counts the registered components, so one returning `null` leaves an empty cell.
+  - Texts through `t` with `custom.` keys in `messages-extra`; token classes only; an interactive part is a client component the server
+    component renders with plain props (a client component registered directly throws). A component that throws takes the page down
+    (`header.top` and `footer.columns`: every page, Next's bare 500); handle a failed read inside it. An unknown slot name fails `tsc`,
+    `next dev` and the tests; production logs it once and leaves it out.
+  - Tests in the fork: delete the upstream-only, FORK-DELETABLE `apps/storefront/src/config/slots.upstream.spec.ts` once a slot is filled
+    (it pins the template's empty registry; `apps/storefront/src/customization-doc.spec.ts` allows it to be missing). The specs that check the
+    template's own markup (frame, cards, the default home page) keep the slots empty, so `pnpm --filter @fluxkit/storefront test` stays green
+    with filled slots; upstream runs the suite with every slot filled twice: with the default home page (`apps/storefront/vitest.brand-fork.config.ts`)
+    and with a reshaped one (`apps/storefront/vitest.home-fork.config.ts`).
 - **Needs a code edit** (core files `apps/storefront/src/components/site-header.tsx`, `apps/storefront/src/components/site-footer.tsx`, `apps/storefront/src/app/globals.css`):
-  a centred header, a second header row or an announcement bar (plan target 3 is NOT reached by design), footer columns side by side
-  (plan target 5, the four-column footer, waits for the `footer.columns` slot or a CSS edit), social links (external URLs are refused
-  by design), payment icons (pictures), the "powered by" line (always last). The `header.top` and `footer.columns` slots are planned (plan WP5), **not yet available**.
+  a centred header or a second header row (plan target 3 is NOT reached by design; an announcement bar is the `header.top` slot), a card
+  badge over the image or any change inside the card other than the two slots (or a card of the fork's own, `cards/custom.ts`), a slot at
+  another place (product page, cart, checkout: no slot there), payment icons as pictures in the template's blocks (a `footer.columns`
+  column may show local pictures), the "powered by" line (always last). Social links: refused in `config/footer.ts` (external URLs), a
+  `footer.columns` column of the fork renders them.
 - Header and footer link sources besides the configs: the legal pages in `apps/storefront/src/config/legal.ts`; account and cart targets in
   `apps/storefront/src/layout/navigation.ts` (upstream-owned); trust bar: `apps/storefront/src/config/trust-bar.ts`; category page header:
   `apps/storefront/src/config/category-page.ts`.
 - Product cards and the list/grid view (L2, L5): a fork overrides the `grid` or `list` card in the fork-owned
   `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
-- **Not yet available** (plan WP5 and later): slots for cards, header and footer (S1), a storefront tokens overrides file. Until they
-  land, those changes are core edits.
+- **Not yet available**: a storefront tokens overrides file (colours are still edited in the upstream `tokens.css`, section 1 step 4).
 
 ## 4. Known limits
 
@@ -120,6 +147,6 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 
 What a fork may rely on across minor releases: `docs/contracts/README.md`, in particular `docs/contracts/branding.md` (this brand config),
 `docs/contracts/header-footer.md` (header and footer composition), `docs/contracts/home-sections.md` (home section width and custom sections),
-`docs/contracts/card-registry.md` (product cards and `?view=`), `docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md`
+`docs/contracts/card-registry.md` (product cards and `?view=`), `docs/contracts/slots.md` (UI slots), `docs/contracts/theme-tokens.md` (tokens and fonts), `docs/contracts/config.md`
 (environment and features) and `docs/contracts/email-templates.md`.
 Anything not listed there is internal.

@@ -24,6 +24,10 @@ import { leftoverText, sentinelTranslator } from "../test-helpers";
 import { builtInCards, cardRegistry, createCardRegistry, resolveCard } from "./registry";
 import type { CardKindEntry, CardProps } from "./types";
 
+// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the cards' own markup. Where the
+// card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
+vi.mock("../../config/slots", () => ({ slots: {} }));
+
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];
 

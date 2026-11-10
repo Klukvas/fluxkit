@@ -3,7 +3,8 @@
  * the fork-owned `config/footer.ts`, the pure view `components/site-footer.tsx` renders, and the checks its spec runs. The
  * footer stays one column of blocks (`.fk-site-footer` in app/globals.css); which blocks, their order, text lines from
  * messages, and the link groups (with optional headings) of its one labelled navigation are configurable. Columns side by
- * side, social links (external) and payment icons are a code edit (or, later, the `footer.columns` slot of plan WP5).
+ * side, social links (external) and payment icons are the `footer.columns` slot (`config/slots.tsx`, `docs/contracts/slots.md`)
+ * or a code edit.
  */
 import type { ContactsView } from "../lib/contacts";
 import { isPlainStorefrontPath } from "../lib/locale-path";

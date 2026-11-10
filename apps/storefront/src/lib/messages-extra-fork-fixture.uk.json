@@ -2,5 +2,14 @@
   "custom.brandStrip.title": "Наші бренди",
   "custom.brandStrip.first": "Перший бренд",
   "custom.brandStrip.second": "Другий бренд",
-  "custom.promo.title": "Акція тижня"
+  "custom.promo.title": "Акція тижня",
+  "custom.slots.announcement": "Безкоштовна доставка від 1 000 грн",
+  "custom.slots.badge": "Новинка",
+  "custom.slots.save": "Зберегти {title}",
+  "custom.slots.saveShort": "Зберегти",
+  "custom.slots.footer.shop": "Магазин",
+  "custom.slots.footer.legal": "Правова інформація",
+  "custom.slots.footer.contacts": "Контакти",
+  "custom.slots.footer.newsletter": "Розсилка",
+  "custom.slots.footer.newsletterSoon": "Наша розсилка скоро з’явиться."
 }

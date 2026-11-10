@@ -87,6 +87,29 @@ describe("client bundle boundary", () => {
     }
   });
 
+  // The UI slots (plan 2026-11-08-design-changeability.md, S1; docs/contracts/slots.md) are server-only: their components
+  // receive the translator, and their markup belongs in the first HTML. A fork's island is rendered BY a slot component.
+  it("keeps the UI slots server-only: the registry and its module imported by no client file, nothing it imports a client file", () => {
+    const registryPath = join("config", "slots.tsx");
+    const registry = files.find((file) => file.path === registryPath);
+    const module = files.find((file) => file.path === join("lib", "slots.ts"));
+    expect(registry, registryPath).toBeDefined();
+    expect(module, "lib/slots.ts").toBeDefined();
+    expect(clientFiles).not.toContain(registry);
+    expect(clientFiles).not.toContain(module);
+    const imported = [...(registry?.text ?? "").matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)].map(
+      (match) => join("config", match[1] as string),
+    );
+    for (const path of imported) {
+      const target = files.find((file) => [".ts", ".tsx"].some((ext) => file.path === path + ext));
+      if (target !== undefined) expect(clientFiles, target.path).not.toContain(target);
+    }
+    for (const file of clientFiles) {
+      expect(file.text, file.path).not.toMatch(/["'][^"'\s]*\/(?:config|lib)\/slots["']/);
+      expect(file.text, file.path).not.toMatch(/["']\.\/slots["']/);
+    }
+  });
+
   it("imports the server-only store data module from server files only", () => {
     const importers = files.filter((file) => /store-data\.server["']/.test(file.text));
     expect(importers.length).toBeGreaterThan(0);

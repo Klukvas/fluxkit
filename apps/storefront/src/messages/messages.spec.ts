@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import { messagePlaceholders } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
 import { withoutLegalMarker } from "../config/legal";
+import { SLOT_NAMES } from "../lib/slots";
 import { messagesByLocale } from "./index";
 
 // Every check runs on the MERGED messages the app renders: the area files plus the fork's overrides (plan
@@ -119,12 +120,15 @@ describe("message keys used in the source", () => {
     `["'](((?:${namespaces.join("|")})\\.[A-Za-z0-9_.]*[A-Za-z0-9_]))["']`,
     "g",
   );
+  const slotNames: ReadonlySet<string> = new Set(SLOT_NAMES);
 
   it("exist in both files (a literal that looks like a key must be a key; plural groups count)", () => {
     const used: [string, string][] = [];
     for (const file of sourceFiles(sourceRoot)) {
       const text = readFileSync(file, "utf8");
       for (const match of text.matchAll(literal)) {
+        // The UI slot names (`lib/slots.ts`; `footer.columns` looks like a key of the `footer` namespace) are not keys.
+        if (slotNames.has(match[1] as string)) continue;
         used.push([relative(sourceRoot, file), match[1] as string]);
       }
     }

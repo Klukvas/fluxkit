@@ -4,16 +4,18 @@ import { customSections } from "../config/custom-sections";
 import { footerConfig } from "../config/footer";
 import { headerConfig } from "../config/header";
 import { homeSections } from "../config/home";
+import { slots } from "../config/slots";
 import * as brandFixture from "./brand-fork-fixture";
 import * as homeConfigFixture from "./home-config-fork-fixture";
 import * as homeRegistryFixture from "./home-fork-fixture";
 import * as layoutFixture from "./layout-fork-fixture";
+import * as slotsFixture from "./slots-fork-fixture";
 
 declare module "vitest" {
   export interface ProvidedContext {
     /**
      * Which fork-owned configs this run replaces with fixtures: `none` (`vitest.config.ts`), `brand-layout`
-     * (`vitest.brand-fork.config.ts`: brand, header, footer) or `home` (`vitest.home-fork.config.ts`: home, custom sections).
+     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
      */
     forkRun: "none" | "brand-layout" | "home";
   }
@@ -42,5 +44,9 @@ describe("the fork-owned configs a run reads", () => {
     const expected = forkRun === "home";
     expect(homeSections === homeConfigFixture.homeSections).toBe(expected);
     expect(customSections === homeRegistryFixture.customSections).toBe(expected);
+  });
+
+  it("reads the filled UI slots fixture exactly in the two fork runs", () => {
+    expect(slots === slotsFixture.slots).toBe(forkRun !== "none");
   });
 });

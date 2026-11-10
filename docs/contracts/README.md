@@ -13,9 +13,10 @@ Existing:
 - `email-templates.md` - mail templates: the template contract, the registration metadata, the override rule and the built-in keys.
 - `personal-data-export.md` - the personal data export document `fluxkit.personal-data-export/v1` (builder only; no route yet).
 - `search.md` - catalog search: routes, facet keys, sort names, limits, the public data rule and what is not contract.
+- `slots.md` - storefront UI slots: the four server-only slots (`header.top`, `product-card.badges`, `product-card.actions`, `footer.columns`), their view-model props and the fork-owned `config/slots.tsx` (draft).
 - `theme-tokens.md` - design tokens.
 
-Not written yet (add when the first implementation exists): `slots.md` (UI slots), price adjusters (a hook, with the pricing pipeline plan),
+Not written yet (add when the first implementation exists): price adjusters (a hook, with the pricing pipeline plan),
 `db-extension.md` (tables safe to extend).
 
 Entry format: name, since-version, description, shape, status (stable / deprecated since X).

@@ -14,8 +14,9 @@
  * A link's text is a message key: a new text goes into `src/messages-extra/{uk,en}.json` under `custom.` (a changed template
  * text into `src/messages-overrides/{uk,en}.json`).
  *
- * NOT here: the logo (`config/brand.ts`), the header's look (tokens, `.fk-header-*` in app/globals.css), a centred header, a
- * second row or an announcement bar (a code edit of `components/site-header.tsx`).
+ * NOT here: the logo (`config/brand.ts`), the header's look (tokens, `.fk-header-*` in app/globals.css), a centred header or a
+ * second row (a code edit of `components/site-header.tsx`). An announcement bar is the `header.top` slot (`config/slots.tsx`,
+ * `docs/contracts/slots.md`; this note was updated when the slots arrived, a fork's copy of this file may still say otherwise).
  *
  * Example: the search icon right after the menu button, four categories, the cart before the language list, the delivery
  * page linked after the catalog:

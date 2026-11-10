@@ -2,5 +2,14 @@
   "custom.brandStrip.title": "Our brands",
   "custom.brandStrip.first": "First brand",
   "custom.brandStrip.second": "Second brand",
-  "custom.promo.title": "Deal of the week"
+  "custom.promo.title": "Deal of the week",
+  "custom.slots.announcement": "Free delivery from 1 000 UAH",
+  "custom.slots.badge": "New",
+  "custom.slots.save": "Save {title}",
+  "custom.slots.saveShort": "Save",
+  "custom.slots.footer.shop": "Shop",
+  "custom.slots.footer.legal": "Legal",
+  "custom.slots.footer.contacts": "Contacts",
+  "custom.slots.footer.newsletter": "Newsletter",
+  "custom.slots.footer.newsletterSoon": "Our newsletter is coming soon."
 }

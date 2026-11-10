@@ -18,6 +18,10 @@ Accessibility rules every kind keeps (the built-in kinds are the reference): one
 the brand link above that layer, the price with `priceLabel`, availability as a badge only when `badge` is true (else visually hidden text),
 the heading level given by `headingLevel`, no action inside the product link.
 
+Card slots (`docs/contracts/slots.md`, since PR-H): the built-in `grid` and `list` cards render the `product-card.badges` and
+`product-card.actions` slots of `config/slots.tsx`. A fork's own card kind (or an override of `grid` or `list` in `cards/custom.ts`) gets
+NO slots unless it calls `renderSlot` of `lib/slots.ts` itself, with `{ card, kind, locale, t }`.
+
 ## `view` URL parameter (catalog, category and search result pages)
 
 | Value | Meaning |
