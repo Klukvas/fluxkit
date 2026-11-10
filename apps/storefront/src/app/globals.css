@@ -101,6 +101,19 @@
   .fk-header-end {
     @apply ms-auto flex shrink-0 items-center gap-1;
   }
+  /* CORE-EDIT (fork a1-reshape): the `centred` header layout (`CentredRow` in components/site-header.tsx). */
+  .fk-header-centred {
+    @apply flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:gap-x-4;
+  }
+  .fk-header-side {
+    @apply flex min-w-0 items-center gap-1 lg:flex-1 lg:basis-0;
+  }
+  .fk-header-middle {
+    @apply flex max-lg:grow lg:justify-center;
+  }
+  .fk-header-centred .fk-header-search {
+    @apply lg:order-last lg:w-full lg:basis-full;
+  }
   .fk-site-footer {
     @apply mt-12 border-t border-border py-6 text-muted-foreground;
   }
@@ -145,7 +158,8 @@
   /* Anchors and focused fields stop below the sticky header, and above a sticky bottom bar while one is on the page. */
   @media (width < 64rem) {
     html {
-      scroll-padding-top: 5rem;
+      /* CORE-EDIT (fork a1-reshape): 5rem plus the announcement bar (header.top) that is sticky with the header. */
+      scroll-padding-top: 6.5rem;
     }
     html:has(.fk-sticky-bottom) {
       scroll-padding-bottom: 9rem;

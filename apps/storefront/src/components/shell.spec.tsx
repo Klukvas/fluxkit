@@ -69,7 +69,9 @@ describe("SiteShell landmarks and accessibility", () => {
   it("labels every navigation landmark", () => {
     const navs = html.match(/<nav[^>]*>/g) ?? [];
     // main (twice: inside the menu below `xl`, inline from `xl`; one is always display:none), locale switcher, footer
-    expect(navs).toHaveLength(4);
+    // CORE-EDIT (fork a1-reshape): the `centred` header splits the inline navigation into two labelled landmarks.
+    const centred = headerConfig.layout === "centred";
+    expect(navs).toHaveLength(centred ? 5 : 4);
     for (const nav of navs) expect(nav).toMatch(/aria-label="§[^"]+"/);
     const mains = navs.filter((nav) => nav.includes('aria-label="§nav.main.label"'));
     expect(mains).toHaveLength(2);

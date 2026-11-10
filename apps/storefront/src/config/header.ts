@@ -22,6 +22,8 @@
  * page linked after the catalog:
  *
  *   export const headerConfig: HeaderConfig = {
+  // CORE-EDIT: `layout` exists only with the core edit of layout/header-layout.ts and components/site-header.tsx.
+  layout: "centred",
  *     blocks: ["menu", "search", "logo", "navigation", "controls"],
  *     controls: ["cart", "account", "language"],
  *     navigation: {
@@ -38,6 +40,8 @@
 import type { HeaderConfig } from "../layout/header-layout";
 
 export const headerConfig: HeaderConfig = {
+  // CORE-EDIT: `layout` exists only with the core edit of layout/header-layout.ts and components/site-header.tsx.
+  layout: "centred",
   // FORK: the categories before the logo (closest supported order to "centred logo, navigation split").
   blocks: ["navigation", "menu", "logo", "search", "controls"],
   controls: ["language", "cart", "account"],

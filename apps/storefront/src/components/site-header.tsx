@@ -55,9 +55,17 @@ function MenuBlock({
   );
 }
 
-function NavigationBlock({ links, t }: { links: readonly HeaderLink[]; t: Translator }) {
+function NavigationBlock({
+  links,
+  t,
+  label = t("nav.main.label"),
+}: {
+  links: readonly HeaderLink[];
+  t: Translator;
+  label?: string;
+}) {
   return (
-    <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">
+    <nav aria-label={label} className="hidden min-w-0 shrink xl:block">
       <ul className="fk-header-nav">
         {links.map((link) => (
           <li key={link.key}>
@@ -118,6 +126,48 @@ function block(view: HeaderBlockView, locale: Locale, t: Translator): ReactNode 
 }
 
 /**
+ * CORE-EDIT (fork a1-reshape): the `centred` layout. From `lg` three equal columns (start: the first half of the navigation
+ * links; middle: the logo; end: the second half and the controls) and the search box in a full-width row below
+ * (`.fk-header-centred` in app/globals.css). Below `lg` the same one row as the default header: menu, logo, search icon,
+ * controls. The two halves are two `nav` landmarks with their own names.
+ */
+function CentredRow({
+  blocks,
+  locale,
+  t,
+}: {
+  blocks: readonly HeaderBlockView[];
+  locale: Locale;
+  t: Translator;
+}) {
+  const find = <K extends HeaderBlockView["kind"]>(kind: K) =>
+    blocks.find((view): view is Extract<HeaderBlockView, { kind: K }> => view.kind === kind);
+  const menu = find("menu");
+  const navigation = find("navigation");
+  const search = find("search");
+  const controls = find("controls");
+  const half = navigation === undefined ? 0 : Math.ceil(navigation.links.length / 2);
+  const before = navigation?.links.slice(0, half) ?? [];
+  const after = navigation?.links.slice(half) ?? [];
+  return (
+    <Container className="fk-header-centred">
+      <div className="fk-header-side">
+        {menu === undefined ? null : block(menu, locale, t)}
+        {before.length === 0 ? null : <NavigationBlock links={before} t={t} />}
+      </div>
+      <div className="fk-header-middle">{block({ kind: "logo" }, locale, t)}</div>
+      {search === undefined ? null : block(search, locale, t)}
+      <div className="fk-header-side justify-end">
+        {after.length === 0 ? null : (
+          <NavigationBlock links={after} t={t} label={t("custom.header.navMore")} />
+        )}
+        {controls === undefined ? null : block(controls, locale, t)}
+      </div>
+    </Container>
+  );
+}
+
+/**
  * Server-rendered header, ONE row of controls in every language (owner request 2026-11-02). Its blocks and their order come
  * from `config/header.ts` through `headerView` (`layout/header-layout.ts`, plan L3); the defaults: the menu button (below `xl`),
  * the logo (`brand-logo.tsx`, `config/brand.ts`), the category links (from `xl`, a row that scrolls instead of wrapping when a shop has many or long names), the
@@ -144,9 +194,14 @@ export function SiteHeader({
   config?: HeaderConfig;
 }) {
   const blocks = headerView(config, { locale, t, categories, searchEnabled });
-  const row = (
-    <Container className="fk-header-row">{blocks.map((view) => block(view, locale, t))}</Container>
-  );
+  const row =
+    config.layout === "centred" ? (
+      <CentredRow blocks={blocks} locale={locale} t={t} />
+    ) : (
+      <Container className="fk-header-row">
+        {blocks.map((view) => block(view, locale, t))}
+      </Container>
+    );
   // The `header.top` slot (`config/slots.tsx`) before the row. Empty, the header's only child stays the row: the same markup
   // and the same React payload as without slots (no `null` child).
   const top = renderSlot("header.top", { locale, t }, slots);

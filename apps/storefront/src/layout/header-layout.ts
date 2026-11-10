@@ -27,6 +27,12 @@ export type HeaderBlockName = "menu" | "logo" | "navigation" | "search" | "contr
 export type HeaderControlName = "language" | "cart" | "account";
 
 export interface HeaderConfig {
+  /**
+   * CORE-EDIT (fork a1-reshape): `centred` puts the logo in the middle from `lg`, the navigation links split before and after
+   * it (from `xl`), the controls at the end, and the search box in a full-width row below. Below `lg` the header is the same
+   * one row as `row` (the default). `blocks` still decides which blocks exist; their order is fixed in `centred`.
+   */
+  layout?: "row" | "centred";
   /** The blocks of the header row, in order; a block that is not listed is not rendered. Each at most once. */
   blocks: readonly HeaderBlockName[];
   /** The controls of the `controls` block, in order; each at most once; not empty while `controls` is listed. */

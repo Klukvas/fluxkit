@@ -110,11 +110,10 @@ describe("a fork's filled UI slots", () => {
   });
 
   it("renders the announcement bar first inside the header, before the header row", () => {
-    expect(
-      header.startsWith(
-        '<header class="fk-site-header"><div data-fork-announcement="" class="bg-primary text-primary-foreground"><div class="mx-auto w-full max-w-6xl px-4"><p class="py-2 text-center text-sm">Free delivery from 1 000 UAH</p></div></div><div class="mx-auto w-full max-w-6xl px-4 fk-header-row">',
-      ),
-    ).toBe(true);
+    // CORE-EDIT (fork a1-reshape): this run reads the fork's real config/header.ts, whose `centred` layout renders another row class.
+    expect(header).toMatch(
+      /^<header class="fk-site-header"><div data-fork-announcement="" class="bg-primary text-primary-foreground"><div class="mx-auto w-full max-w-6xl px-4"><p class="py-2 text-center text-sm">Free delivery from 1 000 UAH<\/p><\/div><\/div><div class="mx-auto w-full max-w-6xl px-4 fk-header-(?:row|centred)">/,
+    );
   });
 
   it("puts the badge and the action on both built-in cards, the action named with the product's title", () => {
