@@ -24,4 +24,6 @@ export const customCards: CardRegistry = {
     listClassName: "grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4",
     maxEagerImages: 4,
   },
+  // Reshape R2: the horizontal card of `?view=list` (the list/grid switch itself ships with the template).
+  list: { Card: HorizontalListCard, listClassName: "grid grid-cols-1 gap-4", maxEagerImages: 2 },
 };
