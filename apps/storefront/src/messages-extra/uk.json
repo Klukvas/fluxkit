@@ -1,5 +1,12 @@
 {
   "custom.card.favourite": "Додати {title} в обране",
   "custom.announcement.text": "Безкоштовна доставка від 1 000 грн",
-  "custom.header.navMore": "Інші розділи"
+  "custom.header.navMore": "Інші розділи",
+  "custom.home.bestsellers": "Хіти продажу",
+  "custom.brandStrip.title": "Наші бренди",
+  "custom.brandStrip.brand1": "Бренд один",
+  "custom.brandStrip.brand2": "Бренд два",
+  "custom.brandStrip.brand3": "Бренд три",
+  "custom.brandStrip.brand4": "Бренд чотири",
+  "custom.brandStrip.brand5": "Бренд п'ять"
 }

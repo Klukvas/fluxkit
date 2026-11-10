@@ -1,5 +1,12 @@
 {
   "custom.card.favourite": "Add {title} to favourites",
   "custom.announcement.text": "Free delivery from 1,000 UAH",
-  "custom.header.navMore": "More sections"
+  "custom.header.navMore": "More sections",
+  "custom.home.bestsellers": "Bestsellers",
+  "custom.brandStrip.title": "Our brands",
+  "custom.brandStrip.brand1": "Brand one",
+  "custom.brandStrip.brand2": "Brand two",
+  "custom.brandStrip.brand3": "Brand three",
+  "custom.brandStrip.brand4": "Brand four",
+  "custom.brandStrip.brand5": "Brand five"
 }

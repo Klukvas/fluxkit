@@ -272,15 +272,9 @@ export const demoConfigBanners: BannerList = [
  * (`demoConfigBanners` above).
  */
 export const homeSections: readonly HomeSection[] = [
-  {
-    kind: "hero",
-    id: "home-hero",
-    headlineKey: "home.hero.title",
-    sublineKey: "home.hero.description",
-    cta: { labelKey: "home.hero.cta", href: "/catalog" },
-    image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
-  },
-  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  // FORK (a1-reshape): full-bleed hero with the text overlaid, then categories, a product row, the banners, "Bestsellers" and
+  // a brand-logos strip.
+  { kind: "custom", id: "home-hero", name: "heroOverlay", width: "full" },
   {
     kind: "categories",
     id: "home-categories",
@@ -295,6 +289,18 @@ export const homeSections: readonly HomeSection[] = [
     source: { sort: "newest" },
     viewAll: { labelKey: "home.newProducts.all" },
   },
+  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  {
+    // TODO(fluxkit): the store API sorts product rows by "newest" only (no sales ranking), so "Bestsellers" shows the newest
+    // products until a bestseller source exists.
+    kind: "productRow",
+    id: "home-bestsellers",
+    titleKey: "custom.home.bestsellers",
+    limit: 4,
+    source: { sort: "newest" },
+    viewAll: { labelKey: "home.newProducts.all" },
+  },
+  { kind: "custom", id: "home-brands", name: "brandStrip", width: "full" },
   { kind: "trust", id: "home-trust", titleKey: "home.trust.title" },
   { kind: "richText", id: "home-about", titleKey: "home.about.title", bodyKey: "home.about.body" },
 ];
