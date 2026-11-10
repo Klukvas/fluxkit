@@ -7,10 +7,10 @@ import { footerConfigProblems, footerView, type FooterConfig } from "./footer-la
 
 const keysOf = (locale: "uk" | "en") => new Set(Object.keys(messagesByLocale[locale]));
 const contacts = contactsView();
-const shopLinks = [{ labelKey: "pages.about.title", href: "/about" }];
+const shopLinks = [{ labelKey: "shopPages.about.title", href: "/about" }];
 const legalLinks = [{ labelKey: "legal.privacy.title", href: "/legal/privacy" }];
 const base: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright", "poweredBy"],
+  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
   navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
 };
 const input = { shopLinks, legalLinks, contacts, showThemeSwitch: true };
@@ -33,7 +33,6 @@ describe("footerView", () => {
       { kind: "contacts", contacts },
       { kind: "themeSwitch" },
       { kind: "copyright" },
-      { kind: "poweredBy" },
     ]);
   });
 
@@ -54,12 +53,7 @@ describe("footerView", () => {
 
   it("drops empty link groups, a navigation with no links at all (no empty landmark), and the switch when the theme config hides it", () => {
     const view = footerView(base, { ...input, shopLinks: [], showThemeSwitch: false });
-    expect(view.map((block) => block.kind)).toEqual([
-      "navigation",
-      "contacts",
-      "copyright",
-      "poweredBy",
-    ]);
+    expect(view.map((block) => block.kind)).toEqual(["navigation", "contacts", "copyright"]);
     expect(view[0]).toEqual({ kind: "navigation", groups: [legalLinks] });
     const noLinks = footerView(base, { ...input, shopLinks: [], legalLinks: [] });
     expect(noLinks.map((block) => block.kind)).not.toContain("navigation");

@@ -4,7 +4,8 @@ import { createTranslator, locales } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { messagesByLocale } from "../messages";
-import { HEADER_CATEGORY_LIMIT, MAIN_CONTENT_ID } from "../layout/navigation";
+import { headerConfig } from "../config/header";
+import { MAIN_CONTENT_ID } from "../layout/navigation";
 import { AccountLinkView, SignOutItemView } from "./account-link";
 import { CartBadgeView } from "./cart-badge";
 import { LocaleSwitcherView } from "./locale-switcher";
@@ -127,7 +128,7 @@ describe("header and footer size (a loose sanity cap, ADR 0048)", () => {
   // `first-html` (the raw HTML: the form is not in a hidden segment and no loading view precedes it). These caps only catch
   // a runaway header or footer (every page carries them); a client fork may raise them with a reason.
   it("keeps the header under 8 000 bytes", () => {
-    const longNames = Array.from({ length: HEADER_CATEGORY_LIMIT }, (_, index) => ({
+    const longNames = Array.from({ length: headerConfig.navigation.categoryLimit }, (_, index) => ({
       slug: `category-${String(index)}`,
       name: `§Category name ${String(index)}`,
     }));

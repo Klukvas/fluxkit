@@ -188,7 +188,12 @@ describe("the footer", () => {
       <SiteFooter locale="en" t={t} year={2026} themeMode="light" contacts={none} shopLinks={[]} />,
     );
     expect(empty).not.toContain("<address");
-    expect(empty.match(/<ul/g)).toHaveLength(1);
+    // No shop pages: their list is left out (no empty `<ul>`), whatever the other link groups of `config/footer.ts` are.
+    const withShopPages = renderToStaticMarkup(
+      <SiteFooter locale="en" t={t} year={2026} themeMode="light" contacts={none} />,
+    );
+    expect(empty).not.toContain("<ul></ul>");
+    expect(empty.match(/<ul/g)?.length).toBe((withShopPages.match(/<ul/g)?.length ?? 0) - 1);
     expect(empty).toContain('class="fk-theme-option"');
   });
 });

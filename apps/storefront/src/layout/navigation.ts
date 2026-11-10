@@ -1,7 +1,8 @@
 /**
- * Header and footer links as configuration (AGENTS.md section 2.2): labels are message keys, targets are storefront paths
- * without the locale (`localizedHref` adds it). Reorder, add or remove entries here without touching a component. Internal
- * to the storefront in v1, not a public contract (plan, open question 11).
+ * Footer and account links as configuration (AGENTS.md section 2.2): labels are message keys, targets are storefront paths
+ * without the locale (`localizedHref` adds it). Internal to the storefront, not a public contract (plan, open question 11).
+ * The header's links, its category count and the order of the header and footer blocks are in the fork-owned
+ * `config/header.ts` and `config/footer.ts` (contract `docs/contracts/header-footer.md`).
  */
 
 import { legalPages } from "../config/legal";
@@ -14,14 +15,6 @@ export interface NavigationLink {
 
 /** The `id` of `<main>`, the target of the skip link. */
 export const MAIN_CONTENT_ID = "main-content";
-
-/** Links after the category list in the header navigation. */
-export const headerLinks: readonly NavigationLink[] = [
-  { labelKey: "nav.catalog", href: "/catalog" },
-];
-
-/** Most top-level categories shown in the header; the rest are reachable through the catalog. */
-export const HEADER_CATEGORY_LIMIT = 6;
 
 /**
  * The footer's second list: the legal pages (privacy plan step 10), from their own config: add or remove a page there, the

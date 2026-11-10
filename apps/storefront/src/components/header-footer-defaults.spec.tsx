@@ -34,8 +34,8 @@ const categories = Array.from({ length: 7 }, (_, index) => ({
 }));
 /** Explicit shop links and contacts: this file freezes the composition, not `config/shop-pages.ts` or `config/contacts.ts`. */
 const shopLinks = [
-  { labelKey: "pages.about.title", href: "/about" },
-  { labelKey: "pages.contacts.title", href: "/contacts" },
+  { labelKey: "shopPages.about.title", href: "/about" },
+  { labelKey: "shopPages.contacts.title", href: "/contacts" },
 ];
 const contacts = contactsView({
   phones: [{ tel: "+380441234567", display: "+380 44 123 45 67" }],
@@ -90,10 +90,10 @@ describe("default header and footer markup (frozen before the L3 config, byte fo
       const { header, footer } = renderFrame(locale);
       expect(header.startsWith("<header")).toBe(true);
       expect(footer.endsWith("</footer>")).toBe(true);
-      expect(header).toBe(frozen(`header.${locale}.html`));
-      expect(footer).toBe(frozen(`footer.${locale}.html`));
-      expect(bytes(header)).toBe(bytes(frozen(`header.${locale}.html`)));
-      expect(bytes(footer)).toBe(bytes(frozen(`footer.${locale}.html`)));
+      expect(header).toBe(frozen(`header.${locale}.txt`));
+      expect(footer).toBe(frozen(`footer.${locale}.txt`));
+      expect(bytes(header)).toBe(bytes(frozen(`header.${locale}.txt`)));
+      expect(bytes(footer)).toBe(bytes(frozen(`footer.${locale}.txt`)));
     });
   }
 });
