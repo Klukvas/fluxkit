@@ -41,3 +41,75 @@
  *   page backgrounds in theme-color.ts. Their specs fail with the value to write until they equal the effective tokens.
  * - A web font comes from apps/storefront/src/config/fonts.ts; name its variable here: `--fk-font-display: var(--font-...), ...`.
  */
+
+/* Verde Kopi: forest green, warm amber accent, warm off-white neutrals, serif headings, small radii, warm soft shadows. */
+:root,
+[data-theme="light"] {
+  --fk-color-background: #faf7f2;
+  --fk-color-foreground: #14201b;
+  --fk-color-muted: #f0ebe1;
+  --fk-color-muted-foreground: #55605a;
+  --fk-color-border: #e2dbcd;
+  --fk-color-border-input: #76807a;
+  --fk-color-primary: #1f5f4a;
+  --fk-color-primary-foreground: #ffffff;
+  --fk-color-accent: #a85d00;
+  --fk-color-accent-foreground: #ffffff;
+  --fk-color-danger: #b3261e;
+  --fk-color-danger-foreground: #ffffff;
+  --fk-color-success: #1f6b3a;
+  --fk-color-warning: #8f5200;
+  --fk-color-ring: #1f5f4a;
+  --fk-radius-control: 0.25rem;
+  --fk-radius-card: 0.5rem;
+  --fk-radius-overlay: 0.5rem;
+  --fk-radius-media: 0.25rem;
+  --fk-font-display: ui-serif, Georgia, Cambria, serif;
+  --fk-shadow-card: 0 1px 2px 0 rgb(60 42 20 / 0.07);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(60 42 20 / 0.1), 0 2px 4px -2px rgb(60 42 20 / 0.06);
+  --fk-shadow-overlay: 0 14px 36px -10px rgb(60 42 20 / 0.16), 0 4px 10px -4px rgb(60 42 20 / 0.08);
+}
+
+[data-theme="dark"] {
+  --fk-color-background: #0e1613;
+  --fk-color-foreground: #e8e4da;
+  --fk-color-muted: #18231e;
+  --fk-color-muted-foreground: #9fb0a6;
+  --fk-color-border: #27352e;
+  --fk-color-border-input: #6f8479;
+  --fk-color-primary: #6cc0a0;
+  --fk-color-primary-foreground: #0e1613;
+  --fk-color-accent: #e9b04a;
+  --fk-color-accent-foreground: #0e1613;
+  --fk-color-danger: #f2857b;
+  --fk-color-danger-foreground: #0e1613;
+  --fk-color-success: #6fd08c;
+  --fk-color-warning: #f0b656;
+  --fk-color-ring: #6cc0a0;
+  --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+  --fk-shadow-overlay: 0 14px 36px -10px rgb(0 0 0 / 0.6), 0 4px 10px -4px rgb(0 0 0 / 0.4);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --fk-color-background: #0e1613;
+    --fk-color-foreground: #e8e4da;
+    --fk-color-muted: #18231e;
+    --fk-color-muted-foreground: #9fb0a6;
+    --fk-color-border: #27352e;
+    --fk-color-border-input: #6f8479;
+    --fk-color-primary: #6cc0a0;
+    --fk-color-primary-foreground: #0e1613;
+    --fk-color-accent: #e9b04a;
+    --fk-color-accent-foreground: #0e1613;
+    --fk-color-danger: #f2857b;
+    --fk-color-danger-foreground: #0e1613;
+    --fk-color-success: #6fd08c;
+    --fk-color-warning: #f0b656;
+    --fk-color-ring: #6cc0a0;
+    --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
+    --fk-shadow-overlay: 0 14px 36px -10px rgb(0 0 0 / 0.6), 0 4px 10px -4px rgb(0 0 0 / 0.4);
+  }
+}
