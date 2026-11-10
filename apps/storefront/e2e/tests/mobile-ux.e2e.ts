@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
+import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
  * The mobile batch of the UX review (plan `docs/plans/2026-11-03-storefront-mobile-ux.md`), on a 390 x 844 touch screen
@@ -390,7 +391,7 @@ for (const width of [1024, 1280]) {
       await expect(header.locator('a[href="#site-search"]')).toBeHidden();
       await expect(header.getByRole("link", { name: "Search", exact: true })).toHaveCount(0);
       expect((await stableBox(header)).height).toBeLessThanOrEqual(64);
-      const logo = await stableBox(header.getByRole("link", { name: "Fluxkit", exact: true }));
+      const logo = await stableBox(header.getByRole("link", { name: SHOP_NAME.en, exact: true }));
       const search = await stableBox(header.getByRole("combobox", { name: "Search products" }));
       const cart = await stableBox(header.getByRole("link", { name: /Cart/ }));
       const middle = (item: { y: number; height: number }) => item.y + item.height / 2;

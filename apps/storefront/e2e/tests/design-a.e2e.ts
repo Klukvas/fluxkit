@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { Locator, Page } from "@playwright/test";
 import { expect, test, uniqueEmail } from "../support/fixtures.ts";
 import { rowValue, tabTo, waitForHydration } from "../support/flows.ts";
+import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
  * Desktop design, batch A (plan `docs/plans/2026-11-03-storefront-design-a.md`): the product card's hover and alignment, the
@@ -192,7 +193,7 @@ test("one focus ring: the logo, an option value and a gallery thumbnail show the
     return color;
   }, ring);
 
-  const logo = page.getByRole("banner").getByRole("link", { name: "Fluxkit" });
+  const logo = page.getByRole("banner").getByRole("link", { name: SHOP_NAME.en });
   await tabTo(page, logo);
   expect(await outline(logo)).toEqual({ style: "solid", width: "2px", color: ringColor });
 

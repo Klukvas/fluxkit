@@ -155,9 +155,17 @@ describe("source guards (AGENTS.md sections 2.3 and 11)", () => {
     );
     expect(localPicture?.text).toMatch(/image: LocalImage;/);
     expect(localPicture?.text).toContain("if (!/^\\/[A-Za-z0-9._-]/.test(image.src)) {");
+    // The header logo (`config/brand.ts`, plan B1) is a plain `<img>` (no `next/image` client code in every page's shell),
+    // checked at render by the brand config's one path rule (`isPublicFilePath`, also no `//` or `..`), its own files only.
+    const brandLogo = sources.find((file) => file.path === join("components", "brand-logo.tsx"));
+    expect(brandLogo?.text).toMatch(/picture: BrandPicture;/);
+    expect(brandLogo?.text).toContain("if (!isPublicFilePath(picture.src)) {");
+    expect(brandLogo?.text.match(/<img[\s>]/g)).toHaveLength(1);
+    expect(brandLogo?.text).not.toMatch(/from ["']next\/image["']/);
     for (const file of sources) {
       if (file.path === join("components", "store-image.tsx")) continue;
       if (file.path === join("components", "local-picture.tsx")) continue;
+      if (file.path === join("components", "brand-logo.tsx")) continue;
       expect(file.text, file.path).not.toMatch(/from ["']next\/image["']/);
       expect(file.text, file.path).not.toMatch(/<img[\s>]/);
     }

@@ -4,6 +4,7 @@ Everything listed here is covered by SemVer. Anything not listed is internal.
 
 Existing:
 - `api.md` - public HTTP API (source of truth: `docs/api/openapi.json`).
+- `branding.md` - the storefront brand config `apps/storefront/src/config/brand.ts` (fork-owned): logo, icons, theme colour, default social picture.
 - `card-registry.md` - storefront product card registry (fork-owned `cards/custom.ts`, `ProductCardModel`) and the `view` URL parameter (draft).
 - `config.md` - environment variables and the feature package contract.
 - `events.md` - domain events (the outbox), the handler metadata key, the delivery rules and the order ports.

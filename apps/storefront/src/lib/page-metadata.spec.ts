@@ -7,13 +7,21 @@ import {
   privateMetadata,
   productMetadata,
   searchMetadata,
+  shopPageMetadata,
 } from "./page-metadata";
 import { product } from "./test-fixtures";
 
 const { uk } = messagesByLocale;
+/** The shop name of the merged messages (a fork renames it in `messages-overrides`): never a literal here (plan B3). */
+const shopName = uk["site.name"] as string;
 
 const t = createTranslator(uk, "uk");
 const origin = "https://shop.example";
+/**
+ * No brand picture: these specs state it instead of reading `config/brand.ts`, which a fork fills (they stay green there,
+ * `vitest.brand-fork.config.ts`). The real file's defaults are checked in `config/brand.spec.ts`.
+ */
+const ogImage = null;
 
 function listing(
   query: { page: number; brand: string | null; view?: "grid" | "list" },
@@ -27,6 +35,7 @@ function listing(
     query,
     title: "Каталог",
     description: "Опис",
+    ogImage,
   });
 }
 
@@ -42,7 +51,7 @@ describe("listingMetadata", () => {
         "x-default": "https://shop.example/uk/catalog",
       },
     });
-    expect(meta.title).toBe("Каталог — Fluxkit");
+    expect(meta.title).toBe(`Каталог — ${shopName}`);
     expect(meta.description).toBe("Опис");
   });
 
@@ -58,7 +67,7 @@ describe("listingMetadata", () => {
     const meta = listing({ page: 2, brand: null }, "/c/shoes");
     expect(meta.alternates?.canonical).toBe("https://shop.example/uk/c/shoes?page=2");
     expect(meta.robots).toEqual({ index: false, follow: true });
-    expect(meta.title).toBe("Каталог (Сторінка 2) — Fluxkit");
+    expect(meta.title).toBe(`Каталог (Сторінка 2) — ${shopName}`);
   });
 
   it("drops the brand but keeps the page for a filtered later page", () => {
@@ -69,10 +78,10 @@ describe("listingMetadata", () => {
   it("repeats title and description in Open Graph with the canonical URL", () => {
     const meta = listing({ page: 1, brand: null });
     expect(meta.openGraph).toMatchObject({
-      title: "Каталог — Fluxkit",
+      title: `Каталог — ${shopName}`,
       description: "Опис",
       url: "https://shop.example/uk/catalog",
-      siteName: "Fluxkit",
+      siteName: shopName,
     });
   });
 
@@ -85,6 +94,7 @@ describe("listingMetadata", () => {
       query: { page: 1, brand: null },
       title: "Каталог",
       description: undefined,
+      ogImage,
     });
     expect(meta).not.toHaveProperty("description");
   });
@@ -102,7 +112,7 @@ describe("productMetadata", () => {
         media: [{ url: "https://cdn.example.com/a.jpg", alt: "Front view", optionValueId: null }],
       }),
     });
-    expect(meta.title).toBe("Demo product | Fluxkit");
+    expect(meta.title).toBe(`Demo product | ${shopName}`);
     expect(meta.description).toBe("A demo product.");
     expect(meta.alternates).toEqual({
       canonical: "https://shop.example/en/p/demo-product",
@@ -113,7 +123,7 @@ describe("productMetadata", () => {
       },
     });
     expect(meta.openGraph).toMatchObject({
-      title: "Demo product | Fluxkit",
+      title: `Demo product | ${shopName}`,
       url: "https://shop.example/en/p/demo-product",
       images: [{ url: "https://cdn.example.com/a.jpg", alt: "Front view" }],
     });
@@ -125,6 +135,7 @@ describe("productMetadata", () => {
       origin,
       locale: "uk",
       t,
+      ogImage,
       product: product({
         title: "Назва",
         description: null,
@@ -143,13 +154,82 @@ describe("productMetadata", () => {
 
 describe("homeMetadata", () => {
   it("gives the home page a locale root canonical and both hreflang URLs", () => {
-    expect(homeMetadata({ origin, locale: "en" }).alternates).toEqual({
+    expect(homeMetadata({ origin, locale: "en", t }).alternates).toEqual({
       canonical: "https://shop.example/en",
       languages: {
         uk: "https://shop.example/uk",
         en: "https://shop.example/en",
         "x-default": "https://shop.example/uk",
       },
+    });
+  });
+});
+
+describe("the brand's default social picture (config/brand.ts ogImage, plan B1)", () => {
+  const ogImage = { src: "/brand/og.png", width: 1200, height: 630 } as const;
+  const expected = [
+    { url: "https://shop.example/brand/og.png", width: 1200, height: 630, alt: shopName },
+  ];
+
+  it("adds nothing without a brand picture (no og:image, the home page keeps no openGraph)", () => {
+    expect(homeMetadata({ origin, locale: "uk", t, ogImage: null })).not.toHaveProperty(
+      "openGraph",
+    );
+    expect(listing({ page: 1, brand: null }).openGraph).not.toHaveProperty("images");
+    expect(
+      productMetadata({ origin, locale: "uk", t, ogImage: null, product: product({ media: [] }) })
+        .openGraph,
+    ).not.toHaveProperty("images");
+  });
+
+  it("is added, absolute, to every page that writes its own openGraph (Next replaces the layout's instead of merging)", () => {
+    expect(homeMetadata({ origin, locale: "uk", t, ogImage }).openGraph).toEqual({
+      images: expected,
+    });
+    const list = listingMetadata({
+      origin,
+      locale: "uk",
+      t,
+      basePath: "/catalog",
+      query: { page: 1, brand: null },
+      title: "Каталог",
+      description: "Опис",
+      ogImage,
+    });
+    expect(list.openGraph).toMatchObject({ siteName: shopName, images: expected });
+    const page = shopPageMetadata({
+      origin,
+      locale: "uk",
+      t,
+      titleKey: "shopPages.returns.title",
+      descriptionKey: "shopPages.returns.description",
+      slug: "returns",
+      ogImage,
+    });
+    expect(page.openGraph).toMatchObject({ images: expected });
+  });
+
+  it("stands in for a product without a usable picture, never for a product's own", () => {
+    const bare = productMetadata({
+      origin,
+      locale: "uk",
+      t,
+      ogImage,
+      product: product({ media: [{ url: "javascript:x", alt: null, optionValueId: null }] }),
+    });
+    expect(bare.openGraph).toMatchObject({ images: expected });
+    const own = productMetadata({
+      origin,
+      locale: "uk",
+      t,
+      ogImage,
+      product: product({
+        title: "Назва",
+        media: [{ url: "https://cdn.example.com/a.jpg", alt: null, optionValueId: null }],
+      }),
+    });
+    expect(own.openGraph).toMatchObject({
+      images: [{ url: "https://cdn.example.com/a.jpg", alt: "Назва" }],
     });
   });
 });

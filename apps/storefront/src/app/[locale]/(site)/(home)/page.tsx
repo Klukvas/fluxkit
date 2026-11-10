@@ -16,7 +16,8 @@ interface HomeProps {
 export async function generateMetadata({ params }: HomeProps): Promise<Metadata> {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  return homeMetadata({ origin: await publicOrigin(), locale });
+  const t = createTranslator(messagesByLocale[locale], locale);
+  return homeMetadata({ origin: await publicOrigin(), locale, t });
 }
 
 /** The sections of `config/home.ts`; each data section streams in on its own (`components/home-sections.tsx`). */

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { HEADER_CATEGORY_LIMIT, headerLinks } from "../layout/navigation";
 import { localizedHref } from "../lib/locale-path";
 import { AccountLink } from "./account-link";
+import { BrandLogo } from "./brand-logo";
 import { CartBadge } from "./cart-badge";
 import { HeaderDisclosure, menuItem } from "./header-menu";
 import { HeaderSearchToggle } from "./header-search-toggle";
@@ -36,7 +37,7 @@ function mainLinks(
 
 /**
  * Server-rendered header, ONE row of controls in every language (owner request 2026-11-02): the menu button (below `xl`),
- * the logo, the category links (from `xl`, a row that scrolls instead of wrapping when a shop has many or long names), the
+ * the logo (`brand-logo.tsx`, `config/brand.ts`), the category links (from `xl`, a row that scrolls instead of wrapping when a shop has many or long names), the
  * search box (in the row from `lg`; below it a search icon that opens a full-width second row, `HeaderSearchToggle`), then
  * the language, cart and account icons. Below `lg` the header is sticky (`.fk-site-header`: the cart count stays in view
  * while scrolling; `scroll-padding-top` keeps anchors and focused fields out from under it). The main navigation exists twice in the markup (inline and inside the menu); one of them is always
@@ -77,9 +78,7 @@ export function SiteHeader({
             </ul>
           </nav>
         </HeaderDisclosure>
-        <Link href={localizedHref(locale, "/")} title={t("site.name")} className="fk-logo">
-          {t("site.name")}
-        </Link>
+        <BrandLogo locale={locale} t={t} />
         <nav aria-label={t("nav.main.label")} className="hidden min-w-0 shrink xl:block">
           <ul className="fk-header-nav">
             {links.map((link) => (

@@ -3,6 +3,7 @@ import { E2E_ORIGIN } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 import { tabTo, waitForHydration } from "../support/flows.ts";
 import { readLayoutShifts, watchLayoutShifts } from "../support/layout-shift.ts";
+import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
  * Desktop design, batch B (plan `docs/plans/2026-11-03-storefront-design-b.md`): the home page from `config/home.ts`, the
@@ -331,7 +332,7 @@ test("in dark, the text of the home, product, cart, checkout and shop pages keep
   // Focus ring: the ring token on the dark page.
   await page.goto("/en/cart");
   await waitForHydration(page);
-  const link = page.getByRole("link", { name: "Fluxkit" });
+  const link = page.getByRole("link", { name: SHOP_NAME.en });
   await link.focus();
   const ring = await link.evaluate((element) => getComputedStyle(element).outlineColor);
   expect(ring).toBe("rgb(129, 140, 248)");

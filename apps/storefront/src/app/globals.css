@@ -48,6 +48,27 @@
   .fk-logo {
     @apply min-h-11 min-w-0 truncate rounded-control font-display text-lg leading-11 font-bold text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:grow max-lg:basis-0 lg:shrink-0;
   }
+  /* An image logo (`config/brand.ts`, `components/brand-logo.tsx`): as tall as the header's text logo line, its width from the
+     picture's ratio. A light/dark pair shows the picture of the theme on `<html data-theme>` (the cookie, ADR 0045); `system`
+     follows the device like the tokens' system block. Unused by the template's default text logo. */
+  .fk-logo-image {
+    @apply inline-block h-8 w-auto max-w-full align-middle;
+  }
+  .fk-logo-dark,
+  [data-theme="dark"] .fk-logo-light {
+    @apply hidden;
+  }
+  [data-theme="dark"] .fk-logo-dark {
+    @apply inline-block;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-theme="system"] .fk-logo-light {
+      @apply hidden;
+    }
+    [data-theme="system"] .fk-logo-dark {
+      @apply inline-block;
+    }
+  }
   .fk-header-button {
     @apply relative inline-flex min-h-11 min-w-11 cursor-pointer list-none items-center justify-center gap-1 rounded-control px-2 text-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;
   }

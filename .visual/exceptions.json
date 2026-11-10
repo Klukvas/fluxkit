@@ -4,5 +4,17 @@
     "selector": "results.toolbar",
     "property": "screenshot",
     "reason": "PR-F (plan 2026-11-08 L2/L5, principle 2): the catalog and search toolbar gains the list/grid switch; only that row is masked, its height is unchanged and the card grid stays pixel-identical"
+  },
+  {
+    "page": "home",
+    "selector": "home.hero-picture",
+    "property": "screenshot",
+    "reason": "PR-E2 B4: neutral grey hero picture replaces the old demo picture (same file name and size); only the picture is masked, computed styles stay identical"
+  },
+  {
+    "page": "en-home",
+    "selector": "home.hero-picture",
+    "property": "screenshot",
+    "reason": "PR-E2 B4: neutral grey hero picture replaces the old demo picture (same file name and size); only the picture is masked, computed styles stay identical"
   }
 ]

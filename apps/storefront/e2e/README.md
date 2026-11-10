@@ -115,7 +115,7 @@ Declared exceptions (plan principle 2: any undeclared difference is a defect): c
 `"*"` covers every property and the presence; `"screenshot"` masks the element in that page's screenshots (both sides). Page ids are in `support/visual/pages.ts` (`home`, `catalog`, `product`, `cart`, `checkout`, `login`, `register`, `legal-privacy`, `search`, `not-found`, `en-home`, `en-catalog`, `en-register`, and the phone pass `home-390`, `catalog-390`). A reason is required; an unknown field, page, selector or property or a duplicate is an error (exit 2, also checked before the runs: `node --experimental-strip-types apps/storefront/e2e/support/visual/compare-cli.ts --check-exceptions .visual/exceptions.json`). Only the entries this tree ADDED count: an entry already in the merge-base's file (same page, theme, selector and property, whatever its reason) belongs to an earlier PR and declares nothing, so exceptions never outlive their PR. Old entries may stay or be removed by any PR. In CI (`--strict`) an added entry that matches no difference fails the job. Example (B4, neutral demo pictures):
 
 ```json
-[{ "page": "home", "selector": "home.hero", "property": "screenshot", "reason": "B4: neutral hero picture, before/after shown to the owner" }]
+[{ "page": "home", "selector": "home.hero-picture", "property": "screenshot", "reason": "B4: neutral hero picture, before/after shown to the owner" }]
 ```
 
 Tolerance: the default is exact (`maxDiffPixels: 0`). Only when a frame differs by anti-aliasing and the PR attaches that frame's diff image from an exact run, `VISUAL_TOLERANCE=ratio bash scripts/visual-compare.sh ...` uses `maxDiffPixelRatio: 0.005` with `threshold: 0.2`. The computed styles never have a tolerance.

@@ -143,6 +143,25 @@ only from that file and that the layout attaches the classes. `fonts.ts` is read
 - `@font-face` only in global CSS: `next/font` emits it into the root layout's stylesheet. Never declare a face (or a stylesheet that
   holds one) inside a `Suspense` boundary: a hoisted stylesheet there makes React outline the boundary.
 
+## Brand (`src/config/brand.ts`, 2026-11-09)
+
+A fork rebrands by following `docs/customization.md` (the checklist for every app). The storefront's own brand assets are in
+`src/config/brand.ts`, fork-owned like `fonts.ts` (contract `docs/contracts/branding.md`): the header logo (text, or an image: a light/dark pair
+switched by CSS on `<html data-theme>`, or one picture declared `darkSafe`), browser icons, the apple icon, `theme-color` per theme and the
+default `og:image`; files go under `public/` (for example `public/brand/`). Upstream values render exactly the old output (text logo, no new head
+tag). The shop name is not there: `site.name` and `site.title` in `src/messages-overrides/<locale>.json`; specs and e2e never write it (they read the
+merged messages, `src/brand-literals.spec.ts`).
+
+- The logo picture is a plain `<img>` (`components/brand-logo.tsx`): `next/image` in the header would add its client code to every page. It loads
+  eagerly with `fetchpriority="low"`, so React writes no preload into `<head>`.
+- Head bytes (every tag is in every page's first HTML; plan cap +300): 0 upstream, checked on `next start` by the CI e2e `first-html`, which
+  prints `FIRST-HTML {... "head": ...}` per route (all 24 routes equal to `main`, 2026-11-09). The example config of the file's comment, measured
+  on `next dev` only: +177 bytes with a `light` or `dark` cookie, +296 with `system` (arithmetic and limits in `docs/contracts/branding.md`).
+- Both pictures of a light/dark logo pair are downloaded (`display: none` does not stop the fetch). A React SVG component with `currentColor`
+  is not offered: the logo is a file under `public/`.
+- The `og:image` is added by the `page-metadata.ts` builders that write an `openGraph` (Next replaces the layout's `openGraph`): home, lists,
+  shop pages and a product without a usable picture.
+
 ## Structure
 
 See `docs/files/storefront.md` for one line per file. In short:

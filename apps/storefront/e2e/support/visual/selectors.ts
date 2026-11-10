@@ -13,8 +13,9 @@
 /**
  * 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review).
  * 3: `feedback.alert` removed (scoped to main it never matched on the compared pages; CI warning of PR 239).
+ * 4: `home.hero-picture` added (the hero's picture alone, a screenshot mask for B4's neutral demo pictures, PR-E2).
  */
-export const SELECTOR_LIST_VERSION = 3;
+export const SELECTOR_LIST_VERSION = 4;
 
 /** Where the search starts: the whole page or one landmark. */
 export type SelectorScope = "page" | "banner" | "main" | "contentinfo";
@@ -219,6 +220,13 @@ export const SELECTORS: readonly SelectorSpec[] = [
     description: "the home page hero",
     scope: "main",
     steps: [{ css: "[data-hero]" }],
+  },
+  {
+    // The picture alone, so a PR that replaces the demo picture masks only it in the screenshots (plan B4), not the hero's text.
+    name: "home.hero-picture",
+    description: "the picture of the home page hero",
+    scope: "main",
+    steps: [{ css: "[data-hero]" }, { css: "img" }],
   },
   {
     name: "home.banner-card",

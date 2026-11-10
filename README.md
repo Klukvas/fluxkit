@@ -530,7 +530,8 @@ docs/               architecture decisions, contracts, API and file maps, plans
 - `AGENTS.md`: rules for all contributors and AI agents (architecture, workflow, security, CI). `CLAUDE.md` imports it.
 - `docs/HANDOFF.md`: current state, next steps and working agreements; read it first when you pick up the project.
 - `docs/adr/`: decisions: 0001 own core, 0002 stack, 0003 tooling, 0004 data model, 0005 search notes, 0006 catalog schema, 0007 and 0008 catalog rules, 0009 and 0010 admin authentication, 0011 and 0012 money, stock and the pricing schema, 0013 and 0014 stock history, 0015 to 0026: cart, customers, orders, the scheduler, the order schema, guest order tokens, the open-order limit and `TRUST_PROXY`, the outbox and bounded jobs, the storefront architecture; 0027: the admin UI architecture (index with status in `docs/adr/README.md`).
-- `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, API, domain events and order ports).
+- `docs/customization.md`: the client fork's guide: rebrand checklist (name, colours, fonts, logo and icons, admin, pictures), the fork-owned files, updating from upstream.
+- `docs/contracts/`: public contracts under SemVer (config and feature flags, design tokens, the storefront brand config, API, domain events and order ports).
 - `docs/api/`: endpoint notes and `openapi.json`. `docs/files/`: what each file and package is responsible for.
 - `apps/storefront/README.md` (rendering, configuration, checks) and `apps/storefront/e2e/README.md` (browser tests): the storefront.
 - `apps/admin/README.md` (run, headers, conventions) and `apps/admin/e2e/README.md` (browser tests): the admin SPA.

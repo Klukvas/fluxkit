@@ -1,6 +1,8 @@
 import type { ProductDetail } from "@fluxkit/api-client";
 import { defaultLocale, locales, type Translator } from "@fluxkit/ui";
 import type { Metadata } from "next";
+import { brand } from "../config/brand";
+import { brandOpenGraphImages, type BrandPicture } from "./brand";
 import { catalogPath, type CatalogQuery } from "./catalog-query";
 import { searchPath, type SearchQuery } from "./search-query";
 import {
@@ -13,8 +15,24 @@ import {
 
 /**
  * `generateMetadata` results, built from data (plan, "SEO"). Pure: the route passes the public origin, the translator and
- * the loaded data. Every canonical and hreflang URL is absolute, built from `STOREFRONT_PUBLIC_URL`.
+ * the loaded data. Every canonical and hreflang URL is absolute, built from `STOREFRONT_PUBLIC_URL`. A page's `openGraph`
+ * REPLACES the layout's (Next does not merge it), so the builders that write one add the brand's default social picture
+ * (`config/brand.ts` `ogImage`; `ogImage` in the input is for tests) themselves; with none configured nothing is added.
  */
+
+/** The `ogImage` input of the builders: `config/brand.ts` unless a test passes its own (`null` for none). */
+interface BrandImageInput {
+  ogImage?: BrandPicture | null;
+}
+
+function defaultImages(origin: string, t: Translator, input: BrandImageInput) {
+  const images = brandOpenGraphImages(
+    origin,
+    t,
+    input.ogImage === undefined ? brand.ogImage : input.ogImage,
+  );
+  return images === undefined ? {} : { images };
+}
 
 function alternatesFor(origin: string, locale: string, path: string) {
   return languageAlternates({ origin, locale, locales, defaultLocale, path });
@@ -24,11 +42,18 @@ function pageTitle(t: Translator, title: string): string {
   return t("seo.pageTitle", { title, site: t("site.name") });
 }
 
-export function homeMetadata(input: { origin: string; locale: string }): Metadata {
-  return { alternates: alternatesFor(input.origin, input.locale, "") };
+export function homeMetadata(
+  input: { origin: string; locale: string; t: Translator } & BrandImageInput,
+): Metadata {
+  const images = defaultImages(input.origin, input.t, input);
+  return {
+    alternates: alternatesFor(input.origin, input.locale, ""),
+    // Only with a configured picture: the home page had no `openGraph` before the brand config.
+    ...("images" in images ? { openGraph: images } : {}),
+  };
 }
 
-export interface ListingMetadataInput {
+export interface ListingMetadataInput extends BrandImageInput {
   origin: string;
   locale: string;
   t: Translator;
@@ -73,6 +98,7 @@ export function listingMetadata(input: ListingMetadataInput): Metadata {
       url: alternates.canonical,
       siteName: t("site.name"),
       type: "website",
+      ...defaultImages(input.origin, t, input),
     },
   };
 }
@@ -102,12 +128,14 @@ export function searchMetadata(input: {
   };
 }
 
-export function productMetadata(input: {
-  origin: string;
-  locale: string;
-  t: Translator;
-  product: ProductDetail;
-}): Metadata {
+export function productMetadata(
+  input: {
+    origin: string;
+    locale: string;
+    t: Translator;
+    product: ProductDetail;
+  } & BrandImageInput,
+): Metadata {
   const { t, product } = input;
   const title = pageTitle(t, product.title);
   const description = trimDescription(product.description) ?? product.title;
@@ -128,7 +156,7 @@ export function productMetadata(input: {
       siteName: t("site.name"),
       type: "website",
       ...(imageUrl === null
-        ? {}
+        ? defaultImages(input.origin, t, input)
         : { images: [{ url: imageUrl, alt: product.media[0]?.alt ?? product.title }] }),
     },
   };
@@ -155,14 +183,16 @@ export function legalMetadata(input: {
  * own canonical and its hreflang alternates. Indexable (no robots opinion): delivery, returns and contacts are what a shopper
  * searches for.
  */
-export function shopPageMetadata(input: {
-  origin: string;
-  locale: string;
-  t: Translator;
-  titleKey: string;
-  descriptionKey: string;
-  slug: string;
-}): Metadata {
+export function shopPageMetadata(
+  input: {
+    origin: string;
+    locale: string;
+    t: Translator;
+    titleKey: string;
+    descriptionKey: string;
+    slug: string;
+  } & BrandImageInput,
+): Metadata {
   const title = pageTitle(input.t, input.t(input.titleKey));
   const description = input.t(input.descriptionKey);
   const alternates = alternatesFor(input.origin, input.locale, `/${input.slug}`);
@@ -176,6 +206,7 @@ export function shopPageMetadata(input: {
       url: alternates.canonical,
       siteName: input.t("site.name"),
       type: "website",
+      ...defaultImages(input.origin, input.t, input),
     },
   };
 }
