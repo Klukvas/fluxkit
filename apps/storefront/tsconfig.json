@@ -20,6 +20,7 @@
     "security-headers.spec.ts",
     "vitest.config.ts",
     "vitest.brand-fork.config.ts",
+    "vitest.home-fork.config.ts",
     "e2e",
     "src",
     ".next/types/**/*.ts",

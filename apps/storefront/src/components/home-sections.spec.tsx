@@ -116,8 +116,9 @@ describe("home sections from config", () => {
     expect(headings(later)).toEqual(["h1", "h2", "h3", "h3", "h2"]);
     expect(later).toContain('<h1 class="sr-only">§site.name</h1>');
     expect(later).toMatch(/<h2 id="hero-title"/);
+    // The page's `Container` belongs to the sections (it moved from the route with L4, markup unchanged).
     expect(render([])).toBe(
-      '<div class="flex flex-col gap-12 py-8"><h1 class="sr-only">§site.name</h1></div>',
+      '<div class="mx-auto w-full max-w-6xl px-4"><div class="flex flex-col gap-12 py-8"><h1 class="sr-only">§site.name</h1></div></div>',
     );
   });
 

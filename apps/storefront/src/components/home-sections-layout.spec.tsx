@@ -1,4 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerenderToNodeStream } from "react-dom/static";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   CategoriesSection,
@@ -11,7 +12,7 @@ import type {
 import type { CustomSectionProps } from "../lib/custom-sections";
 import type { HomeSectionResult } from "../lib/home-data";
 import { category } from "../lib/test-fixtures";
-import { HomeSectionsView, type HomeContext } from "./home-sections";
+import { HomeSections, HomeSectionsView, type HomeContext } from "./home-sections";
 import { leftoverText, sentinelTranslator } from "./test-helpers";
 
 // Per-section `width` and the `custom` kind (plan 2026-11-08-design-changeability.md, L4; `docs/contracts/home-sections.md`).
@@ -61,9 +62,10 @@ function render(sections: readonly HomeSection[], loaded = results): string {
 
 const container = '<div class="mx-auto w-full max-w-6xl px-4">';
 const stack = '<div class="flex flex-col gap-12 py-8">';
-const contained = '<div data-home-width="contained" class="mx-auto w-full max-w-6xl px-4 empty:hidden">';
+const contained =
+  '<div class="mx-auto w-full max-w-6xl px-4 empty:hidden" data-home-width="contained">';
 const fullBand =
-  '<div data-home-width="full" class="bg-muted px-4 py-8 empty:hidden *:mx-auto *:max-w-280">';
+  '<div class="mx-auto w-full max-w-6xl px-4 relative isolate py-8 empty:hidden before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-muted" data-home-width="full">';
 
 afterEach(() => {
   received.length = 0;
@@ -84,16 +86,19 @@ describe("home section width", () => {
 
   it("with a full section, frames each section on its own: a full-bleed token band with contained content", () => {
     const html = render([hero, { ...tiles, width: "full" }, trust, about]);
-    expect(html.startsWith(stack)).toBe(true);
+    // The stack spans the window and clips the bands' layers (no horizontal scrollbar).
+    expect(html.startsWith('<div class="flex flex-col gap-12 py-8 overflow-x-clip">')).toBe(true);
     expect(html).not.toContain(container);
     expect(html.match(/data-home-width="full"/g)).toHaveLength(1);
     expect(html.match(/data-home-width="contained"/g)).toHaveLength(3);
     expect(html).toContain(`${fullBand}<section aria-labelledby="tiles-title"`);
     expect(html).toContain(`${contained}<section aria-labelledby="hero-title"`);
     // Order, the one h1 and the section ids are unchanged.
-    expect([...html.matchAll(/data-home-section-id="([^"]+)"/g)].map((match) => match[1])).toEqual(
-      ["tiles", "trust", "about"],
-    );
+    expect([...html.matchAll(/data-home-section-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
+      "tiles",
+      "trust",
+      "about",
+    ]);
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
   });
 
@@ -124,7 +129,12 @@ describe("custom home sections", () => {
     expect(received).toHaveLength(1);
     const [props] = received;
     expect(Object.keys(props ?? {}).sort()).toEqual(["headingId", "id", "isFirst", "locale", "t"]);
-    expect(props).toMatchObject({ id: "strip", headingId: "strip-title", locale: "uk", isFirst: false });
+    expect(props).toMatchObject({
+      id: "strip",
+      headingId: "strip-title",
+      locale: "uk",
+      isFirst: false,
+    });
     expect(leftoverText(html)).toBe("");
   });
 
@@ -136,7 +146,9 @@ describe("custom home sections", () => {
 
   it("can be full width like any other section", () => {
     const html = render([hero, { ...strip, width: "full" }]);
-    expect(html).toContain(`${fullBand}<section aria-labelledby="strip-title" data-brand-strip="">`);
+    expect(html).toContain(
+      `${fullBand}<section aria-labelledby="strip-title" data-brand-strip="">`,
+    );
   });
 
   it("hides the frame of a custom section that renders nothing", () => {
@@ -174,5 +186,30 @@ describe("custom home sections", () => {
     expect(() => render([{ ...strip, name: "toString" }])).toThrow(
       'names the custom section "toString", which config/custom-sections.ts does not register',
     );
+  });
+});
+
+describe("the streaming route with width and custom sections", () => {
+  it("frames and renders like the static view; a custom section adds no boundary and no loading view", async () => {
+    const sections: HomeSection[] = [
+      { ...strip, width: "full" },
+      hero,
+      tiles,
+      { ...trust, width: "full" },
+    ];
+    const { prelude } = await prerenderToNodeStream(
+      <HomeSections
+        sections={sections}
+        context={context}
+        load={(section) => Promise.resolve(results[section.id] ?? { status: "error" })}
+      />,
+      { progressiveChunkSize: Number.POSITIVE_INFINITY },
+    );
+    let html = "";
+    for await (const chunk of prelude) html += String(chunk);
+    // Only the category tiles stream behind a boundary.
+    expect(html.match(/<!--\$-->/g)).toHaveLength(1);
+    expect(html).not.toContain('aria-busy="true"');
+    expect(html.replace(/<!--\/?\$-->/g, "")).toBe(render(sections));
   });
 });

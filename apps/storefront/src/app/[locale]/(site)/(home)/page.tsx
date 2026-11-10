@@ -1,4 +1,4 @@
-import { Container, createTranslator, isLocale } from "@fluxkit/ui";
+import { createTranslator, isLocale } from "@fluxkit/ui";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { HomeSections } from "../../../../components/home-sections";
@@ -20,7 +20,10 @@ export async function generateMetadata({ params }: HomeProps): Promise<Metadata>
   return homeMetadata({ origin: await publicOrigin(), locale, t });
 }
 
-/** The sections of `config/home.ts`; each data section streams in on its own (`components/home-sections.tsx`). */
+/**
+ * The sections of `config/home.ts`; each data section streams in on its own (`components/home-sections.tsx`). The sections
+ * bring their own `Container` (one around all of them by default; one per section once a section is `width: "full"`).
+ */
 export default async function HomePage({ params }: HomeProps) {
   const { locale } = await params;
   if (!isLocale(locale)) {
@@ -28,12 +31,10 @@ export default async function HomePage({ params }: HomeProps) {
   }
   const t = createTranslator(messagesByLocale[locale], locale);
   return (
-    <Container>
-      <HomeSections
-        sections={homeSections}
-        context={{ locale, t, imageHosts: imageHosts() }}
-        load={(section) => getHomeSection(locale, section)}
-      />
-    </Container>
+    <HomeSections
+      sections={homeSections}
+      context={{ locale, t, imageHosts: imageHosts() }}
+      load={(section) => getHomeSection(locale, section)}
+    />
   );
 }

@@ -1,13 +1,15 @@
 import { readFileSync } from "node:fs";
-import { Container, createTranslator, type Locale } from "@fluxkit/ui";
+import { createTranslator, type Locale } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
+import { prerenderToNodeStream } from "react-dom/static";
 import { describe, expect, it } from "vitest";
 import { homeSections } from "../config/home";
 import { storeBannerViews } from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
 import { category, summary } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
-import { HomeSectionsView } from "./home-sections";
+import { customSections } from "../config/custom-sections";
+import { HomeSections, HomeSectionsView } from "./home-sections";
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings
@@ -50,16 +52,31 @@ const results: Readonly<Record<string, HomeSectionResult>> = {
 
 function renderDefault(locale: Locale): string {
   const t = createTranslator(messagesByLocale[locale], locale);
-  // The route's `Container` around the sections (`app/[locale]/(site)/(home)/page.tsx`).
+  // The frozen copy was taken with the route's `Container` around the sections; the sections now bring it themselves.
   return renderToStaticMarkup(
-    <Container>
-      <HomeSectionsView
-        sections={homeSections}
-        context={{ locale, t, imageHosts: ["cdn.example.com"] }}
-        results={results}
-      />
-    </Container>,
+    <HomeSectionsView
+      sections={homeSections}
+      context={{ locale, t, imageHosts: ["cdn.example.com"] }}
+      results={results}
+    />,
   );
+}
+
+/** What the home route renders (`HomeSections`, streaming), fully resolved, without React's boundary comments. */
+async function renderPage(locale: Locale): Promise<string> {
+  const t = createTranslator(messagesByLocale[locale], locale);
+  const { prelude } = await prerenderToNodeStream(
+    <HomeSections
+      sections={homeSections}
+      context={{ locale, t, imageHosts: ["cdn.example.com"] }}
+      load={(section) => Promise.resolve(results[section.id] ?? { status: "error" })}
+    />,
+    // Every finished boundary in place (no outlined segment), so the markup compares with the static view.
+    { progressiveChunkSize: Number.POSITIVE_INFINITY },
+  );
+  let html = "";
+  for await (const chunk of prelude) html += String(chunk);
+  return html;
 }
 
 function frozen(locale: Locale): string {
@@ -76,5 +93,19 @@ describe("the default home config", () => {
       expect(html.length).toBe(frozen(locale).length);
       expect(html).toBe(frozen(locale));
     });
+
+    it(`streams the same markup on the route (${locale}): no new boundary, no loading view`, async () => {
+      const html = await renderPage(locale);
+      // A finished Suspense boundary is written as `<!--$-->` ... `<!--/$-->`: still only the category tiles and the
+      // product row stream (ADR 0048), nothing else waits behind a boundary or a loading view.
+      expect(html.match(/<!--\$-->/g)).toHaveLength(2);
+      expect(html).not.toContain('aria-busy="true"');
+      expect(html.replace(/<!--\/?\$-->/g, "")).toBe(frozen(locale));
+    });
   }
+
+  it("has no custom section, and the fork-owned registry ships empty", () => {
+    expect(homeSections.filter((section) => section.kind === "custom")).toEqual([]);
+    expect(customSections).toEqual({});
+  });
 });

@@ -253,7 +253,12 @@ describe("home config: width and the custom kind", () => {
   });
 
   it("fails loudly on a width it does not know (a cast or plain JavaScript gets past the types)", () => {
-    const wide = { kind: "trust", id: "trust", titleKey: "t", width: "wide" } as unknown as HomeSection;
+    const wide = {
+      kind: "trust",
+      id: "trust",
+      titleKey: "t",
+      width: "wide",
+    } as unknown as HomeSection;
     expect(() => {
       checkHomeSections([wide]);
     }).toThrow('Home section "trust" has the width "wide"; allowed: contained, full.');
