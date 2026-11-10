@@ -25,9 +25,13 @@
 import type { BrandConfig } from "../lib/brand";
 
 export const brand: BrandConfig = {
-  logo: { kind: "text" },
-  icons: [],
+  logo: {
+    kind: "image",
+    light: { src: "/brand/logo.svg", width: 140, height: 32 },
+    dark: { src: "/brand/logo-dark.svg", width: 140, height: 32 },
+  },
+  icons: [{ src: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
   appleIcon: null,
-  themeColor: false,
+  themeColor: true,
   ogImage: null,
 };

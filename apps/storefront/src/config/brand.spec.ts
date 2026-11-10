@@ -44,19 +44,6 @@ describe("config/brand.ts (fork-owned; contract docs/contracts/branding.md)", ()
     ];
     for (const path of paths) expect(existsSync(`${publicDir}${path}`), path).toBe(true);
   });
-
-  // TEMPLATE-DEFAULT CHECK: upstream's values must render exactly the pre-brand-config output (plan principle 2). A fork that
-  // fills `config/brand.ts` deletes or replaces this one test; every other spec passes with a filled config
-  // (`vitest.brand-fork.config.ts`, part of `pnpm test`).
-  it("template default: text logo, no icon, no theme-color, no og:image", () => {
-    expect(brand).toEqual({
-      logo: { kind: "text" },
-      icons: [],
-      appleIcon: null,
-      themeColor: false,
-      ogImage: null,
-    });
-  });
 });
 
 describe("lib/brand.ts", () => {
