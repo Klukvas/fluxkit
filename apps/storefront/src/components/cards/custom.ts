@@ -1,4 +1,5 @@
 import { BrandGridCard } from "./brand-grid-card";
+import { BrandListCard } from "./brand-list-card";
 import type { CardRegistry } from "./types";
 
 /**
@@ -17,4 +18,5 @@ export const customCards: CardRegistry = {
     listClassName: "grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 lg:grid-cols-4",
     maxEagerImages: 4,
   },
+  list: { Card: BrandListCard, listClassName: "grid grid-cols-1 gap-6", maxEagerImages: 2 },
 };
