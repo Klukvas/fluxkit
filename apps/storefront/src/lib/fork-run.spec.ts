@@ -19,7 +19,7 @@ declare module "vitest" {
   export interface ProvidedContext {
     /**
      * Which fork-owned configs this run replaces with fixtures: `none` (`vitest.config.ts`), `brand-layout`
-     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots and the `grid` card with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
+     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots and the `grid` and `list` cards with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots, the cards).
      */
     forkRun: "none" | "brand-layout" | "home";
   }
@@ -37,14 +37,19 @@ describe("the fork-owned configs a run reads", () => {
     expect(["none", "brand-layout", "home"]).toContain(forkRun);
   });
 
-  it("reads the brand, header, footer and card fixtures exactly in the brand-layout run", () => {
+  it("reads the brand, header and footer fixtures exactly in the brand-layout run", () => {
     const expected = forkRun === "brand-layout";
     expect(brand === brandFixture.brand).toBe(expected);
     expect(headerConfig === headerFixture.headerConfig).toBe(expected);
     expect(footerConfig === footerFixture.footerConfig).toBe(expected);
+  });
+
+  it("reads the fork's own cards fixture exactly in the two fork runs", () => {
+    const expected = forkRun !== "none";
     expect(customCards === cardsFixture.customCards).toBe(expected);
-    // The registry's own import (`./custom`) is swapped too: the lists render the fork's `grid` card.
+    // The registry's own import (`./custom`) is swapped too: the lists render the fork's `grid` and `list` cards.
     expect(cardRegistry["grid"] === cardsFixture.customCards["grid"]).toBe(expected);
+    expect(cardRegistry["list"] === cardsFixture.customCards["list"]).toBe(expected);
   });
 
   it("reads the home and custom section fixtures exactly in the home run", () => {

@@ -157,7 +157,7 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 - Product cards and the list/grid view (L2, L5): a fork overrides the `grid` or `list` card in the fork-owned
   `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
   Tests in the fork (after `pnpm build`, section 0): no edit. The specs that pin the built-in cards render them with the template's defaults
-  (`apps/storefront/src/test-support/template-defaults.ts`), and upstream runs the suite with both cards overridden (`apps/storefront/vitest.brand-fork.config.ts`).
+  (`apps/storefront/src/test-support/template-defaults.ts`), and upstream runs the suite with both cards overridden (`apps/storefront/vitest.brand-fork.config.ts` and `apps/storefront/vitest.home-fork.config.ts`).
 - **Not yet available**: a storefront tokens overrides file (colours are still edited in the upstream `tokens.css`, section 1 step 4).
 
 ## 4. Known limits
