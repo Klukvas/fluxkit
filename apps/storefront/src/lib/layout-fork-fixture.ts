@@ -9,7 +9,7 @@ import type { HeaderConfig } from "../layout/header-layout";
  * which pins the default markup, is left out of that run.
  */
 export const headerConfig: HeaderConfig = {
-  blocks: ["logo", "menu", "navigation", "search", "controls"],
+  blocks: ["menu", "search", "logo", "navigation", "controls"],
   controls: ["cart", "account", "language"],
   navigation: {
     categoryLimit: 4,

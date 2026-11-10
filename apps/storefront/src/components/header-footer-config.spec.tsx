@@ -93,14 +93,14 @@ const markers = {
 describe("SiteHeader follows config/header.ts", () => {
   it("renders the blocks and the controls in the configured order", () => {
     const html = header({
-      blocks: ["logo", "search", "menu", "navigation", "controls"],
+      blocks: ["menu", "search", "logo", "navigation", "controls"],
       controls: ["account", "cart", "language"],
       navigation: { categoryLimit: 6, links: [] },
     });
     const blocks = order(html, [
-      markers.logo,
-      markers.search,
       markers.menu,
+      markers.search,
+      markers.logo,
       markers.navigation,
       markers.controls,
     ]);
@@ -153,20 +153,25 @@ describe("SiteHeader follows config/header.ts", () => {
     expect(html.match(/<nav aria-label="§nav\.main\.label"/g)).toHaveLength(2);
   });
 
-  it("opens the menu's panel towards the end from the first half of the row and towards the start from the second half; the controls' panels always towards the start", () => {
+  it("opens the menu's panel towards the end as the first block on a phone and towards the start as the last; the controls' panels always towards the start", () => {
     const panelOf = (html: string, marker: string) =>
       /class="fk-menu-panel (start|end)-0/.exec(html.slice(html.indexOf(marker)))?.[1];
     const navigation = { categoryLimit: 2, links: [] };
     const orders: [HeaderConfig["blocks"], "start" | "end"][] = [
       [["menu", "logo", "navigation", "search", "controls"], "start"],
-      [["logo", "menu", "navigation", "search", "controls"], "start"],
-      [["logo", "navigation", "search", "menu", "controls"], "end"],
-      [["logo", "search", "navigation", "menu", "controls"], "end"],
+      [["navigation", "menu", "search", "logo", "controls"], "start"],
+      [["logo", "search", "menu", "navigation"], "end"],
+      [["search", "logo", "navigation", "menu"], "end"],
     ];
     for (const [blocks, expected] of orders) {
-      const html = header({ blocks, controls: ["language", "account", "cart"], navigation });
+      const withControls = blocks.includes("controls");
+      const html = header({
+        blocks,
+        controls: withControls ? ["language", "account", "cart"] : [],
+        navigation,
+      });
       expect(panelOf(html, markers.menu), blocks.join()).toBe(expected);
-      expect(panelOf(html, markers.language), blocks.join()).toBe("end");
+      if (withControls) expect(panelOf(html, markers.language), blocks.join()).toBe("end");
     }
   });
 
@@ -191,7 +196,7 @@ describe("SiteHeader follows config/header.ts", () => {
 
   it("keeps every text a message", () => {
     const html = header({
-      blocks: ["navigation", "logo", "search", "menu", "controls"],
+      blocks: ["navigation", "menu", "search", "logo", "controls"],
       controls: ["language", "account", "cart"],
       navigation: { categoryLimit: 3, links: [{ labelKey: "nav.catalog", href: "/catalog" }] },
     });

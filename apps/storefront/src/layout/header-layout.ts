@@ -60,12 +60,28 @@ export type HeaderBlockView =
   | { kind: "controls"; controls: readonly HeaderControlName[] };
 
 /**
- * Where the menu's panel opens: from a button in the first half of the configured row it extends towards the end
- * (`start`-aligned, the default: the menu is the first block), from one in the second half towards the start (`end`-aligned),
- * so the panel (`w-max min-w-48`) stays inside a phone's width either way.
+ * Where the menu's panel (`w-max min-w-48`, absolutely placed under its button) opens. Below `lg` the logo grows
+ * (`max-lg:grow`), so every block after it packs at the END of the row and `navigation` is hidden below `xl`: the button's
+ * place on a phone depends on what follows it, not on its index. Two shapes only, measured in Chromium at 320, 360 and 390 px,
+ * left-to-right and right-to-left, with every control set and the search box on and off (zero overflow):
+ * - `menu` before `logo` with nothing before it that shows on a phone (only `navigation` may precede it): the button is the
+ *   first thing in the row, the panel opens towards the end (`start`, the default);
+ * - `menu` after `logo` with nothing after it that shows on a phone (only `navigation` may follow, and no `controls` at all):
+ *   the button is the last thing in the row, the panel opens towards the start (`end`).
+ * Every other order is refused by `headerConfigProblems`: its panel was measured past an edge of the screen (a search icon
+ * before the button moved it 52 px in, enough for a long category name at 360 px).
  */
 export function menuPanelAlign(config: HeaderConfig): PanelAlign {
-  return config.blocks.indexOf("menu") < config.blocks.length / 2 ? "start" : "end";
+  return config.blocks.indexOf("menu") < config.blocks.indexOf("logo") ? "start" : "end";
+}
+
+/** Whether the menu's place is one of the two measured shapes (see `menuPanelAlign`); true without a menu. */
+export function isSupportedMenuPlace(blocks: readonly HeaderBlockName[]): boolean {
+  const menu = blocks.indexOf("menu");
+  if (menu === -1) return true;
+  const hiddenOnPhone = (block: HeaderBlockName) => block === "navigation";
+  if (menu < blocks.indexOf("logo")) return blocks.slice(0, menu).every(hiddenOnPhone);
+  return !blocks.includes("controls") && blocks.slice(menu + 1).every(hiddenOnPhone);
 }
 
 /**
@@ -165,6 +181,11 @@ export function headerConfigProblems(
         'header block "controls" must be the last block (the row pushes it to the end and its dropdowns open towards the start)',
       );
     }
+  }
+  if (config.blocks.includes("logo") && !isSupportedMenuPlace(config.blocks)) {
+    problems.push(
+      'header block "menu" must be the first block shown on a phone (before "logo", preceded by nothing but "navigation") or the last one (after "logo", followed by nothing but "navigation", with no "controls"): elsewhere its dropdown opens past the edge of a phone screen',
+    );
   }
   const limit = config.navigation.categoryLimit;
   if (!Number.isInteger(limit) || limit < 0 || limit > HEADER_CATEGORY_LIMIT_MAX) {

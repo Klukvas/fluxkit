@@ -7,6 +7,8 @@
 // change there (a ui class, a header island) needs them regenerated, after checking the diff is the intended one:
 //   pnpm --filter @fluxkit/storefront exec vitest run src/components/header-footer-defaults.spec.tsx -u
 // A change to the header or footer composition itself must NOT be regenerated away: defaults stay byte for byte.
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Locale } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -89,7 +91,13 @@ describe("default header and footer markup (frozen before the L3 config, byte fo
       const { header, footer } = renderFrame(locale);
       expect(header.startsWith("<header")).toBe(true);
       expect(footer.endsWith("</footer>")).toBe(true);
-      // Exact file contents (plus one newline at the end): a missing or different file fails, also in CI.
+      // `toMatchFileSnapshot` would quietly write a missing file outside CI: a deleted frozen file must fail here instead.
+      for (const name of [`header.${locale}.txt`, `footer.${locale}.txt`]) {
+        expect(existsSync(join(import.meta.dirname, "header-footer-defaults", name)), name).toBe(
+          true,
+        );
+      }
+      // Exact file contents (plus one newline at the end): a different file fails.
       await expect(`${header}\n`).toMatchFileSnapshot(
         `header-footer-defaults/header.${locale}.txt`,
       );

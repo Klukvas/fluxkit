@@ -69,21 +69,22 @@ describe("headerView", () => {
     expect(view.map((block) => block.kind)).toEqual(["menu", "logo", "navigation", "controls"]);
   });
 
-  it("aligns the menu's panel with the start in the first half of the row and with the end in the second half", () => {
+  it("opens the menu's panel towards the end when the menu is the first block on a phone, towards the start when it is the last", () => {
     const align = (blocks: HeaderConfig["blocks"]) =>
-      headerView({ ...base, blocks }, { locale: "en", t, categories, searchEnabled: true }).find(
-        (block) => block.kind === "menu",
-      );
+      headerView(
+        { ...base, blocks, controls: blocks.includes("controls") ? base.controls : [] },
+        { locale: "en", t, categories, searchEnabled: true },
+      ).find((block) => block.kind === "menu");
+    // Shape 1: nothing but `navigation` (hidden on a phone) before the menu, the menu before the logo.
     expect(align(["menu", "logo", "navigation", "search", "controls"])).toMatchObject({
       align: "start",
     });
-    expect(align(["logo", "menu", "navigation", "search", "controls"])).toMatchObject({
+    expect(align(["navigation", "menu", "search", "logo", "controls"])).toMatchObject({
       align: "start",
     });
-    expect(align(["logo", "navigation", "search", "menu", "controls"])).toMatchObject({
-      align: "end",
-    });
-    expect(align(["logo", "navigation", "menu"])).toMatchObject({ align: "end" });
+    // Shape 2: the menu after the logo, nothing but `navigation` after it, no controls.
+    expect(align(["logo", "search", "menu", "navigation"])).toMatchObject({ align: "end" });
+    expect(align(["search", "logo", "navigation", "menu"])).toMatchObject({ align: "end" });
     expect(menuPanelAlign(base)).toBe("start");
   });
 
@@ -193,5 +194,42 @@ describe("headerConfigProblems: required and supported shapes", () => {
     };
     expect(headerConfigProblems(unknownKey, null)).toEqual([]);
     expect(problems(unknownKey)).toHaveLength(1);
+  });
+});
+
+describe("headerConfigProblems: the menu's place (browser-measured shapes only)", () => {
+  const menuProblem =
+    'header block "menu" must be the first block shown on a phone (before "logo", preceded by nothing but "navigation") or the last one (after "logo", followed by nothing but "navigation", with no "controls"): elsewhere its dropdown opens past the edge of a phone screen';
+  const check = (blocks: HeaderConfig["blocks"]) =>
+    headerConfigProblems(
+      { ...base, blocks, controls: blocks.includes("controls") ? base.controls : [] },
+      keysOf("en"),
+    );
+
+  it("accepts the two shapes, the default included", () => {
+    for (const blocks of [
+      ["menu", "logo", "navigation", "search", "controls"],
+      ["menu", "search", "logo", "navigation", "controls"],
+      ["navigation", "menu", "logo"],
+      ["logo", "menu", "navigation"],
+      ["search", "logo", "navigation", "menu"],
+      ["logo", "search", "controls"],
+    ] as HeaderConfig["blocks"][]) {
+      expect(check(blocks), blocks.join()).toEqual([]);
+    }
+  });
+
+  it("refuses every other place of the menu (measured past the screen edge, or as close to it)", () => {
+    for (const blocks of [
+      // after the logo with controls after it (a 3-control row put the panel 12 px past the start edge at 320 and 360 px)
+      ["logo", "navigation", "search", "menu", "controls"],
+      ["logo", "menu", "navigation", "search", "controls"],
+      // after the logo with the search icon after it
+      ["logo", "menu", "navigation", "search"],
+      // before the logo but after the search icon (52 px in: a long category name crossed the end edge at 360 px)
+      ["search", "menu", "logo", "navigation", "controls"],
+    ] as HeaderConfig["blocks"][]) {
+      expect(check(blocks), blocks.join()).toEqual([menuProblem]);
+    }
   });
 });

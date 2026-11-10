@@ -52,9 +52,10 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   reorder or leave out the blocks of the one header row (menu button, logo, navigation, search box, controls), reorder or leave out the
   controls at the end (language, cart, account), set how many top-level categories show (0 to 12) and which links follow them
   (message key plus storefront path; a new text goes into `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json` under `custom.`).
-  Supported orders: the logo is required, `controls` (when listed) is the last block, menu and navigation go together; the menu's dropdown
-  opens towards the end from the first half of the row and towards the start from the second half (for example logo left, menu right).
-  Checked by unit tests on the rendered classes, not in a real browser: look at a reordered header on a phone before shipping it.
+  Supported orders: the logo is required, `controls` (when listed) is the last block, menu and navigation go together, and the menu is
+  either the first block shown on a phone (before the logo; the default) or the last one (after the logo, with no controls group: "logo
+  left, menu right"); the list and the browser measurement are in `docs/contracts/header-footer.md`. Any other order fails the tests and,
+  if they were skipped, every page (a bare 500). Very long category names can still make the menu wider than a 320 px phone (known limit).
 - Footer: `apps/storefront/src/config/footer.ts` (fork-owned, same contract): reorder or leave out the blocks (navigation, contacts,
   theme switch, copyright), add plain text lines from messages (for example the accepted payment methods), and order the link groups of
   the navigation (shop pages, legal pages, the fork's own lists of internal paths), each with an optional small heading. Which shop pages are
