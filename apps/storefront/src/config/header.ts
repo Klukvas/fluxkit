@@ -38,7 +38,8 @@
 import type { HeaderConfig } from "../layout/header-layout";
 
 export const headerConfig: HeaderConfig = {
-  blocks: ["menu", "logo", "navigation", "search", "controls"],
+  // FORK: the categories before the logo (closest supported order to "centred logo, navigation split").
+  blocks: ["navigation", "menu", "logo", "search", "controls"],
   controls: ["language", "cart", "account"],
   navigation: {
     categoryLimit: 6,
