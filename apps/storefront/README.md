@@ -119,13 +119,22 @@ Applied to every path: `Content-Security-Policy` (`default-src 'self'`; `script-
 - **The CSP part of `STOREFRONT_IMAGE_HOSTS` is read at build time:** Next evaluates `headers()` during `next build` and stores the result in `.next/routes-manifest.json`. Verified: a build without the variable and a `next start` with it kept `img-src 'self' data:`; a build with it contains the host. Change the variable, rebuild. (The image optimizer and the pages read it again at start, see "Images".)
 - The header code lives in `next.config.ts` itself: Next compiles only that one file for its config, and a relative import of another TypeScript file fails with `MODULE_NOT_FOUND`.
 
+## Theme tokens of a fork (`packages/theme/src/brand-overrides.css`, 2026-11-10)
+
+`src/app/globals.css` imports `@fluxkit/theme/tokens.css`, `tailwind.css` and then, LAST, the fork-owned `@fluxkit/theme/brand-overrides.css`
+(empty upstream). A fork sets its colours, shadows, radii and fonts there under the three theme rules of `tokens.css` (light, dark, system,
+in that order; colours and shadows in all three), so its rebrand needs no edit of `tokens.css`. The admin does not import it. Rules,
+cascade and checks: `docs/contracts/theme-tokens.md` "Storefront overrides"; steps: `docs/customization.md` section 1, steps 4 and 5.
+
 ## Fonts (`src/config/fonts.ts`, 2026-11-08)
 
 The template uses the system stacks of the tokens (`--fk-font-sans`, `--fk-font-display`, `--fk-font-mono`). A fork adds its own faces
 in `src/config/fonts.ts`, a fork-owned file (empty upstream; upstream never edits it after creating it): `next/font/local` declarations
 in its `fonts` list (an example is in the file). The root layout puts their `variable` classes on `<html>` once
 (`lib/font-classes.ts`; no attribute while the list is empty), and a token names the variable, for example
-`--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;` in the light block of `packages/theme/src/tokens.css`.
+`--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;` in the light rule of the fork-owned
+`packages/theme/src/brand-overrides.css` (the example comment in `fonts.ts` still names `tokens.css`, which works too but conflicts on
+upstream updates; `fonts.ts` is fork-owned, so upstream does not edit its comment).
 Mail keeps the fallback stack after the `var()` (mail clients load no web font). `config/fonts.spec.ts` checks that `next/font` is imported
 only from that file and that the layout attaches the classes. `fonts.ts` is read as TEXT by that spec and imported by no unit test:
 `localFont(...)` works only under Next's build transform, which Vitest does not have.

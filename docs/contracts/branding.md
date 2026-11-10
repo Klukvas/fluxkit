@@ -34,7 +34,9 @@ light/dark pair.
 ## Not in this file
 
 - The shop name: messages `site.name` and `site.title` (override in `apps/storefront/src/messages-overrides/<locale>.json`).
-- Colours, radii, fonts: `packages/theme/src/tokens.css` (`theme-tokens.md`), `apps/storefront/src/config/fonts.ts`.
+- Colours, radii, fonts: the fork-owned `packages/theme/src/brand-overrides.css` over `packages/theme/src/tokens.css` (`theme-tokens.md`,
+  "Storefront overrides"), `apps/storefront/src/config/fonts.ts`; the `theme-color` literals of `packages/theme/src/theme-color.ts` follow
+  the effective background by hand (its spec prints them).
 - The sender of mails: `EMAIL_FROM` (`config.md`); mails have no logo (known limit).
 - The admin: name from its messages, favicon `apps/admin/public/favicon.*`, colours `packages/theme/src/admin-overrides.css` (ADR 0047).
 
