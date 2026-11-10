@@ -16,6 +16,7 @@ import {
   type TrustSection,
 } from "../config/home";
 import { storeBannerViews } from "../lib/home-banners";
+import { isTemplateHomeComposition, TEMPLATE_DEFAULT_ONLY } from "../lib/home-template-default";
 import type { HomeSectionResult } from "../lib/home-data";
 import { category, summary } from "../lib/test-fixtures";
 import { HomeSectionsView, pageHeadingId, type HomeContext } from "./home-sections";
@@ -459,45 +460,48 @@ describe("home banners of the admin (source admin)", () => {
   });
 });
 
-describe("the default home config renders", () => {
-  it("as hero, banners, categories, products, trust and the about text", () => {
-    const results: Record<string, HomeSectionResult> = {
-      "home-banners": {
-        status: "ok",
-        data: {
-          kind: "banners",
-          banners: storeBannerViews(
-            [
-              {
-                id: "11111111-1111-4111-8111-111111111111",
-                layout: "card",
-                title: "§t",
-                text: null,
-                href: "/catalog",
-                tone: "accent",
-                image: { url: "https://cdn.example.com/x.webp", width: 2, height: 1, alt: null },
-              },
-            ],
-            "uk",
-            ["cdn.example.com"],
-          ),
+describe.skipIf(!isTemplateHomeComposition(homeSections))(
+  `the default home config renders (${TEMPLATE_DEFAULT_ONLY})`,
+  () => {
+    it("as hero, banners, categories, products, trust and the about text", () => {
+      const results: Record<string, HomeSectionResult> = {
+        "home-banners": {
+          status: "ok",
+          data: {
+            kind: "banners",
+            banners: storeBannerViews(
+              [
+                {
+                  id: "11111111-1111-4111-8111-111111111111",
+                  layout: "card",
+                  title: "§t",
+                  text: null,
+                  href: "/catalog",
+                  tone: "accent",
+                  image: { url: "https://cdn.example.com/x.webp", width: 2, height: 1, alt: null },
+                },
+              ],
+              "uk",
+              ["cdn.example.com"],
+            ),
+          },
         },
-      },
-      "home-categories": loaded.tiles as HomeSectionResult,
-      "home-new-products": loaded.row as HomeSectionResult,
-    };
-    const html = render(homeSections, results);
-    expect(sectionOrder(html)).toEqual([
-      "home-banners",
-      "home-categories",
-      "home-new-products",
-      "home-trust",
-      "home-about",
-    ]);
-    expect(html).toContain('src="/home/hero.svg"');
-    expect(headings(html)[0]).toBe("h1");
-  });
-});
+        "home-categories": loaded.tiles as HomeSectionResult,
+        "home-new-products": loaded.row as HomeSectionResult,
+      };
+      const html = render(homeSections, results);
+      expect(sectionOrder(html)).toEqual([
+        "home-banners",
+        "home-categories",
+        "home-new-products",
+        "home-trust",
+        "home-about",
+      ]);
+      expect(html).toContain('src="/home/hero.svg"');
+      expect(headings(html)[0]).toBe("h1");
+    });
+  },
+);
 
 describe("one banner card for the storefront and the admin preview", () => {
   it("draws every banner through BannerCard of @fluxkit/ui, with no card markup of its own", () => {

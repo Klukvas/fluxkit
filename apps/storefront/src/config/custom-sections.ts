@@ -11,8 +11,9 @@ import type { CustomSectionRegistry } from "../lib/custom-sections";
  * and in `config/home.ts`: `{ kind: "custom", id: "home-brands", name: "brandStrip", width: "full" }`.
  *
  * Each component is a SERVER component (never a `'use client'` file; `client-boundary.spec.ts`) that receives
- * `CustomSectionProps` (a plain view model: id, heading id, locale, translator, first-on-page). Its texts go through `t` with
- * keys of the fork's `custom.` namespace (`src/messages-extra/{uk,en}.json`). An interactive part is a client component the server component renders with plain,
- * already translated props.
+ * `CustomSectionProps` (a plain view model: id, heading id, locale, translator, first-on-page, width; with `full` it spans
+ * the window without a container and draws its own surface). Its texts go through `t` with keys of the fork's `custom.`
+ * namespace (`src/messages-extra/{uk,en}.json`). An interactive part is a client component the server component renders with
+ * plain, already translated props. A component that throws takes the home page down: handle a failed read inside it.
  */
 export const customSections: CustomSectionRegistry = {};

@@ -7,13 +7,20 @@ import { homeSections } from "../config/home";
 import { storeBannerViews } from "../lib/home-banners";
 import type { HomeSectionResult } from "../lib/home-data";
 import { category, summary } from "../lib/test-fixtures";
+import { isTemplateHomeComposition, TEMPLATE_DEFAULT_ONLY } from "../lib/home-template-default";
 import { messagesByLocale } from "../messages";
+import enOverrides from "../messages-overrides/en.json";
+import ukOverrides from "../messages-overrides/uk.json";
 import { customSections } from "../config/custom-sections";
 import { HomeSections, HomeSectionsView } from "./home-sections";
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings
-// the page must stay byte for byte the same. Left out of `vitest.home-fork.config.ts` (a fork's home config differs on purpose).
+// the page must stay byte for byte the same. UPSTREAM PINS: skipped (named so in the test names) once a fork changes its home
+// composition or overrides texts, so reshaping the home page by config and new files never needs a test edit.
+
+const templateTexts = Object.keys(ukOverrides).length + Object.keys(enOverrides).length === 0;
+const templatePage = isTemplateHomeComposition(homeSections) && templateTexts;
 
 const results: Readonly<Record<string, HomeSectionResult>> = {
   "home-banners": {
@@ -86,26 +93,33 @@ function frozen(locale: Locale): string {
   );
 }
 
-describe("the default home config", () => {
-  for (const locale of ["uk", "en"] as const) {
-    it(`renders byte for byte as the frozen copy (${locale})`, () => {
-      const html = renderDefault(locale);
-      expect(html.length).toBe(frozen(locale).length);
-      expect(html).toBe(frozen(locale));
-    });
+describe.skipIf(!templatePage)(
+  `the default home page (${TEMPLATE_DEFAULT_ONLY}, and no text overrides)`,
+  () => {
+    for (const locale of ["uk", "en"] as const) {
+      it(`renders byte for byte as the frozen copy (${locale})`, () => {
+        const html = renderDefault(locale);
+        expect(html.length).toBe(frozen(locale).length);
+        expect(html).toBe(frozen(locale));
+      });
 
-    it(`streams the same markup on the route (${locale}): no new boundary, no loading view`, async () => {
-      const html = await renderPage(locale);
-      // A finished Suspense boundary is written as `<!--$-->` ... `<!--/$-->`: still only the category tiles and the
-      // product row stream (ADR 0048), nothing else waits behind a boundary or a loading view.
-      expect(html.match(/<!--\$-->/g)).toHaveLength(2);
-      expect(html).not.toContain('aria-busy="true"');
-      expect(html.replace(/<!--\/?\$-->/g, "")).toBe(frozen(locale));
-    });
-  }
+      it(`streams the same markup on the route (${locale}): no new boundary, no loading view`, async () => {
+        const html = await renderPage(locale);
+        // A finished Suspense boundary is written as `<!--$-->` ... `<!--/$-->`: still only the category tiles and the
+        // product row stream (ADR 0048), nothing else waits behind a boundary or a loading view.
+        expect(html.match(/<!--\$-->/g)).toHaveLength(2);
+        expect(html).not.toContain('aria-busy="true"');
+        expect(html.replace(/<!--\/?\$-->/g, "")).toBe(frozen(locale));
+      });
+    }
+  },
+);
 
-  it("has no custom section, and the fork-owned registry ships empty", () => {
-    expect(homeSections.filter((section) => section.kind === "custom")).toEqual([]);
-    expect(customSections).toEqual({});
-  });
-});
+describe.skipIf(Object.keys(customSections).length > 0)(
+  "the fork-owned custom section registry (template default only: skipped once a fork registers a section)",
+  () => {
+    it("ships empty", () => {
+      expect(customSections).toEqual({});
+    });
+  },
+);

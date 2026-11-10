@@ -64,8 +64,9 @@ const container = '<div class="mx-auto w-full max-w-6xl px-4">';
 const stack = '<div class="flex flex-col gap-12 py-8">';
 const contained =
   '<div class="mx-auto w-full max-w-6xl px-4 empty:hidden" data-home-width="contained">';
-const fullBand =
-  '<div class="mx-auto w-full max-w-6xl px-4 relative isolate py-8 empty:hidden before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-muted" data-home-width="full">';
+const full = '<div class="empty:hidden" data-home-width="full">';
+const fullAfterFull = '<div class="-mt-12 empty:hidden" data-home-width="full">';
+const wide: CustomSection = { ...strip, width: "full" };
 
 afterEach(() => {
   received.length = 0;
@@ -75,24 +76,28 @@ afterEach(() => {
 
 describe("home section width", () => {
   it("puts every section in ONE container when no section is full (today's markup; `contained` is the default)", () => {
-    const html = render([hero, tiles, trust, about]);
+    const html = render([hero, tiles, trust, about, strip]);
     expect(html.startsWith(`${container}${stack}`)).toBe(true);
     expect(html).not.toContain("data-home-width");
     const explicit = render(
-      [hero, tiles, trust, about].map((section) => ({ ...section, width: "contained" as const })),
+      [hero, tiles, trust, about, strip].map((section) => ({
+        ...section,
+        width: "contained" as const,
+      })),
     );
     expect(explicit).toBe(html);
   });
 
-  it("with a full section, frames each section on its own: a full-bleed token band with contained content", () => {
-    const html = render([hero, { ...tiles, width: "full" }, trust, about]);
-    // The stack spans the window and clips the bands' layers (no horizontal scrollbar).
-    expect(html.startsWith('<div class="flex flex-col gap-12 py-8 overflow-x-clip">')).toBe(true);
+  it("renders a full section WITHOUT a container (edge to edge, its own surface) and every other section in its own", () => {
+    const html = render([hero, wide, tiles, trust, about]);
+    expect(html.startsWith(stack)).toBe(true);
     expect(html).not.toContain(container);
-    expect(html.match(/data-home-width="full"/g)).toHaveLength(1);
-    expect(html.match(/data-home-width="contained"/g)).toHaveLength(3);
-    expect(html).toContain(`${fullBand}<section aria-labelledby="tiles-title"`);
+    expect(html).toContain(`${full}<section aria-labelledby="strip-title" data-brand-strip="">`);
+    expect(html.match(/data-home-width="contained"/g)).toHaveLength(4);
     expect(html).toContain(`${contained}<section aria-labelledby="hero-title"`);
+    expect(html).toContain(`${contained}<section aria-labelledby="tiles-title"`);
+    // No surface of the template's own: the section chooses it.
+    expect(html).not.toContain("bg-muted px-4");
     // Order, the one h1 and the section ids are unchanged.
     expect([...html.matchAll(/data-home-section-id="([^"]+)"/g)].map((match) => match[1])).toEqual([
       "tiles",
@@ -102,20 +107,34 @@ describe("home section width", () => {
     expect(html.match(/<h1[ >]/g)).toHaveLength(1);
   });
 
-  it("frames a skeleton, an error and an empty section the same way; an empty frame hides itself (no extra gap)", () => {
-    const loading = render([{ ...tiles, width: "full" }], {});
-    expect(loading).toContain(`${fullBand}<section aria-labelledby="tiles-title" aria-busy="true"`);
-    const empty = render([hero, { ...tiles, width: "full" }], {
+  it("puts a full section first flush under the header, and lets adjacent full sections touch (no strip between)", () => {
+    const html = render([wide, { ...wide, id: "strip-2" }, hero]);
+    expect(html.startsWith('<div class="flex flex-col gap-12 pb-8">')).toBe(true);
+    expect(html).toContain(`${full}<section aria-labelledby="strip-title"`);
+    expect(html).toContain(`${fullAfterFull}<section aria-labelledby="strip-2-title"`);
+    expect(html).toContain(`${contained}<section aria-labelledby="hero-title"`);
+  });
+
+  it("frames a skeleton, an error and an empty contained section; an empty frame hides itself (no extra gap)", () => {
+    const loading = render([wide, tiles], {});
+    expect(loading).toContain(
+      `${contained}<section aria-labelledby="tiles-title" aria-busy="true"`,
+    );
+    const empty = render([wide, tiles], {
       tiles: { status: "ok", data: { kind: "categories", categories: [] } },
     });
-    expect(empty).toContain(`${fullBand}</div>`);
-    const failed = render([{ ...tiles, width: "full" }], { tiles: { status: "error" } });
+    expect(empty).toContain(`${contained}</div>`);
+    const failed = render([wide, tiles], { tiles: { status: "error" } });
     expect(failed).toContain("§home.section.error");
   });
 
-  it("fails loudly on a width it does not know", () => {
-    const wide = { ...trust, width: "wide" } as unknown as HomeSection;
-    expect(() => render([hero, wide])).toThrow('Home section "trust" has the width "wide"');
+  it("fails loudly on a width it does not know, and on full for a built-in kind", () => {
+    const unknown = { ...trust, width: "wide" } as unknown as HomeSection;
+    expect(() => render([hero, unknown])).toThrow('Home section "trust" has the width "wide"');
+    const fullTrust = { ...trust, width: "full" } as unknown as HomeSection;
+    expect(() => render([hero, fullTrust])).toThrow(
+      'Home section "trust" (trust) cannot be full width',
+    );
   });
 });
 
@@ -128,12 +147,20 @@ describe("custom home sections", () => {
     expect(html.indexOf("§h.title")).toBeLessThan(html.indexOf("§custom.brandStrip.title"));
     expect(received).toHaveLength(1);
     const [props] = received;
-    expect(Object.keys(props ?? {}).sort()).toEqual(["headingId", "id", "isFirst", "locale", "t"]);
+    expect(Object.keys(props ?? {}).sort()).toEqual([
+      "headingId",
+      "id",
+      "isFirst",
+      "locale",
+      "t",
+      "width",
+    ]);
     expect(props).toMatchObject({
       id: "strip",
       headingId: "strip-title",
       locale: "uk",
       isFirst: false,
+      width: "contained",
     });
     expect(leftoverText(html)).toBe("");
   });
@@ -144,16 +171,14 @@ describe("custom home sections", () => {
     expect(html).toContain('<h1 class="sr-only">§site.name</h1>');
   });
 
-  it("can be full width like any other section", () => {
-    const html = render([hero, { ...strip, width: "full" }]);
-    expect(html).toContain(
-      `${fullBand}<section aria-labelledby="strip-title" data-brand-strip="">`,
-    );
+  it("tells the component its width, so a full section can choose its surface and inner width", () => {
+    render([hero, wide]);
+    expect(received[0]?.width).toBe("full");
   });
 
   it("hides the frame of a custom section that renders nothing", () => {
     const html = render([hero, { kind: "custom", id: "none", name: "nothing", width: "full" }]);
-    expect(html).toContain(`${fullBand}</div>`);
+    expect(html).toContain(`${full}</div>`);
   });
 
   it("fails loudly in development and tests on a name the registry does not know", () => {
@@ -162,10 +187,11 @@ describe("custom home sections", () => {
     );
   });
 
-  it("in production leaves the section out and logs it with console.error, never silently; the rest renders", () => {
+  it("in production leaves the section out and logs it with console.error once per name, never silently; the rest renders", () => {
     vi.stubEnv("NODE_ENV", "production");
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const html = render([hero, { ...strip, name: "brandStripe" }, trust]);
+    render([hero, { ...strip, name: "brandStripe" }, trust]);
     expect(html).not.toContain("data-brand-strip");
     expect(html).toContain("§h.title");
     expect(html).toContain('data-home-section-id="trust"');
@@ -191,12 +217,7 @@ describe("custom home sections", () => {
 
 describe("the streaming route with width and custom sections", () => {
   it("frames and renders like the static view; a custom section adds no boundary and no loading view", async () => {
-    const sections: HomeSection[] = [
-      { ...strip, width: "full" },
-      hero,
-      tiles,
-      { ...trust, width: "full" },
-    ];
+    const sections: HomeSection[] = [wide, hero, tiles, { ...strip, id: "strip-2", width: "full" }];
     const { prelude } = await prerenderToNodeStream(
       <HomeSections
         sections={sections}
