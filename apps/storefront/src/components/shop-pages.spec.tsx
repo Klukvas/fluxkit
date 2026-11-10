@@ -15,6 +15,10 @@ import { SiteFooter } from "./site-footer";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 import { StoreTrustBar } from "./trust-bar";
 
+// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the template's own footer. Where
+// the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
+vi.mock("../config/slots", () => ({ slots: {} }));
+
 const { uk, en } = messagesByLocale;
 
 // The route module reads the public origin and calls Next's `notFound`; both are stubs here.

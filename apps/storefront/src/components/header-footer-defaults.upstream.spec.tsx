@@ -20,6 +20,10 @@ import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { sentinelTranslator } from "./test-helpers";
 
+// The UI slots a fork fills in `config/slots.tsx` (plan S1) are not part of the composition frozen here: filling them needs no
+// deletion of this file. Empty slots adding nothing is `slot-places.spec.tsx`.
+vi.mock("../config/slots", () => ({ slots: {} }));
+
 /** The page the islands think they are on: `/<locale>/catalog?page=2` (the language links keep path and query). */
 const route = vi.hoisted(() => ({ locale: "uk" }));
 vi.mock("next/navigation", () => ({

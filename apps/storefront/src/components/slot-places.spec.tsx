@@ -1,6 +1,7 @@
 import { Badge } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { FooterConfig } from "../layout/footer-layout";
 import { messagesByLocale } from "../messages";
 import { contactsView } from "../lib/contacts";
 import { cardDisplay } from "../lib/product-card-model";
@@ -89,11 +90,18 @@ function renderFooter(): string {
           showThemeSwitch
           shopLinks={shopLinks}
           contacts={contacts}
+          config={footerConfig}
         />
       </I18nProvider>,
     ),
   );
 }
+
+/** The template's footer composition, explicit: the fork runs swap `config/footer.ts`. */
+const footerConfig: FooterConfig = {
+  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+  navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
+};
 
 const card = cardDisplay({
   product: summary("a", { title: "§a" }, "low_stock"),
