@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { themeColors as exported } from "./index.js";
 import { themeColors } from "./theme-color.js";
-import { storefrontTokens } from "./theme-run.testing.js";
+import { literalCopyFile, storefrontTokens } from "./theme-run.testing.js";
 
 // `themeColors` is a literal copy (HTML cannot read a CSS variable): it must equal the storefront's EFFECTIVE page background,
 // `tokens.css` plus the fork-owned `brand-overrides.css`, so a fork that rebrands in its overrides file is told which literals
@@ -22,7 +22,7 @@ describe("themeColors (the storefront's theme-color, plan B1)", () => {
     expect(background(storefrontTokens["system on a light OS"])).toBe(expected.light);
     expect(
       { ...themeColors },
-      `update the literals in packages/theme/src/theme-color.ts: export const themeColors = ${JSON.stringify(expected)} as const;`,
+      `update the literals in ${literalCopyFile("theme-color.ts")}: export const themeColors = ${JSON.stringify(expected)} as const;`,
     ).toEqual(expected);
   });
 });

@@ -1,6 +1,8 @@
 /*
- * FIXTURE (test only, not shipped): a FILLED admin overrides file (ADR 0047), a neutral admin next to a rebranded shop, with
- * a client font. Read by vitest.brand-fork.config.ts.
+ * FIXTURE (test only, not shipped): a FILLED admin overrides file (ADR 0047). The admin follows the rebranded shop's light
+ * values (the shop overrides fixture) except a neutral primary, ring and accent, a smaller control radius and a client font;
+ * the display face is restated without the storefront's var(--font-display-face), which the admin does not have.
+ * Read by vitest.brand-fork.config.ts.
  */
 @font-face {
   font-family: "Client Sans";
@@ -17,4 +19,5 @@
   --fk-color-accent-foreground: #ffffff;
   --fk-radius-control: 0.25rem;
   --fk-font-sans: "Client Sans", ui-sans-serif, system-ui, sans-serif;
+  --fk-font-display: "Client Sans", ui-sans-serif, system-ui, sans-serif;
 }

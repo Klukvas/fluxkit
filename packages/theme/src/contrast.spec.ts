@@ -13,7 +13,8 @@ import { parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js"
 // WCAG 2.x contrast (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), pure code, no dependency.
 // The theme files use 6-digit hex colors only; any other format fails loudly instead of being skipped.
 // The pairs are checked on the EFFECTIVE values (`theme-run.testing.ts`): the storefront's `tokens.css` plus its fork-owned
-// overrides in every mode it renders, and the admin's `tokens.css` plus its own fork-owned overrides (light only, ADR 0047),
+// overrides in every mode it renders, and the admin's `tokens.css`, the storefront overrides (light rule) and its own
+// fork-owned overrides (light only, ADR 0047),
 // so a fork's palette in either overrides file is checked like the template's.
 const tokensCss = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
 const lightTokens = tokenBlock(parseTokenBlocks(tokensCss), themeSelectors.light).tokens;

@@ -1,7 +1,8 @@
 /*
  * FIXTURE (test only, not shipped): a FILLED storefront overrides file, as a fork that followed docs/customization.md has it.
  * The palette, radii, shadows and display face of the A1 acceptance experiment (fictional "Verde Kopi", branch
- * experiment/a1-rebrand), moved out of tokens.css. Read by vitest.brand-fork.config.ts.
+ * experiment/a1-rebrand), moved out of tokens.css; the display face names a `next/font` variable as a fork with its own
+ * face does (A1 used the fallback stack only). Read by vitest.brand-fork.config.ts.
  */
 :root,
 [data-theme="light"] {
@@ -28,7 +29,8 @@
   --fk-radius-panel: 0.25rem;
   --fk-radius-overlay: 0.5rem;
   --fk-radius-media: 0.25rem;
-  --fk-font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --fk-font-display:
+    var(--font-display-face), ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --fk-shadow-card: 0 1px 2px 0 rgb(23 36 30 / 0.06);
   --fk-shadow-raised: 0 4px 14px -4px rgb(23 36 30 / 0.1), 0 1px 3px -1px rgb(23 36 30 / 0.06);
   --fk-shadow-overlay: 0 12px 28px -10px rgb(23 36 30 / 0.16), 0 3px 8px -4px rgb(23 36 30 / 0.08);

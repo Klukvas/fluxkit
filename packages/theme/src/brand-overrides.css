@@ -3,8 +3,9 @@
  * never edits this file after creating it, so a client fork rebrands here without touching tokens.css and without merge
  * conflicts. Contract: docs/contracts/theme-tokens.md, "Storefront overrides"; steps: docs/customization.md.
  *
- * apps/storefront/src/app/globals.css imports this file LAST, after tokens.css and tailwind.css. The admin never imports it
- * (it follows tokens.css and has its own fork-owned overrides file, ADR 0047): brand-overrides.spec.ts checks both.
+ * apps/storefront/src/app/globals.css imports this file LAST, after tokens.css and tailwind.css. The admin follows the shop
+ * (ADR 0047): apps/admin/src/styles.css imports it before its own fork-owned overrides file, and only the light rule below
+ * matches the admin's page. A font token with var(--font-...) is restated for the admin there (it has no next/font).
  *
  * How the cascade works: use exactly the three rules of tokens.css below, in this order. They have the same specificity as
  * the rules of tokens.css, so the later file wins. A colour or shadow you set for light must also be set for dark and

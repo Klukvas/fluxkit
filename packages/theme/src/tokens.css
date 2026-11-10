@@ -1,5 +1,6 @@
 /*
- * Design tokens: the ONE place to rebrand Fluxkit. Components never use raw colors, fonts or radii
+ * Design tokens: the template's values. A client fork rebrands in its fork-owned overrides file, not here
+ * (docs/contracts/theme-tokens.md, "Storefront overrides"). Components never use raw colors, fonts or radii
  * (AGENTS.md section 2.2); they use the semantic names mapped in tailwind.css.
  * Replace the values below (or add a theme preset selector) when delivering a client design; a rebrand sets BOTH themes (and
  * copies the changed dark colours and shadows into the system block at the end; a test keeps it equal to the dark block).

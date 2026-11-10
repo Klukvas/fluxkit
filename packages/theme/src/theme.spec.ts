@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { themeModes } from "./index.js";
-import { storefrontTokens } from "./theme-run.testing.js";
+import { adminTokens, storefrontTokens } from "./theme-run.testing.js";
 import {
   darkSchemeMedia,
   effectiveTokens,
@@ -235,5 +235,41 @@ describe("effective values (the cascade of tokens.css and an overrides file)", (
         osDark: false,
       }),
     ).toThrow(/Unknown media query/);
+  });
+});
+
+/**
+ * The admin's font tokens that name a web font variable of the storefront (`var(--font-...)` from `next/font` in
+ * `apps/storefront/src/config/fonts.ts`): the admin has no such variable, so the whole `font-family` declaration is invalid
+ * there and the browser falls back to its default serif face (Times New Roman), not to the stack after the `var()`.
+ */
+export function adminWebFontProblems(tokens: Map<string, string>): string[] {
+  return [...tokens]
+    .filter(([name, value]) => name.startsWith("--fk-font-") && /var\(--font-/.test(value))
+    .map(
+      ([name, value]) =>
+        `${name} reaches the admin as "${value}", but the admin has no var(--font-*) (the storefront's next/font): ` +
+        `restate ${name} in packages/theme/src/admin-overrides.css without it (a self-hosted @font-face there, or the fallback stack)`,
+    );
+}
+
+describe("admin font tokens (the admin follows the shop's overrides, ADR 0047)", () => {
+  it("name no storefront web font variable", () => {
+    expect(adminWebFontProblems(adminTokens)).toEqual([]);
+  });
+
+  it("finds a storefront web font variable and names the file to fix (the check itself)", () => {
+    const problems = adminWebFontProblems(
+      new Map([
+        ["--fk-font-display", "var(--font-display-face), ui-serif, serif"],
+        ["--fk-font-sans", "ui-sans-serif, system-ui, sans-serif"],
+        ["--fk-color-primary", "#000000"],
+      ]),
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/^--fk-font-display reaches the admin/);
+    expect(problems[0]).toMatch(
+      /restate --fk-font-display in packages\/theme\/src\/admin-overrides.css/,
+    );
   });
 });

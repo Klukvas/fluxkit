@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { emailTheme } from "./email-theme.js";
 import { emailTheme as exported } from "./index.js";
-import { storefrontTokens } from "./theme-run.testing.js";
+import { literalCopyFile, storefrontTokens } from "./theme-run.testing.js";
 
 // The guard of ADR 0031 decision 14: `emailTheme` holds the resolved LIGHT values of the storefront's EFFECTIVE tokens
 // (`tokens.css` plus the fork-owned `brand-overrides.css`), so a rebrand cannot leave mail in the old colors. Mail clients
 // cannot read CSS, so the values are literals in `email-theme.ts`; each failure names the values to write there.
-const literalFile = "packages/theme/src/email-theme.ts";
+const literalFile = literalCopyFile("email-theme.ts");
 
 function lightTokens(): Map<string, string> {
   return storefrontTokens.light;
