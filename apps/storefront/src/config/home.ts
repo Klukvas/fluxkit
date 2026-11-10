@@ -272,15 +272,8 @@ export const demoConfigBanners: BannerList = [
  * (`demoConfigBanners` above).
  */
 export const homeSections: readonly HomeSection[] = [
-  {
-    kind: "hero",
-    id: "home-hero",
-    headlineKey: "home.hero.title",
-    sublineKey: "home.hero.description",
-    cta: { labelKey: "home.hero.cta", href: "/catalog" },
-    image: { src: "/home/hero.svg", width: 640, height: 480, altKey: null },
-  },
-  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  // Fork: a full-bleed hero with the text laid over the picture (custom section `heroOverlay`, `config/custom-sections.ts`).
+  { kind: "custom", id: "home-hero", name: "heroOverlay", width: "full" },
   {
     kind: "categories",
     id: "home-categories",
@@ -295,6 +288,17 @@ export const homeSections: readonly HomeSection[] = [
     source: { sort: "newest" },
     viewAll: { labelKey: "home.newProducts.all" },
   },
+  { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+  // TODO(fluxkit): placeholder. The store API has no sales ranking (`GET /store/products` sorts by publication date only), so this
+  // row shows the newest four products under a heading that says so. A real "Bestsellers" row needs a ranking in the API.
+  {
+    kind: "productRow",
+    id: "home-bestsellers",
+    titleKey: "custom.home.bestsellers.title",
+    limit: 4,
+    source: { sort: "newest" },
+  },
+  { kind: "custom", id: "home-brands", name: "brandStrip", width: "full" },
   { kind: "trust", id: "home-trust", titleKey: "home.trust.title" },
   { kind: "richText", id: "home-about", titleKey: "home.about.title", bodyKey: "home.about.body" },
 ];
