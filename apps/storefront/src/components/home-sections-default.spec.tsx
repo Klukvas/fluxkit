@@ -18,6 +18,8 @@ import { HomeSections, HomeSectionsView } from "./home-sections";
 // (its product cards included). Where the card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`;
 // filled slots with this default home, the brand fork run (`vitest.brand-fork.config.ts`).
 vi.mock("../config/slots", () => ({ slots: {} }));
+// FORK (a1-reshape): this spec pins the template's built-in cards; the fork overrides `grid` in `cards/custom.ts`.
+vi.mock("./cards/custom", () => ({ customCards: {} }));
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings

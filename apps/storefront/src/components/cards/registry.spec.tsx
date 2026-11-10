@@ -27,6 +27,8 @@ import type { CardKindEntry, CardProps } from "./types";
 // Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the cards' own markup. Where the
 // card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
 vi.mock("../../config/slots", () => ({ slots: {} }));
+// FORK (a1-reshape): this spec pins the template's built-in cards; the fork overrides `grid` in `cards/custom.ts`.
+vi.mock("./custom", () => ({ customCards: {} }));
 
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];

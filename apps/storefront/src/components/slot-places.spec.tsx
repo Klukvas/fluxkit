@@ -27,6 +27,8 @@ import { sentinelTranslator } from "./test-helpers";
  */
 const registry = vi.hoisted(() => ({}) as Record<string, unknown>);
 vi.mock("../config/slots", () => ({ slots: registry }));
+// FORK (a1-reshape): this spec pins the template's built-in cards; the fork overrides `grid` in `cards/custom.ts`.
+vi.mock("./cards/custom", () => ({ customCards: {} }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),

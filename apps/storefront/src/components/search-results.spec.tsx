@@ -12,6 +12,8 @@ import { SearchResultsView, type SearchPageOutcome } from "./search-results";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 
 const { uk, en } = messagesByLocale;
+// FORK (a1-reshape): this spec pins the template's built-in cards; the fork overrides `grid` in `cards/custom.ts`.
+vi.mock("./cards/custom", () => ({ customCards: {} }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
