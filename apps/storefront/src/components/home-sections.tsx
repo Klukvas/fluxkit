@@ -54,8 +54,8 @@ import { StoreTrustBar } from "./trust-bar";
  * `Suspense` boundary (a skeleton of the same size meanwhile); `HomeSectionsView` renders already loaded results (tests).
  *
  * Layout (plan 2026-11-08-design-changeability.md, L4): with every section `contained` (the default) the sections share ONE
- * `Container`, exactly the markup from before `width` existed; once a section is `full`, each section gets a frame of its
- * own (`SectionFrame`). A `custom` section renders the fork's component from `config/custom-sections.ts`.
+ * `Container`, exactly the markup from before `width` existed; once a (custom) section is `full`, each section gets a frame
+ * of its own (`SectionFrame`). A `custom` section renders the fork's component from `config/custom-sections.ts`.
  */
 
 export interface HomeContext {
@@ -469,6 +469,7 @@ function CustomSectionView({
       locale={context.locale}
       t={context.t}
       isFirst={isFirst}
+      width={section.width ?? "contained"}
     />
   );
 }
@@ -640,21 +641,26 @@ function HiddenPageHeading({ sections, t }: { sections: readonly HomeSection[]; 
 const sectionStack = "flex flex-col gap-12 py-8";
 
 /**
- * The frame of one section when the sections do not share one container (some section is `full`). Both frames ARE the
- * shared `Container` (the same content width and gutter, whatever the tokens), so every section's content lines up.
- * `full` adds a band: a `before:` layer of the `muted` token surface, one window wide (`w-screen`) and centred on the
- * section, behind its content (`isolate` keeps the layer inside the frame); the stack clips its overflow (`overflow-x-clip`
- * in `SectionsLayout`), so no horizontal scrollbar. `empty:hidden`: a section that renders nothing (no data, an empty custom
- * section) leaves no frame, no band and no extra gap in the stack.
+ * The frame of one section when the sections do not share one container (some section is `full`):
+ * - `contained`: the same `Container` as the shared one (same content width and gutter, whatever the tokens).
+ * - `full`: NO container: the section spans the window and decides its own inner width and surface. A full section right
+ *   after another full one pulls up over the stack's gap (`-mt-12` = `gap-12`), so adjacent bands touch instead of showing a
+ *   strip of page background between them.
+ * `empty:hidden`: a section that renders nothing (no data, an empty custom section) leaves no frame and no extra gap.
  */
-function SectionFrame({ section, children }: { section: HomeSection; children: ReactNode }) {
+function SectionFrame({
+  section,
+  afterFull,
+  children,
+}: {
+  section: HomeSection;
+  afterFull: boolean;
+  children: ReactNode;
+}) {
   return section.width === "full" ? (
-    <Container
-      className="relative isolate py-8 empty:hidden before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-muted"
-      data-home-width="full"
-    >
+    <div className={afterFull ? "-mt-12 empty:hidden" : "empty:hidden"} data-home-width="full">
       {children}
-    </Container>
+    </div>
   ) : (
     <Container className="empty:hidden" data-home-width="contained">
       {children}
@@ -664,8 +670,8 @@ function SectionFrame({ section, children }: { section: HomeSection; children: R
 
 /**
  * The page around its sections. Every section contained: one `Container` around the stack (the markup from before `width`
- * existed, byte for byte; frozen copy in `home-sections-default.spec.tsx`). Otherwise the stack spans the window and every
- * section has its own `SectionFrame`.
+ * existed, byte for byte; frozen copies in `home-sections-default.spec.tsx`). Otherwise the stack spans the window and every
+ * section has its own `SectionFrame`; a full section first sits flush under the header (no top padding).
  */
 function SectionsLayout({
   sections,
@@ -678,12 +684,17 @@ function SectionsLayout({
 }) {
   checkHomeSections(sections);
   const ownFrames = sections.some((section) => section.width === "full");
+  const firstFull = sections[0]?.width === "full";
   const stack = (
-    <div className={ownFrames ? `${sectionStack} overflow-x-clip` : sectionStack}>
+    <div className={firstFull ? "flex flex-col gap-12 pb-8" : sectionStack}>
       <HiddenPageHeading sections={sections} t={t} />
       {sections.map((section, index) =>
         ownFrames ? (
-          <SectionFrame key={section.id} section={section}>
+          <SectionFrame
+            key={section.id}
+            section={section}
+            afterFull={section.width === "full" && sections[index - 1]?.width === "full"}
+          >
             {renderSection(section, index)}
           </SectionFrame>
         ) : (

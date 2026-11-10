@@ -8,9 +8,10 @@
  * cache; one with nothing to show is left out, and one whose read failed shows a short error while the rest of the page
  * renders. Banners are left out on a failed read instead: a promotion slot that says "could not load" helps nobody.
  *
- * Every section takes an optional `width` (default `contained`), and a `custom` section renders a server component a fork
- * registers by name in `config/custom-sections.ts` (plan 2026-11-08-design-changeability.md, L4; contract:
- * `docs/contracts/home-sections.md`). `checkHomeSections` refuses what the types cannot catch (a cast, plain JavaScript).
+ * Every section takes an optional `width` (default `contained`; `full` for `custom` sections only), and a `custom` section
+ * renders a server component a fork registers by name in `config/custom-sections.ts` (plan 2026-11-08-design-changeability.md,
+ * L4; contract: `docs/contracts/home-sections.md`). `checkHomeSections` refuses what the types cannot catch (a cast, plain
+ * JavaScript).
  */
 
 /** A picture served from `apps/storefront/public` (never a remote URL: no image host to allow, no request to a third party). */
@@ -26,9 +27,10 @@ export interface LocalImage {
 
 /**
  * How wide a section sits on the page:
- * - `contained` (the default): inside the page's content width, as every section was before `width` existed.
- * - `full`: a band over the whole width of the window on the `muted` token surface, its content still in the content width.
- *   A hero in such a band blends into it (the hero's own surface is `muted` too): a full-bleed hero.
+ * - `contained` (the default): inside the page's content width (`Container`), as every section was before `width` existed.
+ * - `full`: NO container: the section spans the window edge to edge and decides its own inner width and surface (a custom
+ *   section renders `Container` of `@fluxkit/ui` inside its own band, for example). Only `custom` sections take it: the
+ *   built-in sections have no edge-to-edge layout yet (their cards and grids would touch the window's edges).
  */
 export const HOME_SECTION_WIDTHS = ["contained", "full"] as const;
 
@@ -37,8 +39,8 @@ export type HomeSectionWidth = (typeof HOME_SECTION_WIDTHS)[number];
 interface HomeSectionBase {
   /** Unique on the page: the heading's `id` (`<id>-title`) and the section's key. */
   id: string;
-  /** Default `contained`. With every section contained the page keeps ONE container around all of them. */
-  width?: HomeSectionWidth;
+  /** Default and, for the built-in kinds, only value. With every section contained the page keeps ONE container. */
+  width?: "contained";
 }
 
 export interface HeroSection extends HomeSectionBase {
@@ -149,10 +151,12 @@ export type BannersSection = AdminBannersSection | ConfigBannersSection;
  * `lib/custom-sections.ts`). An unknown name fails the render in development and tests and is left out, with
  * `console.error`, in production.
  */
-export interface CustomSection extends HomeSectionBase {
+export interface CustomSection extends Omit<HomeSectionBase, "width"> {
   kind: "custom";
   /** Letters, digits and `-`, starting with a letter (for example `brandStrip`). */
   name: string;
+  /** Default `contained`; `full` renders the component edge to edge, without a container (it chooses its own surface). */
+  width?: HomeSectionWidth;
 }
 
 export type HomeSection =
@@ -181,8 +185,8 @@ const customSectionName = /^[A-Za-z][A-Za-z0-9-]*$/;
 
 /**
  * Refuses a home config the types would refuse too, for values that got past them (a cast, plain JavaScript, JSON): a
- * duplicate id, an unknown `width`, a `custom` section without a usable name. Called by every render of the home page, so a
- * broken config fails loudly instead of rendering something unexpected.
+ * duplicate id, an unknown `width`, `full` on a built-in kind, a `custom` section without a usable name. Called by every
+ * render of the home page, so a broken config fails loudly instead of rendering something unexpected.
  */
 export function checkHomeSections(sections: readonly HomeSection[]): void {
   const seen = new Set<string>();
@@ -195,6 +199,11 @@ export function checkHomeSections(sections: readonly HomeSection[]): void {
     if (width !== undefined && !(HOME_SECTION_WIDTHS as readonly unknown[]).includes(width)) {
       throw new Error(
         `Home section "${section.id}" has the width ${JSON.stringify(width)}; allowed: ${HOME_SECTION_WIDTHS.join(", ")}.`,
+      );
+    }
+    if (width === "full" && section.kind !== "custom") {
+      throw new Error(
+        `Home section "${section.id}" (${section.kind}) cannot be full width: only custom sections can (the built-in sections have no edge-to-edge layout).`,
       );
     }
     if (section.kind === "custom" && !customSectionName.test(String(section.name as unknown))) {

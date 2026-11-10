@@ -1,6 +1,6 @@
 import type { Locale, Translator } from "@fluxkit/ui";
 import type { ReactNode } from "react";
-import type { CustomSection } from "../config/home";
+import type { CustomSection, HomeSectionWidth } from "../config/home";
 
 /**
  * The contract of a `custom` home section (plan 2026-11-08-design-changeability.md, L4; `docs/contracts/home-sections.md`).
@@ -20,6 +20,12 @@ export interface CustomSectionProps {
    * hidden one, so the section's heading stays an `h2`.
    */
   isFirst: boolean;
+  /**
+   * `contained`: the page puts the section in its content width. `full`: the section spans the window, without a container;
+   * it chooses its own surface (token classes such as `bg-muted`) and keeps its content readable (for example inside
+   * `Container` of `@fluxkit/ui`).
+   */
+  width: HomeSectionWidth;
 }
 
 /** A server component (it may be `async`). It returns `null` to show nothing; the section then takes no space. */
@@ -36,12 +42,20 @@ function isClientReference(component: unknown): boolean {
   );
 }
 
+/** Names already reported in this process: a production server logs each unknown name once, not on every render. */
+const reportedUnknownNames = new Set<string>();
+
 /**
  * The component of a `custom` section. A name the registry does not know (a typo, a removed component) throws in development
  * and tests, so it is seen at once (`next dev` shows the error); in production the section is left out and reported with
- * `console.error` on every render, while the rest of the page renders. Never silent. A client component registered directly
- * always throws: it could not receive the translator (functions do not cross to the browser), so a fork registers a server
- * component that renders its island with plain, already translated props.
+ * `console.error` (once per name and server process), while the rest of the page renders. Never silent.
+ *
+ * Why not fall back like `resolveCard` (cards registry): an unknown card kind still has an obvious stand-in (the `grid` card
+ * shows the same products), so the shopper loses nothing. An unknown custom section has no stand-in: rendering anything else
+ * would show content nobody configured, so development fails and production leaves the section out.
+ *
+ * A client component registered directly always throws: it could not receive the translator (functions do not cross to the
+ * browser), so a fork registers a server component that renders its island with plain, already translated props.
  */
 export function resolveCustomSection(
   section: CustomSection,
@@ -53,7 +67,10 @@ export function resolveCustomSection(
     const registered = Object.keys(registry);
     const message = `Home section "${section.id}" names the custom section "${section.name}", which config/custom-sections.ts does not register (registered: ${registered.length === 0 ? "none" : registered.join(", ")}).`;
     if (process.env.NODE_ENV !== "production") throw new Error(message);
-    console.error(`${message} The section is left out.`);
+    if (!reportedUnknownNames.has(section.name)) {
+      reportedUnknownNames.add(section.name);
+      console.error(`${message} The section is left out.`);
+    }
     return null;
   }
   if (isClientReference(component)) {

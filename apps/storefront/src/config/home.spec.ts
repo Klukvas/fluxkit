@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { messagesByLocale } from "../messages";
 import { localizedHref } from "../lib/locale-path";
 import { bannerLink, checkBannersSection } from "../lib/home-banners";
+import { isTemplateHomeComposition, TEMPLATE_DEFAULT_ONLY } from "../lib/home-template-default";
 import { categoryPageConfig } from "./category-page";
 import {
   checkHomeSections,
@@ -41,16 +42,20 @@ const configNeedsItems: Assignable<
   HomeSection
 > = false;
 
-// Width and the custom kind (plan 2026-11-08-design-changeability.md, L4): an unknown width or a custom section without a
-// name are type errors; `width` is optional on every kind.
+// Width and the custom kind (plan 2026-11-08-design-changeability.md, L4): an unknown width, `full` on a built-in kind or a
+// custom section without a name are type errors; `width` is optional on every kind.
 const unknownWidthRejected: Assignable<
   { kind: "trust"; id: string; titleKey: string; width: "wide" },
   HomeSection
 > = false;
-const fullWidthAccepted: Assignable<
-  { kind: "trust"; id: string; titleKey: string; width: "full" },
+const containedAccepted: Assignable<
+  { kind: "trust"; id: string; titleKey: string; width: "contained" },
   HomeSection
 > = true;
+const builtInFullRejected: Assignable<
+  { kind: "trust"; id: string; titleKey: string; width: "full" },
+  HomeSection
+> = false;
 const customAccepted: Assignable<
   { kind: "custom"; id: string; name: string; width: "full" },
   HomeSection
@@ -129,17 +134,6 @@ describe("home config", () => {
     ]).toEqual([false, true, false, false, false, false]);
   });
 
-  it("lists the demo composition in order: hero, banners, categories, newest products, trust bar, about text", () => {
-    expect(homeSections.map((section) => section.kind)).toEqual([
-      "hero",
-      "banners",
-      "categories",
-      "productRow",
-      "trust",
-      "richText",
-    ]);
-  });
-
   it("gives every section a unique id (it becomes the heading id)", () => {
     const ids = homeSections.map((section) => section.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -172,13 +166,18 @@ describe("home config", () => {
     }
   });
 
-  it("shows the banners of the admin by default: one data section, read from the store API", () => {
-    expect(bannerSections).toEqual([
-      { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
-    ]);
-    for (const section of bannerSections) expect(isDataSection(section)).toBe(true);
+  it("reads the admin's banners from the store API (a data section), the config banners not", () => {
+    for (const section of bannerSections) {
+      expect(isDataSection(section)).toBe(section.source === "admin");
+    }
     expect(isDataSection(demoConfigSection)).toBe(false);
     expect(MAX_BANNERS).toBe(3);
+  });
+
+  it("accepts the real composition: unique ids, known widths, usable custom names", () => {
+    expect(() => {
+      checkHomeSections(homeSections);
+    }).not.toThrow();
   });
 
   it("keeps 1 to 3 demo banners for the config source, with safe links, distinct ids and a tone from the tokens", () => {
@@ -215,35 +214,57 @@ describe("home config", () => {
       }
     }
   });
-
-  it("keeps today's page: no section of the default composition sets a width or is a custom section", () => {
-    for (const section of homeSections) {
-      expect(section.width, section.id).toBeUndefined();
-      expect(section.kind, section.id).not.toBe("custom");
-    }
-  });
 });
+
+// The template's default page, pinned. A fork that changes `config/home.ts` (config and new files only, plan section 1
+// request 4) skips these instead of editing upstream specs.
+describe.skipIf(!isTemplateHomeComposition(homeSections))(
+  `home config of the template (${TEMPLATE_DEFAULT_ONLY})`,
+  () => {
+    it("lists the demo composition in order: hero, banners, categories, newest products, trust bar, about text", () => {
+      expect(homeSections.map((section) => section.kind)).toEqual([
+        "hero",
+        "banners",
+        "categories",
+        "productRow",
+        "trust",
+        "richText",
+      ]);
+    });
+
+    it("shows the banners of the admin by default: one data section, read from the store API", () => {
+      expect(bannerSections).toEqual([
+        { kind: "banners", source: "admin", id: "home-banners", titleKey: "home.banners.title" },
+      ]);
+    });
+
+    it("keeps today's page: no section of the default composition sets a width or is a custom section", () => {
+      for (const section of homeSections) {
+        expect(section.width, section.id).toBeUndefined();
+        expect(section.kind, section.id).not.toBe("custom");
+      }
+    });
+  },
+);
 
 describe("home config: width and the custom kind", () => {
   const custom: CustomSection = { kind: "custom", id: "brand-strip", name: "brandStrip" };
 
-  it("rejects an unknown width and a custom section without a name at compile time", () => {
-    expect([unknownWidthRejected, fullWidthAccepted, customAccepted, customNeedsName]).toEqual([
-      false,
-      true,
-      true,
-      false,
-    ]);
+  it("rejects an unknown width, full on a built-in kind and a custom section without a name at compile time", () => {
+    expect([
+      unknownWidthRejected,
+      containedAccepted,
+      builtInFullRejected,
+      customAccepted,
+      customNeedsName,
+    ]).toEqual([false, true, false, true, false]);
   });
 
   it("knows two widths: contained (the default) and full", () => {
     expect(HOME_SECTION_WIDTHS).toEqual(["contained", "full"]);
   });
 
-  it("accepts the default composition and every allowed width, a custom section included", () => {
-    expect(() => {
-      checkHomeSections(homeSections);
-    }).not.toThrow();
+  it("accepts every allowed width: contained on any kind, full on a custom section", () => {
     expect(() => {
       checkHomeSections([
         { ...custom, width: "full" },
@@ -262,6 +283,18 @@ describe("home config: width and the custom kind", () => {
     expect(() => {
       checkHomeSections([wide]);
     }).toThrow('Home section "trust" has the width "wide"; allowed: contained, full.');
+  });
+
+  it("fails loudly on full for a built-in kind (they have no edge-to-edge layout)", () => {
+    const fullTrust = {
+      kind: "trust",
+      id: "trust",
+      titleKey: "t",
+      width: "full",
+    } as unknown as HomeSection;
+    expect(() => {
+      checkHomeSections([fullTrust]);
+    }).toThrow('Home section "trust" (trust) cannot be full width: only custom sections can');
   });
 
   it("fails loudly on a duplicate id and on a custom section with an empty or odd name", () => {

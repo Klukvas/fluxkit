@@ -1,72 +1,72 @@
+import { createTranslator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { checkHomeSections } from "../config/home";
 import { customSections } from "../config/custom-sections";
-import { resolveCustomSection } from "../lib/custom-sections";
+import { homeSections } from "../config/home";
 import type { HomeSectionResult } from "../lib/home-data";
-import { forkHomeSections } from "../lib/home-fork-fixture";
 import { category } from "../lib/test-fixtures";
+import { messagesByLocale } from "../messages";
 import { HomeSectionsView } from "./home-sections";
-import { leftoverText, sentinelTranslator } from "./test-helpers";
 
-// Runs ONLY in `vitest.home-fork.config.ts`, where `config/custom-sections.ts` is the filled fixture
-// (`lib/home-fork-fixture.tsx`): a fork's home config with `width: "full"` and a custom section renders as documented.
+// Runs ONLY in `vitest.home-fork.config.ts`, where `config/home.ts`, `config/custom-sections.ts` and the message extras are
+// a fork's (`lib/home-fork-fixture.tsx`, `lib/messages-extra-fork-fixture.{uk,en}.json`): the reshaped home page renders as
+// documented, with the fork's own texts.
 
 const results: Record<string, HomeSectionResult> = {
   "home-categories": {
     status: "ok",
-    data: { kind: "categories", categories: [category("books", [], { name: "§books" })] },
+    data: { kind: "categories", categories: [category("books", [], { name: "Books" })] },
   },
 };
 
 const html = renderToStaticMarkup(
   <HomeSectionsView
-    sections={forkHomeSections}
-    context={{ locale: "en", t: sentinelTranslator(), imageHosts: [] }}
+    sections={homeSections}
+    context={{ locale: "en", t: createTranslator(messagesByLocale.en, "en"), imageHosts: [] }}
     results={results}
   />,
 );
 
-const band =
-  '<div class="mx-auto w-full max-w-6xl px-4 relative isolate py-8 empty:hidden before:absolute before:inset-y-0 before:left-1/2 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-muted" data-home-width="full">';
 const contained =
   '<div class="mx-auto w-full max-w-6xl px-4 empty:hidden" data-home-width="contained">';
 
-describe("a fork's home config with width and a custom section", () => {
-  it("runs with the fork's registry, and every custom name of its config resolves", () => {
-    expect(Object.keys(customSections)).toEqual(["brandStrip"]);
-    expect(() => {
-      checkHomeSections(forkHomeSections);
-    }).not.toThrow();
-    for (const section of forkHomeSections) {
-      if (section.kind === "custom") {
-        expect(resolveCustomSection(section, customSections), section.id).not.toBeNull();
-      }
-    }
+describe("a fork's reshaped home page (full-width custom section first, a contained custom section)", () => {
+  it("runs with the fork's config, registry and extras", () => {
+    expect(Object.keys(customSections)).toEqual(["brandStrip", "promo"]);
+    expect(homeSections[0]).toMatchObject({ kind: "custom", width: "full" });
+    expect(messagesByLocale.uk["custom.brandStrip.title"]).toBe("Наші бренди");
   });
 
-  it("puts the hero and the brand strip in full-bleed bands and the other sections in their own containers", () => {
-    expect(html.startsWith('<div class="flex flex-col gap-12 py-8 overflow-x-clip">')).toBe(true);
-    expect(html).toContain(`${band}<section aria-labelledby="home-hero-title" data-hero=""`);
+  it("renders the full section edge to edge, flush under the header, with the surface it chose", () => {
+    expect(
+      html.startsWith(
+        '<div class="flex flex-col gap-12 pb-8"><h1 class="sr-only">' +
+          messagesByLocale.en["site.name"] +
+          '</h1><div class="empty:hidden" data-home-width="full"><section aria-labelledby="home-brands-title" data-fork-brand-strip="" class="bg-muted py-8"><div class="mx-auto w-full max-w-6xl px-4">',
+      ),
+    ).toBe(true);
+    expect(html).not.toContain('<div class="mx-auto w-full max-w-6xl px-4"><div class="flex');
+  });
+
+  it("puts every other section in its own container, the contained custom section included", () => {
+    expect(html.match(/data-home-width="contained"/g)).toHaveLength(5);
     expect(html).toContain(
-      `${band}<section aria-labelledby="home-brands-title" data-fork-brand-strip="">`,
+      `${contained}<section aria-labelledby="home-promo-title" data-fork-promo="">`,
     );
     expect(html).toContain(`${contained}<section aria-labelledby="home-categories-title"`);
-    expect(html.match(/data-home-width="full"/g)).toHaveLength(2);
-    expect(html.match(/data-home-width="contained"/g)).toHaveLength(3);
+    expect(html).toContain("Deal of the week");
   });
 
-  it("keeps the page outline: the hero's h1 first, then one h2 per section, in the configured order", () => {
+  it("keeps one h1 (visually hidden: the first section is not a hero) and one h2 per section, in order", () => {
     expect([...html.matchAll(/<h([1-6])[ >]/g)].map((match) => `h${match[1]}`)).toEqual([
       "h1",
       "h2",
       "h2",
       "h2",
       "h2",
+      "h2",
+      "h2",
     ]);
-    expect(html.indexOf("§custom.brandStrip.title")).toBeLessThan(
-      html.indexOf("§home.categoryTiles.title"),
-    );
-    expect(leftoverText(html)).toBe("");
+    expect(html.indexOf("Our brands")).toBeLessThan(html.indexOf("Deal of the week"));
   });
 });

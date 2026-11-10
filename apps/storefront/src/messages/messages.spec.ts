@@ -101,7 +101,11 @@ function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) ? [path] : [];
+    // Fork fixtures (`lib/*-fork-fixture.*`) are test data of the fork runs: their `custom.` keys belong to those runs' extras,
+    // and a fork's own extras must not make them look like missing keys.
+    return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) && !/-fork-fixture\./.test(name)
+      ? [path]
+      : [];
   });
 }
 
