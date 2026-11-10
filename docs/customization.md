@@ -28,6 +28,7 @@ marked **not yet available**. Rules behind it: `AGENTS.md` sections 2.2, 15 and 
      once `config/header.ts`, `config/footer.ts` or `config/brand.ts` changes (section 3).
    - `apps/storefront/src/config/slots.upstream.spec.ts`: once a slot is filled (section 3).
    - `apps/storefront/src/components/cards/custom.upstream.spec.ts`: once `cards/custom.ts` registers a card (section 3, product cards).
+   - `packages/theme/src/brand-overrides.upstream.spec.ts`: once `brand-overrides.css` has rules (step 4).
    - Not a file: the one test marked TEMPLATE-DEFAULT CHECK in `apps/storefront/src/config/brand.spec.ts`, once `config/brand.ts` is filled
      (section 1, step 7).
 
