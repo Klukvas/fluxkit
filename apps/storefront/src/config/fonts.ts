@@ -21,7 +21,7 @@
  *
  *   export const fonts: readonly ShopFont[] = [display];
  *
- * and in `packages/theme/src/tokens.css` (light block):
+ * and in `packages/theme/src/brand-overrides.css` (light rule):
  * `--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;`
  */
 
