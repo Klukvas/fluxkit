@@ -13,6 +13,12 @@ export default defineConfig({
     alias: [{ find: /^(?:\.\.\/)+config\/brand$/, replacement: fixture }],
   },
   test: {
-    exclude: [...configDefaults.exclude, "e2e/**", "src/config/brand.spec.ts"],
+    exclude: [
+      ...configDefaults.exclude,
+      "e2e/**",
+      "src/config/brand.spec.ts",
+      // TEMPLATE-DEFAULT CHECK: pins the default header and footer markup (the text logo included).
+      "src/components/header-footer-defaults.spec.tsx",
+    ],
   },
 });
