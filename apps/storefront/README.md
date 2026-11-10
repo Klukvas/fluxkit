@@ -133,8 +133,7 @@ in `src/config/fonts.ts`, a fork-owned file (empty upstream; upstream never edit
 in its `fonts` list (an example is in the file). The root layout puts their `variable` classes on `<html>` once
 (`lib/font-classes.ts`; no attribute while the list is empty), and a token names the variable, for example
 `--fk-font-display: var(--font-display-face), ui-sans-serif, system-ui, sans-serif;` in the light rule of the fork-owned
-`packages/theme/src/brand-overrides.css` (the example comment in `fonts.ts` still names `tokens.css`, which works too but conflicts on
-upstream updates; `fonts.ts` is fork-owned, so upstream does not edit its comment).
+`packages/theme/src/brand-overrides.css`.
 Mail keeps the fallback stack after the `var()` (mail clients load no web font). `config/fonts.spec.ts` checks that `next/font` is imported
 only from that file and that the layout attaches the classes. `fonts.ts` is read as TEXT by that spec and imported by no unit test:
 `localFont(...)` works only under Next's build transform, which Vitest does not have.
