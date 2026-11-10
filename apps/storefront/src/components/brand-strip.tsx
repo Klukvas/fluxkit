@@ -1,4 +1,4 @@
-import { Container } from "@fluxkit/ui";
+import { Container, textStyles } from "@fluxkit/ui";
 import type { LocalImage } from "../config/home";
 import type { CustomSectionProps } from "../lib/custom-sections";
 import { LocalPicture } from "./local-picture";
@@ -31,10 +31,7 @@ export function BrandStrip({ headingId, t }: CustomSectionProps) {
   return (
     <section aria-labelledby={headingId} className="bg-muted py-8">
       <Container className="flex flex-col gap-4">
-        <h2
-          id={headingId}
-          className="text-center text-sm font-medium tracking-wide text-muted-foreground uppercase"
-        >
+        <h2 id={headingId} className={`${textStyles.navGroupTitle} text-center`}>
           {t("custom.home.brands.title")}
         </h2>
         <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
