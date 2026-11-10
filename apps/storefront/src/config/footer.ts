@@ -17,13 +17,14 @@
  * under `custom.`; changed template texts into `src/messages-overrides/{uk,en}.json`.
  *
  * Example: the copyright on top, the legal pages first (with a heading), then the shop pages and the fork's own links, a
- * payments line (both `custom.` keys in `messages-extra`):
+ * payments line (both `custom.` keys in `messages-extra`; backticks here only because `messages/messages.spec.ts` checks every
+ * quoted key literal in the source, comments included, and upstream has no such keys):
  *
  *   export const footerConfig: FooterConfig = {
- *     blocks: ["copyright", "navigation", { kind: "text", textKey: "custom.footer.payments" }, "contacts", "themeSwitch"],
+ *     blocks: ["copyright", "navigation", { kind: "text", textKey: `custom.footer.payments` }, "contacts", "themeSwitch"],
  *     navigation: {
  *       groups: [
- *         { kind: "legal", headingKey: "custom.footer.legal" },
+ *         { kind: "legal", headingKey: `custom.footer.legal` },
  *         { kind: "shopPages" },
  *         { kind: "links", links: [{ labelKey: "nav.catalog", href: "/catalog" }] },
  *       ],

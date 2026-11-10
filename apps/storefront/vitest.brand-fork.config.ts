@@ -6,8 +6,8 @@ import { configDefaults, defineConfig } from "vitest/config";
  * (`src/lib/brand-fork-fixture.ts` in place of `src/config/brand.ts`, plan B1/B3: a rebrand needs no test edit) and the header
  * and footer (`src/lib/layout-fork-fixture.ts` in place of `src/config/header.ts` and `src/config/footer.ts`, plan L3: another
  * order, category count and link groups need no test edit). Part of `pnpm test` (`package.json`). Left out:
- * `config/brand.spec.ts` (it checks the real file: its pictures must exist under `public/`) and the TEMPLATE-DEFAULT check of
- * the default header and footer markup.
+ * `config/brand.spec.ts` (it checks the real file: its pictures must exist under `public/`), the TEMPLATE-DEFAULT check of the
+ * default header and footer markup, and `*.fork.spec.{ts,tsx}` (they belong to `vitest.home-fork.config.ts`).
  */
 const brandFixture = fileURLToPath(new URL("./src/lib/brand-fork-fixture.ts", import.meta.url));
 const layoutFixture = fileURLToPath(new URL("./src/lib/layout-fork-fixture.ts", import.meta.url));
@@ -21,13 +21,14 @@ export default defineConfig({
   },
   test: {
     // Checked by `src/lib/fork-run.spec.ts`: the aliases above really swap the configs in this run.
-    provide: { forkRun: true },
+    provide: { forkRun: "brand-layout" },
     exclude: [
       ...configDefaults.exclude,
       "e2e/**",
       "src/config/brand.spec.ts",
       // TEMPLATE-DEFAULT CHECK: pins the default header and footer markup (the text logo included).
-      "src/components/header-footer-defaults.spec.tsx",
+      "src/components/header-footer-defaults.upstream.spec.tsx",
+      "src/**/*.fork.spec.{ts,tsx}",
     ],
   },
 });

@@ -7,6 +7,11 @@
  * Data sections (`categories`, `productRow`, and `banners` with `source: "admin"`) read the store API through the 60 s data
  * cache; one with nothing to show is left out, and one whose read failed shows a short error while the rest of the page
  * renders. Banners are left out on a failed read instead: a promotion slot that says "could not load" helps nobody.
+ *
+ * Every section takes an optional `width` (default `contained`; `full` for `custom` sections only), and a `custom` section
+ * renders a server component a fork registers by name in `config/custom-sections.ts` (plan 2026-11-08-design-changeability.md,
+ * L4; contract: `docs/contracts/home-sections.md`). `checkHomeSections` refuses what the types cannot catch (a cast, plain
+ * JavaScript).
  */
 
 /** A picture served from `apps/storefront/public` (never a remote URL: no image host to allow, no request to a third party). */
@@ -20,19 +25,34 @@ export interface LocalImage {
   altKey: string | null;
 }
 
-export interface HeroSection {
-  kind: "hero";
-  /** Unique on the page: the heading's `id` and the section's key. */
+/**
+ * How wide a section sits on the page:
+ * - `contained` (the default): inside the page's content width (`Container`), as every section was before `width` existed.
+ * - `full`: NO container: the section spans the window edge to edge and decides its own inner width and surface (a custom
+ *   section renders `Container` of `@fluxkit/ui` inside its own band, for example). Only `custom` sections take it: the
+ *   built-in sections have no edge-to-edge layout yet (their cards and grids would touch the window's edges).
+ */
+export const HOME_SECTION_WIDTHS = ["contained", "full"] as const;
+
+export type HomeSectionWidth = (typeof HOME_SECTION_WIDTHS)[number];
+
+interface HomeSectionBase {
+  /** Unique on the page: the heading's `id` (`<id>-title`) and the section's key. */
   id: string;
+  /** Default and, for the built-in kinds, only value. With every section contained the page keeps ONE container. */
+  width?: "contained";
+}
+
+export interface HeroSection extends HomeSectionBase {
+  kind: "hero";
   headlineKey: string;
   sublineKey?: string;
   cta?: { labelKey: string; href: string };
   image?: LocalImage;
 }
 
-export interface CategoriesSection {
+export interface CategoriesSection extends HomeSectionBase {
   kind: "categories";
-  id: string;
   titleKey: string;
   /** Most top-level categories shown (in the API's order: position, then slug). */
   limit: number;
@@ -40,9 +60,8 @@ export interface CategoriesSection {
   images?: Readonly<Record<string, LocalImage>>;
 }
 
-export interface ProductRowSection {
+export interface ProductRowSection extends HomeSectionBase {
   kind: "productRow";
-  id: string;
   titleKey: string;
   /** `limit` of `GET /store/products` (1 to 24 here). */
   limit: number;
@@ -55,16 +74,14 @@ export interface ProductRowSection {
   viewAll?: { labelKey: string };
 }
 
-export interface TrustSection {
+export interface TrustSection extends HomeSectionBase {
   kind: "trust";
-  id: string;
   /** Heading of the section (visually hidden: the bar's lines speak for themselves). */
   titleKey: string;
 }
 
-export interface RichTextSection {
+export interface RichTextSection extends HomeSectionBase {
   kind: "richText";
-  id: string;
   titleKey?: string;
   /** Plain text; a blank line starts a new paragraph. No HTML. */
   bodyKey: string;
@@ -99,9 +116,8 @@ export interface Banner {
 export type BannerList =
   readonly [] | readonly [Banner] | readonly [Banner, Banner] | readonly [Banner, Banner, Banner];
 
-interface BannersSectionBase {
+interface BannersSectionBase extends HomeSectionBase {
   kind: "banners";
-  id: string;
   /** Heading of the section (visually hidden: the cards' titles speak for themselves). */
   titleKey: string;
 }
@@ -129,13 +145,28 @@ export interface ConfigBannersSection extends BannersSectionBase {
  */
 export type BannersSection = AdminBannersSection | ConfigBannersSection;
 
+/**
+ * A section of the fork's own (request "a brand strip"): `name` is a key of `customSections` in the fork-owned
+ * `config/custom-sections.ts`, which maps it to a SERVER component that receives a plain view model (`CustomSectionProps` in
+ * `lib/custom-sections.ts`). An unknown name fails the render in development and tests and is left out, with
+ * `console.error`, in production.
+ */
+export interface CustomSection extends Omit<HomeSectionBase, "width"> {
+  kind: "custom";
+  /** Letters, digits and `-`, starting with a letter (for example `brandStrip`). */
+  name: string;
+  /** Default `contained`; `full` renders the component edge to edge, without a container (it chooses its own surface). */
+  width?: HomeSectionWidth;
+}
+
 export type HomeSection =
   | HeroSection
   | BannersSection
   | CategoriesSection
   | ProductRowSection
   | TrustSection
-  | RichTextSection;
+  | RichTextSection
+  | CustomSection;
 
 export type HomeSectionKind = HomeSection["kind"];
 
@@ -148,6 +179,39 @@ export function isDataSection(section: HomeSection): section is HomeDataSection 
     section.kind === "productRow" ||
     (section.kind === "banners" && section.source === "admin")
   );
+}
+
+const customSectionName = /^[A-Za-z][A-Za-z0-9-]*$/;
+
+/**
+ * Refuses a home config the types would refuse too, for values that got past them (a cast, plain JavaScript, JSON): a
+ * duplicate id, an unknown `width`, `full` on a built-in kind, a `custom` section without a usable name. Called by every
+ * render of the home page, so a broken config fails loudly instead of rendering something unexpected.
+ */
+export function checkHomeSections(sections: readonly HomeSection[]): void {
+  const seen = new Set<string>();
+  for (const section of sections) {
+    if (seen.has(section.id)) {
+      throw new Error(`Home section id "${section.id}" is used twice; every id must be unique.`);
+    }
+    seen.add(section.id);
+    const width: unknown = section.width;
+    if (width !== undefined && !(HOME_SECTION_WIDTHS as readonly unknown[]).includes(width)) {
+      throw new Error(
+        `Home section "${section.id}" has the width ${JSON.stringify(width)}; allowed: ${HOME_SECTION_WIDTHS.join(", ")}.`,
+      );
+    }
+    if (width === "full" && section.kind !== "custom") {
+      throw new Error(
+        `Home section "${section.id}" (${section.kind}) cannot be full width: only custom sections can (the built-in sections have no edge-to-edge layout).`,
+      );
+    }
+    if (section.kind === "custom" && !customSectionName.test(String(section.name as unknown))) {
+      throw new Error(
+        `Home section "${section.id}" (custom) needs the name of a registered section (letters, digits and "-"), got ${JSON.stringify(section.name)}.`,
+      );
+    }
+  }
 }
 
 /**

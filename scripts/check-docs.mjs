@@ -5,15 +5,17 @@ import { existsSync, readFileSync } from "node:fs";
 
 // Storefront layout and branding config files that are public contracts (plan docs/plans/2026-11-08-design-changeability.md,
 // principle 7). Most do not exist yet: the rule applies from the PR that adds one, and a change that touches none passes.
-// The fork-facing files of the product card registry (`docs/contracts/card-registry.md`, PR-F) are contract files too.
+// The fork-facing files of the product card registry (`docs/contracts/card-registry.md`, PR-F) are contract files too, and
+// so are those of the home sections (`docs/contracts/home-sections.md`, PR-G2): `config/home.ts` (its section types), the
+// fork-owned registry and its types.
 const contractConfig =
-  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots)|components\/cards\/(custom|types))\.tsx?$/;
+  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/(custom|types)|lib\/custom-sections)\.tsx?$/;
 
 /** The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/. */
 function contractConfigProblem(paths) {
   if (!paths.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
-  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts(x) or apps/storefront/src/components/cards/{custom,types}.ts(x)) changed but nothing under docs/contracts/ did.";
+  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/custom-sections.ts(x)) changed but nothing under docs/contracts/ did.";
 }
 
 /** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
@@ -41,10 +43,14 @@ const selfTestCases = [
       "R100\tapps/storefront/src/config/brand.ts\tapps/storefront/src/config/branding.ts\nM\tdocs/contracts/branding.md",
     fails: false,
   },
-  { nameStatus: "M\tapps/storefront/src/config/home.ts", fails: false },
+  { nameStatus: "M\tapps/storefront/src/config/home.ts", fails: true },
+  {
+    nameStatus: "M\tapps/storefront/src/config/home.ts\nM\tdocs/contracts/home-sections.md",
+    fails: false,
+  },
   { paths: [], fails: false },
   {
-    paths: ["apps/storefront/src/config/home.ts", "apps/storefront/src/config/theme.ts"],
+    paths: ["apps/storefront/src/config/home.spec.ts", "apps/storefront/src/config/theme.ts"],
     fails: false,
   },
   {
@@ -77,6 +83,27 @@ const selfTestCases = [
       "apps/storefront/src/components/cards/grid-card.tsx",
       "apps/storefront/src/components/cards/registry.ts",
       "apps/storefront/src/components/cards/custom.spec.tsx",
+    ],
+    fails: false,
+  },
+  { paths: ["apps/storefront/src/config/custom-sections.ts"], fails: true },
+  {
+    nameStatus: "A\tapps/storefront/src/lib/custom-sections.ts\nM\tdocs/files/storefront.md",
+    fails: true,
+  },
+  {
+    paths: [
+      "apps/storefront/src/config/custom-sections.ts",
+      "apps/storefront/src/lib/custom-sections.ts",
+      "docs/contracts/home-sections.md",
+    ],
+    fails: false,
+  },
+  {
+    paths: [
+      "apps/storefront/src/config/custom-sections.spec.ts",
+      "apps/storefront/src/lib/custom-sections-model.ts",
+      "apps/storefront/src/components/home-sections.tsx",
     ],
     fails: false,
   },

@@ -9,7 +9,7 @@ Default VALUES are not contract (plan principle 8). `check:docs` requires a chan
 
 | Name | Shape | Notes |
 |---|---|---|
-| `apps/storefront/src/config/header.ts` | `export const headerConfig: HeaderConfig` | FORK-OWNED: upstream creates it once and never edits it again. Defaults render the header as it was before the file existed (byte for byte, `components/header-footer-defaults.spec.tsx`). |
+| `apps/storefront/src/config/header.ts` | `export const headerConfig: HeaderConfig` | FORK-OWNED: upstream creates it once and never edits it again. Defaults render the header as it was before the file existed (byte for byte, `components/header-footer-defaults.upstream.spec.tsx`). |
 | `apps/storefront/src/config/footer.ts` | `export const footerConfig: FooterConfig` | FORK-OWNED, same rule. |
 | `HeaderConfig` and its parts (`apps/storefront/src/layout/header-layout.ts`) | `{ blocks: HeaderBlockName[]; controls: HeaderControlName[]; navigation: { categoryLimit: number; links: NavigationLink[] } }` | Types only are contract; `headerView` and `headerConfigProblems` are internal. |
 | `FooterConfig` and its parts (`apps/storefront/src/layout/footer-layout.ts`) | `{ blocks: FooterBlock[]; navigation: { groups: FooterLinkGroup[] } }` with `FooterBlock = FooterBlockName \| { kind: "text"; textKey: string }` | Same. |
@@ -63,7 +63,7 @@ checks without the message keys run at render (`headerView`, `footerView` throw)
 page; an unknown message key throws in the translator. What that failure looks like: `SiteShell` renders inside
 `app/[locale]/layout.tsx` (its `error.tsx` sits inside that layout and cannot catch it) and the app has no `global-error.tsx`, so EVERY page answers with Next's bare 500 page (the error and its
 message in the server log). `next build` does not catch it (the pages render per request); the unit tests do. The unit suite runs a second time with a filled fork config (`apps/storefront/vitest.brand-fork.config.ts`,
-`src/lib/layout-fork-fixture.ts`). `components/header-footer-defaults.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
+`src/lib/layout-fork-fixture.ts`). `components/header-footer-defaults.upstream.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
 a fork that changes either file deletes it.
 
 ## Not contract, not configurable (cut from plan L3, with the reason)

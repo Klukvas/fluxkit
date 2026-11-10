@@ -5,7 +5,7 @@
 //
 // The frozen files pin the WHOLE markup, @fluxkit/ui classes (`Container`) and the islands' markup included: an intended
 // change there (a ui class, a header island) needs them regenerated, after checking the diff is the intended one:
-//   pnpm --filter @fluxkit/storefront exec vitest run src/components/header-footer-defaults.spec.tsx -u
+//   pnpm --filter @fluxkit/storefront exec vitest run src/components/header-footer-defaults.upstream.spec.tsx -u
 // A change to the header or footer composition itself must NOT be regenerated away: defaults stay byte for byte.
 import { existsSync } from "node:fs";
 import { join } from "node:path";

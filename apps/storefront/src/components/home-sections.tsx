@@ -2,6 +2,7 @@ import type { CategoryNode, ProductSummary } from "@fluxkit/api-client";
 import {
   BannerCard,
   type BannerCardLinkProps,
+  Container,
   Hero,
   Skeleton,
   textStyles,
@@ -11,13 +12,16 @@ import {
 } from "@fluxkit/ui";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
+import { customSections } from "../config/custom-sections";
 import { trustBarItems, type TrustBarItemConfig } from "../config/trust-bar";
 import {
+  checkHomeSections,
   isDataSection,
   type BannersSection,
   type BannerTone,
   type CategoriesSection,
   type ConfigBannersSection,
+  type CustomSection,
   type HeroSection,
   type HomeDataSection,
   type HomeSection,
@@ -27,6 +31,7 @@ import {
   type TrustSection,
 } from "../config/home";
 import { catalogPath } from "../lib/catalog-query";
+import { resolveCustomSection } from "../lib/custom-sections";
 import {
   bannerLink,
   checkBannersSection,
@@ -47,6 +52,10 @@ import { StoreTrustBar } from "./trust-bar";
  * The home page from `config/home.ts` (review D-18, plan 2026-11-03-storefront-design-b.md). Every section is presentational:
  * the page loads the data and passes each data section its result. `HomeSections` streams each data section into its own
  * `Suspense` boundary (a skeleton of the same size meanwhile); `HomeSectionsView` renders already loaded results (tests).
+ *
+ * Layout (plan 2026-11-08-design-changeability.md, L4): with every section `contained` (the default) the sections share ONE
+ * `Container`, exactly the markup from before `width` existed; once a (custom) section is `full`, each section gets a frame
+ * of its own (`SectionFrame`). A `custom` section renders the fork's component from `config/custom-sections.ts`.
  */
 
 export interface HomeContext {
@@ -441,6 +450,30 @@ function RichTextView({ section, context }: { section: RichTextSection; context:
   );
 }
 
+/** The fork's component of a `custom` section, given a plain view model only (`lib/custom-sections.ts`). */
+function CustomSectionView({
+  section,
+  context,
+  isFirst,
+}: {
+  section: CustomSection;
+  context: HomeContext;
+  isFirst: boolean;
+}) {
+  const Component = resolveCustomSection(section, customSections);
+  if (Component === null) return null;
+  return (
+    <Component
+      id={section.id}
+      headingId={headingId(section)}
+      locale={context.locale}
+      t={context.t}
+      isFirst={isFirst}
+      width={section.width ?? "contained"}
+    />
+  );
+}
+
 function SectionError({
   section,
   context,
@@ -590,6 +623,8 @@ function StaticSectionView({
       return <TrustView section={section} context={context} />;
     case "richText":
       return <RichTextView section={section} context={context} />;
+    case "custom":
+      return <CustomSectionView section={section} context={context} isFirst={isFirst} />;
     default: {
       // A kind added to `HomeSection` without a renderer fails here at compile time.
       const unknown: never = section;
@@ -604,6 +639,87 @@ function HiddenPageHeading({ sections, t }: { sections: readonly HomeSection[]; 
 }
 
 const sectionStack = "flex flex-col gap-12 py-8";
+
+/**
+ * The frame of one section when the sections do not share one container (some section is `full`):
+ * - `contained`: the same `Container` as the shared one (same content width and gutter, whatever the tokens).
+ * - `full`: NO container: the section spans the window and decides its own inner width and surface.
+ * The spacing of a `full` frame is tied to `sectionStack` (`gap-12 py-8`; `home-sections-layout.spec.tsx` checks the pair):
+ * - right after a full section that RENDERED something it pulls up over the stack's gap (`-mt-12`), so adjacent bands touch.
+ *   A sibling selector on the rendered frames decides it, so after an empty full section nothing is pulled up;
+ * - first on the page it pulls up over the stack's top padding (`-mt-8`): flush under the header;
+ * - last on the page it pulls down over the stack's bottom padding (`-mb-8`): flush on the footer.
+ * `empty:hidden`: a section that renders nothing (no data, an empty custom section) leaves no frame, no gap and no pull.
+ */
+function SectionFrame({
+  section,
+  first,
+  last,
+  children,
+}: {
+  section: HomeSection;
+  first: boolean;
+  last: boolean;
+  children: ReactNode;
+}) {
+  if (section.width !== "full") {
+    return (
+      <Container className="empty:hidden" data-home-width="contained">
+        {children}
+      </Container>
+    );
+  }
+  const className = [
+    "empty:hidden [[data-home-width=full]:not(:empty)+&]:-mt-12",
+    first ? "-mt-8" : null,
+    last ? "-mb-8" : null,
+  ]
+    .filter((part) => part !== null)
+    .join(" ");
+  return (
+    <div className={className} data-home-width="full">
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The page around its sections. Every section contained: one `Container` around the stack (the markup from before `width`
+ * existed, byte for byte; frozen copies in `home-sections-default.spec.tsx`). Otherwise the stack spans the window and every
+ * section has its own `SectionFrame`.
+ */
+function SectionsLayout({
+  sections,
+  t,
+  renderSection,
+}: {
+  sections: readonly HomeSection[];
+  t: Translator;
+  renderSection: (section: HomeSection, index: number) => ReactNode;
+}) {
+  checkHomeSections(sections);
+  const ownFrames = sections.some((section) => section.width === "full");
+  const stack = (
+    <div className={sectionStack}>
+      <HiddenPageHeading sections={sections} t={t} />
+      {sections.map((section, index) =>
+        ownFrames ? (
+          <SectionFrame
+            key={section.id}
+            section={section}
+            first={index === 0}
+            last={index === sections.length - 1}
+          >
+            {renderSection(section, index)}
+          </SectionFrame>
+        ) : (
+          renderSection(section, index)
+        ),
+      )}
+    </div>
+  );
+  return ownFrames ? stack : <Container>{stack}</Container>;
+}
 
 async function AwaitedSection({
   section,
@@ -649,9 +765,10 @@ export function HomeSections({
     sections.filter(isDataSection).map((section) => [section.id, load(section)] as const),
   );
   return (
-    <div className={sectionStack}>
-      <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section, index) => {
+    <SectionsLayout
+      sections={sections}
+      t={context.t}
+      renderSection={(section, index) => {
         if (!isDataSection(section)) {
           return (
             <StaticSectionView
@@ -682,8 +799,8 @@ export function HomeSections({
             {awaited}
           </Suspense>
         );
-      })}
-    </div>
+      }}
+    />
   );
 }
 
@@ -700,9 +817,10 @@ export function HomeSectionsView({
 }) {
   const pageHeading = pageHeadingId(sections);
   return (
-    <div className={sectionStack}>
-      <HiddenPageHeading sections={sections} t={context.t} />
-      {sections.map((section, index) => {
+    <SectionsLayout
+      sections={sections}
+      t={context.t}
+      renderSection={(section, index) => {
         if (!isDataSection(section)) {
           return (
             <StaticSectionView
@@ -726,7 +844,7 @@ export function HomeSectionsView({
             isFirst={index === 0}
           />
         );
-      })}
-    </div>
+      }}
+    />
   );
 }
