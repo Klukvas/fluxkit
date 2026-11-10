@@ -6,8 +6,10 @@ import { localizedHref } from "../lib/locale-path";
 import { bannerLink, checkBannersSection } from "../lib/home-banners";
 import { categoryPageConfig } from "./category-page";
 import {
+  checkHomeSections,
   demoConfigBanners,
   homeSections,
+  HOME_SECTION_WIDTHS,
   isDataSection,
   MAX_BANNERS,
   type AdminBannersSection,
@@ -15,6 +17,7 @@ import {
   type BannerList,
   type BannersSection,
   type ConfigBannersSection,
+  type CustomSection,
   type HomeSection,
   type LocalImage,
 } from "./home";
@@ -37,6 +40,22 @@ const configNeedsItems: Assignable<
   { kind: "banners"; source: "config"; id: string; titleKey: string },
   HomeSection
 > = false;
+
+// Width and the custom kind (plan 2026-11-08-design-changeability.md, L4): an unknown width or a custom section without a
+// name are type errors; `width` is optional on every kind.
+const unknownWidthRejected: Assignable<
+  { kind: "trust"; id: string; titleKey: string; width: "wide" },
+  HomeSection
+> = false;
+const fullWidthAccepted: Assignable<
+  { kind: "trust"; id: string; titleKey: string; width: "full" },
+  HomeSection
+> = true;
+const customAccepted: Assignable<
+  { kind: "custom"; id: string; name: string; width: "full" },
+  HomeSection
+> = true;
+const customNeedsName: Assignable<{ kind: "custom"; id: string }, HomeSection> = false;
 
 const publicRoot = join(import.meta.dirname, "..", "..", "public");
 
@@ -79,6 +98,9 @@ function messageKeys(section: HomeSection): string[] {
       return [section.titleKey];
     case "richText":
       return [...(section.titleKey === undefined ? [] : [section.titleKey]), section.bodyKey];
+    case "custom":
+      // Its texts belong to the fork's component (keys of the fork's `custom.` namespace).
+      return [];
   }
 }
 
@@ -192,5 +214,60 @@ describe("home config", () => {
         expect(svg).not.toMatch(/<script|href=|url\(/i);
       }
     }
+  });
+
+  it("keeps today's page: no section of the default composition sets a width or is a custom section", () => {
+    for (const section of homeSections) {
+      expect(section.width, section.id).toBeUndefined();
+      expect(section.kind, section.id).not.toBe("custom");
+    }
+  });
+});
+
+describe("home config: width and the custom kind", () => {
+  const custom: CustomSection = { kind: "custom", id: "brand-strip", name: "brandStrip" };
+
+  it("rejects an unknown width and a custom section without a name at compile time", () => {
+    expect([unknownWidthRejected, fullWidthAccepted, customAccepted, customNeedsName]).toEqual([
+      false,
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it("knows two widths: contained (the default) and full", () => {
+    expect(HOME_SECTION_WIDTHS).toEqual(["contained", "full"]);
+  });
+
+  it("accepts the default composition and every allowed width, a custom section included", () => {
+    expect(() => {
+      checkHomeSections(homeSections);
+    }).not.toThrow();
+    expect(() => {
+      checkHomeSections([
+        { ...custom, width: "full" },
+        { kind: "trust", id: "trust", titleKey: "t", width: "contained" },
+      ]);
+    }).not.toThrow();
+  });
+
+  it("fails loudly on a width it does not know (a cast or plain JavaScript gets past the types)", () => {
+    const wide = { kind: "trust", id: "trust", titleKey: "t", width: "wide" } as unknown as HomeSection;
+    expect(() => {
+      checkHomeSections([wide]);
+    }).toThrow('Home section "trust" has the width "wide"; allowed: contained, full.');
+  });
+
+  it("fails loudly on a duplicate id and on a custom section with an empty or odd name", () => {
+    expect(() => {
+      checkHomeSections([custom, { ...custom, name: "other" }]);
+    }).toThrow('Home section id "brand-strip" is used twice');
+    expect(() => {
+      checkHomeSections([{ ...custom, name: "" }]);
+    }).toThrow('Home section "brand-strip" (custom) needs the name of a registered section');
+    expect(() => {
+      checkHomeSections([{ ...custom, name: "brand strip" }]);
+    }).toThrow('Home section "brand-strip" (custom) needs the name of a registered section');
   });
 });
