@@ -86,21 +86,29 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled brand, header and footer configs (`apps/storefront/vitest.brand-fork.config.ts`).
 - UI slots (S1; fork-owned `apps/storefront/src/config/slots.tsx`, contract `docs/contracts/slots.md`): SERVER components in the fork's new
   files, listed per slot, rendered in order with a plain view model (locale, translator, the slot's data); empty slots render nothing.
-  - `header.top`: an announcement bar inside the header, above its row (sticky with the header below `lg`).
-  - `product-card.badges`, `product-card.actions`: badges in a row above the brand and title, actions over the image's top right corner
-    (`grid`) or at the end of the price row (`list`) of the built-in cards; actions bring their own opaque background and an accessible name.
-    A fork's own card kind renders them with `renderSlot` of `apps/storefront/src/lib/slots.ts` if it wants them.
+  - `header.top`: an announcement bar inside the header, above its row. Below `lg` it is sticky with the header, which grows by the bar's
+    height, while `scroll-padding-top` (80 px, `apps/storefront/src/app/globals.css`) does not: keep the bar short, show it only from `lg`
+    (`max-lg:hidden`), or raise `scroll-padding-top` there (a core edit; no storefront overrides stylesheet yet).
+  - `product-card.badges`, `product-card.actions`: badges in a row above the brand and title, actions in the image's bottom right corner
+    (`grid`; the availability badge keeps the top left) or at the end of the price row (`list`) of the built-in cards. An action is a control
+    of its own (a client island's button, not a second link to the product), with an opaque background, an accessible name with the title and
+    a 44 px target; on `grid` it comes before the title in the focus order, and the card's focus outline shows while it has the focus. A
+    fork's own card kind gets no slots unless it calls `renderSlot` of `apps/storefront/src/lib/slots.ts`.
   - `footer.columns`: columns at the top of the footer (side by side from `sm`, up to four per row from `lg`). A four-column footer (plan
     target 5): four column components, and `navigation` and `contacts` left out of `blocks` in `config/footer.ts`; the columns render the
     links and contacts from their props. Example: `apps/storefront/src/lib/slots-fork-fixture.tsx` (shop pages, legal pages, contacts, a
-    newsletter placeholder).
+    newsletter placeholder). The footer's own rules in `apps/storefront/src/app/globals.css` style column content too (`ul` a wrapping row,
+    links `whitespace-nowrap`): put `flex-col` on a column's list and `whitespace-normal` on its links, or long names (uk legal pages) run past
+    the column. Register only columns that render: the grid counts the registered components, so one returning `null` leaves an empty cell.
   - Texts through `t` with `custom.` keys in `messages-extra`; token classes only; an interactive part is a client component the server
     component renders with plain props (a client component registered directly throws). A component that throws takes the page down
     (`header.top` and `footer.columns`: every page, Next's bare 500); handle a failed read inside it. An unknown slot name fails `tsc`,
     `next dev` and the tests; production logs it once and leaves it out.
   - Tests in the fork: delete the upstream-only, FORK-DELETABLE `apps/storefront/src/config/slots.upstream.spec.ts` once a slot is filled
-    (it pins the template's empty registry). The other specs keep the slots empty where they check the template's own markup; the upstream
-    fork run (`apps/storefront/vitest.home-fork.config.ts`) runs the suite with every slot filled.
+    (it pins the template's empty registry; `apps/storefront/src/customization-doc.spec.ts` allows it to be missing). The specs that check the
+    template's own markup (frame, cards, the default home page) keep the slots empty, so `pnpm --filter @fluxkit/storefront test` stays green
+    with filled slots; upstream runs the suite with every slot filled twice: with the default home page (`apps/storefront/vitest.brand-fork.config.ts`)
+    and with a reshaped one (`apps/storefront/vitest.home-fork.config.ts`).
 - **Needs a code edit** (core files `apps/storefront/src/components/site-header.tsx`, `apps/storefront/src/components/site-footer.tsx`, `apps/storefront/src/app/globals.css`):
   a centred header or a second header row (plan target 3 is NOT reached by design; an announcement bar is the `header.top` slot), a card
   badge over the image or any change inside the card other than the two slots (or a card of the fork's own, `cards/custom.ts`), a slot at

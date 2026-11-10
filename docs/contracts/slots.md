@@ -30,13 +30,37 @@ and the translator; never an API object.
 |---|---|---|---|
 | `header.top` | Inside `<header>` (the banner landmark), before the header row, on every page. Below `lg` the header is sticky, so this is too. | none (`HeaderTopSlotProps`) | none: the components are the header's first children. They draw their own full-width surface (for example `bg-primary text-primary-foreground` with `Container` of `@fluxkit/ui` inside). |
 | `product-card.badges` | On the built-in `grid` and `list` cards: a row under the image and above the brand and title (`grid`), above the brand and title in the text column (`list`). | `card: ProductCardModel` (`docs/contracts/card-registry.md`), `kind: string` (`"grid"` or `"list"`) | one `div` (`flex flex-wrap gap-1`) around the components. |
-| `product-card.actions` | On the same cards, above the card's link layer: over the image's top right corner (`grid`, absolutely positioned) and at the end of the price row (`list`). | as `product-card.badges` | one `div` (`grid`: `absolute top-5 right-5 z-10 flex gap-1`; `list`: `relative z-10 ms-auto flex gap-1`). Each action brings its own opaque background (no text directly on a photo) and an accessible name; the card title stays the card's one link to the product. |
-| `footer.columns` | At the top of the footer, before the blocks of `config/footer.ts`. Each component is one column. | `shopLinks`, `legalLinks: readonly SlotLink[]` (`{ label, href }`: translated, localized), `contacts: ContactsView` (`FooterContacts` of `components/contact-details.tsx` renders it) | one grid `div`: 1 column; 2 side by side from `sm`; 3 or 4 per row from `lg`; more than 4 wrap into rows of 4. A component should return ONE element (a fragment's parts become separate grid cells). |
+| `product-card.actions` | On the same cards, above the card's link layer: in the image's bottom right corner (`grid`; the core availability badge keeps the top left corner, so they never meet: measured at 320, 375 and 1280 px) and at the end of the price row (`list`). | as `product-card.badges` | `grid`: the image moves into a `div` (`relative flex flex-col`) that also holds one `div` (`absolute right-2 bottom-2 z-10 flex gap-1`) around the components; `list`: one `div` (`relative z-10 ms-auto flex gap-1`). Each action is a control of its own (a client island's button, or a link to ANOTHER target): the card title stays the card's link to the product. It brings its own opaque background (no text directly on a photo), an accessible name (with the product's title) and a 44 px target (`min-h-11 min-w-11`). |
+| `footer.columns` | At the top of the footer, before the blocks of `config/footer.ts`. Each component is one column. | `shopLinks`, `legalLinks: readonly SlotLink[]` (`{ label, href }`: translated, localized), `contacts: ContactsView` (`FooterContacts` of `components/contact-details.tsx` renders it) | one grid `div`: 1 column; 2 side by side from `sm`; 3 or 4 per row from `lg`; more than 4 wrap into rows of 4. The column count comes from the number of registered components, so a component that returns `null` leaves an empty cell (return `null` only from the last ones, or register only what renders). A component should return ONE element (a fragment's parts become separate grid cells). |
 
 A four-column footer (plan target 5) with config and new files only: four column components in `config/slots.tsx`, and `navigation` and
 `contacts` left out of `blocks` in `config/footer.ts` (the columns render them from `shopLinks`, `legalLinks` and `contacts`). Each link
-column is its own labelled `nav` with a heading; contacts stay in one `<address>`. Upstream's fork run shows exactly that
+column is its own labelled `nav` with a heading; contacts stay in one `<address>`. Upstream's fork runs show exactly that
 (`src/lib/slots-fork-fixture.tsx`, `src/components/slots.fork.spec.tsx`).
+
+Inherited footer rules: the footer's own component rules in `app/globals.css` also apply to what a column renders: `.fk-site-footer nav`
+(a column of gap 1), `.fk-site-footer ul` and `address` (a WRAPPING ROW, `flex flex-wrap gap-x-2`) and `.fk-site-footer ul a`,
+`address a` (a 44 px tall, `whitespace-nowrap`, padded link). In a column, stack the list (`flex-col` on the `ul`) and let long link texts
+wrap (`whitespace-normal` on the link): utilities win over these rules. Without that, a long name (uk "Повідомлення про конфіденційність")
+runs past a quarter-width column (measured: 8 px at 640, 70 px at 1024, 38 px at 1280 px); with it, nothing overflows in uk or en at
+640, 1024 and 1280 px (probe below).
+
+Geometry probe (LOCAL ONLY, not in CI: it needs Playwright's Chromium, no database): `apps/storefront/e2e/support/slots-geometry/`
+renders the fork fixture with the real compiled stylesheet and asserts no overlap of the actions frame with the availability badge (grid
+card, 320, 375, 1280 px) and no overflowing link or overlapping column in the four-column footer (uk and en, 640, 1024, 1280 px):
+`PLAYWRIGHT_BROWSERS_PATH=<browsers> pnpm --filter @fluxkit/storefront exec vitest run -c e2e/support/slots-geometry/vitest.config.ts`.
+
+## Accessibility and layout notes
+
+- `header.top` and the sticky header: below `lg` the header is sticky and the bar is part of it, so the header grows (with the fixture's
+  one-line bar it measured 97 px tall in review) and takes more of a phone's screen. `scroll-padding-top` (`app/globals.css`, 5 rem =
+  80 px below `lg`) does NOT grow with it: an anchor or a focused field can land under the header. There is no fork-owned stylesheet for
+  the storefront yet, so a fork with a bar either keeps it short, shows it only from `lg` (`max-lg:hidden` on the bar), or raises
+  `scroll-padding-top` in `app/globals.css` (a core edit).
+- `product-card.actions` focus order: on `grid` the actions come before the brand link and the title in the DOM, as they come first on
+  screen (the image is above the text); on `list` they come after the price, at the row's end. While an action has the focus, the whole
+  card shows its `focus-within` outline, as for the title and brand links.
+- Texts through `t` only; token classes only (the design guard applies to a fork's files as to any other).
 
 ## Empty slots
 
@@ -71,5 +95,8 @@ cached. A component must not wrap anything a shopper types into or must use with
 
 `config/slots.upstream.spec.ts` pins the template's empty registry: upstream-only, FORK-DELETABLE (a fork that fills a slot deletes it).
 The specs that check the template's own header, footer and cards pin the slots empty with `vi.mock`, so they stay green whatever a fork
-registers; the fork run `apps/storefront/vitest.home-fork.config.ts` runs the whole unit suite with every slot filled. A fork tests its own
-slot components in its own specs.
+registers (with filled slots, the default home page's frozen copy and the frozen header, footer and card markup still pass). Upstream
+runs the whole unit suite twice more with every slot filled: `apps/storefront/vitest.brand-fork.config.ts` (with the DEFAULT home page,
+the fork's brand, header and footer) and `apps/storefront/vitest.home-fork.config.ts` (with a reshaped home page). Deleting
+`config/slots.upstream.spec.ts` keeps `src/customization-doc.spec.ts` green (it lists the fork-deletable files). A fork tests its own slot
+components in its own specs.
