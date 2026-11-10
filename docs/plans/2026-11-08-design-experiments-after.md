@@ -1,4 +1,4 @@
-# Design experiments: acceptance run A1 (2026-11-10)
+# Design experiments: acceptance run A1 (2026-11-10) and re-run on main (section 6)
 
 Result of acceptance run A1 of plan `docs/plans/2026-11-08-design-changeability.md` (protocol 7.4). Same two scenarios and the same table
 columns as the baseline `docs/plans/2026-11-08-design-experiments-baseline.md`, so the two compare row by row.
@@ -9,8 +9,9 @@ columns as the baseline `docs/plans/2026-11-08-design-experiments-baseline.md`, 
   work. Numbers marked "reported" come from the agents' own reports; file and line counts are recomputed from `git diff --numstat 15c0d98`.
 - Classification used here: `config` = fork-owned files, `config/` files, token and brand files, `public/**`; `new` = not in the
   merge-base; `core edit` = any other changed existing file. Fork-deletable specs that the guide names count as deletions, not edits; `brand.spec.ts` is edited in place (one test removed). The guide's single list of these specs (step 0.3) exists only since PR 253; at `15c0d98` the same deletions were named in the guide's sections. Hours: the protocol (7.4 step 4) asks for tool calls times the baseline's median call time; this document uses the agents' own estimates instead (deviation).
-- After A1 the gaps it found were closed by PR 252 (storefront token overrides) and PR 253 (fork-friendly checks). **Neither run was
-  repeated on the finished code**: section 4 says which gap each PR closes by construction and what is still open.
+- Section 6 holds the re-run on `main` at `7552ccd` (after PR 252 and 253): two models per scenario. Sections 1 to 5 are the first run and stay as written.
+- After A1 the gaps it found were closed by PR 252 (storefront token overrides) and PR 253 (fork-friendly checks). **At the time of the first run neither
+  scenario had been repeated on the finished code** (the re-run is section 6): section 4 says which gap each PR closes by construction and what is still open.
 
 ## 1. Verdict against the protocol (7.4 step 5)
 
@@ -21,12 +22,12 @@ columns as the baseline `docs/plans/2026-11-08-design-experiments-baseline.md`, 
 | Rebrand core edits | 0 | 5 files: 4 non-test files and the test `brand-html.spec.ts` | **not met** at `15c0d98`; 2 files left after PR 252 and 253 (section 4) |
 | Rebrand test edits | 0 | 1 undocumented (`apps/admin/brand-html.spec.ts`), 2 documented deletions | **not met** at `15c0d98`; closed by PR 253 |
 | Reshape requests by config plus new files only | at least 3 of 5 | product code: 4 of 5 (R1, R2, R4, R5; R1 and R4 only partly, see the TODO column: no sale badge, Bestsellers shows the newest, brand logos are text, nothing checked visually). Strict protocol (a spec edit counts as core edit): 1 of 5 (R4) | product code met; strict not met at `15c0d98`; closed by PR 253 (section 4) |
-| Conflicts in `config`/`new` files with three upstream edits | 0 | **not measured** | open |
-| Runs per scenario | two, on different models, the worse counts | one | **not done** |
+| Conflicts in `config`/`new` files with three upstream edits | 0 | **not measured** (first run; section 6) | open |
+| Runs per scenario | two, on different models, the worse counts | one (first run; section 6) | **not done** |
 
 Honest summary: the plan's goal is reached in direction and size (rebrand effort roughly halved, 4 of 5 reshape requests without touching
-product code), but A1 as protocol 7.4 defines it **failed on the strict criteria**. The plan stays open for the items in section 5. A re-run
-of both scenarios on `main` at or after `951d0d1` (two models) is the way to turn the "closed by construction" rows into measurements.
+product code), but A1 as protocol 7.4 defines it **failed on the strict criteria**. The plan stays open for the items in section 5. The re-run on `main` (section 6) turned
+the "closed by construction" rows into measurements.
 
 ## 2. Rebrand scenario (`experiment/a1-rebrand`)
 
@@ -122,11 +123,77 @@ closed gaps, not measurements.
 
 ## 5. Open items after A1
 
-1. Re-run both scenarios on `main` (two models each, the worse counts), including the three-upstream-edits conflict test (protocol 7.4 step 4)
-   and the browser check of the centred header and hero overlay. Update this file with the measured numbers.
+1. Done in section 6 (re-run on `main`, two models, conflict probe). Still open: the browser and e2e check of the four branches.
 2. Owner decisions: `EmailTheme` display font and accent (public interface change); whether `home.ts` becomes fork-owned; whether
    `AGENTS.md` mentions `.fluxkit-fork` and links `docs/customization.md` (the file is the owner's); acknowledgement that the `full` home width
    applies to custom sections only (plan section 9).
 3. Unverified in A1: e2e (no Postgres in the agents' sandbox) and Chromium rendering. CI runs both on `main`; the visual job compared computed
    styles and screenshots for every merged PR, but not the agents' A1 branches.
 4. Agent attribution: commits of this work carry a "Co-Authored-By: Claude Opus 5.5" line; history was not rewritten.
+
+## 6. Re-run on main (2026-11-10, start commit `7552ccd`)
+
+Protocol 7.4 again, on the finished code: two fresh agents per scenario on two models different from the plan's authors (Sonnet 5.5 and
+fable); same briefs as section 2 and 3, one guide (`docs/customization.md`), one branch each, all read-only refs: `origin/experiment/a2-rebrand-sonnet`,
+`a2-rebrand-fable`, `a2-reshape-sonnet`, `a2-reshape-fable`. Counts below are recomputed with `git diff --numstat 7552ccd <branch>`; tool calls and
+minutes are the agents' reports. Models are as launched (Sonnet 5.5 and fable); git carries no model trailer for the agents' commits, so this is not verifiable from git, and the first-run agents (Opus 5.5) were not the same as either. The analysis and this document were written by Sonnet 5.5 and reviewed by fable. Hygiene was checked in the agents' transcripts: they only created their own branch and pushed it; none ran
+`git log`/`git show`, read another branch or opened `docs/plans/2026-11-08-*`.
+
+### 6.1 Results
+
+| Measure | Rebrand, Sonnet | Rebrand, fable | Reshape, Sonnet | Reshape, fable |
+|---|---|---|---|---|
+| Diff | 21 files, +105/-202 | 21 files, +140/-203 | 33 files, +827/-225 | 44 files, +1372/-220 |
+| Commits | 5 | 6 | 11 | 10 |
+| Tool calls, minutes (reported) | about 55, 12 min | about 46, 9 min | about 100, 22 min | about 150, 20 min |
+| Core edits (existing upstream-owned file; stricter than the intro: `config/home.ts` counts here) | 2: `email-theme.ts`, `theme-color.ts` | the same 2 | 3: `site-shell.tsx`, `shell.spec.tsx`, `config/home.ts` | 5: `site-header.tsx`, `layout/header-layout.ts`, `app/globals.css`, `slots.fork.spec.tsx`, `config/home.ts` |
+| Undocumented test edits | 0 | 0 | 1 (`shell.spec.tsx`: 5 `<nav>` landmarks) | 1 (`slots.fork.spec.tsx`: one `vi.mock`) |
+| Prescribed test work | marker spec, `brand-overrides.upstream.spec.ts`, `header-footer-defaults` spec and folder deleted; one test removed in `brand.spec.ts` | the same | marker, `cards/custom`, `slots`, `home-template-default`, `header-footer-defaults` specs deleted | the same set |
+| Expert estimate, tokens / "client is happy" | 1 h / 1-2 days | 30-45 min / 1-2 days | 3-4 h / 1.5-3 days | 2-3 days to "happy" |
+| Newcomer estimate, "client is happy" | 3-5 days | 3-5 days | 4-6 days | 5-8 days |
+| Left TODO | apple icon and og image (PNG), mail sender name (environment), demo copy and pictures | the same | sale badge, Bestsellers, brand pictures, newsletter, social links | the same; the sale badge placeholder shows on every card |
+| Not run | e2e, browser, visual compare | the same | the same | the same |
+
+Reshape per request (both models agree): R1 card, R2 list card and R5 footer were done by config plus new files, no spec edit. R4 home needed
+the upstream-owned `config/home.ts` (the guide names it as the place for the composition) plus new files. R3: the announcement bar is config
+only (fable also added a scroll-padding rule for it to core `globals.css`); the centred header needed a core edit in both runs (Sonnet kept the edit to the swap of one component in `site-shell.tsx` and put the
+header in a new file; fable added an optional `HeaderConfig.layout` and edited `site-header.tsx` and `globals.css`).
+
+### 6.2 Verdict against protocol 7.4 step 5
+
+| Criterion | Target | Measured (the worse run counts) | Result |
+|---|---|---|---|
+| Rebrand effort | at most 2 h expert / half a day newcomer to "happy" | tokens and mail and icons 30-60 min; "happy" estimated 1-2 days expert, 3-5 days newcomer (the agents counted raster icons, real logo, copy, home pictures and browser review) | **not met by estimate**; the estimates are not comparable with the first run, which left more out. Tokens-only is well under 2 h |
+| Rebrand core edits | 0 | 2 (`email-theme.ts`, `theme-color.ts`): the guide instructs them, the classifier counts them | **not met** (was 5 in the first run); closing it needs generated literals or a different mechanism |
+| Rebrand test edits | 0 | 0 undocumented; one in-place edit of `brand.spec.ts`, three prescribed spec deletions and the `header-footer-defaults` fixture folder | **met under the document's convention, not under the strict one** |
+| Reshape requests by config plus new files only | at least 3 of 5 | 3 of 5 (R1, R2, R5) in both runs: no undocumented spec edit; the prescribed fork-deletable spec deletions (`cards/custom.upstream.spec.ts`, `slots.upstream.spec.ts`, `header-footer-defaults` spec and folder) still count under the strict classifier. R4 is partial because of `config/home.ts`; R3 is a core edit | **met under the convention (config files and prescribed deletions allowed); under the strict classifier not met**. The first run counted 4 of 5 by the same convention (R1, R2, R4, R5) and 1 of 5 strictly: R4's `home.ts` edit counted as config there and counts as a core edit in section 6, so the section 6 count of 3 is the stricter one and the earlier prediction of R4 (section 4) did not hold |
+| Conflicts in `config`/`new` files with three upstream edits | 0 | 0 for all four branches: a branch with a messages key in `messages/uk/catalog.json`, a class in `cards/grid-card.tsx` and a line in `home-sections.tsx` merged without conflict. An upstream edit that adds a section in `config/home.ts` (the place the home sections live now, instead of `home-sections.tsx`) **conflicts in both reshape runs** (checked by the reviewer; the probe branch is not pushed, so the 0 is reproducible only from the three edits named here) | **met for the three probe edits only**; the forks' edits of `site-header.tsx`, `globals.css`, `home.ts` and `site-shell.tsx` are in files upstream edits often and would conflict on an upstream change there |
+| Two runs per scenario on different models | yes | yes | **met** |
+| Agent hygiene | no `git log`, no `experiment/*`, no baseline files | confirmed from the transcripts | **met** |
+
+Overall: A1 is **partly passed** on the finished code. By protocol 7.4 step 5 a failed threshold keeps the plan open: two rebrand thresholds fail (core edits 2, effort), so A1 is **not passed** and the plan stays open. The reshape count and the conflict test pass; the rebrand does not reach "0 core edits"
+(two literal files) and its "client is happy" estimate stays at days because of client-supplied assets, not because of the mechanism. The first
+run's gaps are closed as section 4 predicted (except its R4 prediction, see 6.2): no `tokens.css` edit, no admin `common.json` edit, no red upstream spec after a card or footer
+override, no `check:docs` failure in the fork (with the right base, see below).
+
+### 6.3 New findings (not in the first run)
+
+| Finding | Seen by | Suggested fix |
+|---|---|---|
+| `node scripts/check-docs.mjs --base origin/main` is red for a whole fork branch (the marker is read from the base); the guide has no local command | all four | name the command in the guide: `--base <marker commit>` (or the fork's main once it has the marker) |
+| The theme guards scan fork files and are not in `pnpm --filter @fluxkit/storefront test`: `rounded-sm`, a heading role held in a const, `outline-*` without `bg-`, `design-guard.spec` | reshape both | list `pnpm --filter @fluxkit/theme test` in the card, slot and custom-section steps |
+| Cards cannot be client components inside `components/cards/` (`client-boundary.spec`); a client island lives elsewhere | reshape Sonnet | one guide sentence |
+| `messages-extra` rejects "TODO" and "fluxkit)" in shopper-visible strings; `source-guards.spec` matches `<form>` even in comments and `StripE` inside a type name | reshape both | guide sentence on naming and guards |
+| No fork stylesheet and no arbitrary Tailwind values: small caps, equal-thirds header grid and scroll padding have no token-safe route | reshape both | a fork-owned storefront CSS file (contract decision) or utilities for these cases |
+| `slots.fork.spec.tsx` reads the real `config/header.ts` (it mocks only `./cards/custom`): a changed header turns it red in the home-fork run | reshape fable | mock `config/header` there |
+| `config/catalog.ts` is named by the `check:docs` message (`scripts/check-docs.mjs`) but does not exist | reshape fable | remove the mention or build the file |
+| Stale comments in fork-owned files (`brand.ts`, `admin-overrides.css`, `fonts.ts` mention `tokens.css`) | rebrand both | edit the comments |
+| New colours can fail contrast with the template's success and warning colours on a changed muted background; the step does not say that a light-only colour also needs dark and system | rebrand Sonnet | one sentence in step 4 |
+| A system serif stack is not a checklist row; mail buttons keep `--fk-radius-md` | rebrand fable | add a row and the mail note |
+| `pnpm install --offline` fails in the sandbox (`ERR_PNPM_NO_OFFLINE_TARBALL`); `--frozen-lockfile --prefer-offline` works | all four | sandbox note only |
+| Sale badge on every card (fable) and a dashed `TODO` badge (Sonnet): both because the card model has no compare-at price | reshape both | WP6 (API data) |
+
+### 6.4 Still not measured
+
+E2e, the visual comparison and any browser view of the four branches (no Postgres in the agents' sandbox; the centred header, the hero panel
+contrast and the footer columns were never rendered). The conflict test covers the three probe edits only.
