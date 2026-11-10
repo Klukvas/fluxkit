@@ -5,5 +5,18 @@
   "custom.announcement.text": "Безкоштовна доставка для замовлень від 2 000 ₴.",
   "custom.announcement.link": "Умови доставки",
   "custom.home.bestsellers.title": "Хіти продажу",
-  "custom.brandStrip.title": "Наші бренди"
+  "custom.brandStrip.title": "Наші бренди",
+  "custom.footer.shop": "Магазин",
+  "custom.footer.legal": "Правова інформація",
+  "custom.footer.contacts": "Контакти",
+  "custom.footer.social.label": "Ми в соціальних мережах",
+  "custom.footer.social.photo": "Наша сторінка з фото",
+  "custom.footer.social.message": "Наш канал",
+  "custom.footer.social.video": "Наш відеоканал",
+  "custom.footer.newsletter.title": "Розсилка",
+  "custom.footer.newsletter.soon": "Новини та пропозиції електронною поштою: незабаром.",
+  "custom.footer.pay.title": "Приймаємо",
+  "custom.footer.pay.bankCard": "Банківська картка",
+  "custom.footer.pay.onDelivery": "Оплата при отриманні",
+  "custom.footer.pay.transfer": "Банківський переказ"
 }

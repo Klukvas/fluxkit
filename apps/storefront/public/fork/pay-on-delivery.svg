@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 40" width="64" height="40">
+  <!-- FORK placeholder pictogram of a way to pay (neutral, not a scheme mark). TODO(fluxkit): the marks the client may show
+       (config/footer-extras.ts). Fixed greys: a picture loaded by <img> cannot use the theme tokens. -->
+  <rect width="64" height="40" rx="6" fill="#a7abb3"/>
+  <rect x="18" y="10" width="28" height="20" rx="2" fill="#7a7f88"/>
+  <path d="M18 17h28M32 10v20" stroke="#c7cad0" stroke-width="3"/>
+</svg>

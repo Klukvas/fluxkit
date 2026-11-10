@@ -5,5 +5,18 @@
   "custom.announcement.text": "Free delivery for orders over 2 000 ₴.",
   "custom.announcement.link": "Delivery terms",
   "custom.home.bestsellers.title": "Bestsellers",
-  "custom.brandStrip.title": "Our brands"
+  "custom.brandStrip.title": "Our brands",
+  "custom.footer.shop": "Shop",
+  "custom.footer.legal": "Legal information",
+  "custom.footer.contacts": "Contacts",
+  "custom.footer.social.label": "We are on social media",
+  "custom.footer.social.photo": "Our photo page",
+  "custom.footer.social.message": "Our channel",
+  "custom.footer.social.video": "Our video channel",
+  "custom.footer.newsletter.title": "Newsletter",
+  "custom.footer.newsletter.soon": "News and offers by email: coming soon.",
+  "custom.footer.pay.title": "We accept",
+  "custom.footer.pay.bankCard": "Bank card",
+  "custom.footer.pay.onDelivery": "Payment on delivery",
+  "custom.footer.pay.transfer": "Bank transfer"
 }

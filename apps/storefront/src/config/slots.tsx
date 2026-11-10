@@ -1,4 +1,10 @@
 import { AnnouncementBar } from "../components/fork/announcement-bar";
+import {
+  FooterContactsColumn,
+  FooterLegalColumn,
+  FooterNewsletterColumn,
+  FooterShopColumn,
+} from "../components/fork/footer-columns";
 import type { SlotRegistry } from "../lib/slots";
 
 /**
@@ -32,4 +38,11 @@ import type { SlotRegistry } from "../lib/slots";
 export const slots: SlotRegistry = {
   // Reshape R3: the thin announcement bar (`config/announcement.ts`).
   "header.top": [AnnouncementBar],
+  // Reshape R5: the footer in four columns (`config/footer.ts` leaves `navigation` and `contacts` to them).
+  "footer.columns": [
+    FooterShopColumn,
+    FooterLegalColumn,
+    FooterContactsColumn,
+    FooterNewsletterColumn,
+  ],
 };

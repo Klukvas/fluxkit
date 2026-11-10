@@ -34,7 +34,10 @@
 import type { FooterConfig } from "../layout/footer-layout";
 
 export const footerConfig: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+  // Reshape R5: `navigation` and `contacts` are left out: the four columns of the `footer.columns` slot render the shop pages,
+  // the legal pages and the contacts (`config/slots.tsx`, `components/fork/footer-columns.tsx`). The groups below stay for a
+  // later return of the `navigation` block.
+  blocks: ["themeSwitch", "copyright"],
   navigation: {
     groups: [{ kind: "shopPages" }, { kind: "legal" }],
   },
