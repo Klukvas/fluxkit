@@ -38,6 +38,9 @@
 import type { HeaderConfig } from "../layout/header-layout";
 
 export const headerConfig: HeaderConfig = {
+  // Reshape R3 (CORE-EDIT R3 in layout/header-layout.ts): from `lg` the logo in the middle, the navigation split around it,
+  // the search box in a second row; below `lg` the template's one row.
+  layout: "centred",
   blocks: ["menu", "logo", "navigation", "search", "controls"],
   controls: ["language", "cart", "account"],
   navigation: {
