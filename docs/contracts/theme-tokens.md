@@ -147,8 +147,8 @@ a token in the light block of `tokens.css` (since 2026-11-08 non-colour tokens l
   only: a fork that changes admin colours keeps the pairs of "Contrast" below itself (not checked by CI yet).
 - **Known limit:** the admin's headings (71) do not use `textStyles` roles and are not scanned by the heading-role guard; `font-display`
   does not reach them.
-- The admin's name is in its messages (`app.name`, `app.documentTitle` in `apps/admin/src/messages/{uk,en}/common.json`; a fork changes them in
-  its fork-owned `apps/admin/src/messages-overrides/{uk,en}.json`, `docs/contracts/README.md`), its favicon a fork-supplied `apps/admin/public/favicon.{svg,png,ico}` (`apps/admin/brand-html.ts`); neither is a token.
+- The admin's name is in its messages (`app.name`, `app.documentTitle` in `apps/admin/src/messages/{uk,en}/common.json`), its favicon a
+  fork-supplied `apps/admin/public/favicon.{svg,png,ico}` (`apps/admin/brand-html.ts`); neither is a token.
 
 ## Themes and modes (design batch B, 2026-11-03)
 
