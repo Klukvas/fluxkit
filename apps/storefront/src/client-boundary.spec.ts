@@ -68,6 +68,25 @@ describe("client bundle boundary", () => {
     }
   });
 
+  // The custom home sections (plan 2026-11-08-design-changeability.md, L4) are server components too: they receive the
+  // translator, which cannot cross to the browser. A fork's client island is rendered BY such a component, never registered.
+  it("keeps the custom home sections server-only: no client component registered, the registry imported by no client file", () => {
+    const registryPath = join("config", "custom-sections.ts");
+    const registry = files.find((file) => file.path === registryPath);
+    expect(registry, registryPath).toBeDefined();
+    expect(clientFiles).not.toContain(registry);
+    const imported = [...(registry?.text ?? "").matchAll(/from\s+["'](\.{1,2}\/[^"']+)["']/g)].map(
+      (match) => join("config", match[1] as string),
+    );
+    for (const path of imported) {
+      const target = files.find((file) => [".ts", ".tsx"].some((ext) => file.path === path + ext));
+      if (target !== undefined) expect(clientFiles, target.path).not.toContain(target);
+    }
+    for (const file of clientFiles) {
+      expect(file.text, file.path).not.toMatch(/["'][^"'\s]*\/custom-sections["']/);
+    }
+  });
+
   it("imports the server-only store data module from server files only", () => {
     const importers = files.filter((file) => /store-data\.server["']/.test(file.text));
     expect(importers.length).toBeGreaterThan(0);

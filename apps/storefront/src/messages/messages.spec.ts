@@ -101,13 +101,20 @@ function sourceFiles(directory: string): string[] {
   return readdirSync(directory).flatMap((name) => {
     const path = join(directory, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) ? [path] : [];
+    // Fork fixtures (`lib/*-fork-fixture.*`) are test data of the fork runs: their `custom.` keys belong to those runs' extras,
+    // and a fork's own extras must not make them look like missing keys.
+    return /\.(ts|tsx)$/.test(name) && !/\.spec\.tsx?$/.test(name) && !/-fork-fixture\./.test(name)
+      ? [path]
+      : [];
   });
 }
 
 describe("message keys used in the source", () => {
   const sourceRoot = join(import.meta.dirname, "..");
-  const namespaces = [...new Set(Object.keys(en).map((key) => key.split(".")[0]))];
+  // `custom` (the fork's namespace, `src/messages-extra`) is always scanned, also while the extras are empty upstream: a
+  // `custom.` literal outside the fork fixtures fails here at once, and the fixtures' own keys never count, whatever a fork's
+  // extras hold (the fork run `vitest.home-fork.config.ts` repeats this with filled extras).
+  const namespaces = [...new Set([...Object.keys(en).map((key) => key.split(".")[0]), "custom"])];
   const literal = new RegExp(
     `["'](((?:${namespaces.join("|")})\\.[A-Za-z0-9_.]*[A-Za-z0-9_]))["']`,
     "g",
