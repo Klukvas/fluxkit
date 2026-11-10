@@ -1,7 +1,7 @@
 import type { ProductOption } from "@fluxkit/api-client";
 import { createTranslator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
 import { cardDisplay, type CardDisplayInput } from "../lib/product-card-model";
@@ -15,6 +15,9 @@ import { ProductGrid } from "./product-grid";
 import { ProductPurchaseView } from "./product-purchase";
 import { StoreImage } from "./store-image";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+// FORK (a1-reshape): this spec pins the template's built-in cards; the fork overrides `grid` and `list` in `cards/custom.ts`.
+vi.mock("./cards/custom", () => ({ customCards: {} }));
 
 const { uk, en } = messagesByLocale;
 
