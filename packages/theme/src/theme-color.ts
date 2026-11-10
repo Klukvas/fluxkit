@@ -5,4 +5,4 @@
  * `email-theme.ts`: `theme-color.spec.ts` keeps both equal to the EFFECTIVE background (`tokens.css` plus the fork-owned
  * storefront overrides file), so a fork that changes a background changes it here too; the failure names the literals to write.
  */
-export const themeColors = { light: "#ffffff", dark: "#0b1020" } as const;
+export const themeColors = { light: "#faf7f2", dark: "#0e1613" } as const;
