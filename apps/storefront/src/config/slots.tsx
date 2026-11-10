@@ -1,3 +1,4 @@
+import { AnnouncementBar } from "../components/announcement-bar";
 import type { SlotRegistry } from "../lib/slots";
 
 /**
@@ -28,4 +29,4 @@ import type { SlotRegistry } from "../lib/slots";
  *   import { AnnouncementBar } from "../components/announcement-bar";
  *   export const slots: SlotRegistry = { "header.top": [AnnouncementBar] };
  */
-export const slots: SlotRegistry = {};
+export const slots: SlotRegistry = { "header.top": [AnnouncementBar] };
