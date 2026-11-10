@@ -22,7 +22,8 @@
     },
     "./tokens.css": "./src/tokens.css",
     "./tailwind.css": "./src/tailwind.css",
-    "./admin-overrides.css": "./src/admin-overrides.css"
+    "./admin-overrides.css": "./src/admin-overrides.css",
+    "./brand-overrides.css": "./src/brand-overrides.css"
   },
   "files": [
     "dist",
