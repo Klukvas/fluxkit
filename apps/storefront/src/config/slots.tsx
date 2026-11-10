@@ -1,5 +1,11 @@
 import { AnnouncementBar } from "../components/announcement-bar";
 import { FavouriteAction } from "../components/favourite-action";
+import {
+  ContactsColumn,
+  LegalColumn,
+  NewsletterColumn,
+  ShopColumn,
+} from "../components/footer-columns";
 import type { SlotRegistry } from "../lib/slots";
 
 /**
@@ -33,4 +39,5 @@ import type { SlotRegistry } from "../lib/slots";
 export const slots: SlotRegistry = {
   "header.top": [AnnouncementBar],
   "product-card.actions": [FavouriteAction],
+  "footer.columns": [ShopColumn, LegalColumn, ContactsColumn, NewsletterColumn],
 };

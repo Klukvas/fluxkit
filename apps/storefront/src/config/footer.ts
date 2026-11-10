@@ -34,7 +34,8 @@
 import type { FooterConfig } from "../layout/footer-layout";
 
 export const footerConfig: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+  // FORK: navigation and contacts render in the four `footer.columns` of config/slots.tsx.
+  blocks: ["themeSwitch", "copyright"],
   navigation: {
     groups: [{ kind: "shopPages" }, { kind: "legal" }],
   },

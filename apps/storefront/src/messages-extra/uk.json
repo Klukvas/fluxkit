@@ -8,5 +8,18 @@
   "custom.brandStrip.brand2": "Бренд два",
   "custom.brandStrip.brand3": "Бренд три",
   "custom.brandStrip.brand4": "Бренд чотири",
-  "custom.brandStrip.brand5": "Бренд п'ять"
+  "custom.brandStrip.brand5": "Бренд п'ять",
+  "custom.footer.shop": "Магазин",
+  "custom.footer.legal": "Правова інформація",
+  "custom.footer.contacts": "Контакти",
+  "custom.footer.social": "Ми в соцмережах",
+  "custom.footer.social.photo": "Наші фото",
+  "custom.footer.social.video": "Наші відео",
+  "custom.footer.social.chat": "Наш чат",
+  "custom.footer.newsletter": "Розсилка",
+  "custom.footer.newsletterSoon": "Розсилка незабаром з'явиться.",
+  "custom.footer.payment": "Способи оплати",
+  "custom.footer.payment.card": "Банківська картка",
+  "custom.footer.payment.bank": "Банківський переказ",
+  "custom.footer.payment.cash": "Оплата при отриманні"
 }

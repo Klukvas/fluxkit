@@ -8,5 +8,18 @@
   "custom.brandStrip.brand2": "Brand two",
   "custom.brandStrip.brand3": "Brand three",
   "custom.brandStrip.brand4": "Brand four",
-  "custom.brandStrip.brand5": "Brand five"
+  "custom.brandStrip.brand5": "Brand five",
+  "custom.footer.shop": "Shop",
+  "custom.footer.legal": "Legal",
+  "custom.footer.contacts": "Contacts",
+  "custom.footer.social": "Follow us",
+  "custom.footer.social.photo": "Our photos",
+  "custom.footer.social.video": "Our videos",
+  "custom.footer.social.chat": "Our chat",
+  "custom.footer.newsletter": "Newsletter",
+  "custom.footer.newsletterSoon": "Our newsletter is coming soon.",
+  "custom.footer.payment": "Payment methods",
+  "custom.footer.payment.card": "Bank card",
+  "custom.footer.payment.bank": "Bank transfer",
+  "custom.footer.payment.cash": "Cash on delivery"
 }
