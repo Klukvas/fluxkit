@@ -21,6 +21,9 @@ import { SiteHeader } from "./site-header";
 // The card slots render on the template's built-in cards (a fork's own card kind gets none unless it renders them), so the
 // built-in cards are used here, whatever the fork registers in `cards/custom.ts` (`test-support/template-defaults.ts`).
 vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
+// FORK (CORE-EDIT R3): the header row pinned below is the template's row; this run reads the fork's real `config/header.ts`,
+// whose `layout: "centred"` adds a class to it. The slots are what this spec checks, so the header config is the template's.
+vi.mock("../config/header", () => import("../test-support/template-defaults"));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
