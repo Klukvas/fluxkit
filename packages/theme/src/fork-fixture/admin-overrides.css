@@ -1,0 +1,20 @@
+/*
+ * FIXTURE (test only, not shipped): a FILLED admin overrides file (ADR 0047), a neutral admin next to a rebranded shop, with
+ * a client font. Read by vitest.brand-fork.config.ts.
+ */
+@font-face {
+  font-family: "Client Sans";
+  src: url("/admin-ui/fonts/client-sans.woff2") format("woff2");
+  font-display: swap;
+}
+
+:root,
+[data-theme="light"] {
+  --fk-color-primary: #1f2937;
+  --fk-color-primary-foreground: #ffffff;
+  --fk-color-ring: #1f2937;
+  --fk-color-accent: #374151;
+  --fk-color-accent-foreground: #ffffff;
+  --fk-radius-control: 0.25rem;
+  --fk-font-sans: "Client Sans", ui-sans-serif, system-ui, sans-serif;
+}

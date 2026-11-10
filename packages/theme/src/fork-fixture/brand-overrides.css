@@ -1,0 +1,79 @@
+/*
+ * FIXTURE (test only, not shipped): a FILLED storefront overrides file, as a fork that followed docs/customization.md has it.
+ * The palette, radii, shadows and display face of the A1 acceptance experiment (fictional "Verde Kopi", branch
+ * experiment/a1-rebrand), moved out of tokens.css. Read by vitest.brand-fork.config.ts.
+ */
+:root,
+[data-theme="light"] {
+  --fk-color-background: #fbf8f3;
+  --fk-color-foreground: #17241e;
+  --fk-color-muted: #f2ede4;
+  --fk-color-muted-foreground: #56605a;
+  --fk-color-border: #e4ddd0;
+  --fk-color-border-input: #7a7468;
+  --fk-color-primary: #1f5f4a;
+  --fk-color-primary-foreground: #ffffff;
+  --fk-color-accent: #a5600e;
+  --fk-color-accent-foreground: #ffffff;
+  --fk-color-danger: #b42318;
+  --fk-color-danger-foreground: #ffffff;
+  --fk-color-success: #1d6f3a;
+  --fk-color-warning: #975200;
+  --fk-color-ring: #1f5f4a;
+  --fk-radius-sm: 0.125rem;
+  --fk-radius-md: 0.25rem;
+  --fk-radius-lg: 0.5rem;
+  --fk-radius-control: 0.25rem;
+  --fk-radius-card: 0.5rem;
+  --fk-radius-panel: 0.25rem;
+  --fk-radius-overlay: 0.5rem;
+  --fk-radius-media: 0.25rem;
+  --fk-font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  --fk-shadow-card: 0 1px 2px 0 rgb(23 36 30 / 0.06);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(23 36 30 / 0.1), 0 1px 3px -1px rgb(23 36 30 / 0.06);
+  --fk-shadow-overlay: 0 12px 28px -10px rgb(23 36 30 / 0.16), 0 3px 8px -4px rgb(23 36 30 / 0.08);
+}
+
+[data-theme="dark"] {
+  --fk-color-background: #0f1713;
+  --fk-color-foreground: #ebe6dc;
+  --fk-color-muted: #1a2520;
+  --fk-color-muted-foreground: #a9b1a9;
+  --fk-color-border: #2a3831;
+  --fk-color-border-input: #6f7d75;
+  --fk-color-primary: #62b796;
+  --fk-color-primary-foreground: #0f1713;
+  --fk-color-accent: #e2a64b;
+  --fk-color-accent-foreground: #0f1713;
+  --fk-color-danger: #f28b7d;
+  --fk-color-danger-foreground: #0f1713;
+  --fk-color-success: #6fcf8f;
+  --fk-color-warning: #f0b955;
+  --fk-color-ring: #62b796;
+  --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.45), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+  --fk-shadow-overlay: 0 12px 28px -10px rgb(0 0 0 / 0.55), 0 3px 8px -4px rgb(0 0 0 / 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --fk-color-background: #0f1713;
+    --fk-color-foreground: #ebe6dc;
+    --fk-color-muted: #1a2520;
+    --fk-color-muted-foreground: #a9b1a9;
+    --fk-color-border: #2a3831;
+    --fk-color-border-input: #6f7d75;
+    --fk-color-primary: #62b796;
+    --fk-color-primary-foreground: #0f1713;
+    --fk-color-accent: #e2a64b;
+    --fk-color-accent-foreground: #0f1713;
+    --fk-color-danger: #f28b7d;
+    --fk-color-danger-foreground: #0f1713;
+    --fk-color-success: #6fcf8f;
+    --fk-color-warning: #f0b955;
+    --fk-color-ring: #62b796;
+    --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+    --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.45), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+    --fk-shadow-overlay: 0 12px 28px -10px rgb(0 0 0 / 0.55), 0 3px 8px -4px rgb(0 0 0 / 0.35);
+  }
+}

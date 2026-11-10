@@ -97,3 +97,56 @@ export const themeSelectors = {
 } as const;
 
 export const darkSchemeMedia = "(prefers-color-scheme: dark)";
+
+/** What a page's `<html>` and device say: the `data-theme` value (`null`: no attribute) and whether the OS asks for dark. */
+export interface PageState {
+  theme: "light" | "dark" | "system" | null;
+  osDark: boolean;
+}
+
+/** Whether one selector of a block's list matches the page root; only the selector shapes of the theme files are known. */
+function selectorMatches(selector: string, state: PageState): boolean {
+  if (selector === ":root") return true;
+  const attribute = /^\[data-theme="(light|dark|system)"\]$/.exec(selector);
+  if (attribute) return attribute[1] === state.theme;
+  throw new Error(
+    `Unknown selector "${selector}": the theme files use only :root and [data-theme="..."]`,
+  );
+}
+
+function mediaMatches(media: string | null, state: PageState): boolean {
+  if (media === null) return true;
+  if (media === darkSchemeMedia) return state.osDark;
+  throw new Error(`Unknown media query "${media}" in a theme file`);
+}
+
+/**
+ * The EFFECTIVE token values on the page root: the blocks of every stylesheet in import order (`tokens.css`, then an overrides
+ * file), each block that matches the page applied in turn, so a later block wins. Source order alone decides because every
+ * known selector has the same specificity (one pseudo-class or one attribute: 0,1,0); an unknown selector or media throws.
+ * Example: an override of `:root, [data-theme="light"]` also matches a dark page and beats the dark block of `tokens.css`.
+ */
+export function effectiveTokens(
+  blocks: readonly TokenBlock[],
+  state: PageState,
+): Map<string, string> {
+  const tokens = new Map<string, string>();
+  for (const block of blocks) {
+    // Every selector and the media are read even when an earlier one decides: an unknown shape always throws.
+    const selectors = block.selector.split(",").map((part) => selectorMatches(part.trim(), state));
+    if (!mediaMatches(block.media, state) || !selectors.includes(true)) continue;
+    for (const [name, value] of block.tokens) tokens.set(name, value);
+  }
+  return tokens;
+}
+
+/** The page states the storefront renders: light (also the default), dark, and system on a light and on a dark device. */
+export const storefrontStates = {
+  light: { theme: "light", osDark: false },
+  dark: { theme: "dark", osDark: false },
+  "system on a light OS": { theme: "system", osDark: false },
+  "system on a dark OS": { theme: "system", osDark: true },
+} as const satisfies Record<string, PageState>;
+
+/** The one page state of the admin: `<html data-theme="light">`, whatever the device says (ADR 0047). */
+export const adminState: PageState = { theme: "light", osDark: true };

@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { brandOverridesCss } from "./theme-run.testing.js";
 import {
   darkSchemeMedia,
   parseTokenBlocks,
@@ -178,10 +179,8 @@ describe("the storefront's fork-owned token overrides (brand-overrides.css)", ()
     ]);
   });
 
-  it("holds only overrides of the theme rules of tokens.css", () => {
-    expect(overridesProblems(read("packages/theme/src/brand-overrides.css"), tokenBlocks)).toEqual(
-      [],
-    );
+  it("holds only overrides of the theme rules of tokens.css (the file this run reads: the real one, or the fork fixture)", () => {
+    expect(overridesProblems(brandOverridesCss, tokenBlocks)).toEqual([]);
   });
 });
 

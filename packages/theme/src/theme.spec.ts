@@ -2,8 +2,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { themeModes } from "./index.js";
+import { storefrontTokens } from "./theme-run.testing.js";
 import {
   darkSchemeMedia,
+  effectiveTokens,
   parseTokenBlocks,
   themeSelectors,
   tokenBlock,
@@ -79,9 +81,10 @@ describe("design tokens", () => {
     // The template's value. A fork that gives headings their own face changes `--fk-font-display` and passes; one that changes
     // only the body face is told to decide the headings too (they would silently stay in the old system stack).
     // This literal must equal the template's `--fk-font-sans` (and `--fk-font-display`) in tokens.css: change all three together.
+    // Read on the storefront's EFFECTIVE light values: a fork sets fonts in its overrides file, not in tokens.css.
     const templateDisplay = "ui-sans-serif, system-ui, sans-serif";
-    const display = lightBlock.tokens.get("--fk-font-display");
-    const sans = lightBlock.tokens.get("--fk-font-sans");
+    const display = storefrontTokens.light.get("--fk-font-display");
+    const sans = storefrontTokens.light.get("--fk-font-sans");
     expect(sans).toBeDefined();
     expect(display).toBeDefined();
     expect(
@@ -172,5 +175,65 @@ describe("token block parser", () => {
   it("refuses shapes it does not know", () => {
     expect(() => parseTokenBlocks(":root { a { --b: 1; } }")).toThrow(/Unexpected rule shape/);
     expect(() => parseTokenBlocks(":root { nonsense }")).toThrow(/Unreadable declaration/);
+  });
+});
+
+describe("effective values (the cascade of tokens.css and an overrides file)", () => {
+  const overrides = (css: string) => [...blocks, ...parseTokenBlocks(css)];
+  const light = ':root, [data-theme="light"] { --fk-color-primary: #111111; --fk-radius-card: 0; }';
+  const dark = '[data-theme="dark"] { --fk-color-primary: #222222; }';
+  const system =
+    '@media (prefers-color-scheme: dark) { [data-theme="system"] { --fk-color-primary: #222222; } }';
+  const primary = (css: string, state: Parameters<typeof effectiveTokens>[1]) =>
+    effectiveTokens(overrides(css), state).get("--fk-color-primary");
+
+  it("equals the tokens.css blocks without overrides (light, dark, system on either device, no attribute)", () => {
+    expect(effectiveTokens(blocks, { theme: "light", osDark: true })).toEqual(lightBlock.tokens);
+    expect(effectiveTokens(blocks, { theme: null, osDark: false })).toEqual(lightBlock.tokens);
+    expect(effectiveTokens(blocks, { theme: "system", osDark: false })).toEqual(lightBlock.tokens);
+    expect(effectiveTokens(blocks, { theme: "dark", osDark: false })).toEqual(
+      new Map([...lightBlock.tokens, ...darkBlock.tokens]),
+    );
+    expect(effectiveTokens(blocks, { theme: "system", osDark: true })).toEqual(
+      new Map([...lightBlock.tokens, ...darkBlock.tokens]),
+    );
+  });
+
+  it("lets an override win over tokens.css in each mode: the later rule of equal specificity", () => {
+    const all = `${light}\n${dark}\n${system}`;
+    expect(primary(all, { theme: "light", osDark: false })).toBe("#111111");
+    expect(primary(all, { theme: "dark", osDark: false })).toBe("#222222");
+    expect(primary(all, { theme: "system", osDark: false })).toBe("#111111");
+    expect(primary(all, { theme: "system", osDark: true })).toBe("#222222");
+    // A light-only token (a radius) reaches every mode: dark and system inherit it from :root.
+    expect(
+      effectiveTokens(overrides(all), { theme: "dark", osDark: false }).get("--fk-radius-card"),
+    ).toBe("0");
+  });
+
+  it("shows why a light colour override needs its dark and system rules: alone it wins on dark pages too", () => {
+    expect(primary(light, { theme: "dark", osDark: false })).toBe("#111111");
+    expect(primary(light, { theme: "system", osDark: true })).toBe("#111111");
+  });
+
+  it("refuses selectors and media of another shape (another specificity would make source order meaningless)", () => {
+    expect(() =>
+      effectiveTokens(overrides("html { --fk-radius-card: 0; }"), {
+        theme: "light",
+        osDark: false,
+      }),
+    ).toThrow(/Unknown selector "html"/);
+    expect(() =>
+      effectiveTokens(overrides('[data-theme="dark"], .x { --fk-radius-card: 0; }'), {
+        theme: "dark",
+        osDark: false,
+      }),
+    ).toThrow(/Unknown selector ".x"/);
+    expect(() =>
+      effectiveTokens(overrides("@media print { :root { --fk-radius-card: 0; } }"), {
+        theme: "light",
+        osDark: false,
+      }),
+    ).toThrow(/Unknown media query/);
   });
 });
