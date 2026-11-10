@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { checkoutConfig } from "../config/checkout";
 import { messagesByLocale } from "../messages";
-import { footerLinks, headerLinks, sessionLinks } from "./navigation";
+import { footerLinks, sessionLinks } from "./navigation";
 import { localizedHref } from "../lib/locale-path";
 
 const { en } = messagesByLocale;
@@ -10,7 +10,7 @@ const messageKeys = new Set(Object.keys(en));
 
 describe("navigation config", () => {
   it("uses existing message keys and plain storefront paths", () => {
-    for (const link of [...headerLinks, ...footerLinks]) {
+    for (const link of footerLinks) {
       expect(messageKeys.has(link.labelKey), link.labelKey).toBe(true);
       expect(() => localizedHref("uk", link.href), link.href).not.toThrow();
     }

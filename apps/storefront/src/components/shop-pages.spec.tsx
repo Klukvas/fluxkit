@@ -1,8 +1,10 @@
 import { createTranslator, type Translator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+import { footerConfig } from "../config/footer";
 import { LEGAL_PLACEHOLDER_MARKER, legalPages, withoutLegalMarker } from "../config/legal";
 import { shopPages, type ShopPageConfig } from "../config/shop-pages";
+import { footerShopLinks } from "../layout/navigation";
 import { contactsView, type ContactsView } from "../lib/contacts";
 import { buildSitemap } from "../lib/sitemap";
 import { messagesByLocale } from "../messages";
@@ -188,7 +190,19 @@ describe("the footer", () => {
       <SiteFooter locale="en" t={t} year={2026} themeMode="light" contacts={none} shopLinks={[]} />,
     );
     expect(empty).not.toContain("<address");
-    expect(empty.match(/<ul/g)).toHaveLength(1);
+    // No shop pages: their list is left out (no empty `<ul>`), whatever the other link groups of `config/footer.ts` are.
+    const withShopPages = renderToStaticMarkup(
+      <SiteFooter locale="en" t={t} year={2026} themeMode="light" contacts={none} />,
+    );
+    expect(empty).not.toContain("<ul></ul>");
+    // The default shop links add one list only when there are any and `config/footer.ts` lists their group (a fork may have
+    // no `inFooter` page, or no `shopPages` group).
+    const shopListShown =
+      footerShopLinks.length > 0 &&
+      footerConfig.navigation.groups.some((group) => group.kind === "shopPages");
+    expect(empty.match(/<ul/g)?.length ?? 0).toBe(
+      (withShopPages.match(/<ul/g)?.length ?? 0) - (shopListShown ? 1 : 0),
+    );
     expect(empty).toContain('class="fk-theme-option"');
   });
 });

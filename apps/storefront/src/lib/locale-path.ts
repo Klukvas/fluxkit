@@ -22,16 +22,22 @@ export function switchLocalePath(pathname: string, target: Locale, search = "", 
 }
 
 /**
- * A link target from a layout config (`src/layout/navigation.ts`): a path starting with one `/`, no scheme, no `//`, no
- * backslash and no dot segments, so a config entry can never become an external or odd URL.
+ * Whether a link target from a layout config (`src/layout/navigation.ts`, `config/header.ts`, `config/footer.ts`) is a plain
+ * storefront path: starting with one `/`, no scheme, no `//`, no backslash and no dot segments, so a config entry can never
+ * become an external or odd URL.
  */
+export function isPlainStorefrontPath(href: string): boolean {
+  return (
+    href.startsWith("/") &&
+    !href.startsWith("//") &&
+    !href.includes("\\") &&
+    !/(^|\/)\.\.?(\/|$)/.test(href)
+  );
+}
+
+/** A link target from a layout config with the locale in front; anything but a plain storefront path throws. */
 export function localizedHref(locale: Locale, href: string): string {
-  if (
-    !href.startsWith("/") ||
-    href.startsWith("//") ||
-    href.includes("\\") ||
-    /(^|\/)\.\.?(\/|$)/.test(href)
-  ) {
+  if (!isPlainStorefrontPath(href)) {
     throw new RangeError(`"${href}" is not a plain storefront path.`);
   }
   return href === "/" ? `/${locale}` : `/${locale}${href}`;

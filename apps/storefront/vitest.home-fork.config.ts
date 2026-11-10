@@ -25,6 +25,8 @@ export default defineConfig({
     ],
   },
   test: {
+    // Checked by `src/lib/fork-run.spec.ts`: the aliases above really swap the home configs in this run.
+    provide: { forkRun: "home" },
     exclude: [
       ...configDefaults.exclude,
       "e2e/**",
