@@ -14,10 +14,13 @@ import ukOverrides from "../messages-overrides/uk.json";
 import { customSections } from "../config/custom-sections";
 import { HomeSections, HomeSectionsView } from "./home-sections";
 
-// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): the frozen copy is the template's own home markup
-// (its product cards included). Where the card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`;
-// filled slots with this default home, the brand fork run (`vitest.brand-fork.config.ts`).
-vi.mock("../config/slots", () => ({ slots: {} }));
+// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1) and of the cards it registers in `cards/custom.ts`
+// (plan L2): the frozen copy is the template's own home markup (its built-in product cards included), so both files are the
+// template defaults here (`test-support/template-defaults.ts`). Where the card slots render, and that empty slots add nothing,
+// is `slot-places.spec.tsx`; filled slots and the fork's own cards with this default home, the brand fork run
+// (`vitest.brand-fork.config.ts`).
+vi.mock("../config/slots", () => import("../test-support/template-defaults"));
+vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
 
 // The DEFAULT home config (`config/home.ts`) as the home route renders it, against a frozen copy of its markup taken before
 // the per-section `width` and the `custom` kind existed (plan 2026-11-08-design-changeability.md, L4): with default settings

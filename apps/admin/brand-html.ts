@@ -1,17 +1,22 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import enCommon from "./src/messages/en/common.json";
+import { applyOverrides, overrideProblems } from "./src/messages/overrides.ts";
 
 /**
  * The admin's document title and favicon, written into `index.html` once at build (and by `vite dev`) by Vite's
  * `transformIndexHtml` hook (ADR 0047). One source each, nothing in `index.html` to edit:
- * - the name is the English `app.name` of `src/messages/en/common.json` (the same key the header shows). The static title
- *   is what a tab shows before the SPA starts and picks the UI language; the SPA then writes "<page> · <app.name>" in that
- *   language (`src/i18n/use-document-title.ts`). A fork renames the admin in `app.name` and `app.documentTitle` of both
- *   `messages/{uk,en}/common.json`.
+ * - the name is the English `app.name` the admin renders: `src/messages/en/common.json` with a fork's
+ *   `src/messages-overrides/en.json` over it (the same key the header shows). The static title is what a tab shows before
+ *   the SPA starts and picks the UI language; the SPA then writes "<page> · <app.name>" in that language
+ *   (`src/i18n/use-document-title.ts`). A fork renames the admin with `app.name` and `app.documentTitle` in both
+ *   fork-owned `src/messages-overrides/{uk,en}.json` (no core edit; `docs/customization.md`, step 10).
  * - the favicon is a file a fork drops into `apps/admin/public/` (the first of `FAVICON_FILES`); Vite copies it to the
  *   build root, so it is served at `/admin-ui/<file>` by the edge proxy's `try_files`. Upstream ships none (no link).
+ * The plugin also refuses a broken overrides file before anything is built (`messageOverrideProblems`): the SPA loads area
+ * files lazily, so only the build sees every file at once.
  */
 
 export const FAVICON_FILES = ["favicon.svg", "favicon.png", "favicon.ico"] as const;
@@ -28,11 +33,48 @@ export interface AdminBrand {
   favicon: FaviconFile | null;
 }
 
+/** The English `app.name` of the messages with a fork's overrides applied (a bad override value throws). */
+export function adminName(
+  common: Readonly<Record<string, string>>,
+  overrides: Readonly<Record<string, unknown>>,
+): string {
+  const name = applyOverrides(common, overrides, "en")["app.name"];
+  if (name === undefined) throw new Error("src/messages/en/common.json has no app.name.");
+  return name;
+}
+
 /** The brand of this build. `publicDir` is Vite's resolved public folder (an empty string when it is turned off). */
 export function adminBrand(publicDir: string): AdminBrand {
   const favicon =
     publicDir === "" ? undefined : FAVICON_FILES.find((file) => existsSync(join(publicDir, file)));
-  return { name: enCommon["app.name"], favicon: favicon ?? null };
+  // Read from disk, not imported: one JSON import less in the Vite config (its native loader warns on each).
+  const overrides = readJson(
+    fileURLToPath(new URL("./src/messages-overrides/en.json", import.meta.url)),
+  );
+  return { name: adminName(enCommon, overrides), favicon: favicon ?? null };
+}
+
+function readJson(path: string): Record<string, unknown> {
+  return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+}
+
+/**
+ * The problems of the overrides files under `sourceDir` (`apps/admin/src`): every key must be in one of the locale's message
+ * files, eager or lazy (`messages/<locale>/*.json`), and every value a non-empty string. Empty when all is well.
+ */
+export function messageOverrideProblems(sourceDir: string): string[] {
+  return (["uk", "en"] as const).flatMap((locale) => {
+    const folder = join(sourceDir, "messages", locale);
+    const all: Record<string, string> = {};
+    for (const file of readdirSync(folder).filter((name) => name.endsWith(".json"))) {
+      Object.assign(all, readJson(join(folder, file)));
+    }
+    return overrideProblems(
+      all,
+      readJson(join(sourceDir, "messages-overrides", `${locale}.json`)),
+      locale,
+    );
+  });
 }
 
 function escapeHtml(text: string): string {
@@ -61,13 +103,18 @@ export function brandIndexHtml(html: string, brand: AdminBrand, base: string): s
   return result;
 }
 
-/** The Vite plugin: reads the brand once the config is resolved (public folder, base path). */
+/**
+ * The Vite plugin: checks the overrides files and reads the brand once the config is resolved (public folder, base path);
+ * a broken overrides file stops `vite build` and `vite dev` with every problem named.
+ */
 export function adminBrandHtml(): Plugin {
   let brand: AdminBrand = { name: enCommon["app.name"], favicon: null };
   let base = "/";
   return {
     name: "fluxkit-admin-brand-html",
     configResolved(config) {
+      const problems = messageOverrideProblems(join(config.root, "src"));
+      if (problems.length > 0) throw new Error(problems.join("\n"));
       brand = adminBrand(config.publicDir);
       base = config.base;
     },

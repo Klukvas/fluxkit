@@ -18,6 +18,10 @@ import { SiteHeader } from "./site-header";
 // `lib/messages-extra-fork-fixture.{uk,en}.json`): every UI slot filled with config and new files only, plan S1 and section 1,
 // request 5 (a four-column footer without a core edit).
 
+// The card slots render on the template's built-in cards (a fork's own card kind gets none unless it renders them), so the
+// built-in cards are used here, whatever the fork registers in `cards/custom.ts` (`test-support/template-defaults.ts`).
+vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => "/en/catalog",

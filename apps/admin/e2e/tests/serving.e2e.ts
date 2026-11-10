@@ -4,12 +4,18 @@ import { ADMIN_CACHE_CONTROL, ADMIN_SECURITY_HEADERS } from "../../security-head
 import { SPA } from "../support/env.ts";
 import { expect, test } from "../support/fixtures.ts";
 
-/** The admin's name in the English UI (ADR 0047: a fork renames it in the messages), read as data, not imported from `src`. */
-const ADMIN_NAME = (
-  JSON.parse(
-    readFileSync(resolve(import.meta.dirname, "../../src/messages/en/common.json"), "utf8"),
-  ) as Record<string, string>
-)["app.name"] as string;
+function englishMessages(file: string): Record<string, string> {
+  return JSON.parse(
+    readFileSync(resolve(import.meta.dirname, "../../src", file), "utf8"),
+  ) as Record<string, string>;
+}
+
+/**
+ * The admin's name in the English UI (ADR 0047: a fork renames it in its `src/messages-overrides/en.json`, merged last),
+ * read as data, not imported from `src`.
+ */
+const ADMIN_NAME = (englishMessages("messages-overrides/en.json")["app.name"] ??
+  englishMessages("messages/en/common.json")["app.name"]) as string;
 
 /** A page response or an API response: only the headers are read. */
 function expectStrictHeaders(

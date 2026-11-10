@@ -13,6 +13,10 @@ import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers
 
 const { uk, en } = messagesByLocale;
 
+// The results render the template's built-in cards here, whatever a fork registers in `cards/custom.ts` (plan L2,
+// `test-support/template-defaults.ts`); the fork's own cards, the fork run (`vitest.brand-fork.config.ts`).
+vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
   usePathname: () => "/uk/search",

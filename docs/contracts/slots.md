@@ -8,7 +8,7 @@ A slot is a fixed place in the storefront where a fork adds its own SERVER compo
 What is contract: the slot names, their places (as described below), the props each component receives, the fork-owned registry and the
 failure rules. Not contract: the markup and classes around the places (the header row, the card's other elements, the footer blocks) and
 the classes of the slot frames listed below beyond what the table promises. Changes to `config/slots.tsx` or `lib/slots.ts` need a change
-under `docs/contracts/` (`check:docs`).
+under `docs/contracts/` (`check:docs`; in a fork with the `.fluxkit-fork` marker only `lib/slots.ts`, `docs/contracts/README.md`).
 
 ## Registry
 

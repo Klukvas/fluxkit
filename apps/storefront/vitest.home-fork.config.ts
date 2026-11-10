@@ -7,7 +7,9 @@ import { configDefaults, defineConfig } from "vitest/config";
  * a contained one later), `src/lib/home-fork-fixture.tsx` in place of `config/custom-sections.ts` (a filled registry), and
  * `src/lib/messages-extra-fork-run.*.ts` in place of `src/messages-extra/*.json`: the REAL extras with the fixture's `custom.`
  * texts merged over them, so a fork's own sections keep their texts here too; and `src/lib/slots-fork-fixture.tsx` in place of
- * `config/slots.tsx` (every UI slot filled, plan S1: an announcement bar, a card badge and action, a four-column footer). Plus
+ * `config/slots.tsx` (every UI slot filled, plan S1: an announcement bar, a card badge and action, a four-column footer), and
+ * `src/lib/cards-fork-fixture.tsx` in place of `components/cards/custom.ts` (the fork's own `grid` and `list` cards, plan L2,
+ * request 1; specs that pin the built-in cards mock `cards/custom` back with `src/test-support/template-defaults.ts`). Plus
  * `*.fork.spec.{ts,tsx}`, which render that page and those slots. Part of `pnpm test` (`package.json`). Upstream pins of the default page skip themselves here
  * (`lib/home-template-default.ts`). Left out: `*.upstream.spec.ts` (upstream-only, fork-deletable: they require the template's
  * default page), `messages/message-files.spec.ts` and `next.config.spec.ts`, which read the real extras files from disk and
@@ -17,6 +19,7 @@ const registry = fileURLToPath(new URL("./src/lib/home-fork-fixture.tsx", import
 const home = fileURLToPath(new URL("./src/lib/home-config-fork-fixture.ts", import.meta.url));
 const extras = fileURLToPath(new URL("./src/lib/messages-extra-fork-run.", import.meta.url));
 const slots = fileURLToPath(new URL("./src/lib/slots-fork-fixture.tsx", import.meta.url));
+const cards = fileURLToPath(new URL("./src/lib/cards-fork-fixture.tsx", import.meta.url));
 
 export default defineConfig({
   resolve: {
@@ -25,10 +28,15 @@ export default defineConfig({
       { find: /^(?:\.\.\/)+config\/home$|^\.\/home$/, replacement: home },
       { find: /^\.\.\/messages-extra\/(uk|en)\.json$/, replacement: `${extras}$1.ts` },
       { find: /^(?:\.\.\/)+config\/slots$/, replacement: slots },
+      // The same card paths as `vitest.brand-fork.config.ts`.
+      {
+        find: /^(?:\.\/(?:cards\/)?|(?:\.\.\/)+components\/cards\/)custom$/,
+        replacement: cards,
+      },
     ],
   },
   test: {
-    // Checked by `src/lib/fork-run.spec.ts`: the aliases above really swap the home configs and the slots in this run.
+    // Checked by `src/lib/fork-run.spec.ts`: the aliases above really swap the home configs, the slots and the cards in this run.
     provide: { forkRun: "home" },
     exclude: [
       ...configDefaults.exclude,

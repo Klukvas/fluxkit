@@ -6,7 +6,7 @@ Additive: a new width, a width for more kinds, a section kind or a field is mino
 
 The home page is the ordered list `homeSections` in `apps/storefront/src/config/home.ts` (upstream-owned; a fork edits it). What is
 contract here is the shape of the section types (`width`, the `custom` kind) and the fork-owned registry; the default composition,
-texts and pictures are not. Changes to `config/home.ts` need a change under `docs/contracts/` (`check:docs`).
+texts and pictures are not. Changes to `config/home.ts` need a change under `docs/contracts/` (`check:docs`; not in a fork with the `.fluxkit-fork` marker, `docs/contracts/README.md`).
 
 ## Section width
 

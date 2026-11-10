@@ -14,9 +14,13 @@ import { ErrorView, LoadingView, NotFoundView } from "./status-views";
 import { customer } from "../lib/test-fixtures";
 import { findElements, leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 
-// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the template's own frame. Where
-// the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
-vi.mock("../config/slots", () => ({ slots: {} }));
+// Independent of what a fork puts in `config/slots.tsx` (plan S1), `config/header.ts` and `config/footer.ts` (plan L3): this
+// spec checks the template's own frame (its landmarks, links and size caps), so those files are the template defaults here
+// (`test-support/template-defaults.ts`). Where the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`;
+// other header and footer configs, `header-footer-config.spec.tsx`; filled ones, the fork run (`vitest.brand-fork.config.ts`).
+vi.mock("../config/slots", () => import("../test-support/template-defaults"));
+vi.mock("../config/header", () => import("../test-support/template-defaults"));
+vi.mock("../config/footer", () => import("../test-support/template-defaults"));
 
 const { uk, en } = messagesByLocale;
 

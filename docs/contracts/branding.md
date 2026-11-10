@@ -8,7 +8,7 @@ values are NOT contract. How to use it: `docs/customization.md`.
 
 `apps/storefront/src/config/brand.ts` is **fork-owned**: upstream created it once and never edits it again, so a fork fills it without merge conflicts. It
 exports `brand: BrandConfig`, data only. The types and every reader live in `apps/storefront/src/lib/brand.ts` (internal: how a field is rendered may
-change in a minor release; the fields below may not). `check:docs` fails a PR that changes `config/brand.ts` without a change under `docs/contracts/`.
+change in a minor release; the fields below may not). `check:docs` fails a PR that changes `config/brand.ts` without a change under `docs/contracts/` (not in a fork with the `.fluxkit-fork` marker, `docs/contracts/README.md`).
 
 ## Shape (`BrandConfig`, `apps/storefront/src/lib/brand.ts`)
 
