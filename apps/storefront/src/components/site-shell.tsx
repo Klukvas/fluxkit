@@ -8,7 +8,8 @@ import { RouteFocus } from "./route-focus";
 import { SessionNotices } from "./session-notices";
 import { SessionProvider } from "./session-provider";
 import { SiteFooter } from "./site-footer";
-import { SiteHeader, type NavigationCategory } from "./site-header";
+import { CentredHeader } from "./centred-header";
+import type { NavigationCategory } from "./site-header";
 
 /**
  * The page frame inside `<body>`: skip link first (the first Tab stop), then the header, `<main>` (the skip link's target,
@@ -40,7 +41,12 @@ export function SiteShell({
       <SessionProvider locale={locale}>
         <RouteFocus />
         <SkipLink targetId={MAIN_CONTENT_ID}>{t("skip.content")}</SkipLink>
-        <SiteHeader locale={locale} t={t} categories={categories} searchEnabled={searchEnabled} />
+        <CentredHeader
+          locale={locale}
+          t={t}
+          categories={categories}
+          searchEnabled={searchEnabled}
+        />
         <main id={MAIN_CONTENT_ID} tabIndex={-1} className="flex-1 focus:outline-none">
           <SessionNotices />
           {children}
