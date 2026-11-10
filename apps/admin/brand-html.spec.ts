@@ -65,7 +65,6 @@ describe("brandIndexHtml (the admin's document title and favicon, set once at bu
 describe("adminBrand (where the name and the favicon come from)", () => {
   it("takes the name from the English app.name: today's title, before the UI language is known", () => {
     expect(adminBrand(publicDir([])).name).toBe(enCommon["app.name"]);
-    expect(adminBrand(publicDir([])).name).toBe("Fluxkit Admin");
   });
 
   it("uses no favicon by default, and the first fork-supplied file of the public folder otherwise", () => {

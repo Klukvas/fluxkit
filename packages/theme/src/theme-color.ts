@@ -5,4 +5,4 @@
  * `email-theme.ts`: `theme-color.spec.ts` keeps both equal to `tokens.css`, so a fork that changes a background changes it
  * here too, or the spec fails.
  */
-export const themeColors = { light: "#ffffff", dark: "#0b1020" } as const;
+export const themeColors = { light: "#fbf8f3", dark: "#0f1713" } as const;

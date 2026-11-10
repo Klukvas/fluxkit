@@ -13,25 +13,25 @@
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --fk-color-background: #ffffff;
-  --fk-color-foreground: #0f172a;
-  --fk-color-muted: #f1f5f9;
-  --fk-color-muted-foreground: #475569;
-  --fk-color-border: #e2e8f0;
-  --fk-color-border-input: #64748b;
-  --fk-color-primary: #4f46e5;
+  --fk-color-background: #fbf8f3;
+  --fk-color-foreground: #17241e;
+  --fk-color-muted: #f2ede4;
+  --fk-color-muted-foreground: #56605a;
+  --fk-color-border: #e4ddd0;
+  --fk-color-border-input: #7a7468;
+  --fk-color-primary: #1f5f4a;
   --fk-color-primary-foreground: #ffffff;
   /* Accent: the banner `accent` tone, otherwise reserved for client code. Defaults equal the primary pair (no visual change). */
-  --fk-color-accent: #4f46e5;
+  --fk-color-accent: #a5600e;
   --fk-color-accent-foreground: #ffffff;
-  --fk-color-danger: #b91c1c;
+  --fk-color-danger: #b42318;
   --fk-color-danger-foreground: #ffffff;
-  --fk-color-success: #15803d;
-  --fk-color-warning: #b45309;
-  --fk-color-ring: #4f46e5;
-  --fk-radius-sm: 0.25rem;
-  --fk-radius-md: 0.5rem;
-  --fk-radius-lg: 1rem;
+  --fk-color-success: #1d6f3a;
+  --fk-color-warning: #975200;
+  --fk-color-ring: #1f5f4a;
+  --fk-radius-sm: 0.125rem;
+  --fk-radius-md: 0.25rem;
+  --fk-radius-lg: 0.5rem;
   /*
    * Radius ROLES (rounded-control, rounded-card, rounded-panel, rounded-overlay, rounded-media): what components use. Literal
    * values, not var(--fk-radius-md): changing one role restyles only that role. Defaults equal the scale values these parts had.
@@ -40,15 +40,15 @@
    * inside a page; overlay: dialogs and toasts; media: images, thumbnails, skeletons.
    * 0.25rem marks (checkbox, badges, flags) still use --fk-radius-sm: the guard's `radiusExceptions` lists them.
    */
-  --fk-radius-control: 0.5rem;
-  --fk-radius-card: 1rem;
-  --fk-radius-panel: 0.5rem;
-  --fk-radius-overlay: 1rem;
-  --fk-radius-media: 0.5rem;
+  --fk-radius-control: 0.25rem;
+  --fk-radius-card: 0.5rem;
+  --fk-radius-panel: 0.25rem;
+  --fk-radius-overlay: 0.5rem;
+  --fk-radius-media: 0.25rem;
   --fk-font-sans: ui-sans-serif, system-ui, sans-serif;
   --fk-font-mono: ui-monospace, monospace;
   /* Headings (`pageTitle`, `sectionTitle`). Defaults to the body stack; a fork's own face comes from `config/fonts.ts`: `var(--font-...)`. */
-  --fk-font-display: ui-sans-serif, system-ui, sans-serif;
+  --fk-font-display: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   /* Type scale (font size and line height per step). Values equal Tailwind's defaults, so the mapping moved nothing. */
   --fk-font-size-xs: 0.75rem;
   --fk-line-height-xs: 1rem;
@@ -69,31 +69,31 @@
   /* Spacing: the unit every padding, margin, gap and size utility multiplies (p-4 = 4 units). */
   --fk-space-unit: 0.25rem;
   /* Elevation: resting card, raised (a hovered card), overlay (menus, toasts, bars over the page). */
-  --fk-shadow-card: 0 1px 3px 0 rgb(15 23 42 / 0.1);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(15 23 42 / 0.12), 0 2px 4px -2px rgb(15 23 42 / 0.08);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(15 23 42 / 0.2), 0 4px 8px -4px rgb(15 23 42 / 0.1);
+  --fk-shadow-card: 0 1px 2px 0 rgb(23 36 30 / 0.06);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(23 36 30 / 0.1), 0 1px 3px -1px rgb(23 36 30 / 0.06);
+  --fk-shadow-overlay: 0 12px 28px -10px rgb(23 36 30 / 0.16), 0 3px 8px -4px rgb(23 36 30 / 0.08);
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --fk-color-background: #0b1020;
-  --fk-color-foreground: #e2e8f0;
-  --fk-color-muted: #172036;
-  --fk-color-muted-foreground: #94a3b8;
-  --fk-color-border: #26314d;
-  --fk-color-border-input: #6b7a99;
-  --fk-color-primary: #818cf8;
-  --fk-color-primary-foreground: #0b1020;
-  --fk-color-accent: #818cf8;
-  --fk-color-accent-foreground: #0b1020;
-  --fk-color-danger: #f87171;
-  --fk-color-danger-foreground: #0b1020;
-  --fk-color-success: #4ade80;
-  --fk-color-warning: #fbbf24;
-  --fk-color-ring: #818cf8;
-  --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-  --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-  --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+  --fk-color-background: #0f1713;
+  --fk-color-foreground: #ebe6dc;
+  --fk-color-muted: #1a2520;
+  --fk-color-muted-foreground: #a9b1a9;
+  --fk-color-border: #2a3831;
+  --fk-color-border-input: #6f7d75;
+  --fk-color-primary: #62b796;
+  --fk-color-primary-foreground: #0f1713;
+  --fk-color-accent: #e2a64b;
+  --fk-color-accent-foreground: #0f1713;
+  --fk-color-danger: #f28b7d;
+  --fk-color-danger-foreground: #0f1713;
+  --fk-color-success: #6fcf8f;
+  --fk-color-warning: #f0b955;
+  --fk-color-ring: #62b796;
+  --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+  --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.45), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+  --fk-shadow-overlay: 0 12px 28px -10px rgb(0 0 0 / 0.55), 0 3px 8px -4px rgb(0 0 0 / 0.35);
 }
 
 /*
@@ -103,23 +103,23 @@
 @media (prefers-color-scheme: dark) {
   [data-theme="system"] {
     color-scheme: dark;
-    --fk-color-background: #0b1020;
-    --fk-color-foreground: #e2e8f0;
-    --fk-color-muted: #172036;
-    --fk-color-muted-foreground: #94a3b8;
-    --fk-color-border: #26314d;
-    --fk-color-border-input: #6b7a99;
-    --fk-color-primary: #818cf8;
-    --fk-color-primary-foreground: #0b1020;
-    --fk-color-accent: #818cf8;
-    --fk-color-accent-foreground: #0b1020;
-    --fk-color-danger: #f87171;
-    --fk-color-danger-foreground: #0b1020;
-    --fk-color-success: #4ade80;
-    --fk-color-warning: #fbbf24;
-    --fk-color-ring: #818cf8;
-    --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
-    --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.5);
-    --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.7), 0 4px 8px -4px rgb(0 0 0 / 0.5);
+    --fk-color-background: #0f1713;
+    --fk-color-foreground: #ebe6dc;
+    --fk-color-muted: #1a2520;
+    --fk-color-muted-foreground: #a9b1a9;
+    --fk-color-border: #2a3831;
+    --fk-color-border-input: #6f7d75;
+    --fk-color-primary: #62b796;
+    --fk-color-primary-foreground: #0f1713;
+    --fk-color-accent: #e2a64b;
+    --fk-color-accent-foreground: #0f1713;
+    --fk-color-danger: #f28b7d;
+    --fk-color-danger-foreground: #0f1713;
+    --fk-color-success: #6fcf8f;
+    --fk-color-warning: #f0b955;
+    --fk-color-ring: #62b796;
+    --fk-shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.35);
+    --fk-shadow-raised: 0 4px 14px -4px rgb(0 0 0 / 0.45), 0 1px 3px -1px rgb(0 0 0 / 0.35);
+    --fk-shadow-overlay: 0 12px 28px -10px rgb(0 0 0 / 0.55), 0 3px 8px -4px rgb(0 0 0 / 0.35);
   }
 }
