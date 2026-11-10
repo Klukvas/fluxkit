@@ -15,7 +15,10 @@ const { uk } = messagesByLocale;
 const t = createTranslator(uk, "uk");
 const origin = "https://shop.example";
 
-function listing(query: { page: number; brand: string | null }, basePath = "/catalog") {
+function listing(
+  query: { page: number; brand: string | null; view?: "grid" | "list" },
+  basePath = "/catalog",
+) {
   return listingMetadata({
     origin,
     locale: "uk",
@@ -204,5 +207,25 @@ describe("searchMetadata", () => {
     expect(searchMetadata({ origin, locale: "uk", t, query: { ...query, q: "" } }).title).toBe(
       t("seo.pageTitle", { title: t("search.title"), site: t("site.name") }),
     );
+  });
+});
+
+// Presentation URL parameters (plan 2026-11-08-design-changeability.md, L5): the list view is the same page for search engines.
+describe("the view parameter and SEO", () => {
+  it("leaves the catalog's metadata exactly as without it: no `view` in the canonical, hreflang or Open Graph URL", () => {
+    expect(listing({ page: 2, brand: null, view: "list" }, "/c/shoes")).toEqual(
+      listing({ page: 2, brand: null }, "/c/shoes"),
+    );
+    expect(JSON.stringify(listing({ page: 1, brand: null, view: "list" }))).not.toContain("view");
+  });
+
+  it("leaves `view` out of the search canonical", () => {
+    const meta = searchMetadata({
+      origin,
+      locale: "uk",
+      t,
+      query: { q: "lamp", facets: [], price: null, sort: null, page: 2, view: "list" },
+    });
+    expect(meta.alternates?.canonical).toBe("https://shop.example/uk/search?q=lamp");
   });
 });

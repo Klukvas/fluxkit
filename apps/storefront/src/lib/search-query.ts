@@ -1,4 +1,5 @@
 import type { SearchSort } from "@fluxkit/api-client";
+import { isCardView, storedView, type CardView } from "./card-view";
 import { decimalToMinorUnits } from "./search-money";
 
 /**
@@ -16,6 +17,9 @@ import { decimalToMinorUnits } from "./search-money";
  * - The no-script submit of the filter form sends major units (`priceMin=12.50`) and ranges (`rmin.<key>`); the page turns
  *   them into the canonical address and redirects (`isCanonicalSearch`), so the form works before hydration.
  * - Prices are minor units in the address and integers in memory; the boxes show major units (`search-money.ts`).
+ * - `view=list` (`card-view.ts`) is presentation only: kept by every link of the page and by the filter form (a hidden field),
+ *   never sent to the API (`search-data.ts` sends the named fields) and never in a canonical URL; an unknown value is dropped
+ *   by the same redirect.
  */
 
 /** Hits per page asked of the API (its default; `limit` is not sent). */
@@ -50,6 +54,8 @@ export interface SearchQuery {
   /** `null` is the API's default (relevance with words, newest without). */
   sort: SearchSort | null;
   page: number;
+  /** How the list is shown (`?view=`); absent is the default grid, which is never written into the address. */
+  view?: CardView;
 }
 
 export type SearchParseResult = { ok: true; query: SearchQuery } | { ok: false; reason: string };
@@ -204,7 +210,24 @@ export function parseSearchParams(raw: RawSearchParams, exponent: number): Searc
     page = Number(rawPage);
   }
 
-  return { ok: true, query: { q, facets: kept, price, sort: normalizeSort(sort, q), page } };
+  let view: CardView | undefined;
+  const rawView = first(raw["view"]);
+  if (rawView !== undefined && rawView !== "") {
+    if (!isCardView(rawView)) return { ok: false, reason: "view" };
+    view = storedView(rawView);
+  }
+
+  return {
+    ok: true,
+    query: {
+      q,
+      facets: kept,
+      price,
+      sort: normalizeSort(sort, q),
+      page,
+      ...(view === undefined ? {} : { view }),
+    },
+  };
 }
 
 /** `q` as the API takes it: control characters removed, trimmed, at most 200 code points (review SQ-04). */
@@ -220,7 +243,7 @@ function cleanWords(text: string): string {
  * The shared parameters of an address with everything the parser would refuse dropped or clamped (review SQ-04,
  * 2026-11-02; it replaces "a malformed parameter is a 404"): `q` cleaned (`cleanWords`), malformed or repeated `f` entries
  * dropped (at most 50 kept), a malformed `price` or unknown `sort` dropped, `page` dropped unless it is a whole number and
- * capped at the last reachable page. The route compares the result with the address and redirects, so the address always
+ * capped at the last reachable page, an unknown `view` dropped. The route compares the result with the address and redirects, so the address always
  * says what the page shows. The filter form's own fields (`priceMin`, `rmin.*`, ...) are left as they are: a refused box
  * keeps its "Check the filters" state.
  */
@@ -247,6 +270,11 @@ export function sanitizeSearchParams(raw: RawSearchParams): RawSearchParams {
     if (number < 1) delete clean["page"];
     else clean["page"] = String(Math.min(number, MAX_SEARCH_PAGE));
   }
+  const view = first(raw["view"]);
+  if (view !== undefined) {
+    if (isCardView(view)) clean["view"] = view;
+    else delete clean["view"];
+  }
   return clean;
 }
 
@@ -268,7 +296,7 @@ function encode(value: string): string {
 }
 
 /**
- * The locale-less path of a query, ready for `localizedHref`: `q`, `f`, `price`, `sort`, `page`, defaults left out. Every
+ * The locale-less path of a query, ready for `localizedHref`: `q`, `f`, `price`, `sort`, `page`, `view`, defaults left out. Every
  * value is escaped, so typed text cannot end the address or add a parameter.
  */
 export function searchPath(query: SearchQuery, base = "/search"): string {
@@ -280,10 +308,12 @@ export function searchPath(query: SearchQuery, base = "/search"): string {
   }
   if (query.sort !== null) parts.push(`sort=${query.sort}`);
   if (query.page > 1) parts.push(`page=${String(query.page)}`);
+  const view = storedView(query.view);
+  if (view !== undefined) parts.push(`view=${view}`);
   return parts.length === 0 ? base : `${base}?${parts.join("&")}`;
 }
 
-const KNOWN_PARAMS = /^(q|f|price|sort|page|priceMin|priceMax|rmin\..*|rmax\..*)$/;
+const KNOWN_PARAMS = /^(q|f|price|sort|page|view|priceMin|priceMax|rmin\..*|rmax\..*)$/;
 
 /**
  * Whether the address is exactly what `searchPath` writes for its query (unknown parameters aside). The page redirects to
@@ -384,6 +414,15 @@ export function setSort(query: SearchQuery, sort: SearchSort | null): SearchQuer
 /** Drops the facets and the price; the words and the sort stay. */
 export function clearFilters(query: SearchQuery): SearchQuery {
   return { ...query, facets: [], price: null, page: 1 };
+}
+
+/** The same results shown as `view` (the page stays: the list is the same). */
+export function setView(query: SearchQuery, view: CardView): SearchQuery {
+  const stored = storedView(view);
+  const next: SearchQuery = { ...query };
+  if (stored === undefined) delete next.view;
+  else next.view = stored;
+  return next;
 }
 
 export function setPage(query: SearchQuery, page: number): SearchQuery {

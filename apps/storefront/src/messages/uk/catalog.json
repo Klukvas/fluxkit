@@ -26,5 +26,8 @@
   "catalog.pagination.previous": "Назад",
   "catalog.pagination.next": "Далі",
   "catalog.pagination.page": "Сторінка {page}",
-  "catalog.price.from": "від {price}"
+  "catalog.price.from": "від {price}",
+  "catalog.view.label": "Вигляд списку товарів",
+  "catalog.view.grid": "Сітка",
+  "catalog.view.list": "Список"
 }

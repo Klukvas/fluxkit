@@ -5,13 +5,15 @@ import { existsSync, readFileSync } from "node:fs";
 
 // Storefront layout and branding config files that are public contracts (plan docs/plans/2026-11-08-design-changeability.md,
 // principle 7). Most do not exist yet: the rule applies from the PR that adds one, and a change that touches none passes.
-const contractConfig = /^apps\/storefront\/src\/config\/(brand|catalog|header|footer|slots)\.tsx?$/;
+// The fork-facing files of the product card registry (`docs/contracts/card-registry.md`, PR-F) are contract files too.
+const contractConfig =
+  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots)|components\/cards\/(custom|types))\.tsx?$/;
 
 /** The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/. */
 function contractConfigProblem(paths) {
   if (!paths.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
-  return "A storefront contract config file (apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts or .tsx) changed but nothing under docs/contracts/ did.";
+  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots}.ts(x) or apps/storefront/src/components/cards/{custom,types}.ts(x)) changed but nothing under docs/contracts/ did.";
 }
 
 /** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
@@ -61,6 +63,23 @@ const selfTestCases = [
   },
   { paths: ["apps/storefront/src/config/slots.tsx", "docs/contracts/slots.md"], fails: false },
   { paths: ["apps/admin/src/config/brand.ts", "packages/ui/src/config/footer.ts"], fails: false },
+  { paths: ["apps/storefront/src/components/cards/custom.ts"], fails: true },
+  {
+    paths: ["apps/storefront/src/components/cards/types.ts", "docs/files/storefront.md"],
+    fails: true,
+  },
+  {
+    paths: ["apps/storefront/src/components/cards/custom.ts", "docs/contracts/card-registry.md"],
+    fails: false,
+  },
+  {
+    paths: [
+      "apps/storefront/src/components/cards/grid-card.tsx",
+      "apps/storefront/src/components/cards/registry.ts",
+      "apps/storefront/src/components/cards/custom.spec.tsx",
+    ],
+    fails: false,
+  },
 ];
 const casePaths = ({ paths, nameStatus }) => paths ?? changedPaths(parseNameStatus(nameStatus));
 const selfTestFailures = selfTestCases.filter(

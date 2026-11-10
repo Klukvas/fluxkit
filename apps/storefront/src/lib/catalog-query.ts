@@ -4,7 +4,11 @@
  * Decisions (plan, step 5): the page size is 24 (`GET /store/products` default); the API refuses `offset` above 10 000, so
  * the last reachable page is `floor(10000 / pageSize) + 1`; a malformed or out-of-range `page`, and a `brand` that is not a
  * slug, are NOT FOUND (404), never silently page 1; the brand filter exists only as links (`?brand=`), there is no brand list.
+ * `view=list` (`card-view.ts`, plan 2026-11-08-design-changeability.md L5) is presentation only: kept by the filter and page
+ * links, never sent to the API or written into the canonical URL; an unknown value is dropped by a redirect.
  */
+
+import { isCardView, storedView, type CardView } from "./card-view";
 
 export const CATALOG_PAGE_SIZE = 24;
 
@@ -15,6 +19,8 @@ export interface CatalogQuery {
   page: number;
   /** A brand slug, or `null` for no filter. */
   brand: string | null;
+  /** How the list is shown (`?view=`); absent is the default grid. */
+  view?: CardView;
 }
 
 export type CatalogQueryResult = { ok: true; query: CatalogQuery } | { ok: false };
@@ -66,9 +72,9 @@ export function parseCatalogQuery(
 }
 
 /**
- * The query of an address with a bad `page` or `brand` repaired (review SQ-04, 2026-11-02; the SQL listing's twin of
+ * The query of an address with a bad `page`, `brand` or `view` repaired (review SQ-04, 2026-11-02; the SQL listing's twin of
  * `sanitizeSearchParams`): a page that is not a whole number from 1 is page 1, a page past the offset cap is the last
- * reachable page, a brand that is not a slug is no filter. `canonical` is false when the address is not exactly what
+ * reachable page, a brand that is not a slug is no filter, an unknown view the default grid. `canonical` is false when the address is not exactly what
  * `catalogPath` writes for it, and the route redirects there. A page past the last page of the list is only known after
  * the read (`beyond_last_page` of `loadCatalogListing`).
  */
@@ -86,13 +92,15 @@ export function normalizeCatalogQuery(
     rawBrand !== undefined && rawBrand.length <= MAX_SLUG_LENGTH && SLUG.test(rawBrand)
       ? rawBrand
       : null;
-  const query = { page, brand };
+  const rawView = first(search.view);
+  const view = rawView !== undefined && isCardView(rawView) ? storedView(rawView) : undefined;
+  const query: CatalogQuery = { page, brand, ...(view === undefined ? {} : { view }) };
   const written = new URLSearchParams(catalogPath("", query).split("?")[1] ?? "");
-  const incoming = (name: "page" | "brand") => {
+  const incoming = (name: "page" | "brand" | "view") => {
     const value = search[name];
     return value === undefined ? [] : Array.isArray(value) ? value : [value];
   };
-  const canonical = (["page", "brand"] as const).every((name) => {
+  const canonical = (["page", "brand", "view"] as const).every((name) => {
     const sent = incoming(name);
     const wanted = written.getAll(name);
     return sent.length === wanted.length && sent.every((value, index) => value === wanted[index]);
@@ -100,10 +108,13 @@ export function normalizeCatalogQuery(
   return { query, canonical };
 }
 
-/** Locale-less path with the query, for `localizedHref`: brand first, then page; page 1 and no brand are left out. */
+/**
+ * Locale-less path with the query, for `localizedHref`: brand first, then page, then view; page 1, no brand and the default
+ * view are left out.
+ */
 export function catalogPath(
   base: string,
-  options: { page?: number; brand?: string | null },
+  options: { page?: number; brand?: string | null; view?: CardView | undefined },
 ): string {
   const page = options.page ?? 1;
   if (!Number.isInteger(page) || page < 1) {
@@ -112,5 +123,7 @@ export function catalogPath(
   const parts: string[] = [];
   if (options.brand) parts.push(`brand=${encodeURIComponent(options.brand)}`);
   if (page > 1) parts.push(`page=${page}`);
+  const view = storedView(options.view);
+  if (view !== undefined) parts.push(`view=${view}`);
   return parts.length === 0 ? base : `${base}?${parts.join("&")}`;
 }

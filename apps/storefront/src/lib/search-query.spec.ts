@@ -18,6 +18,7 @@ import {
   setPrice,
   setRange,
   setSort,
+  setView,
   toggleFacet,
   type SearchQuery,
 } from "./search-query";
@@ -430,4 +431,65 @@ describe("range boxes: only numbers the API accepts (review F4)", () => {
       expect(parseSearchParams({ "rmin.attr.length": box }, 2).ok).toBe(true);
     },
   );
+});
+
+// Presentation URL parameters (plan 2026-11-08-design-changeability.md, L5): `view=list` changes only how the list is shown.
+describe("the view parameter (?view=grid|list)", () => {
+  it("defaults to the grid and reads `list`", () => {
+    expect(parsed({}).view ?? "grid").toBe("grid");
+    expect(parsed({ view: "list" }).view).toBe("list");
+    expect(parsed({ view: "grid" }).view ?? "grid").toBe("grid");
+  });
+
+  it("writes `view=list` only, after the other parameters, and never the default", () => {
+    const query: SearchQuery = { ...empty, q: "lamp", facets: ["brand:acme"], page: 2 };
+    expect(searchPath({ ...query, view: "list" })).toBe(
+      "/search?q=lamp&f=brand%3Aacme&page=2&view=list",
+    );
+    expect(searchPath({ ...query, view: "grid" })).toBe("/search?q=lamp&f=brand%3Aacme&page=2");
+    expect(searchPath(setView(query, "list"), "/catalog")).toBe(
+      "/catalog?q=lamp&f=brand%3Aacme&page=2&view=list",
+    );
+    expect(setView({ ...query, view: "list" }, "grid")).toEqual(query);
+  });
+
+  it("is kept by every filter, sort and page change (links keep the shopper's view)", () => {
+    const list: SearchQuery = { ...empty, view: "list" };
+    for (const next of [
+      toggleFacet(list, "brand", "acme"),
+      setRange(list, "length", 1, 2),
+      setPrice(list, { min: 100, max: null }),
+      setSort(list, "price_asc"),
+      setPage(list, 3),
+      clearFilters({ ...list, facets: ["brand:acme"] }),
+    ]) {
+      expect(next.view).toBe("list");
+      expect(searchPath(next)).toContain("view=list");
+    }
+  });
+
+  it("is carried by a submit of the filter form (its hidden field)", () => {
+    const result = parseSearchForm(
+      [
+        ["view", "list"],
+        ["f", "brand:acme"],
+        ["page", "4"],
+      ],
+      2,
+    );
+    expect(result).toEqual({ ok: true, query: { ...empty, facets: ["brand:acme"], view: "list" } });
+  });
+
+  it("redirects an unknown or default value to the address without it (no error page)", () => {
+    for (const view of ["tiles", "", "LIST", "grid"]) {
+      const address = resolveSearchAddress({ q: "lamp", view }, 2);
+      expect(address).toEqual({ kind: "query", query: { ...empty, q: "lamp" }, canonical: false });
+    }
+    expect(resolveSearchAddress({ q: "lamp", view: "list" }, 2)).toEqual({
+      kind: "query",
+      query: { ...empty, q: "lamp", view: "list" },
+      canonical: true,
+    });
+    expect(isCanonicalSearch({ view: ["list", "list"] }, { ...empty, view: "list" })).toBe(false);
+  });
 });

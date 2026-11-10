@@ -71,6 +71,19 @@ describe("search data (the results page's server read of GET /store/search)", ()
     expect(events).toEqual(["beforeRequest", "fetch"]);
   });
 
+  // Plan 2026-11-08-design-changeability.md, L5: `view` is presentation only.
+  it("never sends the list view, and the list and grid views share one cache entry", async () => {
+    const { data, calls } = setup(() => json(result), {
+      sharedCache: createSharedSearchCache({ maxEntries: 10, freshMs: 60_000, staleMs: 60_000 }),
+    });
+    const plain: SearchQuery = { q: "", facets: [], price: null, sort: null, page: 1 };
+    await data.search("uk", plain, { shared: true });
+    await data.search("uk", { ...plain, view: "list" }, { shared: true });
+    expect(calls).toHaveLength(1);
+    await data.search("uk", { ...query, view: "list" });
+    expect(new URL(calls[1]?.url ?? "").searchParams.has("view")).toBe(false);
+  });
+
   it("leaves out what is not selected", async () => {
     const { data, calls } = setup(() => json(result));
     await data.search("uk", { q: "", facets: [], price: null, sort: null, page: 1 });

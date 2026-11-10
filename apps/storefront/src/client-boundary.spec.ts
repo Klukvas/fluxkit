@@ -55,6 +55,19 @@ describe("client bundle boundary", () => {
     }
   });
 
+  // The card registry (plan 2026-11-08-design-changeability.md, L2) is server-only: cards render on the server from a plain
+  // view model, so a fork's card never ships to the browser by accident and its markup is in the first HTML.
+  it("keeps the product card registry and its cards server-only", () => {
+    const cards = files.filter((file) => file.path.startsWith(join("components", "cards")));
+    expect(cards.map((file) => file.path)).toEqual(
+      expect.arrayContaining([join("components", "cards", "registry.ts")]),
+    );
+    for (const file of cards) expect(clientFiles, file.path).not.toContain(file);
+    for (const file of clientFiles) {
+      expect(file.text, file.path).not.toMatch(/["'][^"'\s]*\/(?:cards\/[^"']*|product-grid)["']/);
+    }
+  });
+
   it("imports the server-only store data module from server files only", () => {
     const importers = files.filter((file) => /store-data\.server["']/.test(file.text));
     expect(importers.length).toBeGreaterThan(0);

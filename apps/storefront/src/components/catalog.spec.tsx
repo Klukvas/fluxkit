@@ -4,11 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
+import { cardDisplay, type CardDisplayInput } from "../lib/product-card-model";
 import { option, product, summary, variant, category } from "../lib/test-fixtures";
 import { messagesByLocale } from "../messages";
 import { CatalogView } from "./catalog-view";
 import { JsonLd } from "./json-ld";
-import { ProductCard } from "./product-card";
+import { GridCard } from "./cards/grid-card";
 import { ProductDetails } from "./product-details";
 import { ProductGrid } from "./product-grid";
 import { ProductPurchaseView } from "./product-purchase";
@@ -83,7 +84,20 @@ describe("StoreImage", () => {
   });
 });
 
-describe("ProductCard", () => {
+/** The default (`grid`) card of one list item, as `ProductGrid` renders it. */
+function ProductCard(props: CardDisplayInput & { headingLevel: "h2" | "h3" }) {
+  return (
+    <GridCard
+      card={cardDisplay(props)}
+      headingLevel={props.headingLevel}
+      eager={false}
+      locale={props.locale}
+      t={props.t}
+    />
+  );
+}
+
+describe("ProductCard (the grid card)", () => {
   const base = {
     locale: "uk" as const,
     t,
@@ -226,6 +240,25 @@ describe("CatalogView", () => {
     expect(html).toContain('aria-current="page"');
     expect(html).toContain("§catalog.count:60");
     expect(html).toContain('aria-label="§breadcrumbs.label"');
+  });
+
+  // Plan 2026-11-08-design-changeability.md, L2/L5: the SQL listing (search off) offers the same list/grid switch.
+  it("offers the list/grid switch next to the count, grid current, and keeps `view=list` in every list link", () => {
+    const grid = renderToStaticMarkup(<CatalogView {...props} />);
+    expect(grid).toMatch(
+      /<a [^>]*href="\/uk\/catalog\?page=2"[^>]*aria-current="true"[^>]*>§catalog\.view\.grid</,
+    );
+    expect(grid).toMatch(
+      /<a [^>]*href="\/uk\/catalog\?page=2&amp;view=list"[^>]*>§catalog\.view\.list</,
+    );
+    const list = renderToStaticMarkup(
+      <CatalogView {...props} view="list" brand={{ slug: "acme", name: "§acme" }} />,
+    );
+    expect(list).toMatch(/<a [^>]*aria-current="true"[^>]*>§catalog\.view\.list</);
+    expect(list).toContain('class="grid grid-cols-1 gap-4"');
+    expect(list).toContain('href="/uk/catalog?brand=acme&amp;page=3&amp;view=list"');
+    expect(list).toContain('href="/uk/catalog?view=list"');
+    expect(list).toContain('href="/uk/catalog?brand=demo-brand&amp;view=list"');
   });
 
   it("links pages with the brand kept, page 1 without a page parameter, next and previous as rel links", () => {
