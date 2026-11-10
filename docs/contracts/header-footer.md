@@ -63,7 +63,7 @@ checks without the message keys run at render (`headerView`, `footerView` throw)
 page; an unknown message key throws in the translator. What that failure looks like: `SiteShell` renders inside
 `app/[locale]/layout.tsx` (its `error.tsx` sits inside that layout and cannot catch it) and the app has no `global-error.tsx`, so EVERY page answers with Next's bare 500 page (the error and its
 message in the server log). `next build` does not catch it (the pages render per request); the unit tests do. The unit suite runs a second time with a filled fork config (`apps/storefront/vitest.brand-fork.config.ts`,
-`src/lib/layout-fork-fixture.ts`). `components/header-footer-defaults.upstream.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
+`src/lib/header-fork-fixture.ts`, `src/lib/footer-fork-fixture.ts`). `components/header-footer-defaults.upstream.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
 a fork that changes either file deletes it.
 
 ## Not contract, not configurable (cut from plan L3, with the reason)

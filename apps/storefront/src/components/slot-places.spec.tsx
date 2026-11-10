@@ -1,7 +1,6 @@
 import { Badge } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { FooterConfig } from "../layout/footer-layout";
 import { messagesByLocale } from "../messages";
 import { contactsView } from "../lib/contacts";
 import { cardDisplay } from "../lib/product-card-model";
@@ -12,6 +11,8 @@ import type {
   SlotRegistry,
 } from "../lib/slots";
 import { summary } from "../lib/test-fixtures";
+// The template's footer composition, passed explicitly: the fork runs swap `config/footer.ts`.
+import { footerConfig } from "../test-support/template-defaults";
 import { resolveCard } from "./cards/registry";
 import { I18nProvider } from "./i18n-provider";
 import { SessionProvider } from "./session-provider";
@@ -27,6 +28,9 @@ import { sentinelTranslator } from "./test-helpers";
  */
 const registry = vi.hoisted(() => ({}) as Record<string, unknown>);
 vi.mock("../config/slots", () => ({ slots: registry }));
+// The slots of the template's built-in cards, whatever cards a fork registers in `cards/custom.ts` (a fork's own card kind
+// gets no slots unless it renders them): `test-support/template-defaults.ts`.
+vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -96,12 +100,6 @@ function renderFooter(): string {
     ),
   );
 }
-
-/** The template's footer composition, explicit: the fork runs swap `config/footer.ts`. */
-const footerConfig: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
-  navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
-};
 
 const card = cardDisplay({
   product: summary("a", { title: "§a" }, "low_stock"),

@@ -1,4 +1,6 @@
 import { describe, expect, inject, it } from "vitest";
+import { customCards } from "../components/cards/custom";
+import { cardRegistry } from "../components/cards/registry";
 import { brand } from "../config/brand";
 import { customSections } from "../config/custom-sections";
 import { footerConfig } from "../config/footer";
@@ -6,16 +8,18 @@ import { headerConfig } from "../config/header";
 import { homeSections } from "../config/home";
 import { slots } from "../config/slots";
 import * as brandFixture from "./brand-fork-fixture";
+import * as cardsFixture from "./cards-fork-fixture";
+import * as footerFixture from "./footer-fork-fixture";
+import * as headerFixture from "./header-fork-fixture";
 import * as homeConfigFixture from "./home-config-fork-fixture";
 import * as homeRegistryFixture from "./home-fork-fixture";
-import * as layoutFixture from "./layout-fork-fixture";
 import * as slotsFixture from "./slots-fork-fixture";
 
 declare module "vitest" {
   export interface ProvidedContext {
     /**
      * Which fork-owned configs this run replaces with fixtures: `none` (`vitest.config.ts`), `brand-layout`
-     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
+     * (`vitest.brand-fork.config.ts`: brand, header, footer, UI slots and the `grid` card with the default home) or `home` (`vitest.home-fork.config.ts`: home, custom sections, UI slots).
      */
     forkRun: "none" | "brand-layout" | "home";
   }
@@ -33,11 +37,14 @@ describe("the fork-owned configs a run reads", () => {
     expect(["none", "brand-layout", "home"]).toContain(forkRun);
   });
 
-  it("reads the brand, header and footer fixtures exactly in the brand-layout run", () => {
+  it("reads the brand, header, footer and card fixtures exactly in the brand-layout run", () => {
     const expected = forkRun === "brand-layout";
     expect(brand === brandFixture.brand).toBe(expected);
-    expect(headerConfig === layoutFixture.headerConfig).toBe(expected);
-    expect(footerConfig === layoutFixture.footerConfig).toBe(expected);
+    expect(headerConfig === headerFixture.headerConfig).toBe(expected);
+    expect(footerConfig === footerFixture.footerConfig).toBe(expected);
+    expect(customCards === cardsFixture.customCards).toBe(expected);
+    // The registry's own import (`./custom`) is swapped too: the lists render the fork's `grid` card.
+    expect(cardRegistry["grid"] === cardsFixture.customCards["grid"]).toBe(expected);
   });
 
   it("reads the home and custom section fixtures exactly in the home run", () => {

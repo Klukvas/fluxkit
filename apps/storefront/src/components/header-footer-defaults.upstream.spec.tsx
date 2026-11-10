@@ -19,10 +19,13 @@ import { SessionProvider } from "./session-provider";
 import { SiteFooter } from "./site-footer";
 import { SiteHeader } from "./site-header";
 import { sentinelTranslator } from "./test-helpers";
+import { footerConfig } from "../config/footer";
+import { headerConfig } from "../config/header";
+import * as templateDefaults from "../test-support/template-defaults";
 
 // The UI slots a fork fills in `config/slots.tsx` (plan S1) are not part of the composition frozen here: filling them needs no
 // deletion of this file. Empty slots adding nothing is `slot-places.spec.tsx`.
-vi.mock("../config/slots", () => ({ slots: {} }));
+vi.mock("../config/slots", () => import("../test-support/template-defaults"));
 
 /** The page the islands think they are on: `/<locale>/catalog?page=2` (the language links keep path and query). */
 const route = vi.hoisted(() => ({ locale: "uk" }));
@@ -110,4 +113,13 @@ describe("default header and footer markup (frozen before the L3 config, byte fo
       );
     });
   }
+});
+
+// The copies that the specs pinning the template's frame mock in (`test-support/template-defaults.ts`, PR-I2b) must be exactly
+// what upstream ships, or those specs would check another frame than the one frozen above.
+describe("test-support/template-defaults.ts (the header and footer defaults)", () => {
+  it("equals config/header.ts and config/footer.ts", () => {
+    expect(templateDefaults.headerConfig).toEqual(headerConfig);
+    expect(templateDefaults.footerConfig).toEqual(footerConfig);
+  });
 });

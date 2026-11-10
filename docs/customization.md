@@ -91,7 +91,9 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
 - Check: `pnpm --filter @fluxkit/storefront test` (`config/header` and `config/footer` are checked by `apps/storefront/src/layout/header-layout.spec.ts`
   and `apps/storefront/src/layout/footer-layout.spec.ts`; an unknown block name fails `pnpm typecheck`). After changing either file (or `config/brand.ts`),
   delete the upstream-only, FORK-DELETABLE `apps/storefront/src/components/header-footer-defaults.upstream.spec.tsx` and its folder `apps/storefront/src/components/header-footer-defaults/`:
-  a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled brand, header and footer configs (`apps/storefront/vitest.brand-fork.config.ts`).
+  a TEMPLATE-DEFAULT check of upstream's default markup. Every other spec already runs once with filled brand, header and footer configs (`apps/storefront/vitest.brand-fork.config.ts`,
+  the footer there is the four-column recipe below); the specs that pin the template's own frame and footer read the template's defaults
+  (`apps/storefront/src/test-support/template-defaults.ts`), so they stay green with the fork's files and need no edit.
 - UI slots (S1; fork-owned `apps/storefront/src/config/slots.tsx`, contract `docs/contracts/slots.md`): SERVER components in the fork's new
   files, listed per slot, rendered in order with a plain view model (locale, translator, the slot's data); empty slots render nothing.
   - `header.top`: an announcement bar inside the header, above its row. Below `lg` it is sticky with the header, which grows by the bar's
@@ -128,6 +130,8 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   `apps/storefront/src/config/category-page.ts`.
 - Product cards and the list/grid view (L2, L5): a fork overrides the `grid` or `list` card in the fork-owned
   `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
+  Tests in the fork: no edit. The specs that pin the built-in cards render them with the template's defaults
+  (`apps/storefront/src/test-support/template-defaults.ts`), and upstream runs the suite with both cards overridden (`apps/storefront/vitest.brand-fork.config.ts`).
 - **Not yet available**: a storefront tokens overrides file (colours are still edited in the upstream `tokens.css`, section 1 step 4).
 
 ## 4. Known limits

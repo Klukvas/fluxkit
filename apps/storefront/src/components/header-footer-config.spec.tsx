@@ -12,7 +12,7 @@ import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers
 
 // Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks what the header and footer configs
 // render. Where the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
-vi.mock("../config/slots", () => ({ slots: {} }));
+vi.mock("../config/slots", () => import("../test-support/template-defaults"));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),

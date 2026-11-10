@@ -1,7 +1,7 @@
 import type { ProductOption } from "@fluxkit/api-client";
 import { createTranslator } from "@fluxkit/ui";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { catalogPath } from "../lib/catalog-query";
 import { formatMoney } from "../lib/money";
 import { cardDisplay, type CardDisplayInput } from "../lib/product-card-model";
@@ -15,6 +15,10 @@ import { ProductGrid } from "./product-grid";
 import { ProductPurchaseView } from "./product-purchase";
 import { StoreImage } from "./store-image";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
+
+// The lists render the template's built-in cards here, whatever a fork registers in `cards/custom.ts` (plan L2,
+// `test-support/template-defaults.ts`); the fork's own cards, the fork run (`vitest.brand-fork.config.ts`).
+vi.mock("./cards/custom", () => import("../test-support/template-defaults"));
 
 const { uk, en } = messagesByLocale;
 
