@@ -1,4 +1,7 @@
 {
+  "custom.announcement.link": "Delivery details",
+  "custom.announcement.text": "Free delivery on orders over 1000.",
+  "custom.card.favourite": "Add {title} to favourites",
   "custom.card.sale": "Sale",
-  "custom.card.favourite": "Add {title} to favourites"
+  "custom.header.moreNav": "More navigation"
 }

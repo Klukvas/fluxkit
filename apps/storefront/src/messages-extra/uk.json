@@ -1,4 +1,7 @@
 {
+  "custom.announcement.link": "Умови доставки",
+  "custom.announcement.text": "Безкоштовна доставка для замовлень від 1000.",
+  "custom.card.favourite": "Додати «{title}» до обраного",
   "custom.card.sale": "Знижка",
-  "custom.card.favourite": "Додати «{title}» до обраного"
+  "custom.header.moreNav": "Додаткова навігація"
 }
