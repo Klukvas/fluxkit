@@ -3,6 +3,14 @@
 The one entry point for a fork author (plan `docs/plans/2026-11-08-design-changeability.md`, B5). It lists what exists on `main` today; planned work is
 marked **not yet available**. Rules behind it: `AGENTS.md` sections 2.2, 15 and 17. Client work happens in a fork, never in this repository.
 
+## 0. Before you start (once per fork)
+
+1. Create an empty file `.fluxkit-fork` at the repository root, commit it, and delete `apps/storefront/src/fork-marker.upstream.spec.ts`
+   in the same commit (it fails while the marker exists: the template must never contain it). The marker tells `pnpm check:docs`
+   (CI job `docs`) that this is a fork: the storefront config files the fork fills (`brand`, `catalog`, `header`, `footer`, `slots`, `custom-sections` and `home` in
+   `apps/storefront/src/config/`, and `apps/storefront/src/components/cards/custom.ts`) then need no change under `docs/contracts/`. Without it, the first PR that fills one
+   of them fails that job. Rule and the files that keep it: `docs/contracts/README.md`.
+
 ## 1. Rebrand checklist (target: under 2 hours)
 
 Do these in order. Each step names the file, whether the fork owns it (section 2) and how to check it.

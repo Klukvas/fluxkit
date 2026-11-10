@@ -20,3 +20,16 @@ Not written yet (add when the first implementation exists): price adjusters (a h
 `db-extension.md` (tables safe to extend).
 
 Entry format: name, since-version, description, shape, status (stable / deprecated since X).
+
+## Contract files in the template and in a client fork
+
+`check:docs` (`scripts/check-docs.mjs`, CI job `docs`) fails a PR that changes a storefront contract file without a change under
+`docs/contracts/`: `apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x)`,
+`apps/storefront/src/components/cards/{custom,types}.ts(x)` and `apps/storefront/src/lib/{custom-sections,slots}.ts(x)`. The rule is
+for the template, where such a change may change a contract.
+
+A client fork fills the config files among them itself (`docs/customization.md`), which changes no contract. It marks itself with
+an empty file `.fluxkit-fork` at the repository root (checked in, no environment variable): with the marker, the config files
+(`config/*.ts(x)` above and `components/cards/custom.ts`) are left out of the rule; the files that define the contract
+(`components/cards/types.ts`, `lib/custom-sections.ts`, `lib/slots.ts`) keep it. The template never contains the marker:
+`apps/storefront/src/fork-marker.upstream.spec.ts` (upstream-only, deleted by the fork in the same step) fails if it does.

@@ -12,9 +12,23 @@ import { existsSync, readFileSync } from "node:fs";
 const contractConfig =
   /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/(custom|types)|lib\/(custom-sections|slots))\.tsx?$/;
 
-/** The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/. */
-function contractConfigProblem(paths) {
-  if (!paths.some((path) => contractConfig.test(path))) return null;
+// The config files among them that a client fork fills itself (`docs/customization.md`): editing their VALUES changes no
+// template contract, so in a fork they do not need a change under docs/contracts/. The files that define the contract (the
+// types, the slot names) keep the rule in a fork too.
+const forkFilledConfig =
+  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/custom)\.tsx?$/;
+
+// A client fork creates this file at the repository root (`docs/customization.md`, "Before you start"; `docs/contracts/README.md`).
+// The template itself never contains it: `apps/storefront/src/fork-marker.upstream.spec.ts` fails if it does.
+const forkMarker = ".fluxkit-fork";
+
+/**
+ * The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/.
+ * `fork`: the repository is a client fork (the marker exists), so the fork's own config files are left out.
+ */
+function contractConfigProblem(paths, { fork }) {
+  const relevant = fork ? paths.filter((path) => !forkFilledConfig.test(path)) : paths;
+  if (!relevant.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
   return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did.";
 }
@@ -132,10 +146,50 @@ const selfTestCases = [
     ],
     fails: false,
   },
+  // In a fork (the `.fluxkit-fork` marker at the repository root): the fork fills its own config files, which changes no
+  // template contract; the files that define the contract (types, slot names) keep the rule.
+  {
+    paths: [
+      "apps/storefront/src/config/brand.ts",
+      "apps/storefront/src/config/header.ts",
+      "apps/storefront/src/config/footer.ts",
+      "apps/storefront/src/config/slots.tsx",
+      "apps/storefront/src/config/custom-sections.ts",
+      "apps/storefront/src/config/home.ts",
+      "apps/storefront/src/config/catalog.ts",
+      "apps/storefront/src/components/cards/custom.ts",
+    ],
+    fork: true,
+    fails: false,
+  },
+  { nameStatus: "A\tapps/storefront/src/components/cards/custom.ts", fork: true, fails: false },
+  { paths: ["apps/storefront/src/config/footer.ts"], fork: false, fails: true },
+  { paths: ["apps/storefront/src/lib/slots.ts"], fork: true, fails: true },
+  {
+    paths: [
+      "apps/storefront/src/config/slots.tsx",
+      "apps/storefront/src/components/cards/types.ts",
+    ],
+    fork: true,
+    fails: true,
+  },
+  {
+    paths: ["apps/storefront/src/lib/custom-sections.ts", "docs/contracts/home-sections.md"],
+    fork: true,
+    fails: false,
+  },
+  {
+    nameStatus:
+      "R100\tapps/storefront/src/config/slots.tsx\tapps/storefront/src/lib/slots.tsx\nM\tapps/storefront/src/config/brand.ts",
+    fork: true,
+    fails: true,
+  },
 ];
 const casePaths = ({ paths, nameStatus }) => paths ?? changedPaths(parseNameStatus(nameStatus));
 const selfTestFailures = selfTestCases.filter(
-  (testCase) => (contractConfigProblem(casePaths(testCase)) !== null) !== testCase.fails,
+  (testCase) =>
+    (contractConfigProblem(casePaths(testCase), { fork: testCase.fork === true }) !== null) !==
+    testCase.fails,
 );
 if (selfTestFailures.length > 0) {
   console.error(
@@ -214,7 +268,12 @@ if (touched((path) => path === tokensPath)) {
   }
 }
 
-const contractProblem = contractConfigProblem(changedPaths(changed));
+const fork = existsSync(new URL(`../${forkMarker}`, import.meta.url));
+if (fork)
+  console.log(
+    `${forkMarker} found: client fork, its own storefront config files need no docs/contracts/ change`,
+  );
+const contractProblem = contractConfigProblem(changedPaths(changed), { fork });
 if (contractProblem !== null) problems.push(contractProblem);
 
 console.log(`changed files: ${changed.length}`);

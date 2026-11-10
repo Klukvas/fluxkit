@@ -23,6 +23,8 @@ const FORK_DELETES = new Set([
   "apps/storefront/src/components/header-footer-defaults/",
   "apps/storefront/src/config/slots.upstream.spec.ts",
   "apps/storefront/src/lib/home-template-default.upstream.spec.ts",
+  // Deleted with the creation of the fork marker `.fluxkit-fork` (the guide's step 0).
+  "apps/storefront/src/fork-marker.upstream.spec.ts",
 ]);
 
 function repositoryPaths(text: string): string[] {

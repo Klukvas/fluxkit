@@ -3,7 +3,7 @@
 Status: draft (since PR-G1 of `docs/plans/2026-11-08-design-changeability.md`, L3; owner approval 2026-11-08, plan section 9).
 Additive: a new block, control, link group kind or field is minor; a rename or removal is major with a note in `docs/migrations/`.
 Default VALUES are not contract (plan principle 8). `check:docs` requires a change here whenever `config/header.ts` or
-`config/footer.ts` changes upstream. The plan calls this contract `layout-config.md`; it is this file, `header-footer.md`.
+`config/footer.ts` changes upstream (not in a fork with the `.fluxkit-fork` marker, `docs/contracts/README.md`). The plan calls this contract `layout-config.md`; it is this file, `header-footer.md`.
 
 ## Files
 
