@@ -13,6 +13,9 @@ import ukErrors from "./uk/errors.json";
 import ukNavigation from "./uk/navigation.json";
 import ukShell from "./uk/shell.json";
 import ukStatus from "./uk/status.json";
+import enOverrides from "../messages-overrides/en.json";
+import ukOverrides from "../messages-overrides/uk.json";
+import { applyOverrides } from "./overrides";
 
 /**
  * UI strings, one file per area and locale (`messages/{uk,en}/<file>.json`), so parallel steps touch disjoint files
@@ -24,6 +27,11 @@ import ukStatus from "./uk/status.json";
  *   (`i18n/area-messages.tsx`), so the translator never meets a missing key.
  * `messages.spec.ts` checks that both locales have the same files, keys and placeholders, and that the keys an area's
  * source uses are in the eager files or in the files that area declares.
+ *
+ * A client fork changes upstream texts (the admin's name, `app.name` and `app.documentTitle`, for example) in
+ * `src/messages-overrides/<locale>.json` (fork-owned: upstream ships `{}` and never edits them), flat key -> text, applied
+ * LAST to the eager files and to every lazily loaded file (`overrides.ts`; a bad value throws, a key no file has fails the
+ * build, `brand-html.ts`). The parity and placeholder checks run on the merged result.
  */
 export const EAGER_FILES: Record<Locale, Record<string, Messages>> = {
   uk: {
@@ -141,18 +149,33 @@ export function mergeAreas(areas: Record<string, Messages>): Messages {
   return merged;
 }
 
-/** The messages every screen can use from the first render. */
-export const eagerMessages: Record<Locale, Messages> = {
-  uk: mergeAreas(EAGER_FILES.uk),
-  en: mergeAreas(EAGER_FILES.en),
+/** A fork's text overrides per locale (`src/messages-overrides/<locale>.json`, `{}` upstream). */
+export const OVERRIDE_FILES: Record<Locale, Readonly<Record<string, unknown>>> = {
+  uk: ukOverrides,
+  en: enOverrides,
 };
 
-/** The eager messages of a locale plus the given loaded lazy files (a key in two files throws). */
+/** Message files merged (a key in two files throws), then the overrides of their keys applied. */
+export function buildMessages(
+  files: Readonly<Record<string, Messages>>,
+  overrides: Readonly<Record<string, unknown>>,
+  locale: Locale,
+): Messages {
+  return applyOverrides(mergeAreas(files), overrides, locale);
+}
+
+/** The messages every screen can use from the first render. */
+export const eagerMessages: Record<Locale, Messages> = {
+  uk: buildMessages(EAGER_FILES.uk, OVERRIDE_FILES.uk, "uk"),
+  en: buildMessages(EAGER_FILES.en, OVERRIDE_FILES.en, "en"),
+};
+
+/** The eager messages of a locale plus the given loaded lazy files (a key in two files throws), with the overrides. */
 export function messagesWith(
   locale: Locale,
   loaded: Partial<Record<LazyFile, Messages>>,
 ): Messages {
-  return mergeAreas({ ...EAGER_FILES[locale], ...loaded });
+  return buildMessages({ ...EAGER_FILES[locale], ...loaded }, OVERRIDE_FILES[locale], locale);
 }
 
 /**

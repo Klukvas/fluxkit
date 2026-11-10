@@ -21,6 +21,14 @@ Not written yet (add when the first implementation exists): price adjusters (a h
 
 Entry format: name, since-version, description, shape, status (stable / deprecated since X).
 
+## Admin text overrides (draft, PR-I2b)
+
+`apps/admin/src/messages-overrides/uk.json` and `apps/admin/src/messages-overrides/en.json` are fork-owned (upstream ships `{}` and never
+edits them): flat key -> text, applied last over the admin's message files, eager and lazy (`apps/admin/src/messages/overrides.ts`), as the
+storefront's `src/messages-overrides`. A key no message file has, or a value that is not a non-empty string, fails `vite build`, `vite dev`
+and `pnpm --filter @fluxkit/admin test`. Contract: the files' location and shape; the message keys themselves are not contract (a renamed
+key fails the fork's build, naming it). The admin's name is `app.name` and `app.documentTitle` there (`apps/admin/README.md`).
+
 ## Contract files in the template and in a client fork
 
 `check:docs` (`scripts/check-docs.mjs`, CI job `docs`) fails a PR that changes a storefront contract file without a change under
