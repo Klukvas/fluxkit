@@ -6,7 +6,7 @@
  * og:image tags. The types and every reader are in `lib/brand.ts`.
  *
  * NOT here: the shop name (`site.name`, `site.title` in `src/messages-overrides/<locale>.json`), the colours and fonts
- * (`packages/theme/src/tokens.css`, `config/fonts.ts`), the sender name of mails (`EMAIL_FROM`).
+ * (`packages/theme/src/brand-overrides.css`, `config/fonts.ts`), the sender name of mails (`EMAIL_FROM`).
  *
  * Example of a filled file (pictures in `apps/storefront/public/brand/`):
  *
