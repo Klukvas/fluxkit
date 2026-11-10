@@ -15,9 +15,12 @@ import { SiteFooter } from "./site-footer";
 import { leftoverText, sentinelTranslator, textAttributes } from "./test-helpers";
 import { StoreTrustBar } from "./trust-bar";
 
-// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the template's own footer. Where
-// the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
-vi.mock("../config/slots", () => ({ slots: {} }));
+// Independent of what a fork puts in `config/slots.tsx` (plan S1) and `config/footer.ts` (plan L3, for example the four-column
+// recipe without the navigation and contacts blocks): this spec checks the template's own footer, so both files are the
+// template defaults here (`test-support/template-defaults.ts`). Where the slots render, and that empty slots add nothing, is
+// `slot-places.spec.tsx`; filled slots and footer config, the fork run (`vitest.brand-fork.config.ts`).
+vi.mock("../config/slots", () => import("../test-support/template-defaults"));
+vi.mock("../config/footer", () => import("../test-support/template-defaults"));
 
 const { uk, en } = messagesByLocale;
 

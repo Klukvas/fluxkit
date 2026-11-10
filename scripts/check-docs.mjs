@@ -12,11 +12,56 @@ import { existsSync, readFileSync } from "node:fs";
 const contractConfig =
   /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/(custom|types)|lib\/(custom-sections|slots))\.tsx?$/;
 
-/** The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/. */
-function contractConfigProblem(paths) {
-  if (!paths.some((path) => contractConfig.test(path))) return null;
+// The config files among them that a client fork fills itself (`docs/customization.md`): editing their VALUES changes no
+// template contract, so in a fork they do not need a change under docs/contracts/. The files that define the contract (the
+// types, the slot names) keep the rule in a fork too.
+const forkFilledConfig =
+  /^apps\/storefront\/src\/(config\/(brand|catalog|header|footer|slots|custom-sections|home)|components\/cards\/custom)\.tsx?$/;
+
+// A client fork creates this file at the repository root (`docs/customization.md`, "Before you start"; `docs/contracts/README.md`).
+// The template itself never contains it: `apps/storefront/src/fork-marker.upstream.spec.ts` fails if it does.
+const forkMarker = ".fluxkit-fork";
+const forkMarkerSpec = "apps/storefront/src/fork-marker.upstream.spec.ts";
+
+/**
+ * Whether the contract rule runs in fork mode, and the problems of the marker itself. Fork mode follows the marker in the BASE
+ * ref only: a PR that adds the marker cannot relax its own check (a fork lands the marker in a commit or PR of its own first).
+ * Fails closed when the tree holds both the marker and the upstream-only spec that refuses it (half of step 0 done).
+ */
+function forkMode({ markerInBase, markerInTree, upstreamSpecInTree }) {
+  const problems =
+    markerInTree && upstreamSpecInTree
+      ? [
+          `Both ${forkMarker} and ${forkMarkerSpec} exist. In a client fork, delete ${forkMarkerSpec} (docs/customization.md, step 0); in the template, delete ${forkMarker} (the template never contains it).`,
+        ]
+      : [];
+  return { fork: markerInBase, problems };
+}
+
+/** The real repository state `forkMode` reads: the marker in `base` (via `gitRun`) and the marker and the spec on disk. */
+function readForkState(base, gitRun, exists) {
+  let markerInBase = true;
+  try {
+    gitRun("cat-file", "-e", `${base}:${forkMarker}`);
+  } catch {
+    markerInBase = false;
+  }
+  return {
+    markerInBase,
+    markerInTree: exists(forkMarker),
+    upstreamSpecInTree: exists(forkMarkerSpec),
+  };
+}
+
+/**
+ * The problem when a contract config file changed (added, edited, renamed or deleted) without a change under docs/contracts/.
+ * `fork`: the repository is a client fork (the marker exists), so the fork's own config files are left out.
+ */
+function contractConfigProblem(paths, { fork }) {
+  const relevant = fork ? paths.filter((path) => !forkFilledConfig.test(path)) : paths;
+  if (!relevant.some((path) => contractConfig.test(path))) return null;
   if (paths.some((path) => path.startsWith("docs/contracts/"))) return null;
-  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did.";
+  return "A storefront contract file (apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x), apps/storefront/src/components/cards/{custom,types}.ts(x) or apps/storefront/src/lib/{custom-sections,slots}.ts(x)) changed but nothing under docs/contracts/ did. A client fork filling its own config files creates the marker .fluxkit-fork at the repository root (docs/customization.md, step 0).";
 }
 
 /** Parses `git diff --name-status`; a rename or copy lists the old and the new path: `path` is the new one, `paths` both. */
@@ -132,20 +177,121 @@ const selfTestCases = [
     ],
     fails: false,
   },
+  // In a fork (the `.fluxkit-fork` marker at the repository root): the fork fills its own config files, which changes no
+  // template contract; the files that define the contract (types, slot names) keep the rule.
+  {
+    paths: [
+      "apps/storefront/src/config/brand.ts",
+      "apps/storefront/src/config/header.ts",
+      "apps/storefront/src/config/footer.ts",
+      "apps/storefront/src/config/slots.tsx",
+      "apps/storefront/src/config/custom-sections.ts",
+      "apps/storefront/src/config/home.ts",
+      "apps/storefront/src/config/catalog.ts",
+      "apps/storefront/src/components/cards/custom.ts",
+    ],
+    fork: true,
+    fails: false,
+  },
+  { nameStatus: "A\tapps/storefront/src/components/cards/custom.ts", fork: true, fails: false },
+  { paths: ["apps/storefront/src/config/footer.ts"], fork: false, fails: true },
+  { paths: ["apps/storefront/src/lib/slots.ts"], fork: true, fails: true },
+  {
+    paths: [
+      "apps/storefront/src/config/slots.tsx",
+      "apps/storefront/src/components/cards/types.ts",
+    ],
+    fork: true,
+    fails: true,
+  },
+  {
+    paths: ["apps/storefront/src/lib/custom-sections.ts", "docs/contracts/home-sections.md"],
+    fork: true,
+    fails: false,
+  },
+  {
+    nameStatus:
+      "R100\tapps/storefront/src/config/slots.tsx\tapps/storefront/src/lib/slots.tsx\nM\tapps/storefront/src/config/brand.ts",
+    fork: true,
+    fails: true,
+  },
 ];
 const casePaths = ({ paths, nameStatus }) => paths ?? changedPaths(parseNameStatus(nameStatus));
 const selfTestFailures = selfTestCases.filter(
-  (testCase) => (contractConfigProblem(casePaths(testCase)) !== null) !== testCase.fails,
+  (testCase) =>
+    (contractConfigProblem(casePaths(testCase), { fork: testCase.fork === true }) !== null) !==
+    testCase.fails,
 );
-if (selfTestFailures.length > 0) {
+// The marker's own cases: fork mode only from the base ref; marker plus upstream-only spec in the tree fails.
+const forkModeCases = [
+  {
+    state: { markerInBase: false, markerInTree: false, upstreamSpecInTree: true },
+    fork: false,
+    problems: 0,
+  },
+  // The PR that adds the marker (and deletes the spec): its own check stays strict.
+  {
+    state: { markerInBase: false, markerInTree: true, upstreamSpecInTree: false },
+    fork: false,
+    problems: 0,
+  },
+  // An upstream PR that adds the marker and keeps the spec: strict, and refused.
+  {
+    state: { markerInBase: false, markerInTree: true, upstreamSpecInTree: true },
+    fork: false,
+    problems: 1,
+  },
+  {
+    state: { markerInBase: true, markerInTree: true, upstreamSpecInTree: false },
+    fork: true,
+    problems: 0,
+  },
+  {
+    state: { markerInBase: true, markerInTree: true, upstreamSpecInTree: true },
+    fork: true,
+    problems: 1,
+  },
+  // A fork PR that deletes the marker again: the base still decides this PR.
+  {
+    state: { markerInBase: true, markerInTree: false, upstreamSpecInTree: false },
+    fork: true,
+    problems: 0,
+  },
+];
+const forkModeFailures = forkModeCases.filter(({ state, fork, problems }) => {
+  const result = forkMode(state);
+  return result.fork !== fork || result.problems.length !== problems;
+});
+// `readForkState` with a fake git: `cat-file -e` succeeds only when the base has the marker.
+const fakeGit =
+  (hasMarker) =>
+  (...args) => {
+    if (args[0] !== "cat-file" || args[2] !== `main:${forkMarker}`) throw new Error(args.join(" "));
+    if (!hasMarker) throw new Error("missing");
+    return "";
+  };
+const readStateFailures = [true, false].filter(
+  (hasMarker) =>
+    readForkState("main", fakeGit(hasMarker), (path) => path === forkMarker).markerInBase !==
+    hasMarker,
+);
+if (selfTestFailures.length > 0 || forkModeFailures.length > 0 || readStateFailures.length > 0) {
   console.error(
     "check:docs self-test failed for: " +
-      selfTestFailures.map((testCase) => JSON.stringify(casePaths(testCase))).join(", "),
+      [
+        ...selfTestFailures.map((testCase) => JSON.stringify(casePaths(testCase))),
+        ...forkModeFailures.map((testCase) => JSON.stringify(testCase.state)),
+        ...readStateFailures.map(
+          (hasMarker) => `readForkState(marker in base: ${String(hasMarker)})`,
+        ),
+      ].join(", "),
   );
   process.exit(1);
 }
 if (process.argv.includes("--self-test")) {
-  console.log(`check:docs self-test: ${selfTestCases.length} cases passed`);
+  console.log(
+    `check:docs self-test: ${selfTestCases.length + forkModeCases.length + 2} cases passed`,
+  );
   process.exit(0);
 }
 
@@ -214,7 +360,15 @@ if (touched((path) => path === tokensPath)) {
   }
 }
 
-const contractProblem = contractConfigProblem(changedPaths(changed));
+const quietGit = (...args) =>
+  execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+const { fork, problems: markerProblems } = forkMode(readForkState(base, quietGit, existsSync));
+problems.push(...markerProblems);
+if (fork)
+  console.log(
+    `${forkMarker} found in ${base}: client fork, its own storefront config files need no docs/contracts/ change`,
+  );
+const contractProblem = contractConfigProblem(changedPaths(changed), { fork });
 if (contractProblem !== null) problems.push(contractProblem);
 
 console.log(`changed files: ${changed.length}`);

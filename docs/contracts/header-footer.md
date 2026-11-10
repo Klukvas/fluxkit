@@ -3,7 +3,7 @@
 Status: draft (since PR-G1 of `docs/plans/2026-11-08-design-changeability.md`, L3; owner approval 2026-11-08, plan section 9).
 Additive: a new block, control, link group kind or field is minor; a rename or removal is major with a note in `docs/migrations/`.
 Default VALUES are not contract (plan principle 8). `check:docs` requires a change here whenever `config/header.ts` or
-`config/footer.ts` changes upstream. The plan calls this contract `layout-config.md`; it is this file, `header-footer.md`.
+`config/footer.ts` changes upstream (not in a fork with the `.fluxkit-fork` marker, `docs/contracts/README.md`). The plan calls this contract `layout-config.md`; it is this file, `header-footer.md`.
 
 ## Files
 
@@ -63,7 +63,7 @@ checks without the message keys run at render (`headerView`, `footerView` throw)
 page; an unknown message key throws in the translator. What that failure looks like: `SiteShell` renders inside
 `app/[locale]/layout.tsx` (its `error.tsx` sits inside that layout and cannot catch it) and the app has no `global-error.tsx`, so EVERY page answers with Next's bare 500 page (the error and its
 message in the server log). `next build` does not catch it (the pages render per request); the unit tests do. The unit suite runs a second time with a filled fork config (`apps/storefront/vitest.brand-fork.config.ts`,
-`src/lib/layout-fork-fixture.ts`). `components/header-footer-defaults.upstream.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
+`src/lib/header-fork-fixture.ts`, `src/lib/footer-fork-fixture.ts`). `components/header-footer-defaults.upstream.spec.tsx` is a TEMPLATE-DEFAULT check of the default markup:
 a fork that changes either file deletes it.
 
 ## Not contract, not configurable (cut from plan L3, with the reason)

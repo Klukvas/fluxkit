@@ -48,9 +48,17 @@ Checked after every build (`build-output.spec.ts`): `index.html` has no inline s
   (`html { ... }` would lose to `tokens.css`). No dark, `system` or `prefers-color-scheme` rule there. `src/theme-isolation.spec.ts`
   checks the import order, those rules (pattern checks) and that no shipped storefront, UI or other theme source names the file (tests may).
 - Name: `app.name` (header, static tab title) and `app.documentTitle` (`"{page} · <name>"`, the tab title on every screen) in
-  `src/messages/{uk,en}/common.json`; a fork changes those four values. `index.html` has an empty `<title>`: the Vite plugin of
-  `brand-html.ts` (`transformIndexHtml`) fills it at build and in `vite dev` with the English `app.name` (shown before the SPA picks the
-  UI language); `build-output.spec.ts` pins it.
+  `src/messages/{uk,en}/common.json`; a fork changes those four values in its fork-owned `src/messages-overrides/{uk,en}.json`
+  (PR-I2b; this note supersedes the "edit `common.json`" wording of ADR 0047, which is not edited), with no core edit. `index.html` has an
+  empty `<title>`: the Vite plugin of `brand-html.ts` (`transformIndexHtml`) fills it at build and in `vite dev` with the English
+  `app.name` the admin renders, overrides included (shown before the SPA picks the UI language); `build-output.spec.ts` pins it, and
+  `brand-html.spec.ts` reads it from the messages (no literal), so renaming the admin needs no test edit.
+- Text overrides (client forks): `src/messages-overrides/<locale>.json` (fork-owned, `{}` upstream), flat key -> text, e.g.
+  `{ "app.name": "Shop Admin", "app.documentTitle": "{page} · Shop Admin" }`. Applied LAST to the eager files and to every lazily
+  loaded area file (`src/messages/overrides.ts`, `src/messages/index.ts`), with the storefront's rules: a value that is not a non-empty
+  string throws, and a key no message file has (a typo, or a key upstream renamed) stops `vite build` and `vite dev`, naming the key and
+  the file (`brand-html.ts` checks every file at once: the SPA loads area files lazily). That check runs when `vite build` or `vite dev` starts and in `src/messages/overrides.spec.ts`, not in the running app: a typo in a key of a lazily loaded area changes nothing on screen, so restart `vite dev` after editing the overrides. The parity, placeholder and "no hard-coded text"
+  specs run on the merged result (`src/messages/overrides.spec.ts`).
 - Favicon: none upstream. A fork adds `public/favicon.svg` (or `favicon.png`, `favicon.ico`; the first one found wins); the build copies it
   to `dist/` and the plugin links it as `/admin-ui/<file>`, the one file of `index.html` outside `/admin-ui/assets/` (served by the
   proxy's `try_files`, same origin, so the CSP allows it).

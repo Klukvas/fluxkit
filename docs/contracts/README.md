@@ -20,3 +20,26 @@ Not written yet (add when the first implementation exists): price adjusters (a h
 `db-extension.md` (tables safe to extend).
 
 Entry format: name, since-version, description, shape, status (stable / deprecated since X).
+
+## Admin text overrides (draft, PR-I2b)
+
+`apps/admin/src/messages-overrides/uk.json` and `apps/admin/src/messages-overrides/en.json` are fork-owned (upstream ships `{}` and never
+edits them): flat key -> text, applied last over the admin's message files, eager and lazy (`apps/admin/src/messages/overrides.ts`), as the
+storefront's `src/messages-overrides`. A key no message file has, or a value that is not a non-empty string, fails `vite build`, `vite dev`
+and `pnpm --filter @fluxkit/admin test`. Contract: the files' location and shape; the message keys themselves are not contract (a renamed
+key fails the fork's build, naming it). The admin's name is `app.name` and `app.documentTitle` there (`apps/admin/README.md`).
+
+## Contract files in the template and in a client fork
+
+`check:docs` (`scripts/check-docs.mjs`, CI job `docs`) fails a PR that changes a storefront contract file without a change under
+`docs/contracts/`: `apps/storefront/src/config/{brand,catalog,header,footer,slots,custom-sections,home}.ts(x)`,
+`apps/storefront/src/components/cards/{custom,types}.ts(x)` and `apps/storefront/src/lib/{custom-sections,slots}.ts(x)`. The rule is
+for the template, where such a change may change a contract.
+
+A client fork fills the config files among them itself (`docs/customization.md`), which changes no contract. It marks itself with
+an empty file `.fluxkit-fork` at the repository root (checked in, no environment variable), in a commit or PR of its own. The check reads
+the marker from the PR's BASE ref, so no PR relaxes its own check; a tree with both the marker and the upstream-only spec below fails.
+With the marker in the base, the config files
+(`config/*.ts(x)` above and `components/cards/custom.ts`) are left out of the rule; the files that define the contract
+(`components/cards/types.ts`, `lib/custom-sections.ts`, `lib/slots.ts`) keep it. The template never contains the marker:
+`apps/storefront/src/fork-marker.upstream.spec.ts` (upstream-only, deleted by the fork in the same step) fails if it does.

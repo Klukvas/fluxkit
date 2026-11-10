@@ -24,9 +24,12 @@ import { leftoverText, sentinelTranslator } from "../test-helpers";
 import { builtInCards, cardRegistry, createCardRegistry, resolveCard } from "./registry";
 import type { CardKindEntry, CardProps } from "./types";
 
-// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the cards' own markup. Where the
-// card slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
-vi.mock("../../config/slots", () => ({ slots: {} }));
+// Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1) and of the cards it registers in `cards/custom.ts`
+// (plan L2): this spec checks the template's built-in cards, so both files are the template defaults here
+// (`test-support/template-defaults.ts`). Where the card slots render, and that empty slots add nothing, is
+// `slot-places.spec.tsx`; filled slots and the fork's own cards, the fork run (`vitest.brand-fork.config.ts`).
+vi.mock("../../config/slots", () => import("../../test-support/template-defaults"));
+vi.mock("./custom", () => import("../../test-support/template-defaults"));
 
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];
