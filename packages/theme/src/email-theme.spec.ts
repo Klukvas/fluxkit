@@ -1,16 +1,15 @@
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { emailTheme } from "./email-theme.js";
 import { emailTheme as exported } from "./index.js";
-import { parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
+import { storefrontTokens } from "./theme-run.testing.js";
 
-// The guard of ADR 0031 decision 14: `emailTheme` holds the resolved LIGHT values of tokens.css, so a rebrand of the
-// tokens cannot leave mail in the old colors.
-const tokensCss = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
+// The guard of ADR 0031 decision 14: `emailTheme` holds the resolved LIGHT values of the storefront's EFFECTIVE tokens
+// (`tokens.css` plus the fork-owned `brand-overrides.css`), so a rebrand cannot leave mail in the old colors. Mail clients
+// cannot read CSS, so the values are literals in `email-theme.ts`; each failure names the values to write there.
+const literalFile = "packages/theme/src/email-theme.ts";
 
 function lightTokens(): Map<string, string> {
-  return tokenBlock(parseTokenBlocks(tokensCss), themeSelectors.light).tokens;
+  return storefrontTokens.light;
 }
 
 /**
@@ -62,17 +61,28 @@ describe("emailTheme", () => {
     expect(exported).toBe(emailTheme);
   });
 
-  it("uses the light value of the token of the same name for every color", () => {
-    for (const [name, value] of Object.entries(emailTheme.color)) {
-      const token = `--fk-color-${kebab(name)}`;
-      expect(tokens.get(token), `${token} is not defined in tokens.css`).toBeDefined();
-      expect(value, token).toBe(tokens.get(token));
+  it("uses the effective light value of the token of the same name for every color", () => {
+    const expected = Object.fromEntries(
+      Object.keys(emailTheme.color).map((name) => [name, tokens.get(`--fk-color-${kebab(name)}`)]),
+    );
+    for (const [name, value] of Object.entries(expected)) {
+      expect(value, `--fk-color-${kebab(name)} is not defined in tokens.css`).toBeDefined();
     }
+    expect(
+      { ...emailTheme.color },
+      `update the literals in ${literalFile}: color: ${JSON.stringify(expected)}`,
+    ).toEqual(expected);
   });
 
   it("uses the token font stacks (without a self-hosted web font, which mail clients do not load)", () => {
-    expect(emailTheme.font.sans).toBe(mailFontStack(tokens.get("--fk-font-sans") ?? ""));
-    expect(emailTheme.font.mono).toBe(mailFontStack(tokens.get("--fk-font-mono") ?? ""));
+    const expected = {
+      sans: mailFontStack(tokens.get("--fk-font-sans") ?? ""),
+      mono: mailFontStack(tokens.get("--fk-font-mono") ?? ""),
+    };
+    expect(
+      { ...emailTheme.font },
+      `update the literals in ${literalFile}: font: ${JSON.stringify(expected)}`,
+    ).toEqual(expected);
   });
 
   it("drops the web font variables of `config/fonts.ts` from a stack, and keeps the fallbacks", () => {
@@ -83,13 +93,19 @@ describe("emailTheme", () => {
     expect(mailFontStack("var(--font-body)")).toBe("");
   });
 
-  it("uses the token radii, resolved from rem to px (16px per rem)", () => {
-    for (const [name, value] of Object.entries(emailTheme.radius)) {
-      const token = tokens.get(`--fk-radius-${name}`);
-      const rem = /^([0-9.]+)rem$/.exec(token ?? "");
-      expect(rem, `--fk-radius-${name} must be in rem`).not.toBeNull();
-      expect(value).toBe(`${String(Number(rem?.[1]) * 16)}px`);
-    }
+  it("uses the effective token radii, resolved from rem to px (16px per rem)", () => {
+    const expected = Object.fromEntries(
+      Object.keys(emailTheme.radius).map((name) => {
+        const token = tokens.get(`--fk-radius-${name}`);
+        const rem = /^([0-9.]+)rem$/.exec(token ?? "");
+        expect(rem, `--fk-radius-${name} must be in rem`).not.toBeNull();
+        return [name, `${String(Number(rem?.[1]) * 16)}px`];
+      }),
+    );
+    expect(
+      { ...emailTheme.radius },
+      `update the literals in ${literalFile}: radius: ${JSON.stringify(expected)}`,
+    ).toEqual(expected);
   });
 
   it("covers every light token except the ones mail does not use (each with a reason)", () => {

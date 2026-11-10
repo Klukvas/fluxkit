@@ -1,5 +1,10 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { emailTheme } from "./email-theme.js";
+import * as emailFixture from "./fork-fixture/email-theme.js";
+import * as themeColorFixture from "./fork-fixture/theme-color.js";
+import { emailTheme as exportedEmailTheme, themeColors as exportedThemeColors } from "./index.js";
+import { themeColors } from "./theme-color.js";
 import {
   adminOverridesFile,
   adminTokens,
@@ -44,5 +49,15 @@ describe("the overrides files a theme run reads", () => {
     // The admin never receives the storefront overrides, and the storefront never the admin's.
     expect(background(adminTokens)).toBe(template.get("--fk-color-background"));
     expect(storefrontTokens.light.get("--fk-font-sans")).toBe(template.get("--fk-font-sans"));
+  });
+});
+
+describe("the literal copies a theme run reads", () => {
+  it("are the real files upstream and the fork's updated copies in the fork run, also through the package entry", () => {
+    const fork = themeRun === "brand-fork";
+    expect(Object.is(themeColors, themeColorFixture.themeColors)).toBe(fork);
+    expect(Object.is(emailTheme, emailFixture.emailTheme)).toBe(fork);
+    expect(exportedThemeColors).toBe(themeColors);
+    expect(exportedEmailTheme).toBe(emailTheme);
   });
 });
