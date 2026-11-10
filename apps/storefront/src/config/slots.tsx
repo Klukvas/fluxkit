@@ -1,4 +1,10 @@
 import { AnnouncementBar } from "../components/announcement-bar";
+import {
+  ContactsColumn,
+  LegalColumn,
+  NewsletterPaymentsColumn,
+  ShopColumn,
+} from "../components/footer-columns";
 import type { SlotRegistry } from "../lib/slots";
 
 /**
@@ -29,4 +35,7 @@ import type { SlotRegistry } from "../lib/slots";
  *   import { AnnouncementBar } from "../components/announcement-bar";
  *   export const slots: SlotRegistry = { "header.top": [AnnouncementBar] };
  */
-export const slots: SlotRegistry = { "header.top": [AnnouncementBar] };
+export const slots: SlotRegistry = {
+  "header.top": [AnnouncementBar],
+  "footer.columns": [ShopColumn, LegalColumn, ContactsColumn, NewsletterPaymentsColumn],
+};

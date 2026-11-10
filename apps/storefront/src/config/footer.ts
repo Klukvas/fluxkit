@@ -34,7 +34,9 @@
 import type { FooterConfig } from "../layout/footer-layout";
 
 export const footerConfig: FooterConfig = {
-  blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+  // The fork's four columns (`footer.columns` slot, `components/footer-columns.tsx`) draw the shop pages, the legal pages and the
+  // contacts; what stays here is the theme switch and the copyright.
+  blocks: ["themeSwitch", "copyright"],
   navigation: {
     groups: [{ kind: "shopPages" }, { kind: "legal" }],
   },
