@@ -18,6 +18,16 @@ import { StoreTrustBar } from "./trust-bar";
 // Independent of the UI slots a fork fills in `config/slots.tsx` (plan S1): this spec checks the template's own footer. Where
 // the slots render, and that empty slots add nothing, is `slot-places.spec.tsx`; filled slots, the fork run.
 vi.mock("../config/slots", () => ({ slots: {} }));
+// FORK (a1-reshape): this spec checks the template's own footer blocks with the slots empty; the fork's config/footer.ts moves
+// navigation and contacts into footer.columns, so the template's default footer config is used here.
+// `importOriginal`: the brand fork run aliases config/header and config/footer to one fixture module.
+vi.mock("../config/footer", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  footerConfig: {
+    blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
+    navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
+  },
+}));
 
 const { uk, en } = messagesByLocale;
 
