@@ -41,3 +41,70 @@
  *   page backgrounds in theme-color.ts. Their specs fail with the value to write until they equal the effective tokens.
  * - A web font comes from apps/storefront/src/config/fonts.ts; name its variable here: `--fk-font-display: var(--font-...), ...`.
  */
+
+/* Verde Kopi (fictional client): forest green, warm amber, warm neutrals, serif headings from a system stack. */
+:root,
+[data-theme="light"] {
+  --fk-color-background: #fbf8f2;
+  --fk-color-foreground: #14211c;
+  --fk-color-muted: #f1ebdf;
+  --fk-color-muted-foreground: #4a5a52;
+  --fk-color-border: #e3dccc;
+  --fk-color-border-input: #78847d;
+  --fk-color-primary: #1f5f4a;
+  --fk-color-primary-foreground: #ffffff;
+  --fk-color-accent: #9a5200;
+  --fk-color-accent-foreground: #ffffff;
+  --fk-color-success: #136b37;
+  --fk-color-warning: #964706;
+  --fk-color-ring: #1f5f4a;
+  --fk-radius-control: 0.25rem;
+  --fk-radius-card: 0.5rem;
+  --fk-radius-panel: 0.25rem;
+  --fk-radius-overlay: 0.5rem;
+  --fk-radius-media: 0.25rem;
+  --fk-font-display: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  --fk-shadow-card: 0 1px 3px 0 rgb(74 52 28 / 0.1);
+  --fk-shadow-raised: 0 4px 12px -2px rgb(74 52 28 / 0.12), 0 2px 4px -2px rgb(74 52 28 / 0.08);
+  --fk-shadow-overlay: 0 12px 32px -8px rgb(74 52 28 / 0.2), 0 4px 8px -4px rgb(74 52 28 / 0.1);
+}
+
+[data-theme="dark"] {
+  --fk-color-background: #0d1612;
+  --fk-color-foreground: #e8efe9;
+  --fk-color-muted: #16241e;
+  --fk-color-muted-foreground: #9db2a6;
+  --fk-color-border: #26382f;
+  --fk-color-border-input: #6f8a7b;
+  --fk-color-primary: #5fb796;
+  --fk-color-primary-foreground: #0d1612;
+  --fk-color-accent: #f0b04a;
+  --fk-color-accent-foreground: #0d1612;
+  --fk-color-success: #4ade80;
+  --fk-color-warning: #fbbf24;
+  --fk-color-ring: #5fb796;
+  --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.45);
+  --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.65), 0 4px 8px -4px rgb(0 0 0 / 0.45);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme="system"] {
+    --fk-color-background: #0d1612;
+    --fk-color-foreground: #e8efe9;
+    --fk-color-muted: #16241e;
+    --fk-color-muted-foreground: #9db2a6;
+    --fk-color-border: #26382f;
+    --fk-color-border-input: #6f8a7b;
+    --fk-color-primary: #5fb796;
+    --fk-color-primary-foreground: #0d1612;
+    --fk-color-accent: #f0b04a;
+    --fk-color-accent-foreground: #0d1612;
+    --fk-color-success: #4ade80;
+    --fk-color-warning: #fbbf24;
+    --fk-color-ring: #5fb796;
+    --fk-shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+    --fk-shadow-raised: 0 4px 12px -2px rgb(0 0 0 / 0.55), 0 2px 4px -2px rgb(0 0 0 / 0.45);
+    --fk-shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.65), 0 4px 8px -4px rgb(0 0 0 / 0.45);
+  }
+}
