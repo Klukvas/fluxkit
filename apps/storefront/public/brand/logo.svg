@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 152 32" width="152" height="32">
+  <!-- Verde Kopi logo for light pages: a coffee bean mark and the name in the system serif stack (an <img> cannot load a web font). -->
+  <g transform="rotate(28 16 16)">
+    <ellipse cx="16" cy="16" rx="9" ry="13" fill="#1f5f4a"/>
+    <path d="M17 4.5c-5 4-5 7.5-1 11.500s4 7.500-1 11.500" fill="none" stroke="#faf7f2" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <text x="38" y="22.500" font-family="ui-serif, Georgia, Cambria, serif" font-size="20" font-weight="700" fill="#14201b">Verde Kopi</text>
+</svg>

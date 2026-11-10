@@ -25,9 +25,14 @@
 import type { BrandConfig } from "../lib/brand";
 
 export const brand: BrandConfig = {
-  logo: { kind: "text" },
-  icons: [],
+  logo: {
+    kind: "image",
+    light: { src: "/brand/logo.svg", width: 152, height: 32 },
+    dark: { src: "/brand/logo-dark.svg", width: 152, height: 32 },
+  },
+  icons: [{ src: "/brand/icon.svg", type: "image/svg+xml", sizes: "any" }],
+  // TODO(verde-kopi): a 180 x 180 PNG apple-touch-icon and a 1200 x 630 og:image need raster files from the client's designer.
   appleIcon: null,
-  themeColor: false,
+  themeColor: true,
   ogImage: null,
 };
