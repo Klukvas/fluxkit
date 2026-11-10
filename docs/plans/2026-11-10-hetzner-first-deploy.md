@@ -187,3 +187,23 @@ Still open:
 - No expiry mail (account without email): the renewal timer is the only safeguard; check `systemctl status fluxkit-cert-renew` after its first runs.
 - The pre-switch storefront image `fluxkit-storefront:7349a1b-ip` is deleted (2026-11-11): going back to the IP set-up needs a storefront rebuild.
 - A real domain later means the same steps 2 to 5 again (new certificate, `FLUXKIT_DOMAIN`, `STOREFRONT_IMAGE_HOSTS`, URL rewrite, storefront rebuild).
+
+## 15. Disk space housekeeping (2026-11-11, owner's "yes, add both")
+
+Before: 15 GB free of 38 GB; Fluxkit images about 1.5 GB (one release), Docker build cache 4.1 GB (2.7 GB reclaimable), most other
+image space belongs to AutoFlow (about 60 `klukvas/autoflow-*` and `autoflow-*` images, 2.4 GB reclaimable by Docker's count; not
+touched). Nothing removed old images or build cache, and nothing warned about low space.
+
+| Piece | What it does | Undo |
+|---|---|---|
+| `/usr/local/sbin/fluxkit-prune-images [--dry-run]` | For `fluxkit-api`, `fluxkit-storefront`, `fluxkit-edge`: keeps `FLUXKIT_IMAGE_TAG` from `production.env` and the newest other tag (rollback), removes older tags unless a container (running or stopped) uses the image. Touches no other repository. Run it after each update; the weekly unit runs it too | `rm` the script |
+| `fluxkit-disk-cleanup.service` + `.timer` (Sundays 04:45 UTC) | `fluxkit-prune-images`, then `docker builder prune --force --filter until=168h` (cache unused for a week; shared with any other build on the host) | `systemctl disable --now fluxkit-disk-cleanup.timer`, remove the unit files and `/usr/local/sbin/fluxkit-disk-cleanup` |
+| `fluxkit-disk-check.service` + `.timer` (hourly) | Below `FLUXKIT_DISK_MIN_FREE_GB` (default 5) free on `/`: `logger -p user.warning -t fluxkit-disk` and the unit fails (`systemctl --failed`, `journalctl -t fluxkit-disk`) | `systemctl disable --now fluxkit-disk-check.timer`, remove the unit files and `/usr/local/sbin/fluxkit-disk-check` |
+
+Checks: dry run with one release keeps everything; with temporary aliases the script kept the newer one as "previous", kept
+an alias whose image a stopped AutoFlow container uses, and removed unused older tags (throwaway `FROM scratch` images, removed
+afterwards). First cleanup run freed 11 MB of build cache (the rest is younger than a week). The disk check reports `ok` at 14 GB
+free; with a threshold of 100 GB it logged the warning and exited 1.
+
+Not done: the warning reaches only the journal (the host sends no mail; a notification channel is a separate decision);
+AutoFlow's images stay until the owner decides.
