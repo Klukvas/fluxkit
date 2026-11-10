@@ -24,6 +24,7 @@ const FORK_DELETES = new Set([
   "apps/storefront/src/config/slots.upstream.spec.ts",
   "apps/storefront/src/components/cards/custom.upstream.spec.ts",
   "apps/storefront/src/lib/home-template-default.upstream.spec.ts",
+  "packages/theme/src/brand-overrides.upstream.spec.ts",
   // Deleted with the creation of the fork marker `.fluxkit-fork` (the guide's step 0).
   "apps/storefront/src/fork-marker.upstream.spec.ts",
 ]);
@@ -44,6 +45,9 @@ describe("docs/customization.md (plan B5)", () => {
       "apps/storefront/src/config/fonts.ts",
       "apps/storefront/src/messages-overrides/uk.json",
       "packages/theme/src/tokens.css",
+      "packages/theme/src/brand-overrides.css",
+      "packages/theme/src/email-theme.ts",
+      "packages/theme/src/theme-color.ts",
       "packages/theme/src/admin-overrides.css",
       "docs/contracts/branding.md",
     ]) {

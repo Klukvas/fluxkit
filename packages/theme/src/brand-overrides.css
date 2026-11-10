@@ -1,0 +1,43 @@
+/*
+ * Storefront token overrides: FORK-OWNED, empty upstream (plan 2026-11-08-design-changeability.md, principle 6). Upstream
+ * never edits this file after creating it, so a client fork rebrands here without touching tokens.css and without merge
+ * conflicts. Contract: docs/contracts/theme-tokens.md, "Storefront overrides"; steps: docs/customization.md.
+ *
+ * apps/storefront/src/app/globals.css imports this file LAST, after tokens.css and tailwind.css. The admin follows the shop
+ * (ADR 0047): apps/admin/src/styles.css imports it before its own fork-owned overrides file, and only the light rule below
+ * matches the admin's page. A font token with var(--font-...) is restated for the admin there (it has no next/font).
+ *
+ * How the cascade works: use exactly the three rules of tokens.css below, in this order. They have the same specificity as
+ * the rules of tokens.css, so the later file wins. A colour or shadow you set for light must also be set for dark and
+ * system: on <html data-theme="dark"> the `:root` rule matches too and, coming after the dark rule of tokens.css, would
+ * otherwise win (light colours in dark mode). The system rule repeats the dark rule exactly. Fonts, radii, the type scale
+ * and the spacing unit go in the light rule only (dark and system inherit them). The checks refuse anything else.
+ *
+ *   :root,
+ *   [data-theme="light"] {
+ *     --fk-color-primary: #1f5f4a;
+ *     --fk-color-ring: #1f5f4a;
+ *     --fk-radius-card: 0.5rem;
+ *     --fk-font-display: ui-serif, Georgia, serif;
+ *   }
+ *
+ *   [data-theme="dark"] {
+ *     --fk-color-primary: #62b796;
+ *     --fk-color-ring: #62b796;
+ *   }
+ *
+ *   @media (prefers-color-scheme: dark) {
+ *     [data-theme="system"] {
+ *       --fk-color-primary: #62b796;
+ *       --fk-color-ring: #62b796;
+ *     }
+ *   }
+ *
+ * Rules:
+ * - Existing `--fk-*` tokens only (names: docs/contracts/theme-tokens.md), 6-digit hex colours, no !important.
+ * - `pnpm --filter @fluxkit/theme test` computes the EFFECTIVE values (tokens.css, then this file) and checks the contrast
+ *   pairs of contrast.spec.ts in light, dark and system on them.
+ * - Two literal copies cannot read CSS and still follow by hand: the mail colours, fonts and radii in email-theme.ts and the
+ *   page backgrounds in theme-color.ts. Their specs fail with the value to write until they equal the effective tokens.
+ * - A web font comes from apps/storefront/src/config/fonts.ts; name its variable here: `--fk-font-display: var(--font-...), ...`.
+ */

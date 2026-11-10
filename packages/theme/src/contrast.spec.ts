@@ -2,19 +2,22 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { darkSchemeMedia, parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
+import {
+  adminTokens,
+  brandOverridesFile,
+  adminOverridesFile,
+  storefrontTokens,
+} from "./theme-run.testing.js";
+import { parseTokenBlocks, themeSelectors, tokenBlock } from "./token-blocks.js";
 
 // WCAG 2.x contrast (https://www.w3.org/TR/WCAG21/#dfn-contrast-ratio), pure code, no dependency.
-// tokens.css uses 6-digit hex colors only; any other format fails loudly instead of being skipped.
+// The theme files use 6-digit hex colors only; any other format fails loudly instead of being skipped.
+// The pairs are checked on the EFFECTIVE values (`theme-run.testing.ts`): the storefront's `tokens.css` plus its fork-owned
+// overrides in every mode it renders, and the admin's `tokens.css`, the storefront overrides (light rule) and its own
+// fork-owned overrides (light only, ADR 0047),
+// so a fork's palette in either overrides file is checked like the template's.
 const tokensCss = readFileSync(fileURLToPath(new URL("./tokens.css", import.meta.url)), "utf8");
-const blocks = parseTokenBlocks(tokensCss);
-const lightTokens = tokenBlock(blocks, themeSelectors.light).tokens;
-const darkTokens = tokenBlock(blocks, themeSelectors.dark).tokens;
-// The system mode on a dark OS: the light values (`:root`) overridden by the system block inside the dark media query.
-const systemDarkTokens = new Map([
-  ...lightTokens,
-  ...tokenBlock(blocks, themeSelectors.system, darkSchemeMedia).tokens,
-]);
+const lightTokens = tokenBlock(parseTokenBlocks(tokensCss), themeSelectors.light).tokens;
 
 function colorValues(tokens: Map<string, string>): Map<string, string> {
   return new Map([...tokens].filter(([name]) => name.startsWith("--fk-color-")));
@@ -28,7 +31,9 @@ function channel(value: number): number {
 function luminance(hex: string): number {
   const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
   if (!match) {
-    throw new Error(`Unsupported color format "${hex}": use a 6-digit hex color in tokens.css`);
+    throw new Error(
+      `Unsupported color format "${hex}": use a 6-digit hex color in tokens.css and the overrides files`,
+    );
   }
   const [r, g, b] = [match[1], match[2], match[3]].map((part) =>
     channel(Number.parseInt(part as string, 16)),
@@ -100,12 +105,20 @@ describe("contrast helper", () => {
   });
 });
 
-describe("token contrast (WCAG 2.x)", () => {
-  for (const [theme, tokens] of [
-    ["light", lightTokens],
-    ["dark", darkTokens],
-    ["system on a dark OS", systemDarkTokens],
-  ] as const) {
+const effectiveSets: [string, Map<string, string>][] = [
+  ...Object.entries(storefrontTokens).map(
+    ([mode, tokens]) => [`storefront ${mode}`, tokens] as [string, Map<string, string>],
+  ),
+  ["admin (light)", adminTokens],
+];
+
+describe("token contrast (WCAG 2.x) on the effective values", () => {
+  it("reads both overrides files of this run", () => {
+    expect(brandOverridesFile).toMatch(/brand-overrides\.css$/);
+    expect(adminOverridesFile).toMatch(/admin-overrides\.css$/);
+  });
+
+  for (const [theme, tokens] of effectiveSets) {
     const values = colorValues(tokens);
     for (const [foreground, background, minimum] of pairs) {
       it(`${theme}: ${foreground} on ${background} is at least ${minimum}:1`, () => {

@@ -28,6 +28,7 @@ marked **not yet available**. Rules behind it: `AGENTS.md` sections 2.2, 15 and 
      once `config/header.ts`, `config/footer.ts` or `config/brand.ts` changes (section 3).
    - `apps/storefront/src/config/slots.upstream.spec.ts`: once a slot is filled (section 3).
    - `apps/storefront/src/components/cards/custom.upstream.spec.ts`: once `cards/custom.ts` registers a card (section 3, product cards).
+   - `packages/theme/src/brand-overrides.upstream.spec.ts`: once `brand-overrides.css` has rules (step 4).
    - Not a file: the one test marked TEMPLATE-DEFAULT CHECK in `apps/storefront/src/config/brand.spec.ts`, once `config/brand.ts` is filled
      (section 1, step 7).
 
@@ -44,12 +45,12 @@ section 0, step 2.
 | 1 | Shop name and page title | `site.name`, `site.title`, `site.description` in `apps/storefront/src/messages-overrides/uk.json` and `apps/storefront/src/messages-overrides/en.json` (flat key -> text; a key the base does not have fails the build) | yes | `pnpm --filter @fluxkit/storefront test` (parity, placeholders) |
 | 2 | Other storefront texts (hero, trust bar, shop pages, contacts) | the same overrides files; the keys are in `apps/storefront/src/messages/uk/` and `apps/storefront/src/messages/en/` (one file per area) | yes | same |
 | 3 | The fork's own new texts | `apps/storefront/src/messages-extra/uk.json` and `apps/storefront/src/messages-extra/en.json`, keys under `custom.` only | yes | same |
-| 4 | Colours, radii, shadows, type scale (storefront and, by default, admin) | `packages/theme/src/tokens.css`: the light block, the dark block and the `system` block (colours and shadows in all three; every other token in the light block only). Names and roles: `docs/contracts/theme-tokens.md`. Radii: the template's components use the ROLE radii (`--fk-radius-control`, `-card`, `-panel`, `-overlay`, `-media`): set those to reshape buttons, cards, panels, dialogs and pictures. The size scale `--fk-radius-sm` / `-md` / `-lg` is not on those components (only a few small marks use `sm`), but it still drives mail: the mail card frame and button take `--fk-radius-md` (`emailTheme.radius.md`, step 5), so change the scale too if mail should match | **no** (upstream edits this file: expect a merge conflict on update; a storefront overrides file is not yet available) | `pnpm --filter @fluxkit/theme test` (contrast pairs in all three modes, mail colours equal the tokens) |
-| 5 | Mail colours and the browser theme colour | `packages/theme/src/email-theme.ts` and, for a changed `--fk-color-background`, `packages/theme/src/theme-color.ts` (literal copies: mail and `<meta name="theme-color">` cannot read CSS variables; `email-theme.spec.ts` and `theme-color.spec.ts` fail until they equal the tokens) | **no** | `pnpm --filter @fluxkit/theme test` |
-| 6 | Web fonts | `apps/storefront/src/config/fonts.ts` (self-hosted `next/font/local`, woff2 next to it), then `--fk-font-display` or `--fk-font-sans` in the light block of `tokens.css`; rules in `apps/storefront/README.md` "Fonts" and `docs/contracts/theme-tokens.md` "Fonts". A system font stack (for example a serif `ui-serif, Georgia, "Times New Roman", serif`) needs no `fonts.ts`: write it straight into the token (and copy it to `email-theme.ts`, step 5); a changed `--fk-font-sans` needs `--fk-font-display` set too (`theme.spec.ts`) | yes (`fonts.ts`) | `pnpm --filter @fluxkit/storefront test` (`config/fonts.spec.ts`) |
+| 4 | Storefront colours, radii, shadows, type scale, display font | `packages/theme/src/brand-overrides.css` (imported after `packages/theme/src/tokens.css` by the storefront and, light rule only, by the admin): the rules `:root, [data-theme="light"]`, `[data-theme="dark"]` and the `system` rule in its media query, in that order; colours and shadows in all three (a light-only colour would also win on dark pages), every other token in the light rule only; the comment at the top of the file has an example. Rules and names: `docs/contracts/theme-tokens.md` "Storefront overrides". Do not edit `tokens.css` | yes | `pnpm --filter @fluxkit/theme test` (the file's rules, contrast pairs on the effective values in every mode, mail colours and theme colour equal the effective values); then delete the upstream-only `packages/theme/src/brand-overrides.upstream.spec.ts` (it pins the empty file) |
+| 5 | Mail colours and the browser theme colour | `packages/theme/src/email-theme.ts` (light colours, font stacks, radii in px) and, for a changed `--fk-color-background`, `packages/theme/src/theme-color.ts`: the two files a rebrand still edits outside the fork-owned files (literal copies: mail and `<meta name="theme-color">` cannot read CSS variables). `email-theme.spec.ts` and `theme-color.spec.ts` fail until they equal the effective values of step 4 and print the literals to write | **no** (expect a conflict when upstream changes them) | `pnpm --filter @fluxkit/theme test` |
+| 6 | Web fonts | `apps/storefront/src/config/fonts.ts` (self-hosted `next/font/local`, woff2 next to it), then `--fk-font-display` or `--fk-font-sans` in the light rule of `packages/theme/src/brand-overrides.css` (the example in `fonts.ts` says `tokens.css`: the overrides file is the place that does not conflict); rules in `apps/storefront/README.md` "Fonts" and `docs/contracts/theme-tokens.md` "Fonts" | yes | `pnpm --filter @fluxkit/storefront test` (`config/fonts.spec.ts`) |
 | 7 | Logo, browser icons, theme colour, default social picture | `apps/storefront/src/config/brand.ts` with the files in `apps/storefront/public/` (for example a new `public/brand/` folder); contract `docs/contracts/branding.md`. Defaults: text logo, no icon, no `theme-color`, no `og:image` | yes | `pnpm --filter @fluxkit/storefront test` (`config/brand.spec.ts`: the named files exist; its one test marked TEMPLATE-DEFAULT CHECK pins upstream's empty values: delete it in the fork. Every other spec already runs once with a filled config, `vitest.brand-fork.config.ts`) |
 | 8 | Light/dark default and the theme switch | `apps/storefront/src/config/theme.ts` (`defaultMode`, `showToggle`) | **no** | - |
-| 9 | Admin colours, radii or font different from the shop | `packages/theme/src/admin-overrides.css` (ADR 0047); empty = the admin follows the shop | yes | `pnpm --filter @fluxkit/admin test` |
+| 9 | Admin colours, radii or font different from the shop | `packages/theme/src/admin-overrides.css` (ADR 0047; light rule only). Empty = the admin follows the shop: the light rule of step 4 reaches it. A neutral admin restates the template's values (`tokens.css`, light block) of the tokens step 4 changed. A font token of step 4 with `var(--font-...)` must be restated here without it (the admin has no `next/font`; `theme.spec.ts` names it) | yes | `pnpm --filter @fluxkit/admin test`, `pnpm --filter @fluxkit/theme test` (contrast pairs on the admin's effective values) |
 | 10 | Admin name and favicon | `app.name` and `app.documentTitle` (keep `{page}`) in `apps/admin/src/messages-overrides/uk.json` and `apps/admin/src/messages-overrides/en.json` (flat key -> text over `apps/admin/src/messages/`; a key no message file has, or an empty value, stops the build; `apps/admin/README.md`); a new `favicon.svg` (or `.png`, `.ico`) in a new `apps/admin/public/` folder | yes | `pnpm --filter @fluxkit/admin test` (`build-output.spec.ts`) |
 | 11 | Sender name in mail (the shop name in mail) | `EMAIL_FROM` display name in the environment (`docs/contracts/config.md`) | environment | API boot refuses a malformed value |
 | 12 | Home page pictures | replace `apps/storefront/public/home/hero.svg` (640 x 480) with the same name and size, or point `apps/storefront/src/config/home.ts` at a new file; the home banners are edited in the admin (Storefront -> Home banners); the static `config` banners use `apps/storefront/public/home/banner-1.svg` to `banner-3.svg` (640 x 320) | pictures yes (replace in place), `home.ts` **no** | `pnpm --filter @fluxkit/storefront test` (`config/home.spec.ts`: file exists, `viewBox` equals the size) |
@@ -74,6 +75,7 @@ Upstream creates these once and never edits them again, so merging upstream neve
 - `apps/storefront/src/config/custom-sections.ts` (no custom home section)
 - `apps/storefront/src/components/cards/custom.ts` (no card of the fork's own; `docs/contracts/card-registry.md`)
 - `apps/storefront/src/config/slots.tsx` (no slot component; `docs/contracts/slots.md`)
+- `packages/theme/src/brand-overrides.css` (no rules)
 - `packages/theme/src/admin-overrides.css` (no rules)
 - `apps/admin/src/messages-overrides/uk.json`, `apps/admin/src/messages-overrides/en.json` (`{}`)
 - files a fork adds: its pictures under `apps/storefront/public/`, the admin favicon in `apps/admin/public/`
@@ -123,7 +125,7 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   files, listed per slot, rendered in order with a plain view model (locale, translator, the slot's data); empty slots render nothing.
   - `header.top`: an announcement bar inside the header, above its row. Below `lg` it is sticky with the header, which grows by the bar's
     height, while `scroll-padding-top` (80 px, `apps/storefront/src/app/globals.css`) does not: keep the bar short, show it only from `lg`
-    (`max-lg:hidden`), or raise `scroll-padding-top` there (a core edit; no storefront overrides stylesheet yet).
+    (`max-lg:hidden`), or raise `scroll-padding-top` there (a core edit: `brand-overrides.css` holds token values only).
   - `product-card.badges`, `product-card.actions`: badges in a row above the brand and title, actions in the image's bottom right corner
     (`grid`; the availability badge keeps the top left) or at the end of the price row (`list`) of the built-in cards. An action is a control
     of its own (a client island's button, not a second link to the product), with an opaque background, an accessible name with the title and
@@ -163,11 +165,15 @@ file, or ask upstream for an extension point (`AGENTS.md` section 17).
   `apps/storefront/src/components/cards/custom.ts` (contract `docs/contracts/card-registry.md`); the catalog's `?view=list` switch ships in the template.
   Tests in the fork (after `pnpm build`, section 0): delete the upstream-only `apps/storefront/src/components/cards/custom.upstream.spec.ts` (it pins the empty registry); nothing else. The specs that pin the built-in cards render them with the template's defaults
   (`apps/storefront/src/test-support/template-defaults.ts`), and upstream runs the suite with both cards overridden (`apps/storefront/vitest.brand-fork.config.ts` and `apps/storefront/vitest.home-fork.config.ts`).
-- **Not yet available**: a storefront tokens overrides file (colours are still edited in the upstream `tokens.css`, section 1 step 4).
 
 ## 4. Known limits
 
-- Storefront colours live in the upstream `tokens.css` (step 4): no storefront overrides file yet.
+- Mail colours and the browser theme colour are literal copies in upstream files (step 5): a rebrand edits `packages/theme/src/email-theme.ts`
+  and `packages/theme/src/theme-color.ts` by hand (their specs print the values).
+- The admin takes the light rule of the storefront overrides: a neutral admin restates every changed token in `admin-overrides.css` (step 9),
+  and a filled overrides file adds its rules to the admin's CSS too (about +2.3 KB raw, +0.4 KB gzip for the A1 rebrand).
+- `packages/theme/vitest.brand-fork.config.ts` runs the theme specs on upstream's fixtures over the fork's `tokens.css`: green for a fork that
+  follows step 4; a fork that still edits `tokens.css` may see it fail naming `packages/theme/src/fork-fixture/`.
 - A local picture in a slot component goes through the internal `LocalPicture` (section 3, UI slots): no contract-safe way yet.
 - Mail has no logo; mail buttons keep the scale radius (`emailTheme.radius`).
 - Admin headings do not follow the heading roles; the admin shows its name as text (no image logo).

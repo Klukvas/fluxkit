@@ -137,13 +137,33 @@ function forbiddenOverrideRules(css: string): string[] {
 }
 
 describe("the fork-owned admin overrides (ADR 0047)", () => {
-  it("imports admin-overrides.css last, after the shared tokens and the Tailwind mapping", () => {
+  it("imports admin-overrides.css last, after the shared tokens, the Tailwind mapping and the shop's overrides", () => {
+    // The admin follows the shop (ADR 0047 decision 1): the storefront's fork-owned `brand-overrides.css` comes before the
+    // admin's own overrides, which win for the admin alone (PR-I2a, option B).
     expect(cssImports(readFileSync(join(appRoot, "src", "styles.css"), "utf8"))).toEqual([
       "tailwindcss",
       "@fluxkit/theme/tokens.css",
       "@fluxkit/theme/tailwind.css",
+      "@fluxkit/theme/brand-overrides.css",
       "@fluxkit/theme/admin-overrides.css",
     ]);
+  });
+
+  it("would still pass the built-CSS check with a filled shop overrides file: its dark rule never matches the light page, its media rule is the system one", () => {
+    // The storefront overrides may hold `[data-theme="dark"]` and the system media rule; neither matches `data-theme="light"`.
+    // The check of the built CSS above allows a colour-scheme media rule only for `[data-theme=system]`: a fork's filled file
+    // (the theme package's fork fixture) passes it.
+    const filled = withoutComments(
+      readFileSync(join(themeSource, "fork-fixture", "brand-overrides.css"), "utf8"),
+    );
+    const blocks = colorSchemeMediaBlocks(filled);
+    expect(blocks.length).toBeGreaterThan(0);
+    for (const block of blocks) {
+      for (const match of block.matchAll(/([^{}]+)\{/g)) {
+        expect((match[1] as string).trim().replace(/["']/g, "")).toBe("[data-theme=system]");
+      }
+    }
+    expect(filled).toMatch(/\[data-theme="dark"\]\s*\{/);
   });
 
   it("is a file of @fluxkit/theme that adds no dark or OS-following rule", () => {

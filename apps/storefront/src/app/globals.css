@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@fluxkit/theme/tokens.css";
 @import "@fluxkit/theme/tailwind.css";
+/* Fork-owned token overrides, empty upstream, LAST so their rules win over tokens.css (docs/contracts/theme-tokens.md). */
+@import "@fluxkit/theme/brand-overrides.css";
 /* Tailwind must also scan the shared UI library for class names. */
 @source "../../../../packages/ui/src";
 

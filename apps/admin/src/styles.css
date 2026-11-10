@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@fluxkit/theme/tokens.css";
 @import "@fluxkit/theme/tailwind.css";
+/* The shop's fork-owned token overrides: the admin follows the shop (ADR 0047); only their light rule matches this page. */
+@import "@fluxkit/theme/brand-overrides.css";
 /* Fork-owned, empty upstream, LAST so a fork can give the admin alone other token values (ADR 0047). */
 @import "@fluxkit/theme/admin-overrides.css";
 /* Tailwind must also scan the shared UI library for class names. */

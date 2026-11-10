@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run && vitest run -c vitest.brand-fork.config.ts"
   },
   "devDependencies": {
     "@types/node": "26.6.5",
@@ -22,7 +22,8 @@
     },
     "./tokens.css": "./src/tokens.css",
     "./tailwind.css": "./src/tailwind.css",
-    "./admin-overrides.css": "./src/admin-overrides.css"
+    "./admin-overrides.css": "./src/admin-overrides.css",
+    "./brand-overrides.css": "./src/brand-overrides.css"
   },
   "files": [
     "dist",
