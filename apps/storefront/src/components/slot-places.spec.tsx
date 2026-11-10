@@ -205,20 +205,30 @@ describe("product-card.badges and product-card.actions", () => {
   const listBadge = renderToStaticMarkup(<Badge variant="neutral">new:id-a:list</Badge>);
   const action = '<a href="/uk/compare?id=id-a">compare</a>';
 
-  it("renders the badges in a row under the image and the actions over the image's top right corner of the grid card", () => {
+  it("renders the badges in a row under the image and the actions in the image's bottom right corner of the grid card", () => {
     const empty = renderCard("grid");
     fill({ "product-card.badges": [New], "product-card.actions": [Compare] });
-    const withBadges = insertBefore(
-      empty,
-      '<a class="relative z-10',
-      `<div class="flex flex-wrap gap-1">${badge}</div>`,
-    );
+    // The empty card: `<article …>`, the image, then the brand link (the card of `card` has one).
+    const imageStart = empty.indexOf(">") + 1;
+    const imageEnd = empty.indexOf('<a class="relative z-10');
+    const image = empty.slice(imageStart, imageEnd);
+    expect(image.length).toBeGreaterThan(0);
     expect(renderCard("grid")).toBe(
-      insertBefore(
-        withBadges,
-        "</article>",
-        `<div class="absolute top-5 right-5 z-10 flex gap-1">${action}</div>`,
-      ),
+      empty.slice(0, imageStart) +
+        `<div class="relative flex flex-col">${image}<div class="absolute right-2 bottom-2 z-10 flex gap-1">${action}</div></div>` +
+        `<div class="flex flex-wrap gap-1">${badge}</div>` +
+        empty.slice(imageEnd),
+    );
+  });
+
+  it("keeps the availability badge where it is (top left, core) when the grid card has actions", () => {
+    fill({ "product-card.actions": [Compare] });
+    const html = renderCard("grid");
+    expect(html).toMatch(
+      /class="[^"]*pointer-events-none absolute top-5 left-5[^"]*">§availability\.low_stock/,
+    );
+    expect(html.indexOf("absolute right-2 bottom-2")).toBeLessThan(
+      html.indexOf("absolute top-5 left-5"),
     );
   });
 

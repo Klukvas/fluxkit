@@ -90,7 +90,9 @@ describe("a fork's filled UI slots", () => {
       '<section aria-labelledby="fork-footer-contacts">',
       '<section aria-labelledby="fork-footer-newsletter" data-fork-newsletter="">',
     ]);
-    expect(footer).toContain('<a href="/en/about">' + messages["shopPages.about.title"] + "</a>");
+    expect(footer).toContain(
+      `<a class="whitespace-normal" href="/en/about">${messages["shopPages.about.title"]}</a>`,
+    );
     for (const link of footerLinks) expect(footer).toContain(`href="/en${link.href}"`);
     expect(footer).toContain('<a href="mailto:hello@example.com">hello@example.com</a>');
     expect(footer).toContain("Our newsletter is coming soon.");
@@ -131,7 +133,7 @@ describe("a fork's filled UI slots", () => {
       );
       expect(html, kind).toContain('<div class="flex flex-wrap gap-1"><span');
       expect(html, kind).toContain(">New</span></div>");
-      expect(html, kind).toContain('aria-label="Details: Desk lamp"');
+      expect(html, kind).toContain('aria-label="Save Desk lamp" aria-pressed="false"');
     }
   });
 });

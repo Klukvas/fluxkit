@@ -10,12 +10,12 @@ import type { CardProps } from "./types";
  * The `grid` card kind (the default): one product in a grid of cards. The whole card is one click target (the title link
  * stretches over it); the brand link sits above that layer so it stays separately clickable. Its markup is exactly the
  * product card of before the registry (`registry.spec.tsx` compares them) while the card slots of `config/slots.tsx` are
- * empty: their badges render in a row under the image, their actions over the image's top right corner.
+ * empty: their badges render in a row under the image, their actions in the image's bottom right corner.
  */
 export function GridCard({ card, headingLevel: Heading, eager, locale, t }: CardProps) {
   const { availability } = card;
-  // The card slots (`config/slots.tsx`). Each sits next to an element that is always there (the image, the availability
-  // badge's place), so an empty slot adds no child: the same markup and React payload as without slots.
+  // The card slots (`config/slots.tsx`). Each takes the place of an element that is always there (the image), so an empty
+  // slot adds no child: the same markup and React payload as without slots.
   const slotProps = { card, kind: "grid", locale, t };
   const badges = renderSlot("product-card.badges", slotProps, slots);
   const actions = renderSlot("product-card.actions", slotProps, slots);
@@ -29,6 +29,18 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
       eager={eager}
     />
   );
+  // With actions, the image gets a frame of its own and the actions sit in its bottom right corner: away from the availability
+  // badge (top left, core) at every width, above the card's link layer (`z-10`), and before the brand and title in the focus
+  // order, as they come first on screen. Without actions the image stays the card's direct child, as before slots.
+  const imageBlock =
+    actions === null ? (
+      image
+    ) : (
+      <div className="relative flex flex-col">
+        {image}
+        <div className="absolute right-2 bottom-2 z-10 flex gap-1">{actions}</div>
+      </div>
+    );
   const availabilityBadge =
     availability !== null && availability.badge ? (
       // Over the image's corner (after the title in reading order): the text column keeps one shape on every card.
@@ -42,10 +54,10 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
   return (
     <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       {badges === null ? (
-        image
+        imageBlock
       ) : (
         <>
-          {image}
+          {imageBlock}
           <div className="flex flex-wrap gap-1">{badges}</div>
         </>
       )}
@@ -80,15 +92,7 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
           <VisuallyHidden>{availability.text}</VisuallyHidden>
         ) : null}
       </div>
-      {actions === null ? (
-        availabilityBadge
-      ) : (
-        <>
-          {availabilityBadge}
-          {/* Over the image's top right corner, above the card's link layer (`z-10`); each action brings its own opaque surface. */}
-          <div className="absolute top-5 right-5 z-10 flex gap-1">{actions}</div>
-        </>
-      )}
+      {availabilityBadge}
     </article>
   );
 }

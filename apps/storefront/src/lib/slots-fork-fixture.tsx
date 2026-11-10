@@ -8,9 +8,11 @@ import type {
   SlotLink,
   SlotRegistry,
 } from "./slots";
+import { ForkSaveButton } from "./slots-save-button-fork-fixture";
 
 /**
- * A client fork's `config/slots.tsx` as it would write it, for `vitest.home-fork.config.ts` only (its texts are in
+ * A client fork's `config/slots.tsx` as it would write it, for the fork runs `vitest.home-fork.config.ts` and
+ * `vitest.brand-fork.config.ts` only (its texts are in
  * `messages-extra-fork-fixture.{uk,en}.json`): every slot filled, so the unit suite runs again as such a fork has it and a spec
  * that depends on empty slots fails upstream, not in a fork (plan 2026-11-08-design-changeability.md, S1 and section 1,
  * request 5: a four-column footer with config and new files only). Server components, token classes, translated texts.
@@ -32,19 +34,24 @@ function ForkNewBadge({ t }: ProductCardSlotProps) {
   return <Badge variant="neutral">{t("custom.slots.badge")}</Badge>;
 }
 
-/** An action above the card's link layer: its own opaque surface and an accessible name with the product's title. */
-function ForkDetailsAction({ card, t }: ProductCardSlotProps) {
+/**
+ * An action: a control of its own (not a second link to the product: the title stays the card's link), a client island
+ * rendered with plain, translated props; its own opaque surface, a 44 px target and an accessible name with the title.
+ */
+function ForkSaveAction({ card, t }: ProductCardSlotProps) {
   return (
-    <Link
-      href={card.href}
-      aria-label={t("custom.slots.details", { title: card.title })}
-      className="inline-flex min-h-11 items-center rounded-control bg-background px-2 text-sm text-foreground shadow-card"
-    >
-      {t("custom.slots.detailsShort")}
-    </Link>
+    <ForkSaveButton
+      label={t("custom.slots.save", { title: card.title })}
+      text={t("custom.slots.saveShort")}
+    />
   );
 }
 
+/**
+ * A column of links. The footer's own rules (`.fk-site-footer nav`, `ul`, `ul a` in app/globals.css) style these too: the list
+ * is a wrapping row and each link `whitespace-nowrap`. In a column the list stacks (`flex-col`) and long names such as the
+ * legal pages wrap (`whitespace-normal`): utilities win over those component rules.
+ */
 function LinkColumn({ label, links }: { label: string; links: readonly SlotLink[] }) {
   if (links.length === 0) return null;
   return (
@@ -53,7 +60,9 @@ function LinkColumn({ label, links }: { label: string; links: readonly SlotLink[
       <ul className="flex-col">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href}>{link.label}</Link>
+            <Link href={link.href} className="whitespace-normal">
+              {link.label}
+            </Link>
           </li>
         ))}
       </ul>
@@ -102,6 +111,6 @@ function ForkNewsletterColumn({ t }: FooterColumnsSlotProps) {
 export const slots: SlotRegistry = {
   "header.top": [ForkAnnouncement],
   "product-card.badges": [ForkNewBadge],
-  "product-card.actions": [ForkDetailsAction],
+  "product-card.actions": [ForkSaveAction],
   "footer.columns": [ForkShopColumn, ForkLegalColumn, ForkContactsColumn, ForkNewsletterColumn],
 };
