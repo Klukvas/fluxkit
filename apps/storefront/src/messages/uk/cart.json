@@ -45,7 +45,7 @@
   "cart.summary.subtotal": "Проміжна сума",
   "cart.summary.total": "Разом",
   "cartDelivery.note": "Доставка розраховується при оформленні замовлення",
-  "cart.checkout": "Оформити замовлення",
+  "cart.checkout": "Оформлення",
   "cart.checkout.saving": "Зберігаємо зміни…",
   "cart.leftFailure": "Зміну кількості, зроблену перед виходом з кошика, не збережено: {reason}",
   "cart.checkout.blocked": "Виправте або видаліть позначені товари, щоб продовжити.",
