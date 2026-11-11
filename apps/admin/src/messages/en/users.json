@@ -41,7 +41,7 @@
   "user.list.emptyTitle": "No admin users",
   "user.list.emptyBody": "The list is empty. Create an owner on the server with pnpm admin:create.",
   "user.list.pagerLabel": "Pages of admin users",
-  "user.list.pageRange": "Users {from} to {to} of {total}",
+  "user.list.pageRange": "{from}–{to} of {total}",
   "user.list.previous": "Previous page",
   "user.list.next": "Next page",
   "user.create.summaryTitle": "The user was not created",

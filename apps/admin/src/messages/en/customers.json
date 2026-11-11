@@ -24,7 +24,7 @@
   "customer.list.noMatchTitle": "No customer matches",
   "customer.list.noMatchBody": "No customer's email starts with this text. Check it, or clear the search.",
   "customer.list.pagerLabel": "Pages of the customer list",
-  "customer.list.pageRange": "Customers {from} to {to} of {total}",
+  "customer.list.pageRange": "{from}–{to} of {total}",
   "customer.list.previous": "Previous page",
   "customer.list.next": "Next page",
   "customer.detail.title": "Customer",

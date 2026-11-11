@@ -352,7 +352,7 @@ test("synonym groups: the empty state and a page of groups (the list answered by
   await page.goto(`${SPA}/catalog/search/synonyms`);
   const main = page.getByRole("main");
   await expect(main.getByRole("row", { name: /first, page/ })).toBeVisible();
-  await expect(main.getByText("1 to 1 of 120")).toBeVisible();
+  await expect(main.getByText("1–1 of 120")).toBeVisible();
   await main.getByRole("link", { name: "Next page" }).click();
   await expect(page).toHaveURL(/offset=50/);
   await expect(main.getByRole("row", { name: /second, page/ })).toBeVisible();
