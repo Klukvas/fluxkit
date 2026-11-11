@@ -3,6 +3,8 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Storefront account orders page (plan `docs/plans/2026-11-11-improve-ui-account-orders-back-link.md`; markup only): the link back to the account moves from the bottom of the page to under the title, underlined, and reads "Back to my account" / "Назад до акаунта", like the Profile and Privacy and data pages.
+- Admin area sub-navigation (plan `docs/plans/2026-11-11-improve-ui-admin-subnav-targets.md`; classes only): the links above the dictionaries, shipping, e-mail, search and personal data screens are at least 24 px high, 44 px on a touch screen (one shared class, `apps/admin/src/views/sub-nav.ts`).
 - Storefront `uk` copy (plan `docs/plans/2026-11-11-improve-ui-uk-cart-checkout-label.md`; messages only): the cart's checkout button reads "Оформлення" (the checkout step's name) instead of "Оформити замовлення", which stays on the checkout page's final submit button. A fork that overrides `cart.checkout` keeps its value.
 - Admin Stock tab (plan `docs/plans/2026-11-11-improve-ui-admin-stock-radios.md`; classes only): the adjustment mode radios use the admin's radio pattern (20 px, `primary` accent, 44 px rows) like every other admin radio.
 - UI quality pass (classes and one admin view only: no API, schema, configuration variable, dependency or token change): numbers and money in end-aligned `DataTable` columns, the cart summary and the checkout summary use tabular digits; the admin's page loading spinner appears only after 200 ms (`LOADING_REVEAL_DELAY_MS`), so a fast read no longer flashes it.
