@@ -16,5 +16,11 @@
     "selector": "home.hero-picture",
     "property": "screenshot",
     "reason": "PR-E2 B4: neutral grey hero picture replaces the old demo picture (same file name and size); only the picture is masked, computed styles stay identical"
+  },
+  {
+    "page": "cart",
+    "selector": "cart.checkout-link",
+    "property": "screenshot",
+    "reason": "PR 261 (plan 2026-11-11-improve-ui-uk-cart-checkout-label): the uk checkout link reads \"Оформлення\" instead of \"Оформити замовлення\"; only the link is masked, computed styles stay identical"
   }
 ]
