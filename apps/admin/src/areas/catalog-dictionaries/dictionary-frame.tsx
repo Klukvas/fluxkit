@@ -3,6 +3,7 @@ import { useEffect, useRef, type ReactNode, type Ref } from "react";
 import { Link } from "react-router";
 import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
+import { subNavLinkClass } from "../../views/sub-nav";
 import { UnknownResultNotice } from "./form-parts";
 
 /** The five dictionary screens, in the order of the sub-navigation (all of them need `catalog.read`). */
@@ -28,11 +29,7 @@ export function DictionaryNav({ t, current }: { t: Translator; current: Dictiona
             <Link
               to={PATHS[screen.id]}
               aria-current={screen.id === current ? "page" : undefined}
-              className={
-                screen.id === current
-                  ? "font-semibold text-foreground underline underline-offset-4"
-                  : "text-muted-foreground underline underline-offset-4"
-              }
+              className={subNavLinkClass(screen.id === current)}
             >
               {t(screen.titleKey)}
             </Link>

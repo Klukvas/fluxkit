@@ -108,7 +108,15 @@ export function AccountOrdersView({
 }) {
   return (
     <div className="flex flex-col gap-6">
-      <h1 className={textStyles.pageTitle}>{t("account.orders.title")}</h1>
+      <div className="flex flex-col gap-2">
+        <h1 className={textStyles.pageTitle}>{t("account.orders.title")}</h1>
+        <Link
+          href={localizedHref(locale, "/account")}
+          className={`self-start underline underline-offset-4 ${focusRing}`}
+        >
+          {t("account.profile.back")}
+        </Link>
+      </div>
       {state.status === "loading" || state.status === "signedOut" ? (
         <div className="flex flex-col gap-4" aria-busy="true">
           <Spinner label={t("account.orders.loading")} />
@@ -182,9 +190,6 @@ export function AccountOrdersView({
           />
         </>
       ) : null}
-      <Link href={localizedHref(locale, "/account")} className={`self-start ${focusRing}`}>
-        {t("nav.account.account")}
-      </Link>
     </div>
   );
 }

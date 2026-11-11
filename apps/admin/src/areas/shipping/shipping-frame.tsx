@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
+import { subNavLinkClass } from "../../views/sub-nav";
 
 /** The two lists of the Shipping area, in the order of the sub-navigation (both need shipping.manage). */
 export const SHIPPING_SCREENS = [
@@ -22,11 +23,7 @@ export function ShippingNav({ t, current }: { t: Translator; current: ShippingSc
             <Link
               to={PATHS[screen.id]}
               aria-current={screen.id === current ? "page" : undefined}
-              className={
-                screen.id === current
-                  ? "font-semibold text-foreground underline underline-offset-4"
-                  : "text-muted-foreground underline underline-offset-4"
-              }
+              className={subNavLinkClass(screen.id === current)}
             >
               {t(screen.titleKey)}
             </Link>

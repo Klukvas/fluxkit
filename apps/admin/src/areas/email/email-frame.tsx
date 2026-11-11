@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
+import { subNavLinkClass } from "../../views/sub-nav";
 import { describeErrorCode } from "./email-view";
 
 export const linkClass = "font-medium text-foreground underline underline-offset-4";
@@ -29,11 +30,7 @@ export function EmailNav({ t, current }: { t: Translator; current: EmailScreenId
             <Link
               to={PATHS[screen.id]}
               aria-current={screen.id === current ? "page" : undefined}
-              className={
-                screen.id === current
-                  ? "font-semibold text-foreground underline underline-offset-4"
-                  : "text-muted-foreground underline underline-offset-4"
-              }
+              className={subNavLinkClass(screen.id === current)}
             >
               {t(screen.labelKey)}
             </Link>
