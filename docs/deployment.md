@@ -165,6 +165,7 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 3. Compose recreates the changed containers: `migrate` runs the new migrations while the old API is still serving, then the new API replaces the old one. Expect a few seconds of `502` from the edge while the single API restarts: **the example has no zero-downtime rollout** (one instance is required today). Additive migrations (the project's rule) keep the old API working while they run.
 4. If `migrate` fails, Compose does not start the new API (it waits for `service_completed_successfully`). Whether the old API container is still serving at that moment was not tested here: plan for downtime. Read `docker compose ... logs migrate`, fix, run `up` again.
 5. Rollback: stop the API, run the newest `apps/api/drizzle/NNNN_name.down.sql` against the database (`docker compose ... exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 < apps/api/drizzle/NNNN_name.down.sql`), one migration at a time from the newest, then start the previous image tag. The migrator refuses to run code older than the database.
+6. Old images stay on the host after an update (each release built there adds about 1.5 GB of images plus build cache). Keep the running tag and the previous one for rollback, remove older `fluxkit-*` tags (section "Disk space").
 
 ## Backups
 
@@ -179,6 +180,17 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 - Every container logs to stdout/stderr; the Compose file rotates them (`json-file`, 5 files of 20 MB per container). Read them with `docker compose ... logs -f api`.
 - The API logs errors and job summaries, never passwords, tokens, payment bodies or mail contents (ADR 0031, 0032). nginx access logs contain client IP addresses and URLs (personal data under GDPR): keep the rotation short or ship them to a store with a retention policy. Guest order links keep their token in the URL fragment, which never reaches the server.
 - No metrics or tracing exist. Watch: container health (`docker compose ps`), `migrate` exit codes, `503` from `/media` uploads (disk full), free disk space of the media and Postgres volumes.
+
+## Disk space
+
+The Compose file limits container logs only. Nothing else in the example frees space by itself:
+
+- **Images**: every release built or pulled on the host stays until removed. Keep the running `FLUXKIT_IMAGE_TAG` and the previous one (rollback); remove older `fluxkit-api|storefront|edge` tags with `docker image rm`. Never remove an image a container still uses, and never run `docker image prune -a` or `docker system prune` on a shared host: they also remove other projects' images.
+- **Build cache**: building on the host leaves several GB of cache. `docker builder prune --force --filter until=168h` drops what was not used for a week (the cache is shared by every build on the host).
+- **Backups** on the host grow with the database and media; keep a fixed number of days and copy them off the host.
+- **Watch free space**: a full disk stops uploads (`503` from `/media`) and, worse, Postgres. A simple scheduled check of `df` with a warning threshold (for example 5 GB) is enough on a small host; send the warning somewhere a person reads it.
+
+The test server's scripts and timers for these points are described in `docs/plans/2026-11-10-hetzner-first-deploy.md`, section 15.
 
 ## Production readiness checklist
 
