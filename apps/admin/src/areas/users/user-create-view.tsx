@@ -7,15 +7,9 @@ import { PATHS } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import { EMAIL_MAX_LENGTH, type CreateField, type CreateUserValues } from "./user-form";
 import type { LookupResult } from "./user-lookup";
-import {
-  DescriptorText,
-  NewPasswordField,
-  RoleBadge,
-  RoleChoices,
-  focusClass,
-  linkClass,
-} from "./user-parts";
+import { DescriptorText, NewPasswordField, RoleBadge, RoleChoices, focusClass } from "./user-parts";
 import { userHref } from "./user-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The create form (plan step 10): email, role (each role with what it may do), the initial password with live policy
@@ -167,10 +161,10 @@ export function CreatedPanel({
         </div>
       </Alert>
       <div className="flex flex-wrap items-center gap-4">
-        <Link to={userHref(user.id)} className={linkClass}>
+        <Link to={userHref(user.id)} className={standaloneLinkClass}>
           {t("user.created.openUser")}
         </Link>
-        <Link to={PATHS.users} className={linkClass}>
+        <Link to={PATHS.users} className={standaloneLinkClass}>
           {t("user.created.toList")}
         </Link>
         <Button variant="secondary" onClick={onCreateAnother}>
@@ -202,7 +196,7 @@ export function CreateUnknownView({
           <p>{t(`user.create.unknown.${lookup.kind}`)}</p>
           {lookup.kind === "found" ? (
             <p>
-              <Link to={userHref(lookup.user.id)} className={linkClass}>
+              <Link to={userHref(lookup.user.id)} className={standaloneLinkClass}>
                 {t("user.create.unknownOpen")}
               </Link>
             </p>
@@ -217,7 +211,7 @@ export function CreateUserScreen({ t, children }: { t: Translator; children: Rea
   return (
     <div className="flex flex-col gap-6">
       <p>
-        <Link to={PATHS.users} className={linkClass}>
+        <Link to={PATHS.users} className={standaloneLinkClass}>
           {t("user.back")}
         </Link>
       </p>

@@ -2,8 +2,8 @@ import { Button, Field, Input, LiveRegion, type Locale, type Translator } from "
 import { useRef, type ReactNode } from "react";
 import { Link } from "react-router";
 import { PageHeading } from "../../views/status-views";
-import { helpLinkClass } from "./article-view";
 import { articlesByTopic, helpArticlePath, type HelpArticle, type HelpLibrary } from "./help-model";
+import { standaloneLinkClass } from "../../views/links";
 
 export interface HelpIndexViewProps {
   t: Translator;
@@ -20,7 +20,7 @@ export interface HelpIndexViewProps {
 function ArticleItem({ locale, article }: { locale: Locale; article: HelpArticle }) {
   return (
     <li className="flex flex-col gap-1">
-      <Link to={helpArticlePath(article.id)} className={helpLinkClass}>
+      <Link to={helpArticlePath(article.id)} className={standaloneLinkClass}>
         {article.title[locale]}
       </Link>
       <p className="max-w-prose text-sm text-muted-foreground">{article.summary[locale]}</p>

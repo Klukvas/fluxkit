@@ -6,7 +6,6 @@ import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 
-export const linkClass = "font-medium text-foreground underline underline-offset-4";
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 

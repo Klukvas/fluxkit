@@ -14,8 +14,9 @@ import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { StatusLine, linkClass, localeLabel } from "./search-frame";
+import { StatusLine, localeLabel } from "./search-frame";
 import type { SynonymListQuery } from "./synonym-list-query";
+import { inlineLinkClass, standaloneLinkClass } from "../../views/links";
 
 export type SynonymListState =
   | { status: "loading" }
@@ -73,7 +74,7 @@ export function SynonymApplyNote({ t, uiLocale, queue, locales }: SynonymIntroPr
         {t("search.synonyms.queueNow", {
           depth: new Intl.NumberFormat(uiLocale).format(queue.depth),
         })}{" "}
-        <Link to={PATHS.search} className={linkClass}>
+        <Link to={PATHS.search} className={inlineLinkClass}>
           {t("search.synonyms.openStatus")}
         </Link>
       </p>
@@ -173,7 +174,7 @@ export function SynonymResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("search.synonyms.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("search.synonyms.firstPage")}
           </Link>
         </div>
@@ -260,12 +261,16 @@ export function SynonymPager({
         {t("search.synonyms.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("search.synonyms.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("search.synonyms.next")}
         </Link>
       ) : null}

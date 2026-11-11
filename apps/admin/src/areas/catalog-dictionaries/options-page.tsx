@@ -30,7 +30,6 @@ import {
   DictionaryPage,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "./dictionary-frame";
 import { ConfirmDelete } from "./form-dialog";
@@ -42,6 +41,7 @@ import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { standaloneLinkClass } from "../../views/links";
 
 const DEFAULT_LIMIT = 50;
 
@@ -64,7 +64,7 @@ function OptionsList() {
       id: "code",
       header: t("dict.option.columnCode"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.optionDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.optionDetail, { id: row.id })} className={standaloneLinkClass}>
           {row.code}
         </Link>
       ),
@@ -148,13 +148,16 @@ function OptionCreate() {
       {created !== null ? (
         <FocusedPanel title={t("dict.option.created", { code: created.code })}>
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.optionDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.optionDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("dict.option.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.options} className={linkClass}>
+            <Link to={PATHS.options} className={standaloneLinkClass}>
               {t("dict.form.backToList")}
             </Link>
           </p>

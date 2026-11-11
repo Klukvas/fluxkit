@@ -1,4 +1,11 @@
-import { Alert, Container, textStyles, type Locale, type Translator } from "@fluxkit/ui";
+import {
+  Alert,
+  Breadcrumbs,
+  Container,
+  textStyles,
+  type Locale,
+  type Translator,
+} from "@fluxkit/ui";
 import Link from "next/link";
 import {
   LEGAL_PLACEHOLDER_MARKER,
@@ -128,7 +135,17 @@ export function LegalPage({
   const intro = t(`legal.${slug}.intro`);
   return (
     <Container className="flex flex-col gap-6 py-8">
-      <h1 className={textStyles.pageTitle}>{t(`legal.${slug}.title`)}</h1>
+      {/* Breadcrumbs like the shop pages listed next to these in the footer (council decision 3). */}
+      <div className="flex flex-col gap-4">
+        <Breadcrumbs
+          label={t("breadcrumbs.label")}
+          items={[
+            { label: t("breadcrumbs.home"), href: localizedHref(locale, "/") },
+            { label: t(`legal.${slug}.title`) },
+          ]}
+        />
+        <h1 className={textStyles.pageTitle}>{t(`legal.${slug}.title`)}</h1>
+      </div>
       {/* The box follows the text, not a message of its own: it goes away only when the shop replaced the text. */}
       {intro.includes(LEGAL_PLACEHOLDER_MARKER) ? (
         <Alert variant="warning" title={t("legal.placeholder.title")}>

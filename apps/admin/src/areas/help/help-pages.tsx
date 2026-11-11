@@ -11,7 +11,7 @@ import { PATHS } from "../../router/paths";
 import { useScreenAccess } from "../../router/screen-access";
 import { useSession } from "../../session/session-context";
 import { PageHeading } from "../../views/status-views";
-import { ArticleView, helpLinkClass } from "./article-view";
+import { ArticleView } from "./article-view";
 import { loadChecklistFacts, withManual } from "./checklist-model";
 import { useChecklistPreferences } from "./checklist-storage";
 import {
@@ -31,6 +31,7 @@ import {
   sectionsOf,
 } from "./help-model";
 import { MAX_QUERY_LENGTH, buildSearchIndex, searchArticles } from "./help-search";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The getting-started checklist with its data: the facts are read when it mounts (one read per fact, never repeated by
@@ -179,7 +180,7 @@ export function HelpArticlePage() {
         <PageHeading>{t("help.article.notFoundTitle")}</PageHeading>
         <p className="text-muted-foreground">{t("help.article.notFoundBody")}</p>
         <p>
-          <Link to={PATHS.help} className={helpLinkClass}>
+          <Link to={PATHS.help} className={standaloneLinkClass}>
             {t("help.article.allArticles")}
           </Link>
         </p>

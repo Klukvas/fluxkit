@@ -276,8 +276,10 @@ describe("SiteFooter follows config/footer.ts", () => {
       },
     });
     expect(html).toMatch(
-      /<nav aria-label="§footer\.nav\.label"><h2 class="[^"]*text-sm[^"]*px-2">§legal\.privacy\.title<\/h2><ul><li><a href="\/en\/legal\/privacy">/,
+      /<nav aria-label="§footer\.nav\.label"><h2 class="[^"]*text-sm[^"]*">§legal\.privacy\.title<\/h2><ul><li><a href="\/en\/legal\/privacy">/,
     );
+    // No start padding: the lists cancel their links' `px-2` (`-ms-2` in globals.css), so the heading and the link text line up.
+    expect(html).not.toMatch(/<h2 class="[^"]*\bpx-2\b/);
     expect(html.match(/<h2/g)).toHaveLength(1);
     expect(html).toContain("</nav><p>§footer.nav.label</p><form");
     expect(() => footer({ blocks: ["copyright"], navigation: { groups: [] } })).toThrow(

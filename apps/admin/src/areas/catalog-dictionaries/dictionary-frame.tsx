@@ -5,6 +5,7 @@ import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import { subNavLinkClass } from "../../views/sub-nav";
 import { UnknownResultNotice } from "./form-parts";
+import { standaloneLinkClass } from "../../views/links";
 
 /** The five dictionary screens, in the order of the sub-navigation (all of them need `catalog.read`). */
 export const DICTIONARY_SCREENS = [
@@ -16,8 +17,6 @@ export const DICTIONARY_SCREENS = [
 ] as const satisfies readonly { id: RouteId; titleKey: string }[];
 
 export type DictionaryId = (typeof DICTIONARY_SCREENS)[number]["id"];
-
-const linkClass = "font-medium text-foreground underline underline-offset-4";
 
 /** Sub-navigation of the area: a link to each dictionary, the current one marked with `aria-current`. */
 export function DictionaryNav({ t, current }: { t: Translator; current: DictionaryId }) {
@@ -69,7 +68,7 @@ export function DictionaryPage({
 export function BackLink({ to, label }: { to: string; label: string }) {
   return (
     <p>
-      <Link to={to} className={linkClass}>
+      <Link to={to} className={standaloneLinkClass}>
         {label}
       </Link>
     </p>
@@ -199,12 +198,10 @@ export function CreateUnknown({ t, listTo }: { t: Translator; listTo: string }) 
       <p className="font-semibold">{t("dict.unknown.title")}</p>
       <p>{t("dict.unknown.createBody")}</p>
       <p className="mt-2">
-        <Link to={listTo} className={linkClass}>
+        <Link to={listTo} className={standaloneLinkClass}>
           {t("dict.unknown.checkList")}
         </Link>
       </p>
     </div>
   );
 }
-
-export { linkClass };

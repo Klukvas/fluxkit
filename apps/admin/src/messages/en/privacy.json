@@ -35,7 +35,7 @@
   "personal.list.noMatchBody": "Choose another status or show all requests.",
   "personal.list.toLookup": "Look up by email",
   "personal.list.pagerLabel": "Pages of requests",
-  "personal.list.pageRange": "{from} to {to} of {total}",
+  "personal.list.pageRange": "{from}–{to} of {total}",
   "personal.list.previous": "Previous",
   "personal.list.next": "Next",
   "personal.lookup.intro": "Find out what the shop holds for an email address: the account, the guest orders and the stored mails. The address is sent in the request body, never in the page address, and the lookup is recorded in the audit log.",

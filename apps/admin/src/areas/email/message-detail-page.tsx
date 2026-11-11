@@ -10,7 +10,7 @@ import { createSingleFlight } from "../../lib/single-flight";
 import { useRefreshingResource } from "../../lib/use-refreshing-resource";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback } from "../../views/status-views";
-import { DialogError, EmailFrame, StatusLine, linkClass } from "./email-frame";
+import { DialogError, EmailFrame, StatusLine } from "./email-frame";
 import { describeEmailProblem } from "./email-errors";
 import { useCanManageEmail } from "./email-permissions";
 import type { MessageAction, MessageNotice } from "./message-actions";
@@ -20,6 +20,7 @@ import {
   MessageNoticeView,
   VariablesTable,
 } from "./message-detail-view";
+import { standaloneLinkClass } from "../../views/links";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -106,7 +107,7 @@ function MessageDetail({ id }: { id: string }) {
   return (
     <EmailFrame t={t} current="emailMessages" title={t("page.emailMessageDetail.title")}>
       <p>
-        <Link to={PATHS.emailMessages} className={linkClass}>
+        <Link to={PATHS.emailMessages} className={standaloneLinkClass}>
           {t("mail.detail.back")}
         </Link>
       </p>

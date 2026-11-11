@@ -28,7 +28,6 @@ import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { ResourceFallback } from "../../views/status-views";
 import { describe } from "../catalog-dictionaries/form-parts";
-import { linkClass } from "../catalog-dictionaries/dictionary-frame";
 import { CODE_PATTERN } from "../catalog-dictionaries/form-rules";
 import { carrierCodesOf, providerHref } from "./method-view";
 import {
@@ -42,6 +41,7 @@ import {
 import { CHECK_REASONS, safeProviderCodes } from "./shipping-errors";
 import { ShippingFrame } from "./shipping-frame";
 import { useCanManageShipping } from "./shipping-permissions";
+import { standaloneLinkClass } from "../../views/links";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -92,7 +92,7 @@ export function ProvidersView({ t, codes, partial, typed, onTyped }: ProvidersVi
           <ul className="flex flex-col gap-1">
             {codes.map((entry) => (
               <li key={entry}>
-                <Link to={providerHref(entry)} className={`${linkClass} break-all`}>
+                <Link to={providerHref(entry)} className={`${standaloneLinkClass} break-all`}>
                   {entry}
                 </Link>
               </li>
@@ -128,7 +128,7 @@ export function ProvidersView({ t, codes, partial, typed, onTyped }: ProvidersVi
         </Field>
         <p>
           {valid ? (
-            <Link to={providerHref(code)} className={linkClass}>
+            <Link to={providerHref(code)} className={standaloneLinkClass}>
               {t("ship.providers.open", { code })}
             </Link>
           ) : (
@@ -469,7 +469,7 @@ function ProviderScreen({ code }: { code: string }) {
   return (
     <ShippingFrame t={t} current="shippingProviders" title={t("ship.provider.title", { code })}>
       <p>
-        <Link to={PATHS.shippingProviders} className={linkClass}>
+        <Link to={PATHS.shippingProviders} className={standaloneLinkClass}>
           {t("ship.provider.back")}
         </Link>
       </p>

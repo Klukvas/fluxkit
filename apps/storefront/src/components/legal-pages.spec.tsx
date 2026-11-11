@@ -126,9 +126,13 @@ describe("a legal page", () => {
   it("renders every page without hardcoded text and with one h1", () => {
     for (const page of legalPages) {
       const html = renderToStaticMarkup(<LegalPage slug={page.slug} locale="en" t={t} />);
-      // The cookie names are technical identifiers, not words.
-      const withoutNames = cookieTable.reduce((text, row) => text.replace(row.name, ""), html);
+      // The cookie names are technical identifiers, not words; the breadcrumb separator is decorative (as in shop-pages.spec).
+      const withoutNames = cookieTable
+        .reduce((text, row) => text.replace(row.name, ""), html)
+        .replace(/<span aria-hidden="true">\/<\/span>/g, "");
       expect(leftoverText(withoutNames), page.slug).toBe("");
+      expect(html, page.slug).toContain('aria-label="§breadcrumbs.label"');
+      expect(html, page.slug).toContain('href="/en"');
       expect(textAttributes(html).filter((text) => !text.startsWith("§"))).toEqual([]);
       expect(html.match(/<h1/g), page.slug).toHaveLength(1);
     }

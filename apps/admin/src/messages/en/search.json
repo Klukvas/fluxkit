@@ -133,7 +133,7 @@
   "search.synonyms.pastEnd": "There are no groups on this page.",
   "search.synonyms.firstPage": "Go to the first page",
   "search.synonyms.pagerLabel": "Pages of synonym groups",
-  "search.synonyms.pageRange": "{from} to {to} of {total}",
+  "search.synonyms.pageRange": "{from}–{to} of {total}",
   "search.synonyms.previous": "Previous page",
   "search.synonyms.next": "Next page",
   "search.synonyms.createTitle": "Add a synonym group",

@@ -13,7 +13,6 @@ import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import type { CustomerAction } from "./customer-actions";
-import { linkClass } from "./customer-parts";
 import {
   customerOrdersHref,
   fullName,
@@ -22,6 +21,7 @@ import {
   statusLabelKey,
   statusTone,
 } from "./customer-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The customer detail (plan step 9): profile, account state, the link to the customer's orders and the actions.
@@ -144,7 +144,7 @@ export function CustomerDetailView({
         <span className="flex flex-col gap-1">
           <span>{new Intl.NumberFormat(uiLocale).format(customer.orderCount)}</span>
           {canReadOrders ? (
-            <Link to={customerOrdersHref(customer.id)} className={linkClass}>
+            <Link to={customerOrdersHref(customer.id)} className={standaloneLinkClass}>
               {t("customer.detail.ordersLink")}
             </Link>
           ) : null}
@@ -176,7 +176,7 @@ export function CustomerDetailView({
   return (
     <div className="flex flex-col gap-6">
       <p>
-        <Link to={PATHS.customers} className={linkClass}>
+        <Link to={PATHS.customers} className={standaloneLinkClass}>
           {t("customer.detail.back")}
         </Link>
       </p>

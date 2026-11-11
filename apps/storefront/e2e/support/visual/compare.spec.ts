@@ -9,7 +9,13 @@ import {
   diffSnapshots,
   formatComparison,
 } from "./compare.ts";
-import { ExceptionsError, ownExceptions, parseExceptions, screenshotMasks } from "./exceptions.ts";
+import {
+  ExceptionsError,
+  comparesViewportOnly,
+  ownExceptions,
+  parseExceptions,
+  screenshotMasks,
+} from "./exceptions.ts";
 import {
   COMPUTED_PROPERTIES,
   fragment,
@@ -177,6 +183,12 @@ describe("parseExceptions", () => {
       "card.article",
     ]);
     expect(screenshotMasks(exceptions, "catalog", "light")).toEqual(["home.banner-card"]);
+  });
+
+  it("compares only the viewport when the whole page is masked", () => {
+    expect(comparesViewportOnly(["home.hero", "page.body"])).toBe(true);
+    expect(comparesViewportOnly(["home.hero", "footer.contentinfo"])).toBe(false);
+    expect(comparesViewportOnly([])).toBe(false);
   });
 
   it("keeps only the entries a PR added (an inherited entry declares nothing, even with a new reason)", () => {

@@ -130,3 +130,15 @@ export function screenshotMasks(
     )
     .map((entry) => entry.selector);
 }
+
+/** The selector whose screenshot mask covers a whole page. */
+export const WHOLE_PAGE_SELECTOR = "page.body";
+
+/**
+ * Whether a page's screenshots compare only the viewport: when the whole page is masked, a full-page shot can differ only in its
+ * height, which a mask cannot declare (a PR that adds a breadcrumb row makes the page taller), so the frame keeps the viewport
+ * size on both sides and the masked comparison is meaningful again.
+ */
+export function comparesViewportOnly(masks: readonly string[]): boolean {
+  return masks.includes(WHOLE_PAGE_SELECTOR);
+}

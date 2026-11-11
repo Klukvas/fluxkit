@@ -3,7 +3,6 @@ import type { RefObject } from "react";
 import { Link } from "react-router";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { helpLinkClass } from "./article-view";
 import {
   CHECKLIST_STEPS,
   doneCount,
@@ -14,6 +13,7 @@ import {
   type ManualStepId,
 } from "./checklist-model";
 import { helpArticlePath, type ScreenRouteId } from "./help-model";
+import { inlineLinkClass, standaloneLinkClass } from "../../views/links";
 
 export type ChecklistFactsState =
   Exclude<ResourceFallbackState, { status: "ready" }> | { status: "ready"; data: ChecklistFacts };
@@ -119,12 +119,12 @@ export function ChecklistView({
                   <p className="flex flex-wrap gap-x-4 gap-y-1">
                     <Link
                       to={helpArticlePath(step.article, step.section)}
-                      className={helpLinkClass}
+                      className={standaloneLinkClass}
                     >
                       {t("help.checklist.readArticle")}
                     </Link>
                     {step.screen !== "home" && canOpen(step.screen) ? (
-                      <Link to={PATHS[step.screen]} className={helpLinkClass}>
+                      <Link to={PATHS[step.screen]} className={standaloneLinkClass}>
                         {t("help.checklist.openScreen")}
                       </Link>
                     ) : null}
@@ -174,7 +174,7 @@ export function HiddenNoticeView({
   return (
     <p ref={headingRef} tabIndex={-1} role="status" className="text-muted-foreground">
       {t("help.checklist.hiddenNotice")}{" "}
-      <Link to={PATHS.help} className={helpLinkClass}>
+      <Link to={PATHS.help} className={inlineLinkClass}>
         {t("help.checklist.openHelp")}
       </Link>
     </p>

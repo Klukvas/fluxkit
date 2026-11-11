@@ -123,7 +123,7 @@
   "ship.providers.open": "Відкрити перевізника {code}",
   "ship.providers.openDisabled": "Введіть чинний код перевізника, щоб відкрити його",
   "ship.provider.title": "Перевізник {code}",
-  "ship.provider.back": "До перевізників",
+  "ship.provider.back": "Назад до перевізників",
   "ship.provider.notEnabledTitle": "Перевізник {code} не ввімкнений",
   "ship.provider.notEnabledBody": "Цей магазин не має перевізника з таким кодом. Перевірте код або попросіть розробників увімкнути перевізника (налаштування сервера SHIPPING_PROVIDERS_ENABLED) і перезапустити сервер.",
   "ship.settings.title": "Профіль перевізника",

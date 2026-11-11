@@ -3,6 +3,11 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Storefront header and footer (council decisions 1 and 2, `docs/plans/2026-11-11-ui-council-decisions.md`; CSS only, no token change): a category list longer than the header row fades at its end edge while it can scroll and snaps to whole items; the footer's link lists and contacts start at the same edge as the theme switch and the copyright (link group headings lose their `px-2` to stay aligned); every link keeps its 44 px hit area.
+- Storefront legal pages (council decision 3): Home / page title breadcrumbs above the `h1`, like the shop pages.
+- Storefront home loading placeholder (council decision 7): shown only after 200 ms, so a fast navigation no longer flashes it.
+- Admin copy (council decision 4; message values only, keys unchanged): back links read "Back to …" / "Назад до …" everywhere (order detail: "Back to orders" / "Назад до замовлень"), and the page-range counters of every paged list read "{from}–{to} of {total}" / "{from}–{to} з {total}".
+- Admin links (council decision 5): the area copies of `linkClass` and `helpLinkClass` are replaced by `apps/admin/src/views/links.ts`; links on their own (table cells, back links, pagers, next steps) are at least 24 px high, 44 px on a touch screen; links inside sentences keep their text height.
 - Storefront account orders page (plan `docs/plans/2026-11-11-improve-ui-account-orders-back-link.md`; markup only): the link back to the account moves from the bottom of the page to under the title, underlined, and reads "Back to my account" / "Назад до акаунта", like the Profile and Privacy and data pages.
 - Admin area sub-navigation (plan `docs/plans/2026-11-11-improve-ui-admin-subnav-targets.md`; classes only): the links above the dictionaries, shipping, e-mail, search and personal data screens are at least 24 px high, 44 px on a touch screen (one shared class, `apps/admin/src/views/sub-nav.ts`).
 - Storefront `uk` copy (plan `docs/plans/2026-11-11-improve-ui-uk-cart-checkout-label.md`; messages only): the cart's checkout button reads "Оформлення" (the checkout step's name) instead of "Оформити замовлення", which stays on the checkout page's final submit button. A fork that overrides `cart.checkout` keeps its value.

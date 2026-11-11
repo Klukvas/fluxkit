@@ -1,5 +1,5 @@
 {
-  "user.back": "До адміністраторів",
+  "user.back": "Назад до адміністраторів",
   "user.you": "Ви",
   "user.neverSignedIn": "Ще не входив",
   "user.status.active": "Активний",
@@ -41,7 +41,7 @@
   "user.list.emptyTitle": "Адміністраторів немає",
   "user.list.emptyBody": "Список порожній. Створіть власника на сервері командою pnpm admin:create.",
   "user.list.pagerLabel": "Сторінки адміністраторів",
-  "user.list.pageRange": "Користувачі з {from} по {to} із {total}",
+  "user.list.pageRange": "{from}–{to} з {total}",
   "user.list.previous": "Попередня сторінка",
   "user.list.next": "Наступна сторінка",
   "user.create.summaryTitle": "Користувача не створено",

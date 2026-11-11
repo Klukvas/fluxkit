@@ -17,7 +17,7 @@ import type { FormEvent, Ref } from "react";
 import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { buildPath, PATHS } from "../../router/paths";
-import { DescriptorText, ErrorBox, linkClass } from "./privacy-frame";
+import { DescriptorText, ErrorBox } from "./privacy-frame";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import {
   NOTE_MAX_LENGTH,
@@ -28,6 +28,7 @@ import {
   type CreateRequestIssue,
 } from "./privacy-view";
 import { requestHref } from "./requests-view";
+import { standaloneLinkClass } from "../../views/links";
 
 export const EMAIL_MAX_LENGTH = 254;
 
@@ -117,7 +118,10 @@ export function LookupResultView({
             id: "name",
             term: t("personal.lookup.accountName"),
             description: (
-              <Link to={buildPath(PATHS.customerDetail, { id: account.id })} className={linkClass}>
+              <Link
+                to={buildPath(PATHS.customerDetail, { id: account.id })}
+                className={standaloneLinkClass}
+              >
                 {t("personal.lookup.fullName", {
                   first: account.firstName,
                   last: account.lastName,
@@ -151,7 +155,7 @@ export function LookupResultView({
       id: "number",
       header: t("personal.lookup.orderNumber"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.orderDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.orderDetail, { id: row.id })} className={standaloneLinkClass}>
           {row.number}
         </Link>
       ),
@@ -219,7 +223,7 @@ export function LookupResultView({
           <ul className="flex flex-col gap-1">
             {result.openRequests.map((request) => (
               <li key={request.id}>
-                <Link to={requestHref(request.id)} className={linkClass}>
+                <Link to={requestHref(request.id)} className={standaloneLinkClass}>
                   {t("personal.lookup.openItem", {
                     kind: t(kindLabelKey(request.kind)),
                     date: formatDateTime(request.receivedAt, uiLocale),

@@ -121,7 +121,7 @@
   "mail.list.pastEnd": "There is nothing on this page any more.",
   "mail.list.firstPage": "Back to the first page",
   "mail.list.pagerLabel": "Pages of messages",
-  "mail.list.pageRange": "{from} to {to} of {total}",
+  "mail.list.pageRange": "{from}–{to} of {total}",
   "mail.list.previous": "Previous page",
   "mail.list.next": "Next page",
 

@@ -30,8 +30,9 @@ import {
   looksLikeOrderId,
   type OrderListQuery,
 } from "./order-list-query";
-import { DescriptorText, OrderPager, linkClass } from "./order-parts";
+import { DescriptorText, OrderPager } from "./order-parts";
 import { ORDER_STATUS_TONES, orderStatusLabelKey } from "./order-view";
+import { standaloneLinkClass } from "../../views/links";
 
 export type OrderListState =
   | { status: "loading" }
@@ -182,7 +183,7 @@ export function OrderListView({
             {t("order.list.apply")}
           </Button>
           {hasFilters(query) ? (
-            <Link to={PATHS.orders} className={linkClass}>
+            <Link to={PATHS.orders} className={standaloneLinkClass}>
               {t("order.list.clearFilters")}
             </Link>
           ) : null}
@@ -194,7 +195,7 @@ export function OrderListView({
           <span className="rounded-control border border-border px-3 py-1 text-foreground">
             {t("order.list.customerChip", { id: query.customerId.slice(0, 8) })}
           </span>
-          <Link to={hrefWithoutCustomer} className={linkClass}>
+          <Link to={hrefWithoutCustomer} className={standaloneLinkClass}>
             {t("order.list.removeCustomer")}
           </Link>
         </p>
@@ -237,7 +238,7 @@ export function OrderResultsView({
       id: "number",
       header: t("order.list.columnNumber"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.orderDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.orderDetail, { id: row.id })} className={standaloneLinkClass}>
           {row.number}
         </Link>
       ),
@@ -307,7 +308,7 @@ export function OrderResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("order.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("order.list.firstPage")}
           </Link>
         </div>
@@ -325,11 +326,14 @@ export function OrderResultsView({
         action={
           <span className="flex flex-col items-center gap-2">
             {looksLikeOrderId(query.q) ? (
-              <Link to={buildPath(PATHS.orderDetail, { id: query.q })} className={linkClass}>
+              <Link
+                to={buildPath(PATHS.orderDetail, { id: query.q })}
+                className={standaloneLinkClass}
+              >
                 {t("order.list.openById")}
               </Link>
             ) : null}
-            <Link to={PATHS.orders} className={linkClass}>
+            <Link to={PATHS.orders} className={standaloneLinkClass}>
               {t("order.list.clearFilters")}
             </Link>
           </span>

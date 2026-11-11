@@ -9,10 +9,10 @@ import {
   type MessageDescriptor,
 } from "../../lib/problem-messages";
 import { useResource, type ResourceView } from "../../lib/use-resource";
+import { standaloneLinkClass } from "../../views/links";
 
 /** Presentational helpers of the orders area: props in, markup out, every word from the translator. */
 
-export const linkClass = "font-medium text-foreground underline underline-offset-4";
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
@@ -148,12 +148,16 @@ export function OrderPager({
         {t("order.list.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("order.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("order.list.next")}
         </Link>
       ) : null}

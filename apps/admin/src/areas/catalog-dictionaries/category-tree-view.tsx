@@ -3,9 +3,9 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { PATHS, buildPath } from "../../router/paths";
 import type { TreeItem } from "./category-tree";
-import { linkClass } from "./dictionary-frame";
 import type { ContentLocales } from "./form-parts";
 import { resolveLocalized } from "./locale-text";
+import { standaloneLinkClass } from "../../views/links";
 
 export interface CategoryTreeViewProps {
   t: Translator;
@@ -69,7 +69,7 @@ function TreeNodes({
               {mode === "browse" ? (
                 <Link
                   to={buildPath(PATHS.categoryDetail, { id: item.category.id })}
-                  className={linkClass}
+                  className={standaloneLinkClass}
                 >
                   {name}
                 </Link>

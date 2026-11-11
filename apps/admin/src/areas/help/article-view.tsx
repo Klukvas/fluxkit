@@ -12,6 +12,7 @@ import {
   type HelpTopic,
   type ScreenRouteId,
 } from "./help-model";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The article page as markup (props in, markup out). Every block of the closed set is rendered by React as text: there is
@@ -19,7 +20,6 @@ import {
  */
 
 // Link text in the body color with an underline (`primary` is only checked as a non-text color).
-export const helpLinkClass = "font-medium text-foreground underline underline-offset-4";
 
 const calloutBase =
   "max-w-prose rounded-panel border border-s-4 border-border bg-muted p-4 text-foreground";
@@ -48,7 +48,7 @@ export function ScreenLink({
   }
   return (
     <p>
-      <Link to={PATHS[route]} className={helpLinkClass}>
+      <Link to={PATHS[route]} className={standaloneLinkClass}>
         {t("help.screen.open", { screen })}
       </Link>
     </p>
@@ -127,7 +127,7 @@ export function ArticleView({
     <article className="flex flex-col gap-5">
       <div className="flex flex-col gap-2">
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-          <Link to={PATHS.help} className={helpLinkClass}>
+          <Link to={PATHS.help} className={standaloneLinkClass}>
             {t("help.article.allArticles")}
           </Link>
           {topic === null ? null : (
@@ -145,7 +145,7 @@ export function ArticleView({
           <ul className="flex flex-col gap-1 ps-1">
             {sections.map((section) => (
               <li key={section.id}>
-                <Link to={{ hash: section.id }} className={helpLinkClass}>
+                <Link to={{ hash: section.id }} className={standaloneLinkClass}>
                   {section.title[locale]}
                 </Link>
               </li>
@@ -164,12 +164,12 @@ export function ArticleView({
           {previous === null ? (
             <span />
           ) : (
-            <Link to={helpArticlePath(previous.id)} className={helpLinkClass}>
+            <Link to={helpArticlePath(previous.id)} className={standaloneLinkClass}>
               {t("help.article.previous", { title: previous.title[locale] })}
             </Link>
           )}
           {next === null ? null : (
-            <Link to={helpArticlePath(next.id)} className={helpLinkClass}>
+            <Link to={helpArticlePath(next.id)} className={standaloneLinkClass}>
               {t("help.article.next", { title: next.title[locale] })}
             </Link>
           )}

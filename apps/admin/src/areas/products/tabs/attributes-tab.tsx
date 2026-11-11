@@ -5,7 +5,6 @@ import { adminClient } from "../../../lib/api";
 import { PATHS, buildPath } from "../../../router/paths";
 import { useUnsavedChangesGuard } from "../../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
-import { linkClass } from "../../catalog-dictionaries/dictionary-frame";
 import { hasIssues } from "../../catalog-dictionaries/form-rules";
 import { useFormSubmit } from "../../catalog-dictionaries/use-form-submit";
 import { AttributeFieldsView } from "../attribute-fields-view";
@@ -22,6 +21,7 @@ import {
 import { problemsOnTab } from "../publish-problems";
 import { useReportDirty, type ProductTabProps } from "../tab-props";
 import { useCan } from "../use-can";
+import { standaloneLinkClass } from "../../../views/links";
 
 /**
  * Attributes: the form generated from the product type's product-level attributes (`attribute-values-form.ts`). Saves
@@ -80,7 +80,7 @@ export function AttributesTab({
         <p>
           <Link
             to={buildPath(PATHS.productTypeDetail, { id: productType.id })}
-            className={linkClass}
+            className={standaloneLinkClass}
           >
             {t("products.attributes.openType")}
           </Link>

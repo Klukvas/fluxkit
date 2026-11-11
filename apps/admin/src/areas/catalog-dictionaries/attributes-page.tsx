@@ -31,7 +31,6 @@ import {
   DictionaryPage,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "./dictionary-frame";
 import { ConfirmDelete } from "./form-dialog";
@@ -43,6 +42,7 @@ import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { standaloneLinkClass } from "../../views/links";
 
 const DEFAULT_LIMIT = 50;
 
@@ -84,7 +84,7 @@ function AttributesList() {
       id: "code",
       header: t("dict.attribute.columnCode"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.attributeDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.attributeDetail, { id: row.id })} className={standaloneLinkClass}>
           {row.code}
         </Link>
       ),
@@ -192,13 +192,16 @@ function AttributeCreate() {
       {created !== null ? (
         <FocusedPanel title={t("dict.attribute.created", { code: created.code })}>
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.attributeDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.attributeDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("dict.attribute.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.attributes} className={linkClass}>
+            <Link to={PATHS.attributes} className={standaloneLinkClass}>
               {t("dict.form.backToList")}
             </Link>
           </p>

@@ -15,9 +15,10 @@ import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { ErrorCodeText, StatusLine, linkClass } from "./email-frame";
+import { ErrorCodeText, StatusLine } from "./email-frame";
 import { MESSAGE_STATUSES, ageText, mailboxText, messageHref, statusLabelKey } from "./email-view";
 import type { TestSendView } from "./test-send";
+import { standaloneLinkClass } from "../../views/links";
 
 export type StatusState =
   | { status: "loading" }
@@ -138,7 +139,7 @@ export function TestSendResult({ t, view }: { t: Translator; view: TestSendView 
         <Alert variant="success">
           <p>{t("mail.test.queued")}</p>
           <p>
-            <Link to={messageHref(view.messageId)} className={linkClass}>
+            <Link to={messageHref(view.messageId)} className={standaloneLinkClass}>
               {t("mail.test.openMessage")}
             </Link>
           </p>
@@ -160,7 +161,7 @@ export function TestSendResult({ t, view }: { t: Translator; view: TestSendView 
         <Alert variant="warning" title={t("mail.unknown.title")}>
           <p>{t("mail.test.unknownBody")}</p>
           <p>
-            <Link to={PATHS.emailMessages} className={linkClass}>
+            <Link to={PATHS.emailMessages} className={standaloneLinkClass}>
               {t("mail.unknown.openList")}
             </Link>
           </p>
@@ -205,7 +206,7 @@ export function StatusView({ t, uiLocale, state, now, onRetry, testSend }: Statu
       id: "status",
       header: t("mail.status.columnStatus"),
       cell: (row) => (
-        <Link to={`${PATHS.emailMessages}?status=${row.status}`} className={linkClass}>
+        <Link to={`${PATHS.emailMessages}?status=${row.status}`} className={standaloneLinkClass}>
           {t(statusLabelKey(row.status))}
         </Link>
       ),

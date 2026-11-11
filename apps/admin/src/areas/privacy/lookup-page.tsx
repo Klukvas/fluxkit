@@ -9,7 +9,7 @@ import { createSingleFlight } from "../../lib/single-flight";
 import { buildPath, PATHS } from "../../router/paths";
 import { CreateRequestFormView, LookupForm, LookupResultView } from "./lookup-view";
 import { describePrivacyProblem } from "./privacy-errors";
-import { PrivacyFrame, StatusLine, linkClass } from "./privacy-frame";
+import { PrivacyFrame, StatusLine } from "./privacy-frame";
 import { useCanManagePrivacy } from "./privacy-permissions";
 import {
   checkEmail,
@@ -17,6 +17,7 @@ import {
   type CreateRequestForm,
   type CreateRequestIssue,
 } from "./privacy-view";
+import { inlineLinkClass } from "../../views/links";
 
 interface Found {
   /** The address that was looked up. It lives in this component's state only: never in a URL, storage or a log. */
@@ -155,7 +156,7 @@ export function PrivacyLookupPage() {
             {t("personal.create.done")}{" "}
             <Link
               to={buildPath(PATHS.privacyRequestDetail, { id: createdId })}
-              className={linkClass}
+              className={inlineLinkClass}
             >
               {t("personal.create.open")}
             </Link>

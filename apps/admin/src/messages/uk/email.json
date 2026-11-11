@@ -121,7 +121,7 @@
   "mail.list.pastEnd": "На цій сторінці вже нічого немає.",
   "mail.list.firstPage": "Назад до першої сторінки",
   "mail.list.pagerLabel": "Сторінки листів",
-  "mail.list.pageRange": "{from} – {to} з {total}",
+  "mail.list.pageRange": "{from}–{to} з {total}",
   "mail.list.previous": "Попередня сторінка",
   "mail.list.next": "Наступна сторінка",
 

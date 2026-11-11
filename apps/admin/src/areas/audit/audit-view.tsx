@@ -31,8 +31,7 @@ import {
   type AuditFeed,
   type AuditQuery,
 } from "./audit-model";
-
-const linkClass = "font-medium text-foreground underline underline-offset-4";
+import { standaloneLinkClass } from "../../views/links";
 
 export interface AuditFilterFormProps {
   t: Translator;
@@ -211,7 +210,7 @@ export function AuditFilterForm({
           {t("audit.list.apply")}
         </Button>
         {hasAuditFilters(query) ? (
-          <Link to={PATHS.auditLog} className={linkClass}>
+          <Link to={PATHS.auditLog} className={standaloneLinkClass}>
             {t("audit.list.clearFilters")}
           </Link>
         ) : null}
@@ -308,7 +307,7 @@ export function AuditResultsView({
         return href === null ? (
           text
         ) : (
-          <Link to={href} className={linkClass}>
+          <Link to={href} className={standaloneLinkClass}>
             {text}
           </Link>
         );
@@ -333,7 +332,7 @@ export function AuditResultsView({
         title={t("audit.list.noMatchTitle")}
         description={t("audit.list.noMatchBody")}
         action={
-          <Link to={PATHS.auditLog} className={linkClass}>
+          <Link to={PATHS.auditLog} className={standaloneLinkClass}>
             {t("audit.list.clearFilters")}
           </Link>
         }

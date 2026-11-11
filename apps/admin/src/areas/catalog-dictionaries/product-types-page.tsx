@@ -30,7 +30,6 @@ import {
   DictionaryPage,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "./dictionary-frame";
 import { ConfirmDelete } from "./form-dialog";
@@ -43,6 +42,7 @@ import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
 import { useOptionDefinitions } from "./use-option-definitions";
+import { standaloneLinkClass } from "../../views/links";
 
 const DEFAULT_LIMIT = 50;
 
@@ -65,7 +65,10 @@ function ProductTypesList() {
       id: "code",
       header: t("dict.productType.columnCode"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.productTypeDetail, { id: row.id })} className={linkClass}>
+        <Link
+          to={buildPath(PATHS.productTypeDetail, { id: row.id })}
+          className={standaloneLinkClass}
+        >
           {row.code}
         </Link>
       ),
@@ -187,13 +190,16 @@ function ProductTypeCreate() {
       {created !== null ? (
         <FocusedPanel title={t("dict.productType.created", { code: created.code })}>
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.productTypeDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.productTypeDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("dict.productType.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.productTypes} className={linkClass}>
+            <Link to={PATHS.productTypes} className={standaloneLinkClass}>
               {t("dict.form.backToList")}
             </Link>
           </p>

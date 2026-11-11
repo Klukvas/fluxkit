@@ -24,7 +24,7 @@
   "customer.list.noMatchTitle": "Покупців не знайдено",
   "customer.list.noMatchBody": "Жодний email покупця не починається з цього тексту. Перевірте його або скиньте пошук.",
   "customer.list.pagerLabel": "Сторінки списку покупців",
-  "customer.list.pageRange": "Покупці з {from} по {to} із {total}",
+  "customer.list.pageRange": "{from}–{to} з {total}",
   "customer.list.previous": "Попередня сторінка",
   "customer.list.next": "Наступна сторінка",
   "customer.detail.title": "Покупець",

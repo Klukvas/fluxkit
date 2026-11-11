@@ -26,13 +26,14 @@ import {
   type AttributeAssignmentValues,
   type OptionAssignmentValues,
 } from "./dictionary-forms";
-import { linkClass, type NoticeKind } from "./dictionary-frame";
+import { type NoticeKind } from "./dictionary-frame";
 import { ConfirmDelete, FormDialog, useDialogTarget } from "./form-dialog";
 import { TextField, describe, type ContentLocales } from "./form-parts";
 import { hasIssues } from "./form-rules";
 import { resolveLocalized } from "./locale-text";
 import { ServerPicker } from "./server-picker";
 import { useFormSubmit } from "./use-form-submit";
+import { standaloneLinkClass } from "../../views/links";
 
 const LEVELS: readonly ProductTypeAttributeLevel[] = ["product", "variant"];
 
@@ -232,7 +233,7 @@ export function AttributeAssignmentsSection({
               <span className="flex flex-col">
                 <Link
                   to={buildPath(PATHS.attributeDetail, { id: row.attributeId })}
-                  className={linkClass}
+                  className={standaloneLinkClass}
                 >
                   {row.attributeCode}
                 </Link>
@@ -508,7 +509,7 @@ export function OptionAssignmentsSection({
               <span className="flex flex-col">
                 <Link
                   to={buildPath(PATHS.optionDetail, { id: row.optionId })}
-                  className={linkClass}
+                  className={standaloneLinkClass}
                 >
                   {nameOf(row)}
                 </Link>

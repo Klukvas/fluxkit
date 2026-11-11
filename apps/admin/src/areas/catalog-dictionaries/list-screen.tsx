@@ -2,7 +2,8 @@ import { DataTable, EmptyState, type DataTableColumn, type Translator } from "@f
 import { Link } from "react-router";
 import type { Paginated } from "@fluxkit/api-client";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { DictionaryPage, linkClass, primaryLinkClass, type DictionaryId } from "./dictionary-frame";
+import { DictionaryPage, primaryLinkClass, type DictionaryId } from "./dictionary-frame";
+import { standaloneLinkClass } from "../../views/links";
 
 export type ListState<Row> =
   | { status: "loading" }
@@ -35,12 +36,16 @@ export function ListPager({
         {t("dict.list.range", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("dict.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("dict.list.next")}
         </Link>
       ) : null}
@@ -111,7 +116,7 @@ export function ListScreen<Row>({
         offset > 0 ? (
           <div className="flex flex-col gap-3">
             <p className="text-muted-foreground">{t("dict.list.pastEnd")}</p>
-            <Link to={hrefForOffset(0)} className={linkClass}>
+            <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
               {t("dict.list.firstPage")}
             </Link>
           </div>

@@ -10,10 +10,11 @@ import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, buildPath } from "../../router/paths";
-import { DescriptorText, linkClass } from "../orders/order-parts";
+import { DescriptorText } from "../orders/order-parts";
 import { moneyText, type MoneyContext } from "../orders/order-view";
 import type { AttentionList, AttentionRow } from "./attention-list";
 import { PAYMENT_STATUS_TONES, attentionCodeKey, paymentStatusLabelKey } from "./payment-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /** The attention list's table and its "load more" part: props in, markup out, every word from the translator. */
 
@@ -35,7 +36,7 @@ export function AttentionTable({
       cell: (row) => (
         <Link
           to={buildPath(PATHS.orderDetail, { id: row.orderId })}
-          className={`${linkClass} break-all`}
+          className={`${standaloneLinkClass} break-all`}
         >
           {t("payment.list.openOrder", { number: row.orderNumber })}
         </Link>

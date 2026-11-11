@@ -5,6 +5,7 @@ import type { Failure } from "../lib/failure";
 import { describeFailure, type MessageDescriptor } from "../lib/problem-messages";
 import { PATHS } from "../router/paths";
 import { useRouteFocus } from "../router/route-focus";
+import { standaloneLinkClass } from "./links";
 
 /**
  * Presentational building blocks for page states: props in, markup out, every word from the translator. Each full-page
@@ -35,14 +36,13 @@ function PageView({ title, children }: { title: string; children: ReactNode }) {
 }
 
 // Link text in the body color with an underline: `primary` is only checked as a non-text color (contrast.spec.ts).
-const linkClass = "font-medium text-foreground underline underline-offset-4";
 
 export function NotFoundView({ t }: { t: Translator }) {
   return (
     <PageView title={t("notFound.title")}>
       <p className="text-muted-foreground">{t("notFound.body")}</p>
       <p>
-        <Link to={PATHS.home} className={linkClass}>
+        <Link to={PATHS.home} className={standaloneLinkClass}>
           {t("action.goHome")}
         </Link>
       </p>
@@ -55,7 +55,7 @@ export function NotAllowedView({ t }: { t: Translator }) {
     <PageView title={t("notAllowed.title")}>
       <p className="text-muted-foreground">{t("notAllowed.body")}</p>
       <p>
-        <Link to={PATHS.home} className={linkClass}>
+        <Link to={PATHS.home} className={standaloneLinkClass}>
           {t("action.goHome")}
         </Link>
       </p>

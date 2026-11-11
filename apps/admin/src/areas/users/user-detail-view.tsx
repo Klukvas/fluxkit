@@ -13,7 +13,8 @@ import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import type { UserAction } from "./user-actions";
-import { ActivityBadge, RoleBadge, RoleChoices, linkClass } from "./user-parts";
+import { ActivityBadge, RoleBadge, RoleChoices } from "./user-parts";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The user detail (plan step 10): the stored user, the role change, the activity and the password reset. Presentational:
@@ -106,7 +107,7 @@ export function UserDetailView({
   return (
     <div className="flex flex-col gap-8">
       <p>
-        <Link to={PATHS.users} className={linkClass}>
+        <Link to={PATHS.users} className={standaloneLinkClass}>
           {t("user.back")}
         </Link>
       </p>

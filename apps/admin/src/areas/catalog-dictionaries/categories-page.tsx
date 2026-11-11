@@ -34,7 +34,6 @@ import {
   DictionaryPage,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   primaryLinkClass,
   type NoticeKind,
 } from "./dictionary-frame";
@@ -47,6 +46,7 @@ import { useCanWrite } from "./use-can-write";
 import { useCategoryTree } from "./use-category-tree";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { standaloneLinkClass } from "../../views/links";
 
 export function categoryFieldNames(locales: readonly string[]): string[] {
   return [
@@ -187,13 +187,16 @@ function CategoryCreate() {
           })}
         >
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.categoryDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.categoryDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("dict.category.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.categories} className={linkClass}>
+            <Link to={PATHS.categories} className={standaloneLinkClass}>
               {t("dict.category.backToTree")}
             </Link>
           </p>
