@@ -13,10 +13,11 @@ import {
 import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { PATHS, buildPath } from "../../router/paths";
-import { ErrorCodeText, linkClass } from "./email-frame";
+import { ErrorCodeText } from "./email-frame";
 import { MESSAGE_STATUS_TONES, messageHref, statusLabelKey, templateHref } from "./email-view";
 import { offeredActions, type MessageAction, type MessageNotice } from "./message-actions";
 import { variableRows, type VariableRow } from "./variables-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /** The status line after an action: the new message for a resend, or the honest "no answer". */
 export function MessageNoticeView({ t, notice }: { t: Translator; notice: MessageNotice | null }) {
@@ -27,7 +28,7 @@ export function MessageNoticeView({ t, notice }: { t: Translator; notice: Messag
         <Alert variant="success">
           <p>{t("mail.notice.resent")}</p>
           <p>
-            <Link to={messageHref(notice.messageId)} className={linkClass}>
+            <Link to={messageHref(notice.messageId)} className={standaloneLinkClass}>
               {t("mail.notice.openNew")}
             </Link>
           </p>
@@ -40,7 +41,7 @@ export function MessageNoticeView({ t, notice }: { t: Translator; notice: Messag
         <Alert variant="warning" title={t("mail.unknown.title")}>
           <p>{t(`mail.notice.lost.${notice.action}`)}</p>
           <p>
-            <Link to={PATHS.emailMessages} className={linkClass}>
+            <Link to={PATHS.emailMessages} className={standaloneLinkClass}>
               {t("mail.unknown.openList")}
             </Link>
           </p>
@@ -165,7 +166,7 @@ export function MessageFacts({
         <span className="break-all">
           <Link
             to={templateHref(message.templateKey, message.locale)}
-            className={`${linkClass} font-mono`}
+            className={`${standaloneLinkClass} font-mono`}
           >
             {message.templateKey}
           </Link>{" "}
@@ -189,7 +190,10 @@ export function MessageFacts({
       id: "order",
       term: t("mail.detail.order"),
       description: (
-        <Link to={buildPath(PATHS.orderDetail, { id: message.orderId })} className={linkClass}>
+        <Link
+          to={buildPath(PATHS.orderDetail, { id: message.orderId })}
+          className={standaloneLinkClass}
+        >
           {t("mail.detail.openOrder")}
         </Link>
       ),
@@ -202,7 +206,7 @@ export function MessageFacts({
       description: (
         <Link
           to={buildPath(PATHS.customerDetail, { id: message.customerId })}
-          className={linkClass}
+          className={standaloneLinkClass}
         >
           {t("mail.detail.openCustomer")}
         </Link>
@@ -214,7 +218,7 @@ export function MessageFacts({
       id: "resendOf",
       term: t("mail.detail.resendOf"),
       description: (
-        <Link to={messageHref(message.resendOf)} className={linkClass}>
+        <Link to={messageHref(message.resendOf)} className={standaloneLinkClass}>
           {t("mail.detail.openOriginal")}
         </Link>
       ),

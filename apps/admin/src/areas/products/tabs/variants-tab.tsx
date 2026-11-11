@@ -29,7 +29,6 @@ import { UnsavedChangesDialog } from "../../../router/unsaved-changes-dialog";
 import { PATHS, buildPath } from "../../../router/paths";
 import { FailureMessage } from "../../../views/status-views";
 import { useAdminConfig } from "../../catalog-dictionaries/config-gate";
-import { linkClass } from "../../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../../catalog-dictionaries/form-dialog";
 import {
   FormActions,
@@ -82,6 +81,7 @@ import {
   type VariantCreateValues,
   type VariantFormValues,
 } from "../variant-form";
+import { standaloneLinkClass } from "../../../views/links";
 
 const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -973,7 +973,7 @@ export function VariantsTab({
           <p>
             <Link
               to={buildPath(PATHS.productTypeDetail, { id: productType.id })}
-              className={linkClass}
+              className={standaloneLinkClass}
             >
               {t("products.attributes.openType")}
             </Link>

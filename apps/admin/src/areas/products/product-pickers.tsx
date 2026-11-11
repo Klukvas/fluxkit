@@ -9,9 +9,9 @@ import { useContentLocales } from "../catalog-dictionaries/config-gate";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import { ServerPicker } from "../catalog-dictionaries/server-picker";
 import { PATHS } from "../../router/paths";
-import { linkClass } from "../catalog-dictionaries/dictionary-frame";
 import { GENERAL_FIELD_IDS } from "./field-ids";
 import { useCan } from "./use-can";
+import { inlineLinkClass } from "../../views/links";
 
 /** A short form of an id, for a reference whose name is not known (support can match it). */
 export function shortId(id: string): string {
@@ -100,7 +100,7 @@ export function ProductTypeCreateLinkView({ t, canCreate }: { t: Translator; can
   return (
     <p className="text-sm text-muted-foreground">
       {t("products.form.productTypeMissing")}{" "}
-      <Link to={PATHS.productTypeNew} className={linkClass}>
+      <Link to={PATHS.productTypeNew} className={inlineLinkClass}>
         {t("products.form.productTypeCreate")}
       </Link>{" "}
       {t("products.form.productTypeCreateNote")}

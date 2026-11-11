@@ -21,8 +21,9 @@ import {
   type ResourceFallbackState,
 } from "../../views/status-views";
 import { CUSTOMER_SEARCH_MAX_LENGTH, type CustomerListQuery } from "./customer-list-query";
-import { CustomerPager, DescriptorText, linkClass } from "./customer-parts";
+import { CustomerPager, DescriptorText } from "./customer-parts";
 import { customerHref, fullName, statusLabelKey, statusTone } from "./customer-view";
+import { standaloneLinkClass } from "../../views/links";
 
 export type CustomerListState =
   | { status: "loading" }
@@ -92,7 +93,7 @@ export function CustomerListView({
             {t("customer.list.apply")}
           </Button>
           {query.q === "" ? null : (
-            <Link to={PATHS.customers} className={linkClass}>
+            <Link to={PATHS.customers} className={standaloneLinkClass}>
               {t("customer.list.clearSearch")}
             </Link>
           )}
@@ -130,7 +131,7 @@ export function CustomerResultsView({
       id: "email",
       header: t("customer.list.columnEmail"),
       cell: (row) => (
-        <Link to={customerHref(row.id)} className={`${linkClass} break-all`}>
+        <Link to={customerHref(row.id)} className={`${standaloneLinkClass} break-all`}>
           {row.email}
         </Link>
       ),
@@ -191,7 +192,7 @@ export function CustomerResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("customer.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("customer.list.firstPage")}
           </Link>
         </div>
@@ -210,7 +211,7 @@ export function CustomerResultsView({
         title={t("customer.list.noMatchTitle")}
         description={t("customer.list.noMatchBody")}
         action={
-          <Link to={PATHS.customers} className={linkClass}>
+          <Link to={PATHS.customers} className={standaloneLinkClass}>
             {t("customer.list.clearSearch")}
           </Link>
         }

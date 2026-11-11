@@ -18,7 +18,6 @@ import {
   DeletedPanel,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "../catalog-dictionaries/dictionary-frame";
 import { FormErrorSummary, type ContentLocales } from "../catalog-dictionaries/form-parts";
@@ -41,6 +40,7 @@ import { METHOD_STATUS_TONES, methodHref, methodStatusLabelKey, methodTitle } fr
 import { ShippingFrame } from "./shipping-frame";
 import { useCanManageShipping } from "./shipping-permissions";
 import { deleteProblemMapper, methodProblemMapper } from "./shipping-errors";
+import { standaloneLinkClass } from "../../views/links";
 
 /** The field names a method form can show an error on (the API's `errors[].path`), for the values on screen now. */
 export function methodFieldNames(values: MethodFormValues, locales: readonly string[]): string[] {
@@ -119,13 +119,13 @@ function MethodCreate() {
           title={t("ship.created", { title: methodTitle(created, locale, content.defaultLocale) })}
         >
           <p className="flex flex-wrap gap-4">
-            <Link to={methodHref(created.id)} className={linkClass}>
+            <Link to={methodHref(created.id)} className={standaloneLinkClass}>
               {t("ship.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.shipping} className={linkClass}>
+            <Link to={PATHS.shipping} className={standaloneLinkClass}>
               {t("dict.form.backToList")}
             </Link>
           </p>

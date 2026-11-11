@@ -22,10 +22,10 @@ import {
   statusLabelKey,
   statusTone,
 } from "./user-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /** Presentational helpers of the users area: props in, markup out, every word from the translator. */
 
-export const linkClass = "font-medium text-foreground underline underline-offset-4";
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
@@ -370,12 +370,16 @@ export function UserPager({
         {t("user.list.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("user.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("user.list.next")}
         </Link>
       ) : null}

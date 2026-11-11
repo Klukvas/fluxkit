@@ -20,7 +20,6 @@ import {
   DeletedPanel,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "../catalog-dictionaries/dictionary-frame";
 import { ConfirmDelete } from "../catalog-dictionaries/form-dialog";
@@ -50,6 +49,7 @@ import { BANNER_LIMITS } from "./banner-rules";
 import { bannerPlacement, type BannerPlacement } from "./banner-visibility";
 import { zoneLabel } from "./banner-time";
 import { BannersFrame } from "./banners-frame";
+import { standaloneLinkClass } from "../../views/links";
 
 /** Puts an uploaded picture into its slot of the form. */
 function withPicture(
@@ -136,13 +136,16 @@ function BannerCreate() {
           title={t("banners.created", { name: bannerName(t, created, locale, content) })}
         >
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.bannerDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.bannerDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("banners.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.banners} className={linkClass}>
+            <Link to={PATHS.banners} className={standaloneLinkClass}>
               {t("banners.backToList")}
             </Link>
           </p>

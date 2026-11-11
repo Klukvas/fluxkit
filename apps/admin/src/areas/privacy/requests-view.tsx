@@ -14,7 +14,6 @@ import { Link } from "react-router";
 import { formatDateTime } from "../../lib/format";
 import { buildPath, PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { linkClass } from "./privacy-frame";
 import {
   REQUEST_STATUSES,
   REQUEST_STATUS_TONES,
@@ -22,6 +21,7 @@ import {
   statusLabelKey,
 } from "./privacy-view";
 import type { RequestListQuery } from "./request-list-query";
+import { standaloneLinkClass } from "../../views/links";
 
 export type RequestListState =
   | { status: "loading" }
@@ -90,7 +90,7 @@ export function RequestResultsView({
       id: "received",
       header: t("personal.list.columnReceived"),
       cell: (row) => (
-        <Link to={requestHref(row.id)} className={linkClass}>
+        <Link to={requestHref(row.id)} className={standaloneLinkClass}>
           {formatDateTime(row.receivedAt, uiLocale)}
         </Link>
       ),
@@ -143,7 +143,7 @@ export function RequestResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("personal.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("personal.list.firstPage")}
           </Link>
         </div>
@@ -158,7 +158,7 @@ export function RequestResultsView({
           query.status === undefined ? "personal.list.emptyBody" : "personal.list.noMatchBody",
         )}
         action={
-          <Link to={PATHS.privacyLookup} className={linkClass}>
+          <Link to={PATHS.privacyLookup} className={standaloneLinkClass}>
             {t("personal.list.toLookup")}
           </Link>
         }
@@ -212,12 +212,16 @@ export function RequestPager({
         {t("personal.list.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("personal.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("personal.list.next")}
         </Link>
       ) : null}

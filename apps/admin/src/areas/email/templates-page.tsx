@@ -5,10 +5,11 @@ import { adminClient } from "../../lib/api";
 import { useResource } from "../../lib/use-resource";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback } from "../../views/status-views";
-import { EmailFrame, linkClass } from "./email-frame";
+import { EmailFrame } from "./email-frame";
 import { previewLocale } from "./email-view";
 import { isTemplateKey } from "./message-list-query";
 import { PreviewBody, PreviewLocaleSwitch, TemplatesView } from "./templates-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /** `/email/templates`: the registered templates. */
 export function EmailTemplatesPage() {
@@ -35,7 +36,7 @@ function Preview({ templateKey, locale }: { templateKey: string; locale: string 
       title={t("mail.preview.title", { key: templateKey })}
     >
       <p>
-        <Link to={PATHS.emailTemplates} className={linkClass}>
+        <Link to={PATHS.emailTemplates} className={standaloneLinkClass}>
           {t("mail.preview.back")}
         </Link>
       </p>

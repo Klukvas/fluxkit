@@ -14,7 +14,7 @@ import { PATHS } from "../../router/paths";
 import { readPaging, writeQuery } from "../../router/query";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
 import { ConfigGate, useAdminConfig } from "../catalog-dictionaries/config-gate";
-import { linkClass, primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
+import { primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
 import { ListPager } from "../catalog-dictionaries/list-screen";
 import {
   METHOD_STATUS_TONES,
@@ -27,6 +27,7 @@ import {
 } from "./method-view";
 import { ShippingFrame } from "./shipping-frame";
 import { useCanManageShipping } from "./shipping-permissions";
+import { standaloneLinkClass } from "../../views/links";
 
 export const METHODS_PAGE_SIZE = 50;
 
@@ -66,7 +67,7 @@ export function MethodsView({
       id: "code",
       header: t("ship.list.columnCode"),
       cell: (row) => (
-        <Link to={methodHref(row.id)} className={`${linkClass} break-all`}>
+        <Link to={methodHref(row.id)} className={`${standaloneLinkClass} break-all`}>
           {row.code}
         </Link>
       ),
@@ -128,7 +129,7 @@ export function MethodsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("dict.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("dict.list.firstPage")}
           </Link>
         </div>

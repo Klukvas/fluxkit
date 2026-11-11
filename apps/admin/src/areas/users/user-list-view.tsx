@@ -10,8 +10,9 @@ import {
   ResourceFallback,
   type ResourceFallbackState,
 } from "../../views/status-views";
-import { ActivityBadge, RoleBadge, UserPager, linkClass } from "./user-parts";
+import { ActivityBadge, RoleBadge, UserPager } from "./user-parts";
 import { isSelf, userHref } from "./user-view";
+import { standaloneLinkClass } from "../../views/links";
 
 export type UserListState =
   | { status: "loading" }
@@ -34,7 +35,7 @@ export function UserListView({
       <p className="max-w-prose text-muted-foreground">{t("user.list.intro")}</p>
       {canCreate ? (
         <p>
-          <Link to={PATHS.userNew} className={linkClass}>
+          <Link to={PATHS.userNew} className={standaloneLinkClass}>
             {t("user.list.create")}
           </Link>
         </p>
@@ -74,7 +75,7 @@ export function UserResultsView({
       header: t("user.list.columnEmail"),
       cell: (row) => (
         <span className="flex flex-wrap items-center gap-2">
-          <Link to={userHref(row.id)} className={`${linkClass} break-all`}>
+          <Link to={userHref(row.id)} className={`${standaloneLinkClass} break-all`}>
             {row.email}
           </Link>
           {isSelf(row.id, meId) ? <Badge>{t("user.you")}</Badge> : null}
@@ -128,7 +129,7 @@ export function UserResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("user.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("user.list.firstPage")}
           </Link>
         </div>

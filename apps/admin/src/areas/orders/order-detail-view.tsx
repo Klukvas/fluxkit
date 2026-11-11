@@ -15,7 +15,6 @@ import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
 import type { OrderAction } from "./order-actions";
-import { linkClass } from "./order-parts";
 import {
   ORDER_STATUS_TONES,
   customerDetailHref,
@@ -29,6 +28,7 @@ import {
   type LineRow,
   type MoneyContext,
 } from "./order-view";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * The order detail (plan step 8): summary, actions, contact, addresses, lines with their reservations, totals and the
@@ -226,7 +226,7 @@ export function OrderDetailView({
           ) : customerHref === null ? (
             <span className="break-all">{order.contact.email}</span>
           ) : (
-            <Link to={customerHref} className={linkClass}>
+            <Link to={customerHref} className={standaloneLinkClass}>
               {order.contact.email}
             </Link>
           )}
@@ -238,7 +238,7 @@ export function OrderDetailView({
                 : t("order.detail.accountOrder")}
           </small>
           {order.customerId === null ? null : (
-            <Link to={customerOrdersHref(order.customerId)} className={linkClass}>
+            <Link to={customerOrdersHref(order.customerId)} className={standaloneLinkClass}>
               {t("order.detail.customerOrders")}
             </Link>
           )}
@@ -401,7 +401,7 @@ export function OrderDetailView({
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <p>
-          <Link to={PATHS.orders} className={linkClass}>
+          <Link to={PATHS.orders} className={standaloneLinkClass}>
             {t("order.detail.backToList")}
           </Link>
         </p>

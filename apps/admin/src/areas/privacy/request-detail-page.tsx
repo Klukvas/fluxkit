@@ -12,7 +12,7 @@ import { ResourceFallback } from "../../views/status-views";
 import { attemptErase } from "./erase-flow";
 import { browserDownloadEnvironment, downloadBlob } from "./export-download";
 import { describePrivacyProblem, readErasureReasons } from "./privacy-errors";
-import { ErrorBox, PrivacyFrame, StatusLine, linkClass } from "./privacy-frame";
+import { ErrorBox, PrivacyFrame, StatusLine } from "./privacy-frame";
 import { useCanManagePrivacy } from "./privacy-permissions";
 import {
   eraseNotice,
@@ -34,6 +34,7 @@ import {
   RequestNoticeView,
   SubjectEmailField,
 } from "./request-detail-view";
+import { standaloneLinkClass } from "../../views/links";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -245,7 +246,7 @@ function RequestDetail({ id }: { id: string }) {
   return (
     <PrivacyFrame t={t} current="privacyRequestDetail" title={t("page.privacyRequestDetail.title")}>
       <p>
-        <Link to={PATHS.privacy} className={linkClass}>
+        <Link to={PATHS.privacy} className={standaloneLinkClass}>
           {t("personal.detail.back")}
         </Link>
       </p>

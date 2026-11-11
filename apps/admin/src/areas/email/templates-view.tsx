@@ -9,9 +9,9 @@ import {
 } from "@fluxkit/ui";
 import { Link } from "react-router";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { linkClass } from "./email-frame";
 import { categoryLabelKey, templateHref } from "./email-view";
 import { SandboxedMailFrame } from "./preview-frame";
+import { standaloneLinkClass } from "../../views/links";
 
 export type TemplateListState =
   | { status: "loading" }
@@ -33,7 +33,7 @@ export function TemplatesView({
       id: "key",
       header: t("mail.templates.columnKey"),
       cell: (row) => (
-        <Link to={templateHref(row.key)} className={`${linkClass} break-all font-mono`}>
+        <Link to={templateHref(row.key)} className={`${standaloneLinkClass} break-all font-mono`}>
           {row.key}
         </Link>
       ),
@@ -55,7 +55,7 @@ export function TemplatesView({
       cell: (row) => (
         <span className="flex flex-wrap gap-x-3">
           {row.locales.map((locale) => (
-            <Link key={locale} to={templateHref(row.key, locale)} className={linkClass}>
+            <Link key={locale} to={templateHref(row.key, locale)} className={standaloneLinkClass}>
               {locale}
             </Link>
           ))}

@@ -10,12 +10,7 @@ import { useUnsavedChangesGuard } from "../../router/unsaved-changes";
 import { UnsavedChangesDialog } from "../../router/unsaved-changes-dialog";
 import { PageHeading } from "../../views/status-views";
 import { ConfigGate, useContentLocales } from "../catalog-dictionaries/config-gate";
-import {
-  BackLink,
-  CreateUnknown,
-  FocusedPanel,
-  linkClass,
-} from "../catalog-dictionaries/dictionary-frame";
+import { BackLink, CreateUnknown, FocusedPanel } from "../catalog-dictionaries/dictionary-frame";
 import { hasIssues } from "../catalog-dictionaries/form-rules";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
 import { useFormSubmit } from "../catalog-dictionaries/use-form-submit";
@@ -29,6 +24,7 @@ import {
 import { ProductGeneralView } from "./product-general-view";
 import { BrandPicker, ProductTypePicker } from "./product-pickers";
 import { useCan } from "./use-can";
+import { standaloneLinkClass } from "../../views/links";
 
 /**
  * `/products/new`: product type, title, description, slug and brand. The API creates the draft with its default variant;
@@ -84,13 +80,16 @@ function ProductCreate() {
         >
           <p className="text-muted-foreground">{t("products.create.next")}</p>
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.productDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.productDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("products.create.openEditor")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.products} className={linkClass}>
+            <Link to={PATHS.products} className={standaloneLinkClass}>
               {t("products.backToList")}
             </Link>
           </p>

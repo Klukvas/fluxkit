@@ -31,7 +31,6 @@ import {
   DictionaryPage,
   FocusedPanel,
   NoticeBar,
-  linkClass,
   type NoticeKind,
 } from "./dictionary-frame";
 import { ConfirmDelete } from "./form-dialog";
@@ -42,6 +41,7 @@ import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { useCanWrite } from "./use-can-write";
 import { useEditorState } from "./use-editor-state";
 import { useFormSubmit } from "./use-form-submit";
+import { standaloneLinkClass } from "../../views/links";
 
 const DEFAULT_LIMIT = 50;
 
@@ -69,7 +69,7 @@ function BrandsList() {
       id: "slug",
       header: t("dict.brand.columnSlug"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.brandDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.brandDetail, { id: row.id })} className={standaloneLinkClass}>
           {row.slug}
         </Link>
       ),
@@ -159,13 +159,16 @@ function BrandCreate() {
           })}
         >
           <p className="flex flex-wrap gap-4">
-            <Link to={buildPath(PATHS.brandDetail, { id: created.id })} className={linkClass}>
+            <Link
+              to={buildPath(PATHS.brandDetail, { id: created.id })}
+              className={standaloneLinkClass}
+            >
               {t("dict.brand.openCreated")}
             </Link>
             <Button variant="secondary" onClick={again}>
               {t("dict.form.createAnother")}
             </Button>
-            <Link to={PATHS.brands} className={linkClass}>
+            <Link to={PATHS.brands} className={standaloneLinkClass}>
               {t("dict.form.backToList")}
             </Link>
           </p>

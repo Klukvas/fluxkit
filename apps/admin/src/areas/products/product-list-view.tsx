@@ -16,7 +16,7 @@ import { formatDateTime } from "../../lib/format";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, buildPath } from "../../router/paths";
 import { PageHeading, ResourceFallback } from "../../views/status-views";
-import { linkClass, primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
+import { primaryLinkClass } from "../catalog-dictionaries/dictionary-frame";
 import { TextField } from "../catalog-dictionaries/form-parts";
 import { ListPager, type ListState } from "../catalog-dictionaries/list-screen";
 import { resolveLocalized } from "../catalog-dictionaries/locale-text";
@@ -28,6 +28,7 @@ import {
 } from "./product-list-query";
 import { shortId } from "./product-pickers";
 import { STATUS_TONES, statusLabelKey } from "./product-status";
+import { standaloneLinkClass } from "../../views/links";
 
 export interface ProductListViewProps {
   t: Translator;
@@ -92,7 +93,7 @@ export function ProductListView({
       id: "title",
       header: t("products.list.columnTitle"),
       cell: (row) => (
-        <Link to={buildPath(PATHS.productDetail, { id: row.id })} className={linkClass}>
+        <Link to={buildPath(PATHS.productDetail, { id: row.id })} className={standaloneLinkClass}>
           {resolveLocalized(row.title, uiLocale, defaultLocale) || row.slug}
         </Link>
       ),
@@ -173,7 +174,7 @@ export function ProductListView({
             {t("products.list.apply")}
           </Button>
           {hasFilters(query) ? (
-            <Link to={PATHS.products} className={linkClass}>
+            <Link to={PATHS.products} className={standaloneLinkClass}>
               {t("products.list.clearFilters")}
             </Link>
           ) : null}
@@ -196,7 +197,7 @@ export function ProductListView({
         query.offset > 0 ? (
           <div className="flex flex-col gap-3">
             <p className="text-muted-foreground">{t("dict.list.pastEnd")}</p>
-            <Link to={hrefForOffset(0)} className={linkClass}>
+            <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
               {t("dict.list.firstPage")}
             </Link>
           </div>
@@ -205,7 +206,7 @@ export function ProductListView({
             title={t("products.list.noMatchTitle")}
             description={t("products.list.noMatchBody")}
             action={
-              <Link to={PATHS.products} className={linkClass}>
+              <Link to={PATHS.products} className={standaloneLinkClass}>
                 {t("products.list.clearFilters")}
               </Link>
             }

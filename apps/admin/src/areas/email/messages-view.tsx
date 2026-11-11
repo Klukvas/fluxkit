@@ -19,7 +19,7 @@ import { dateHint } from "../../lib/date-input-echo";
 import { formatDateTime } from "../../lib/format";
 import { PATHS } from "../../router/paths";
 import { ResourceFallback, type ResourceFallbackState } from "../../views/status-views";
-import { ErrorCodeText, linkClass } from "./email-frame";
+import { ErrorCodeText } from "./email-frame";
 import {
   MESSAGE_STATUSES,
   MESSAGE_STATUS_TONES,
@@ -35,6 +35,7 @@ import {
   type MessageFilters,
   type MessageListQuery,
 } from "./message-list-query";
+import { standaloneLinkClass } from "../../views/links";
 
 export type MessageListState =
   | { status: "loading" }
@@ -194,7 +195,7 @@ export function MessageFilterForm({
           {t("mail.list.apply")}
         </Button>
         {hasFilters(query) ? (
-          <Link to={PATHS.emailMessages} className={linkClass}>
+          <Link to={PATHS.emailMessages} className={standaloneLinkClass}>
             {t("mail.list.clearFilters")}
           </Link>
         ) : null}
@@ -271,7 +272,7 @@ export function MessageResultsView({
       id: "created",
       header: t("mail.list.columnCreated"),
       cell: (row) => (
-        <Link to={messageHref(row.id)} className={linkClass}>
+        <Link to={messageHref(row.id)} className={standaloneLinkClass}>
           {formatDateTime(row.createdAt, uiLocale)}
         </Link>
       ),
@@ -290,7 +291,10 @@ export function MessageResultsView({
       id: "template",
       header: t("mail.list.columnTemplate"),
       cell: (row) => (
-        <Link to={templateHref(row.templateKey)} className={`${linkClass} break-all font-mono`}>
+        <Link
+          to={templateHref(row.templateKey)}
+          className={`${standaloneLinkClass} break-all font-mono`}
+        >
           {row.templateKey}
         </Link>
       ),
@@ -338,7 +342,7 @@ export function MessageResultsView({
       return (
         <div className="flex flex-col gap-3">
           <p className="text-muted-foreground">{t("mail.list.pastEnd")}</p>
-          <Link to={hrefForOffset(0)} className={linkClass}>
+          <Link to={hrefForOffset(0)} className={standaloneLinkClass}>
             {t("mail.list.firstPage")}
           </Link>
         </div>
@@ -354,7 +358,7 @@ export function MessageResultsView({
         title={t("mail.list.noMatchTitle")}
         description={t("mail.list.noMatchBody")}
         action={
-          <Link to={PATHS.emailMessages} className={linkClass}>
+          <Link to={PATHS.emailMessages} className={standaloneLinkClass}>
             {t("mail.list.clearFilters")}
           </Link>
         }
@@ -408,12 +412,16 @@ export function MessagePager({
         {t("mail.list.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("mail.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("mail.list.next")}
         </Link>
       ) : null}

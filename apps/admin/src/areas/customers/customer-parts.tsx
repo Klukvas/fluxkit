@@ -3,10 +3,10 @@ import { LiveRegion, type Translator } from "@fluxkit/ui";
 import type { ReactNode, Ref } from "react";
 import { Link } from "react-router";
 import { describeProblem, type MessageDescriptor } from "../../lib/problem-messages";
+import { standaloneLinkClass } from "../../views/links";
 
 /** Presentational helpers of the customers area: props in, markup out, every word from the translator. */
 
-export const linkClass = "font-medium text-foreground underline underline-offset-4";
 export const focusClass =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
@@ -89,12 +89,16 @@ export function CustomerPager({
         {t("customer.list.pageRange", { from: offset + 1, to: offset + count, total })}
       </p>
       {hasPrevious ? (
-        <Link to={hrefForOffset(Math.max(0, offset - limit))} rel="prev" className={linkClass}>
+        <Link
+          to={hrefForOffset(Math.max(0, offset - limit))}
+          rel="prev"
+          className={standaloneLinkClass}
+        >
           {t("customer.list.previous")}
         </Link>
       ) : null}
       {hasNext ? (
-        <Link to={hrefForOffset(offset + limit)} rel="next" className={linkClass}>
+        <Link to={hrefForOffset(offset + limit)} rel="next" className={standaloneLinkClass}>
           {t("customer.list.next")}
         </Link>
       ) : null}
