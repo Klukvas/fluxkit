@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import type { MessageDescriptor } from "../../lib/problem-messages";
 import { PATHS, type RouteId } from "../../router/paths";
 import { PageHeading } from "../../views/status-views";
+import { subNavLinkClass } from "../../views/sub-nav";
 
 export const linkClass = "font-medium text-foreground underline underline-offset-4";
 export const focusClass =
@@ -28,11 +29,7 @@ export function PrivacyNav({ t, current }: { t: Translator; current: PrivacyScre
             <Link
               to={PATHS[screen.id]}
               aria-current={screen.id === active ? "page" : undefined}
-              className={
-                screen.id === active
-                  ? "font-semibold text-foreground underline underline-offset-4"
-                  : "text-muted-foreground underline underline-offset-4"
-              }
+              className={subNavLinkClass(screen.id === active)}
             >
               {t(screen.labelKey)}
             </Link>
