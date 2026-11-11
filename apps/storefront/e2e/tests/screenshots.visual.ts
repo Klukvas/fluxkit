@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { E2E_ORIGIN } from "../support/env.ts";
 import { locate, preparePage, setTheme, settle } from "../support/visual/browser.ts";
 import {
+  comparesViewportOnly,
   parseExceptions,
   screenshotMasks,
   type VisualException,
@@ -31,10 +32,11 @@ const exceptions: VisualException[] = existsSync(masksFile())
   ? parseExceptions(JSON.parse(readFileSync(masksFile(), "utf8")), masksFile())
   : [];
 
+const maskNamesFor = (frame: ScreenshotFrame) =>
+  screenshotMasks(exceptions, frame.page.id, frame.theme);
+
 const masksFor = (page: Page, frame: ScreenshotFrame) =>
-  screenshotMasks(exceptions, frame.page.id, frame.theme).map((name) =>
-    locate(page, selectorByName(name)),
-  );
+  maskNamesFor(frame).map((name) => locate(page, selectorByName(name)));
 
 async function open(page: Page, frame: ScreenshotFrame): Promise<void> {
   await setTheme(page.context(), frame.theme);
@@ -57,7 +59,7 @@ for (const frame of screenshotFrames()) {
     test(`screenshot ${name}`, async ({ page }) => {
       await open(page, frame);
       await expect(page).toHaveScreenshot(`${name}.png`, {
-        fullPage: true,
+        fullPage: !comparesViewportOnly(maskNamesFor(frame)),
         mask: masksFor(page, frame),
       });
     });
