@@ -231,7 +231,7 @@ function SummaryLine({
         <div className="flex justify-between gap-4">
           <h3 className={textStyles.itemTitle}>{line.title}</h3>
           {line.lineTotal === null ? null : (
-            <p className="shrink-0 text-foreground">
+            <p className="shrink-0 text-foreground tabular-nums">
               {formatMoney(line.lineTotal, exponent, locale)}
             </p>
           )}
@@ -533,7 +533,8 @@ export function CheckoutPageView(props: CheckoutPageViewProps) {
                 );
               })}
             </ul>
-            <dl className="flex flex-col gap-1 text-foreground">
+            {/* Tabular digits: the amounts change in place when the delivery method changes, and must not jiggle. */}
+            <dl className="flex flex-col gap-1 text-foreground tabular-nums">
               <div className="flex justify-between gap-6">
                 <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
                 <dd>{t.plural("cart.count", cart.itemCount)}</dd>

@@ -68,8 +68,9 @@ export function isFirstScrollHint(hint: unknown, root: ScrollHintRoot): boolean 
 }
 
 const cellClasses = "px-3 py-2 align-top";
+// End-aligned columns hold numbers and money: tabular digits keep them lined up down the column.
 const alignClass = (align: DataTableColumn<unknown>["align"]): string | false =>
-  align === "end" && "text-end";
+  align === "end" && "text-end tabular-nums";
 
 /**
  * Plain, presentational data table: no sorting, no paging, no fetching. The caller owns the data and the state

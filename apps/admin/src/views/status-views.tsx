@@ -1,5 +1,5 @@
-import { Alert, Button, Spinner, type Translator } from "@fluxkit/ui";
-import { useEffect, useRef, type ReactNode } from "react";
+import { Alert, Button, Spinner, cn, type Translator } from "@fluxkit/ui";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { Failure } from "../lib/failure";
 import { describeFailure, type MessageDescriptor } from "../lib/problem-messages";
@@ -84,9 +84,21 @@ export function ErrorView({ t, onReload }: { t: Translator; onReload: () => void
   );
 }
 
+/** How long a read may take before its spinner appears: most answer sooner, and a spinner that flashes for a frame is noise. */
+export const LOADING_REVEAL_DELAY_MS = 200;
+
 export function LoadingView({ t }: { t: Translator }) {
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setRevealed(true), LOADING_REVEAL_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  // Hidden, not absent: the box keeps its height, so nothing moves when the spinner appears.
   return (
-    <div className="flex items-center gap-3 py-8 text-muted-foreground" aria-busy="true">
+    <div
+      className={cn("flex items-center gap-3 py-8 text-muted-foreground", !revealed && "invisible")}
+      aria-busy="true"
+    >
       <Spinner label={t("status.loading")} />
     </div>
   );
