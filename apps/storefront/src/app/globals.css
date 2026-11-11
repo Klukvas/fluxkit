@@ -97,8 +97,28 @@
   .fk-header-row {
     @apply flex flex-wrap items-center gap-x-2 gap-y-2 py-2 lg:flex-nowrap lg:gap-x-4;
   }
+  /*
+   * A category list longer than the row scrolls sideways (council decision 1, docs/plans/2026-11-11-ui-council-decisions.md):
+   * items snap at their start, and the end edge fades so a cut item reads as "more to scroll", not as a broken label. The fade
+   * runs on a scroll-driven animation: it shows only while the list can scroll and goes away at the end of it; a browser
+   * without scroll timelines skips it and shows the plain list (the mask is then never applied).
+   */
   .fk-header-nav {
     @apply flex flex-nowrap items-center gap-x-1 overflow-x-auto *:shrink-0;
+    scroll-snap-type: x proximity;
+  }
+  .fk-header-nav > li {
+    scroll-snap-align: start;
+  }
+  @supports (animation-timeline: scroll()) {
+    .fk-header-nav {
+      mask-image: linear-gradient(to right, black calc(100% - var(--header-nav-fade)), transparent);
+      animation: fk-header-nav-fade linear both;
+      animation-timeline: scroll(self inline);
+    }
+    .fk-header-nav:dir(rtl) {
+      mask-image: linear-gradient(to left, black calc(100% - var(--header-nav-fade)), transparent);
+    }
   }
   .fk-header-end {
     @apply ms-auto flex shrink-0 items-center gap-1;
@@ -113,9 +133,11 @@
   .fk-site-footer nav {
     @apply flex flex-col gap-1;
   }
+  /* `-ms-2` cancels the links' `px-2` at the start, so their text lines up with the theme switch and the copyright while each link
+     keeps its 44 px hit area (council decision 2, docs/plans/2026-11-11-ui-council-decisions.md). */
   .fk-site-footer ul,
   .fk-site-footer address {
-    @apply flex flex-wrap gap-x-2 not-italic;
+    @apply -ms-2 flex flex-wrap gap-x-2 not-italic;
   }
   .fk-site-footer ul a,
   .fk-site-footer address a {
@@ -221,4 +243,23 @@ body {
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
+}
+
+/*
+ * The width of the header category list's end fade (`.fk-header-nav`, council decision 1). Registered so the scroll-driven
+ * keyframes below can animate it; 0 (no fade) wherever the animation does not run. Not a theme token: an internal of that rule.
+ */
+@property --header-nav-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes fk-header-nav-fade {
+  0%,
+  95% {
+    --header-nav-fade: calc(var(--fk-space-unit) * 8);
+  }
+  100% {
+    --header-nav-fade: 0px;
+  }
 }

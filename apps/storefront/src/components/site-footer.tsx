@@ -64,7 +64,7 @@ function block(
               <LinkList key={index} links={group.links} locale={locale} t={t} />
             ) : (
               <Fragment key={index}>
-                <h2 className={`${textStyles.navGroupTitle} px-2`}>{t(group.headingKey)}</h2>
+                <h2 className={textStyles.navGroupTitle}>{t(group.headingKey)}</h2>
                 <LinkList links={group.links} locale={locale} t={t} />
               </Fragment>
             ),

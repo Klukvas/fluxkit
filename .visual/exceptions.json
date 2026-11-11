@@ -22,5 +22,35 @@
     "selector": "cart.checkout-bar",
     "property": "screenshot",
     "reason": "PR 261 (plan 2026-11-11-improve-ui-uk-cart-checkout-label): the uk checkout link reads \"Оформлення\" instead of \"Оформити замовлення\"; the bar holding it is masked (the link's own box changes width with the label at 1280), computed styles stay identical"
+  },
+  {
+    "page": "*",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "plan 2026-11-11-ui-council-decisions, decision 1: the header category list fades at its end edge while it can scroll (mask-image, not a recorded property) and snaps to items; the header is masked"
+  },
+  {
+    "page": "*",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "plan 2026-11-11-ui-council-decisions, decision 2: the footer link lists and contacts move 8 px to the start (-ms-2; margin is not a recorded property) to line up with the theme switch and the copyright; the footer is masked"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "plan 2026-11-11-ui-council-decisions, decision 3: Home / page title breadcrumbs above the h1 push the whole legal page down; the page is masked"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "main.breadcrumb-link",
+    "property": "presence",
+    "reason": "plan 2026-11-11-ui-council-decisions, decision 3: the legal page gains breadcrumbs, so a navigation link now exists in main"
+  },
+  {
+    "page": "legal-privacy",
+    "selector": "main.link",
+    "property": "*",
+    "reason": "plan 2026-11-11-ui-council-decisions, decision 3: the first link of main is now the breadcrumb Home link (text-sm, muted) instead of the account link of the privacy text"
   }
 ]
