@@ -508,7 +508,8 @@ export function CartPageView({
             <h2 id="cart-summary-heading" className={textStyles.sectionTitle}>
               {t("cart.summary.title")}
             </h2>
-            <dl className="flex max-w-sm flex-col gap-1 text-foreground">
+            {/* Tabular digits: the amounts change in place with every quantity change, and must not jiggle. */}
+            <dl className="flex max-w-sm flex-col gap-1 text-foreground tabular-nums">
               <div className="flex justify-between gap-6">
                 <dt className="text-muted-foreground">{t("cart.summary.items")}</dt>
                 <dd>{t.plural("cart.count", cart.itemCount)}</dd>
@@ -542,7 +543,7 @@ export function CartPageView({
           {/* The total and the checkout control stick to the bottom of a phone screen while the lines scroll (review D-09):
               CSS only, the same elements (a direct child of the page container, so `sticky` has the whole page to stick in). */}
           <div className="fk-sticky-bottom fk-bottom-bar flex flex-col gap-2 bg-background max-md:sticky max-md:bottom-0 max-md:z-20 max-md:-mx-4 max-md:border-t max-md:border-border max-md:px-4 max-md:pt-3 max-md:shadow-card">
-            <dl className="flex max-w-sm flex-col text-foreground max-md:max-w-none">
+            <dl className="flex max-w-sm flex-col text-foreground tabular-nums max-md:max-w-none">
               <div className="flex justify-between gap-6 font-semibold">
                 <dt>{t("cart.summary.total")}</dt>
                 <dd>{formatMoney(cart.total, exponent, locale)}</dd>

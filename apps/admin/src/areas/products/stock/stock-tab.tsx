@@ -324,14 +324,14 @@ export function AdjustmentFormView({
           <fieldset className="flex flex-col gap-1">
             <legend className="font-medium">{t("products.stock.mode")}</legend>
             {modes.map((mode) => (
-              <label key={mode} className="flex items-center gap-2">
+              <label key={mode} className="inline-flex min-h-11 items-center gap-2">
                 <input
                   type="radio"
                   name="stock-mode"
                   value={mode}
                   checked={values.mode === mode}
                   disabled={busy}
-                  className={focusClass}
+                  className={`size-5 accent-primary ${focusClass}`}
                   onChange={() => onChange({ ...values, mode })}
                 />
                 {t(`products.stock.modeLabel.${mode}`)}

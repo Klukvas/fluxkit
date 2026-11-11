@@ -14,8 +14,9 @@
  * 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review).
  * 3: `feedback.alert` removed (scoped to main it never matched on the compared pages; CI warning of PR 239).
  * 4: `home.hero-picture` added (the hero's picture alone, a screenshot mask for B4's neutral demo pictures, PR-E2).
+ * 5: `cart.checkout-bar` added (the cart's total and checkout bar, a screenshot mask for the link's `uk` label change, PR 261).
  */
-export const SELECTOR_LIST_VERSION = 4;
+export const SELECTOR_LIST_VERSION = 5;
 
 /** Where the search starts: the whole page or one landmark. */
 export type SelectorScope = "page" | "banner" | "main" | "contentinfo";
@@ -146,6 +147,14 @@ export const SELECTORS: readonly SelectorSpec[] = [
     description: "the cart line's remove button (variant secondary)",
     scope: "main",
     steps: [{ role: "button", name: "^Видалити" }],
+  },
+  {
+    // The whole bar, not the link: the link is as wide as its label at desktop width, so a mask on it differs in size between
+    // two labels; the bar spans the column on both sides. On the cart page the funnel's checkout step is not a link yet.
+    name: "cart.checkout-bar",
+    description: "the cart's bottom bar holding the total and the link to the checkout",
+    scope: "main",
+    steps: [{ css: 'div:has(> a[href$="/checkout"])' }],
   },
   {
     name: "main.button",

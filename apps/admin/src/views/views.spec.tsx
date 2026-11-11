@@ -12,6 +12,7 @@ import { leftoverText, renderInRouter, sentinelTranslator, textAttributes } from
 import {
   ErrorView,
   FailureMessage,
+  LOADING_REVEAL_DELAY_MS,
   LoadingView,
   NotAllowedView,
   NotBuiltView,
@@ -58,6 +59,13 @@ describe("status views", () => {
     expect(html).toContain('role="status"');
     expect(html).toContain("§status.loading");
     expectNoHardcodedText(html);
+  });
+
+  it("keeps the loading spinner's box but hides it until the reveal delay, so a fast read does not flash it", () => {
+    const html = renderInRouter(<LoadingView t={t} />);
+    expect(html).toMatch(/<div class="[^"]*\binvisible\b[^"]*" aria-busy="true">/);
+    expect(LOADING_REVEAL_DELAY_MS).toBeGreaterThanOrEqual(150);
+    expect(LOADING_REVEAL_DELAY_MS).toBeLessThanOrEqual(300);
   });
 
   it("shows a failure's message, the unknown code in small print and an optional retry", () => {
