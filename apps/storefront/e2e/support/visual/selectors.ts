@@ -14,7 +14,7 @@
  * 2: `overlay.dialog` and `footer.heading` removed (never matched), `feedback.*` scoped to main (PR 239 review).
  * 3: `feedback.alert` removed (scoped to main it never matched on the compared pages; CI warning of PR 239).
  * 4: `home.hero-picture` added (the hero's picture alone, a screenshot mask for B4's neutral demo pictures, PR-E2).
- * 5: `cart.checkout-link` added (the cart's checkout link alone, a screenshot mask for its `uk` label change, PR 261).
+ * 5: `cart.checkout-bar` added (the cart's total and checkout bar, a screenshot mask for the link's `uk` label change, PR 261).
  */
 export const SELECTOR_LIST_VERSION = 5;
 
@@ -149,12 +149,12 @@ export const SELECTORS: readonly SelectorSpec[] = [
     steps: [{ role: "button", name: "^Видалити" }],
   },
   {
-    // Both `uk` labels ("Оформити замовлення" before PR 261, "Оформлення" after) start with "Оформ", so either side finds the
-    // link; on the cart page the funnel's checkout step is not a link yet, so it cannot match first.
-    name: "cart.checkout-link",
-    description: "the cart summary's link to the checkout",
+    // The whole bar, not the link: the link is as wide as its label at desktop width, so a mask on it differs in size between
+    // two labels; the bar spans the column on both sides. On the cart page the funnel's checkout step is not a link yet.
+    name: "cart.checkout-bar",
+    description: "the cart's bottom bar holding the total and the link to the checkout",
     scope: "main",
-    steps: [{ role: "link", name: "^Оформ" }],
+    steps: [{ css: 'div:has(> a[href$="/checkout"])' }],
   },
   {
     name: "main.button",
