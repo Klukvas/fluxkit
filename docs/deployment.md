@@ -11,12 +11,12 @@ Plan and decisions: `docs/plans/2026-10-29-production-deploy.md`. Architecture: 
 | Compose example | `infra/docker-compose.prod.yml`, `infra/production.env.example` | Started healthy by the smoke test, including the `meilisearch` service and the search steps (read-only roots, migrate before start; non-root users except the engine, which runs as root inside its container under `read_only`, `cap_drop: ALL` and `no-new-privileges`: the image has no `USER`) |
 | Edge proxy (nginx, default) | `infra/proxy/nginx/` (templates, snippet, start-up script) | `nginx -t` in the running edge; routing, headers, TLS, body limits, client address forwarding by the smoke test |
 | Edge proxy (Caddy, alternative) | `infra/proxy/caddy/Caddyfile` | `caddy validate` and `caddy fmt` (Caddy 2.10.2); the admin SPA headers, `X-Forwarded-For` replacement, HSTS and the webhook body limit against a stub upstream. Not run with the real API or storefront, no ACME certificate |
-| Automatic deployment | `.github/workflows/deploy.yml`, `infra/deploy/fluxkit-deploy` (section "Automatic deployment") | `actionlint`, `shellcheck`; the host script against a fake `docker` (arguments, order, return to the previous release); real runs: `docs/plans/2026-11-10-hetzner-first-deploy.md`, section 16 |
+| Automatic deployment | `.github/workflows/deploy.yml`, `infra/deploy/fluxkit-deploy` (section "Automatic deployment") | `actionlint`, `shellcheck`; the host script against a fake `docker` (arguments, order, return to the previous release); first real run on the test server 2026-11-12 (`7349a1b` to `ad1e09d`: pull, backup, switch, healthy, site checked; `docs/plans/2026-11-10-hetzner-first-deploy.md`, section 16). The return to the previous release has not run on a real host |
 | Smoke test | `scripts/deploy-smoke.sh` (CI job `deploy-smoke`) | Passes locally and in the CI job `deploy-smoke` on GitHub (green for the search engine change, 2026-11-04) |
 | Header copies | `apps/admin/edge-proxy-headers.spec.ts` | Fails when the nginx copy of the `/admin-ui` headers drifts from `apps/admin/security-headers.ts` |
 | `.env.example` completeness | `scripts/check-env-example.mjs` (`pnpm check:env`, CI `verify`) | Fails when the code reads a variable `.env.example` does not list |
 
-Not verified anywhere: a certificate from a real CA, real DNS and public traffic, IPv6 clients, a payment provider calling the webhook, real mail, a restore from backup, an update of a running shop, more than one host.
+Not verified anywhere: a certificate from a real CA, real DNS and public traffic, IPv6 clients, a payment provider calling the webhook, real mail, a restore from backup, an update of a running shop that runs a new migration, more than one host.
 
 ## Topology
 

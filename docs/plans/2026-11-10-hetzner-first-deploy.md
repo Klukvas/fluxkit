@@ -207,3 +207,25 @@ free; with a threshold of 100 GB it logged the warning and exited 1.
 
 Not done: the warning reaches only the journal (the host sends no mail; a notification channel is a separate decision);
 AutoFlow's images stay until the owner decides.
+
+## 16. Automatic deployment: set-up and first run (2026-11-12, owner's "yes")
+
+Workflow and host script: `docs/plans/2026-11-12-deploy-workflow.md`, `docs/deployment.md` "Automatic deployment" (PR 264).
+
+| Piece | What was done | Undo |
+|---|---|---|
+| Repository secrets | `DOCKERHUB_TOKEN` (from the owner's macOS Keychain, set by the owner), `DEPLOY_SSH_KEY` (new ed25519 key `fluxkit-deploy`, set by the owner) | `gh secret delete` |
+| Repository variables | `DOCKERHUB_USERNAME`, `DEPLOY_HOST`, `DEPLOY_KNOWN_HOSTS` (ed25519 key, fingerprint checked against an authenticated session), `DEPLOY_PUBLIC_URL`, `STOREFRONT_IMAGE_HOSTS` | `gh variable delete`; without `DEPLOY_HOST` the workflow is skipped |
+| `/usr/local/sbin/fluxkit-deploy` | `infra/deploy/fluxkit-deploy` as of PR 264 (checksum compared) | `rm` |
+| `/root/.ssh/authorized_keys` | one line `command="/usr/local/sbin/fluxkit-deploy",restrict <fluxkit-deploy key>`; `ls` or `deploy abc1234; id` with that key only print the usage error. Copy before: `authorized_keys.bak-2026-11-12` | remove the line |
+| `/etc/fluxkit/production.env` | `FLUXKIT_IMAGE_PREFIX=klukvas/fluxkit` added. Copy before: `production.env.bak-2026-11-12`; the script keeps `production.env.pre-deploy` on each run | remove the line |
+| Images | the running `fluxkit-*:7349a1b` tagged `klukvas/fluxkit-*:7349a1b` first, so the previous release resolves under the new prefix; after the first run the old `fluxkit-*:7349a1b` names were untagged (same image ids) | `docker tag` back |
+| `/usr/local/sbin/fluxkit-prune-images` | also handles `${FLUXKIT_IMAGE_PREFIX}-{api,storefront,edge}` (legacy `fluxkit-*` names kept). Copy before: `fluxkit-prune-images.bak-2026-11-12` | restore the copy |
+
+First run: merging PR 264 (`ad1e09d`) on 2026-11-12 started `CI` (17.5 min), then Deploy: images built and pushed in 4 min
+(cold cache), deployment 50 s: pull, backup (`media-2026-11-12T111921Z.tgz` and the database dump), switch, `migrate` exit 0,
+`api`, `storefront`, `edge` healthy, prune kept `7349a1b` for rollback. `https://178-104-79-222.sslip.io/store/config` answers
+`200`, `/` redirects to `/uk` (`200`). Release directories on the host: `7349a1b`, `ad1e09d`; 14 GB free.
+
+Not tried yet: the automatic return to the previous release on a real host (only against a fake `docker`), a release with a new
+migration, a manual `workflow_dispatch` run. The Docker Hub repositories `klukvas/fluxkit-*` are public (anyone can pull the images).
