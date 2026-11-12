@@ -11,6 +11,7 @@ Plan and decisions: `docs/plans/2026-10-29-production-deploy.md`. Architecture: 
 | Compose example | `infra/docker-compose.prod.yml`, `infra/production.env.example` | Started healthy by the smoke test, including the `meilisearch` service and the search steps (read-only roots, migrate before start; non-root users except the engine, which runs as root inside its container under `read_only`, `cap_drop: ALL` and `no-new-privileges`: the image has no `USER`) |
 | Edge proxy (nginx, default) | `infra/proxy/nginx/` (templates, snippet, start-up script) | `nginx -t` in the running edge; routing, headers, TLS, body limits, client address forwarding by the smoke test |
 | Edge proxy (Caddy, alternative) | `infra/proxy/caddy/Caddyfile` | `caddy validate` and `caddy fmt` (Caddy 2.10.2); the admin SPA headers, `X-Forwarded-For` replacement, HSTS and the webhook body limit against a stub upstream. Not run with the real API or storefront, no ACME certificate |
+| Automatic deployment | `.github/workflows/deploy.yml`, `infra/deploy/fluxkit-deploy` (section "Automatic deployment") | `actionlint`, `shellcheck`; the host script against a fake `docker` (arguments, order, return to the previous release); real runs: `docs/plans/2026-11-10-hetzner-first-deploy.md`, section 16 |
 | Smoke test | `scripts/deploy-smoke.sh` (CI job `deploy-smoke`) | Passes locally and in the CI job `deploy-smoke` on GitHub (green for the search engine change, 2026-11-04) |
 | Header copies | `apps/admin/edge-proxy-headers.spec.ts` | Fails when the nginx copy of the `/admin-ui` headers drifts from `apps/admin/security-headers.ts` |
 | `.env.example` completeness | `scripts/check-env-example.mjs` (`pnpm check:env`, CI `verify`) | Fails when the code reads a variable `.env.example` does not list |
@@ -40,7 +41,7 @@ volumes: postgres-data, meili-data, media (MEDIA_DIR), acme-webroot
 - A Linux host with Docker Engine 25 or newer and Compose v2.20 or newer (`up --wait`), about 2 GB RAM free for the API (image uploads need about 512 MB of headroom, ADR 0028), 1 GB for the storefront, and disk for Postgres, the media volume and the images (`api` about 560 MB, `storefront` about 1 GB, `edge` about 85 MB, measured 2026-10-29).
 - A DNS name for the shop pointing at the host, ports 80 and 443 open.
 - A TLS certificate for that name (see TLS). The host must reach its own public address on 443 (hairpin): the Next image optimizer fetches uploaded images from `https://<domain>/media/...` from inside the storefront container and refuses private addresses (ADR 0028, README "Uploaded images").
-- The repository checked out on the host (or images built elsewhere and pushed to a private registry: set `FLUXKIT_IMAGE_PREFIX` and `FLUXKIT_IMAGE_TAG`).
+- The repository checked out on the host (or images built elsewhere and pushed to a registry: set `FLUXKIT_IMAGE_PREFIX` and `FLUXKIT_IMAGE_TAG`; section "Automatic deployment").
 
 ## Configuration
 
@@ -161,11 +162,51 @@ What was checked (2026-10-30, a scratch database migrated to `0011`, PostgreSQL 
 ## Updates and migrations
 
 1. Back up (next section). Migrations are forward only; a rollback is manual.
-2. `git pull` (or new image tags), then `docker compose ... build` and `docker compose ... up -d --wait`.
+2. `git pull` (or new image tags), then `docker compose ... build` and `docker compose ... up -d --wait`. With the deploy workflow this step and the backup are automatic (next section).
 3. Compose recreates the changed containers: `migrate` runs the new migrations while the old API is still serving, then the new API replaces the old one. Expect a few seconds of `502` from the edge while the single API restarts: **the example has no zero-downtime rollout** (one instance is required today). Additive migrations (the project's rule) keep the old API working while they run.
 4. If `migrate` fails, Compose does not start the new API (it waits for `service_completed_successfully`). Whether the old API container is still serving at that moment was not tested here: plan for downtime. Read `docker compose ... logs migrate`, fix, run `up` again.
 5. Rollback: stop the API, run the newest `apps/api/drizzle/NNNN_name.down.sql` against the database (`docker compose ... exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 < apps/api/drizzle/NNNN_name.down.sql`), one migration at a time from the newest, then start the previous image tag. The migrator refuses to run code older than the database.
 6. Old images stay on the host after an update (each release built there adds about 1.5 GB of images plus build cache). Keep the running tag and the previous one for rollback, remove older `fluxkit-*` tags (section "Disk space").
+
+## Automatic deployment (GitHub Actions and Docker Hub)
+
+`.github/workflows/deploy.yml` (plan `docs/plans/2026-11-12-deploy-workflow.md`) deploys every commit on `main` whose `CI` run passed,
+and any commit on `main` by hand (Actions -> Deploy -> Run workflow). It is skipped while the repository variable `DEPLOY_HOST` is empty.
+
+1. **Images** (GitHub runner, `linux/amd64`): the `api`, `storefront` and `edge` targets, pushed as
+   `<DOCKERHUB_USERNAME>/fluxkit-{api,storefront,edge}:<first 7 characters of the commit>`. The host builds nothing.
+2. **Host**: `git archive <commit> infra` goes over SSH to `infra/deploy/fluxkit-deploy`, which locks, unpacks the files into
+   `/opt/fluxkit/releases/<tag>`, pulls every image (a missing one changes nothing), runs the backup command, writes the tag into
+   `FLUXKIT_IMAGE_TAG`, points `/opt/fluxkit/current` at the release and runs `up -d --wait --no-build`. If the release does not
+   become healthy within 5 minutes it restores the env file and `current`, starts the previous release and fails. That return
+   cannot undo a migration (the old API refuses a newer database): then restore the backup ("Updates and migrations").
+3. **Check**: `GET /store/config` and `GET /` through `DEPLOY_PUBLIC_URL`.
+
+Set up once:
+
+| Where | Name | Value |
+|---|---|---|
+| Repository variable | `DOCKERHUB_USERNAME` | Docker Hub account or organisation |
+| Repository secret | `DOCKERHUB_TOKEN` | Docker Hub access token, read and write |
+| Repository variable | `DEPLOY_HOST`, optional `DEPLOY_USER` (root), `DEPLOY_PORT` (22) | The host |
+| Repository variable | `DEPLOY_KNOWN_HOSTS` | `ssh-keyscan -t ed25519 <host>` output (port other than 22: `[host]:port`); checked strictly |
+| Repository secret | `DEPLOY_SSH_KEY` | Private half of a key made only for this (`ssh-keygen -t ed25519 -N '' -C fluxkit-deploy`) |
+| Repository variable | `DEPLOY_PUBLIC_URL` | `https://<domain>`, checked after the deployment |
+| Repository variable | `STOREFRONT_IMAGE_HOSTS`, `STOREFRONT_REQUIRE_LEGAL_TEXT` | Storefront build arguments (Configuration, TLS) |
+| Host | `/usr/local/sbin/fluxkit-deploy` | `install -m 0755 infra/deploy/fluxkit-deploy /usr/local/sbin/` (update it by hand when the file changes) |
+| Host | `~/.ssh/authorized_keys` of `DEPLOY_USER` | `command="/usr/local/sbin/fluxkit-deploy",restrict <public key> fluxkit-deploy`: the key can run nothing else |
+| Host | `FLUXKIT_IMAGE_PREFIX` in the env file | `<DOCKERHUB_USERNAME>/fluxkit`; `FLUXKIT_IMAGE_TAG` present (the running tag) |
+
+The script's paths are the test server's layout and can be changed with variables at its top (`FLUXKIT_ROOT`, the env files, the
+backup and image cleanup commands; it runs them when they exist). The deploy user needs Docker (root, or the `docker` group,
+which is root-equivalent).
+
+Notes:
+- Docker Hub creates a repository as **public** on the first push unless the account's default is private. This repository is
+  public; a client fork should make the three image repositories private (or use another registry and change the login step).
+- Whoever can push to `main` or holds the Docker Hub token can run code on the host. Protect `main` and keep the token's scope to
+  these repositories where Docker Hub allows it.
+- There is a short `502` while the single API restarts (no zero-downtime rollout).
 
 ## Backups
 

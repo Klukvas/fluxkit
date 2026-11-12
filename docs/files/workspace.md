@@ -28,6 +28,8 @@
 
 ## CI and scripts
 - `.github/workflows/ci.yml` - CI jobs (verify, feature-matrix, policy, docs, compose; `visual-gate` and `visual` for the visual comparison, also on a manual run with a base branch). `.github/dependabot.yml` - weekly dependency updates.
+- `.github/workflows/deploy.yml` - after a green `CI` run on `main` (or by hand): builds and pushes the three production images to Docker Hub, then deploys over SSH; skipped without the variable `DEPLOY_HOST` (`docs/deployment.md`, "Automatic deployment"). Must NOT contain a host, user or domain: those are repository variables and secrets.
+- `infra/deploy/fluxkit-deploy` - the host side of that deployment (forced SSH command): pull, backup, switch, start, return to the previous release on failure. Installed on the host by hand.
 - `scripts/license-policy.json` + `scripts/check-licenses.mjs` - license policy and its check (production strict, dev extras, explicit exceptions).
 - `scripts/third-party-notices.mjs` - writes `third-party/THIRD_PARTY_NOTICES.md` for runtime dependencies and the vendored Snowball code (git-ignored, CI artifact).
 - `scripts/snowball/` - tools for the vendored Snowball stemmers (ADR 0034 decision 7, `packages/core/src/search/stemmers/README.md`): `generate.mjs` turns a `.sbl` algorithm file into TypeScript, `make-vocabulary-sample.mjs` writes the CI vocabulary samples, `verify-vocabulary.mjs` checks the built stemmers against a full `snowball-data` vocabulary (by hand, needs `pnpm build`). Not part of any build or CI job.
