@@ -3,6 +3,7 @@
 One line per user-visible or schema change.
 
 ## Unreleased
+- Automatic deployment (plan `docs/plans/2026-11-12-deploy-workflow.md`; CI and infra only: no application, API, schema, app configuration or package dependency change): new `.github/workflows/deploy.yml` builds the `api`, `storefront` and `edge` images of every commit on `main` that passed `CI`, pushes them to Docker Hub and deploys them over SSH through the new host script `infra/deploy/fluxkit-deploy` (backup first, back to the previous release when the new one is not healthy); off until the repository variable `DEPLOY_HOST` is set (`docs/deployment.md`, "Automatic deployment").
 - Storefront header and footer (council decisions 1 and 2, `docs/plans/2026-11-11-ui-council-decisions.md`; CSS only, no token change): a category list longer than the header row fades at its end edge while it can scroll and snaps to whole items; the footer's link lists and contacts start at the same edge as the theme switch and the copyright (link group headings lose their `px-2` to stay aligned); every link keeps its 44 px hit area.
 - Storefront legal pages (council decision 3): Home / page title breadcrumbs above the `h1`, like the shop pages.
 - Storefront home loading placeholder (council decision 7): shown only after 200 ms, so a fast navigation no longer flashes it.

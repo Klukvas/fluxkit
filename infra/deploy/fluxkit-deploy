@@ -1,0 +1,89 @@
+#!/bin/bash
+# Deploys one Fluxkit release from the image registry on this host (docs/deployment.md, "Automatic deployment").
+#
+# Called by .github/workflows/deploy.yml over SSH. The workflow's key is limited to this script in authorized_keys:
+#   command="/usr/local/sbin/fluxkit-deploy",restrict ssh-ed25519 AAAA... fluxkit-deploy
+# The client's command line is "deploy <commit sha>"; stdin carries the release's infra/ directory as a tar stream
+# (git archive --format=tar <sha> infra). By hand, as root: fluxkit-deploy deploy <sha> < infra.tar
+#
+# Order: lock, unpack, pull every image (a missing image changes nothing), backup, switch FLUXKIT_IMAGE_TAG and
+# /opt/fluxkit/current, start. When the new release does not become healthy, the previous one is started again; that
+# cannot undo a migration the new release ran (the old API refuses a newer database: restore the backup).
+set -euo pipefail
+
+FLUXKIT_ROOT=${FLUXKIT_ROOT:-/opt/fluxkit}
+ENV_FILE=${FLUXKIT_ENV_FILE:-/etc/fluxkit/production.env}
+MEILI_ENV_FILE=${FLUXKIT_MEILI_ENV_FILE:-/etc/fluxkit/meilisearch.env}
+BACKUP_COMMAND=${FLUXKIT_DEPLOY_BACKUP:-/usr/local/sbin/fluxkit-backup}
+PRUNE_COMMAND=${FLUXKIT_DEPLOY_PRUNE:-/usr/local/sbin/fluxkit-prune-images}
+LOCK_FILE=${FLUXKIT_DEPLOY_LOCK:-/run/lock/fluxkit-deploy.lock}
+WAIT_SECONDS=300
+
+log() { echo "fluxkit deploy: $*"; }
+fail() { echo "fluxkit deploy: $*" >&2; exit 1; }
+
+compose() {
+  local release_dir=$1
+  shift
+  FLUXKIT_ENV_FILE="$ENV_FILE" FLUXKIT_MEILI_ENV_FILE="$MEILI_ENV_FILE" \
+    docker compose --env-file "$ENV_FILE" -f "$release_dir/infra/docker-compose.prod.yml" "$@"
+}
+
+env_value() { sed -n "s/^$1=//p" "$ENV_FILE"; }
+
+# Under the forced command the client's words arrive in SSH_ORIGINAL_COMMAND; by hand they are the arguments.
+read -r action tag extra <<< "${SSH_ORIGINAL_COMMAND:-$*}" || true
+if [ "${action:-}" != deploy ] || ! [[ "${tag:-}" =~ ^[0-9a-f]{7,40}$ ]] || [ -n "${extra:-}" ]; then
+  fail "usage: deploy <commit sha, 7 to 40 lowercase hex characters>"
+fi
+tag=${tag:0:7}
+
+exec 9> "$LOCK_FILE"
+flock -n 9 || fail "another deployment is running"
+
+[ -n "$(env_value FLUXKIT_IMAGE_PREFIX)" ] || fail "set FLUXKIT_IMAGE_PREFIX (registry repository prefix) in $ENV_FILE"
+previous_tag=$(env_value FLUXKIT_IMAGE_TAG)
+[ -n "$previous_tag" ] || fail "FLUXKIT_IMAGE_TAG missing in $ENV_FILE"
+previous_release=$(readlink -f "$FLUXKIT_ROOT/current") || fail "$FLUXKIT_ROOT/current is missing"
+
+release_dir="$FLUXKIT_ROOT/releases/$tag"
+staging=$(mktemp -d "$FLUXKIT_ROOT/releases/.incoming-XXXXXX")
+trap 'rm -rf "$staging"' EXIT
+tar -x --no-same-owner --no-same-permissions -C "$staging" -f - infra
+[ -f "$staging/infra/docker-compose.prod.yml" ] || fail "the release archive has no infra/docker-compose.prod.yml"
+if [ -d "$release_dir" ]; then
+  log "release directory $release_dir exists: kept (same commit, same files)"
+else
+  chmod 755 "$staging"
+  mv "$staging" "$release_dir"
+fi
+
+log "release $tag (running: $previous_tag)"
+FLUXKIT_IMAGE_TAG=$tag compose "$release_dir" pull --quiet
+
+if [ -x "$BACKUP_COMMAND" ]; then
+  log "backup before the switch"
+  "$BACKUP_COMMAND"
+else
+  log "no backup command at $BACKUP_COMMAND: no backup taken"
+fi
+
+cp -p "$ENV_FILE" "$ENV_FILE.pre-deploy"
+sed -i "s/^FLUXKIT_IMAGE_TAG=.*/FLUXKIT_IMAGE_TAG=$tag/" "$ENV_FILE"
+ln -sfn "$release_dir" "$FLUXKIT_ROOT/current"
+
+if compose "$release_dir" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build; then
+  log "release $tag is up"
+  if [ -x "$PRUNE_COMMAND" ]; then
+    "$PRUNE_COMMAND" || log "warning: image cleanup failed; the release runs (run $PRUNE_COMMAND by hand)"
+  fi
+  exit 0
+fi
+
+log "release $tag did not become healthy; starting $previous_tag again" >&2
+compose "$release_dir" logs --tail 50 migrate api >&2 || true
+cp -p "$ENV_FILE.pre-deploy" "$ENV_FILE"
+ln -sfn "$previous_release" "$FLUXKIT_ROOT/current"
+compose "$previous_release" up -d --wait --wait-timeout "$WAIT_SECONDS" --no-build ||
+  fail "the previous release $previous_tag did not start either; if $tag ran a migration, restore the backup (docs/deployment.md, \"Updates and migrations\")"
+fail "release $tag failed; $previous_tag runs again"
