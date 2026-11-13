@@ -1,5 +1,5 @@
 /*
- * The media port of feature packages (ADR 0049, contract `docs/contracts/features.md`). Types only: `apps/api` implements it
+ * The media port of feature packages (ADR 0049, contract: `docs/contracts/README.md`, "Feature extension points"). Types only: `apps/api` implements it
  * over its `media_upload` table and provides it under `MEDIA_PORT` of `@fluxkit/api-kit`, so a feature references uploads
  * by id without ever reading that table.
  */

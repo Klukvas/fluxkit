@@ -1,5 +1,5 @@
 /*
- * The public entry of the API kit (ADR 0049, contract `docs/contracts/features.md`): the minimum a feature package needs
+ * The public entry of the API kit (ADR 0049, contract: `docs/contracts/README.md`, "Feature extension points"): the minimum a feature package needs
  * to raise the API's problems, declare admin permissions and reach the API's database, media and locales. Nothing else
  * is exported here on purpose; the API's own internals use `@fluxkit/api-kit/internal`, which features must not import.
  */

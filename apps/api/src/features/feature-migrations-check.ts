@@ -34,7 +34,7 @@ export async function assertFeatureMigrationsApplied(
   if (problems.length > 0) {
     throw new Error(
       `Enabled features have migrations that are not applied: ${problems.join("; ")}. ` +
-        "Run `pnpm db:migrate` with the same FEATURES_ENABLED before starting the API (docs/contracts/features.md).",
+        "Run `pnpm db:migrate` with the same FEATURES_ENABLED before starting the API (docs/contracts/README.md, section Feature extension points).",
     );
   }
 }

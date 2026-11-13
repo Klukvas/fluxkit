@@ -71,7 +71,7 @@ for config in "$repo_root"/packages/features/*/drizzle.config.ts "$api_dir"/src/
   [ -f "$config" ] || continue
   dir="$(dirname "$config")"
   check "feature ${dir#"$repo_root"/}" "$dir" \
-    "Run drizzle-kit generate in ${dir#"$repo_root"/}, add the matching .down.sql (it also deletes its row from drizzle.__drizzle_migrations_feature_<name>), and commit both (docs/contracts/features.md)."
+    "Run drizzle-kit generate in ${dir#"$repo_root"/}, add the matching .down.sql (it also deletes its row from drizzle.__drizzle_migrations_feature_<name>), and commit both (docs/contracts/README.md, section Feature extension points)."
   features=$((features + 1))
 done
 

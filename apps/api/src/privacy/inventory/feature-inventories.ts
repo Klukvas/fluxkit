@@ -48,7 +48,7 @@ export function mergeFeatureInventories(
     if (feature.personalDataInventory === undefined) {
       if (feature.migrationsFolder !== undefined) {
         throw new Error(
-          `Feature "${feature.name}" ships migrations but exports no personalDataInventory (ADR 0033, docs/contracts/features.md).`,
+          `Feature "${feature.name}" ships migrations but exports no personalDataInventory (ADR 0033; docs/contracts/README.md, section Feature extension points).`,
         );
       }
       continue;
