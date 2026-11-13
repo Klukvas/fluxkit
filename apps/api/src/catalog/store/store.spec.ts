@@ -722,10 +722,24 @@ describe("store API (public, real app, real Postgres)", () => {
         publishedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T.*Z$/),
         price: { from: 1000, to: 1500, currency: "UAH" },
         availability: "in_stock",
+        // Several sellable variants: the shopper chooses on the product page.
+        defaultVariantId: null,
       });
       expect(second?.image).toBeNull();
+      // p2 is a simple product: its one variant can be added from the list.
+      expect(second?.defaultVariantId).toBe(ids["variant:SIMPLE"]);
       expect(Object.keys(first ?? {}).sort()).toEqual(
-        ["availability", "brand", "id", "image", "price", "publishedAt", "slug", "title"].sort(),
+        [
+          "availability",
+          "brand",
+          "defaultVariantId",
+          "id",
+          "image",
+          "price",
+          "publishedAt",
+          "slug",
+          "title",
+        ].sort(),
       );
     });
 
@@ -1521,6 +1535,8 @@ describe("store API (public, real app, real Postgres)", () => {
       await rule("rule-low-in", [low, inStock, outOfStock], 37);
       // The only in-stock variant is priceless, so it does not count: the product is out of stock.
       await rule("rule-hidden-in", [outOfStock, { ...inStock, prices: [] }], 38);
+      // One active variant next to an inactive one: the active one is the default variant of the list.
+      await rule("rule-inactive-extra", [inStock, { ...inStock, isActive: false }], 39);
     });
 
     afterAll(async () => {
@@ -1673,6 +1689,28 @@ describe("store API (public, real app, real Postgres)", () => {
         expect(await detailOf("rule-hidden-in")).toBe("out_of_stock");
         // The stock product has an in-stock variant.
         expect(byId.get(idOf("stock"))?.availability).toBe("in_stock");
+      });
+
+      it("names the default variant only when exactly one variant is sellable, whatever its stock", async () => {
+        const byId = new Map((await brandPage("brand-p")).items.map((item) => [item.id, item]));
+        const defaultOf = (key: string) => byId.get(idOf(key))?.defaultVariantId;
+        // One sellable variant: the simple product, and products whose other variants are priceless (no shop price).
+        expect(defaultOf("maxPrice")).toBe(idOf("variant:MAX"));
+        expect(defaultOf("pricedOptions")).toBe(idOf("variant:PO-RED-S"));
+        // The only sellable variant is out of stock: still named (the storefront decides it cannot be added).
+        expect(defaultOf("rule-hidden-in")).toBe(idOf("variant:RULE-HIDDEN-IN-0"));
+        expect(byId.get(idOf("rule-hidden-in"))?.availability).toBe("out_of_stock");
+        // Several sellable variants, however many are hidden next to them: none.
+        expect(defaultOf("priceMix")).toBeNull();
+        expect(defaultOf("rule-all-out")).toBeNull();
+        expect(defaultOf("stock")).toBeNull();
+      });
+
+      it("ignores an inactive variant when naming the default variant", async () => {
+        const byId = new Map((await brandPage("brand-p")).items.map((item) => [item.id, item]));
+        expect(byId.get(idOf("rule-inactive-extra"))?.defaultVariantId).toBe(
+          idOf("variant:RULE-INACTIVE-EXTRA-0"),
+        );
       });
 
       it("still lists a product whose sellable variants are all out of stock", async () => {

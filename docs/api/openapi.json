@@ -1229,6 +1229,12 @@
                             "type": "string",
                             "enum": ["in_stock", "low_stock", "out_of_stock"]
                           },
+                          "defaultVariantId": {
+                            "nullable": true,
+                            "description": "The id of the product's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
+                            "type": "string",
+                            "format": "uuid"
+                          },
                           "match": {
                             "description": "Present only when the request selects at variant level (`inStock`, `price`, an option, or a variant-level attribute): the sellable variants that fit the facets and the price (not the words), from current data. `null` when none fits any more (the index is behind; the product is queued for sync). Absent otherwise: then every variant matches and `price` and `availability` describe them.",
                             "nullable": true,
@@ -1308,7 +1314,8 @@
                           "image",
                           "publishedAt",
                           "price",
-                          "availability"
+                          "availability",
+                          "defaultVariantId"
                         ],
                         "additionalProperties": false
                       }
@@ -31241,6 +31248,12 @@
                           "availability": {
                             "type": "string",
                             "enum": ["in_stock", "low_stock", "out_of_stock"]
+                          },
+                          "defaultVariantId": {
+                            "nullable": true,
+                            "description": "The id of the product's only sellable variant (active and priced in the shop currency), so a list can add it to the cart without opening the product; null when the product has several sellable variants (the shopper chooses on the product page). Set whatever the variant's availability: an out-of-stock variant still has its id here.",
+                            "type": "string",
+                            "format": "uuid"
                           }
                         },
                         "required": [
@@ -31251,7 +31264,8 @@
                           "image",
                           "publishedAt",
                           "price",
-                          "availability"
+                          "availability",
+                          "defaultVariantId"
                         ],
                         "additionalProperties": false
                       }

@@ -83,6 +83,8 @@ export function summary(
     publishedAt: "2026-10-01T10:00:00.000Z",
     price: { from: 1999, to: 1999, currency: "UAH" },
     availability,
+    // Several variants by default: the card links to the product page to choose one.
+    defaultVariantId: null,
     ...overrides,
   };
 }

@@ -444,6 +444,7 @@ const productList: Shape<ProductList> = {
           publishedAt: "string",
           price: priceRange,
           availability,
+          defaultVariantId: { nullable: "string" },
         },
       },
     },
