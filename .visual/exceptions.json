@@ -100,21 +100,21 @@
     "theme": "light",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: every page carries the footer, and its height changes on every page (1280: link groups become vertical columns with headings, about 260 to 310 px of content; 390: two columns, taller still), so every full-page frame changes size and only a whole-page mask can declare it; the header and footer themselves are declared by their own masks. Re-baseline after merge."
   },
   {
     "page": "*",
     "theme": "dark",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: every page carries the footer, and its height changes on every page (1280: link groups become vertical columns with headings, about 260 to 310 px of content; 390: two columns, taller still), so every full-page frame changes size and only a whole-page mask can declare it; the header and footer themselves are declared by their own masks. Re-baseline after merge."
   },
   {
     "page": "*",
     "theme": "system",
     "selector": "page.body",
     "property": "screenshot",
-    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: every page carries the footer, and its height changes on every page (1280: link groups become vertical columns with headings, about 260 to 310 px of content; 390: two columns, taller still), so every full-page frame changes size and only a whole-page mask can declare it; the header and footer themselves are declared by their own masks. Re-baseline after merge."
   },
   {
     "page": "*",
