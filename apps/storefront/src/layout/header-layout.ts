@@ -151,7 +151,10 @@ function pickerCategory(locale: Locale, category: NavigationCategory): HeaderCat
  * The header's blocks as `SiteHeader` renders them, in config order. Left out: `search` when the shop has no search, `menu`
  * and `navigation` when there is no link at all (no empty landmark), `navigation` in `picker` mode (the menu's disclosure is
  * the picker), the `theme` control while `showThemeSwitch` (`showToggle` of `config/theme.ts`) is false, and `controls` when
- * nothing is left in it. `categories` is `null` when the API could not be read: the configured links still show. A config
+ * nothing is left in it. `categories` is `null` when the API could not be read: the configured links still show.
+ * `featureLinks` are the header links of the enabled feature slices (`features/registry.ts`, `docs/contracts/header-footer.md`):
+ * appended after `navigation.links` wherever those show, a path the config already links left out; none, and the view is
+ * exactly the config's. A config
  * with a structural problem throws here (`assertHeaderConfig`), so a fork that skipped the tests still fails loudly on the
  * first page instead of rendering a broken header.
  */
@@ -163,12 +166,17 @@ export function headerView(
     categories: readonly NavigationCategory[] | null;
     searchEnabled: boolean;
     showThemeSwitch: boolean;
+    /** The header links of the enabled feature slices; none when left out. */
+    featureLinks?: readonly NavigationLink[];
   },
 ): HeaderBlockView[] {
   assertHeaderConfig(config);
   const { locale, t } = input;
   const shownCategories = (input.categories ?? []).slice(0, config.navigation.categoryLimit);
-  const configuredLinks: HeaderLink[] = config.navigation.links.map((link) => ({
+  const configuredLinks: HeaderLink[] = appendFeatureLinks(
+    config.navigation.links,
+    input.featureLinks ?? [],
+  ).map((link) => ({
     key: link.href,
     href: localizedHref(locale, link.href),
     label: t(link.labelKey),
@@ -220,6 +228,25 @@ export function headerView(
     }
   }
   return blocks;
+}
+
+/**
+ * `links` followed by the feature links whose path is not among them yet (a fork that links a feature's page itself keeps its
+ * own entry, in its own place). Shared with the footer.
+ */
+export function appendFeatureLinks(
+  links: readonly NavigationLink[],
+  featureLinks: readonly NavigationLink[],
+): readonly NavigationLink[] {
+  if (featureLinks.length === 0) return links;
+  const known = new Set(links.map((link) => link.href));
+  const added: NavigationLink[] = [];
+  for (const link of featureLinks) {
+    if (known.has(link.href)) continue;
+    known.add(link.href);
+    added.push(link);
+  }
+  return [...links, ...added];
 }
 
 /** The values that occur more than once, each once (for one problem per repeated value). */

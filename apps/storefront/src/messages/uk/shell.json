@@ -32,6 +32,7 @@
   "footer.group.shop": "Покупцям",
   "footer.group.legal": "Правова інформація",
   "footer.group.contacts": "Контакти",
+  "footer.group.more": "Більше",
   "locale.switcher.label": "Мова сайту",
   "locale.switcher.current": "Мова сайту: {name}",
   "locale.short.uk": "УКР",

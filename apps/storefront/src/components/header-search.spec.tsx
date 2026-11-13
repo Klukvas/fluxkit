@@ -61,7 +61,7 @@ describe("the header's search box and the shop's search setting (availability ga
     // configured blocks (`config/header.ts`) can only leave the box out, never force it in.
     const header = readFileSync(join(root, "components", "site-header.tsx"), "utf8");
     expect(header).toMatch(
-      /headerView\(config, \{ locale, t, categories, searchEnabled, showThemeSwitch \}\)/,
+      /headerView\(config, \{\s*locale,\s*t,\s*categories,\s*searchEnabled,\s*showThemeSwitch,\s*featureLinks,?\s*\}\)/,
     );
     const view = readFileSync(join(root, "layout", "header-layout.ts"), "utf8");
     expect(view).toMatch(

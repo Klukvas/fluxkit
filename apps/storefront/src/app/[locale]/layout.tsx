@@ -6,6 +6,8 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { SiteShell } from "../../components/site-shell";
 import { brand } from "../../config/brand";
+import { featureNavigation, storefrontFeatures } from "../../features/registry";
+import { shellEnabledFeatures } from "../../features/runtime.server";
 import { fonts } from "../../config/fonts";
 import { themeConfig } from "../../config/theme";
 import { brandIconsMetadata, brandThemeColor } from "../../lib/brand";
@@ -75,6 +77,12 @@ export default async function LocaleLayout({
   const categories = await navigationCategories(locale);
   const searchEnabled = await headerSearchEnabled();
   const themeMode = await requestThemeMode();
+  // The links of the enabled feature slices (none while `GET /store/config` lists no feature, or cannot be read).
+  const enabledFeatures = await shellEnabledFeatures();
+  const featureLinks = {
+    header: featureNavigation(storefrontFeatures, enabledFeatures, "header"),
+    footer: featureNavigation(storefrontFeatures, enabledFeatures, "footer"),
+  };
 
   return (
     // The fonts' `variable` classes (`config/fonts.ts`; none in the template, then no attribute) sit on <html>, where the tokens are.
@@ -88,6 +96,7 @@ export default async function LocaleLayout({
           searchEnabled={searchEnabled}
           year={new Date().getFullYear()}
           themeMode={themeMode}
+          featureLinks={featureLinks}
         >
           {children}
         </SiteShell>

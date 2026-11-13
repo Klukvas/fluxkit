@@ -5,6 +5,7 @@ import { themeConfig } from "../config/theme";
 import { messagesByLocale } from "../messages";
 import { contactsView } from "../lib/contacts";
 import {
+  FOOTER_FEATURES_HEADING,
   FOOTER_GROUP_HEADINGS,
   assertFooterConfig,
   footerConfigProblems,
@@ -233,5 +234,48 @@ describe("footer text lines and group headings", () => {
     expect(
       problems({ ...base, navigation: { groups: [{ kind: "links", links: [link, link] }] } }),
     ).toEqual(['footer link "/catalog" is listed more than once in group 1']);
+  });
+});
+
+describe("footerView: links of the enabled feature slices (plan 2026-11-13-blog.md, E7)", () => {
+  const notebook = { labelKey: "features.notebook.nav", href: "/notebook" };
+  const featureLinks = [notebook, { labelKey: "features.notebook.nav", href: "/about" }];
+
+  it("appends them to the shop pages group, without a path already there", () => {
+    expect(footerView(base, { ...input, featureLinks })).toEqual([
+      { kind: "navigation", groups: [group([...shopLinks, notebook]), group(legalLinks)] },
+      { kind: "contacts", contacts },
+      { kind: "themeSwitch" },
+      { kind: "copyright" },
+    ]);
+  });
+
+  it("puts them in a group of their own at the end when the config has no shop pages group (headed in the columns layout)", () => {
+    const legalOnly: FooterConfig = { ...base, navigation: { groups: [{ kind: "legal" }] } };
+    expect(footerView(legalOnly, { ...input, featureLinks })[0]).toEqual({
+      kind: "navigation",
+      groups: [group(legalLinks), group(featureLinks)],
+    });
+    expect(footerView({ ...legalOnly, layout: "columns" }, { ...input, featureLinks })[0]).toEqual({
+      kind: "navigation",
+      groups: [
+        group(legalLinks, FOOTER_GROUP_HEADINGS.legal),
+        group(featureLinks, FOOTER_FEATURES_HEADING),
+      ],
+    });
+    // A footer without any navigation group still gets its navigation from a feature.
+    const noGroups: FooterConfig = { ...base, navigation: { groups: [] } };
+    expect(footerView(noGroups, input).map((block) => block.kind)).not.toContain("navigation");
+    expect(footerView(noGroups, { ...input, featureLinks })[0]).toEqual({
+      kind: "navigation",
+      groups: [group(featureLinks)],
+    });
+  });
+
+  it("is exactly the config's view without feature links, and the heading exists in both locales", () => {
+    expect(footerView(base, { ...input, featureLinks: [] })).toEqual(footerView(base, input));
+    for (const locale of ["uk", "en"] as const) {
+      expect(keysOf(locale).has(FOOTER_FEATURES_HEADING), locale).toBe(true);
+    }
   });
 });
