@@ -21,6 +21,7 @@ import { DEFAULT_CUSTOMER_AUTH_CONFIG } from "./customers/auth/customer-auth-con
 import type { ScryptParams } from "./auth/password-hasher.js";
 import type { RateLimitOverrides } from "./rate-limit/rate-limiter.js";
 import { DEFAULT_PRICING_CONFIG, toPricingConfig } from "./common/pricing-config.js";
+import { adminJsonBodyLimitBytes, isAdminContentJsonRequest } from "./common/json-body-limit.js";
 import { documentAdminPermissions } from "./auth/admin-permission-docs.js";
 import { documentAdminCsrf, documentStoreContract } from "./common/openapi.js";
 import {
@@ -247,6 +248,14 @@ export async function createApp(
   // The payment webhook keeps its exact body bytes (ADR 0032 decision 12): mounted before Nest registers its JSON parser
   // at init, on this path only, so no other route's raw body is kept and the signature is checked over what arrived.
   app.use(PAYMENT_WEBHOOK_PATH, paymentWebhookRawBody());
+  // JSON parsers, after the webhook reader (common/json-body-limit.ts): a larger limit for the admin content area, then
+  // Express's default for everything else. Registering a JSON parser here makes Nest skip its own at init, so the second
+  // line restores exactly that default; the urlencoded parser Nest still adds.
+  app.useBodyParser("json", {
+    limit: adminJsonBodyLimitBytes((env.locales ?? DEFAULT_LOCALES).length),
+    type: isAdminContentJsonRequest,
+  });
+  app.useBodyParser("json");
   // The one place Express is configured, so the API, the specs and the OpenAPI export all see the same `request.ip`.
   // 0 (the default) trusts no proxy: the client is the socket address and `X-Forwarded-For` is ignored.
   app.set("trust proxy", env.trustProxy ?? DEFAULT_TRUST_PROXY);
