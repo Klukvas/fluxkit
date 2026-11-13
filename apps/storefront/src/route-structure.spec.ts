@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
+import { locales } from "@fluxkit/ui";
 import { describe, expect, it } from "vitest";
+import { knownShopPageSlugs, shopPages } from "./config/shop-pages";
+import { coreFirstSegments, featureSlicePages, featureSliceProblems } from "./features/slice-rules";
+import { RESERVED_SLUGS } from "./lib/shop-pages";
 
 const appRoot = join(import.meta.dirname, "app");
 const localeRoot = join(appRoot, "[locale]");
@@ -18,6 +22,9 @@ const mustAnswerRealNotFound = [
   // The shop pages (`config/shop-pages.ts`): an unknown or switched-off slug.
   "(pages)/[page]/page.tsx",
   "[...rest]/page.tsx",
+  // Every page of a feature slice (`(feature-<name>)/`, plan 2026-11-13-blog.md E5): a feature that is off, or content that
+  // does not exist, answers a real 404.
+  ...featureSlicePages(localeRoot),
 ];
 
 /**
@@ -105,6 +112,18 @@ describe("route structure", () => {
     const page = join(localeRoot, route);
     expect(existsSync(page), route).toBe(true);
     expect(loadingFilesAbove(page), `loading.tsx above ${route}`).toEqual([]);
+  });
+
+  it("keeps every feature slice to its rules: layout, manifest, messages, no loading view, the gate first, its own path", () => {
+    // The first path segment of a slice's page must not be a shop page slug (`(pages)/[page]` would lose that page to the
+    // static segment, silently), a reserved slug or another route's segment.
+    const reserved = new Set<string>([
+      ...RESERVED_SLUGS,
+      ...knownShopPageSlugs,
+      ...shopPages.map((page) => page.slug),
+      ...coreFirstSegments(localeRoot),
+    ]);
+    expect(featureSliceProblems(localeRoot, { locales, reserved })).toEqual([]);
   });
 
   it("keeps a loading.tsx only on pages that never call notFound() for missing content", () => {
