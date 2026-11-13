@@ -229,3 +229,25 @@ First run: merging PR 264 (`ad1e09d`) on 2026-11-12 started `CI` (17.5 min), the
 
 Not tried yet: the automatic return to the previous release on a real host (only against a fake `docker`), a release with a new
 migration, a manual `workflow_dispatch` run. The Docker Hub repositories `klukvas/fluxkit-*` are public (anyone can pull the images).
+
+## 17. Own domain `fluxkitcore.com` (2026-11-13, owner's "yes, run them")
+
+The owner bought `fluxkitcore.com` at Cloudflare Registrar (DNS at Cloudflare). Same steps as section 14, plus the deploy variables.
+
+| Step | What was done | Undo |
+|---|---|---|
+| 1 | Cloudflare DNS: `A fluxkitcore.com` and `A www.fluxkitcore.com` to `178.104.79.222`, **DNS only** (a Cloudflare proxy would add a hop: `TRUST_PROXY` 2 and an appending edge, `docs/deployment.md`) | delete the two records |
+| 2 | `fluxkit-backup` before any change: `db-2026-11-13T155449Z.dump`, `media-2026-11-13T155449Z.tgz` | - |
+| 3 | `certbot certonly --webroot --cert-name fluxkitcore.com -d fluxkitcore.com -d www.fluxkitcore.com` (staging dry run first), issuer `YE2`, valid until 2027-02-11; the renewal timer of section 14 renews it with the rest | `certbot delete --cert-name fluxkitcore.com` |
+| 4 | `fluxkit-install-cert`: `NAME=fluxkitcore.com` (copy `fluxkit-install-cert.bak-2026-11-13`); `production.env`: `FLUXKIT_DOMAIN` and `STOREFRONT_IMAGE_HOSTS` set to `fluxkitcore.com` (copy `production.env.bak-2026-11-13`) | restore both copies |
+| 5 | One transaction rewrote `media.url` from `https://178-104-79-222.sslip.io/media/` to `https://fluxkitcore.com/media/`: 91 of 91 rows (`brand.logo_url` and `order_item.image_url` had none) | the reverse `UPDATE`, or restore the dump of step 2 |
+| 6 | `fluxkit-install-cert`, then `fk up -d --wait`: all healthy | - |
+| 7 | Repository variables `STOREFRONT_IMAGE_HOSTS=fluxkitcore.com`, `DEPLOY_PUBLIC_URL=https://fluxkitcore.com`; Deploy run by hand (`workflow_dispatch`) to rebuild the storefront (the image host is a build argument) | set the old values, run Deploy |
+
+Verified from outside, without skipping certificate checks (after the Deploy run of step 7, `1f184c0` with the new image host): `/` 307 to `/uk`, `/uk`, `/store/config`, `/admin-ui/`, `https://www.fluxkitcore.com/uk` 200; `http://fluxkitcore.com/uk` and `http://178-104-79-222.sslip.io/uk` 301 to `https://fluxkitcore.com/uk`; HSTS present; CSP `img-src` names `fluxkitcore.com`; no `sslip` left in the HTML of `/uk` and `/uk/catalog`; every optimized picture of `/uk` (11) and `/uk/catalog` (24) answers 200; the catalog shows its pictures in Chrome. 13 GB free on the host.
+
+Notes:
+- An automatic deployment of `1f184c0` (merged 2026-11-13) finished at 15:55:44 UTC, about 30 s before step 4 changed `production.env`; the two did not overlap (the env file has both changes), but host changes should wait for a running Deploy next time.
+- `workflow_dispatch` with `sha` needs the full commit hash: a short one fails in `actions/checkout` ("A branch or tag with the name ... could not be found"). Empty `sha` deploys the head of `main`.
+- The old `178-104-79-222.sslip.io` certificate is still in `/etc/letsencrypt` and renewed by the timer; `http://178-104-79-222.sslip.io/...` redirects to `https://fluxkitcore.com/...`, `https://178-104-79-222.sslip.io` now shows a name warning.
+- `https://www.fluxkitcore.com` serves the shop itself (one `server` block on 443), it does not redirect to the bare domain.
