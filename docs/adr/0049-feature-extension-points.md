@@ -13,7 +13,7 @@ by id); changes none of them. Records E1 to E4 of the plan (PR 1); E5 to E9 come
 - The first feature with a table (blog) needs all of them; later features reuse them.
 
 ## Decision
-1. API kit packages/api-kit (@fluxkit/api-kit), depending on @nestjs/common (peer 12.2.0) and @fluxkit/core only. Public entry:
+1. API kit packages/api-kit (@fluxkit/api-kit), depending on @nestjs/common 12.2.0 (a runtime dependency with its peers reflect-metadata and rxjs at the API's versions: the production image installs with --prod, which links no peer of a workspace package) and @fluxkit/core only. Public entry:
    ProblemException (+ ProblemCode, ProblemInit, FieldError, ProblemExtensions), RequirePermission, AdminController (+ DefaultPermissions),
    FEATURE_DATABASE, MEDIA_PORT, LOCALE_CONFIG (+ LocaleConfig). Moved unchanged with re-exports from the old apps/api paths; the four
    metadata key strings are pinned. ./internal holds the API-only values (not a contract; features must not import it). The kit's
