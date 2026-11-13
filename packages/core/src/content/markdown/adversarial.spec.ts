@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MARKDOWN_LIMITS } from "./limits.js";
 import { parseMarkdown } from "./parse.js";
+import { runMarkdownParse } from "./run-parse.js";
 import type {
   MarkdownBlock,
   MarkdownDocument,
@@ -64,12 +65,26 @@ function expectBounded(result: MarkdownParseResult): void {
   }
 }
 
-/** Each timing test parses its input seven times at the length limit; a slow runner must not hit vitest's 5 s default. */
+/** Each timing test parses its input four times at the length limit; a slow runner must not hit vitest's 5 s default. */
 const TIMING_TEST_TIMEOUT_MS = 30_000;
+/** Work of an 8x larger input: linear is 8x; n log n would be about 10x here, quadratic 64x. */
+const MAX_WORK_RATIO = 9;
+
+/** An adversarial input: a unit repeated up to the length, or a builder for inputs with more than one part. */
+type AdversarialInput = string | ((length: number) => string);
 
 /** Builds an input of about `length` characters by repeating `unit`. */
 function repeatTo(unit: string, length: number): string {
   return unit.repeat(Math.floor(length / unit.length));
+}
+
+function sourceOf(input: AdversarialInput, length: number): string {
+  return typeof input === "string" ? repeatTo(input, length) : input(length);
+}
+
+/** The parser's own work count (characters visited and loop steps): deterministic, unlike wall-clock time. */
+function stepsOf(source: string): number {
+  return runMarkdownParse(source, OPTIONS).steps;
 }
 
 /**
@@ -89,8 +104,8 @@ function timeOf(source: string): number {
   return best;
 }
 
-/** Adversarial inputs (blog plan section 8 and 12), each a unit repeated up to the length limit. */
-const ADVERSARIAL: readonly [string, string][] = [
+/** Adversarial inputs (blog plan section 8 and 12), each a unit repeated up to the length limit or built for it. */
+const ADVERSARIAL: readonly [string, AdversarialInput][] = [
   ["stars", "*"],
   ["underscores", "_"],
   ["opening brackets", "["],
@@ -123,6 +138,21 @@ const ADVERSARIAL: readonly [string, string][] = [
   ["spaces then a word", "                                        b\n"],
   ["valid links", "[a](/x) "],
   ["empty brackets before unclosed targets", "[]("],
+  ["link targets that start inside one another", "[a](x"],
+  [
+    "link targets inside one another, closed far away",
+    (length) => repeatTo("[a](x", length - 1) + ")",
+  ],
+  // Openers that stay on the stack, then closers of the other character that can never match them: without CommonMark's
+  // `openers_bottom` table every closer would walk back over all the openers.
+  [
+    "openers then closers of another character",
+    (length) => repeatTo("*a ", length / 2) + repeatTo("b_ ", length / 2),
+  ],
+  [
+    "strong openers then emphasis closers",
+    (length) => repeatTo("**a ", length / 2) + repeatTo("b* ", length / 2),
+  ],
 ];
 
 /** A small deterministic generator (mulberry32), so a failing case is the same on every run. */
@@ -148,21 +178,25 @@ const FUZZ_PIECES = [
 ];
 
 describe("parseMarkdown, adversarial input", () => {
-  it.each(ADVERSARIAL)("%s: bounded output at the length limit", (_name, unit) => {
-    expectBounded(parse(repeatTo(unit, MAX)));
+  it.each(ADVERSARIAL)("%s: bounded output at the length limit", (_name, input) => {
+    expectBounded(parse(sourceOf(input, MAX)));
   });
 
   it.each(ADVERSARIAL)(
-    "%s: linear time (8x the input costs far less than 64x the time)",
-    (_name, unit) => {
-      const small = repeatTo(unit, MAX / 8);
-      const large = repeatTo(unit, MAX);
-      parse(large); // warm up the JIT before measuring
-      const smallTime = timeOf(small);
-      const largeTime = timeOf(large);
-      // Linear is about 8x; quadratic would be about 64x. The floor absorbs timer noise and slow CI runners.
-      expect(largeTime).toBeLessThan(Math.max(smallTime * 24, 100));
-      expect(largeTime).toBeLessThan(1_000);
+    "%s: linear work (8x the input, at most 9x the parser's steps)",
+    (_name, input) => {
+      const small = stepsOf(sourceOf(input, MAX / 8));
+      const large = stepsOf(sourceOf(input, MAX));
+      expect(large).toBeLessThanOrEqual(small * MAX_WORK_RATIO);
+    },
+  );
+
+  it.each(ADVERSARIAL)(
+    "%s: under a second at the length limit (a coarse wall-clock backstop)",
+    (_name, input) => {
+      const source = sourceOf(input, MAX);
+      parse(source); // warm up the JIT before measuring
+      expect(timeOf(source)).toBeLessThan(1_000);
     },
     TIMING_TEST_TIMEOUT_MS,
   );
