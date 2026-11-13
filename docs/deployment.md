@@ -118,7 +118,7 @@ Switching one on (the blog here):
 ```bash
 C="docker compose --env-file infra/production.env -f infra/docker-compose.prod.yml"
 # 1. Back up (next sections), then add the name to infra/production.env (comma-separated): FEATURES_ENABLED=blog
-# 2. Its migrations: the migrate service reads the same env file. Prints: Feature "blog": applied 1 migration
+# 2. Its migrations: the migrate service reads the same env file. Prints `Feature "blog": applied 1 migration:` and the migration tag
 $C run --rm --no-deps migrate
 # 3. Start the API with the new env file
 $C up -d --no-deps --force-recreate --wait api
@@ -131,7 +131,7 @@ $C up -d --no-deps --force-recreate --wait api
   its next read of the config (a page load).
 - Switching off: remove the name and run step 3. The routes answer `404` at once, the storefront's pages within 60 s. The tables and
   their rows stay (switching on again brings them back); nothing is migrated.
-- Removing a feature and its data: switch it off, back up, then run the feature's `.down.sql` files from the newest, BEFORE any core
+- Removing a feature and its data (the `.down.sql` drops the feature's tables and every row in them: blog posts are gone): switch it off, back up, then run the feature's `.down.sql` files from the newest, BEFORE any core
   down migration (a feature table may reference a core table, `blog_post` references `media_upload`; core never references a feature
   table). From the API image, so a host with only `infra/` can do it:
   `$C run --rm --no-deps -T api cat /app/packages/features/blog/drizzle/0000_blog_post.down.sql | $C exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1`.

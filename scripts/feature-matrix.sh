@@ -227,6 +227,9 @@ case "$mode" in
     pnpm install --no-frozen-lockfile
     # The storefront's registry comes from the slices on disk (its prebuild, pretypecheck and pretest below run this too).
     node scripts/generate-feature-registry.mjs
+    # A missing or foreign file must fail too: `! grep` alone would pass on grep's "no such file" exit code.
+    grep -q "generatedFeatures" apps/storefront/src/features/registry.generated.ts \
+      || { echo "the storefront registry was not generated" >&2; exit 1; }
     ! grep -qi "blog" apps/storefront/src/features/registry.generated.ts \
       || { echo "the generated storefront registry still names the blog" >&2; cat apps/storefront/src/features/registry.generated.ts >&2; exit 1; }
     pnpm lint
