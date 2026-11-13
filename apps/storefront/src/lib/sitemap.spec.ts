@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogOutcome, StoreData } from "./store-data";
-import { SITEMAP_PRODUCT_PAGE_SIZE, buildSitemap, collectSitemapProducts } from "./sitemap";
+import { feature as fixtureFeature } from "../features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
+import type { FeatureData, StorefrontFeature } from "../features/types";
+import {
+  SITEMAP_PRODUCT_PAGE_SIZE,
+  buildSitemap,
+  collectFeatureSitemapPages,
+  collectSitemapProducts,
+} from "./sitemap";
 import { category, summary } from "./test-fixtures";
 
 function ok<T>(data: T): CatalogOutcome<T> {
@@ -150,5 +157,113 @@ describe("buildSitemap", () => {
       publishedAt: "2026-03-01T10:00:00.000Z",
     }));
     expect(buildSitemap({ ...input, products }).length).toBeLessThan(50_000);
+  });
+});
+
+describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", () => {
+  const atlas: StorefrontFeature = {
+    ...fixtureFeature,
+    name: "atlas",
+    sitemap: async ({ locale, data }) => {
+      const outcome = await data.read<string[]>("GET /store/atlas/maps", async () => ({
+        ok: true,
+        status: 200,
+        data: [`maps-${locale}`],
+      }));
+      if (!outcome.ok) throw new Error("refused");
+      return outcome.data.map((slug) => ({ path: `/atlas/${slug}`, lastModified: "2026-11-01" }));
+    },
+  };
+  /** Feature data that answers every read with what the call gives, recording the feature it was asked for. */
+  function dataOf(asked: string[]) {
+    return (feature: string): FeatureData => ({
+      read: async (_operation, call) => {
+        asked.push(feature);
+        const result = await call({
+          baseUrl: "http://api.internal:3000",
+          fetch: async () => new Response(null),
+          options: {},
+        });
+        return result.ok
+          ? { ok: true, data: result.data, stale: false }
+          : { ok: false, status: result.status, problem: result.problem };
+      },
+    });
+  }
+
+  it("asks only the enabled slices, in registry order, through their own reads", async () => {
+    const asked: string[] = [];
+    const pages = await collectFeatureSitemapPages([atlas, fixtureFeature], ["notebook", "atlas"], {
+      locale: "uk",
+      data: dataOf(asked),
+    });
+    expect(pages).toEqual([
+      { path: "/atlas/maps-uk", lastModified: "2026-11-01" },
+      { path: "/notebook" },
+    ]);
+    expect(asked).toEqual(["atlas"]);
+    expect(
+      await collectFeatureSitemapPages([atlas, fixtureFeature], [], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
+    ).toEqual([]);
+  });
+
+  it("fails loudly on a refused read and on a path that is not a plain storefront path", async () => {
+    const refusing: StorefrontFeature = {
+      ...fixtureFeature,
+      sitemap: async () => {
+        throw new Error("GET /store/notebook/pages answered 500");
+      },
+    };
+    await expect(
+      collectFeatureSitemapPages([refusing], ["notebook"], { locale: "uk", data: dataOf([]) }),
+    ).rejects.toThrow(/answered 500/);
+    for (const path of ["https://example.com/x", "notebook", "/", "/a/../b"]) {
+      const odd: StorefrontFeature = { ...fixtureFeature, sitemap: async () => [{ path }] };
+      await expect(
+        collectFeatureSitemapPages([odd], ["notebook"], { locale: "uk", data: dataOf([]) }),
+        path,
+      ).rejects.toThrow(`The sitemap of feature "notebook" lists "${path}"`);
+    }
+  });
+
+  it("lists the feature pages after the shop pages, in every locale with alternates, and nothing without them", () => {
+    const input = {
+      origin: "https://shop.example",
+      locales: ["uk", "en"],
+      defaultLocale: "uk",
+      categories: [],
+      products: [],
+      shopPages: ["/about"],
+    };
+    const without = buildSitemap(input);
+    const urls = buildSitemap({
+      ...input,
+      featurePages: [{ path: "/notebook", lastModified: "2026-11-01" }],
+    });
+    expect(buildSitemap({ ...input, featurePages: [] })).toEqual(without);
+    expect(urls.map((entry) => entry.url)).toEqual([
+      "https://shop.example/uk",
+      "https://shop.example/en",
+      "https://shop.example/uk/catalog",
+      "https://shop.example/en/catalog",
+      "https://shop.example/uk/about",
+      "https://shop.example/en/about",
+      "https://shop.example/uk/notebook",
+      "https://shop.example/en/notebook",
+    ]);
+    expect(urls[6]).toEqual({
+      url: "https://shop.example/uk/notebook",
+      lastModified: "2026-11-01",
+      alternates: {
+        languages: {
+          uk: "https://shop.example/uk/notebook",
+          en: "https://shop.example/en/notebook",
+          "x-default": "https://shop.example/uk/notebook",
+        },
+      },
+    });
   });
 });
