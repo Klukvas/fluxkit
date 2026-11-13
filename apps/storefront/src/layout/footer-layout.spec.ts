@@ -1,14 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { footerConfig } from "../config/footer";
+import { headerConfig } from "../config/header";
 import { themeConfig } from "../config/theme";
 import { messagesByLocale } from "../messages";
 import { contactsView } from "../lib/contacts";
 import {
+  FOOTER_GROUP_HEADINGS,
   assertFooterConfig,
   footerConfigProblems,
   footerView,
   type FooterConfig,
 } from "./footer-layout";
+import { headerHasThemeControl } from "./header-layout";
+
+/** The switch shown and only in the footer (the checks below are about the footer's own block). */
+const footerOnly = { showToggle: true, inHeader: false };
 
 const keysOf = (locale: "uk" | "en") => new Set(Object.keys(messagesByLocale[locale]));
 const contacts = contactsView();
@@ -18,19 +24,22 @@ const base: FooterConfig = {
   blocks: ["navigation", "contacts", "themeSwitch", "copyright"],
   navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
 };
-const input = { shopLinks, legalLinks, contacts, showThemeSwitch: true };
+const input = { shopLinks, legalLinks, contacts, showThemeSwitch: true, themeInHeader: false };
 const group = (links: typeof shopLinks, headingKey: string | null = null) => ({
   headingKey,
   links,
 });
 
 describe("the footer config in config/footer.ts", () => {
-  // Runs on the template's file and, in the fork run (`vitest.brand-fork.config.ts`), on a filled fork config.
+  // Runs on the template's file and, in the fork run (`vitest.brand-fork.config.ts`), on a filled fork config. The theme
+  // switch check reads the real header config: the template's switch is the header's `theme` control.
   it("has no problems in either language", () => {
+    const theme = {
+      showToggle: themeConfig.showToggle,
+      inHeader: headerHasThemeControl(headerConfig),
+    };
     for (const locale of ["uk", "en"] as const) {
-      expect(footerConfigProblems(footerConfig, keysOf(locale), themeConfig.showToggle)).toEqual(
-        [],
-      );
+      expect(footerConfigProblems(footerConfig, keysOf(locale), theme)).toEqual([]);
     }
   });
 });
@@ -70,8 +79,8 @@ describe("footerView", () => {
 });
 
 describe("footerConfigProblems", () => {
-  const problems = (config: FooterConfig, showToggle = true) =>
-    footerConfigProblems(config, keysOf("en"), showToggle);
+  const problems = (config: FooterConfig, theme = footerOnly) =>
+    footerConfigProblems(config, keysOf("en"), theme);
 
   it("accepts the reference config", () => {
     expect(problems(base)).toEqual([]);
@@ -98,21 +107,89 @@ describe("footerConfigProblems", () => {
     ]);
   });
 
-  it("refuses a footer without the theme switch while config/theme.ts shows it (the choice could never be changed back)", () => {
+  it("refuses a footer without the theme switch while config/theme.ts shows it and the header has no theme control (the choice could never be changed back)", () => {
     const blocks = base.blocks.filter((block) => block !== "themeSwitch");
     expect(() => footerView({ ...base, blocks }, input)).toThrow(
       /config\/footer\.ts is invalid: footer block "themeSwitch" is missing/,
     );
-    expect(() => assertFooterConfig(base, true)).not.toThrow();
+    expect(() => assertFooterConfig(base, footerOnly)).not.toThrow();
     expect(problems({ ...base, blocks })).toEqual([
-      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true: set `showToggle: false` to hide the switch',
+      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true and config/header.ts lists no "theme" control: list one of them, or set `showToggle: false` to hide the switch',
     ]);
-    expect(problems({ ...base, blocks }, false)).toEqual([]);
+    expect(problems({ ...base, blocks }, { showToggle: false, inHeader: false })).toEqual([]);
+  });
+
+  it("accepts a footer without the switch when the header lists the theme control, and both places at once", () => {
+    const blocks = base.blocks.filter((block) => block !== "themeSwitch");
+    const inHeader = { showToggle: true, inHeader: true };
+    expect(problems({ ...base, blocks }, inHeader)).toEqual([]);
+    expect(problems(base, inHeader)).toEqual([]);
+    expect(() => footerView({ ...base, blocks }, { ...input, themeInHeader: true })).not.toThrow();
+  });
+});
+
+describe("the columns layout (round 4)", () => {
+  const columns: FooterConfig = {
+    layout: "columns",
+    blocks: ["navigation", "contacts", "copyright"],
+    navigation: { groups: [{ kind: "shopPages" }, { kind: "legal" }] },
+  };
+  const problems = (config: FooterConfig) =>
+    footerConfigProblems(config, keysOf("en"), { showToggle: true, inHeader: true });
+
+  it("gives the built-in groups their default headings, keeps a configured one, and leaves the stack layout without", () => {
+    const view = footerView(
+      {
+        ...columns,
+        navigation: {
+          groups: [{ kind: "shopPages" }, { kind: "legal", headingKey: "footer.nav.label" }],
+        },
+      },
+      { ...input, themeInHeader: true },
+    );
+    expect(view[0]).toEqual({
+      kind: "navigation",
+      groups: [
+        group(shopLinks, FOOTER_GROUP_HEADINGS.shopPages),
+        group(legalLinks, "footer.nav.label"),
+      ],
+    });
+    expect(footerView(base, input)[0]).toEqual({
+      kind: "navigation",
+      groups: [group(shopLinks), group(legalLinks)],
+    });
+  });
+
+  it("has its default headings in both locales", () => {
+    for (const locale of ["uk", "en"] as const) {
+      for (const key of [...Object.values(FOOTER_GROUP_HEADINGS), "footer.group.contacts"]) {
+        expect(keysOf(locale).has(key), `${locale} ${key}`).toBe(true);
+      }
+    }
+  });
+
+  it("refuses an own link group without a heading (each column is a navigation named by it)", () => {
+    const own = { labelKey: "nav.catalog", href: "/catalog" };
+    expect(
+      problems({ ...columns, navigation: { groups: [{ kind: "links", links: [own] }] } }),
+    ).toEqual([
+      "footer link group 1 needs a headingKey in the columns layout (each column is a navigation named by its heading)",
+    ]);
+    expect(
+      problems({
+        ...columns,
+        navigation: { groups: [{ kind: "links", links: [own], headingKey: "footer.nav.label" }] },
+      }),
+    ).toEqual([]);
+    // The stack layout keeps the heading optional.
+    expect(
+      problems({ ...base, navigation: { groups: [{ kind: "links", links: [own] }] } }),
+    ).toEqual([]);
   });
 });
 
 describe("footer text lines and group headings", () => {
-  const problems = (config: FooterConfig) => footerConfigProblems(config, keysOf("en"), true);
+  const problems = (config: FooterConfig) => footerConfigProblems(config, keysOf("en"), footerOnly);
 
   it("renders text blocks in their place and passes a group's heading key on", () => {
     const view = footerView(
@@ -140,7 +217,7 @@ describe("footer text lines and group headings", () => {
   it("refuses an empty block list, a repeated or unknown text key, an unknown heading key and a repeated link in a group", () => {
     expect(problems({ ...base, blocks: [] })).toEqual([
       "footer lists no blocks",
-      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true: set `showToggle: false` to hide the switch',
+      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true and config/header.ts lists no "theme" control: list one of them, or set `showToggle: false` to hide the switch',
     ]);
     const text = { kind: "text", textKey: "footer.nav.label" } as const;
     expect(problems({ ...base, blocks: [...base.blocks, text, text] })).toEqual([

@@ -2,17 +2,22 @@
  * The header as data (plan 2026-11-08-design-changeability.md, L3; contract `docs/contracts/header-footer.md`): the types of
  * the fork-owned `config/header.ts`, the pure view `components/site-header.tsx` renders, and the checks its spec runs. Only
  * what needs no change of the header's CSS structure is configurable: which blocks, in which order (with `controls` last), the
- * order of the controls, the number of categories and the links after them. A centred header, a second row or an announcement
+ * order of the controls, the number of categories, the links after them and how the navigation shows from `xl` (an inline
+ * row or a "Categories" picker, since round 4). A centred header, a second row or an announcement
  * bar is a code edit of `site-header.tsx`.
  */
 import type { Locale, Translator } from "@fluxkit/ui";
 import { isPlainStorefrontPath, localizedHref } from "../lib/locale-path";
 import type { NavigationLink } from "./navigation";
 
-/** A top-level category as the header links it (`lib/navigation-categories.ts`). */
+/**
+ * A top-level category as the header links it (`lib/navigation-categories.ts`), with its direct children from the same
+ * `GET /store/categories` tree (only the `picker` display shows them).
+ */
 export interface NavigationCategory {
   slug: string;
   name: string;
+  children?: readonly NavigationCategory[];
 }
 
 /**
@@ -23,8 +28,20 @@ export interface NavigationCategory {
  */
 export type HeaderBlockName = "menu" | "logo" | "navigation" | "search" | "controls";
 
-/** The client islands of the controls group: the language list, the cart icon with its count, the account menu. */
-export type HeaderControlName = "language" | "cart" | "account";
+/**
+ * The client islands of the controls group: the language list, the theme menu (Light / Dark / System, only while `showToggle`
+ * of `config/theme.ts` is true; below `sm` it moves into the menu's panel when the header has a menu, so a phone's row keeps
+ * room for the logo), the cart icon with its count, the account menu.
+ */
+export type HeaderControlName = "language" | "theme" | "cart" | "account";
+
+/**
+ * How the navigation shows from `xl`: `row`, the links inline in the header row (scrolling sideways when they do not fit);
+ * `picker`, ONE disclosure that is the menu button below `xl` and a "Categories" button from `xl`, whose panel lists the
+ * top-level categories with their children in columns, then the links. In `picker` mode the `navigation` block renders
+ * nothing (the `menu` block's disclosure is the picker), so the category list is in the page once.
+ */
+export type HeaderNavigationDisplay = "row" | "picker";
 
 export interface HeaderConfig {
   /** The blocks of the header row, in order; a block that is not listed is not rendered. Each at most once. */
@@ -32,6 +49,8 @@ export interface HeaderConfig {
   /** The controls of the `controls` block, in order; each at most once; not empty while `controls` is listed. */
   controls: readonly HeaderControlName[];
   navigation: {
+    /** `row` (also when omitted) or `picker`, see `HeaderNavigationDisplay`. */
+    display?: HeaderNavigationDisplay;
     /** Most top-level categories in the navigation, 0 to `HEADER_CATEGORY_LIMIT_MAX`; the rest are reachable through the catalog. */
     categoryLimit: number;
     /** Links after the categories: a message key and a storefront path without the locale (`localizedHref` adds it). */
@@ -42,6 +61,12 @@ export interface HeaderConfig {
 /** The upper bound of `categoryLimit`: the inline row scrolls, but every link is in each page's first HTML twice. */
 export const HEADER_CATEGORY_LIMIT_MAX = 12;
 
+/**
+ * Most children shown under one category in the `picker` panel: every link is in each page's first HTML, and the category's
+ * own page lists all of them. Not configurable.
+ */
+export const HEADER_CATEGORY_CHILDREN_MAX = 8;
+
 /** A resolved navigation link: a unique React key, the localized target, the label. */
 export interface HeaderLink {
   key: string;
@@ -49,15 +74,31 @@ export interface HeaderLink {
   label: string;
 }
 
+/** A category of the `picker` panel: its link and the links of its children (at most `HEADER_CATEGORY_CHILDREN_MAX`). */
+export interface HeaderCategoryLink extends HeaderLink {
+  children: readonly HeaderLink[];
+}
+
 /** The side of its button a dropdown panel is aligned with (`HeaderDisclosure`). */
 export type PanelAlign = "start" | "end";
 
+/**
+ * `withTheme` on `menu` and `picker`: the panel also holds the theme switch below `sm`, where the `theme` control is hidden;
+ * `themeInMenu` on `controls` says the same from the control's side.
+ */
 export type HeaderBlockView =
-  | { kind: "menu"; links: readonly HeaderLink[]; align: PanelAlign }
+  | { kind: "menu"; links: readonly HeaderLink[]; align: PanelAlign; withTheme: boolean }
+  | {
+      kind: "picker";
+      categories: readonly HeaderCategoryLink[];
+      links: readonly HeaderLink[];
+      align: PanelAlign;
+      withTheme: boolean;
+    }
   | { kind: "logo" }
   | { kind: "navigation"; links: readonly HeaderLink[] }
   | { kind: "search" }
-  | { kind: "controls"; controls: readonly HeaderControlName[] };
+  | { kind: "controls"; controls: readonly HeaderControlName[]; themeInMenu: boolean };
 
 /**
  * Where the menu's panel (`w-max min-w-48`, absolutely placed under its button) opens. Below `lg` the logo grows
@@ -84,11 +125,35 @@ export function isSupportedMenuPlace(blocks: readonly HeaderBlockName[]): boolea
   return !blocks.includes("controls") && blocks.slice(menu + 1).every(hiddenOnPhone);
 }
 
+/** Whether the header lists the `theme` control (`controls` block and control): the footer may then leave its switch out. */
+export function headerHasThemeControl(config: Pick<HeaderConfig, "blocks" | "controls">): boolean {
+  return config.blocks.includes("controls") && config.controls.includes("theme");
+}
+
+function categoryLink(locale: Locale, category: NavigationCategory): HeaderLink {
+  return {
+    key: `c:${category.slug}`,
+    href: localizedHref(locale, `/c/${encodeURIComponent(category.slug)}`),
+    label: category.name,
+  };
+}
+
+function pickerCategory(locale: Locale, category: NavigationCategory): HeaderCategoryLink {
+  return {
+    ...categoryLink(locale, category),
+    children: (category.children ?? [])
+      .slice(0, HEADER_CATEGORY_CHILDREN_MAX)
+      .map((child) => categoryLink(locale, child)),
+  };
+}
+
 /**
  * The header's blocks as `SiteHeader` renders them, in config order. Left out: `search` when the shop has no search, `menu`
- * and `navigation` when there is no link at all (no empty landmark). `categories` is `null` when the API could not be read:
- * the configured links still show. A config with a structural problem throws here (`assertHeaderConfig`), so a fork that
- * skipped the tests still fails loudly on the first page instead of rendering a broken header.
+ * and `navigation` when there is no link at all (no empty landmark), `navigation` in `picker` mode (the menu's disclosure is
+ * the picker), the `theme` control while `showThemeSwitch` (`showToggle` of `config/theme.ts`) is false, and `controls` when
+ * nothing is left in it. `categories` is `null` when the API could not be read: the configured links still show. A config
+ * with a structural problem throws here (`assertHeaderConfig`), so a fork that skipped the tests still fails loudly on the
+ * first page instead of rendering a broken header.
  */
 export function headerView(
   config: HeaderConfig,
@@ -97,30 +162,47 @@ export function headerView(
     t: Translator;
     categories: readonly NavigationCategory[] | null;
     searchEnabled: boolean;
+    showThemeSwitch: boolean;
   },
 ): HeaderBlockView[] {
   assertHeaderConfig(config);
   const { locale, t } = input;
+  const shownCategories = (input.categories ?? []).slice(0, config.navigation.categoryLimit);
+  const configuredLinks: HeaderLink[] = config.navigation.links.map((link) => ({
+    key: link.href,
+    href: localizedHref(locale, link.href),
+    label: t(link.labelKey),
+  }));
   const links: HeaderLink[] = [
-    ...(input.categories ?? []).slice(0, config.navigation.categoryLimit).map((category) => ({
-      key: `c:${category.slug}`,
-      href: localizedHref(locale, `/c/${encodeURIComponent(category.slug)}`),
-      label: category.name,
-    })),
-    ...config.navigation.links.map((link) => ({
-      key: link.href,
-      href: localizedHref(locale, link.href),
-      label: t(link.labelKey),
-    })),
+    ...shownCategories.map((category) => categoryLink(locale, category)),
+    ...configuredLinks,
   ];
+  const isPicker = config.navigation.display === "picker";
+  const controls = config.controls.filter(
+    (control) => control !== "theme" || input.showThemeSwitch,
+  );
+  const hasMenu = config.blocks.includes("menu") && links.length > 0;
+  const themeInMenu = hasMenu && config.blocks.includes("controls") && controls.includes("theme");
+  const align = menuPanelAlign(config);
   const blocks: HeaderBlockView[] = [];
   for (const name of config.blocks) {
     switch (name) {
       case "menu":
-        if (links.length > 0) blocks.push({ kind: "menu", links, align: menuPanelAlign(config) });
+        if (!hasMenu) break;
+        blocks.push(
+          isPicker
+            ? {
+                kind: "picker",
+                categories: shownCategories.map((category) => pickerCategory(locale, category)),
+                links: configuredLinks,
+                align,
+                withTheme: themeInMenu,
+              }
+            : { kind: "menu", links, align, withTheme: themeInMenu },
+        );
         break;
       case "navigation":
-        if (links.length > 0) blocks.push({ kind: "navigation", links });
+        if (links.length > 0 && !isPicker) blocks.push({ kind: "navigation", links });
         break;
       case "logo":
         blocks.push({ kind: "logo" });
@@ -129,7 +211,7 @@ export function headerView(
         if (input.searchEnabled) blocks.push({ kind: "search" });
         break;
       case "controls":
-        blocks.push({ kind: "controls", controls: config.controls });
+        if (controls.length > 0) blocks.push({ kind: "controls", controls, themeInMenu });
         break;
       default: {
         const unknown: never = name;

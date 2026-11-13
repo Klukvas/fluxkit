@@ -3,9 +3,11 @@ import { headerConfig } from "../config/header";
 import { messagesByLocale } from "../messages";
 import { sentinelTranslator } from "../components/test-helpers";
 import {
+  HEADER_CATEGORY_CHILDREN_MAX,
   HEADER_CATEGORY_LIMIT_MAX,
   assertHeaderConfig,
   headerConfigProblems,
+  headerHasThemeControl,
   headerView,
   menuPanelAlign,
   type HeaderConfig,
@@ -34,7 +36,13 @@ describe("the header config in config/header.ts", () => {
 
 describe("headerView", () => {
   it("keeps the configured block order and resolves the links: categories (limited, slug encoded) first, then the links", () => {
-    const view = headerView(base, { locale: "uk", t, categories, searchEnabled: true });
+    const view = headerView(base, {
+      locale: "uk",
+      t,
+      categories,
+      searchEnabled: true,
+      showThemeSwitch: true,
+    });
     expect(view.map((block) => block.kind)).toEqual([
       "menu",
       "logo",
@@ -47,25 +55,35 @@ describe("headerView", () => {
       { key: "c:a b/c", href: "/uk/c/a%20b%2Fc", label: "Odd" },
       { key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" },
     ];
-    expect(view[0]).toEqual({ kind: "menu", links, align: "start" });
+    expect(view[0]).toEqual({ kind: "menu", links, align: "start", withTheme: false });
     expect(view[2]).toEqual({ kind: "navigation", links });
-    expect(view[4]).toEqual({ kind: "controls", controls: ["language", "cart", "account"] });
+    expect(view[4]).toEqual({
+      kind: "controls",
+      controls: ["language", "cart", "account"],
+      themeInMenu: false,
+    });
   });
 
   it("follows another order, leaves out blocks that are not listed, and orders the controls", () => {
     const view = headerView(
       { ...base, blocks: ["search", "logo", "controls"], controls: ["cart", "language"] },
-      { locale: "en", t, categories, searchEnabled: true },
+      { locale: "en", t, categories, searchEnabled: true, showThemeSwitch: true },
     );
     expect(view).toEqual([
       { kind: "search" },
       { kind: "logo" },
-      { kind: "controls", controls: ["cart", "language"] },
+      { kind: "controls", controls: ["cart", "language"], themeInMenu: false },
     ]);
   });
 
   it("drops the search block when the shop has no search", () => {
-    const view = headerView(base, { locale: "en", t, categories, searchEnabled: false });
+    const view = headerView(base, {
+      locale: "en",
+      t,
+      categories,
+      searchEnabled: false,
+      showThemeSwitch: true,
+    });
     expect(view.map((block) => block.kind)).toEqual(["menu", "logo", "navigation", "controls"]);
   });
 
@@ -73,7 +91,7 @@ describe("headerView", () => {
     const align = (blocks: HeaderConfig["blocks"]) =>
       headerView(
         { ...base, blocks, controls: blocks.includes("controls") ? base.controls : [] },
-        { locale: "en", t, categories, searchEnabled: true },
+        { locale: "en", t, categories, searchEnabled: true, showThemeSwitch: true },
       ).find((block) => block.kind === "menu");
     // Shape 1: nothing but `navigation` (hidden on a phone) before the menu, the menu before the logo.
     expect(align(["menu", "logo", "navigation", "search", "controls"])).toMatchObject({
@@ -92,22 +110,29 @@ describe("headerView", () => {
     expect(() =>
       headerView(
         { ...base, blocks: ["controls", "logo"] },
-        { locale: "en", t, categories, searchEnabled: true },
+        { locale: "en", t, categories, searchEnabled: true, showThemeSwitch: true },
       ),
     ).toThrow(/config\/header\.ts is invalid: header block "controls" must be the last block/);
     expect(() => assertHeaderConfig(base)).not.toThrow();
   });
 
   it("shows only the configured links when the categories could not be read, and no empty navigation", () => {
-    const degraded = headerView(base, { locale: "en", t, categories: null, searchEnabled: false });
+    const degraded = headerView(base, {
+      locale: "en",
+      t,
+      categories: null,
+      searchEnabled: false,
+      showThemeSwitch: true,
+    });
     expect(degraded[0]).toEqual({
       kind: "menu",
       links: [{ key: "/catalog", href: "/en/catalog", label: "§nav.catalog" }],
       align: "start",
+      withTheme: false,
     });
     const nothing = headerView(
       { ...base, navigation: { categoryLimit: 0, links: [] } },
-      { locale: "en", t, categories, searchEnabled: false },
+      { locale: "en", t, categories, searchEnabled: false, showThemeSwitch: true },
     );
     expect(nothing.map((block) => block.kind)).toEqual(["logo", "controls"]);
   });
@@ -231,5 +256,114 @@ describe("headerConfigProblems: the menu's place (browser-measured shapes only)"
     ] as HeaderConfig["blocks"][]) {
       expect(check(blocks), blocks.join()).toEqual([menuProblem]);
     }
+  });
+});
+
+describe("headerView: the picker display (round 4)", () => {
+  const picker: HeaderConfig = {
+    ...base,
+    navigation: { ...base.navigation, display: "picker" },
+  };
+  const tree = [
+    {
+      slug: "shoes",
+      name: "Shoes",
+      children: Array.from({ length: HEADER_CATEGORY_CHILDREN_MAX + 2 }, (_, index) => ({
+        slug: `shoes-${String(index)}`,
+        name: `Shoes ${String(index)}`,
+      })),
+    },
+    { slug: "hats", name: "Hats" },
+    { slug: "bags", name: "Bags", children: [] },
+  ];
+  const input = { locale: "uk", t, searchEnabled: true, showThemeSwitch: true } as const;
+
+  it("renders ONE disclosure in the menu's place with the categories and their children, then the links, and no inline row", () => {
+    const view = headerView(picker, { ...input, categories: tree });
+    expect(view.map((block) => block.kind)).toEqual(["picker", "logo", "search", "controls"]);
+    const block = view[0];
+    if (block?.kind !== "picker") throw new Error("no picker");
+    // `categoryLimit` 2 of `base`: the third top-level category is left out.
+    expect(block.categories.map((category) => category.key)).toEqual(["c:shoes", "c:hats"]);
+    expect(block.categories[0]?.children).toHaveLength(HEADER_CATEGORY_CHILDREN_MAX);
+    expect(block.categories[0]?.children[0]).toEqual({
+      key: "c:shoes-0",
+      href: "/uk/c/shoes-0",
+      label: "Shoes 0",
+    });
+    expect(block.categories[1]?.children).toEqual([]);
+    expect(block.links).toEqual([{ key: "/catalog", href: "/uk/catalog", label: "§nav.catalog" }]);
+    expect(block).toMatchObject({ align: "start", withTheme: false });
+  });
+
+  it("keeps the configured links when the categories could not be read, and leaves the picker out with no link at all", () => {
+    const degraded = headerView(picker, { ...input, categories: null });
+    expect(degraded[0]).toMatchObject({ kind: "picker", categories: [] });
+    const nothing = headerView(
+      { ...picker, navigation: { display: "picker", categoryLimit: 0, links: [] } },
+      { ...input, categories: tree },
+    );
+    expect(nothing.map((block) => block.kind)).toEqual(["logo", "search", "controls"]);
+  });
+
+  it("is the row display when `display` is left out (existing forks keep their header)", () => {
+    const view = headerView(base, { ...input, categories: tree });
+    expect(view.map((block) => block.kind)).toContain("navigation");
+    expect(view[0]?.kind).toBe("menu");
+  });
+});
+
+describe("headerView: the theme control (round 4)", () => {
+  const withTheme: HeaderConfig = { ...base, controls: ["language", "theme", "cart", "account"] };
+  const input = { locale: "en", t, categories, searchEnabled: true } as const;
+
+  it("lists the theme control and puts the switch into the menu's panel for a phone", () => {
+    const view = headerView(withTheme, { ...input, showThemeSwitch: true });
+    expect(view[0]).toMatchObject({ kind: "menu", withTheme: true });
+    expect(view.at(-1)).toEqual({
+      kind: "controls",
+      controls: ["language", "theme", "cart", "account"],
+      themeInMenu: true,
+    });
+  });
+
+  it("keeps the control on a phone when there is no menu to carry the switch", () => {
+    const view = headerView(
+      { ...withTheme, blocks: ["logo", "search", "controls"] },
+      { ...input, showThemeSwitch: true },
+    );
+    expect(view.at(-1)).toMatchObject({ kind: "controls", themeInMenu: false });
+    const noLinks = headerView(
+      { ...withTheme, navigation: { categoryLimit: 0, links: [] } },
+      { ...input, showThemeSwitch: true },
+    );
+    expect(noLinks.at(-1)).toMatchObject({ kind: "controls", themeInMenu: false });
+  });
+
+  it("drops the control (and an emptied controls block) while config/theme.ts hides the switch", () => {
+    const view = headerView(withTheme, { ...input, showThemeSwitch: false });
+    expect(view[0]).toMatchObject({ kind: "menu", withTheme: false });
+    expect(view.at(-1)).toEqual({
+      kind: "controls",
+      controls: ["language", "cart", "account"],
+      themeInMenu: false,
+    });
+    const onlyTheme = headerView(
+      { ...withTheme, controls: ["theme"] },
+      { ...input, showThemeSwitch: false },
+    );
+    expect(onlyTheme.map((block) => block.kind)).toEqual(["menu", "logo", "navigation", "search"]);
+  });
+
+  it("tells the footer whether the header carries the switch", () => {
+    expect(headerHasThemeControl(withTheme)).toBe(true);
+    expect(headerHasThemeControl(base)).toBe(false);
+    expect(headerHasThemeControl({ ...withTheme, blocks: ["logo", "search"] })).toBe(false);
+  });
+
+  it("refuses the theme control listed twice", () => {
+    expect(
+      headerConfigProblems({ ...withTheme, controls: ["theme", "theme"] }, keysOf("en")),
+    ).toEqual(['header control "theme" is listed more than once']);
   });
 });

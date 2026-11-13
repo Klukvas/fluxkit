@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { messagesByLocale } from "../messages";
 import { contactsView } from "../lib/contacts";
 import type { FooterConfig } from "../layout/footer-layout";
-import type { HeaderConfig } from "../layout/header-layout";
+import type { HeaderConfig, NavigationCategory } from "../layout/header-layout";
 import { I18nProvider } from "./i18n-provider";
 import { SessionProvider } from "./session-provider";
 import { SiteFooter } from "./site-footer";
@@ -38,15 +38,21 @@ const contacts = contactsView({
   mapHref: null,
 });
 
-function header(config: HeaderConfig, searchEnabled = true): string {
+function header(
+  config: HeaderConfig,
+  searchEnabled = true,
+  navigationCategories: readonly NavigationCategory[] = categories,
+): string {
   return renderToStaticMarkup(
     <I18nProvider locale="en" messages={sentinelMessages}>
       <SessionProvider locale="en">
         <SiteHeader
           locale="en"
           t={t}
-          categories={categories}
+          categories={navigationCategories}
           searchEnabled={searchEnabled}
+          themeMode="light"
+          showThemeSwitch
           config={config}
         />
       </SessionProvider>
@@ -54,10 +60,12 @@ function header(config: HeaderConfig, searchEnabled = true): string {
   );
 }
 
+/** `themeInHeader` false: the footer's own theme switch checks run as for a header without the `theme` control. */
 function footer(
   config: FooterConfig,
   shopLinks = [{ labelKey: "shopPages.faq.title", href: "/faq" }],
   showThemeSwitch = true,
+  themeInHeader = false,
 ) {
   return renderToStaticMarkup(
     <SiteFooter
@@ -66,6 +74,7 @@ function footer(
       year={2026}
       themeMode="light"
       showThemeSwitch={showThemeSwitch}
+      themeInHeader={themeInHeader}
       shopLinks={shopLinks}
       contacts={contacts}
       config={config}
@@ -285,5 +294,165 @@ describe("SiteFooter follows config/footer.ts", () => {
     expect(() => footer({ blocks: ["copyright"], navigation: { groups: [] } })).toThrow(
       /config\/footer\.ts is invalid: footer block "themeSwitch" is missing/,
     );
+  });
+});
+
+describe("SiteHeader: the picker display and the theme control (round 4)", () => {
+  const tree: NavigationCategory[] = [
+    {
+      slug: "shoes",
+      name: "§cat-shoes",
+      children: [
+        { slug: "boots", name: "§cat-boots" },
+        { slug: "sandals", name: "§cat-sandals" },
+      ],
+    },
+    { slug: "hats", name: "§cat-hats" },
+  ];
+  const picker: HeaderConfig = {
+    blocks: ["menu", "logo", "navigation", "search", "controls"],
+    controls: ["language", "theme", "cart", "account"],
+    navigation: {
+      display: "picker",
+      categoryLimit: 6,
+      links: [{ labelKey: "nav.catalog", href: "/catalog" }],
+    },
+  };
+
+  it("renders the category list once, in one disclosure named by its visible text, with the children nested", () => {
+    const html = header(picker, true, tree);
+    expect(html.match(/§cat-shoes/g)).toHaveLength(1);
+    expect(html.match(/§cat-boots/g)).toHaveLength(1);
+    expect(html.match(/<nav aria-label="§nav\.main\.label"/g)).toHaveLength(1);
+    expect(html).not.toContain(markers.navigation);
+    // No aria-label on the summary: "Menu" (visually hidden, below `xl`) or "Categories" (from `xl`) names it.
+    expect(html).toMatch(
+      /<details class="group relative shrink-0"><summary role="button" aria-expanded="false" class="fk-header-button">.*?<span class="sr-only xl:hidden">§nav\.menu<\/span><span class="max-xl:hidden">§nav\.categories<\/span>/,
+    );
+    expect(html).toContain(
+      '<ul class="fk-picker"><li><a class="fk-menu-item" href="/en/c/shoes">§cat-shoes</a><ul><li><a class="fk-menu-item" href="/en/c/boots">§cat-boots</a></li>',
+    );
+    expect(html).toContain(
+      '<ul class="fk-picker-links"><li><a class="fk-menu-item" href="/en/catalog">§nav.catalog</a></li></ul>',
+    );
+    expect(html).not.toContain('role="menu');
+  });
+
+  it("renders the theme control with both icons and the no-script form, and its phone copy in the menu's panel", () => {
+    const html = header(picker, true, tree);
+    const control = html.slice(html.indexOf('aria-label="§theme.label"'));
+    expect(html).toMatch(
+      /<details class="group relative max-sm:hidden"><summary role="button" aria-expanded="false" aria-label="§theme\.label"/,
+    );
+    expect(control).toMatch(/class="fk-icon fk-light-only".*class="fk-icon fk-dark-only"/);
+    expect(control).toContain('<form class="fk-theme-menu" action="/theme" method="post">');
+    expect(control.match(/class="fk-theme-item"/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(control).toContain(
+      'value="light" aria-pressed="true" class="fk-theme-item" name="mode">§theme.light</button>',
+    );
+    // Two forms in all: the control's and the copy in the menu's panel (`sm:hidden`).
+    expect(html.match(/action="\/theme"/g)).toHaveLength(2);
+    expect(html.indexOf('class="fk-menu-theme"')).toBeLessThan(html.indexOf("fk-header-end"));
+  });
+
+  it("keeps the theme control on a phone when the header has no menu", () => {
+    const html = header({ ...picker, blocks: ["logo", "search", "controls"] }, true, tree);
+    expect(html).toMatch(
+      /<details class="group relative "><summary role="button" aria-expanded="false" aria-label="§theme\.label"/,
+    );
+    expect(html).not.toContain("fk-menu-theme");
+    expect(html.match(/action="\/theme"/g)).toHaveLength(1);
+  });
+
+  it("keeps every text a message", () => {
+    const html = header(picker, true, tree);
+    expect(leftoverText(html)).toBe("");
+    for (const value of textAttributes(html)) expect(value.startsWith("§"), value).toBe(true);
+  });
+});
+
+describe("SiteFooter: the columns layout (round 4)", () => {
+  const columns: FooterConfig = {
+    layout: "columns",
+    blocks: ["navigation", { kind: "text", textKey: "site.description" }, "contacts", "copyright"],
+    navigation: {
+      groups: [
+        { kind: "shopPages" },
+        { kind: "legal" },
+        {
+          kind: "links",
+          headingKey: "footer.nav.label",
+          links: [{ labelKey: "nav.catalog", href: "/catalog" }],
+        },
+      ],
+    },
+  };
+  const noContacts = contactsView({
+    phones: [],
+    email: null,
+    addressKey: null,
+    hoursKey: null,
+    links: [],
+    mapHref: null,
+  });
+
+  it("makes each link group a navigation named by its visible heading, the contacts a column, the rest a bottom row", () => {
+    const html = footer(columns, undefined, true, true);
+    expect(html).toContain(
+      '<div class="fk-footer-grid"><nav aria-labelledby="footer-group-1"><h2 id="footer-group-1">§footer.group.shop</h2><ul><li><a href="/en/faq">',
+    );
+    expect(html).toContain(
+      '<nav aria-labelledby="footer-group-2"><h2 id="footer-group-2">§footer.group.legal</h2>',
+    );
+    expect(html).toContain(
+      '<nav aria-labelledby="footer-group-3"><h2 id="footer-group-3">§footer.nav.label</h2>',
+    );
+    expect(html).toContain("<div><h2>§footer.group.contacts</h2><address>");
+    expect(html).toContain(
+      '<div class="fk-footer-bottom"><p>§site.description</p><p>§footer.copyright</p><p>§footer.powered</p></div>',
+    );
+    expect(html).not.toContain("fk-theme-form");
+    expect(html.match(/<nav/g)).toHaveLength(3);
+  });
+
+  it("leaves out the grid with no column, and the contacts column without a phone or an email", () => {
+    const html = renderToStaticMarkup(
+      <SiteFooter
+        locale="en"
+        t={t}
+        year={2026}
+        themeMode="light"
+        showThemeSwitch
+        themeInHeader
+        shopLinks={[]}
+        contacts={noContacts}
+        config={{
+          layout: "columns",
+          blocks: ["contacts", "copyright"],
+          navigation: { groups: [] },
+        }}
+      />,
+    );
+    expect(html).not.toContain("fk-footer-grid");
+    expect(html).not.toContain("<h2");
+    expect(html).toContain('<div class="fk-footer-bottom"><p>§footer.copyright</p>');
+  });
+
+  it("keeps a theme switch a fork still lists, in the bottom row", () => {
+    const html = footer({ ...columns, blocks: [...columns.blocks, "themeSwitch"] });
+    expect(html.indexOf("fk-footer-bottom")).toBeLessThan(html.indexOf('class="fk-theme-form"'));
+  });
+
+  it("refuses an own group without a heading at render", () => {
+    const own = { kind: "links", links: [{ labelKey: "nav.catalog", href: "/catalog" }] } as const;
+    expect(() =>
+      footer({ ...columns, navigation: { groups: [own] } }, undefined, true, true),
+    ).toThrow(/needs a headingKey in the columns layout/);
+  });
+
+  it("keeps every text a message (the phone is the shop's data)", () => {
+    const html = footer(columns, undefined, true, true);
+    expect(leftoverText(html.replace(/<address>.*?<\/address>/, ""))).toBe("");
+    for (const value of textAttributes(html)) expect(value.startsWith("§"), value).toBe(true);
   });
 });

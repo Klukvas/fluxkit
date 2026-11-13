@@ -1,10 +1,10 @@
 /**
  * The footer as data (plan 2026-11-08-design-changeability.md, L3; contract `docs/contracts/header-footer.md`): the types of
- * the fork-owned `config/footer.ts`, the pure view `components/site-footer.tsx` renders, and the checks its spec runs. The
- * footer stays one column of blocks (`.fk-site-footer` in app/globals.css); which blocks, their order, text lines from
- * messages, and the link groups (with optional headings) of its one labelled navigation are configurable. Columns side by
- * side, social links (external) and payment icons are the `footer.columns` slot (`config/slots.tsx`, `docs/contracts/slots.md`)
- * or a code edit.
+ * the fork-owned `config/footer.ts`, the pure view `components/site-footer.tsx` renders, and the checks its spec runs. Which
+ * blocks, their order, text lines from messages, the link groups (with optional headings) and the layout are configurable:
+ * `stack` (one column of blocks, the one labelled navigation) or `columns` (since round 4: each link group its own navigation
+ * named by its visible heading, the contacts a column, the other blocks in a bottom row). Social links (external) and payment
+ * icons are the `footer.columns` slot (`config/slots.tsx`, `docs/contracts/slots.md`) or a code edit.
  */
 import type { ContactsView } from "../lib/contacts";
 import { isPlainStorefrontPath } from "../lib/locale-path";
@@ -40,7 +40,36 @@ export type FooterLinkGroup = (
   { kind: "shopPages" } | { kind: "legal" } | { kind: "links"; links: readonly NavigationLink[] }
 ) & { headingKey?: string };
 
+/**
+ * `stack` (also when omitted, the footer before round 4): the blocks top to bottom in one column, the link groups as lists
+ * in ONE navigation labelled `footer.nav.label`. `columns`: a grid (two columns on a phone, four from `lg`) of one
+ * navigation per link group, each named by its visible heading (`headingKey`, or `footer.group.shop` / `footer.group.legal`
+ * for the built-in groups; an own `links` group needs a `headingKey`), and the contacts as a column with the heading
+ * `footer.group.contacts`, in the order of their blocks; the other blocks (text lines, the theme switch, the copyright) and
+ * the "powered by" line in a bottom row.
+ */
+export type FooterLayout = "stack" | "columns";
+
+/** The headings of the built-in link groups in the `columns` layout, when the config sets none. */
+export const FOOTER_GROUP_HEADINGS = {
+  shopPages: "footer.group.shop",
+  legal: "footer.group.legal",
+} as const;
+
+/** The heading of the contacts column in the `columns` layout. */
+export const FOOTER_CONTACTS_HEADING = "footer.group.contacts";
+
+/** Where the shopper finds the theme switch, for the check that it exists while `showToggle` is true. */
+export interface ThemeSwitchPlace {
+  /** `showToggle` of `config/theme.ts`. */
+  showToggle: boolean;
+  /** The header lists the `theme` control (`headerHasThemeControl` of `config/header.ts`). */
+  inHeader: boolean;
+}
+
 export interface FooterConfig {
+  /** `stack` (also when omitted) or `columns`, see `FooterLayout`. */
+  layout?: FooterLayout;
   /** The blocks, top to bottom; a block that is not listed is not rendered. */
   blocks: readonly FooterBlock[];
   navigation: {
@@ -65,7 +94,8 @@ export type FooterBlockView =
 /**
  * The footer's blocks as `SiteFooter` renders them, in config order. Left out: empty link groups, `navigation` when no group
  * has a link (no empty landmark), `themeSwitch` while the theme config hides it. The contacts block is passed on as it is:
- * `FooterContacts` renders nothing without a phone or an email. A config with a structural problem throws here
+ * `FooterContacts` renders nothing without a phone or an email. In the `columns` layout every group has a heading (the
+ * built-in groups' default when the config sets none). A config with a structural problem throws here
  * (`assertFooterConfig`, with `showThemeSwitch` as `showToggle`), so a fork that skipped the tests still fails loudly.
  */
 export function footerView(
@@ -75,19 +105,28 @@ export function footerView(
     legalLinks: readonly NavigationLink[];
     contacts: ContactsView;
     showThemeSwitch: boolean;
+    /** The header lists the `theme` control (`headerHasThemeControl`). */
+    themeInHeader: boolean;
   },
 ): FooterBlockView[] {
-  assertFooterConfig(config, input.showThemeSwitch);
+  assertFooterConfig(config, { showToggle: input.showThemeSwitch, inHeader: input.themeInHeader });
+  const isColumns = config.layout === "columns";
   const groups = config.navigation.groups
     .map((group): FooterLinkGroupView => {
-      const headingKey = group.headingKey ?? null;
+      const own = group.headingKey ?? null;
       switch (group.kind) {
         case "shopPages":
-          return { headingKey, links: input.shopLinks };
+          return {
+            headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.shopPages : null),
+            links: input.shopLinks,
+          };
         case "legal":
-          return { headingKey, links: input.legalLinks };
+          return {
+            headingKey: own ?? (isColumns ? FOOTER_GROUP_HEADINGS.legal : null),
+            links: input.legalLinks,
+          };
         case "links":
-          return { headingKey, links: group.links };
+          return { headingKey: own, links: group.links };
         default: {
           const unknown: never = group;
           throw new RangeError(`Unknown footer link group ${JSON.stringify(unknown)}`);
@@ -126,13 +165,13 @@ export function footerView(
 /**
  * What is wrong with a footer config (empty when nothing is): run by `layout/footer-layout.spec.ts` on `config/footer.ts`
  * with the message keys of each locale, and at render without them (`messageKeys` `null`: the translator throws instead).
- * `showToggle` is that of `config/theme.ts`: hiding the switch while the shop still honours a stored choice would leave a
- * shopper unable to change it back.
+ * `theme.showToggle` is that of `config/theme.ts`: hiding the switch while the shop still honours a stored choice would leave
+ * a shopper unable to change it back, so while it is true the footer lists `themeSwitch` or the header the `theme` control.
  */
 export function footerConfigProblems(
   config: FooterConfig,
   messageKeys: ReadonlySet<string> | null,
-  showToggle: boolean,
+  theme: ThemeSwitchPlace,
 ): string[] {
   const problems: string[] = [];
   const missingKey = (key: string) => messageKeys !== null && !messageKeys.has(key);
@@ -167,6 +206,11 @@ export function footerConfigProblems(
       );
     }
     if (group.kind !== "links") return;
+    if (config.layout === "columns" && group.headingKey === undefined) {
+      problems.push(
+        `footer link group ${String(index + 1)} needs a headingKey in the columns layout (each column is a navigation named by its heading)`,
+      );
+    }
     if (group.links.length === 0) {
       problems.push(`footer link group ${String(index + 1)} has no links`);
     }
@@ -182,17 +226,17 @@ export function footerConfigProblems(
       problems.push(`footer link "${href}" is listed more than once in group ${String(index + 1)}`);
     }
   });
-  if (showToggle && !config.blocks.includes("themeSwitch")) {
+  if (theme.showToggle && !theme.inHeader && !config.blocks.includes("themeSwitch")) {
     problems.push(
-      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true: set `showToggle: false` to hide the switch',
+      'footer block "themeSwitch" is missing while `showToggle` in config/theme.ts is true and config/header.ts lists no "theme" control: list one of them, or set `showToggle: false` to hide the switch',
     );
   }
   return problems;
 }
 
 /** Throws with every structural problem of a footer config (see `footerConfigProblems`). */
-export function assertFooterConfig(config: FooterConfig, showToggle: boolean): void {
-  const problems = footerConfigProblems(config, null, showToggle);
+export function assertFooterConfig(config: FooterConfig, theme: ThemeSwitchPlace): void {
+  const problems = footerConfigProblems(config, null, theme);
   if (problems.length > 0) {
     throw new Error(`config/footer.ts is invalid: ${problems.join("; ")}`);
   }

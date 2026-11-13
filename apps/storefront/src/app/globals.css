@@ -150,6 +150,94 @@
   .fk-theme-group {
     @apply flex flex-wrap gap-1;
   }
+  /*
+   * The `columns` footer layout (round 4, `site-footer.tsx`): link groups and contacts as columns, two on a phone and four from
+   * `lg`, each with a heading (no class on the headings, lists and links, as above); the lists stack and their links may wrap
+   * in a narrow column. The other blocks and the "powered by" line form the bottom row.
+   */
+  .fk-footer-columns {
+    @apply flex flex-col gap-6;
+  }
+  .fk-footer-grid {
+    @apply grid grid-cols-2 gap-x-4 gap-y-6 lg:grid-cols-4;
+  }
+  .fk-footer-grid > div {
+    @apply flex flex-col gap-1;
+  }
+  .fk-footer-grid h2 {
+    @apply text-sm font-semibold text-foreground;
+  }
+  .fk-footer-grid ul,
+  .fk-footer-grid address {
+    @apply flex-col items-start gap-0;
+  }
+  .fk-footer-grid ul a,
+  .fk-footer-grid address a {
+    @apply whitespace-normal;
+  }
+  .fk-footer-bottom {
+    @apply flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-t border-border pt-4;
+  }
+  /*
+   * The header's `theme` control (round 4, `site-header.tsx`): its icon is the sun or the moon of the theme `<html data-theme>`
+   * resolves to, the system mode following the device as the tokens' system block does, so it is right before any script.
+   */
+  .fk-dark-only,
+  [data-theme="dark"] .fk-light-only {
+    @apply hidden;
+  }
+  [data-theme="dark"] .fk-dark-only {
+    @apply inline-block;
+  }
+  @media (prefers-color-scheme: dark) {
+    [data-theme="system"] .fk-light-only {
+      @apply hidden;
+    }
+    [data-theme="system"] .fk-dark-only {
+      @apply inline-block;
+    }
+  }
+  /* The switch inside a dropdown panel (`ThemeSwitch` variant `menu`): the group's name, then three 44 px rows. */
+  .fk-theme-menu,
+  .fk-theme-menu-group {
+    @apply flex flex-col;
+  }
+  .fk-theme-menu > span[id] {
+    @apply px-3 py-1 text-sm text-muted-foreground;
+  }
+  .fk-theme-item {
+    @apply flex min-h-11 w-full cursor-pointer items-center rounded-control px-3 text-start whitespace-nowrap text-foreground not-aria-pressed:hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring aria-pressed:bg-primary aria-pressed:font-semibold aria-pressed:text-primary-foreground;
+  }
+  /* The theme switch in the menu's panel: only below `sm`, where the `theme` control is hidden. */
+  .fk-menu-theme {
+    @apply mt-1 border-t border-border pt-1 sm:hidden;
+  }
+  /*
+   * The `picker` display of the header navigation (round 4, `PickerBlock` in `site-header.tsx`): below `xl` the menu's flat list
+   * (the children hidden), from `xl` a wide panel with the categories in columns, each with its children, and the configured
+   * links in a row below. No class on the nested lists and links beyond `.fk-menu-item` (bytes, see above).
+   */
+  .fk-picker-panel {
+    @apply xl:w-3xl xl:p-3;
+  }
+  .fk-picker {
+    @apply flex flex-col xl:block xl:columns-3 xl:gap-4;
+  }
+  .fk-picker > li {
+    @apply break-inside-avoid xl:mb-2;
+  }
+  .fk-picker > li > a {
+    @apply xl:font-semibold;
+  }
+  .fk-picker ul {
+    @apply max-xl:hidden;
+  }
+  .fk-picker ul a {
+    @apply text-sm text-muted-foreground hover:text-foreground;
+  }
+  .fk-picker-links {
+    @apply flex flex-col xl:mt-1 xl:flex-row xl:flex-wrap xl:border-t xl:border-border xl:pt-2;
+  }
   .fk-header-slot {
     @apply inline-flex min-h-11 min-w-11 items-center justify-center;
   }
