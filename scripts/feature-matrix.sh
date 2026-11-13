@@ -194,7 +194,7 @@ case "$mode" in
     tables="$(blog_tables)"
     [ "$tables" = "absent absent" ] || { echo "run 'off' on a database never migrated with the blog (found: $tables)" >&2; exit 1; }
     pnpm build
-    FEATURES_ENABLED= node apps/api/dist/database/migrate.js
+    FEATURES_ENABLED='' node apps/api/dist/database/migrate.js
     tables="$(blog_tables)"
     echo "blog tables after the migration: $tables"
     [ "$tables" = "absent absent" ] || { echo "the migration without the blog created its tables ($tables)" >&2; exit 1; }
