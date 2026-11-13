@@ -131,23 +131,69 @@ describe("test data uses reserved example domains only (plan row X7)", () => {
   });
 });
 
-describe("a feature or provider package declares no database table (ADR 0033 decision 3)", () => {
+const DECLARES_TABLES = /drizzle-orm\/pg-core|pgTable\(/;
+const FEATURE_SCHEMA = /^packages\/features\/([^/]+)\/src\/schema\.ts$/;
+const EXPORTS_INVENTORY =
+  /export\s+(?:const|let|var)\s+personalDataInventory\b|export\s*\{[^}]*\bpersonalDataInventory\b[^}]*\}/;
+
+/**
+ * The files (repository-relative) that may not declare tables but do. A provider never may; a feature only in its
+ * `src/schema.ts`, and only when the same package's `src/index.ts` exports `personalDataInventory` (ADR 0049, E3), so
+ * every feature table is classified by the feature's own inventory (merged at startup, checked by its own spec).
+ */
+function tableOffenders(
+  files: readonly string[],
+  read: (relativePath: string) => string | undefined,
+): string[] {
+  return files.filter((file) => {
+    if (!DECLARES_TABLES.test(read(file) ?? "")) return false;
+    const feature = FEATURE_SCHEMA.exec(file)?.[1];
+    if (feature === undefined) return true;
+    return !EXPORTS_INVENTORY.test(read(`packages/features/${feature}/src/index.ts`) ?? "");
+  });
+}
+
+describe("a feature or provider package declares no database table outside the feature rule (ADR 0033 decision 3, ADR 0049)", () => {
   const files = [
     ...sourceFiles(join(ROOT, "packages/features"), /\.tsx?$/),
     ...sourceFiles(join(ROOT, "packages/providers"), /\.tsx?$/),
-  ];
+  ].map(rel);
+  const readRepoFile = (path: string): string | undefined => {
+    try {
+      return text(join(ROOT, path));
+    } catch {
+      return undefined;
+    }
+  };
 
-  // The feature matrix deletes the features or the providers in turn, so only one of the two roots is
-  // guaranteed to hold files; the check needs at least one file to be a real scan.
+  // The feature matrix deletes the features (`deleted`) or the providers (`providers-deleted`) in turn, never both, so
+  // only one of the two roots is guaranteed to hold files; the check needs at least one file to be a real scan.
   it("finds the packages (the check below is not vacuous)", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
-  it("does not import the Drizzle table builders, so no table can bypass the inventory", () => {
-    const offenders = files
-      .filter((file) => /drizzle-orm\/pg-core|pgTable\(/.test(text(file)))
-      .map(rel);
-    expect(offenders).toEqual([]);
+  it("imports the Drizzle table builders only in a feature's src/schema.ts that comes with an inventory", () => {
+    expect(tableOffenders(files, readRepoFile)).toEqual([]);
+  });
+
+  it("refuses a provider table, a feature table outside schema.ts and a schema.ts without an inventory", () => {
+    const tree: Record<string, string> = {
+      "packages/providers/x/src/schema.ts": 'import { pgTable } from "drizzle-orm/pg-core";',
+      "packages/features/a/src/schema.ts": 'import { pgTable } from "drizzle-orm/pg-core";',
+      "packages/features/a/src/index.ts": "export const featureModule = A;",
+      "packages/features/b/src/tables.ts": 'const t = pgTable("t", {});',
+      "packages/features/b/src/index.ts": "export const personalDataInventory = {};",
+      "packages/features/c/src/schema.ts": 'import { pgTable } from "drizzle-orm/pg-core";',
+      "packages/features/c/src/index.ts":
+        "export { featureModule, personalDataInventory } from './m.js';",
+      "packages/features/d/src/schema.ts": 'import { pgTable } from "drizzle-orm/pg-core";',
+      "packages/features/d/src/index.ts": "export const personalDataInventory = {};",
+    };
+    expect(tableOffenders(Object.keys(tree), (path) => tree[path])).toEqual([
+      "packages/providers/x/src/schema.ts",
+      "packages/features/a/src/schema.ts",
+      "packages/features/b/src/tables.ts",
+    ]);
   });
 });
 

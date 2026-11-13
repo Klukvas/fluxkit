@@ -29,6 +29,7 @@ import {
   type MediaConfig,
   type MediaTuning,
 } from "./media/media-config.js";
+import { assertFeatureMigrationsAppliedTo } from "./features/feature-migrations-check.js";
 import {
   DEFAULT_FEATURES_DIR,
   loadFeatures,
@@ -162,6 +163,8 @@ export async function createApp(
     enabled: env.enabledFeatures,
     featuresDir: env.featuresDir ?? DEFAULT_FEATURES_DIR,
   });
+  // The API refuses to start while an enabled feature has unapplied migrations (ADR 0049).
+  await assertFeatureMigrationsAppliedTo(env.databaseUrl, features);
   const shippingProviders = await loadShippingProviders({
     enabled: env.enabledShippingProviders ?? [],
     providersDir: options.shippingProvidersDir ?? DEFAULT_SHIPPING_PROVIDERS_DIR,
@@ -177,7 +180,8 @@ export async function createApp(
   const app = await NestFactory.create<NestExpressApplication>(
     AppModule.register({
       databaseUrl: env.databaseUrl,
-      features: [...features, ...(options.extraFeatures ?? [])],
+      features,
+      extraFeatures: options.extraFeatures,
       shippingProviders: [...shippingProviders, ...(options.extraShippingProviders ?? [])],
       paymentProviders: [...paymentProviders, ...(options.extraPaymentProviders ?? [])],
       payments: {

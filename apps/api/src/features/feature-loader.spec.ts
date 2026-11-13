@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { loadFeatures } from "./feature-loader.js";
+import { findEnabledFeatures, loadFeatures } from "./feature-loader.js";
 
 describe("loadFeatures", () => {
   let dir: string;
@@ -83,6 +83,45 @@ describe("loadFeatures", () => {
     await writeFeature("Upper", "Upper", "export const featureModule = class {};\n");
     await expect(loadFeatures({ enabled: ["upper"], featuresDir: dir })).rejects.toThrow(
       /Invalid feature name "Upper" in .*package\.json/,
+    );
+  });
+
+  it("reports a feature's migrations folder only when it has a journal", async () => {
+    await writeFeature("plain", "plain", "export const featureModule = class {};\n");
+    await writeFeature("tables", "tables", "export const featureModule = class {};\n");
+    await mkdir(join(dir, "tables", "drizzle", "meta"), { recursive: true });
+    await writeFile(join(dir, "tables", "drizzle", "meta", "_journal.json"), '{"entries":[]}');
+    await mkdir(join(dir, "plain", "drizzle"), { recursive: true });
+
+    const loaded = await loadFeatures({ enabled: ["plain", "tables"], featuresDir: dir });
+
+    expect(loaded.map(({ name, migrationsFolder }) => ({ name, migrationsFolder }))).toEqual([
+      { name: "plain", migrationsFolder: undefined },
+      { name: "tables", migrationsFolder: join(dir, "tables", "drizzle") },
+    ]);
+  });
+
+  it("carries the personalDataInventory export as found, and nothing when there is none", async () => {
+    await writeFeature(
+      "inventoried",
+      "inventoried",
+      "export const featureModule = class {};\nexport const personalDataInventory = { t: {} };\n",
+    );
+    await writeFeature("bare", "bare", "export const featureModule = class {};\n");
+    const [inventoried, bare] = await loadFeatures({
+      enabled: ["inventoried", "bare"],
+      featuresDir: dir,
+    });
+    expect(inventoried?.personalDataInventory).toEqual({ t: {} });
+    expect(bare !== undefined && "personalDataInventory" in bare).toBe(false);
+  });
+
+  it("finds enabled packages without importing them", async () => {
+    await writeFeature("untouched", "untouched", "throw new Error('must not be imported');\n");
+    const found = await findEnabledFeatures({ enabled: ["untouched"], featuresDir: dir });
+    expect(found.map((manifest) => manifest.name)).toEqual(["untouched"]);
+    await expect(findEnabledFeatures({ enabled: ["absent"], featuresDir: dir })).rejects.toThrow(
+      /Feature "absent" is enabled/,
     );
   });
 
