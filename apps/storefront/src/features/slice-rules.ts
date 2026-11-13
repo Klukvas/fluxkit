@@ -1,9 +1,12 @@
 /**
  * The route rules of a feature slice (plan docs/plans/2026-11-13-blog.md, E5), read from the files on disk. Used by the specs
- * only (`route-structure.spec.ts` on the real app, `slice-rules.spec.ts` on the fixture slice); never imported by a page.
+ * only (`route-structure.spec.ts` on the real app, `slice-rules.spec.ts` on the fixture slice); never imported by a page. The
+ * page and layout sources are read with the TypeScript compiler (a dev dependency), not with patterns: an entry a pattern
+ * cannot see (a re-export, an arrow function) must be refused, not skipped.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { basename, dirname, join, relative } from "node:path";
+import ts from "typescript";
 
 /** The route group of a slice; the name follows `FEATURES_ENABLED` (`packages/config/src/features.ts`). */
 const SLICE_GROUP = /^\(feature-([a-z][a-z0-9-]*)\)$/;
@@ -11,6 +14,29 @@ const SLICE_GROUP = /^\(feature-([a-z][a-z0-9-]*)\)$/;
 const ROUTE_FILE_EXTENSIONS = ["tsx", "ts", "jsx", "js"];
 const LOADING_FILES = ROUTE_FILE_EXTENSIONS.map((extension) => `loading.${extension}`);
 const PAGE_FILES = ROUTE_FILE_EXTENSIONS.map((extension) => `page.${extension}`);
+/** The only file names a slice holds outside its private `_` folders. */
+const SLICE_PAGE = "page.tsx";
+const SLICE_LAYOUT = "layout.tsx";
+
+/**
+ * The exported functions a page may have; each must start with the gate. `generateStaticParams` is not among them: it runs at
+ * build time without a request, before any gate could run.
+ */
+const GATED_ENTRIES: ReadonlySet<string> = new Set([
+  "default",
+  "generateMetadata",
+  "generateViewport",
+]);
+/** Route segment config a page may export, each as a plain literal (no code runs). */
+const SEGMENT_CONFIG: ReadonlySet<string> = new Set([
+  "dynamic",
+  "dynamicParams",
+  "revalidate",
+  "fetchCache",
+  "runtime",
+  "preferredRegion",
+  "maxDuration",
+]);
 
 export interface FeatureSlice {
   /** The feature name, `<name>` of `(feature-<name>)`. */
@@ -41,15 +67,28 @@ function filesNamed(directory: string, names: readonly string[]): string[] {
   });
 }
 
+/** Every file of a slice outside its private folders (a folder whose name starts with `_` is never routed). */
+function routedFiles(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    if (statSync(path).isDirectory()) return entry.startsWith("_") ? [] : routedFiles(path);
+    return [path];
+  });
+}
+
+/** Every folder of a slice outside its private folders. */
+function routedFolders(directory: string): string[] {
+  return readdirSync(directory).flatMap((entry) => {
+    const path = join(directory, entry);
+    if (!statSync(path).isDirectory() || entry.startsWith("_")) return [];
+    return [path, ...routedFolders(path)];
+  });
+}
+
 /** The pages of a slice (its private `_feature` folder holds none that route). */
 export function slicePages(slice: { directory: string }): string[] {
-  return filesNamed(slice.directory, PAGE_FILES)
-    .filter(
-      (page) =>
-        !relative(slice.directory, page)
-          .split(/[\\/]/)
-          .some((part) => part.startsWith("_")),
-    )
+  return routedFiles(slice.directory)
+    .filter((path) => PAGE_FILES.includes(basename(path)))
     .sort();
 }
 
@@ -85,34 +124,141 @@ export function coreFirstSegments(localeRoot: string): Set<string> {
   return segments;
 }
 
-/**
- * Whether every exported entry of a page (the page itself and `generateMetadata`) is an async function whose first statement
- * is `await requireFeature("<name>");`: the feature is checked before anything else, any feature API call included.
- */
-export function gatesEveryEntry(source: string, name: string): boolean {
-  // An entry this check cannot read (an arrow function, a re-export, a sync page) is refused rather than skipped.
-  if (
-    /export\s+(const|let|var)\s+generateMetadata|export\s+default\s+(?!async\s+function)/.test(
-      source,
-    )
-  ) {
-    return false;
-  }
-  const entries = source.match(/export\s+(default\s+)?(async\s+)?function\s+\w*/g) ?? [];
-  const relevant = entries.filter((entry) => /default|generateMetadata$/.test(entry));
-  const gate = new RegExp(
-    String.raw`export\s+(default\s+)?async\s+function\s+\w*\s*\([^)]*\)\s*(:\s*[^{]+)?\{\s*await\s+requireFeature\(\s*"${name}"\s*\)\s*;`,
-    "g",
+function parse(source: string): ts.SourceFile {
+  return ts.createSourceFile("source.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+function modifierFlags(node: ts.Declaration): ts.ModifierFlags {
+  return ts.getCombinedModifierFlags(node);
+}
+
+/** Whether a function body starts with `await requireFeature("<name>");`. */
+function startsWithGate(body: ts.Block | undefined, name: string): boolean {
+  const first = body?.statements[0];
+  if (first === undefined || !ts.isExpressionStatement(first)) return false;
+  const awaited = first.expression;
+  if (!ts.isAwaitExpression(awaited) || !ts.isCallExpression(awaited.expression)) return false;
+  const call = awaited.expression;
+  const [argument] = call.arguments;
+  return (
+    ts.isIdentifier(call.expression) &&
+    call.expression.text === "requireFeature" &&
+    call.arguments.length === 1 &&
+    argument !== undefined &&
+    ts.isStringLiteral(argument) &&
+    argument.text === name
   );
-  const gated = source.match(gate) ?? [];
-  return relevant.length > 0 && gated.length === relevant.length;
+}
+
+function isPlainLiteral(node: ts.Expression | undefined): boolean {
+  return (
+    node !== undefined &&
+    (ts.isStringLiteral(node) ||
+      ts.isNumericLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node) ||
+      node.kind === ts.SyntaxKind.TrueKeyword ||
+      node.kind === ts.SyntaxKind.FalseKeyword)
+  );
 }
 
 /**
- * Every rule a slice breaks (empty when none): a malformed group name; no `layout.tsx`; no manifest `_feature/feature.ts` or no
- * `_feature/messages/<locale>.json`; a `loading.tsx` inside the slice or above it (a page must answer a real 404); a page whose
- * entries do not start with `await requireFeature("<name>")`; a page whose first URL segment is dynamic, missing, or one of
- * `reserved` (a shop page slug or a path the app or the template owns).
+ * What is wrong with the exports of a slice's page (empty when nothing is). Allowed: `export default async function`, `export
+ * async function generateMetadata` and `generateViewport`, each with `await requireFeature("<name>");` as its FIRST statement;
+ * route segment config (`dynamic`, `revalidate`, ...) as a plain literal; type exports. Refused: any other exported function,
+ * `generateStaticParams` included, any other exported value, `export { ... }`, `export ... from`, `export * from` and `export
+ * default <expression>`, so that nothing of the page runs before the gate.
+ */
+export function pageGateProblems(source: string, name: string): string[] {
+  const problems: string[] = [];
+  let hasDefault = false;
+  for (const statement of parse(source).statements) {
+    if (ts.isExportDeclaration(statement)) {
+      if (!statement.isTypeOnly) {
+        problems.push(
+          "`export { ... }` and `export ... from` are refused: declare each entry in the page itself",
+        );
+      }
+    } else if (ts.isExportAssignment(statement)) {
+      problems.push(
+        "`export default <expression>` is refused: write `export default async function`",
+      );
+    } else if (ts.isFunctionDeclaration(statement)) {
+      const flags = modifierFlags(statement);
+      if ((flags & ts.ModifierFlags.Export) === 0) continue;
+      const entry =
+        (flags & ts.ModifierFlags.Default) !== 0 ? "default" : (statement.name?.text ?? "");
+      if (entry === "default") hasDefault = true;
+      if (!GATED_ENTRIES.has(entry)) {
+        problems.push(
+          `exported function ${entry} is refused (a page exports only the page, generateMetadata and generateViewport)`,
+        );
+      } else if ((flags & ts.ModifierFlags.Async) === 0) {
+        problems.push(
+          `${entry} must be an async function starting with await requireFeature("${name}");`,
+        );
+      } else if (!startsWithGate(statement.body, name)) {
+        problems.push(`${entry} must start with await requireFeature("${name}");`);
+      }
+    } else if (ts.isVariableStatement(statement)) {
+      const exported =
+        statement.modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ??
+        false;
+      if (!exported) continue;
+      for (const declaration of statement.declarationList.declarations) {
+        const declared = ts.isIdentifier(declaration.name) ? declaration.name.text : "(pattern)";
+        if (!SEGMENT_CONFIG.has(declared)) {
+          problems.push(
+            `exported value ${declared} is refused (a page exports only its gated functions and route segment config)`,
+          );
+        } else if (!isPlainLiteral(declaration.initializer)) {
+          problems.push(`route segment config ${declared} must be a plain literal`);
+        }
+      }
+    } else if (
+      (ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) &&
+      (modifierFlags(statement) & ts.ModifierFlags.Export) !== 0
+    ) {
+      problems.push("an exported class or enum is refused in a page");
+    }
+  }
+  if (!hasDefault) problems.push("no `export default async function`: a page is one");
+  return problems;
+}
+
+/** What is wrong with a slice's layout: it re-exports the default of `(site)/layout` and does nothing else. */
+export function layoutProblems(source: string): string[] {
+  const statements = parse(source).statements;
+  const [only] = statements;
+  const isReexport =
+    statements.length === 1 &&
+    only !== undefined &&
+    ts.isExportDeclaration(only) &&
+    !only.isTypeOnly &&
+    only.moduleSpecifier !== undefined &&
+    ts.isStringLiteral(only.moduleSpecifier) &&
+    only.moduleSpecifier.text.endsWith("(site)/layout") &&
+    only.exportClause !== undefined &&
+    ts.isNamedExports(only.exportClause) &&
+    only.exportClause.elements.length === 1 &&
+    only.exportClause.elements[0]?.name.text === "default" &&
+    only.exportClause.elements[0]?.propertyName === undefined;
+  return isReexport
+    ? []
+    : [
+        'the layout must be exactly `export { default } from "../(site)/layout";` (the locale check, nothing that runs before the gate)',
+      ];
+}
+
+/**
+ * Every rule a slice breaks (empty when none):
+ * - a malformed group name; no manifest `_feature/feature.ts` or no `_feature/messages/<locale>.json`;
+ * - outside its private `_` folders, any file but `layout.tsx` at its root and `page.tsx` files: a route handler, a metadata
+ *   image or sitemap file, `default.tsx`, `template.tsx`, `loading.tsx`, `error.tsx`, `not-found.tsx` or a nested layout would
+ *   run without the gate (the not-found view is the app's own, `[locale]/not-found.tsx`); a parallel `@slot` or intercepting
+ *   `(.)` folder likewise;
+ * - a layout that is not the `(site)` re-export; a `loading.tsx` above the slice (a page must answer a real 404);
+ * - a page whose exports are not gated (`pageGateProblems`);
+ * - a page whose first URL segment is dynamic, missing, or one of `reserved` (a shop page slug or a path the app owns).
  */
 export function featureSliceProblems(
   localeRoot: string,
@@ -129,7 +275,14 @@ export function featureSliceProblems(
       continue;
     }
     const name = slice.name;
-    if (!existsSync(join(slice.directory, "layout.tsx"))) problems.push(`${where}: no layout.tsx`);
+    const layout = join(slice.directory, SLICE_LAYOUT);
+    if (!existsSync(layout)) {
+      problems.push(`${where}: no layout.tsx`);
+    } else {
+      for (const problem of layoutProblems(readFileSync(layout, "utf8"))) {
+        problems.push(`${where}/layout.tsx: ${problem}`);
+      }
+    }
     if (!existsSync(join(slice.directory, "_feature", "feature.ts"))) {
       problems.push(`${where}: no manifest _feature/feature.ts`);
     }
@@ -138,7 +291,25 @@ export function featureSliceProblems(
         problems.push(`${where}: no _feature/messages/${locale}.json`);
       }
     }
-    for (const loading of [...filesNamed(slice.directory, LOADING_FILES), ...above]) {
+    for (const folder of routedFolders(slice.directory)) {
+      const base = basename(folder);
+      if (base.startsWith("@") || base.startsWith("(.")) {
+        problems.push(
+          `${relative(localeRoot, folder)}: parallel and intercepting routes are refused in a slice (they would render without the gate)`,
+        );
+      }
+    }
+    for (const file of routedFiles(slice.directory)) {
+      const path = relative(slice.directory, file);
+      const isRootLayout = path === SLICE_LAYOUT;
+      const isPage = basename(file) === SLICE_PAGE;
+      if (!isRootLayout && !isPage) {
+        problems.push(
+          `${relative(localeRoot, file)}: only layout.tsx (at the slice's root) and page.tsx route in a slice; anything else would run without the gate (private files go in _feature/)`,
+        );
+      }
+    }
+    for (const loading of above) {
       problems.push(
         `${where}: a loading view at ${relative(localeRoot, loading) || "."} hides a 404`,
       );
@@ -147,10 +318,8 @@ export function featureSliceProblems(
     if (pages.length === 0) problems.push(`${where}: no page`);
     for (const page of pages) {
       const path = relative(localeRoot, page);
-      if (!gatesEveryEntry(readFileSync(page, "utf8"), name)) {
-        problems.push(
-          `${path}: the page and its generateMetadata must start with await requireFeature("${name}");`,
-        );
+      for (const problem of pageGateProblems(readFileSync(page, "utf8"), name)) {
+        problems.push(`${path}: ${problem}`);
       }
       const segment = firstUrlSegment(localeRoot, page);
       if (segment === null || segment.startsWith("[")) {

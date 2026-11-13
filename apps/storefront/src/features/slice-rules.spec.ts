@@ -7,7 +7,8 @@ import {
   coreFirstSegments,
   featureSlicePages,
   featureSliceProblems,
-  gatesEveryEntry,
+  layoutProblems,
+  pageGateProblems,
 } from "./slice-rules";
 
 const fixtureLocaleRoot = join(import.meta.dirname, "fixtures", "app", "[locale]");
@@ -32,6 +33,9 @@ function sliceCopy(group: string, edit: (slice: string) => void = () => undefine
 }
 
 const options = { locales, reserved };
+const onlyLayoutAndPage =
+  "only layout.tsx (at the slice's root) and page.tsx route in a slice; anything else would run without the gate (private files go in _feature/)";
+const gateFirst = (entry: string) => `${entry} must start with await requireFeature("notebook");`;
 
 describe("feature slice route rules (plan 2026-11-13-blog.md, E5)", () => {
   it("accepts the fixture slice and lists its page", () => {
@@ -41,7 +45,7 @@ describe("feature slice route rules (plan 2026-11-13-blog.md, E5)", () => {
     ]);
   });
 
-  it("refuses a slice without layout, manifest or messages, and a loading view inside or above it", () => {
+  it("refuses a slice without layout, manifest or messages, a loading view inside it (a stray route file) or above it", () => {
     const localeRoot = sliceCopy("(feature-notebook)", (slice) => {
       rmSync(join(slice, "layout.tsx"));
       rmSync(join(slice, "_feature", "feature.ts"));
@@ -59,7 +63,7 @@ describe("feature slice route rules (plan 2026-11-13-blog.md, E5)", () => {
       "(feature-notebook): no layout.tsx",
       "(feature-notebook): no manifest _feature/feature.ts",
       "(feature-notebook): no _feature/messages/en.json",
-      `(feature-notebook): a loading view at ${join("(feature-notebook)", "notebook", "loading.tsx")} hides a 404`,
+      `${join("(feature-notebook)", "notebook", "loading.tsx")}: ${onlyLayoutAndPage}`,
       "(feature-notebook): a loading view at . hides a 404",
     ]);
   });
@@ -85,38 +89,142 @@ describe("feature slice route rules (plan 2026-11-13-blog.md, E5)", () => {
     ]);
   });
 
-  it("requires await requireFeature(<its name>) as the first statement of the page and of generateMetadata", () => {
+  it("refuses every route file but the root layout and the pages (they would answer with the feature off)", () => {
+    const files = [
+      join("notebook", "feed", "route.ts"),
+      join("notebook", "opengraph-image.tsx"),
+      join("notebook", "sitemap.ts"),
+      join("notebook", "default.tsx"),
+      join("notebook", "template.tsx"),
+      join("notebook", "error.tsx"),
+      join("notebook", "not-found.tsx"),
+      join("notebook", "layout.tsx"),
+      join("notebook", "page.ts"),
+      join("notebook", "view.tsx"),
+    ];
+    const localeRoot = sliceCopy("(feature-notebook)", (slice) => {
+      for (const file of files) {
+        mkdirSync(join(slice, file, ".."), { recursive: true });
+        writeFileSync(join(slice, file), "export default function X() { return null; }\n");
+      }
+      mkdirSync(join(slice, "notebook", "@aside"));
+      mkdirSync(join(slice, "notebook", "(.)photo"));
+      // A private folder never routes: anything may live there.
+      writeFileSync(join(slice, "_feature", "route.ts"), "export const x = 1;\n");
+    });
+    const problems = featureSliceProblems(localeRoot, options);
+    for (const file of files) {
+      expect(problems, file).toContain(`${join("(feature-notebook)", file)}: ${onlyLayoutAndPage}`);
+    }
+    for (const folder of ["@aside", "(.)photo"]) {
+      expect(problems, folder).toContain(
+        `${join("(feature-notebook)", "notebook", folder)}: parallel and intercepting routes are refused in a slice (they would render without the gate)`,
+      );
+    }
+    expect(
+      problems.some((problem) => problem.startsWith(join("(feature-notebook)", "_feature"))),
+    ).toBe(false);
+    // `page.ts` is a page Next routes: refused as a file and still checked as a page.
+    expect(problems).toContain(
+      `${join("(feature-notebook)", "notebook", "page.ts")}: default must be an async function starting with await requireFeature("notebook");`,
+    );
+  });
+
+  it("refuses a layout that is anything but the (site) re-export", () => {
+    expect(layoutProblems('export { default } from "../(site)/layout";\n')).toEqual([]);
+    for (const source of [
+      'export { default } from "./my-layout";',
+      'export { default as Layout, default } from "../(site)/layout";',
+      'import Site from "../(site)/layout";\nexport default Site;',
+      'export { default } from "../(site)/layout";\nexport const revalidate = 0;',
+      "export default async function Layout() { await read(); return null; }",
+    ]) {
+      expect(layoutProblems(source), source).toHaveLength(1);
+    }
+  });
+
+  it("accepts the gated page and requires await requireFeature(<its name>) first in the page and generateMetadata", () => {
     const source = readFileSync(fixturePage, "utf8");
-    expect(gatesEveryEntry(source, "notebook")).toBe(true);
-    expect(gatesEveryEntry(source, "blog")).toBe(false);
+    expect(pageGateProblems(source, "notebook")).toEqual([]);
+    expect(pageGateProblems(source, "blog")).toEqual([
+      'generateMetadata must start with await requireFeature("blog");',
+      'default must start with await requireFeature("blog");',
+    ]);
     // A read before the gate.
     expect(
-      gatesEveryEntry(
+      pageGateProblems(
         source.replace(
-          'export default async function NotebookPage(props: NotebookPageProps) {\n  await requireFeature("notebook");',
-          'export default async function NotebookPage(props: NotebookPageProps) {\n  await read();\n  await requireFeature("notebook");',
+          'NotebookPageProps) {\n  await requireFeature("notebook");',
+          'NotebookPageProps) {\n  await read();\n  await requireFeature("notebook");',
         ),
         "notebook",
       ),
-    ).toBe(false);
+    ).toEqual([gateFirst("default")]);
     // generateMetadata without the gate.
     expect(
-      gatesEveryEntry(
+      pageGateProblems(
         source.replace(
           'Promise<Metadata> {\n  await requireFeature("notebook");',
           "Promise<Metadata> {",
         ),
         "notebook",
       ),
-    ).toBe(false);
-    // An entry the check cannot read is refused, not skipped.
+    ).toEqual([gateFirst("generateMetadata")]);
+  });
+
+  it("refuses every way past the gate: re-exports, export lists, arrow entries, generateStaticParams, other exports", () => {
+    const page =
+      'export default async function Page() {\n  await requireFeature("notebook");\n  return null;\n}\n';
+    const cases: [string, string][] = [
+      [
+        'export { generateMetadata } from "../x/meta";',
+        "`export { ... }` and `export ... from` are refused: declare each entry in the page itself",
+      ],
+      [
+        "async function generateMetadata() { return {}; }\nexport { generateMetadata };",
+        "`export { ... }` and `export ... from` are refused: declare each entry in the page itself",
+      ],
+      [
+        'export * from "../x/meta";',
+        "`export { ... }` and `export ... from` are refused: declare each entry in the page itself",
+      ],
+      [
+        "export const generateMetadata = async () => ({});",
+        "exported value generateMetadata is refused (a page exports only its gated functions and route segment config)",
+      ],
+      [
+        'export async function generateStaticParams() { return fetch("http://api/x"); }',
+        "exported function generateStaticParams is refused (a page exports only the page, generateMetadata and generateViewport)",
+      ],
+      [
+        "export function generateMetadata() { return {}; }",
+        'generateMetadata must be an async function starting with await requireFeature("notebook");',
+      ],
+      [
+        "export const revalidate = compute();",
+        "route segment config revalidate must be a plain literal",
+      ],
+      ["export class Thing {}", "an exported class or enum is refused in a page"],
+    ];
+    for (const [addition, problem] of cases) {
+      expect(pageGateProblems(`${page}${addition}\n`, "notebook"), addition).toEqual([problem]);
+    }
     expect(
-      gatesEveryEntry(`${source}\nexport const generateMetadata = () => ({});\n`, "notebook"),
-    ).toBe(false);
-    expect(gatesEveryEntry("export default function Page() { return null; }", "notebook")).toBe(
-      false,
-    );
-    expect(gatesEveryEntry("", "notebook")).toBe(false);
+      pageGateProblems("const Page = async () => null;\nexport default Page;\n", "notebook"),
+    ).toEqual([
+      "`export default <expression>` is refused: write `export default async function`",
+      "no `export default async function`: a page is one",
+    ]);
+    expect(pageGateProblems("", "notebook")).toEqual([
+      "no `export default async function`: a page is one",
+    ]);
+    // Allowed besides the gated entries: plain route segment config, type exports and private helpers.
+    expect(
+      pageGateProblems(
+        `${page}export const revalidate = 60;\nexport const dynamic = "force-dynamic";\nexport type Props = { a: string };\nfunction helper() { return 1; }\n`,
+        "notebook",
+      ),
+    ).toEqual([]);
   });
 
   it("names the static first path segments of the app's own pages (the reserved list of the real check)", () => {
