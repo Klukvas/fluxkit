@@ -27,7 +27,8 @@ const PAGES = {
   ],
 } as const;
 
-const FOOTER_NAV = { en: "Footer navigation", uk: "Навігація внизу сторінки" } as const;
+/** The footer's shop pages column (the `columns` layout since round 4: a navigation named by its visible heading). */
+const FOOTER_NAV = { en: "Customer service", uk: "Покупцям" } as const;
 
 const sideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -207,7 +207,10 @@ test("the daily limit of the download shows its wait, and the legal pages are pl
   await expect(limited).toBeFocused();
 
   // Legal pages: placeholders with the "Template placeholder" box, linked from the footer, no cookie banner.
-  const footer = page.getByRole("navigation", { name: "Footer navigation" });
+  // The footer's legal column (the `columns` layout since round 4: a navigation named by its visible heading).
+  const footer = page
+    .getByRole("contentinfo")
+    .getByRole("navigation", { name: "Legal", exact: true });
   for (const [name, path] of [
     ["Privacy notice", "/en/legal/privacy"],
     ["Terms", "/en/legal/terms"],

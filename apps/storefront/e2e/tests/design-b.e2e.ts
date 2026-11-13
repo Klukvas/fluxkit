@@ -7,7 +7,8 @@ import { SHOP_NAME } from "../support/shop-name.ts";
 
 /**
  * Desktop design, batch B (plan `docs/plans/2026-11-03-storefront-design-b.md`): the home page from `config/home.ts`, the
- * category banner, and the dark theme (server-rendered from the `fluxkit_theme` cookie, the system mode, the footer switch
+ * category banner, and the dark theme (server-rendered from the `fluxkit_theme` cookie, the system mode, the switch (the
+ * header's `theme` control since round 4)
  * with and without a script, contrast of what a shopper sees in dark).
  */
 
@@ -166,20 +167,26 @@ test("the system mode follows the device's colour scheme, also when it changes",
   expect(await bodyBackground(page)).toBe(LIGHT_BACKGROUND);
 });
 
-test("the footer switch works by keyboard, says which theme is on, and the choice survives a reload", async ({
+test("the header's theme control works by keyboard, says which theme is on, and the choice survives a reload", async ({
   page,
   context,
 }) => {
   await page.goto("/en/catalog");
   await waitForHydration(page);
+  // Round 4: the switch is the header's `theme` control (a disclosure); its panel holds the three buttons.
+  const control = page.getByRole("banner").getByRole("button", { name: "Theme", exact: true });
   const group = page.getByRole("group", { name: "Theme" });
   const dark = group.getByRole("button", { name: "Dark" });
   const light = group.getByRole("button", { name: "Light" });
   const system = group.getByRole("button", { name: "System" });
+
+  await tabTo(page, control, 80);
+  await page.keyboard.press("Enter");
+  await expect(control).toHaveAttribute("aria-expanded", "true");
   await expect(system).toHaveAttribute("aria-pressed", "true");
   await expect(dark).toHaveAttribute("aria-pressed", "false");
 
-  await tabTo(page, dark, 200);
+  await tabTo(page, dark, 10);
   await page.keyboard.press("Enter");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await expect(dark).toHaveAttribute("aria-pressed", "true");
@@ -192,8 +199,15 @@ test("the footer switch works by keyboard, says which theme is on, and the choic
   expect(cookie?.path).toBe("/");
   expect(cookie?.sameSite).toBe("Lax");
 
+  // Escape closes the panel and gives the focus back to the control.
+  await page.keyboard.press("Escape");
+  await expect(control).toHaveAttribute("aria-expanded", "false");
+  await expect(control).toBeFocused();
+
   await page.reload();
+  await waitForHydration(page);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await control.click();
   await expect(dark).toHaveAttribute("aria-pressed", "true");
 
   await light.focus();
@@ -208,11 +222,17 @@ test("without a script the switch posts the choice and comes back to the same pa
   const context = await browser.newContext({ baseURL: E2E_ORIGIN, javaScriptEnabled: false });
   const page = await context.newPage();
   await page.goto("/uk/catalog");
+  // The header's `theme` control is a native `<details>`: it opens without a script.
+  const control = page.getByRole("banner").getByRole("button", { name: "Тема", exact: true });
+  await control.click();
   await page.getByRole("group", { name: "Тема" }).getByRole("button", { name: "Темна" }).click();
   await expect(page).toHaveURL(`${E2E_ORIGIN}/uk/catalog`);
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   expect(await bodyBackground(page)).toBe(DARK_BACKGROUND);
-  await expect(page.getByRole("button", { name: "Темна" })).toHaveAttribute("aria-pressed", "true");
+  await control.click();
+  await expect(
+    page.getByRole("group", { name: "Тема" }).getByRole("button", { name: "Темна" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await context.close();
 });
 

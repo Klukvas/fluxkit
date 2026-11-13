@@ -76,5 +76,86 @@
     "selector": "form.select",
     "property": "presence",
     "reason": "plan 2026-11-13-storefront-ui-round-4 B (council decision 5): the catalog's only native select was the sort; it is now a disclosure of links, so no select is found in main"
+  },
+  {
+    "page": "*",
+    "selector": "header.nav-link",
+    "property": "presence",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the inline category row is replaced by the closed \"Categories\" picker, so no header navigation link is visible at 1280"
+  },
+  {
+    "page": "*",
+    "selector": "header.button",
+    "property": "*",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the first visible header button at 1280 is now the \"Categories\" picker summary (fk-header-button) instead of the search form's submit button"
+  },
+  {
+    "page": "*",
+    "selector": "footer.button",
+    "property": "presence",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the theme switch moved from the footer to the header's theme control, so the footer has no button"
+  },
+  {
+    "page": "*",
+    "theme": "light",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+  },
+  {
+    "page": "*",
+    "theme": "dark",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+  },
+  {
+    "page": "*",
+    "theme": "system",
+    "selector": "page.body",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer becomes columns (its height changes on every page) and the header gains the picker and the theme control; whole pages masked, viewport frames"
+  },
+  {
+    "page": "*",
+    "theme": "light",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: \"Categories\" picker instead of the inline category row, theme control in the header controls"
+  },
+  {
+    "page": "*",
+    "theme": "dark",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: \"Categories\" picker instead of the inline category row, theme control in the header controls"
+  },
+  {
+    "page": "*",
+    "theme": "system",
+    "selector": "header.banner",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: \"Categories\" picker instead of the inline category row, theme control in the header controls"
+  },
+  {
+    "page": "*",
+    "theme": "light",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer in columns with headings, the theme switch moved to the header"
+  },
+  {
+    "page": "*",
+    "theme": "dark",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer in columns with headings, the theme switch moved to the header"
+  },
+  {
+    "page": "*",
+    "theme": "system",
+    "selector": "footer.contentinfo",
+    "property": "screenshot",
+    "reason": "plan 2026-11-13-storefront-ui-round-4, A: the footer in columns with headings, the theme switch moved to the header"
   }
 ]

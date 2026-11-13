@@ -49,7 +49,7 @@ function between(html: string, start: string, end: string): string {
 
 /**
  * A form of the page itself: not the header's search form (`role="search"`). Looked for inside `<main>` only, because the
- * footer's no-script theme switch is a form too.
+ * header's no-script theme switch is a form too (two: the theme control and its copy in the phone menu).
  */
 const PAGE_FORM = /<form(?![^>]*role="search")[\s>]/;
 
