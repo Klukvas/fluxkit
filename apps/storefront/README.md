@@ -198,14 +198,19 @@ An optional feature (`FEATURES_ENABLED`, AGENTS.md 2.1) brings its storefront pa
 deleted with the feature. None ships upstream yet; the mechanism is proven by the fixture slice `src/features/fixtures/app/[locale]/(feature-notebook)/`
 (never routed). Contract: `docs/contracts/README.md`, "Feature extension points".
 
+- **Run tests and the type check through the package scripts** (`pnpm --filter @fluxkit/storefront test`, `... typecheck`, or the root
+  `pnpm test` / `pnpm typecheck`): their pre-scripts write the registry. Calling `vitest` or `tsc` directly needs
+  `node scripts/generate-feature-registry.mjs` (from the repository root) first, or the import of `registry.generated.ts` fails.
 - **Registry.** Next 16 with Turbopack has no glob import, so `scripts/generate-feature-registry.mjs` writes `src/features/registry.generated.ts`
   (git-ignored) from the slices on disk; the `predev`, `prebuild`, `pretypecheck` and `pretest` scripts run it (`turbo.json` keys the build
   and typecheck caches on the script; the slices are package files). Deleting a slice and running any of them leaves an empty registry.
   `src/features/registry.ts` checks the manifests at load (a broken one fails the build and every page). No other module imports a
   slice, slices never import each other (dependency-cruiser), and a manifest imports nothing that imports the registry back.
 - **Gate.** Every page and `generateMetadata` of a slice starts with `await requireFeature("<name>")`: `GET /store/config` `features`
-  (cached 60 s) decides, and an off feature is a real 404 (no `loading.tsx` anywhere above, `route-structure.spec.ts`). A slice's first
-  path segment may not be a shop page slug or another route's segment (same spec).
+  (cached 60 s) decides, and an off feature is a real 404 (no `loading.tsx` anywhere above, `route-structure.spec.ts`). Only the root
+  layout and `page.tsx` files route in a slice (no route handler, metadata image, `generateStaticParams`, re-exported entry; the
+  contract lists them); the spec reads the pages with the TypeScript compiler. A slice's first path segment may not be a shop page
+  slug, another route's segment or another slice's (same spec, and the generator).
 - **Header, footer, sitemap.** `[locale]/layout.tsx` reads the enabled features once (an outage means no feature link) and passes the
   enabled slices' links to the header (after `navigation.links`) and the footer (into the shop pages group, else a group of their own);
   `/sitemap.xml` asks each enabled slice for its pages. With no enabled feature the header and footer markup is unchanged.
