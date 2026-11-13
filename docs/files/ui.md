@@ -45,3 +45,7 @@ Dumb, token-styled components: props in, markup out. No fetching, no API types, 
 - `src/*.spec.ts(x)` - Vitest with `renderToStaticMarkup` (no DOM library); `src/test-helpers.ts` (not built) parses the markup. `no-hardcoded-text.spec.tsx` renders every component (the admin ones included, with loading, empty, busy and multiline variants) with sentinel strings and fails on any other text. Admin component specs: `admin-data.spec.tsx`, `admin-nav.spec.tsx`, `dialog.spec.tsx`, `tabs.spec.tsx`, `locale-text-field.spec.tsx`, `tab-navigation.spec.ts`, `dialog-focus.spec.ts`.
 - `src/raw-html-guard.spec.ts` - fails when any source or spec of the library sets raw HTML (`dangerouslySetInnerHTML`, `innerHTML`, `outerHTML`, `insertAdjacentHTML`, `document.write`); blog plan section 8.
 - Built with `tsc` to `dist/` (bundler resolution, consumed by Next and Vite).
+
+- `src/icons.tsx`, `src/icons.spec.tsx` - 22 replaceable named decorative 24×24 line icons; fixed colour/accessibility invariants and token sizing, no copy or dependencies.
+- `src/side-nav.tsx`, `src/admin-nav.spec.tsx` - optional icons, `collapsed` and `currentTone` with compatible defaults; hidden names, uniquely labelled groups and collapsed separators; router props stay intact.
+- `src/side-nav-tooltip.tsx` - client-only native top-layer popover for collapsed icon labels; hover/focus, Escape, inline-end placement and scroll/resize cleanup, no portal.

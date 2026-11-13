@@ -1,5 +1,7 @@
 # Changelog
 
+- Admin shell: add a remembered collapsible desktop icon sidebar, daily-work navigation and pinned Help, plus a compact account disclosure; mobile keeps the expanded Menu panel.
+
 One line per user-visible or schema change.
 
 ## Unreleased

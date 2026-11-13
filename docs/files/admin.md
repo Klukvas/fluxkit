@@ -193,3 +193,12 @@ Run, headers and conventions: `apps/admin/README.md`. Plan: `docs/plans/2026-10-
 - `layout/feature-route-view.tsx` - what a slice's screen shows while held back (loading view, "not found", the failure with a retry) and its document title key.
 - `i18n/message-files.ts` - `loadAnyMessageFile`: the areas' lazy files plus each slice's `feature:<name>` file (the SPA's and `messagesForArea`'s loader).
 - `lib/api.ts` - also `adminFeatureTransport`: the admin client's transport (CSRF, time limits, session signals, problem parsing) for a slice's own routes.
+
+## Admin shell redesign PR 1
+
+- `src/layout/navigation.ts`, `navigation.spec.ts` - typed icon/route groups: daily work, catalog setup, storefront, settings, bottom Help; existing permission filtering, exact Home match and mobile navigation-key guard.
+- `src/layout/shell.tsx`, `src/styles.css` - compact header and responsive panels from shared navigation markup; sticky desktop sidebar, independent scroll and pinned footer; mobile keeps expanded Menu-controlled navigation/account panel.
+- `src/layout/sidebar-preference.ts`, `sidebar-preference.spec.ts`, `use-sidebar-collapsed.ts` - boolean browser preference through the shared accessor, expanded fallback on missing/invalid/denied reads and failed writes; no write-on-mount.
+- `src/layout/user-menu.tsx`, `user-menu.spec.tsx` - account disclosure, decorative Unicode initials, outside/Escape/route dismissal and focus restoration; existing sign-out confirmation/operation and visible failure alert.
+- `src/views/views.spec.tsx`, `src/source-guards.spec.ts`, `build-output.spec.ts`, `security-headers.spec.ts` - responsive markup/controls, translated states, one shared storage accessor, built entry/static-import byte caps.
+- `e2e/tests/shell.e2e.ts` - desktop/mobile collapse, persistence/denied storage, responsive landmarks, pinned Help, top-layer tooltips/RTL and account keyboard/pending/failure scenarios; orchestrator runs browser checks.

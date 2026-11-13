@@ -1,8 +1,7 @@
 # Admin shell redesign
 
-- Status: proposed architecture; implementation and measurements are pending.
+- Status: PR 1 implemented and verified on branch claude/admin-sidebar-icons-95ad74; PR not opened yet.
 - Owner request: 2026-11-13, make `apps/admin` easier to navigate through three separate PRs.
-- This session owns this plan only. No implementation, next task, commit, push, deployment or external write.
 - Scope: admin core presentation; permission filtering, routes, session operations and domain behaviour stay intact.
 
 ## Three PRs
@@ -49,8 +48,8 @@
 | Change `apps/admin/src/layout/shell.tsx` | Desktop frame, separately rendered Help, collapse control and responsive panels; presentation props carry collapse state and callbacks from `Shell`. |
 | Change `apps/admin/src/layout/user-menu.tsx` | Compact account disclosure and focus handling; preserve existing sign-out path. |
 | Change `apps/admin/src/messages/{uk,en}/{shell,navigation}.json` | Add shell labels and catalog-setup heading; existing route labels remain. |
-| Change `apps/admin/src/i18n/{i18n-context.tsx,locale-preference.ts}` | Correct storage comments to include panel preference and existing checklist; accessor implementation remains the only storage reference. |
-| Change `apps/admin/src/source-guards.spec.ts`, `apps/admin/build-output.spec.ts` | Add exact accessor consumer; update storage wording; record fresh before/after budget measurements. Budget constants remain unless separately decided. |
+| Change `apps/admin/src/i18n/{i18n-context.tsx,locale-preference.ts}` | Correct storage comments to include panel preference and existing checklist; accessor implementation remains the only storage reference. Non-personal language/sidebar keys share `BROWSER_PREFERENCE_KEYS` in `locale-preference.ts`, keeping both keys beside the accessor in the built shared chunk. |
+| Change `apps/admin/src/source-guards.spec.ts`, `apps/admin/build-output.spec.ts` | Add exact accessor consumer; update storage wording; record fresh before/after budget measurements. Only exceeded budget caps may move to about the measured size plus 1 %, after trimming (orchestrator decision). |
 | Change `apps/admin/src/views/views.spec.tsx`; add `layout/user-menu.spec.tsx` | Static shell variants, translated labels, controlled open/closed account view and failure/pending states. |
 | Add `apps/admin/e2e/tests/shell.e2e.ts`; change `e2e/support/fixtures.ts`, `tests/{sign-in,session,serving,help,roles}.e2e.ts` | New interactions/matrix; adjust hidden account actions and separate Help landmark locators; preserve domain scenarios. |
 | Change docs listed below | Document implemented behaviour and actual evidence only. |
@@ -193,14 +192,29 @@ expect(contrastRatio(
 - Budget baseline and after: `pnpm build`, then `pnpm --filter @fluxkit/admin test build-output.spec.ts`; record measured raw/gzip totals from the same manifest/static-import traversal, not Vite's per-file summary alone.
 - Admin browser suite after build: `pnpm --filter @fluxkit/admin test:e2e`; isolated iteration: `pnpm --filter @fluxkit/admin test:e2e shell`. Services and disposable `E2E_DATABASE_URL` ending `_e2e_test` follow `apps/admin/e2e/README.md`; never use a development database. `pnpm test` uses a different `_test` database.
 - Additional docs check: `pnpm check:docs`. Full suite includes both real/fork theme runs; no snapshot-update, weakened guard or dependency install as a substitute for verification.
-- Screenshot matrix: widths **1440, 1024, 768, 390 px** × saved **expanded/collapsed** × **light/dark** = 16 cases, in both uk and en (32 captures). At 390, Menu is open for navigation captures and both saved states render expanded; add Menu-closed header captures. At 768, desktop collapse is active.
-- Dark captures set `data-theme="dark"` in the test page only, after mount; admin stays fixed light in production. These are component palette probes, not a supported admin dark-mode feature. Include actual effective light overrides in acceptance evidence.
+- Screenshot matrix: widths **1440, 1024, 768, 390 px** × saved **expanded/collapsed** × **light/dark** = 16 captures in uk (orchestrator decision). At 390, Menu is open for navigation captures and both saved states render expanded; Menu-closed header behaviour is covered by e2e without additional captures. At 768, desktop collapse is active.
+- Dark captures force `data-theme="dark"` as a palette probe only; the admin has no dark mode of its own (ADR 0047).
 - Capture at a documented common height plus a short-height scroll probe; include current item, hovered/focused tooltip, footer and open account popup. Assert no horizontal overflow, overlap, clipping or unreachable controls; add an RTL geometry probe. Artifacts stay ignored test outputs, not new committed baselines.
-- **Not verified in this plan-only session:** builds, size deltas, unit/integration/e2e tests, screenshots or runtime behaviour. PR 1 report names any missing services/checks honestly. Screen readers, Safari/Firefox, real client-fork layouts and production dark-mode support remain outside the Chromium evidence.
+- **Implementation evidence:** actual builds, bundle measurements and unit checks are recorded in Results (PR 1). E2E, integration tests and screenshots are run by the orchestrator. Screen readers, Safari/Firefox, real client-fork layouts and production dark-mode support remain outside the Chromium evidence.
 
 ## Red zones and instruction review
 
 - No red zone is expected: no dependency, schema/migration, API/config/event/feature-boundary change, token change, auth/permission change or destructive action. Sign-out presentation keeps the existing operation and leave confirmation. SideNav additions are internal under `docs/contracts/README.md`; existing defaults remain compatible.
-- **Conditional open decision — budget:** actual before/after measurements are pending. Recommend keeping 445,000 raw / 135,000 gzip and reducing added entry code first. If either cap must rise, stop for the PR decision, propose the smallest measured increase and record it in `build-output.spec.ts` and the report; no assumed approval or invented measurement.
-- Instruction sources checked: canonical `/Users/andreypavlenko/Desktop/Projects/AGENTS.md`, supplied global routing instructions, repository `AGENTS.md`, `CLAUDE.md`, `docs/HANDOFF.md`, module READMEs, `~/.claude/rules/common/*` and `typescript/*`. Source-specific specs and the existing theme/message contracts constrain the design.
-- Current explicit Architect request owns this file only; no implementation pipeline, independent code review, next task or automatic commit is represented as completed. Canonical scope/safety wins over standing continuation/merge wording; no technical waiver is taken.
+- **Budget decision (orchestrator-authorized):** after named exports and shared markup, initial JS is 451,609 raw / 135,019 gzip (baseline 441,990 / 131,834). Both exceeded caps move to measured size plus about 1 %: raw 445,000 → 456,200; gzip 135,000 → 136,400. No other cap changes.
+
+## Results (PR 1)
+
+- PR 1 provides shared decorative icons, remembered desktop collapse, role-filtered daily-work navigation, pinned Help, a scrolling sidebar and compact account disclosure. Mobile keeps the expanded Menu panel. PRs 2 and 3 remain separate later sessions; no dependency, API, migration or theme-token change.
+- Orchestrator verification uses Node 22.23.5 and real Postgres 17, Redis 8 and Meilisearch v1.55.0 in Docker.
+- Final entry bundle (entry plus static imports, gzip level 9, 3 chunks): **451 685 raw / 135 038 gzip bytes**, before **441 990 raw / 131 834 gzip**; delta **+9 695 raw / +3 204 gzip**. Caps remain **456 200 raw / 136 400 gzip**.
+
+| Command | Result |
+|---|---|
+| `pnpm lint`, `pnpm typecheck`, `pnpm format:check`, `pnpm check:boundaries`, `pnpm check:env` | Each exits 0. |
+| `pnpm test` | Every package passes except `@fluxkit/api`: 2 of 259 files fail on macOS, also without this change. `local-media-storage.spec.ts` expects `/proc`; `delete-abandoned-uploads.job.spec.ts` expects `EISDIR`. PR 1 changes no API file. Admin: 166 files pass; UI: 16; theme: 7 plus 8 in the fork run, all pass. |
+| `pnpm --filter @fluxkit/admin test:e2e` | 72 pass, 1 fails: `email.e2e.ts:69`, "No mail matches" after a second Recipient filter. It fails identically on clean `main` (`8296a167`) in the same environment; it is pre-existing. |
+| Shell and screenshot run | `shell.e2e.ts` passes; 29 tests pass together with the screenshot run. The RTL tooltip scenario passes after `inset-auto` fixes the UA popover `inset` override that caused one failure. |
+
+- Separate Codex QA: one major (focus after My account → Stay with unsaved input) and three minors are fixed: clipped navigation focus outlines, an e2e request-count race and a tooltip surface without a visible edge (now `border border-border`). Tooltip lazy-loading (~0.3 KB gzip) is declined: the saving does not justify a lazy boundary in the shared UI library.
+- Screenshots cover uk UI at 1440, 1024, 768 and 390 px, expanded/collapsed (390 px: Menu open/closed), in light and forced `data-theme="dark"`, plus the collapsed tooltip and open account menu. Forced dark is a palette probe; the admin has no dark mode of its own. At a 900 px tall window the expanded sidebar scrolls, with Settings items below the fold; the collapsed form fits.
+- **Not verified:** screen readers, Safari, Firefox, a real client fork and CI.

@@ -280,6 +280,7 @@ Storefront -> Blog (after Home banners). Routes `/features/blog` (`catalog.read`
 
 ## Known limits
 
+- At short window heights (including 900 px), the expanded desktop sidebar scrolls, with Settings items below the fold; the collapsed sidebar fits.
 - Concurrent edits are last-write-wins per field (no version on the API, owner answer 13); there is no audit log for catalog or price changes (customer and admin user changes and the privacy actions are in the Audit log).
 - No proactive "session ends soon" warning (the API does not expose the expiry).
 - A user change made in another tab (signing out and in as someone else in the same browser) is not noticed by an open tab until one of its requests answers 401 or 403: until then it shows the previous user's header, navigation and permissions while its requests run as the new user (step 13 review L2, kept as a known limitation by the owner).
@@ -295,3 +296,13 @@ Storefront -> Blog (after Home banners). Routes `/features/blog` (`catalog.read`
 - Customers: the list has no lock state, order count or status filter (the API's list does not offer them) and the search finds the start of an email only, not a name. The lock shows as a flag; the API gives no time for it. An admin cannot create or delete a customer, change an email or set a password (no such route); deactivating does not restore sessions when the account is activated again (they were deleted). A lost answer is shown with the stored state and never retried by the screen.
 - The Shipping area cannot list the enabled carriers (the API has no such route): the carriers page shows the carriers the methods name and opens another by its code. The carrier profile is a JSON text: the carrier port has a validator (`validateSettings`, shipping plan step 7b) but no schema the screen could render, so the API's `400` answers name the fields (`settings.<path>`) and the screen shows them as field errors or the generic message.
 - The browser tests cannot make the fake carrier lose an answer (its test hook works inside the API process only), so the "result unknown" path of a create, and the reconcile that follows, are covered by the unit and markup specs only.
+
+## Admin shell (redesign PR 1)
+
+From `md`, the full-height sticky sidebar has a separately scrolling main navigation, pinned Help and a collapse/expand control. Daily work starts with Home, Orders, Products, Customers and Payments, followed by Catalog setup, Storefront and Settings. Links and empty groups are filtered through the existing route permissions. The current link uses the existing opaque foreground/muted token pair.
+
+The desktop choice is browser-wide (`fluxkit.admin.sidebarCollapsed`, exactly `"true"` or `"false"`), through the same lazy storage accessor as language and the Help checklist. Missing, invalid or blocked storage expands the sidebar; failed writes also restore expanded state. No preference write runs on mount. Mobile always uses expanded links behind the existing Menu button with account/language controls; navigation (including the same page) closes it, and Escape closes it and focuses Menu.
+
+The compact account button shows decorative email initials and opens an ordinary disclosure of signed-in email, My account and Sign out. Tab follows native order; Escape returns focus to its trigger; outside pointer/focus and navigation dismiss it. Unsaved-change confirmation and the sign-out operation are preserved; Stay restores Sign out focus, pending disables it, and failures remain visible outside the popup. Language stays visible on desktop. No admin dark mode is introduced (ADR 0047).
+
+Plan and actual check evidence: `docs/plans/2026-11-13-admin-shell-redesign.md`. E2E and screenshots are run by the orchestrator; no screenshot baselines accompany this change.
