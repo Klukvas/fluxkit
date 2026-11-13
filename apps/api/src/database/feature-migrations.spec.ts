@@ -74,6 +74,9 @@ describe("feature migrations (ADR 0049, fixture `notebook`; real Postgres)", () 
   }
 
   afterAll(async () => {
+    // Leave the shared database core-only (the reset spec ends with the fixture migrated): the schema specs drop core tables
+    // by name, which the fixture's foreign key to media_upload blocks.
+    await ensureMigrated();
     for (const database of scratch) await database.drop();
     for (const folder of tempFolders) await rm(folder, { recursive: true, force: true });
   });

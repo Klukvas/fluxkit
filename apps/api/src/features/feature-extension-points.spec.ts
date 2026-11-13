@@ -86,6 +86,8 @@ describe("a feature with a table, through the API kit (ADR 0049, fixture `notebo
   afterAll(async () => {
     for (const running of started) await running.app.close();
     await pool.end();
+    // Leave the shared database core-only: the schema specs drop core tables by name, which the fixture's foreign key blocks.
+    await ensureMigrated();
   });
 
   describe("default deny for a feature's admin routes (global AdminPathGuard)", () => {

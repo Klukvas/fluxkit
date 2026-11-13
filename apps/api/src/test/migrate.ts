@@ -79,7 +79,9 @@ function sameState(expected: MigrationState, applied: MigrationState): boolean {
  * the database empty, so the order of spec files must not matter, and a spec that ran with a feature leaves its tables
  * behind. When the state differs, everything in the `public` and `drizzle` schemas is dropped (a feature table and its
  * foreign keys to core tables go with `CASCADE`, its migrations table with the `drizzle` schema), then the core
- * migrations and the given features' are applied. Refuses databases whose name does not end in `_test`.
+ * migrations and the given features' are applied. Refuses databases whose name does not end in `_test`. A spec that passes
+ * features calls `ensureMigrated()` again in its `afterAll`: the schema specs drop core tables by name, without `CASCADE`,
+ * and a feature table's foreign key to a core table would block them.
  */
 export async function ensureMigrated(
   features: readonly TestFeatureMigrations[] = [],
