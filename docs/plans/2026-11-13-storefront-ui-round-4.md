@@ -67,9 +67,11 @@ ties and says why.
 
 ### C. Home banners (small)
 
-- `seeds/src/coffee/banners.ts`: the third banner becomes `card` with a title and text (both locales). An `image` banner next to `card`
-  banners in one row takes the row's height (cover), so a mixed row still lines up. The test server keeps its data until the admin
-  changes the banner or the database is re-seeded.
+- `seeds/src/coffee/banners.ts`: the third banner becomes `card` with a title and text (both locales) and a new wordless picture
+  (`banner-equipment.webp`, same studio look as the other two); the two worded pictures are removed. Branch `fix/home-banner-row`.
+- Not done (deviation, orchestrator): stretching an `image` banner to the row height next to cards. `object-cover` in a taller frame
+  crops the sides, which cuts the words an `image` banner has drawn in; a mixed row stays the admin's choice. The test server keeps
+  its data until the admin switches the banner (`/admin/banners`) or the database is re-seeded from scratch.
 
 ## Owner decisions needed (red zones, AGENTS.md section 14)
 
