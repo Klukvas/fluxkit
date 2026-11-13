@@ -19,6 +19,7 @@ const config = {
   emailDelivery: false,
   onlinePayment: false,
   search: false,
+  features: [],
 };
 
 function problem(status: number, code: ProblemDetails["code"]): CatalogOutcome<never> {

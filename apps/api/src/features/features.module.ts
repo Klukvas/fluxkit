@@ -1,9 +1,7 @@
 import { Global, Module, type DynamicModule } from "@nestjs/common";
 import { coreInventory, mergeFeatureInventories } from "../privacy/inventory/index.js";
+import { ENABLED_FEATURES } from "./enabled-features.js";
 import type { LoadedFeature } from "./feature-loader.js";
-
-/** The names of the features loaded from `FEATURES_ENABLED`, sorted (`readonly string[]`); `features` of the config routes. */
-export const ENABLED_FEATURES = Symbol("ENABLED_FEATURES");
 
 /**
  * What core reads about the enabled features (ADR 0049): their names, and their personal-data inventories, checked and

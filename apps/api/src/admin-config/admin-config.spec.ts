@@ -50,6 +50,8 @@ describe("GET /admin/config (real app, real Postgres)", () => {
       onlinePayment: false,
       // The specs run with search off unless they pass `search` (SEARCH_ENABLED=false).
       search: false,
+      // The specs run without FEATURES_ENABLED.
+      features: [],
       // The specs run without a media driver (an environment-less app has uploads switched off).
       media: {
         uploadsEnabled: false,

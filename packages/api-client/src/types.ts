@@ -606,6 +606,8 @@ export interface StoreConfig {
   onlinePayment: boolean;
   /** False with `SEARCH_ENABLED=false`: the search routes answer 404; show no search box or facets, use the product list. */
   search: boolean;
+  /** The optional features enabled on the API (`FEATURES_ENABLED`), sorted; show a feature's pages and links only when listed (ADR 0049). */
+  features: string[];
 }
 
 export interface PriceRange {

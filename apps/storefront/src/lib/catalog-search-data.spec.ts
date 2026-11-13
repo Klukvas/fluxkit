@@ -15,6 +15,7 @@ const config = {
   emailDelivery: false,
   onlinePayment: false,
   search: true,
+  features: [],
 };
 
 function ok<T>(data: T): CatalogOutcome<T> {

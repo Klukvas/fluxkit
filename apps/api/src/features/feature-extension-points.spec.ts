@@ -1,3 +1,4 @@
+import { Module } from "@nestjs/common";
 import { getTableConfig } from "drizzle-orm/pg-core";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -17,6 +18,10 @@ import {
 import { loadFeatures } from "./feature-loader.js";
 
 const MEDIA_BASE = "https://media.example.test/media";
+
+/** A test-only extra module (`extraFeatures`): mounted, but not a feature of FEATURES_ENABLED. */
+@Module({})
+class ProbeModule {}
 
 interface Note {
   id: string;
@@ -222,6 +227,24 @@ describe("a feature with a table, through the API kit (ADR 0049, fixture `notebo
       await expect(
         pool.query("delete from media_upload where id = $1", [upload.id]),
       ).rejects.toThrow(/fixture_note_cover_upload_id_fkey/);
+    });
+  });
+
+  describe("enabled features in the config routes (E4)", () => {
+    it("lists the loaded feature on GET /store/config and GET /admin/config", async () => {
+      const store = await call<{ features: string[] }>(owner, "GET", "/store/config");
+      const admin = await call<{ features: string[] }>(viewer, "GET", "/admin/config");
+      expect(store.body.features).toEqual(["notebook"]);
+      expect(admin.body.features).toEqual(["notebook"]);
+    });
+
+    it("lists the loaded features sorted, and never a test-only extra module", async () => {
+      const both = await start({
+        enabledFeatures: ["sample", "notebook"],
+        extraFeatures: [{ name: "probe", module: ProbeModule }],
+      });
+      const result = await call<{ features: string[] }>(both, "GET", "/store/config");
+      expect(result.body.features).toEqual(["notebook", "sample"]);
     });
   });
 
