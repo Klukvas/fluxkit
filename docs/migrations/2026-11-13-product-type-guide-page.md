@@ -15,6 +15,11 @@ A type whose page is not enabled in the storefront gets no link (the fallback is
 ## What a fork does
 
 - Run `pnpm db:migrate` (adds the nullable column; existing types get no guide page).
+- **Already-deployed databases:** a database migrated or seeded before this change keeps ALL its product types without a guide
+  page, and neither the migration nor `pnpm seed` / `pnpm seed:test` fills it (the seed runner never overwrites an existing type).
+  So an apparel or shoe type LOSES its size guide link on the product page as soon as this change is deployed, until someone
+  sets "Guide page" on that type in the admin (Product types, the type, "Guide page", e.g. `size-guide`, Save). The template's
+  test server runs the coffee demo, whose types name no page: nothing to do there.
 - Either set "Guide page" (for example `size-guide`) on the product types that need it in the admin (recommended: a gift card
   type then gets no size guide), or keep the old behaviour for every type without a page of its own by setting
   `export const productOptionGuide: ShopPageSlug | null = "size-guide";` in `apps/storefront/src/config/shop-pages.ts`.
