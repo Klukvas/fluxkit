@@ -161,8 +161,10 @@ describe("a feature or provider package declares no database table outside the f
   const readRepoFile = (path: string): string | undefined => {
     try {
       return text(join(ROOT, path));
-    } catch {
-      return undefined;
+    } catch (error) {
+      // A feature without src/index.ts exports no inventory; any other read error fails the spec.
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return undefined;
+      throw error;
     }
   };
 
