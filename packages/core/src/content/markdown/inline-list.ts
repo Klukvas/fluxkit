@@ -1,3 +1,4 @@
+import type { WorkCounter } from "./budget.js";
 import type { MarkdownInline } from "./types.js";
 
 /**
@@ -25,6 +26,8 @@ export interface Finished {
 export class SlotList {
   head: Slot | null = null;
   tail: Slot | null = null;
+
+  constructor(private readonly work: WorkCounter) {}
 
   append(piece: Piece, line: number): Slot {
     const slot: Slot = { piece, prev: this.tail, next: null, line };
@@ -59,6 +62,7 @@ export class SlotList {
     let text = "";
     let slot = first;
     while (slot !== null && slot !== end) {
+      this.work.count(1);
       const { piece } = slot;
       if (piece.kind === "text") {
         text += piece.value;

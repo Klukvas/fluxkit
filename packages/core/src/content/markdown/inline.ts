@@ -78,7 +78,7 @@ function charFrom(text: string, index: number): string {
  * bracket algorithms, limited to code spans, emphasis, strong, links and hard breaks. Everything else is text.
  */
 class InlineParser {
-  private readonly slots = new SlotList();
+  private readonly slots: SlotList;
   private readonly emphasis: EmphasisStack;
   private readonly backticks: BacktickRuns;
   private brackets: Bracket | null = null;
@@ -97,12 +97,14 @@ class InlineParser {
   ) {
     this.line = startLine;
     this.pendingLine = startLine;
-    this.emphasis = new EmphasisStack(this.slots);
-    this.backticks = new BacktickRuns(text);
+    this.slots = new SlotList(state.budget);
+    this.emphasis = new EmphasisStack(this.slots, state.budget);
+    this.backticks = new BacktickRuns(text, state.budget);
   }
 
   parse(): MarkdownInline[] {
     while (this.position < this.text.length) {
+      this.state.budget.count(1);
       this.step(this.text.charAt(this.position));
     }
     this.flush();
@@ -180,6 +182,7 @@ class InlineParser {
     const start = this.position;
     let length = 0;
     while (this.text.charAt(start + length) === "`") length += 1;
+    this.state.budget.count(length);
     const closer = this.backticks.closerOf(length, start + length);
     if (closer === -1) {
       this.addText("`".repeat(length));
@@ -199,6 +202,7 @@ class InlineParser {
     const start = this.position;
     let length = 0;
     while (this.text.charAt(start + length) === char) length += 1;
+    this.state.budget.count(length);
     const before = charBefore(this.text, start);
     const after = charFrom(this.text, start + length);
     const leftFlanking =
@@ -242,7 +246,9 @@ class InlineParser {
     this.flush();
     this.emphasis.process(opener.delimiterBottom);
     const { nodes, depth } = this.slots.take(opener.slot.next, null);
-    if (inlinePlainText(nodes).trim() === "") {
+    const linkText = inlinePlainText(nodes);
+    this.state.budget.count(linkText.length);
+    if (linkText.trim() === "") {
       throw new MarkdownFailure("empty_link_text", opener.line);
     }
     const checked = checkMarkdownLink(target.href, this.state.locales);
@@ -272,6 +278,7 @@ class InlineParser {
       earlier !== null && earlier.active;
       earlier = earlier.previous
     ) {
+      this.state.budget.count(1);
       earlier.active = false;
     }
     this.position = target.end;
@@ -293,6 +300,7 @@ class InlineParser {
     const targetStart = index;
     let depth = 0;
     while (index < text.length) {
+      this.state.budget.count(1);
       const char = text.charAt(index);
       if (char === " " || char === "\t" || char === "\n") break;
       if (char === ")" && depth === 0) break;
@@ -303,11 +311,15 @@ class InlineParser {
         if (char === ")") depth -= 1;
         index += 1;
       }
+      // Like CommonMark's reference parsers: deeper nesting is no target. It also bounds how far the scans that start inside
+      // one another (`[a](x[a](x...`) can overlap, since every `](` opens one more level.
+      if (depth > MARKDOWN_LIMITS.maxLinkTargetParentheses) return null;
       if (index - start > MARKDOWN_LIMITS.maxLinkTargetLength) return null;
     }
     const targetEnd = index;
     while (text.charAt(index) === " " || text.charAt(index) === "\t") index += 1;
     if (text.charAt(index) !== ")" || depth !== 0) return null;
+    this.state.budget.count(targetEnd - targetStart);
     return { href: unescapeTarget(text.slice(targetStart, targetEnd)), end: index + 1 };
   }
 
@@ -320,6 +332,7 @@ class InlineParser {
     if (this.noCloseLeft) return -1;
     this.nextClose = this.text.indexOf(")", from);
     this.noCloseLeft = this.nextClose === -1;
+    this.state.budget.count((this.noCloseLeft ? this.text.length : this.nextClose) - from);
     return this.nextClose;
   }
 }
@@ -327,6 +340,8 @@ class InlineParser {
 /** The inline nodes of one paragraph or heading; `startLine` is the source line of its first character. */
 export function parseInline(text: string, startLine: number, state: InlineState): MarkdownInline[] {
   const nodes = new InlineParser(text, startLine, state).parse();
-  state.budget.addNodes(countInline(nodes), startLine);
+  const count = countInline(nodes);
+  state.budget.count(count);
+  state.budget.addNodes(count, startLine);
   return nodes;
 }
