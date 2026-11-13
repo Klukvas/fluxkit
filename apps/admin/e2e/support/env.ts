@@ -45,6 +45,28 @@ export const MANAGER_PASSWORD = "e2e-manager-password-0123456789";
 export const VIEWER_EMAIL = "e2e-viewer@example.com";
 export const VIEWER_PASSWORD = "e2e-viewer-password-0123456789";
 
+/**
+ * The optional features the suite's API runs with (ADR 0049): `ADMIN_E2E_FEATURES`, a comma-separated list of feature names
+ * (default: none, like the template). It becomes the API's `FEATURES_ENABLED`, so `prepare-database.ts` applies the
+ * features' migrations too. Without it, `blog.e2e.ts` checks that the admin shows no blog; with `blog` it runs the blog
+ * scenarios. A malformed value stops the run before anything starts.
+ */
+export function e2eFeatures(env: Env = process.env): string[] {
+  const value = (env["ADMIN_E2E_FEATURES"] ?? "").trim();
+  if (value === "") return [];
+  const names = value.split(",").map((name) => name.trim());
+  for (const name of names) {
+    if (!/^[a-z][a-z0-9-]{0,31}$/.test(name)) {
+      throw new Error(
+        `ADMIN_E2E_FEATURES must be a comma-separated list of feature names (for example "blog"), got "${value}".`,
+      );
+    }
+  }
+  return [...new Set(names)];
+}
+
+export const ADMIN_E2E_FEATURES: readonly string[] = e2eFeatures();
+
 /** Suffix the e2e database must end with; see `prepare-database.ts`. */
 export const E2E_DATABASE_SUFFIX = "_e2e_test";
 
@@ -132,7 +154,8 @@ export function apiEnvironment(env: Env = process.env): Env {
     STORE_COOKIE_SECURE: "false",
     ADMIN_COOKIE_SECURE: "false",
     TRUST_PROXY: "1",
-    FEATURES_ENABLED: "",
+    // The suite's harness flag only (`ADMIN_E2E_FEATURES`); a FEATURES_ENABLED in the shell never counts.
+    FEATURES_ENABLED: e2eFeatures(env).join(","),
     // The test-only carrier of the template (packages/providers/_fake): shipping settings and waybills need one provider.
     SHIPPING_PROVIDERS_ENABLED: "fake",
     // The test-only `fake` payment provider (payments plan step 11). The suite plays the provider: it POSTs the fake's signed webhook
