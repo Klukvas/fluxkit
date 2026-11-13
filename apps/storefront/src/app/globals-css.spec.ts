@@ -46,3 +46,19 @@ describe("app/globals.css component classes", () => {
     expect(outside).not.toContain("@apply");
   });
 });
+
+describe("app/globals.css scrollbars (plan 2026-11-13-storefront-ui-round-4 B)", () => {
+  const source = css.replace(/\/\*[\s\S]*?\*\//g, "");
+
+  // The thumb and track must be a pair the theme's contrast test holds to 3:1 in every mode (`--color-border-input` on
+  // `--color-background`, packages/theme/src/contrast.spec.ts); another pair would need its own entry there first.
+  it("colours them from the --color-border-input / --color-background token pair, and only there", () => {
+    expect(source.match(/scrollbar-color:[^;]*;/g)).toEqual([
+      "scrollbar-color: var(--color-border-input) var(--color-background);",
+    ]);
+  });
+
+  it("makes every scrollbar thin (scrollbar-width is not inherited)", () => {
+    expect(source).toMatch(/\* \{\s*scrollbar-width: thin;\s*\}/);
+  });
+});

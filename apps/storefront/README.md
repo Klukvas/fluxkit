@@ -550,7 +550,7 @@ Plan `docs/plans/2026-11-03-storefront-design-b.md` (before/after measurements a
   reached under another origin than that variable cannot use the script-less switch. A body that is not a form or has no known mode
   is a `400`; every refusal is a status without a body (no untranslated text). `showToggle: false` hides it, ignores the cookie and makes `/theme` a 404. Colours come from the
   tokens only, so every page, form control, badge, skeleton, toast, the filter sheet and the buy bar follow; product pictures keep their own
-  background on the `muted` surface; `color-scheme` follows the theme (native controls and scrollbars). Mail stays light. The admin is not
+  background on the `muted` surface; `color-scheme` follows the theme (native controls; scrollbars take `scrollbar-color` from the `border-input` and `background` tokens, `app/globals.css`). Mail stays light. The admin is not
   affected (it sets `data-theme="light"`; spec on its built CSS).
 - **Tests:** `components/home-sections.spec.tsx`, `config/home.spec.ts`, `lib/home-data.spec.ts`, `lib/theme-mode.spec.ts`,
   `lib/theme-route.spec.ts`, the cookie guards in `source-guards.spec.ts` and `security-headers.spec.ts`, `legal-pages.spec.tsx` (the cookie

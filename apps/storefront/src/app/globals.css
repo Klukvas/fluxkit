@@ -254,6 +254,22 @@ body {
 }
 
 /*
+ * Thin scrollbars in the theme's colours (plan 2026-11-13-storefront-ui-round-4 B): the page and every scrolling panel (filter
+ * lists, the filter sheet, suggestion lists, the product summary). The thumb is `--color-border-input` on a `--color-background` track, the
+ * pair the theme's contrast test already holds to 3:1 in every mode (`packages/theme/src/contrast.spec.ts`), so no new token.
+ * `scrollbar-color` is inherited from the root; `scrollbar-width` is not, hence the universal selector. In a base layer, so
+ * a utility on an element still wins.
+ */
+@layer base {
+  :root {
+    scrollbar-color: var(--color-border-input) var(--color-background);
+  }
+  * {
+    scrollbar-width: thin;
+  }
+}
+
+/*
  * The width of the header category list's end fade (`.fk-header-nav`, council decision 1). Registered so the scroll-driven
  * keyframes below can animate it; 0 (no fade) wherever the animation does not run. Not a theme token: an internal of that rule.
  */
