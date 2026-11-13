@@ -59,6 +59,31 @@ module.exports = {
       to: { path: "^packages/features/", pathNot: "^packages/features/$1/" },
     },
     {
+      name: "storefront-reaches-slices-only-through-the-registry",
+      comment:
+        "A storefront feature slice (app/[locale]/(feature-<name>)/, plan 2026-11-13-blog.md E5 and E6) is deleted with its " +
+        "feature, so no app code imports it except the one generated registry module (features/registry.generated.ts); " +
+        "Next routes its pages itself. A slice may import the app (feature -> core direction).",
+      severity: "error",
+      from: {
+        path: "^apps/storefront/src/",
+        pathNot:
+          "^apps/storefront/src/(app/\\[locale\\]/\\(feature-[^/]+\\)/|features/registry\\.generated\\.ts$)",
+      },
+      to: { path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-[^/]+\\)/" },
+    },
+    {
+      name: "storefront-slices-must-not-import-each-other",
+      comment:
+        "Feature slices are independent so that any one can be removed (as features-must-not-import-each-other).",
+      severity: "error",
+      from: { path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-([^/]+)\\)/" },
+      to: {
+        path: "^apps/storefront/src/app/\\[locale\\]/\\(feature-[^/]+\\)/",
+        pathNot: "^apps/storefront/src/app/\\[locale\\]/\\(feature-$1\\)/",
+      },
+    },
+    {
       name: "api-kit-depends-only-on-nest-common-and-core",
       comment:
         "The API kit (ADR 0049) is what a feature package may use from the API: problems, permission decorators and DI " +
