@@ -92,6 +92,7 @@ function renderInline(node: MarkdownViewInline, key: string, context: RenderCont
     case "link":
       return renderLink(node, key, context);
     default:
+      // Node types are an additive contract: one from a newer API that this version does not know is skipped, quietly.
       return null;
   }
 }
@@ -123,6 +124,7 @@ function renderHeading(
         </h4>
       );
     default:
+      // Only levels 2 to 4 exist; another one from a newer API is skipped (forward compatibility).
       return null;
   }
 }
@@ -177,6 +179,7 @@ function renderBlock(node: MarkdownViewBlock, key: string, context: RenderContex
     case "thematicBreak":
       return <hr key={key} className="border-border" />;
     default:
+      // Node types are an additive contract: one from a newer API that this version does not know is skipped, quietly.
       return null;
   }
 }
