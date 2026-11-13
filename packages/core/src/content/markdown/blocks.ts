@@ -9,7 +9,7 @@ import {
   startsBlock,
   type ListMarker,
 } from "./block-syntax.js";
-import { MarkdownFailure, type ParseBudget } from "./budget.js";
+import { MarkdownFailure, type ParseBudget, type WorkCounter } from "./budget.js";
 import { parseInline } from "./inline.js";
 import { MARKDOWN_LIMITS } from "./limits.js";
 import { indentOf, isBlank, trimSpaces, type SourceLine } from "./source.js";
@@ -41,6 +41,12 @@ interface Parsed<T> {
 
 const ROOT: Nesting = { depth: 0, listDepth: 0 };
 
+/** Work of looking at one line: its recognizers read it a bounded number of times. */
+function visit(work: WorkCounter, line: SourceLine): SourceLine {
+  work.count(line.text.length + 1);
+  return line;
+}
+
 function lineAt(lines: readonly SourceLine[], index: number): SourceLine {
   const line = lines[index];
   if (line === undefined) {
@@ -60,7 +66,7 @@ function parseFence(
   state.budget.block(opening.number);
   const content: string[] = [];
   for (let next = index + 1; next < lines.length; next += 1) {
-    const text = lineAt(lines, next).text;
+    const text = visit(state.budget, lineAt(lines, next)).text;
     if (isFenceClose(text, open)) {
       return { block: { type: "codeBlock", value: content.join("\n") }, next: next + 1 };
     }
@@ -91,7 +97,10 @@ function parseParagraph(
   const first = lineAt(lines, index);
   const texts = [trimSpaces(first.text)];
   let next = index + 1;
-  while (next < lines.length && !interruptsParagraph(lineAt(lines, next).text)) {
+  while (
+    next < lines.length &&
+    !interruptsParagraph(visit(state.budget, lineAt(lines, next)).text)
+  ) {
     texts.push(trimSpaces(lineAt(lines, next).text));
     next += 1;
   }
@@ -120,12 +129,13 @@ function collectContainer(
   index: number,
   first: SourceLine,
   take: (text: string) => string | null,
+  work: WorkCounter,
 ): Parsed<SourceLine[]> {
   const inner: SourceLine[] = [first];
   let lastContent = isBlank(first.text) ? -1 : 0;
   let next = index + 1;
   for (; next < lines.length; next += 1) {
-    const line = lineAt(lines, next);
+    const line = visit(work, lineAt(lines, next));
     const taken = take(line.text);
     const previousIsBlank = isBlank(lineAt(inner, inner.length - 1).text);
     if (taken !== null) {
@@ -158,6 +168,7 @@ function parseQuote(
     index,
     { text: content, number: line.number },
     quoteContent,
+    state.budget,
   );
   const children = parseBlocks(collected.block, inner, state);
   return { block: { type: "blockquote", children }, next: collected.next };
@@ -181,6 +192,7 @@ function parseListItem(
     index,
     { text: marker.firstContent, number: line.number },
     take,
+    state.budget,
   );
   return {
     block: { type: "listItem", children: parseBlocks(collected.block, inner, state) },
@@ -207,7 +219,12 @@ function parseList(
     items.push(item.block);
     next = item.next;
     let following = next;
-    while (following < lines.length && isBlank(lineAt(lines, following).text)) following += 1;
+    while (
+      following < lines.length &&
+      isBlank(visit(state.budget, lineAt(lines, following)).text)
+    ) {
+      following += 1;
+    }
     const candidate = following < lines.length ? listMarker(lineAt(lines, following).text) : null;
     const continues =
       candidate !== null &&
@@ -246,7 +263,7 @@ export function parseBlocks(
   const blocks: MarkdownBlock[] = [];
   let index = 0;
   while (index < lines.length) {
-    if (isBlank(lineAt(lines, index).text)) {
+    if (isBlank(visit(state.budget, lineAt(lines, index)).text)) {
       index += 1;
       continue;
     }

@@ -22,7 +22,7 @@ same plan, section 8). Builds on ADR 0046 (the banner link rule, reused for link
    inline code; fenced code blocks with three or more backticks or tildes (the info string is dropped, no highlighting; an unclosed fence
    is refused); block quotes (lazy continuation lines allowed); bullet (`-`, `*`, `+`) and ordered (`1.`, `1)`) lists, two levels;
    thematic breaks (`---`, `***`, `___`); links `[text](target)` with optional spaces inside the parentheses and balanced parentheses in
-   the target; hard breaks with a trailing backslash; backslash escapes of ASCII punctuation. Only an ordered item starting at 1 ends a
+   the target (at most 32 levels, like CommonMark's reference parsers; deeper is text); hard breaks with a trailing backslash; backslash escapes of ASCII punctuation. Only an ordered item starting at 1 ends a
    paragraph (`2024. it rained` continues the sentence).
 3. **Everything else is text**, rendered literally: raw HTML, images `![...](...)`, tables, footnotes, autolinks `<https://...>`, entities,
    link titles (`[a](/x "t")`), `<...>` targets, setext headings (`---` under a line is a break), indented code blocks (the indentation
@@ -48,7 +48,9 @@ same plan, section 8). Builds on ADR 0046 (the banner link rule, reused for link
    and a serialized document (`JSON.stringify`) of at most 256 KB of UTF-8. The parser is a hand-written single pass with no regular
    expression that can backtrack: emphasis uses CommonMark's delimiter stack with its `openers_bottom` table, code spans an index of
    backtick runs, links a bracket stack whose deactivation stops at the first inactive bracket, and a link target scan stops after 2 048
-   characters. An adversarial spec asserts linear time and the output caps on inputs at the length limit.
+   characters or 32 open parentheses, after a cheap check that a `)` lies within reach. An adversarial spec asserts linear WORK on
+   inputs at the length limit (the parser's internal step counter, `run-parse.ts`, not exported: 8 times the input may cost at most 9
+   times the steps; wall-clock time only as a coarse backstop of one second, since it depends on the runner) and the output caps.
 7. **Error codes** (`MarkdownErrorCode`): `control_character`, `heading_level`, `empty_heading`, `unclosed_code_fence`, `link_refused`,
    `empty_link_text`, `too_long`, `too_many_blocks`, `too_deep`, `too_many_links`, `too_many_nodes`, `too_large`. The document-wide
    `too_long` and `too_large` report line 1; the others the line of the offending text. The blog API maps them (plan section 6:

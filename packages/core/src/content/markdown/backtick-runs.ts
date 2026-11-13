@@ -1,3 +1,5 @@
+import type { WorkCounter } from "./budget.js";
+
 /**
  * Where code spans can close: every maximal run of backticks in a paragraph, indexed by its length. Openers are met left to
  * right, so one cursor per length only moves forward and finding every closer costs one pass over the text (scanning ahead
@@ -7,7 +9,11 @@ export class BacktickRuns {
   private readonly startsByLength = new Map<number, number[]>();
   private readonly cursors = new Map<number, number>();
 
-  constructor(text: string) {
+  constructor(
+    text: string,
+    private readonly work: WorkCounter,
+  ) {
+    work.count(text.length);
     let index = 0;
     while (index < text.length) {
       if (text.charAt(index) !== "`") {
@@ -28,8 +34,10 @@ export class BacktickRuns {
     const starts = this.startsByLength.get(length);
     if (starts === undefined) return -1;
     let cursor = this.cursors.get(length) ?? 0;
-    while (cursor < starts.length && (starts[cursor] ?? Number.POSITIVE_INFINITY) < from)
+    while (cursor < starts.length && (starts[cursor] ?? Number.POSITIVE_INFINITY) < from) {
       cursor += 1;
+      this.work.count(1);
+    }
     this.cursors.set(length, cursor);
     return starts[cursor] ?? -1;
   }
