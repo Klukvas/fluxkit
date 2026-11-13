@@ -31,12 +31,18 @@ same plan, section 8). Builds on ADR 0046 (the banner link rule, reused for link
    no dot segments also as `%2e`, no locale prefix; an `https` host without credentials), with the scheme written exactly `https://`
    (`HTTPS://` is refused), and no control character (C0, DEL, C1) or bidi control (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to
    U+2069), raw or percent-encoded as UTF-8 (one decoding, like a browser; the encoded line and paragraph separators U+2028 and U+2029
-   are refused too). A refused target is the error `link_refused` with a `reason`. Whitespace (a raw line end, tab or space) ends a
+   are refused too), and no invisible format character (U+00AD, U+200B to U+200D, U+2060, U+FEFF, U+180E; raw or percent-encoded,
+   reason `format_character`: `exa\u00ADmple.com` would point elsewhere than what the admin sees). A refused target is the error
+   `link_refused` with a `reason`. Whitespace (a raw line end, tab or space) ends a
    target, so such brackets stay text and make no link. `[](/x)` (no visible name) is refused. The AST keeps the target without the
    locale; `MarkdownView` adds `localePrefix` to a path (and hands it to the app's router link), renders an `https` address as a plain
-   anchor with `rel="noopener noreferrer"` and no `target`, and checks every link again at render: one that fails renders as its text.
+   anchor with `rel="noopener noreferrer"` and no `target`, and checks every link again at render (a path without `//`, dot segments
+   also as `%2e`, or a leading locale segment of the library's locales or the prefix's own; an `https` host without credentials; no
+   whitespace, control, bidi control or format character, raw or percent-encoded): one that fails renders as its text.
 5. **Input hygiene.** `\r\n` and a lone `\r` end a line. NUL anywhere is refused (`control_character`). Bidi controls in text are kept
-   (legitimate in prose), never in targets. Tabs in a line's leading indentation and markers count to the next stop of four.
+   (legitimate in prose), never in targets. Tabs in a line's leading indentation and markers count to the next stop of four. A leading
+   UTF-8 BOM is text, so `\uFEFF# x` is a paragraph, not a refused heading; text indented by four or more spaces is a paragraph too
+   (there are no indented code blocks).
 6. **Limits** (`MARKDOWN_LIMITS`): 40 000 characters (UTF-16 code units), 2 000 blocks (list items included), block nesting 4 (quotes
    and list items together), list nesting 2, inline nesting 4 (emphasis, strong and link inside each other), 300 links, 20 000 nodes,
    and a serialized document (`JSON.stringify`) of at most 256 KB of UTF-8. The parser is a hand-written single pass with no regular
