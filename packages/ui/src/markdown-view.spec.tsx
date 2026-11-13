@@ -85,7 +85,9 @@ describe("MarkdownView, blocks and inline nodes", () => {
     expect(tags(markup, "ol")[0]?.attributes["start"]).toBeUndefined();
     expect(tags(markup, "ol")[1]?.attributes["start"]).toBe("3");
     expect(tags(markup, "hr")).toHaveLength(1);
-    expect(text(markup)).toBe("Two Three Four a em strong x() b line 1 line 2 quoted one two inner");
+    expect(text(markup)).toBe(
+      "Two Three Four a em strong x() b line 1 line 2 quoted one two inner",
+    );
   });
 
   it("lets a scrollable code block be reached with the keyboard", () => {
