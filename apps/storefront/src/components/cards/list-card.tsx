@@ -4,15 +4,16 @@ import { slots } from "../../config/slots";
 import { renderSlot } from "../../lib/slots";
 import { StoreImage } from "../store-image";
 import { focusRing } from "../styles";
+import { CardPurchaseAction } from "./card-purchase";
 import type { CardProps } from "./types";
 
 /**
  * The `list` card kind (`?view=list`): one product per row, the image beside the text. The same accessibility contract as
  * the grid card: one link to the product (the title, stretched over the card), the brand link above that layer, the price
  * with its spoken label, availability as a badge only for an exception (in stock stays text for assistive technology).
- * Token and role classes only; every text comes translated from the view model. No add-to-cart: the list item has no
- * variant id, so the product page is where a variant is chosen. The card slots of `config/slots.tsx`: badges in a row above
- * the brand and title, actions at the end of the price row.
+ * Token and role classes only; every text comes translated from the view model. The purchase action (`card.purchase`: add
+ * to cart, or choose options on the product page) sits under the price row. The card slots of `config/slots.tsx`: badges in
+ * a row above the brand and title, actions at the end of the price row.
  */
 export function ListCard({ card, headingLevel: Heading, eager, locale, t }: CardProps) {
   const { availability } = card;
@@ -82,6 +83,11 @@ export function ListCard({ card, headingLevel: Heading, eager, locale, t }: Card
             </>
           )}
         </div>
+        {card.purchase === null ? null : (
+          <div className="sm:w-56">
+            <CardPurchaseAction card={card} />
+          </div>
+        )}
       </div>
     </article>
   );

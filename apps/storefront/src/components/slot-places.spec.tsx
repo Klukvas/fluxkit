@@ -244,7 +244,8 @@ describe("product-card.badges and product-card.actions", () => {
       '<a class="relative z-10',
       `<div class="flex flex-wrap gap-1">${listBadge}</div>`,
     );
-    const priceRowEnd = "</div></div></article>";
+    // The price row ends right before the purchase action (the card's product has several variants: a choose link).
+    const priceRowEnd = '</div><div class="sm:w-56">';
     expect(renderCard("list")).toBe(
       insertBefore(
         withBadges,

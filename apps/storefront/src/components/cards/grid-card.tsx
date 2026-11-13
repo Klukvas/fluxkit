@@ -4,13 +4,15 @@ import { slots } from "../../config/slots";
 import { renderSlot } from "../../lib/slots";
 import { StoreImage } from "../store-image";
 import { focusRing } from "../styles";
+import { CardPurchaseAction } from "./card-purchase";
 import type { CardProps } from "./types";
 
 /**
  * The `grid` card kind (the default): one product in a grid of cards. The whole card is one click target (the title link
  * stretches over it); the brand link sits above that layer so it stays separately clickable. Its markup is exactly the
- * product card of before the registry (`registry.spec.tsx` compares them) while the card slots of `config/slots.tsx` are
- * empty: their badges render in a row under the image, their actions in the image's bottom right corner.
+ * product card of before the registry plus the purchase action at the bottom (`registry.spec.tsx` compares them) while the
+ * card slots of `config/slots.tsx` are empty: their badges render in a row under the image, their actions in the image's
+ * bottom right corner.
  */
 export function GridCard({ card, headingLevel: Heading, eager, locale, t }: CardProps) {
   const { availability } = card;
@@ -92,6 +94,7 @@ export function GridCard({ card, headingLevel: Heading, eager, locale, t }: Card
           <VisuallyHidden>{availability.text}</VisuallyHidden>
         ) : null}
       </div>
+      <CardPurchaseAction card={card} />
       {availabilityBadge}
     </article>
   );

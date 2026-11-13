@@ -10,13 +10,14 @@ import {
 import Link from "next/link";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { availabilityDisplay } from "../../lib/availability";
+import { availabilityDisplay, canAddToCart } from "../../lib/availability";
 import { allowedImageUrl } from "../../lib/image-source";
 import { localizedHref } from "../../lib/locale-path";
 import { formatMoney } from "../../lib/money";
 import { cardDisplay, listPriceLabel, type ProductCardModel } from "../../lib/product-card-model";
 import type { CardOffer } from "../../lib/search-facets";
 import { summary } from "../../lib/test-fixtures";
+import { CardAddButton } from "../card-add-button";
 import { ProductGrid } from "../product-grid";
 import { StoreImage } from "../store-image";
 import { focusRing } from "../styles";
@@ -30,6 +31,15 @@ import type { CardKindEntry, CardProps } from "./types";
 // `slot-places.spec.tsx`; filled slots and the fork's own cards, the fork run (`vitest.brand-fork.config.ts`).
 vi.mock("../../config/slots", () => import("../../test-support/template-defaults"));
 vi.mock("./custom", () => import("../../test-support/template-defaults"));
+// The add-to-cart island needs the page's providers (i18n, cart store); its own markup is `card-add-button.spec.tsx`. Here a
+// stand-in shows WHERE a card puts it and with which variant and title.
+vi.mock("../card-add-button", () => ({
+  CardAddButton: ({ variantId, title }: { variantId: string; title: string }) => (
+    <button type="button" data-add-stub={variantId}>
+      {title}
+    </button>
+  ),
+}));
 
 const t = sentinelTranslator();
 const hosts = ["cdn.example.com"];
@@ -38,6 +48,7 @@ const hosts = ["cdn.example.com"];
  * FROZEN copy of `components/product-card.tsx` as it was before the card registry (origin/main 094790c), test-only. The
  * registry's `grid` card must render exactly this markup for every input (plan 2026-11-08-design-changeability.md, L2: "no
  * change at defaults"). A deliberate change of the grid card updates this copy in the same PR, with its reason.
+ * Changed 2026-11-13 (owner design, add to cart from a card): the purchase action at the bottom, after the price block.
  */
 const PRODUCT_OFFER: CardOffer = { kind: "product" };
 function LegacyProductCard({
@@ -79,6 +90,7 @@ function LegacyProductCard({
         ? t.plural("search.card.matchingOptions", offer.variantCount)
         : null;
   const badgeShown = availability !== null && shown !== "in_stock";
+  const purchasable = shown !== null && canAddToCart(shown);
   return (
     <article className="group relative flex h-full flex-col gap-2 rounded-card border border-border bg-background p-3 transition-shadow hover:border-border-input hover:shadow-raised focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring motion-reduce:transition-none">
       <StoreImage
@@ -117,6 +129,17 @@ function LegacyProductCard({
           <VisuallyHidden>{t(availability.messageKey)}</VisuallyHidden>
         ) : null}
       </div>
+      {!purchasable ? null : product.defaultVariantId === null ? (
+        <Link
+          href={href}
+          className={`relative z-10 inline-flex min-h-11 w-full items-center justify-center rounded-control border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted ${focusRing}`}
+        >
+          <span>{t("product.card.chooseOptions")}</span>{" "}
+          <VisuallyHidden>{product.title}</VisuallyHidden>
+        </Link>
+      ) : (
+        <CardAddButton variantId={product.defaultVariantId} title={product.title} />
+      )}
       {availability !== null && badgeShown ? (
         <Badge
           variant={availability.variant}
@@ -203,6 +226,34 @@ const CASES: Case[] = [
     locale: "en",
   },
   {
+    name: "one sellable variant: added from the card",
+    product: summary("i", { title: "§i", defaultVariantId: "variant-i" }),
+    brandPath: null,
+    headingLevel: "h2",
+    locale: "uk",
+  },
+  {
+    name: "one sellable variant, out of stock: nothing to buy",
+    product: summary("j", { title: "§j", defaultVariantId: "variant-j" }, "out_of_stock"),
+    brandPath: null,
+    headingLevel: "h2",
+    locale: "en",
+  },
+  {
+    name: "search hit of a one-variant product",
+    product: summary("k", { title: "§k", defaultVariantId: "variant-k" }),
+    brandPath: null,
+    offer: {
+      kind: "matched",
+      price: { from: 2599, to: 2599, currency: "UAH" },
+      availability: "low_stock",
+      variantCount: 1,
+      linkQuery: "",
+    },
+    headingLevel: "h3",
+    locale: "uk",
+  },
+  {
     name: "index catching up",
     product: summary("h", { title: "§h" }, "low_stock"),
     brandPath: "/catalog?brand=demo-brand",
@@ -211,6 +262,12 @@ const CASES: Case[] = [
     locale: "uk",
   },
 ];
+
+function caseNamed(name: string): Case {
+  const found = CASES.find((entry) => entry.name === name);
+  if (found === undefined) throw new Error(`No case named "${name}"`);
+  return found;
+}
 
 function legacy(entry: Case): string {
   return renderToStaticMarkup(
@@ -319,7 +376,7 @@ describe("card registry: kinds", () => {
 describe("the list card", () => {
   const entry = CASES[0] as Case;
 
-  it("shows one link to the product, the brand link, the price and the availability, with translated text only", () => {
+  it("shows the title link to the product, the brand link, the price, the availability and the choose link, with translated text only", () => {
     const html = render("list", entry);
     expect(html.match(/<article[ >]/g)).toHaveLength(1);
     expect(html.match(/<h2[ >]/g)).toHaveLength(1);
@@ -338,7 +395,7 @@ describe("the list card", () => {
     const lowStock = render("list", CASES[1] as Case);
     expect(lowStock).toMatch(/<span class="[^"]*">§availability\.low_stock<\/span>/);
     expect(lowStock).not.toContain('<span class="sr-only">§availability.low_stock');
-    const catchingUp = render("list", CASES[6] as Case);
+    const catchingUp = render("list", caseNamed("index catching up"));
     expect(catchingUp).toContain("§search.card.dependsOnOption");
     expect(catchingUp).toContain('href="/uk/p/h?opt.size=l"');
     expect(catchingUp).not.toContain("§availability");
@@ -368,5 +425,39 @@ describe("the list card", () => {
     expect(html.match(/<li[ >]/g)).toHaveLength(4);
     expect(html.match(/loading="eager"/g)).toHaveLength(2);
     expect(html.match(/loading="lazy"/g)).toHaveLength(2);
+  });
+});
+
+describe.each(["grid", "list"])("the purchase action of the %s card", (kind) => {
+  /** The markup after the title link: the action is never inside the product link. */
+  const afterTitleLink = (html: string): string => html.slice(html.indexOf("</a></h"));
+
+  it("adds a one-variant product from the card, with its variant id, outside the product link", () => {
+    const html = render(kind, caseNamed("one sellable variant: added from the card"));
+    expect(html.match(/data-add-stub="variant-i"/g)).toHaveLength(1);
+    expect(afterTitleLink(html)).toContain('data-add-stub="variant-i"');
+    expect(html).not.toContain("§product.card.chooseOptions");
+  });
+
+  it("links a product with several variants to its page to choose, named with the title, above the link layer", () => {
+    const html = render(kind, CASES[0] as Case);
+    expect(html).not.toContain("data-add-stub");
+    const choose = afterTitleLink(html);
+    expect(choose).toMatch(
+      /<a class="relative z-10 [^"]*min-h-11[^"]*" href="\/uk\/p\/a"><span>§product\.card\.chooseOptions<\/span> <span class="sr-only">§a<\/span><\/a>/,
+    );
+  });
+
+  it("offers nothing to buy when the shown availability is out of stock or not known yet", () => {
+    for (const name of [
+      "one sellable variant, out of stock: nothing to buy",
+      "out of stock, no brand, allowed image, price range",
+      "search hit with several matching variants",
+      "index catching up",
+    ]) {
+      const html = render(kind, caseNamed(name));
+      expect(html, name).not.toContain("data-add-stub");
+      expect(html, name).not.toContain("§product.card.chooseOptions");
+    }
   });
 });
