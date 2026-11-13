@@ -6,7 +6,7 @@
 # packages/api-kit
 
 `@fluxkit/api-kit` (ADR 0049): the API building blocks a feature package may use (contract: `docs/contracts/README.md`, "Feature extension
-points"). Depends on `@nestjs/common` (peer) and `@fluxkit/core` only. No I/O.
+points"). Depends on `@nestjs/common` (with its peers `reflect-metadata` and `rxjs`, at the API's versions) and `@fluxkit/core` only. No I/O.
 
 - `src/index.ts` - public entry, the minimum set: `ProblemException` (+ `ProblemCode`, `ProblemInit`, `FieldError`, `ProblemExtensions`),
   `RequirePermission`, `AdminController` (+ `DefaultPermissions`), `FEATURE_DATABASE`, `MEDIA_PORT`, `LOCALE_CONFIG` (+ `LocaleConfig`).
