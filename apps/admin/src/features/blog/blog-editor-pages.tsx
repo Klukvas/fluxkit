@@ -78,7 +78,7 @@ function BlogCreate() {
     event.preventDefault();
     // A save must not race a cover that is still uploading.
     if (form.state.busy || !canWrite || upload.running) return;
-    const issues = validateBlogForm(values, content, false);
+    const issues = validateBlogForm(values, content, "optional");
     if (hasIssues(issues)) {
       form.showIssues(issues, firstInvalidBlogField);
       return;
@@ -178,7 +178,7 @@ function BlogEditForm({
     event.preventDefault();
     // A save must not race a cover that is still uploading.
     if (form.state.busy || !canWrite || upload.running) return;
-    const issues = validateBlogForm(values, content, post.slugLocked);
+    const issues = validateBlogForm(values, content, post.slugLocked ? "locked" : "required");
     if (hasIssues(issues)) {
       form.showIssues(issues, firstInvalidBlogField);
       return;

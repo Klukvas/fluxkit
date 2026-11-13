@@ -9,13 +9,26 @@ import type { BlogPost, PublishBlogPostBody } from "./blog-api";
 
 export type PublishAction = "publishNow" | "publishWithDate" | "schedule" | "unpublish";
 
-/** The actions of a post, in the order the panel shows them. */
-export function publishActions(post: Pick<BlogPost, "state" | "publishedAt">): PublishAction[] {
+/** Whether the post's stored date is still ahead (by the browser's clock, only to choose what to offer and send). */
+function storedDateAhead(post: Pick<BlogPost, "publishedAt">, now: number): boolean {
+  return post.publishedAt !== null && Date.parse(post.publishedAt) > now;
+}
+
+/**
+ * The actions of a post, in the order the panel shows them. A draft unpublished earlier with a date already past offers
+ * "Publish again with the date" only: sent without a date it is live at once (by the server's clock), so a separate
+ * "Publish now" would do the same.
+ */
+export function publishActions(
+  post: Pick<BlogPost, "state" | "publishedAt">,
+  now: number,
+): PublishAction[] {
   switch (post.state) {
     case "draft":
-      return post.publishedAt === null
-        ? ["publishNow", "schedule"]
-        : ["publishWithDate", "publishNow", "schedule"];
+      if (post.publishedAt === null) return ["publishNow", "schedule"];
+      return storedDateAhead(post, now)
+        ? ["publishNow", "publishWithDate", "schedule"]
+        : ["publishWithDate", "schedule"];
     case "scheduled":
       return ["publishNow", "schedule", "unpublish"];
     case "published":
@@ -24,14 +37,16 @@ export function publishActions(post: Pick<BlogPost, "state" | "publishedAt">): P
 }
 
 /**
- * "Publish now": a post that never had a date sends no date (the server's clock decides); a post with a stored date (a
- * scheduled one, or one unpublished earlier) sends this moment, else the stored date would be kept.
+ * "Publish now". Without a stored date, or with one already past, no date is sent and the server's clock decides (the API
+ * keeps a past stored date, which is live at once). Only a stored date still ahead (a scheduled post, or one unpublished
+ * while scheduled) needs a date to go live now: the API has no "now" for it, so this moment of the browser's clock is sent
+ * (a clock running ahead leaves the post scheduled for that difference; the panel shows the state the API answers).
  */
 export function publishNowBody(
   post: Pick<BlogPost, "publishedAt">,
   now: number,
 ): PublishBlogPostBody {
-  return post.publishedAt === null ? {} : { publishedAt: new Date(now).toISOString() };
+  return storedDateAhead(post, now) ? { publishedAt: new Date(now).toISOString() } : {};
 }
 
 /** "Publish again with its date": the stored date, kept by the API when no date is sent. */

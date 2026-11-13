@@ -135,17 +135,17 @@ describe("the post form model", () => {
 
 describe("local checks", () => {
   it("needs the title in the main language only", () => {
-    const issues = validateBlogForm(emptyBlogForm(locales), CONTENT, false);
+    const issues = validateBlogForm(emptyBlogForm(locales), CONTENT, "optional");
     expect(issues).toEqual({ "title.uk": { key: "features.blog.form.titleRequired" } });
     const filled = { ...emptyBlogForm(locales), title: { uk: "Так", en: "" } };
-    expect(validateBlogForm(filled, CONTENT, false)).toEqual({});
+    expect(validateBlogForm(filled, CONTENT, "optional")).toEqual({});
   });
 
   it("counts characters as the API does (code points of the trimmed text)", () => {
     const base = { ...emptyBlogForm(locales), title: { uk: "😀".repeat(120), en: "" } };
-    expect(validateBlogForm(base, CONTENT, false)).toEqual({});
+    expect(validateBlogForm(base, CONTENT, "optional")).toEqual({});
     const over = { ...base, seoTitle: { uk: "", en: "x".repeat(71) } };
-    expect(validateBlogForm(over, CONTENT, false)).toEqual({
+    expect(validateBlogForm(over, CONTENT, "optional")).toEqual({
       "seoTitle.en": { key: "features.blog.form.tooLong", values: { max: 70 } },
     });
   });
@@ -157,20 +157,29 @@ describe("local checks", () => {
       body: { uk: "x".repeat(40_001), en: "" },
       slug: "Bad Slug",
     };
-    expect(validateBlogForm(values, CONTENT, false)).toEqual({
+    expect(validateBlogForm(values, CONTENT, "optional")).toEqual({
       slug: { key: "features.blog.reason.invalid_slug" },
       "body.uk": { key: "features.blog.reason.markdown_too_long" },
     });
-    expect(validateBlogForm(values, CONTENT, true)).toEqual({
+    expect(validateBlogForm(values, CONTENT, "locked")).toEqual({
       "body.uk": { key: "features.blog.reason.markdown_too_long" },
     });
     expect(
       validateBlogForm(
         { ...values, body: { uk: "", en: "" }, slug: "a".repeat(161) },
         CONTENT,
-        false,
+        "required",
       ),
     ).toEqual({ slug: { key: "features.blog.form.slugTooLong", values: { max: 160 } } });
+  });
+
+  it("refuses an emptied slug on a saved post that is not locked, never on create or a locked one", () => {
+    const values = { ...emptyBlogForm(locales), title: { uk: "Так", en: "" }, slug: "  " };
+    expect(validateBlogForm(values, CONTENT, "required")).toEqual({
+      slug: { key: "features.blog.form.slugRequired" },
+    });
+    expect(validateBlogForm(values, CONTENT, "optional")).toEqual({});
+    expect(validateBlogForm(values, CONTENT, "locked")).toEqual({});
   });
 });
 
@@ -279,6 +288,19 @@ describe("refusals on the form", () => {
     expect(map(refusal, 409, fields).fields["title.en"]).toEqual({
       key: "features.blog.reason.translation_missing_title",
       values: { language: "English" },
+    });
+  });
+
+  it("names the language of a stored body that no longer parses when it cannot be put on a field (publish)", () => {
+    const entries = [
+      { path: "body.en", code: "markdown_invalid", line: 5, markdownCode: "too_deep" },
+    ];
+    expect(map(problem({ errors: entries }), 400, [])).toEqual({
+      fields: {},
+      other: [
+        { key: "features.blog.reason.bodyInLanguage", values: { language: "English" } },
+        { key: "features.blog.markdown.too_deep", values: { line: 5 } },
+      ],
     });
   });
 

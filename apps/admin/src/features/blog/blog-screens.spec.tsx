@@ -227,6 +227,29 @@ describe("the publish panel", () => {
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*aria-describedby="blog-publish-unsaved"/);
   });
 
+  it("locks unpublishing too while the form has unsaved changes (the reload would drop them)", () => {
+    for (const state of ["published", "scheduled"] as const) {
+      const html = panel({
+        unsaved: true,
+        post: postFixture({
+          state,
+          status: "published",
+          publishedAt:
+            state === "published" ? "2026-11-01T08:00:00.000Z" : "2099-01-01T08:00:00.000Z",
+          slugLocked: true,
+        }),
+      });
+      const buttons = [...html.matchAll(/<button[^>]*>[^<]*<\/button>/g)].map((match) => match[0]);
+      const unpublish = buttons.find((button) =>
+        button.includes("§features.blog.publish.unpublish"),
+      );
+      expect(unpublish, state).toMatch(/disabled=""/);
+      expect(unpublish, state).toMatch(/aria-describedby="blog-publish-unsaved"/);
+      // Every button of the panel is locked, none is left to drop the edits.
+      for (const button of buttons) expect(button, state).toMatch(/disabled=""/);
+    }
+  });
+
   it("shows the state but no control without catalog.publish", () => {
     const html = panel({ canPublish: false });
     expect(html).toContain("§features.blog.publish.noPermission");

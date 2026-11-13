@@ -102,15 +102,23 @@ export function bodyMap(values: LocaleValues, locales: readonly string[]): Local
   return map;
 }
 
-/** Local checks before a save (the API checks again): required title, lengths, the slug pattern. */
+/**
+ * How the slug field is checked: on create an empty slug is made from the title by the API (`optional`); a saved post keeps
+ * one (`required`: an emptied field is refused here, it would send `""`); a locked slug is never sent (`locked`).
+ */
+export type SlugRule = "optional" | "required" | "locked";
+
+/** Local checks before a save (the API checks again): required title, lengths, the slug. */
 export function validateBlogForm(
   values: BlogFormValues,
   content: ContentLocales,
-  slugLocked: boolean,
+  slugRule: SlugRule,
 ): FormIssues {
   const issues: FormIssues = {};
   const slug = values.slug.trim();
-  if (!slugLocked && slug !== "") {
+  if (slugRule === "required" && slug === "") {
+    issues["slug"] = issue("features.blog.form.slugRequired");
+  } else if (slugRule !== "locked" && slug !== "") {
     if (slug.length > BLOG_SLUG_MAX_LENGTH) {
       issues["slug"] = issue("features.blog.form.slugTooLong", { max: BLOG_SLUG_MAX_LENGTH });
     } else if (!BLOG_SLUG_PATTERN.test(slug)) {
@@ -286,11 +294,27 @@ export function blogProblemMapper(uiLocale: string): ProblemMapper {
     for (const entry of problem.errors ?? []) {
       const descriptor = describeBlogFieldError(errorMembers(entry), uiLocale);
       const field = formFields.find((name) => name === entry.path);
-      if (field === undefined) other.push(descriptor);
-      else if (fields[field] === undefined) fields[field] = descriptor;
+      if (field === undefined) {
+        // Outside the form (the publish panel: a stored body that no longer parses) the line alone would not say which
+        // language's text it is in.
+        const language = markdownLanguage(entry);
+        if (language !== null) {
+          other.push({
+            key: "features.blog.reason.bodyInLanguage",
+            values: { language: languageName(language, uiLocale) },
+          });
+        }
+        other.push(descriptor);
+      } else if (fields[field] === undefined) fields[field] = descriptor;
     }
     return { fields, other };
   };
+}
+
+/** The locale of a Markdown refusal of a body (`body.<locale>`), or `null` for any other entry. */
+function markdownLanguage(entry: FieldError): string | null {
+  const match = /^body\.([^.]+)$/.exec(entry.path);
+  return match !== null && entry.code.startsWith("markdown_") ? (match[1] ?? null) : null;
 }
 
 /** An `errors[]` entry with the extension members the client's type does not name (`line`, `markdownCode`, `reason`). */

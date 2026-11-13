@@ -39,8 +39,8 @@ function stateSentence(t: Translator, post: BlogPost, uiLocale: string): string 
 
 /**
  * Publish now, schedule (date and time in the browser's zone), unpublish (plan section 10). Shown to every reader; the
- * buttons only with `catalog.publish`. A form with unsaved changes locks them: publishing sends nothing of the form, so the
- * stored text would go live. A refusal (`translation_incomplete`: which language misses a title or a body) is listed in the
+ * buttons only with `catalog.publish`. A form with unsaved changes locks every one of them: publishing sends nothing of the
+ * form (the stored text would go live), and after any action the post is read again, which would replace the unsaved edits. A refusal (`translation_incomplete`: which language misses a title or a body) is listed in the
  * panel's summary; after a success the post is read again and the status line says what happened.
  */
 export function BlogPublishPanel({
@@ -67,7 +67,7 @@ export function BlogPublishPanel({
   const statusRef = useRef<HTMLDivElement>(null);
   const focusAfterCommit = useFocusAfterCommit();
   const action = useFormSubmit([], blogProblemMapper(uiLocale));
-  const actions = publishActions(post);
+  const actions = publishActions(post, Date.now());
   const locked = unsaved || action.state.busy;
 
   async function run(
@@ -138,8 +138,18 @@ export function BlogPublishPanel({
             </p>
           ) : null}
           <div className="flex flex-wrap items-center gap-3">
+            {actions.includes("publishNow") ? (
+              <Button
+                disabled={locked}
+                aria-describedby={unsaved ? "blog-publish-unsaved" : undefined}
+                onClick={() => void publish(publishNowBody(post, Date.now()))}
+              >
+                {t("features.blog.publish.now")}
+              </Button>
+            ) : null}
             {actions.includes("publishWithDate") && post.publishedAt !== null ? (
               <Button
+                variant={actions.includes("publishNow") ? "secondary" : "primary"}
                 disabled={locked}
                 aria-describedby={unsaved ? "blog-publish-unsaved" : undefined}
                 onClick={() => void publish(PUBLISH_WITH_STORED_DATE)}
@@ -149,20 +159,12 @@ export function BlogPublishPanel({
                 })}
               </Button>
             ) : null}
-            {actions.includes("publishNow") ? (
-              <Button
-                variant={actions.includes("publishWithDate") ? "secondary" : "primary"}
-                disabled={locked}
-                aria-describedby={unsaved ? "blog-publish-unsaved" : undefined}
-                onClick={() => void publish(publishNowBody(post, Date.now()))}
-              >
-                {t("features.blog.publish.now")}
-              </Button>
-            ) : null}
             {actions.includes("unpublish") ? (
               <Button
                 variant="secondary"
-                disabled={action.state.busy}
+                // Locked like publishing: the post is read again afterwards, which would replace unsaved edits.
+                disabled={locked}
+                aria-describedby={unsaved ? "blog-publish-unsaved" : undefined}
                 onClick={() => void run(() => blogApi.unpublishBlogPost(post.id), "unpublished")}
               >
                 {t("features.blog.publish.unpublish")}

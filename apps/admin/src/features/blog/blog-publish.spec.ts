@@ -17,26 +17,31 @@ const NOW = Date.parse("2026-11-13T12:00:00.000Z");
 
 describe("the publish actions of a post", () => {
   it("offers what each state allows", () => {
-    expect(publishActions({ state: "draft", publishedAt: null })).toEqual([
+    const actions = (state: "draft" | "scheduled" | "published", publishedAt: string | null) =>
+      publishActions({ state, publishedAt }, NOW);
+    expect(actions("draft", null)).toEqual(["publishNow", "schedule"]);
+    // Unpublished with a past date: sent without a date it is live at once, so "publish now" would be the same button.
+    expect(actions("draft", "2026-10-01T08:00:00.000Z")).toEqual(["publishWithDate", "schedule"]);
+    // Unpublished while scheduled: "now" and "again at its date" differ.
+    expect(actions("draft", "2026-12-01T08:00:00.000Z")).toEqual([
       "publishNow",
-      "schedule",
-    ]);
-    expect(publishActions({ state: "draft", publishedAt: "2026-10-01T08:00:00.000Z" })).toEqual([
       "publishWithDate",
-      "publishNow",
       "schedule",
     ]);
-    expect(publishActions({ state: "scheduled", publishedAt: "2026-12-01T08:00:00.000Z" })).toEqual(
-      ["publishNow", "schedule", "unpublish"],
-    );
-    expect(publishActions({ state: "published", publishedAt: "2026-10-01T08:00:00.000Z" })).toEqual(
-      ["unpublish"],
-    );
+    expect(actions("scheduled", "2026-12-01T08:00:00.000Z")).toEqual([
+      "publishNow",
+      "schedule",
+      "unpublish",
+    ]);
+    expect(actions("published", "2026-10-01T08:00:00.000Z")).toEqual(["unpublish"]);
   });
 
-  it("publishes now with the server's clock when there is no stored date, else with this moment", () => {
+  it("publishes now by the server's clock unless the stored date is still ahead", () => {
     expect(publishNowBody({ publishedAt: null }, NOW)).toEqual({});
-    // A scheduled post (or one unpublished earlier) would keep its stored date without one.
+    // A stored date already past is kept by the API and live at once: no date from the browser.
+    expect(publishNowBody({ publishedAt: "2026-10-01T08:00:00.000Z" }, NOW)).toEqual({});
+    expect(publishNowBody({ publishedAt: "2026-11-13T12:00:00.000Z" }, NOW)).toEqual({});
+    // A stored date ahead would keep the post scheduled: the API has no "now" for it, so this moment is sent.
     expect(publishNowBody({ publishedAt: "2026-12-01T08:00:00.000Z" }, NOW)).toEqual({
       publishedAt: "2026-11-13T12:00:00.000Z",
     });

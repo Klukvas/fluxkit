@@ -154,11 +154,18 @@ test.describe("with the blog feature (ADMIN_E2E_FEATURES=blog)", () => {
     await expect(refusal).toBeVisible();
     await expect(refusal).toContainText("The text in English is missing.");
 
+    // An emptied address of a saved post is refused before anything is sent.
+    await textbox(main, "Address (slug)").fill("");
+    await main.getByRole("button", { name: "Save changes" }).click();
+    await expect(main.getByText("Enter the address: a saved post always has one.")).toBeVisible();
+    await textbox(main, "Address (slug)").fill(post.slug);
+
     // Unsaved text locks publishing until it is saved.
     await textbox(main, "Text (English)").fill("Text.");
-    await expect(
-      main.getByText("Save your changes first: publishing uses the saved post."),
-    ).toBeVisible();
+    const saveFirst = main.getByText(
+      "Save your changes first: publishing and unpublishing use the saved post and reload it.",
+    );
+    await expect(saveFirst).toBeVisible();
     await expect(main.getByRole("button", { name: "Publish now" })).toBeDisabled();
     await main.getByRole("button", { name: "Save changes" }).click();
     await expect(main.getByText("Saved.", { exact: true })).toBeVisible();
@@ -171,10 +178,22 @@ test.describe("with the blog feature (ADMIN_E2E_FEATURES=blog)", () => {
       main.getByText("Fixed: the post has a publish date, and links to it must keep working."),
     ).toBeVisible();
 
+    // Dirty, then unpublish: the button is locked, so the reload after it can never drop the edit.
+    const english = textbox(main, "Text (English)");
+    await english.fill("Text, edited and not saved yet.");
+    await expect(saveFirst).toBeVisible();
+    await expect(main.getByRole("button", { name: "Unpublish" })).toBeDisabled();
+    await main.getByRole("button", { name: "Save changes" }).click();
+    await expect(main.getByText("Saved.", { exact: true })).toBeVisible();
+    await expect(english).toHaveValue("Text, edited and not saved yet.");
+
     await main.getByRole("button", { name: "Unpublish" }).click();
     await expect(
       main.getByText("The post is a draft again and no longer on the storefront."),
     ).toBeVisible();
+    await expect(english).toHaveValue("Text, edited and not saved yet.");
+    // Its date is past: publishing again keeps it and is live at once, so no separate "Publish now".
+    await expect(main.getByRole("button", { name: "Publish now" })).toHaveCount(0);
     await expect(main.getByRole("button", { name: /^Publish again with the date / })).toBeVisible();
 
     await main.getByLabel("Date and time").fill("2099-03-01T10:00");
