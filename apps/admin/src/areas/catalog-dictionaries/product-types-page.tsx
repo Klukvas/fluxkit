@@ -1,5 +1,5 @@
 import type { AdminProductType, AdminProductTypeDetail } from "@fluxkit/api-client";
-import { Button, Checkbox, StatusBadge, type DataTableColumn } from "@fluxkit/ui";
+import { Button, Checkbox, StatusBadge, type DataTableColumn, type Translator } from "@fluxkit/ui";
 import { useState, type FormEvent } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useI18n } from "../../i18n/i18n-context";
@@ -33,8 +33,8 @@ import {
   type NoticeKind,
 } from "./dictionary-frame";
 import { ConfirmDelete } from "./form-dialog";
-import type { ContentLocales } from "./form-parts";
-import { hasIssues } from "./form-rules";
+import { TextField, type ContentLocales } from "./form-parts";
+import { SLUG_MAX_LENGTH, SLUG_PATTERN_SOURCE, hasIssues, type FormIssues } from "./form-rules";
 import { ListScreen } from "./list-screen";
 import { localeFieldNames, resolveLocalized } from "./locale-text";
 import { AttributeAssignmentsSection, OptionAssignmentsSection } from "./product-type-assignments";
@@ -47,7 +47,7 @@ import { standaloneLinkClass } from "../../views/links";
 const DEFAULT_LIMIT = 50;
 
 export function productTypeFieldNames(locales: readonly string[]): string[] {
-  return ["code", "requiresShipping", ...localeFieldNames("name", locales)];
+  return ["code", "requiresShipping", "optionGuidePage", ...localeFieldNames("name", locales)];
 }
 
 function ProductTypesList() {
@@ -149,6 +149,48 @@ function ShippingCheckbox({
   );
 }
 
+/** The fields of a product type besides its code and name: shipping and the guide page (plan 2026-11-13). */
+function ProductTypeExtraFields({
+  t,
+  values,
+  onChange,
+  canWrite,
+  issues,
+}: {
+  t: Translator;
+  values: ProductTypeFormValues;
+  onChange: (values: ProductTypeFormValues) => void;
+  canWrite: boolean;
+  issues: FormIssues;
+}) {
+  return (
+    <>
+      <ShippingCheckbox
+        checked={values.requiresShipping}
+        disabled={!canWrite}
+        onChange={(requiresShipping) => onChange({ ...values, requiresShipping })}
+        label={t("dict.productType.requiresShipping")}
+        hint={t("dict.productType.requiresShippingHint")}
+      />
+      <TextField
+        t={t}
+        id="productType-optionGuidePage"
+        name="optionGuidePage"
+        label={t("dict.productType.optionGuidePage")}
+        hint={t("dict.productType.optionGuidePageHint")}
+        value={values.optionGuidePage}
+        readOnly={!canWrite}
+        required={false}
+        maxLength={SLUG_MAX_LENGTH}
+        pattern={SLUG_PATTERN_SOURCE}
+        patternHint={t("dict.error.slugFormat")}
+        error={issues["optionGuidePage"]}
+        onChange={(optionGuidePage) => onChange({ ...values, optionGuidePage })}
+      />
+    </>
+  );
+}
+
 function ProductTypeCreate() {
   const { t, locale } = useI18n();
   const content = useContentLocales();
@@ -224,12 +266,12 @@ function ProductTypeCreate() {
             onSubmit={(event) => void submit(event)}
             cancelTo={PATHS.productTypes}
             extra={
-              <ShippingCheckbox
-                checked={values.requiresShipping}
-                disabled={!canWrite}
-                onChange={(requiresShipping) => setValues({ ...values, requiresShipping })}
-                label={t("dict.productType.requiresShipping")}
-                hint={t("dict.productType.requiresShippingHint")}
+              <ProductTypeExtraFields
+                t={t}
+                values={values}
+                onChange={setValues}
+                canWrite={canWrite}
+                issues={form.state.fieldErrors}
               />
             }
           />
@@ -303,12 +345,12 @@ function ProductTypeEditForm({
         onSubmit={(event) => void submit(event)}
         cancelTo={PATHS.productTypes}
         extra={
-          <ShippingCheckbox
-            checked={values.requiresShipping}
-            disabled={!canWrite}
-            onChange={(requiresShipping) => setValues({ ...values, requiresShipping })}
-            label={t("dict.productType.requiresShipping")}
-            hint={t("dict.productType.requiresShippingHint")}
+          <ProductTypeExtraFields
+            t={t}
+            values={values}
+            onChange={setValues}
+            canWrite={canWrite}
+            issues={form.state.fieldErrors}
           />
         }
       />
