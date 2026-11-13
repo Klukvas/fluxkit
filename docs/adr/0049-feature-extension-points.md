@@ -23,9 +23,11 @@ by id); changes none of them. Records E1 to E4 of the plan (PR 1); E5 to E9 come
    upload_not_found at the caller's field; describeUploads(ids) -> {id, url, width, height}); LOCALE_CONFIG is the existing symbol.
    ZodValidationPipe and the problem factories are not moved.
 2. Feature migrations: drizzle.config.ts, schema, drizzle/ with its own journal and hand-written .down.sql (which also deletes its row).
-   pnpm db:migrate applies core then each feature in FEATURES_ENABLED, each in drizzle.__drizzle_migrations_feature_<name> (dash -> _),
+   pnpm db:migrate applies core then each feature in FEATURES_ENABLED, each in drizzle.__drizzle_migrations_feature_<name> (dash -> _;
+   names at most 32 characters, so the table name fits Postgres's 63-byte identifiers),
    under MIGRATION_LOCK_KEY; refuses before applying anything when a table is ahead of its journal or an enabled feature has no package;
-   never migrates a disabled feature. createApp refuses to start while an enabled feature has unapplied migrations (names the feature,
+   never migrates a disabled feature. createApp refuses to start while an enabled feature has unapplied migrations, or a recorded
+   migration newer than its journal (an older build against a newer feature schema) (names the feature,
    not the database; runs before Nest on its own connection, only when a feature ships migrations). Foreign keys to core tables: a plain
    uuid in the feature schema, the constraint added by hand at the end of the generated SQL; the drift check is blind to it, the feature's
    spec asserts it (pg_constraint). Rejected: a stub of the core table in the kit. Down order: feature downs before any core down; core
@@ -34,7 +36,9 @@ by id); changes none of them. Records E1 to E4 of the plan (PR 1); E5 to E9 come
    table and resets on any difference.
 3. Inventory vocabulary and rules move to core privacy (PersonalDataInventory, checkPersonalDataInventory; re-exported in apps/api under
    the old names). The loader carries personalDataInventory; at startup the API merges it with the core inventory and refuses a malformed
-   value, a broken rule, a table already classified, or no inventory while the feature ships migrations. The source guard allows table
+   value, a broken rule, a table without columns, a table already classified, or a missing or empty inventory while the feature ships
+   migrations. Completeness is enforced by core: database-inventory.spec.ts migrates the core and every feature package on disk into a
+   scratch database and requires every column of public to be classified by the merged inventory. The source guard allows table
    builders only in packages/features/<name>/src/schema.ts of a package whose src/index.ts exports personalDataInventory.
 4. GET /store/config and GET /admin/config carry an additive features: string[] (loaded names from FEATURES_ENABLED, sorted).
 5. The fixture feature apps/api/src/test/fixtures/features/notebook (a table with a hand-added foreign key to media_upload) proves
@@ -47,4 +51,5 @@ by id); changes none of them. Records E1 to E4 of the plan (PR 1); E5 to E9 come
 - Enabling a feature with tables on a live shop: set FEATURES_ENABLED, run the migrate step, start the API. Removal: the feature's
   .down.sql files, newest first, before any core down; then delete its folders and flag. Deployment notes follow in PR 6.
 - The hand-added foreign key is invisible to the drift check; only the feature's spec guards it.
-- A feature's migrations run in their own transaction after the core's: a failing one leaves the core migrated.
+- A feature's migrations run in their own transaction after the core's: a failing one leaves the core migrated; a re-run after the fix
+  applies only what is pending (tested).
