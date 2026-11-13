@@ -98,7 +98,7 @@ Purposes and legal bases are proposals taken from the plan. TODO(fluxkit): legal
 | `product_category` | all 5 columns | none | D24 | not_applicable | not_applicable | |
 | `product_option` | all 4 columns | none | D24 | not_applicable | not_applicable | |
 | `product_option_value` | all 5 columns | none | D24 | not_applicable | not_applicable | |
-| `product_type` | all 6 columns | none | D24 | not_applicable | not_applicable | |
+| `product_type` | all 7 columns | none | D24 | not_applicable | not_applicable | |
 | `product_type_attribute` | all 6 columns | none | D24 | not_applicable | not_applicable | |
 | `product_type_option` | all 4 columns | none | D24 | not_applicable | not_applicable | |
 | `reservation` | `id`, `variant_id`, `location_id`, `quantity`, `status`, `expires_at`, `created_at`, `updated_at` | none | D21 | not_applicable | not_applicable |  |

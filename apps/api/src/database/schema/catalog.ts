@@ -175,6 +175,9 @@ export const productType = pgTable(
     code: text("code").notNull(),
     name: jsonb("name").$type<I18nText>().notNull(),
     requiresShipping: boolean("requires_shipping").notNull().default(true),
+    // Slug of a storefront shop page linked next to the option pickers (a size guide). The API cannot know the storefront's
+    // pages, so it stores the slug only; the storefront ignores a page it does not have or has switched off.
+    optionGuidePage: text("option_guide_page"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -182,6 +185,7 @@ export const productType = pgTable(
     unique("product_type_code_key").on(t.code),
     codeCheck("product_type_code_check", t.code),
     requiredTextCheck("product_type_name_check", t.name),
+    slugCheck("product_type_option_guide_page_check", t.optionGuidePage),
   ],
 );
 
