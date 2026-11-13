@@ -192,6 +192,28 @@ See `docs/files/storefront.md` for one line per file. In short:
 
 **Add a home section:** reorder, remove or add entries of `homeSections` in `config/home.ts` (each with a unique `id`; texts are message keys in `home.json` of both locales). A new `kind`: add a member to the `HomeSection` union and a `case` in `home-sections.tsx` (TypeScript fails until both exist), and, for a data kind, a loader in `lib/home-data.ts`. **Add a header or footer link:** add `{ labelKey, href }` to `navigation.links` of `config/header.ts` or to a `links` group of `config/footer.ts`, and the message key to both locales (upstream: the area file; a fork: `messages-extra` under `custom.`). A shop page in the footer: `inFooter` in `config/shop-pages.ts`.
 
+### Feature slices (blog plan PR 4a, `docs/plans/2026-11-13-blog.md` E5 to E7)
+
+An optional feature (`FEATURES_ENABLED`, AGENTS.md 2.1) brings its storefront part as ONE folder, `src/app/[locale]/(feature-<name>)/`,
+deleted with the feature. None ships upstream yet; the mechanism is proven by the fixture slice `src/features/fixtures/app/[locale]/(feature-notebook)/`
+(never routed). Contract: `docs/contracts/README.md`, "Feature extension points".
+
+- **Registry.** Next 16 with Turbopack has no glob import, so `scripts/generate-feature-registry.mjs` writes `src/features/registry.generated.ts`
+  (git-ignored) from the slices on disk; the `predev`, `prebuild`, `pretypecheck` and `pretest` scripts run it (`turbo.json` keys the build
+  and typecheck caches on the script; the slices are package files). Deleting a slice and running any of them leaves an empty registry.
+  `src/features/registry.ts` checks the manifests at load (a broken one fails the build and every page). No other module imports a
+  slice, slices never import each other (dependency-cruiser), and a manifest imports nothing that imports the registry back.
+- **Gate.** Every page and `generateMetadata` of a slice starts with `await requireFeature("<name>")`: `GET /store/config` `features`
+  (cached 60 s) decides, and an off feature is a real 404 (no `loading.tsx` anywhere above, `route-structure.spec.ts`). A slice's first
+  path segment may not be a shop page slug or another route's segment (same spec).
+- **Header, footer, sitemap.** `[locale]/layout.tsx` reads the enabled features once (an outage means no feature link) and passes the
+  enabled slices' links to the header (after `navigation.links`) and the footer (into the shop pages group, else a group of their own);
+  `/sitemap.xml` asks each enabled slice for its pages. With no enabled feature the header and footer markup is unchanged.
+- **Texts.** `_feature/messages/<locale>.json`, keys `features.<name>.` only, merged after the area files and before the fork's extras
+  and overrides; server only.
+- **Data.** A slice reads its API through `featureData(name).read(...)`: cached like the catalog under tag `feature:<name>`, but never
+  served from the last-good copy (content the shop took back must not survive an outage); an outage shows the error view.
+
 ### i18n
 
 - Every user-facing string is a message key; components receive a translator (`createTranslator(messages, locale)` from `@fluxkit/ui`), a missing key or placeholder value throws. Server components build it from `messagesByLocale` (`src/messages/index.ts`); client components use `useI18n()`. Code and specs never import a message JSON file directly.
