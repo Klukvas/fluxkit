@@ -71,7 +71,14 @@ for (const frame of screenshotFrames()) {
         for (const selector of ELEMENT_SHOT_SELECTORS) {
           const element = locate(page, selectorByName(selector));
           await expect(element, `${selector} must exist on ${frame.page.path}`).toHaveCount(1);
-          if (skipsElementShot(maskNamesFor(frame), selector)) continue;
+          if (skipsElementShot(maskNamesFor(frame), selector)) {
+            // Never silently: the HTML report (screenshots-html) lists every element shot left out, with the frame.
+            test.info().annotations.push({
+              type: "element shot left out",
+              description: `${name}--${selector}: masked by .visual/exceptions.json (only its size could differ); its computed styles are still compared`,
+            });
+            continue;
+          }
           await expect(element).toHaveScreenshot(`${name}--${selector}.png`, {
             mask: masksFor(page, frame),
           });

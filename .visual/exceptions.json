@@ -192,7 +192,7 @@
     "page": "home",
     "selector": "card.article",
     "property": "screenshot",
-    "reason": "owner design 2026-11-13: the first home card gains its Choose options link and grows taller; its element shot is left out (a mask cannot declare a size), the full-page frames are masked by page.body"
+    "reason": "owner design 2026-11-13: the first home card gains its Choose options link and grows taller; its element shot is left out (a mask cannot declare a size; listed as an annotation in the screenshots report) and the full-page frames are masked by page.body; the card styling stays guarded by the computed styles (card.article, card.title, card.badge, zero tolerance)"
   },
   {
     "page": "home",
