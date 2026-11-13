@@ -45,11 +45,14 @@ never from `@fluxkit/api-kit/internal` (API only, not a contract):
   the schema in `src/schema.ts`, and `drizzle/` with its own `meta/_journal.json`, the generated `NNNN_name.sql` and a hand-written
   `NNNN_name.down.sql` per migration, which also runs `DELETE FROM "drizzle"."__drizzle_migrations_feature_<name>" WHERE "created_at" =
   <when of its journal entry>`.
-- Migrations table: `drizzle.__drizzle_migrations_feature_<name>`, a `-` of the feature name written as `_`.
+- Migrations table: `drizzle.__drizzle_migrations_feature_<name>`, a `-` of the feature name written as `_`; feature names have at most
+  32 characters (`config.md`, `FEATURES_ENABLED`), so the table name fits Postgres's 63-byte identifiers.
 - `pnpm db:migrate` applies the core journal, then the journals of the features in `FEATURES_ENABLED` (in that order), under one advisory
   lock. It refuses, changing nothing, when an enabled feature has no package or a table records a migration newer than its journal. A
-  disabled feature is never migrated.
-- The API refuses to start while an enabled feature has unapplied migrations (the message names the feature and the tags). Enabling a
+  disabled feature is never migrated. Each journal runs in its own transaction, core first: a failing feature migration leaves the core
+  (and the features before it) migrated and rolls back only its own journal; a re-run after the fix applies what is pending.
+- The API refuses to start while an enabled feature has unapplied migrations, or a migration newer than its journal (an older build
+  against a newer feature schema); the message names the feature and the tags or the newest recorded entry. Enabling a
   feature with tables: set `FEATURES_ENABLED`, run `pnpm db:migrate` (or the deployment's migrate step), then start the API.
 - Foreign keys to core tables: declare the column as a plain `uuid` (no `.references()`: core tables are not importable) and add the
   constraint by hand at the end of the generated SQL: `ALTER TABLE "<table>" ADD CONSTRAINT "<table>_<column>_fkey" FOREIGN KEY
@@ -63,8 +66,10 @@ never from `@fluxkit/api-kit/internal` (API only, not a contract):
 **Personal data.** A feature with tables exports `personalDataInventory: PersonalDataInventory` (core `privacy`) from `src/index.ts`
 (table -> column -> `{class, ref, export, erasure, reason?}`, the rules of `checkPersonalDataInventory`, ADR 0033) and checks every
 column of its Drizzle tables with `checkPersonalDataInventory` in its own spec; its README repeats the rows. The API merges it with the core
-inventory at startup and refuses to start when it is not an inventory, breaks a rule, classifies a table core or another feature already
-classifies, or is missing while the feature ships migrations. Table builders (`drizzle-orm/pg-core`, `pgTable(`) are allowed only in
+inventory at startup and refuses to start when it is not an inventory, breaks a rule, lists a table without columns, classifies a table core
+or another feature already classifies, or is missing or empty while the feature ships migrations. Core also checks completeness:
+`apps/api/src/privacy/inventory/database-inventory.spec.ts` migrates the core and every feature package on disk into a scratch database and
+fails when any column of `public` is not classified by the merged inventory. Table builders (`drizzle-orm/pg-core`, `pgTable(`) are allowed only in
 `packages/features/<name>/src/schema.ts` of a package whose `src/index.ts` exports `personalDataInventory`; never in a provider.
 
 **Enabled features on the config routes.** `features: string[]` on `GET /store/config` and `GET /admin/config`: the names in

@@ -289,7 +289,9 @@ async function apply(pool: pg.Pool, target: JournalTarget & Planned): Promise<st
  * recorded in its own table `drizzle.__drizzle_migrations_feature_<name>` (ADR 0049). A disabled feature is never
  * migrated. Forward only: it never rolls back, drops or deletes (rollbacks are the hand-written `NNNN_name.down.sql`
  * scripts; a feature's go before any core one). Runs under a session-level advisory lock, so two instances starting
- * together cannot both apply. Throws `MigrateUsageError`, `MigrateRefusal` or `MigrateFailure`; the caller decides the
+ * together cannot both apply. Each journal runs in its own transaction, core first: a failing feature migration leaves
+ * the core (and the features before it) migrated and its own changes rolled back; after the fix, a re-run applies only
+ * what is pending. Throws `MigrateUsageError`, `MigrateRefusal` or `MigrateFailure`; the caller decides the
  * exit code.
  */
 export async function runMigrateCommand(
