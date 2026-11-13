@@ -13,6 +13,7 @@ import {
 } from "../test/notebook-feature.js";
 import { createScratchDatabase, type ScratchDatabase } from "../test/scratch-database.js";
 import {
+  MigrateFailure,
   MigrateRefusal,
   MigrateUsageError,
   formatMigrateResult,
@@ -185,6 +186,51 @@ describe("feature migrations (ADR 0049, fixture `notebook`; real Postgres)", () 
       expect(await exists(database.url, "public.fixture_note")).toBe(false);
     });
 
+    it("leaves the core migrated when a feature migration fails, and a re-run completes the feature", async () => {
+      const database = await freshDatabase();
+      const featuresDir = await mkdtemp(join(tmpdir(), "fluxkit-failing-feature-"));
+      tempFolders.push(featuresDir);
+      const drizzleDir = join(featuresDir, "flaky", "drizzle");
+      await mkdir(join(drizzleDir, "meta"), { recursive: true });
+      await writeFile(
+        join(featuresDir, "flaky", "package.json"),
+        JSON.stringify({ type: "module", fluxkit: { feature: "flaky" } }),
+      );
+      await writeFile(
+        join(drizzleDir, "meta", "_journal.json"),
+        JSON.stringify({
+          version: "7",
+          dialect: "postgresql",
+          entries: [{ idx: 0, version: "7", when: 1, tag: "0000_flaky", breakpoints: true }],
+        }),
+      );
+      const sql = join(drizzleDir, "0000_flaky.sql");
+      await writeFile(
+        sql,
+        'create table "flaky_note" ("id" integer references "no_such_table"("id"));',
+      );
+      const env = { DATABASE_URL: database.url, FEATURES_ENABLED: "flaky" };
+      const core = await readJournal(migrationsFolder);
+
+      const error: unknown = await runMigrateCommand([], env, io, { featuresDir }).catch(
+        (caught: unknown) => caught,
+      );
+
+      expect(error).toBeInstanceOf(MigrateFailure);
+      expect((error as Error).message).toMatch(/no_such_table/);
+      // Core and features run in separate transactions: the core part stays applied, the feature part rolled back.
+      expect(await exists(database.url, "public.health_check")).toBe(true);
+      expect(await exists(database.url, "public.flaky_note")).toBe(false);
+
+      await writeFile(sql, 'create table "flaky_note" ("id" integer primary key);');
+      const rerun = await runMigrateCommand([], env, io, { featuresDir });
+
+      expect(rerun.applied).toEqual([]);
+      expect(rerun.total).toBe(core.length);
+      expect(rerun.features).toEqual([{ name: "flaky", applied: ["0000_flaky"], total: 1 }]);
+      expect(await exists(database.url, "public.flaky_note")).toBe(true);
+    });
+
     it("goes up, down, up, down with the feature's hand-written down migration and its foreign key", async () => {
       const database = await freshDatabase();
       const down = await readFile(NOTEBOOK_DOWN_SQL, "utf8");
@@ -229,6 +275,31 @@ describe("feature migrations (ADR 0049, fixture `notebook`; real Postgres)", () 
       await migrateWithNotebook(database.url);
       const app = await createApp(env, { logLevels: [] });
       await app.close();
+    });
+
+    it("refuses to start when an enabled feature's table records a migration newer than this code", async () => {
+      const database = await freshDatabase();
+      await migrateWithNotebook(database.url);
+      await query(database.url, `insert into ${FEATURE_TABLE} (hash, created_at) values ($1, $2)`, [
+        "from-a-newer-release",
+        Date.now() * 10,
+      ]);
+
+      const error: unknown = await createApp(
+        {
+          databaseUrl: database.url,
+          enabledFeatures: ["notebook"],
+          featuresDir: FIXTURE_FEATURES_DIR,
+        },
+        { logLevels: [] },
+      ).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toMatch(
+        /Enabled features have migrations that are newer than this code: "notebook" \(newest recorded created_at \d+\)/,
+      );
+      expect((error as Error).message).not.toMatch(/not applied/);
+      expect((error as Error).message).not.toContain(database.name);
     });
   });
 
