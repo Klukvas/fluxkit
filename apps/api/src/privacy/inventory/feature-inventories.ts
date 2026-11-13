@@ -34,10 +34,10 @@ const inventorySchema = z.record(z.string(), z.record(z.string(), columnEntrySch
 
 /**
  * The core inventory plus the `personalDataInventory` of every enabled feature (ADR 0033 "Feature rule", ADR 0049).
- * Throws, naming the feature, when its export is not an inventory, breaks an entry rule of `checkInventory`, classifies a
- * table that core or another feature already classifies, or is missing while the feature ships migrations (a table
- * nobody classified). Whether every column of the feature's tables is listed is the feature's own spec's job: only
- * the feature knows its Drizzle tables.
+ * Throws, naming the feature, when its export is not an inventory, breaks an entry rule of `checkInventory`, lists a table
+ * without columns, classifies a table that core or another feature already classifies, or is missing or empty while the
+ * feature ships migrations. Whether every column of the feature's tables is listed is checked against the migrated
+ * database by `database-inventory.spec.ts` (core, every feature on disk) and by the feature's own spec.
  */
 export function mergeFeatureInventories(
   core: Inventory,
@@ -68,6 +68,14 @@ export function mergeFeatureInventories(
       columns: Object.keys(columns),
     }));
     const problems = checkInventory(inventory, listed);
+    if (feature.migrationsFolder !== undefined && listed.length === 0) {
+      problems.push("classifies no table although the feature ships migrations");
+    }
+    problems.push(
+      ...listed
+        .filter((table) => table.columns.length === 0)
+        .map((table) => `${table.name}: lists no column`),
+    );
     const clashes = Object.keys(inventory).filter((table) => table in merged);
     if (clashes.length > 0) {
       problems.push(...clashes.map((table) => `${table}: already classified by core or a feature`));

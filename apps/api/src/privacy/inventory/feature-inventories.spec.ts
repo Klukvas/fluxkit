@@ -26,6 +26,19 @@ describe("mergeFeatureInventories (ADR 0033 feature rule, ADR 0049 E3)", () => {
     ).toThrow(/Feature "notebook" ships migrations but exports no personalDataInventory/);
   });
 
+  it("refuses an empty inventory from a feature with migrations, and a table without columns", () => {
+    expect(() =>
+      mergeFeatureInventories(coreInventory, [
+        { name: "hollow", personalDataInventory: {}, migrationsFolder: "/x/drizzle" },
+      ]),
+    ).toThrow(/Feature "hollow".*classifies no table although the feature ships migrations/);
+    expect(() =>
+      mergeFeatureInventories(coreInventory, [
+        { name: "hollow", personalDataInventory: { post: {} }, migrationsFolder: "/x/drizzle" },
+      ]),
+    ).toThrow(/post: lists no column/);
+  });
+
   it("refuses an export that is not an inventory, naming the feature and the place", () => {
     expect(() =>
       mergeFeatureInventories(coreInventory, [
