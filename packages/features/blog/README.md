@@ -3,7 +3,8 @@
 Purpose: an optional blog. Admins with the catalog permissions write posts (title, excerpt, Markdown body, SEO title and description,
 cover picture and its alt text, per content locale), keep them as drafts, publish, schedule (a future `publishedAt`), unpublish and delete
 them; the store API serves the public posts with their body as a parsed Markdown AST, never HTML. Plan: `docs/plans/2026-11-13-blog.md`
-(this package is its PR 3: the API part). The storefront pages and the admin screens are separate slices (plan PRs 4b and 5).
+(this package is its PR 3: the API part). The storefront pages and the admin screens are separate slices (plan PRs 4b and 5); the
+admin slice is `apps/admin/src/features/blog/` (Storefront -> Blog, `apps/admin/README.md`, "Feature slices").
 
 Posts are public shop content: never put personal data in them (no author, no names of staff or customers).
 
@@ -69,5 +70,6 @@ guard, CSRF rule and real problem filter are proven by the core specs with the f
 2. If the database ever had the migration, roll it back BEFORE any core down migration (its foreign key references `media_upload`):
    `psql "$DATABASE_URL" -f packages/features/blog/drizzle/0000_blog_post.down.sql`. Every post is lost; cover uploads stay attached
    with their files.
-3. Delete this folder (and the blog slices of the storefront and the admin once they exist), then run `pnpm install` to update the
-   lockfile.
+3. Delete this folder, the admin slice `apps/admin/src/features/blog/` (its screens, messages and specs; the admin's feature
+   registry then finds no blog and shows no Blog entry) and the storefront slice once it exists, then run `pnpm install` to update the
+   lockfile. Nothing else of the admin names the blog.
