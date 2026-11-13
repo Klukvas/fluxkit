@@ -84,6 +84,14 @@ ties and says why.
    editor (sanitized Markdown), storefront `/blog` and `/blog/[slug]` with metadata, JSON-LD `BlogPosting`, sitemap entries through a new
    extension point. Its own plan and an independent review before any code.
 
+## Owner answers (2026-11-13, in chat)
+
+- Size guide: the recommended option, a nullable guide page on the product type (migration and API change approved). Branch
+  `feature/product-type-guide-page`, its own short plan `docs/plans/2026-11-13-product-type-guide-page.md`.
+- Card add-to-cart: the recommended option, additive `defaultVariantId` in `ProductSummary` (API contract change approved). Branch
+  `feature/card-add-to-cart`.
+- Blog: write its plan and have it reviewed first. Branch `docs/blog-plan`, `docs/plans/2026-11-13-blog.md`.
+
 ## Verification
 
 Each branch: `pnpm lint`, `format:check`, `typecheck`, `check:boundaries`, `test` (storefront specs), `check:docs`; e2e and the visual
