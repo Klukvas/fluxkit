@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   cpSync,
   mkdirSync,
+  renameSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -63,6 +64,10 @@ describe("feature registry generator (scripts/generate-feature-registry.mjs, pla
     const slice = join(fixtureApp, "[locale]", "(feature-notebook)");
     cpSync(slice, join(appDir, "[locale]", "(feature-notebook)"), { recursive: true });
     cpSync(slice, join(appDir, "[locale]", "(feature-atlas)"), { recursive: true });
+    renameSync(
+      join(appDir, "[locale]", "(feature-atlas)", "notebook"),
+      join(appDir, "[locale]", "(feature-atlas)", "atlas"),
+    );
     // Its type imports (`./types`) are erased, so the registry loads from anywhere.
     const outFile = join(scratchDirectory(), "registry.generated.ts");
     const result = generate(appDir, outFile);
@@ -71,6 +76,11 @@ describe("feature registry generator (scripts/generate-feature-registry.mjs, pla
     expect(source.indexOf("(feature-atlas)")).toBeLessThan(source.indexOf("(feature-notebook)"));
     const loaded = (await import(outFile)) as { generatedFeatures: RegisteredFeature[] };
     expect(loaded.generatedFeatures.map((entry) => entry.folder)).toEqual(["atlas", "notebook"]);
+    // The first path segments of each slice's pages, read from disk (private folders and groups skipped).
+    expect(loaded.generatedFeatures.map((entry) => entry.segments)).toEqual([
+      ["atlas"],
+      ["notebook"],
+    ]);
     expect(loaded.generatedFeatures.map((entry) => entry.feature.name)).toEqual([
       "notebook",
       "notebook",
@@ -78,6 +88,18 @@ describe("feature registry generator (scripts/generate-feature-registry.mjs, pla
     // The copy named "atlas" still says "notebook": the registry check refuses it.
     expect(featureRegistryProblems(loaded.generatedFeatures)).toContain(
       "the manifest of (feature-atlas) is named \"notebook\": a slice's name is its folder's",
+    );
+  });
+
+  it("refuses two slices with pages under the same first path segment, naming both", () => {
+    const appDir = scratchDirectory();
+    const slice = join(fixtureApp, "[locale]", "(feature-notebook)");
+    cpSync(slice, join(appDir, "[locale]", "(feature-notebook)"), { recursive: true });
+    cpSync(slice, join(appDir, "[locale]", "(feature-atlas)"), { recursive: true });
+    const result = generate(appDir, join(scratchDirectory(), "registry.generated.ts"));
+    expect(result.status).toBe(1);
+    expect(result.stderr).toMatch(
+      /the slices "atlas" and "notebook" both have pages under \/notebook: a path segment belongs to one feature/,
     );
   });
 
@@ -126,15 +148,20 @@ function manifest(changes: Partial<StorefrontFeature> = {}): StorefrontFeature {
 
 describe("feature registry checks (features/registry.ts)", () => {
   it("accepts the fixture slice", () => {
-    expect(featureRegistryProblems([{ folder: "notebook", feature: fixtureFeature }])).toEqual([]);
+    expect(
+      featureRegistryProblems([
+        { folder: "notebook", segments: ["notebook"], feature: fixtureFeature },
+      ]),
+    ).toEqual([]);
   });
 
   it("refuses a manifest named unlike its folder, a name twice, messages outside the namespace, empty or uneven", () => {
     const problems = featureRegistryProblems([
-      { folder: "notes", feature: fixtureFeature },
-      { folder: "notebook", feature: fixtureFeature },
+      { folder: "notes", segments: ["notes"], feature: fixtureFeature },
+      { folder: "notebook", segments: ["notebook"], feature: fixtureFeature },
       {
         folder: "notebook",
+        segments: ["notebook"],
         feature: manifest({
           messages: {
             uk: {
@@ -159,21 +186,40 @@ describe("feature registry checks (features/registry.ts)", () => {
     );
   });
 
-  it("refuses a link that is not a plain storefront path, an unknown label and a repeated link", () => {
+  it("refuses a link that is not a plain path of one of the slice's own pages, an unknown label and a repeated link", () => {
     const problems = featureRegistryProblems([
       {
         folder: "notebook",
+        segments: ["notebook"],
         feature: manifest({
           navigation: [
             { placement: "header", labelKey: "features.notebook.nav", path: "https://example.com" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/catalog" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook?page=2" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook#top" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook/a b" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook/\u0007" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook/../cart" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/notebook//x" },
+            { placement: "header", labelKey: "features.notebook.nav", path: "/" },
             { placement: "footer", labelKey: "nav.cart", path: "/notebook" },
             { placement: "footer", labelKey: "features.notebook.nav", path: "/notebook" },
           ],
         }),
       },
     ]);
+    const notAPath = (path: string) =>
+      `feature "notebook": link "${path}" is not a storefront path "/<segment>..." without query, fragment, spaces or dot segments`;
     expect(problems).toEqual([
-      'feature "notebook": link "https://example.com" is not a plain storefront path',
+      notAPath("https://example.com"),
+      'feature "notebook": link "/catalog" is not under one of the slice\'s own pages (/notebook)',
+      notAPath("/notebook?page=2"),
+      notAPath("/notebook#top"),
+      notAPath("/notebook/a b"),
+      notAPath("/notebook/\u0007"),
+      notAPath("/notebook/../cart"),
+      notAPath("/notebook//x"),
+      notAPath("/"),
       'feature "notebook": link "/notebook": message key "nav.cart" is not among its uk messages',
       'feature "notebook": link "/notebook": message key "nav.cart" is not among its en messages',
       'feature "notebook": footer link "/notebook" is listed twice',

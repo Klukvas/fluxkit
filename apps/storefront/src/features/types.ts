@@ -53,8 +53,12 @@ export interface StorefrontFeature {
   messages: Readonly<Record<Locale, Readonly<Record<string, string>>>>;
 }
 
-/** A registry entry: the slice folder's `<name>` (from the generator) and its manifest. */
+/**
+ * A registry entry: the slice folder's `<name>` and the first path segments of its pages (both from the generator, read from
+ * disk), and its manifest.
+ */
 export interface RegisteredFeature {
   folder: string;
+  segments: readonly string[];
   feature: StorefrontFeature;
 }

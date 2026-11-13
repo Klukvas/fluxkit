@@ -6,7 +6,7 @@
  */
 import { locales, type Locale } from "@fluxkit/ui";
 import type { NavigationLink } from "../layout/navigation";
-import { isPlainStorefrontPath } from "../lib/locale-path";
+import { featurePathProblem } from "./paths";
 import { generatedFeatures } from "./registry.generated";
 import type { FeatureLinkPlacement, RegisteredFeature, StorefrontFeature } from "./types";
 
@@ -52,7 +52,11 @@ function messageProblems(feature: StorefrontFeature, locales: readonly Locale[])
   return problems;
 }
 
-function navigationProblems(feature: StorefrontFeature, locales: readonly Locale[]): string[] {
+function navigationProblems(
+  feature: StorefrontFeature,
+  segments: readonly string[],
+  locales: readonly Locale[],
+): string[] {
   const problems: string[] = [];
   const seen = new Set<string>();
   for (const link of feature.navigation) {
@@ -61,11 +65,8 @@ function navigationProblems(feature: StorefrontFeature, locales: readonly Locale
         `feature "${feature.name}": unknown link placement "${String(link.placement)}"`,
       );
     }
-    if (!isPlainStorefrontPath(link.path)) {
-      problems.push(
-        `feature "${feature.name}": link "${link.path}" is not a plain storefront path`,
-      );
-    }
+    const pathProblem = featurePathProblem(link.path, segments);
+    if (pathProblem !== null) problems.push(`feature "${feature.name}": link ${pathProblem}`);
     for (const locale of locales) {
       if (!Object.hasOwn(feature.messages[locale] ?? {}, link.labelKey)) {
         problems.push(
@@ -87,7 +88,7 @@ function navigationProblems(feature: StorefrontFeature, locales: readonly Locale
 /**
  * What is wrong with a list of registered slices (empty when nothing is): a manifest whose `name` is not its folder's, a name
  * that is not a feature name, a name listed twice, messages outside `features.<name>.`, empty or missing in a locale, and a link
- * whose path is not plain or whose label is not one of the feature's own messages.
+ * whose path is not one of the slice's own pages (`featurePathProblem`) or whose label is not one of the feature's own messages.
  */
 export function featureRegistryProblems(
   entries: readonly RegisteredFeature[],
@@ -95,7 +96,7 @@ export function featureRegistryProblems(
 ): string[] {
   const problems: string[] = [];
   const names = new Set<string>();
-  for (const { folder, feature } of entries) {
+  for (const { folder, segments, feature } of entries) {
     if (feature.name !== folder) {
       problems.push(
         `the manifest of (feature-${folder}) is named "${feature.name}": a slice's name is its folder's`,
@@ -107,7 +108,7 @@ export function featureRegistryProblems(
     if (names.has(feature.name)) problems.push(`feature "${feature.name}" is registered twice`);
     names.add(feature.name);
     problems.push(...messageProblems(feature, messageLocales));
-    problems.push(...navigationProblems(feature, messageLocales));
+    problems.push(...navigationProblems(feature, segments, messageLocales));
   }
   return problems;
 }
@@ -120,13 +121,18 @@ export function assertFeatureRegistry(entries: readonly RegisteredFeature[]): vo
   }
 }
 
-function checkedFeatures(entries: readonly RegisteredFeature[]): readonly StorefrontFeature[] {
+function checkedEntries(entries: readonly RegisteredFeature[]): readonly RegisteredFeature[] {
   assertFeatureRegistry(entries);
-  return entries.map((entry) => entry.feature);
+  return entries;
 }
 
-/** Every slice on disk, in name order, enabled or not. Checked at load: a broken manifest fails the build and every page. */
-export const storefrontFeatures: readonly StorefrontFeature[] = checkedFeatures(generatedFeatures);
+/** Every slice on disk with its page segments, in name order. Checked at load: a broken manifest fails the build and every page. */
+export const registeredFeatures: readonly RegisteredFeature[] = checkedEntries(generatedFeatures);
+
+/** The manifests of `registeredFeatures`, enabled or not. */
+export const storefrontFeatures: readonly StorefrontFeature[] = registeredFeatures.map(
+  (entry) => entry.feature,
+);
 
 /** The slices whose name is in `enabled` (`GET /store/config` `features`), in registry order. */
 export function enabledStorefrontFeatures(

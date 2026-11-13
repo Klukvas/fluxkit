@@ -8,7 +8,16 @@
 // --app: the app router folder holding `[locale]` (default apps/storefront/src/app); --out: the file to write (default
 // apps/storefront/src/features/registry.generated.ts). The file is rewritten only when its content changes. No dependency;
 // plain Node 22.
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,7 +42,32 @@ function option(name) {
   return value;
 }
 
-/** The slices under `<appDir>/[locale]`, sorted by name; throws on a malformed group or a slice without its manifest. */
+/**
+ * The first URL segments of a slice's pages (`(feature-blog)/blog/[slug]/page.tsx` -> `blog`): every `page.tsx` outside the
+ * private `_` folders, route groups skipped. A page at the slice's root or with a dynamic first segment is left out here
+ * (`route-structure.spec.ts` refuses it).
+ */
+function pageSegments(sliceDir) {
+  const segments = new Set();
+  const walk = (directory, path) => {
+    for (const entry of readdirSync(directory)) {
+      const full = join(directory, entry);
+      if (statSync(full).isDirectory()) {
+        if (entry.startsWith("_")) continue;
+        walk(full, /^\(.*\)$/.test(entry) ? path : [...path, entry]);
+      } else if (entry === "page.tsx" && path[0] !== undefined && !path[0].startsWith("[")) {
+        segments.add(path[0]);
+      }
+    }
+  };
+  walk(sliceDir, []);
+  return [...segments].sort();
+}
+
+/**
+ * The slices under `<appDir>/[locale]`, sorted by name, each with its pages' first segments; throws on a malformed group, a
+ * slice without its manifest and two slices claiming the same first segment.
+ */
 function findSlices(appDir) {
   const localeDir = join(appDir, "[locale]");
   if (!existsSync(localeDir)) {
@@ -54,7 +88,19 @@ function findSlices(appDir) {
     if (!existsSync(manifest)) {
       throw new Error(`${join(localeDir, entry)} has no manifest _feature/feature.ts.`);
     }
-    slices.push({ name, manifest });
+    slices.push({ name, manifest, segments: pageSegments(join(localeDir, entry)) });
+  }
+  const owners = new Map();
+  for (const slice of slices) {
+    for (const segment of slice.segments) {
+      const owner = owners.get(segment);
+      if (owner !== undefined) {
+        throw new Error(
+          `the slices "${owner}" and "${slice.name}" both have pages under /${segment}: a path segment belongs to one feature.`,
+        );
+      }
+      owners.set(segment, slice.name);
+    }
   }
   return slices;
 }
@@ -81,7 +127,7 @@ function registrySource(slices, outFile) {
           "export const generatedFeatures: readonly RegisteredFeature[] = [",
           ...slices.map(
             (slice, index) =>
-              `  { folder: ${JSON.stringify(slice.name)}, feature: feature${index} },`,
+              `  { folder: ${JSON.stringify(slice.name)}, segments: ${JSON.stringify(slice.segments)}, feature: feature${index} },`,
           ),
           "];",
         ].join("\n");
@@ -97,7 +143,15 @@ function main() {
   const source = registrySource(slices, outFile);
   if (existsSync(outFile) && readFileSync(outFile, "utf8") === source) return;
   mkdirSync(dirname(outFile), { recursive: true });
-  writeFileSync(outFile, source);
+  // Written next to the target and renamed over it: turbo may run two storefront tasks (build and typecheck) at once, and
+  // neither may read a half-written registry.
+  const temporary = `${outFile}.${process.pid}.tmp`;
+  try {
+    writeFileSync(temporary, source);
+    renameSync(temporary, outFile);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
   const names = slices.map((slice) => slice.name);
   console.log(
     `feature registry: ${names.length === 0 ? "no feature slices" : names.join(", ")} -> ${relative(process.cwd(), outFile)}`,

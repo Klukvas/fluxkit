@@ -1,8 +1,8 @@
 import type { CategoryNode } from "@fluxkit/api-client";
 import type { Locale } from "@fluxkit/ui";
-import type { FeatureData, FeatureSitemapPage, StorefrontFeature } from "../features/types";
+import { featurePathProblem } from "../features/paths";
+import type { FeatureData, FeatureSitemapPage, RegisteredFeature } from "../features/types";
 import { MAX_API_OFFSET } from "./catalog-query";
-import { isPlainStorefrontPath } from "./locale-path";
 import { languageAlternates } from "./seo";
 import { SITEMAP_REVALIDATE_SECONDS, type StoreData } from "./store-data";
 
@@ -66,27 +66,27 @@ export async function collectSitemapProducts(
 /**
  * The pages of the enabled feature slices (plan docs/plans/2026-11-13-blog.md, section 9), each feature asked once (in parallel)
  * through its manifest's `sitemap`, in registry order. A disabled feature is not asked. A failed read throws (from the slice or
- * `StoreData.featureRead`): a sitemap that silently lacks pages would hide them from search. A path that is not a plain
- * storefront path throws too, naming the feature.
+ * `StoreData.featureRead`): a sitemap that silently lacks pages would hide them from search. A path that is not under one of
+ * the slice's own pages (`featurePathProblem`) throws too, naming the feature.
  */
 export async function collectFeatureSitemapPages(
-  features: readonly StorefrontFeature[],
+  features: readonly RegisteredFeature[],
   enabled: readonly string[],
   context: { locale: Locale; data: (feature: string) => FeatureData },
 ): Promise<FeatureSitemapPage[]> {
-  const asked = features.filter((feature) => enabled.includes(feature.name));
+  const asked = features.filter((entry) => enabled.includes(entry.feature.name));
   const answers = await Promise.all(
-    asked.map((feature) =>
+    asked.map(({ feature }) =>
       feature.sitemap({ locale: context.locale, data: context.data(feature.name) }),
     ),
   );
   return answers.flatMap((pages, index) => {
-    const name = asked[index]?.name ?? "";
+    const entry = asked[index];
+    const name = entry?.feature.name ?? "";
     return pages.map((page) => {
-      if (!isPlainStorefrontPath(page.path) || page.path === "/") {
-        throw new Error(
-          `The sitemap of feature "${name}" lists "${page.path}", which is not a plain storefront path of a page.`,
-        );
+      const problem = featurePathProblem(page.path, entry?.segments ?? []);
+      if (problem !== null) {
+        throw new Error(`The sitemap of feature "${name}" lists ${problem}.`);
       }
       return page.lastModified === undefined
         ? { path: page.path }

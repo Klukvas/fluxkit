@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CatalogOutcome, StoreData } from "./store-data";
 import { feature as fixtureFeature } from "../features/fixtures/app/[locale]/(feature-notebook)/_feature/feature";
-import type { FeatureData, StorefrontFeature } from "../features/types";
+import type { FeatureData, RegisteredFeature, StorefrontFeature } from "../features/types";
 import {
   SITEMAP_PRODUCT_PAGE_SIZE,
   buildSitemap,
@@ -174,6 +174,12 @@ describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", ()
       return outcome.data.map((slug) => ({ path: `/atlas/${slug}`, lastModified: "2026-11-01" }));
     },
   };
+  /** A registry entry of a manifest whose pages live under `/<segment>`. */
+  const entry = (feature: StorefrontFeature, segment = feature.name): RegisteredFeature => ({
+    folder: feature.name,
+    segments: [segment],
+    feature,
+  });
   /** Feature data that answers every read with what the call gives, recording the feature it was asked for. */
   function dataOf(asked: string[]) {
     return (feature: string): FeatureData => ({
@@ -193,24 +199,28 @@ describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", ()
 
   it("asks only the enabled slices, in registry order, through their own reads", async () => {
     const asked: string[] = [];
-    const pages = await collectFeatureSitemapPages([atlas, fixtureFeature], ["notebook", "atlas"], {
-      locale: "uk",
-      data: dataOf(asked),
-    });
+    const pages = await collectFeatureSitemapPages(
+      [entry(atlas), entry(fixtureFeature)],
+      ["notebook", "atlas"],
+      {
+        locale: "uk",
+        data: dataOf(asked),
+      },
+    );
     expect(pages).toEqual([
       { path: "/atlas/maps-uk", lastModified: "2026-11-01" },
       { path: "/notebook" },
     ]);
     expect(asked).toEqual(["atlas"]);
     expect(
-      await collectFeatureSitemapPages([atlas, fixtureFeature], [], {
+      await collectFeatureSitemapPages([entry(atlas), entry(fixtureFeature)], [], {
         locale: "uk",
         data: dataOf([]),
       }),
     ).toEqual([]);
   });
 
-  it("fails loudly on a refused read and on a path that is not a plain storefront path", async () => {
+  it("fails loudly on a refused read and on a path that is not under one of the slice's own pages", async () => {
     const refusing: StorefrontFeature = {
       ...fixtureFeature,
       sitemap: async () => {
@@ -218,12 +228,23 @@ describe("feature pages in the sitemap (plan 2026-11-13-blog.md, section 9)", ()
       },
     };
     await expect(
-      collectFeatureSitemapPages([refusing], ["notebook"], { locale: "uk", data: dataOf([]) }),
+      collectFeatureSitemapPages([entry(refusing)], ["notebook"], {
+        locale: "uk",
+        data: dataOf([]),
+      }),
     ).rejects.toThrow(/answered 500/);
-    for (const path of ["https://example.com/x", "notebook", "/", "/a/../b"]) {
+    for (const path of [
+      "https://example.com/x",
+      "notebook",
+      "/",
+      "/notebook/../b",
+      "/notebook?page=2",
+      "/notebook/a b",
+      "/catalog",
+    ]) {
       const odd: StorefrontFeature = { ...fixtureFeature, sitemap: async () => [{ path }] };
       await expect(
-        collectFeatureSitemapPages([odd], ["notebook"], { locale: "uk", data: dataOf([]) }),
+        collectFeatureSitemapPages([entry(odd)], ["notebook"], { locale: "uk", data: dataOf([]) }),
         path,
       ).rejects.toThrow(`The sitemap of feature "notebook" lists "${path}"`);
     }
